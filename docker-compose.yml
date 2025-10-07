@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  jobsearch:
+    build: .
+    container_name: switzerland_jobs_search
+    volumes:
+      - ./results:/app/results
+      - ./scripts:/app/scripts
+      - ./config:/app/config
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: python search_jobs.py
