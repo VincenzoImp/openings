@@ -1,0 +1,218 @@
+# JobSearch Tool Configuration File
+# Copy this file to config.yaml and customize for your job search
+
+# Profile Information
+profile:
+  name: "Your Name"
+  email: "your.email@example.com"
+
+  # Your background and target roles
+  summary: |
+    Brief description of your background, current position, and target roles.
+    This is used for display purposes only.
+
+  # Career stage and timeline
+  career_stage: "PhD Candidate"  # Examples: "Graduate", "PhD Candidate", "Professional", "Senior Engineer"
+  target_start_date: "2026-10"   # When you're available to start (YYYY-MM format)
+
+# Search Parameters
+search:
+  # Job sites to search (supported: indeed, linkedin, glassdoor, google)
+  sites:
+    - indeed
+    - linkedin
+    - google
+
+  # Locations to search (city, country format)
+  locations:
+    - "Zurich, Switzerland"
+    - "Lausanne, Switzerland"
+    - "Berlin, Germany"
+    - "Munich, Germany"
+
+  # Search queries - customize based on your target roles
+  queries:
+    # Core research/engineering areas
+    core_areas:
+      - "distributed systems engineer"
+      - "backend engineer"
+      - "data scientist"
+
+    # Specific technologies/domains
+    technologies:
+      - "Python developer"
+      - "machine learning engineer"
+      - "cloud engineer"
+
+    # Academic/research positions
+    research:
+      - "PhD researcher computer science"
+      - "research scientist"
+      - "postdoc"
+
+    # Industry-specific
+    industry:
+      - "fintech engineer"
+      - "startup engineer"
+
+  # Search filters
+  filters:
+    results_per_query: 50          # Number of results to fetch per query (max recommended: 50)
+    days_back: 30                  # Search jobs posted in last N days
+    job_types:                     # Can be: fulltime, parttime, internship, contract
+      - fulltime
+      - contract
+    country_indeed: "Switzerland"  # Country filter for Indeed searches
+    linkedin_fetch_description: true  # Fetch full job descriptions from LinkedIn
+
+# Relevance Scoring
+# Define keyword categories and their weights to calculate job relevance scores
+# Higher weight = more important to your search
+relevance_scoring:
+  # Minimum score threshold (jobs below this won't be saved to relevant_jobs)
+  min_score: 10
+
+  # Keyword categories with weights
+  categories:
+    # Primary focus areas (highest weight)
+    primary_skills:
+      weight: 20
+      keywords:
+        - "distributed systems"
+        - "blockchain"
+        - "web3"
+        - "microservices"
+
+    # Academic/research positions
+    research_positions:
+      weight: 18
+      keywords:
+        - "PhD"
+        - "postdoc"
+        - "research scientist"
+        - "researcher"
+
+    # Technical skills
+    technical_stack:
+      weight: 15
+      keywords:
+        - "Python"
+        - "Go"
+        - "Rust"
+        - "Kubernetes"
+        - "Docker"
+        - "PostgreSQL"
+        - "Redis"
+
+    # Data & Analytics
+    data_analytics:
+      weight: 15
+      keywords:
+        - "data science"
+        - "machine learning"
+        - "data analysis"
+        - "user behavior"
+        - "analytics"
+
+    # Domain expertise
+    domain_expertise:
+      weight: 12
+      keywords:
+        - "security"
+        - "privacy"
+        - "cryptography"
+        - "zero knowledge"
+
+    # Specific companies/institutions (optional)
+    target_organizations:
+      weight: 12
+      keywords:
+        - "ETH Zurich"
+        - "EPFL"
+        - "Google"
+        - "Meta"
+
+    # Secondary skills
+    secondary_skills:
+      weight: 10
+      keywords:
+        - "network analysis"
+        - "social networks"
+        - "protocol design"
+
+    # Programming languages
+    languages:
+      weight: 8
+      keywords:
+        - "TypeScript"
+        - "JavaScript"
+        - "C++"
+        - "Java"
+
+    # Soft skills/culture
+    culture:
+      weight: 6
+      keywords:
+        - "open source"
+        - "remote"
+        - "research"
+        - "innovation"
+
+    # Geographic preferences
+    location_preference:
+      weight: 5
+      keywords:
+        - "Zurich"
+        - "Lausanne"
+        - "Berlin"
+
+    # Time-sensitive (e.g., summer programs)
+    time_sensitive:
+      weight: 15
+      keywords:
+        - "summer 2026"
+        - "internship 2026"
+        - "starting 2026"
+
+# Output Settings
+output:
+  # Directory to save results
+  results_dir: "../results"
+
+  # File format options
+  formats:
+    - csv
+    - xlsx
+
+  # Filename prefix
+  prefix: "jobs"
+
+  # Include timestamp in filename
+  include_timestamp: true
+
+  # Excel formatting options
+  excel:
+    auto_adjust_columns: true
+    freeze_header_row: true
+
+# Advanced Settings
+advanced:
+  # Remove duplicate jobs based on these fields
+  deduplication_fields:
+    - title
+    - company
+    - location
+
+  # Retry failed queries
+  retry_failed_queries: true
+  max_retries: 2
+
+  # Rate limiting (delay between queries in seconds)
+  rate_limit_delay: 1
+
+  # Logging level (DEBUG, INFO, WARNING, ERROR)
+  log_level: "INFO"
+
+  # Save all jobs or only relevant ones
+  save_all_jobs: true
+  save_relevant_jobs: true

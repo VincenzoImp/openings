@@ -1,0 +1,10 @@
+services:
+  jobsearch:
+    build: .
+    container_name: jobsearch_tool
+    volumes:
+      - ./results:/app/results
+      - ./scripts:/app/scripts
+      - ./config:/app/config
+    environment:
+      - PYTHONUNBUFFERED=1
