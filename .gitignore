@@ -8,14 +8,30 @@ env/
 venv/
 ENV/
 *.egg-info/
+.eggs/
+dist/
+build/
 
-# Results
+# Results (keep directory structure, ignore contents)
 results/*.csv
 results/*.xlsx
 results/*.json
-
-# Keep results directory but ignore contents
 !results/.gitkeep
+
+# Database (keep directory structure, ignore contents)
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+!data/.gitkeep
+
+# Logs
+logs/
+*.log
+
+# User configuration (personal settings)
+config/settings.yaml
+config/local.yaml
+config/*.local.yaml
 
 # IDE
 .vscode/
@@ -27,6 +43,27 @@ results/*.json
 # OS
 .DS_Store
 Thumbs.db
+ehthumbs.db
 
-# Logs
-*.log
+# Temporary files
+*.tmp
+*.bak
+tmp/
+temp/
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Type checking
+.mypy_cache/
+
+# Docker
+.docker/

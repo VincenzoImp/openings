@@ -1,5 +1,24 @@
+# Switzerland Jobs Search - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core job scraping library (requires Python 3.10+)
 python-jobspy>=1.1.80
+
+# Data manipulation and analysis
 pandas>=2.0.0
+
+# Excel file generation with formatting
 openpyxl>=3.1.0
+
+# Data visualization (optional, for analyze_jobs.py charts)
 matplotlib>=3.7.0
 seaborn>=0.12.0
+
+# Configuration management (YAML support)
+pyyaml>=6.0.0
+
+# Retry logic with exponential backoff for rate limiting
+tenacity>=8.0.0
+
+# Interactive dashboard for job results analysis
+streamlit>=1.28.0

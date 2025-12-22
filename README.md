@@ -1,17 +1,43 @@
-# Switzerland Jobs Search 🇨🇭
+# JobSpy Dashboard
 
-Automated job search tool using JobSpy to find positions in Switzerland matching your profile.
+Automated job search and analysis tool using [JobSpy](https://github.com/speedyapply/JobSpy) to aggregate positions from multiple job boards. Features parallel execution, relevance scoring, SQLite persistence, and an interactive Streamlit dashboard.
 
+## Features
 
-## 🚀 Quick Start
+- **Multi-Site Scraping**: Search LinkedIn, Indeed, Glassdoor, Google Jobs, ZipRecruiter, and more simultaneously
+- **Parallel Execution**: Concurrent searches with ThreadPoolExecutor (~3 min vs ~15 min sequential)
+- **SQLite Persistence**: Track jobs across runs, identify new opportunities, mark as applied
+- **YAML Configuration**: Fully customizable queries, scoring, and settings without code changes
+- **Relevance Scoring**: Automatic scoring based on configurable keywords and weights
+- **Interactive Dashboard**: Streamlit-based UI for filtering, sorting, and analyzing results
+- **Excel Export**: Clickable links, colored headers, conditional formatting
+- **Retry Logic**: Exponential backoff with tenacity for rate limit handling
+- **Structured Logging**: File and console logs with rotation
+
+## Quick Start
 
 ### Option 1: Using Docker (Recommended)
 
 ```bash
-# Build and run
+# Clone the repository
+git clone https://github.com/yourusername/jobspy-dashboard.git
+cd jobspy-dashboard
+
+# Copy example config and customize
+cp config/settings.example.yaml config/settings.yaml
+# Edit config/settings.yaml with your preferences
+
+# Build and run job search
 docker-compose up --build
 
-# Results will be saved in ./results/ directory
+# Run analysis
+docker-compose --profile analyze up analyze
+
+# Launch interactive dashboard
+docker-compose --profile dashboard up dashboard
+# Then open http://localhost:8501 in your browser
+
+# Results saved in ./results/ and ./data/
 ```
 
 ### Option 2: Local Python (Requires Python 3.10+)
@@ -20,285 +46,406 @@ docker-compose up --build
 # Install dependencies
 pip install -r requirements.txt
 
+# Copy example config
+cp config/settings.example.yaml config/settings.yaml
+
 # Run job search
 cd scripts
 python search_jobs.py
 
 # Analyze results
 python analyze_jobs.py
+
+# Launch dashboard
+streamlit run dashboard.py
+# Then open http://localhost:8501 in your browser
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
-switzerland-jobs-search/
+jobspy-dashboard/
+├── config/
+│   ├── settings.yaml          # Your configuration (gitignored)
+│   └── settings.example.yaml  # Example configuration template
 ├── scripts/
-│   ├── search_jobs.py      # Main job search script
-│   └── analyze_jobs.py     # Results analysis tool
-├── results/                # Generated CSV/Excel files (gitignored)
-├── config/                 # Configuration files
-├── Dockerfile             # Docker container
-├── docker-compose.yml     # Docker orchestration
-├── requirements.txt       # Python dependencies
+│   ├── search_jobs.py         # Main job search (parallel execution)
+│   ├── analyze_jobs.py        # Results analysis and reporting
+│   ├── dashboard.py           # Interactive Streamlit dashboard
+│   ├── config.py              # Configuration loader with validation
+│   ├── logger.py              # Structured logging with rotation
+│   ├── database.py            # SQLite persistence for job tracking
+│   └── models.py              # Type-safe dataclasses
+├── results/                    # CSV/Excel output (gitignored)
+├── data/                       # SQLite database (gitignored)
+├── logs/                       # Log files (gitignored)
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+├── CLAUDE.md                   # Developer documentation
 └── README.md
 ```
 
-## 🔍 Search Queries
+## Configuration
 
-The tool searches for positions matching Vincenzo's specific background:
+All settings are in `config/settings.yaml`. Copy from `settings.example.yaml` and customize.
 
-### Core Research Areas
-- Distributed systems researcher
-- Blockchain researcher
-- Network analysis
-- Social network analysis
-- User behavior analysis
+The configuration file is extensively documented with comments explaining every parameter, including:
+- All possible values and their meanings
+- JobSpy limitations and workarounds
+- Site-specific behaviors
+- Best practices and recommendations
 
-### Blockchain & Web3
-- Blockchain engineer
-- Web3 developer
-- Smart contracts, Cryptocurrency
-- Nostr protocol
-- Decentralized systems
+### Search Settings
 
-### Research Positions
-- PhD researcher / Postdoc
-- Research scientist blockchain
-- Visiting researcher
-- Research associate
-
-### Data Science
-- Data scientist/analyst/engineer
-- Behavioral analytics
-- Network data analysis
-- Transaction analysis
-
-### Software Engineering
-- Backend engineer (Python)
-- Full-stack (TypeScript/React)
-- Blockchain software engineer
-- Open source developer
-
-### Security & Privacy
-- Security researcher
-- Privacy engineer
-- Cryptography
-- Zero-knowledge proofs
-
-### Academic Roles
-- Teaching assistant
-- University lecturer
-- Research associate
-
-### Technology-Specific
-- Python/TypeScript/React developer
-- Node.js, PostgreSQL, Docker
-
-### Summer/Temporary
-- Summer internship 2026
-- Research internship
-- Temporary researcher positions
-
-## 📍 Locations Searched
-
-- Zurich (primary focus)
-- Lausanne (EPFL)
-- Geneva
-- Bern
-- Basel
-- General Switzerland
-
-## 🎯 Relevance Scoring
-
-The tool automatically scores jobs based on relevance to Vincenzo's profile:
-
-| Criteria | Score Weight |
-|----------|--------------|
-| Blockchain & Distributed Systems | +20 |
-| PhD/Research positions | +18 |
-| Data analysis & User behavior | +15 |
-| Summer 2026 programs | +15 |
-| Security & Privacy (ZK, Cryptography) | +12 |
-| Academic institutions (ETH/EPFL) | +12 |
-| ETH Zurich specifically | +10 |
-| Social network analysis | +10 |
-| Technical stack (Python/TypeScript/React) | +8 |
-| Open source development | +8 |
-| Teaching positions | +6 |
-| Computer Science | +5 |
-| Zurich/Lausanne location | +5 |
-| Hackathon/Competition | +5 |
-
-Jobs scoring >10 are considered highly relevant and saved separately.
-
-## 📊 Output Files
-
-The tool generates timestamped files in the `results/` directory:
-
-- **all_jobs_[timestamp].csv**: All jobs found
-- **all_jobs_[timestamp].xlsx**: Excel format with formatting
-- **relevant_jobs_[timestamp].csv**: Filtered highly relevant jobs
-- **relevant_jobs_[timestamp].xlsx**: Excel format
-
-## 🔧 Customization
-
-### Modify Search Queries
-
-Edit `scripts/search_jobs.py`, lines 19-76 to adjust the search queries. The current queries are tailored to Vincenzo's research areas and technical skills:
-
-```python
-search_queries = [
-    # Core Research Areas
-    "distributed systems researcher",
-    "blockchain researcher",
-    # ... add your custom queries
-]
+```yaml
+search:
+  results_wanted: 30        # Results per query per site (max ~1000)
+  hours_old: 168            # 168 = 7 days, 720 = 30 days
+  job_types:
+    - "fulltime"
+    - "contract"
+  sites:
+    - "indeed"              # Best coverage, minimal rate limiting
+    - "linkedin"            # Global coverage, aggressive rate limiting
+    - "glassdoor"           # Good company insights
+  locations:
+    - "Zurich, Switzerland"
+    - "Remote"
+  distance: 50              # Search radius in miles (~80 km)
+  is_remote: false          # true = remote only
+  linkedin_fetch_description: true  # Get full descriptions (slower)
 ```
 
-### Adjust Relevance Scoring
+### Search Queries
 
-Edit the `calculate_relevance_score()` function in `scripts/search_jobs.py` (lines 175-239) to adjust weights. Current weights prioritize:
-- Blockchain/distributed systems (+20)
-- PhD/research positions (+18)
-- Data analysis (+15)
-
-```python
-# Example: Increase blockchain weight
-if any(keyword in text for keyword in blockchain_keywords):
-    score += 25  # Changed from 20
+```yaml
+queries:
+  software_engineering:
+    - "software engineer"
+    - "backend developer"
+    - "full-stack developer"
+  data:
+    - "data engineer"
+    - "data scientist"
+  # Add your own categories
 ```
 
-### Filter by Specific Companies
+### Relevance Scoring
 
-Edit `scripts/analyze_jobs.py`:
-
-```python
-target_companies = ['Google', 'ETH Zurich', 'EPFL', 'IBM Research']
-export_filtered_by_company(df, target_companies)
+```yaml
+scoring:
+  threshold: 10             # Minimum score to be "relevant"
+  weights:
+    primary_skills: 20      # Your main expertise
+    technologies: 12        # Tech stack matches
+    seniority_match: 10     # Level matching
+  keywords:
+    primary_skills:
+      - "software engineer"
+      - "backend"
+    technologies:
+      - "python"
+      - "javascript"
+      - "react"
 ```
 
-## 📈 Analysis Features
+### Parallelism & Retry
 
-Run `python analyze_jobs.py` to get:
+```yaml
+parallel:
+  max_workers: 5            # Concurrent searches (3-5 recommended)
 
-- **Top Companies Hiring**: Most active recruiters
-- **Job Locations**: Geographic distribution
-- **Common Keywords**: Trending skills and technologies
-- **Salary Information**: If available
-- **Job Types**: Full-time, contract, internship breakdown
-- **Remote Opportunities**: On-site vs remote distribution
+retry:
+  max_attempts: 3           # Retry failed requests
+  base_delay: 2             # Initial delay (seconds)
+  backoff_factor: 2         # Exponential multiplier
+```
 
-## 🌐 Data Sources
+## Output Files
+
+### Results Directory (`results/`)
+
+| File | Description |
+|------|-------------|
+| `all_jobs_YYYYMMDD_HHMMSS.csv` | All jobs found |
+| `all_jobs_YYYYMMDD_HHMMSS.xlsx` | Excel with formatting |
+| `relevant_jobs_YYYYMMDD_HHMMSS.csv` | Jobs above score threshold |
+| `relevant_jobs_YYYYMMDD_HHMMSS.xlsx` | Excel with highlighting |
+
+### Database (`data/jobs.db`)
+
+SQLite database tracking all jobs with full details:
+
+| Column | Description |
+|--------|-------------|
+| `job_id` | Unique identifier (SHA256 hash) |
+| `title`, `company`, `location` | Basic job info |
+| `job_url` | Link to job posting |
+| `site` | Source (indeed, linkedin, glassdoor) |
+| `job_type` | fulltime, contract, internship, etc. |
+| `is_remote` | Remote work available |
+| `job_level` | Seniority level (LinkedIn) |
+| `description` | Full job description |
+| `date_posted` | When job was posted |
+| `min_amount`, `max_amount`, `currency` | Salary information |
+| `company_url` | Company page URL |
+| `first_seen`, `last_seen` | Tracking dates |
+| `relevance_score` | Calculated score |
+| `applied` | Application status |
+
+### Logs (`logs/search.log`)
+
+Structured logs with timestamps, rotation, and levels (INFO, WARNING, ERROR).
+
+## Interactive Dashboard
+
+The dashboard provides a powerful interface for analyzing and filtering job results.
+
+### Features
+
+- **Multiple data sources**: Load from CSV files or SQLite database
+- **Comprehensive filtering**: Text search, job level, sites, companies, locations, job types, remote status, salary range, relevance score, date posted
+- **Statistics view**: Total jobs, average score, top sources, remote jobs count
+- **Interactive charts**: Jobs by source, score distribution
+- **Sortable table**: Customize columns, sort by any field, clickable job links
+- **Job details view**: Full description and metadata
+- **Export**: Download filtered results as CSV or Excel
+
+### Launch Dashboard
+
+**Using Docker:**
+```bash
+docker-compose --profile dashboard up dashboard
+```
+
+**Using Local Python:**
+```bash
+cd scripts
+streamlit run dashboard.py
+```
+
+Then open http://localhost:8501 in your browser.
+
+### Dashboard Filters
+
+| Filter | Description |
+|--------|-------------|
+| Search | Text search in title, company, description |
+| Job Level | LinkedIn seniority levels (Entry, Associate, Mid-Senior, etc.) |
+| Job Sites | Filter by source (LinkedIn, Indeed, Glassdoor) |
+| Job Type | fulltime, parttime, internship, contract |
+| Remote Only | Show only remote positions |
+| Salary Range | Min/max annual salary |
+| Relevance Score | Minimum score threshold |
+| Date Posted | Jobs after a specific date |
+| Companies | Select specific companies |
+| Hide Applied | Hide jobs marked as applied |
+
+## Data Sources
 
 The tool scrapes jobs from:
-- LinkedIn
-- Indeed
-- Glassdoor
-- Google Jobs
 
-## ⚠️ Important Notes
+| Site | Coverage | Rate Limiting | Notes |
+|------|----------|---------------|-------|
+| **Indeed** | Best | Minimal | 100 jobs/page, supports all filters |
+| **LinkedIn** | Global | Aggressive | 25 jobs/page, 3-7s delays, guest API |
+| **Glassdoor** | Good | Moderate | GraphQL API, company insights |
+| **Google Jobs** | Aggregator | Minimal | Requires specific query syntax |
+| **ZipRecruiter** | USA/Canada | Moderate | North America only |
+| **Bayt** | Middle East | Minimal | UAE, Saudi Arabia, etc. |
+| **Naukri** | India | Minimal | India only |
+| **BDJobs** | Bangladesh | Minimal | Bangladesh only |
 
-1. **Rate Limiting**: JobSpy may hit rate limits on job sites. If you encounter issues:
-   - Reduce `results_wanted` parameter (default: 50)
-   - Increase delay between searches
-   - Run searches at different times
+## Supported Countries
 
-2. **Python Version**: Requires Python 3.10+ (use Docker if you have Python 3.9 or lower)
+| Region | Countries |
+|--------|-----------|
+| North America | USA, Canada |
+| Europe | UK, Germany, France, Netherlands, Switzerland, Ireland, Spain, Italy, Austria, Belgium, Denmark, Finland, Norway, Sweden, Poland, Portugal |
+| Asia | India, Singapore, Hong Kong, Japan, South Korea, China |
+| Oceania | Australia, New Zealand |
+| Middle East | UAE, Saudi Arabia, Israel |
+| South America | Brazil, Argentina, Mexico |
 
-3. **Results Freshness**: Default search looks at jobs posted in the last 30 days (`hours_old=720`)
+## Known Limitations
 
-4. **Duplicates**: The tool automatically removes duplicate listings based on title, company, and location
+### Indeed Filter Exclusivity
 
-## 🔄 Running Periodic Searches
+Indeed can only use ONE of these filters at a time:
+- `hours_old` (date filtering)
+- `job_type` + `is_remote`
+- `easy_apply`
+
+**We prioritize `hours_old` for fresh results.** If you need job type filtering, set `hours_old: null`.
+
+### LinkedIn Rate Limiting
+
+- Built-in delays: 3-7 seconds between requests
+- Hard limit at ~1000 results
+- Heavy rate limiting around 10th page
+- `linkedin_fetch_description=True` doubles request count
+
+### Glassdoor Issues
+
+- "Location not parsed" errors for locations not in database
+- 400/429 errors indicate rate limiting
+
+## Troubleshooting
+
+### Rate Limiting
+
+If you encounter errors or empty results:
+
+1. Reduce `parallel.max_workers` to 3
+2. Reduce `search.results_wanted` to 20
+3. Increase `retry.base_delay` to 5
+4. Run at different times of day
+5. Consider using proxies for heavy usage
+
+### Docker Issues
+
+```bash
+# Rebuild from scratch
+docker-compose down
+docker system prune -f
+docker-compose up --build
+```
+
+### Python Version
+
+JobSpy requires Python 3.10+. Check your version:
+
+```bash
+python3 --version
+```
+
+If below 3.10, use Docker instead.
+
+### No Results Found
+
+1. Check internet connection
+2. Increase `search.hours_old` (e.g., 1440 for 60 days)
+3. Reduce number of queries/locations
+4. Try again later (sites may be blocking)
+
+## Database Queries
+
+```bash
+# Statistics
+sqlite3 data/jobs.db "SELECT COUNT(*), AVG(relevance_score) FROM jobs"
+
+# New jobs today
+sqlite3 data/jobs.db "SELECT title, company FROM jobs WHERE first_seen = date('now')"
+
+# Top jobs not yet applied
+sqlite3 data/jobs.db "SELECT title, company, relevance_score FROM jobs WHERE applied = 0 ORDER BY relevance_score DESC LIMIT 10"
+
+# Mark job as applied
+sqlite3 data/jobs.db "UPDATE jobs SET applied = 1 WHERE job_id = 'abc123...'"
+
+# Jobs by site
+sqlite3 data/jobs.db "SELECT site, COUNT(*) FROM jobs GROUP BY site"
+
+# Remote jobs
+sqlite3 data/jobs.db "SELECT title, company FROM jobs WHERE is_remote = 1 ORDER BY relevance_score DESC"
+```
+
+## Scheduled Searches
 
 ### Using Cron (Linux/Mac)
 
 ```bash
 # Run daily at 9 AM
-0 9 * * * cd /path/to/switzerland-jobs-search && docker-compose up
+crontab -e
+0 9 * * * cd /path/to/jobspy-dashboard && docker-compose up
 ```
 
-### Manual Scheduling
+### Using launchd (Mac)
 
-Run the script manually whenever you want to check for new positions.
+Create `~/Library/LaunchAgents/com.jobspy.daily.plist`:
 
-## 📝 Example Output
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.jobspy.daily</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/docker-compose</string>
+        <string>up</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/path/to/jobspy-dashboard</string>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>9</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+</dict>
+</plist>
+```
+
+## Example Output
 
 ```
-🔍 Searching for jobs in Switzerland...
-================================================================================
+============================================================
+  SEARCHING FOR JOBS
+============================================================
+12:00:01 | INFO | Total search tasks: 120
+12:00:01 | INFO | Parallel workers: 5
+12:00:05 | INFO | [1/120] (0%) Found 23 jobs: software engineer @ Zurich
+12:00:07 | INFO | [2/120] (1%) Found 15 jobs: backend developer @ Remote
+...
+12:03:45 | INFO | Job search complete: 100 succeeded, 20 failed out of 120 total
 
-📍 Searching in: Zurich, Switzerland
-   - Query: blockchain engineer
-      ✅ Found 23 jobs
-   - Query: PhD candidate computer science
-      ✅ Found 15 jobs
-
-✅ Total job listings found: 342
-📊 Removing duplicates...
-✅ Unique jobs after deduplication: 187
-
-🔍 Filtering relevant jobs...
-✅ Found 45 highly relevant jobs
-
-🎯 TOP 10 MOST RELEVANT JOBS
-================================================================================
-
-1. Blockchain Research Scientist
-   Company: ETH Zurich
+============================================================
+  TOP 10 MOST RELEVANT JOBS
+============================================================
+1. Senior Software Engineer
+   Company: Tech Startup Inc
    Location: Zurich, Switzerland
-   Relevance Score: 48
-   URL: https://...
+   Relevance Score: 45
 
-2. PhD Position - Distributed Systems
-   Company: EPFL
-   Location: Lausanne, Switzerland
-   Relevance Score: 43
-   URL: https://...
+2. Backend Engineer - Python
+   Company: FinTech Corp
+   Location: Remote
+   Relevance Score: 42
+...
+
+============================================================
+  SEARCH COMPLETE
+============================================================
+12:03:48 | INFO | Duration: 3m 47s
+12:03:48 | INFO | Total unique jobs: 187
+12:03:48 | INFO | Highly relevant jobs: 45
+12:03:48 | INFO | New jobs (first time seen): 12
 ```
 
-## 🤝 Contributing
+## Contributing
 
-Feel free to customize the search queries, scoring algorithm, and analysis features to better match your needs.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-## 📄 License
+## License
 
 MIT License
 
-## 🆘 Troubleshooting
+## Acknowledgments
 
-### Docker Issues
+- [JobSpy](https://github.com/speedyapply/JobSpy) - The underlying job scraping library
+- [Streamlit](https://streamlit.io/) - Dashboard framework
+- [Pandas](https://pandas.pydata.org/) - Data manipulation
+- [Tenacity](https://github.com/jd/tenacity) - Retry logic
 
-```bash
-# Rebuild container
-docker-compose down
-docker-compose up --build
+## Support
 
-# View logs
-docker-compose logs
-```
-
-### Python Issues
-
-```bash
-# Check Python version
-python3 --version  # Should be 3.10+
-
-# Reinstall dependencies
-pip install --upgrade -r requirements.txt
-```
-
-### No Results Found
-
-- Check internet connection
-- Try fewer search queries
-- Increase `hours_old` parameter (search older jobs)
-- Check if job sites are blocking requests (try again later)
-
-## 📞 Support
-
-For issues with JobSpy library, visit: https://github.com/speedyapply/JobSpy
+- **JobSpy issues**: https://github.com/speedyapply/JobSpy/issues
+- **This project**: Open an issue on GitHub
 
 ---
 
-**Good luck with your job search! 🍀**
+**Good luck with your job search!**

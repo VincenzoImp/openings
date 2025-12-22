@@ -1,13 +1,53 @@
-version: '3.8'
+# JobSpy Dashboard - Docker Compose Configuration
+# Run with: docker-compose up --build
 
 services:
   jobsearch:
     build: .
-    container_name: switzerland_jobs_search
+    container_name: jobspy_search
     volumes:
+      # Persist results, database, and logs
       - ./results:/app/results
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # Mount scripts and config for live editing
       - ./scripts:/app/scripts
       - ./config:/app/config
     environment:
       - PYTHONUNBUFFERED=1
+    # Default: run job search
     command: python search_jobs.py
+
+  # Alias for running analysis
+  analyze:
+    build: .
+    container_name: jobspy_analyze
+    volumes:
+      - ./results:/app/results
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./scripts:/app/scripts
+      - ./config:/app/config
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: python analyze_jobs.py
+    profiles:
+      - analyze
+
+  # Interactive dashboard for job results analysis
+  dashboard:
+    build: .
+    container_name: jobspy_dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./results:/app/results
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./scripts:/app/scripts
+      - ./config:/app/config
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: streamlit run dashboard.py --server.address=0.0.0.0 --server.port=8501
+    profiles:
+      - dashboard

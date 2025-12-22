@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+.eggs/
+*.egg
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Results and data (these are mounted as volumes)
+results/
+data/
+logs/
+
+# Documentation (not needed in container)
+README.md
+CLAUDE.md
+LICENSE
+
+# Temporary files
+*.tmp
+*.bak
+tmp/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
