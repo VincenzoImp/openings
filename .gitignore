@@ -1,22 +1,37 @@
-# Results directory
-results/*.csv
-results/*.xlsx
-!results/.gitkeep
-
-# Configuration files (keep examples)
-config/config.yaml
-!config/config.example.yaml
-
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-venv/
 env/
+venv/
 ENV/
-.venv
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Results (keep directory structure, ignore contents)
+results/*.csv
+results/*.xlsx
+results/*.json
+!results/.gitkeep
+
+# Database (keep directory structure, ignore contents)
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+!data/.gitkeep
+
+# Logs
+logs/
+*.log
+
+# User configuration (personal settings)
+config/settings.yaml
+config/local.yaml
+config/*.local.yaml
 
 # IDE
 .vscode/
@@ -28,28 +43,27 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+ehthumbs.db
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Temporary files
+*.tmp
+*.bak
+tmp/
+temp/
+
+# Jupyter notebooks
+.ipynb_checkpoints/
 *.ipynb
 
-# Logs
-*.log
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+# Type checking
+.mypy_cache/
+
+# Docker
+.docker/

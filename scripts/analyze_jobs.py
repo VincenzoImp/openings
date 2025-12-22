@@ -1,271 +1,415 @@
+#!/usr/bin/env python3
 """
-Job Search Results Analysis Tool
+Job Analysis Tool.
+
 Analyzes saved job search results and generates insights.
+Provides statistics on companies, locations, keywords, and more.
 """
 
-import sys
-from pathlib import Path
-import pandas as pd
-import yaml
-from datetime import datetime
+from __future__ import annotations
+
 from collections import Counter
-import re
-import logging
+from pathlib import Path
+from typing import TYPE_CHECKING
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+import pandas as pd
+
+from config import get_config
+from database import get_database
+from logger import get_logger, log_section, log_subsection, setup_logging
+
+if TYPE_CHECKING:
+    from config import Config
 
 
-class JobAnalyzer:
-    """Analyzes job search results."""
+# Required columns for analysis
+REQUIRED_COLUMNS = ["title", "company", "location"]
 
-    def __init__(self, config_path: str = "../config/config.yaml"):
-        """Initialize with configuration."""
-        self.config = self._load_config(config_path)
-        self.results_dir = Path(self.config.get('output', {}).get('results_dir', '../results'))
 
-    def _load_config(self, config_path: str) -> dict:
-        """Load configuration from YAML file."""
-        config_file = Path(config_path)
-        if config_file.exists():
-            with open(config_file, 'r') as f:
-                return yaml.safe_load(f)
-        return {}
+def load_latest_results(config: Config) -> pd.DataFrame | None:
+    """
+    Load the most recent job search results.
 
-    def load_latest_results(self, prefix: str = "relevant_jobs") -> pd.DataFrame:
-        """Load the most recent results file."""
-        csv_files = list(self.results_dir.glob(f"{prefix}_*.csv"))
+    Args:
+        config: Configuration object.
 
-        if not csv_files:
-            # Try 'all_jobs' if relevant not found
-            csv_files = list(self.results_dir.glob("all_jobs_*.csv"))
+    Returns:
+        DataFrame with job data, or None if not found.
+    """
+    logger = get_logger("analyze")
+    results_dir = config.results_path
 
-        if not csv_files:
-            logger.error(f"No results found in {self.results_dir}")
-            return pd.DataFrame()
+    if not results_dir.exists():
+        logger.error("No results directory found. Run search_jobs.py first.")
+        return None
 
-        # Sort by modification time and get latest
-        latest_file = max(csv_files, key=lambda p: p.stat().st_mtime)
-        logger.info(f"Loading results from: {latest_file}")
+    # Find latest CSV file (prefer relevant_jobs over all_jobs)
+    csv_files = list(results_dir.glob("relevant_jobs_*.csv"))
 
+    if not csv_files:
+        csv_files = list(results_dir.glob("all_jobs_*.csv"))
+
+    if not csv_files:
+        logger.error("No job results found. Run search_jobs.py first.")
+        return None
+
+    latest_file = max(csv_files, key=lambda f: f.stat().st_ctime)
+    logger.info(f"Loading: {latest_file.name}")
+
+    try:
         df = pd.read_csv(latest_file)
+
+        # Validate required columns
+        missing_cols = [col for col in REQUIRED_COLUMNS if col not in df.columns]
+        if missing_cols:
+            logger.error(f"Missing required columns: {missing_cols}")
+            return None
+
+        logger.info(f"Loaded {len(df)} jobs")
         return df
 
-    def analyze_companies(self, df: pd.DataFrame, top_n: int = 15) -> pd.DataFrame:
-        """Analyze top companies by job count."""
-        if df.empty or 'company' not in df.columns:
-            return pd.DataFrame()
-
-        companies = df['company'].value_counts().head(top_n)
-        return companies
-
-    def analyze_locations(self, df: pd.DataFrame, top_n: int = 10) -> pd.DataFrame:
-        """Analyze top locations by job count."""
-        if df.empty or 'location' not in df.columns:
-            return pd.DataFrame()
-
-        locations = df['location'].value_counts().head(top_n)
-        return locations
-
-    def analyze_keywords(self, df: pd.DataFrame, top_n: int = 20) -> Counter:
-        """Extract and analyze keywords from job titles."""
-        if df.empty or 'title' not in df.columns:
-            return Counter()
-
-        # Combine all titles
-        all_titles = ' '.join(df['title'].astype(str).tolist()).lower()
-
-        # Split into words and filter
-        words = re.findall(r'\b[a-z]{3,}\b', all_titles)
-
-        # Common stop words to filter
-        stop_words = {
-            'the', 'and', 'for', 'are', 'with', 'from', 'this', 'that',
-            'will', 'have', 'has', 'our', 'you', 'your', 'all', 'can',
-            'was', 'were', 'been', 'their', 'about', 'into', 'through',
-            'job', 'work', 'position', 'role', 'opportunity'
-        }
-
-        # Filter stop words
-        filtered_words = [w for w in words if w not in stop_words]
-
-        # Count occurrences
-        keyword_counts = Counter(filtered_words)
-        return keyword_counts.most_common(top_n)
-
-    def analyze_salary(self, df: pd.DataFrame) -> dict:
-        """Analyze salary information if available."""
-        if df.empty:
-            return {}
-
-        salary_info = {}
-
-        if 'min_amount' in df.columns:
-            salary_data = df[df['min_amount'].notna()]
-            if not salary_data.empty:
-                salary_info['min_avg'] = salary_data['min_amount'].mean()
-                salary_info['min_median'] = salary_data['min_amount'].median()
-
-        if 'max_amount' in df.columns:
-            salary_data = df[df['max_amount'].notna()]
-            if not salary_data.empty:
-                salary_info['max_avg'] = salary_data['max_amount'].mean()
-                salary_info['max_median'] = salary_data['max_amount'].median()
-
-        if 'currency' in df.columns:
-            salary_info['currencies'] = df['currency'].value_counts().to_dict()
-
-        return salary_info
-
-    def analyze_job_types(self, df: pd.DataFrame) -> pd.Series:
-        """Analyze distribution of job types."""
-        if df.empty or 'job_type' not in df.columns:
-            return pd.Series()
-
-        return df['job_type'].value_counts()
-
-    def analyze_remote_distribution(self, df: pd.DataFrame) -> dict:
-        """Analyze remote vs on-site distribution."""
-        if df.empty or 'is_remote' not in df.columns:
-            return {}
-
-        remote_counts = df['is_remote'].value_counts().to_dict()
-        return {
-            'remote': remote_counts.get(True, 0),
-            'on_site': remote_counts.get(False, 0)
-        }
-
-    def generate_report(self, df: pd.DataFrame):
-        """Generate comprehensive analysis report."""
-        if df.empty:
-            print("❌ No data to analyze!")
-            return
-
-        print("\n" + "=" * 80)
-        print(" " * 25 + "📊 JOB SEARCH ANALYSIS REPORT")
-        print("=" * 80)
-
-        # Overview
-        print(f"\n📈 OVERVIEW")
-        print(f"   Total jobs: {len(df)}")
-
-        if 'relevance_score' in df.columns:
-            print(f"   Average relevance score: {df['relevance_score'].mean():.1f}")
-            print(f"   Max relevance score: {df['relevance_score'].max():.0f}")
-
-        if 'date_posted' in df.columns:
-            try:
-                df['date_posted'] = pd.to_datetime(df['date_posted'], errors='coerce')
-                recent_jobs = df[df['date_posted'] >= pd.Timestamp.now() - pd.Timedelta(days=7)]
-                print(f"   Jobs posted in last 7 days: {len(recent_jobs)}")
-            except:
-                pass
-
-        # Companies
-        print(f"\n🏢 TOP COMPANIES")
-        companies = self.analyze_companies(df)
-        for idx, (company, count) in enumerate(companies.items(), 1):
-            print(f"   {idx:2d}. {company:<40} ({count} jobs)")
-
-        # Locations
-        print(f"\n📍 TOP LOCATIONS")
-        locations = self.analyze_locations(df)
-        for idx, (location, count) in enumerate(locations.items(), 1):
-            print(f"   {idx:2d}. {location:<40} ({count} jobs)")
-
-        # Keywords
-        print(f"\n🔑 TOP KEYWORDS IN JOB TITLES")
-        keywords = self.analyze_keywords(df)
-        for idx, (keyword, count) in enumerate(keywords, 1):
-            print(f"   {idx:2d}. {keyword:<30} ({count} occurrences)")
-
-        # Job types
-        print(f"\n💼 JOB TYPES")
-        job_types = self.analyze_job_types(df)
-        for job_type, count in job_types.items():
-            print(f"   {job_type:<20} {count} jobs")
-
-        # Remote distribution
-        print(f"\n🏠 REMOTE WORK DISTRIBUTION")
-        remote_dist = self.analyze_remote_distribution(df)
-        if remote_dist:
-            total = sum(remote_dist.values())
-            for work_type, count in remote_dist.items():
-                pct = (count / total * 100) if total > 0 else 0
-                print(f"   {work_type.capitalize():<20} {count} jobs ({pct:.1f}%)")
-
-        # Salary info
-        print(f"\n💰 SALARY INFORMATION")
-        salary_info = self.analyze_salary(df)
-        if salary_info:
-            if 'min_avg' in salary_info:
-                print(f"   Average min salary: {salary_info['min_avg']:,.0f}")
-            if 'max_avg' in salary_info:
-                print(f"   Average max salary: {salary_info['max_avg']:,.0f}")
-            if 'currencies' in salary_info:
-                print(f"   Currencies: {', '.join(salary_info['currencies'].keys())}")
-        else:
-            print(f"   No salary data available")
-
-        print("\n" + "=" * 80)
-
-    def export_filtered_by_company(self, df: pd.DataFrame, companies: list, output_file: str = None):
-        """Export jobs filtered by specific companies."""
-        if df.empty or 'company' not in df.columns:
-            logger.warning("No data or company column not found")
-            return
-
-        filtered = df[df['company'].isin(companies)]
-
-        if filtered.empty:
-            logger.warning(f"No jobs found for companies: {companies}")
-            return
-
-        if output_file is None:
-            output_file = self.results_dir / "filtered_by_company.csv"
-
-        filtered.to_csv(output_file, index=False)
-        print(f"\n💾 Filtered {len(filtered)} jobs saved to: {output_file}")
-
-    def export_top_scoring_jobs(self, df: pd.DataFrame, top_n: int = 50, output_file: str = None):
-        """Export top N jobs by relevance score."""
-        if df.empty or 'relevance_score' not in df.columns:
-            logger.warning("No data or relevance_score column not found")
-            return
-
-        top_jobs = df.nlargest(top_n, 'relevance_score')
-
-        if output_file is None:
-            output_file = self.results_dir / f"top_{top_n}_jobs.csv"
-
-        top_jobs.to_csv(output_file, index=False)
-        print(f"\n💾 Top {top_n} jobs saved to: {output_file}")
+    except Exception as e:
+        logger.error(f"Error loading CSV: {e}")
+        return None
 
 
-def main():
-    """Main entry point."""
-    # Allow custom config path via command line
-    config_path = sys.argv[1] if len(sys.argv) > 1 else "../config/config.yaml"
+def analyze_companies(df: pd.DataFrame) -> pd.Series:
+    """
+    Analyze companies hiring.
 
-    analyzer = JobAnalyzer(config_path)
+    Args:
+        df: DataFrame with job data.
 
-    # Load latest results
-    df = analyzer.load_latest_results(prefix="relevant_jobs")
+    Returns:
+        Series with company counts.
+    """
+    logger = get_logger("analyze")
 
-    if df.empty:
-        logger.error("No results to analyze. Run search_jobs.py first.")
-        sys.exit(1)
+    log_subsection(logger, "TOP COMPANIES HIRING")
+
+    company_counts = df["company"].value_counts().head(15)
+
+    for company, count in company_counts.items():
+        logger.info(f"  {company}: {count} positions")
+
+    return company_counts
+
+
+def analyze_locations(df: pd.DataFrame) -> pd.Series:
+    """
+    Analyze job locations.
+
+    Args:
+        df: DataFrame with job data.
+
+    Returns:
+        Series with location counts.
+    """
+    logger = get_logger("analyze")
+
+    log_subsection(logger, "JOB LOCATIONS")
+
+    location_counts = df["location"].value_counts().head(10)
+
+    for location, count in location_counts.items():
+        logger.info(f"  {location}: {count} jobs")
+
+    return location_counts
+
+
+def analyze_keywords(df: pd.DataFrame) -> list[tuple[str, int]]:
+    """
+    Extract and analyze common keywords in job titles.
+
+    Args:
+        df: DataFrame with job data.
+
+    Returns:
+        List of (keyword, count) tuples.
+    """
+    logger = get_logger("analyze")
+
+    log_subsection(logger, "MOST COMMON KEYWORDS IN JOB TITLES")
+
+    # Combine all titles
+    all_titles = " ".join(df["title"].dropna().astype(str).str.lower())
+
+    # Split into words and count
+    words = all_titles.split()
+
+    # Filter out common words
+    stop_words = {
+        "the",
+        "a",
+        "an",
+        "and",
+        "or",
+        "but",
+        "in",
+        "at",
+        "to",
+        "for",
+        "of",
+        "on",
+        "with",
+        "by",
+        "from",
+        "is",
+        "are",
+        "was",
+        "be",
+        "-",
+        "&",
+        "/",
+        "(",
+        ")",
+        "m/f/d",
+        "f/m/d",
+        "m/w/d",
+        "all",
+        "genders",
+    }
+
+    filtered_words = [
+        word.strip("()[].,;:")
+        for word in words
+        if word not in stop_words and len(word) > 2
+    ]
+
+    word_counts = Counter(filtered_words).most_common(20)
+
+    for word, count in word_counts:
+        logger.info(f"  {word}: {count}")
+
+    return word_counts
+
+
+def analyze_salary(df: pd.DataFrame) -> dict[str, float | int] | None:
+    """
+    Analyze salary information if available.
+
+    Args:
+        df: DataFrame with job data.
+
+    Returns:
+        Dictionary with salary statistics, or None if no data.
+    """
+    logger = get_logger("analyze")
+
+    log_subsection(logger, "SALARY INFORMATION")
+
+    if "min_amount" not in df.columns:
+        logger.info("  No salary data in results")
+        return None
+
+    salary_data = df[df["min_amount"].notna()]
+
+    if len(salary_data) == 0:
+        logger.info("  No salary information available in results")
+        return None
+
+    stats = {
+        "jobs_with_salary": len(salary_data),
+        "avg_min_salary": salary_data["min_amount"].mean(),
+        "avg_max_salary": (
+            salary_data["max_amount"].mean()
+            if "max_amount" in salary_data.columns
+            else None
+        ),
+    }
+
+    logger.info(f"  Jobs with salary info: {stats['jobs_with_salary']}")
+    logger.info(f"  Average min salary: {stats['avg_min_salary']:.0f}")
+
+    if stats["avg_max_salary"]:
+        logger.info(f"  Average max salary: {stats['avg_max_salary']:.0f}")
+
+    if "currency" in df.columns:
+        currencies = salary_data["currency"].value_counts()
+        logger.info("  Currencies:")
+        for curr, count in currencies.items():
+            logger.info(f"    {curr}: {count} jobs")
+
+    return stats
+
+
+def analyze_job_types(df: pd.DataFrame) -> pd.Series | None:
+    """
+    Analyze job types.
+
+    Args:
+        df: DataFrame with job data.
+
+    Returns:
+        Series with job type counts, or None if no data.
+    """
+    logger = get_logger("analyze")
+
+    if "job_type" not in df.columns:
+        return None
+
+    log_subsection(logger, "JOB TYPES")
+
+    job_types = df["job_type"].value_counts()
+    for jtype, count in job_types.items():
+        logger.info(f"  {jtype}: {count}")
+
+    return job_types
+
+
+def analyze_remote(df: pd.DataFrame) -> pd.Series | None:
+    """
+    Analyze remote work options.
+
+    Args:
+        df: DataFrame with job data.
+
+    Returns:
+        Series with remote status counts, or None if no data.
+    """
+    logger = get_logger("analyze")
+
+    if "is_remote" not in df.columns:
+        return None
+
+    log_subsection(logger, "REMOTE WORK OPTIONS")
+
+    remote_counts = df["is_remote"].value_counts()
+    for remote, count in remote_counts.items():
+        label = "Remote" if remote else "On-site"
+        logger.info(f"  {label}: {count} jobs")
+
+    return remote_counts
+
+
+def generate_report(df: pd.DataFrame, config: Config) -> dict[str, any]:
+    """
+    Generate a comprehensive analysis report.
+
+    Args:
+        df: DataFrame with job data.
+        config: Configuration object.
+
+    Returns:
+        Dictionary with all analysis results.
+    """
+    logger = get_logger("analyze")
+
+    log_section(logger, "JOB SEARCH ANALYSIS REPORT")
+
+    # Overview
+    log_subsection(logger, "OVERVIEW")
+    logger.info(f"  Total jobs analyzed: {len(df)}")
+
+    report = {
+        "total_jobs": len(df),
+    }
+
+    if "relevance_score" in df.columns:
+        avg_score = df["relevance_score"].mean()
+        max_score = df["relevance_score"].max()
+        logger.info(f"  Average relevance score: {avg_score:.1f}")
+        logger.info(f"  Highest relevance score: {max_score:.0f}")
+        report["avg_relevance_score"] = avg_score
+        report["max_relevance_score"] = max_score
+
+    if "search_date" in df.columns:
+        search_date = df["search_date"].iloc[0]
+        logger.info(f"  Search date: {search_date}")
+        report["search_date"] = search_date
+
+    # Detailed analysis
+    report["companies"] = analyze_companies(df)
+    report["locations"] = analyze_locations(df)
+    report["keywords"] = analyze_keywords(df)
+    report["salary"] = analyze_salary(df)
+    report["job_types"] = analyze_job_types(df)
+    report["remote"] = analyze_remote(df)
+
+    return report
+
+
+def analyze_database(config: Config) -> None:
+    """
+    Analyze jobs from database.
+
+    Args:
+        config: Configuration object.
+    """
+    logger = get_logger("analyze")
+
+    db = get_database(config)
+    stats = db.get_statistics()
+
+    log_section(logger, "DATABASE STATISTICS")
+
+    logger.info(f"  Total jobs tracked: {stats['total_jobs']}")
+    logger.info(f"  Jobs seen today: {stats['seen_today']}")
+    logger.info(f"  New today: {stats['new_today']}")
+    logger.info(f"  Jobs marked as applied: {stats['applied']}")
+    logger.info(f"  Average relevance score: {stats['avg_relevance_score']}")
+
+
+def export_filtered_by_company(
+    df: pd.DataFrame, companies: list[str], config: Config
+) -> Path | None:
+    """
+    Export jobs filtered by specific companies.
+
+    Args:
+        df: DataFrame with job data.
+        companies: List of company names to filter.
+        config: Configuration object.
+
+    Returns:
+        Path to exported file, or None if no matches.
+    """
+    logger = get_logger("analyze")
+
+    if not companies:
+        return None
+
+    logger.info(f"Filtering jobs from: {', '.join(companies)}")
+
+    filtered = df[df["company"].str.lower().isin([c.lower() for c in companies])]
+
+    if len(filtered) == 0:
+        logger.warning("No jobs found from specified companies")
+        return None
+
+    output_path = config.results_path / "filtered_by_company.csv"
+    filtered.to_csv(output_path, index=False)
+    logger.info(f"Saved {len(filtered)} jobs to: {output_path}")
+
+    return output_path
+
+
+def main() -> None:
+    """Main analysis function."""
+    # Load configuration
+    config = get_config()
+
+    # Setup logging
+    logger = setup_logging(config)
+
+    # Load results
+    df = load_latest_results(config)
+
+    if df is None:
+        return
 
     # Generate report
-    analyzer.generate_report(df)
+    generate_report(df, config)
 
-    # Optional: Export top scoring jobs
-    if 'relevance_score' in df.columns:
-        analyzer.export_top_scoring_jobs(df, top_n=50)
+    # Database analysis
+    analyze_database(config)
 
-    # Optional: Filter by companies (customize as needed)
-    # target_companies = ['Google', 'Meta', 'ETH Zurich']
-    # analyzer.export_filtered_by_company(df, target_companies)
+    # Optional: Filter by specific companies
+    # Uncomment and customize this list:
+    # target_companies = ['Google', 'ETH Zurich', 'EPFL', 'IBM Research']
+    # export_filtered_by_company(df, target_companies, config)
+
+    log_section(logger, "ANALYSIS COMPLETE")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,608 @@
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                    JOB SEARCH TOOL - EXAMPLE CONFIGURATION                ║
+# ║                                                                           ║
+# ║  This is a GENERIC example for tech job searches.                         ║
+# ║  Copy this file to settings.yaml and customize for your needs.            ║
+# ║                                                                           ║
+# ║  Based on JobSpy v1.1.82 - https://github.com/speedyapply/JobSpy          ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+
+# =============================================================================
+# SEARCH SETTINGS - Main search parameters
+# =============================================================================
+search:
+  # ---------------------------------------------------------------------------
+  # results_wanted (int): Number of results requested PER QUERY PER SITE
+  # ---------------------------------------------------------------------------
+  # - JobSpy default: 15
+  # - Practical maximum: ~1000 (limit imposed by job boards)
+  # - WARNING: High values increase execution time and risk of
+  #   rate limiting (especially on LinkedIn)
+  # - Recommended: 20-50 for frequent searches, 100+ for rare searches
+  results_wanted: 30
+
+  # ---------------------------------------------------------------------------
+  # hours_old (int): Filter jobs posted within the last N hours
+  # ---------------------------------------------------------------------------
+  # - Common values:
+  #   - 24    = last day
+  #   - 72    = last 3 days
+  #   - 168   = last week
+  #   - 720   = last 30 days
+  #   - 1440  = last 60 days
+  #   - 2160  = last 90 days
+  # - IMPORTANT NOTE (Indeed limitation):
+  #   On Indeed, hours_old is MUTUALLY EXCLUSIVE with job_type and is_remote.
+  #   If you set hours_old, job_type is SILENTLY IGNORED.
+  # - NOTE: ZipRecruiter and Glassdoor round up to the next day
+  hours_old: 168
+
+  # ---------------------------------------------------------------------------
+  # job_type (str): Contract type to search for
+  # ---------------------------------------------------------------------------
+  # Possible values (use the first one in the list):
+  #   - "fulltime"   : Full-time (also: vollzeit, 100%, etc.)
+  #   - "parttime"   : Part-time (also: teilzeit)
+  #   - "contract"   : Contract/Freelance
+  #   - "temporary"  : Temporary
+  #   - "internship" : Internship/Traineeship (also: praktikum)
+  #   - "perdiem"    : Per diem
+  #   - "nights"     : Night shift
+  #   - "summer"     : Summer position
+  #   - "volunteer"  : Volunteer
+  #
+  # LIMITATIONS:
+  #   - Indeed: DOES NOT WORK if hours_old is set (see above)
+  #   - LinkedIn: Always works
+  #   - Glassdoor: Always works
+  #
+  # NOTE: In our implementation, we prioritize hours_old (freshness)
+  # so job_type is only used if hours_old is not set.
+  job_types:
+    - "fulltime"
+    - "contract"
+    - "internship"
+
+  # ---------------------------------------------------------------------------
+  # sites (list[str]): Sites to scrape jobs from
+  # ---------------------------------------------------------------------------
+  # Available sites:
+  #
+  # RECOMMENDED (work globally):
+  #   - "indeed"     : BEST - No rate limiting, global coverage
+  #                    Uses country-specific domains (indeed.com, de.indeed.com, etc.)
+  #   - "linkedin"   : GOOD but aggressive rate limiting (~10 pages max)
+  #                    Uses guest API (no login), 25 jobs/page
+  #                    Internal delay: 3-7 seconds between requests
+  #   - "glassdoor"  : GOOD - Good company insights
+  #                    May have location parsing issues
+  #
+  # OTHER SITES (regional):
+  #   - "google"        : Requires google_search_term with specific syntax
+  #                       Normal search_term DOES NOT work well
+  #   - "zip_recruiter" : USA/Canada ONLY
+  #   - "bayt"          : Middle East (UAE, Saudi, etc.)
+  #   - "naukri"        : India
+  #   - "bdjobs"        : Bangladesh
+  #
+  # NOTE: JobSpy scrapes all sites IN PARALLEL internally
+  sites:
+    - "indeed"
+    - "linkedin"
+    - "glassdoor"
+
+  # ---------------------------------------------------------------------------
+  # locations (list[str]): Locations to search in
+  # ---------------------------------------------------------------------------
+  # Recommended format: "City, Country" or "City, State" (for USA)
+  #
+  # For LinkedIn: location is the ONLY geographic filter (searches globally)
+  # For Indeed/Glassdoor: use country-specific domains + location for precision
+  #
+  # Valid examples:
+  #   - "San Francisco, CA"      : San Francisco Bay Area
+  #   - "New York, NY"           : New York City
+  #   - "London, UK"             : London, United Kingdom
+  #   - "Berlin, Germany"        : Berlin, Germany
+  #   - "Remote"                 : Remote positions only
+  #
+  # NOTE: Too many locations = too many queries = more time and rate limiting
+  locations:
+    - "San Francisco, CA"
+    - "New York, NY"
+    - "Remote"
+
+  # ---------------------------------------------------------------------------
+  # distance (int): Search radius in MILES
+  # ---------------------------------------------------------------------------
+  # - JobSpy default: 50 miles (~80 km)
+  # - Recommended values:
+  #   - 25  : City only (~40 km)
+  #   - 50  : Metropolitan area (~80 km)
+  #   - 100 : Region (~160 km)
+  distance: 50
+
+  # ---------------------------------------------------------------------------
+  # is_remote (bool): Filter for remote-only jobs
+  # ---------------------------------------------------------------------------
+  # - true  : Only 100% remote jobs
+  # - false : All jobs (default)
+  #
+  # Indeed LIMITATION: is_remote is part of the composite filter with job_type
+  # If hours_old is set, is_remote is IGNORED on Indeed
+  is_remote: false
+
+  # ---------------------------------------------------------------------------
+  # easy_apply (bool): Filter for easy apply jobs
+  # ---------------------------------------------------------------------------
+  # - true  : Only jobs with "Easy Apply" (application on the site)
+  # - false : All jobs (default)
+  # - null  : Don't apply filter
+  #
+  # NOTE: LinkedIn Easy Apply filter no longer works (deprecated)
+  # LIMITATION: On Indeed, easy_apply is mutually exclusive with hours_old
+  easy_apply: null
+
+  # ---------------------------------------------------------------------------
+  # offset (int): Start search from a specific offset
+  # ---------------------------------------------------------------------------
+  # - Default: 0 (start from the beginning)
+  # - Useful for: Manual pagination, resuming interrupted searches
+  # - Example: offset=100 skips the first 100 results
+  offset: 0
+
+  # ---------------------------------------------------------------------------
+  # enforce_annual_salary (bool): Normalize all salaries to annual
+  # ---------------------------------------------------------------------------
+  # - true  : Convert hourly/monthly/weekly to yearly for comparison
+  #           Formulas: hourly*2080, monthly*12, weekly*52, daily*260
+  # - false : Keep original interval
+  #
+  # RECOMMENDED: true for easy salary comparison
+  enforce_annual_salary: true
+
+  # ---------------------------------------------------------------------------
+  # description_format (str): Job description format
+  # ---------------------------------------------------------------------------
+  # Possible values:
+  #   - "markdown" : Convert HTML to Markdown (default, recommended)
+  #   - "html"     : Keep original HTML
+  #   - "plain"    : Plain text without formatting
+  #
+  # NOTE: "markdown" is best for text analysis and relevance scoring
+  description_format: "markdown"
+
+  # ---------------------------------------------------------------------------
+  # verbose (int): JobSpy log verbosity level
+  # ---------------------------------------------------------------------------
+  # Values:
+  #   - 0 : Errors only (quietest)
+  #   - 1 : Errors + warnings (recommended)
+  #   - 2 : All logs (very verbose, JobSpy default)
+  #
+  # NOTE: We have our own logging system, so 1 reduces noise
+  verbose: 1
+
+  # ---------------------------------------------------------------------------
+  # LINKEDIN-SPECIFIC PARAMETERS
+  # ---------------------------------------------------------------------------
+
+  # linkedin_fetch_description (bool): Download full LinkedIn description
+  # - true  : Makes additional request for each job to get:
+  #           - Full description
+  #           - Direct job URL
+  #           - Job level, industry, function
+  # - false : Only basic data from the list (faster)
+  #
+  # WARNING: Increases requests by O(n), slows down significantly and
+  # increases rate limiting risk. Use with caution.
+  linkedin_fetch_description: true
+
+  # linkedin_company_ids (list[int]): Filter by LinkedIn company IDs
+  # - Search only for jobs from specific companies
+  # - Find the ID from URL: linkedin.com/company/[name]/... -> numeric ID
+  # - Example: [1035, 1441] for Google and Microsoft
+  # - null or empty list = all companies
+  linkedin_company_ids: null
+
+  # ---------------------------------------------------------------------------
+  # GOOGLE JOBS-SPECIFIC PARAMETERS
+  # ---------------------------------------------------------------------------
+
+  # google_search_term (str): Specific query for Google Jobs
+  # - REQUIRED if you use "google" in sites
+  # - Normal search_term DOES NOT work well with Google
+  # - Syntax: Copy exactly from Google Jobs search bar
+  # - Examples:
+  #   - "software engineer jobs near San Francisco since yesterday"
+  #   - "data scientist jobs in New York remote"
+  #
+  # HOW TO FIND THE CORRECT SYNTAX:
+  # 1. Go to Google and search "software engineer jobs"
+  # 2. Click on "Jobs" in the results
+  # 3. Apply desired filters (location, date, etc.)
+  # 4. Copy the text from the search bar
+  google_search_term: null
+
+  # ---------------------------------------------------------------------------
+  # PROXY AND NETWORK PARAMETERS
+  # ---------------------------------------------------------------------------
+
+  # proxies (list[str]): Proxy list to avoid rate limiting
+  # - Format: ['user:pass@host:port', 'host:port', 'localhost']
+  # - 'localhost' = direct connection
+  # - Proxies are used in round-robin across sites
+  # - RECOMMENDED for heavy LinkedIn scraping
+  # - Example:
+  #   proxies:
+  #     - "user:pass@proxy1.example.com:8080"
+  #     - "proxy2.example.com:3128"
+  #     - "localhost"
+  proxies: null
+
+  # ca_cert (str): Path to CA certificate for HTTPS proxies
+  # - Required only for proxies with self-signed certificates
+  # - Example: "/path/to/ca-bundle.crt"
+  ca_cert: null
+
+  # user_agent (str): Custom User-Agent
+  # - null = use JobSpy default (may be outdated)
+  # - Useful if you receive many blocks
+  # - Example: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  user_agent: null
+
+# =============================================================================
+# SEARCH QUERIES - Search queries organized by category
+# =============================================================================
+#
+# TIPS FOR EFFECTIVE QUERIES (especially Indeed):
+# - Use "" for exact match: "software engineer"
+# - Use - to exclude: software -marketing -sales
+# - Use OR for alternatives: (python OR java OR c++)
+# - Use () for grouping: (senior OR lead) engineer
+#
+# ADVANCED INDEED QUERY EXAMPLE:
+# '"software engineer" (python OR java) -marketing -sales senior'
+#
+# NOTE: Indeed also searches in the description, so you might get
+# irrelevant results. Use exclusions (-) to filter.
+#
+queries:
+  # Software Engineering roles
+  software_engineering:
+    - "software engineer"
+    - "backend engineer"
+    - "frontend developer"
+    - "full-stack developer"
+    - "software developer"
+
+  # DevOps & Infrastructure
+  devops:
+    - "devops engineer"
+    - "site reliability engineer"
+    - "cloud engineer"
+    - "platform engineer"
+    - "infrastructure engineer"
+
+  # Data roles
+  data:
+    - "data engineer"
+    - "data scientist"
+    - "data analyst"
+    - "machine learning engineer"
+    - "ML engineer"
+
+  # Specific technologies (customize to your stack)
+  technologies:
+    - "Python developer"
+    - "JavaScript developer"
+    - "React developer"
+    - "Node.js developer"
+    - "Go developer"
+    - "Rust developer"
+
+  # Senior/Lead roles
+  senior:
+    - "senior software engineer"
+    - "staff engineer"
+    - "tech lead"
+    - "engineering manager"
+
+  # Entry level / Internships
+  entry_level:
+    - "junior developer"
+    - "software engineer intern"
+    - "new grad software engineer"
+    - "entry level developer"
+
+# =============================================================================
+# RELEVANCE SCORING - Scoring system to filter relevant jobs
+# =============================================================================
+#
+# The scoring system assigns points to jobs based on keywords found
+# in the title, description, and company name. Jobs with score > threshold
+# are saved as "relevant".
+#
+scoring:
+  # ---------------------------------------------------------------------------
+  # threshold (int): Minimum score to consider a job "relevant"
+  # ---------------------------------------------------------------------------
+  # - 0   : All jobs (no filter)
+  # - 10  : Light filter (default)
+  # - 20  : Medium filter
+  # - 30+ : Aggressive filter (only highly relevant jobs)
+  threshold: 10
+
+  # ---------------------------------------------------------------------------
+  # weights (dict): Weights for each keyword category
+  # ---------------------------------------------------------------------------
+  # Each category adds its weight to the score if at least one
+  # keyword from the category is found in the job.
+  #
+  # CUSTOMIZATION: Increase weights for areas more important to you,
+  # reduce or zero out less relevant ones.
+  weights:
+    primary_skills: 20      # Your main expertise
+    secondary_skills: 15    # Skills you're comfortable with
+    technologies: 12        # Specific tech stack matches
+    seniority_match: 10     # Matching your level
+    company_type: 8         # Preferred company types
+    remote_bonus: 5         # Remote work preference
+    location_bonus: 5       # Preferred locations
+
+  # ---------------------------------------------------------------------------
+  # keywords (dict): Keyword lists for each category
+  # ---------------------------------------------------------------------------
+  # Keywords are searched in lowercase in the combined text of:
+  # title + description + company name
+  #
+  # TIPS:
+  # - Add variants (e.g., "javascript", "js")
+  # - Include synonyms and translations
+  # - More specific keywords = fewer false positives
+  keywords:
+    primary_skills:
+      - "software engineer"
+      - "backend"
+      - "full-stack"
+      - "developer"
+      - "programmer"
+
+    secondary_skills:
+      - "data"
+      - "cloud"
+      - "devops"
+      - "api"
+      - "microservices"
+
+    technologies:
+      - "python"
+      - "javascript"
+      - "typescript"
+      - "react"
+      - "node.js"
+      - "postgresql"
+      - "docker"
+      - "kubernetes"
+      - "aws"
+      - "gcp"
+
+    seniority:
+      - "senior"
+      - "staff"
+      - "lead"
+      - "principal"
+
+    company_type:
+      - "startup"
+      - "tech"
+      - "fintech"
+      - "saas"
+
+    remote:
+      - "remote"
+      - "work from home"
+      - "distributed"
+      - "hybrid"
+
+# =============================================================================
+# PARALLELISM SETTINGS - Parallel execution configuration
+# =============================================================================
+parallel:
+  # ---------------------------------------------------------------------------
+  # max_workers (int): Number of parallel workers for queries
+  # ---------------------------------------------------------------------------
+  # - Each worker executes one query+location simultaneously
+  # - NOTE: JobSpy internally already parallelizes sites
+  # - Too many workers = more rate limiting
+  # - Recommended values:
+  #   - 3  : Conservative (less rate limiting)
+  #   - 5  : Balanced (default)
+  #   - 10 : Aggressive (only with proxies)
+  max_workers: 5
+
+# =============================================================================
+# RETRY SETTINGS - Retry handling for transient errors
+# =============================================================================
+retry:
+  # ---------------------------------------------------------------------------
+  # max_attempts (int): Maximum number of attempts per query
+  # ---------------------------------------------------------------------------
+  # Includes initial attempt, so 3 = 1 attempt + 2 retries
+  max_attempts: 3
+
+  # ---------------------------------------------------------------------------
+  # base_delay (float): Base delay between retries in seconds
+  # ---------------------------------------------------------------------------
+  # Actual delay uses exponential backoff:
+  # delay = base_delay * (backoff_factor ^ attempt_number)
+  base_delay: 2
+
+  # ---------------------------------------------------------------------------
+  # backoff_factor (float): Multiplication factor for exponential backoff
+  # ---------------------------------------------------------------------------
+  # Example with base_delay=2, backoff_factor=2:
+  #   - Retry 1: 2 seconds
+  #   - Retry 2: 4 seconds
+  #   - Retry 3: 8 seconds
+  backoff_factor: 2
+
+# =============================================================================
+# LOGGING SETTINGS - Logging system configuration
+# =============================================================================
+logging:
+  # ---------------------------------------------------------------------------
+  # level (str): Minimum log level to record
+  # ---------------------------------------------------------------------------
+  # Values (from most to least verbose):
+  #   - "DEBUG"   : Everything, including debug details
+  #   - "INFO"    : Normal progress (default)
+  #   - "WARNING" : Only warnings and errors
+  #   - "ERROR"   : Only errors
+  level: "INFO"
+
+  # ---------------------------------------------------------------------------
+  # file (str): Log file path (relative to project root)
+  # ---------------------------------------------------------------------------
+  file: "logs/search.log"
+
+  # ---------------------------------------------------------------------------
+  # max_size_mb (int): Maximum log file size in MB
+  # ---------------------------------------------------------------------------
+  # When reached, the file is rotated (renamed with .1, .2, etc.)
+  max_size_mb: 10
+
+  # ---------------------------------------------------------------------------
+  # backup_count (int): Number of backup log files to keep
+  # ---------------------------------------------------------------------------
+  # Example: with backup_count=5, you'll have:
+  # search.log, search.log.1, search.log.2, ..., search.log.5
+  backup_count: 5
+
+# =============================================================================
+# OUTPUT SETTINGS - Output and persistence configuration
+# =============================================================================
+output:
+  # ---------------------------------------------------------------------------
+  # results_dir (str): Directory for CSV/Excel output
+  # ---------------------------------------------------------------------------
+  results_dir: "results"
+
+  # ---------------------------------------------------------------------------
+  # data_dir (str): Directory for SQLite database
+  # ---------------------------------------------------------------------------
+  data_dir: "data"
+
+  # ---------------------------------------------------------------------------
+  # database_file (str): SQLite database filename
+  # ---------------------------------------------------------------------------
+  database_file: "jobs.db"
+
+# =============================================================================
+# PROFILE INFORMATION - Profile information for display
+# =============================================================================
+# These values are used only for the banner and reports,
+# they do not affect the search.
+profile:
+  name: "Your Name"
+  current_position: "Current Role @ Company"
+  skills: "Python, JavaScript, React, PostgreSQL"
+  target: "Senior Software Engineer, Tech Lead"
+
+# =============================================================================
+# REFERENCE: SUPPORTED COUNTRIES FOR Indeed/Glassdoor
+# =============================================================================
+#
+# Indeed supports these countries (use exact name):
+# * = also supported by Glassdoor
+#
+# ┌────────────────────┬────────────────┬────────────────┬────────────────┐
+# │ Argentina          │ Australia*     │ Austria*       │ Bahrain        │
+# │ Belgium*           │ Brazil*        │ Canada*        │ Chile          │
+# │ China              │ Colombia       │ Costa Rica     │ Czech Republic │
+# │ Denmark            │ Ecuador        │ Egypt          │ Finland        │
+# │ France*            │ Germany*       │ Greece         │ Hong Kong*     │
+# │ Hungary            │ India*         │ Indonesia      │ Ireland*       │
+# │ Israel             │ Italy*         │ Japan          │ Kuwait         │
+# │ Luxembourg         │ Malaysia       │ Mexico*        │ Morocco        │
+# │ Netherlands*       │ New Zealand*   │ Nigeria        │ Norway         │
+# │ Oman               │ Pakistan       │ Panama         │ Peru           │
+# │ Philippines        │ Poland         │ Portugal       │ Qatar          │
+# │ Romania            │ Saudi Arabia   │ Singapore*     │ South Africa   │
+# │ South Korea        │ Spain*         │ Sweden         │ Switzerland*   │
+# │ Taiwan             │ Thailand       │ Turkey         │ Ukraine        │
+# │ United Arab Emirates│ UK*           │ USA*           │ Uruguay        │
+# │ Venezuela          │ Vietnam*       │                │                │
+# └────────────────────┴────────────────┴────────────────┴────────────────┘
+#
+# =============================================================================
+# REFERENCE: JOB OUTPUT COLUMNS (DataFrame columns returned by JobSpy)
+# =============================================================================
+#
+# Standard columns (all sites):
+#   - id                : Unique job ID (format: site-id)
+#   - site              : Source (indeed, linkedin, glassdoor, etc.)
+#   - job_url           : Job URL on the site
+#   - job_url_direct    : Direct URL to the company (if available)
+#   - title             : Job title
+#   - company           : Company name
+#   - location          : Formatted location (city, state, country)
+#   - date_posted       : Publication date
+#   - job_type          : Contract type (fulltime, parttime, etc.)
+#   - salary_source     : Salary source (direct_data or description)
+#   - interval          : Salary interval (yearly, monthly, hourly, etc.)
+#   - min_amount        : Minimum salary
+#   - max_amount        : Maximum salary
+#   - currency          : Currency (USD, CHF, EUR, etc.)
+#   - is_remote         : Boolean if remote
+#   - description       : Full description
+#   - emails            : Emails found in description
+#
+# LinkedIn-specific columns:
+#   - job_level         : Level (entry, mid-senior, director, etc.)
+#   - job_function      : Function (Engineering, Research, etc.)
+#   - company_industry  : Company sector
+#
+# Indeed-specific columns:
+#   - company_url       : Company page URL
+#   - company_logo      : Company logo URL
+#   - company_addresses : Company addresses
+#   - company_num_employees : Number of employees
+#   - company_revenue   : Company revenue
+#   - company_description : Company description
+#
+# Naukri-specific columns (India):
+#   - skills            : Required skills
+#   - experience_range  : Required experience range
+#   - company_rating    : Company rating
+#   - company_reviews_count : Number of reviews
+#   - vacancy_count     : Number of open positions
+#   - work_from_home_type : WFH type (Hybrid, Remote, etc.)
+#
+# =============================================================================
+# KNOWN LIMITATIONS & ISSUES
+# =============================================================================
+#
+# 1. Indeed Filter Exclusivity:
+#    - Only ONE of: hours_old, (job_type + is_remote), easy_apply
+#    - If you use hours_old, job_type is silently ignored
+#
+# 2. LinkedIn Rate Limiting:
+#    - Aggressive rate limit (~10 pages max without proxies)
+#    - Internal delay 3-7 seconds between requests
+#    - linkedin_fetch_description doubles the requests
+#
+# 3. Glassdoor Issues:
+#    - "Location not parsed" for locations not in Glassdoor database
+#    - 400/429 errors for rate limiting
+#
+# 4. Google Jobs:
+#    - Requires google_search_term with specific syntax
+#    - Normal search_term doesn't work well
+#    - Syntax: copy from Google Jobs search bar
+#
+# 5. ZipRecruiter:
+#    - USA and Canada ONLY
+#    - Does not work for other countries
+#
+# =============================================================================
