@@ -174,7 +174,7 @@ class TelegramNotifier(BaseNotifier):
             f"• Total found: {data.total_jobs_found}",
             f"• New: {data.new_jobs_count}",
             f"• Updated: {data.updated_jobs_count}",
-            f"• Avg score: {data.avg_score:.1f}",
+            f"• Avg score: {self._escape_markdown(f'{data.avg_score:.1f}')}",
         ]
 
         if data.new_jobs_count == 0:

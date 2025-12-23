@@ -89,9 +89,9 @@ class JobSearchScheduler:
 
         # Log next scheduled run
         if self._scheduler and self.config.scheduler.enabled:
-            next_run = self._scheduler.get_jobs()[0].next_run_time
-            if next_run:
-                self.logger.info(f"Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+            jobs = self._scheduler.get_jobs()
+            if jobs and hasattr(jobs[0], 'next_run_time') and jobs[0].next_run_time:
+                self.logger.info(f"Next scheduled run: {jobs[0].next_run_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
     def _schedule_retry(self) -> None:
         """Schedule a retry after failure."""
