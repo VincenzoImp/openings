@@ -1,4 +1,4 @@
-# Switzerland Jobs Search - Python Dependencies
+# Job Search Tool - Python Dependencies
 # Install with: pip install -r requirements.txt
 
 # Core job scraping library (requires Python 3.10+)
@@ -22,3 +22,12 @@ tenacity>=8.0.0
 
 # Interactive dashboard for job results analysis
 streamlit>=1.28.0
+
+# Scheduling for automated periodic execution
+APScheduler>=3.10.0
+
+# Telegram bot notifications
+python-telegram-bot>=21.0
+
+# Template engine for notification formatting
+Jinja2>=3.1.0

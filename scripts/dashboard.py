@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Job Search Tool - Interactive Dashboard.
+JobSpy Search Tool - Interactive Dashboard.
 
 A Streamlit-based dashboard for analyzing and filtering job search results.
 Provides filtering, sorting, statistics, and export capabilities.

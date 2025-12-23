@@ -1,9 +1,11 @@
 # Job Search Tool
 
-Automated job search and analysis tool powered by the [JobSpy](https://github.com/speedyapply/JobSpy) library to aggregate positions from multiple job boards. Features parallel execution, relevance scoring, SQLite persistence, and an interactive Streamlit dashboard.
+Automated job search and analysis tool powered by the [JobSpy](https://github.com/speedyapply/JobSpy) library to aggregate positions from multiple job boards. Features parallel execution, relevance scoring, SQLite persistence, an interactive Streamlit dashboard, **automated scheduling**, and **Telegram notifications**.
 
 ## Features
 
+- **Automated Scheduling**: Run searches at configurable intervals (e.g., every 24 hours)
+- **Telegram Notifications**: Receive instant alerts when new relevant jobs are found
 - **Multi-Site Scraping**: Search LinkedIn, Indeed, Glassdoor, Google Jobs, ZipRecruiter, and more simultaneously
 - **Parallel Execution**: Concurrent searches with ThreadPoolExecutor (~3 min vs ~15 min sequential)
 - **SQLite Persistence**: Track jobs across runs, identify new opportunities, mark as applied
@@ -164,7 +166,25 @@ retry:
 
 ## Output Files
 
-### Results Directory (`results/`)
+### Database (`data/jobs.db`) - PRIMARY STORAGE
+
+The SQLite database is the **core storage** used by the system for:
+- Tracking all jobs seen across runs
+- Identifying new vs already-seen jobs
+- Determining which jobs to notify about
+- Marking jobs as "applied"
+
+### Results Directory (`results/`) - OPTIONAL
+
+CSV/Excel files are optional exports for human review. Disable with:
+
+```yaml
+output:
+  save_csv: false
+  save_excel: false
+```
+
+When enabled (default), generates:
 
 | File | Description |
 |------|-------------|
@@ -173,7 +193,7 @@ retry:
 | `relevant_jobs_YYYYMMDD_HHMMSS.csv` | Jobs above score threshold |
 | `relevant_jobs_YYYYMMDD_HHMMSS.xlsx` | Excel with highlighting |
 
-### Database (`data/jobs.db`)
+### Database Schema (`data/jobs.db`)
 
 SQLite database tracking all jobs with full details:
 
@@ -351,43 +371,94 @@ sqlite3 data/jobs.db "SELECT site, COUNT(*) FROM jobs GROUP BY site"
 sqlite3 data/jobs.db "SELECT title, company FROM jobs WHERE is_remote = 1 ORDER BY relevance_score DESC"
 ```
 
-## Scheduled Searches
+## Automated Scheduling with Notifications
 
-### Using Cron (Linux/Mac)
+The tool includes built-in scheduling and Telegram notifications - no external cron needed!
+
+### Setup Telegram Notifications
+
+1. **Create a bot with @BotFather**:
+   - Open Telegram and search for `@BotFather`
+   - Send `/newbot` and follow instructions
+   - Copy the bot token (format: `123456789:ABCdefGHIjklMNOpqrsTUVwxyz`)
+
+2. **Get your chat_id**:
+   - Start a chat with your new bot (send any message)
+   - Visit: `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
+   - Look for `"chat":{"id": YOUR_CHAT_ID}`
+
+3. **Configure `config/settings.yaml`**:
+
+```yaml
+scheduler:
+  enabled: true           # Enable scheduled mode
+  interval_hours: 24      # Run every 24 hours
+  run_on_startup: true    # Run immediately when starting
+
+notifications:
+  enabled: true
+  telegram:
+    enabled: true
+    bot_token: "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+    chat_ids:
+      - "987654321"       # Your chat ID
+    min_score_for_notification: 15  # Only notify high-score jobs
+    max_jobs_in_message: 10         # Top 10 jobs in notification
+```
+
+4. **Start the scheduler**:
+
+```bash
+# Using Docker (recommended - runs continuously)
+docker-compose --profile scheduler up scheduler --build -d
+
+# View logs
+docker-compose logs -f scheduler
+
+# Stop
+docker-compose --profile scheduler down
+```
+
+### Notification Example
+
+When new jobs are found, you'll receive a Telegram message like:
+
+```
+🔔 Job Search Tool - New Jobs Found
+━━━━━━━━━━━━━━━━━━━━━
+
+📊 Run Summary
+• Date: 2025-12-23 09:00
+• Total found: 150
+• New: 12
+• Avg score: 24.5
+
+━━━━━━━━━━━━━━━━━━━━━
+
+🏆 Top 5 New Jobs
+
+1️⃣ Blockchain Engineer
+   🏢 ETH Zurich
+   📍 Zurich, Switzerland
+   ⭐ Score: 48
+   View Job →
+
+2️⃣ PhD Researcher - Distributed Systems
+   🏢 EPFL
+   📍 Lausanne, Switzerland
+   ⭐ Score: 42
+   View Job →
+...
+```
+
+### Alternative: Using Cron (Manual Scheduling)
+
+If you prefer external scheduling:
 
 ```bash
 # Run daily at 9 AM
 crontab -e
 0 9 * * * cd /path/to/job-search-tool && docker-compose up
-```
-
-### Using launchd (Mac)
-
-Create `~/Library/LaunchAgents/com.job-search-tool.daily.plist`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.job-search-tool.daily</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/local/bin/docker-compose</string>
-        <string>up</string>
-    </array>
-    <key>WorkingDirectory</key>
-    <string>/path/to/job-search-tool</string>
-    <key>StartCalendarInterval</key>
-    <dict>
-        <key>Hour</key>
-        <integer>9</integer>
-        <key>Minute</key>
-        <integer>0</integer>
-    </dict>
-</dict>
-</plist>
 ```
 
 ## Example Output
