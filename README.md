@@ -166,7 +166,25 @@ retry:
 
 ## Output Files
 
-### Results Directory (`results/`)
+### Database (`data/jobs.db`) - PRIMARY STORAGE
+
+The SQLite database is the **core storage** used by the system for:
+- Tracking all jobs seen across runs
+- Identifying new vs already-seen jobs
+- Determining which jobs to notify about
+- Marking jobs as "applied"
+
+### Results Directory (`results/`) - OPTIONAL
+
+CSV/Excel files are optional exports for human review. Disable with:
+
+```yaml
+output:
+  save_csv: false
+  save_excel: false
+```
+
+When enabled (default), generates:
 
 | File | Description |
 |------|-------------|
@@ -175,7 +193,7 @@ retry:
 | `relevant_jobs_YYYYMMDD_HHMMSS.csv` | Jobs above score threshold |
 | `relevant_jobs_YYYYMMDD_HHMMSS.xlsx` | Excel with highlighting |
 
-### Database (`data/jobs.db`)
+### Database Schema (`data/jobs.db`)
 
 SQLite database tracking all jobs with full details:
 
