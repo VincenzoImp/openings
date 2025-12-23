@@ -1,27 +1,90 @@
-# JobSpy Dashboard - Docker Compose Configuration
-# Run with: docker-compose up --build
+# Job Search Tool - Docker Compose Configuration
+#
+# Usage:
+#   docker-compose up --build              # Single-shot mode (default)
+#   docker-compose up scheduler --build    # Scheduled mode with notifications
+#   docker-compose up dashboard --build    # Interactive dashboard
+#
+# For scheduled mode, configure settings.yaml:
+#   scheduler.enabled: true
+#   notifications.enabled: true
+#   notifications.telegram.enabled: true
+#   notifications.telegram.bot_token: "YOUR_BOT_TOKEN"
+#   notifications.telegram.chat_ids: ["YOUR_CHAT_ID"]
 
 services:
-  jobsearch:
+  # ============================================================================
+  # SCHEDULER SERVICE (Recommended for automated operation)
+  # ============================================================================
+  # Runs continuously with configurable interval (default: 24 hours)
+  # Sends notifications via Telegram when new jobs are found
+  # Use: docker-compose up scheduler --build
+  scheduler:
     build: .
-    container_name: jobspy_search
+    container_name: job_search_scheduler
+    restart: unless-stopped
     volumes:
-      # Persist results, database, and logs
       - ./results:/app/results
       - ./data:/app/data
       - ./logs:/app/logs
-      # Mount scripts and config for live editing
+      - ./scripts:/app/scripts
+      - ./config:/app/config
+      - ./templates:/app/templates
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=Europe/Zurich
+    command: python main.py
+    profiles:
+      - scheduler
+
+  # ============================================================================
+  # SINGLE-SHOT SERVICE (Backward compatible default)
+  # ============================================================================
+  # Runs once and exits - original behavior
+  # Use: docker-compose up --build
+  jobsearch:
+    build: .
+    container_name: job_search
+    volumes:
+      - ./results:/app/results
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./scripts:/app/scripts
+      - ./config:/app/config
+      - ./templates:/app/templates
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=Europe/Zurich
+    command: python main.py
+
+  # ============================================================================
+  # LEGACY SINGLE-SHOT (Runs original search_jobs.py directly)
+  # ============================================================================
+  # For backward compatibility - skips new main.py entry point
+  # Use: docker-compose --profile legacy up legacy --build
+  legacy:
+    build: .
+    container_name: job_search_legacy
+    volumes:
+      - ./results:/app/results
+      - ./data:/app/data
+      - ./logs:/app/logs
       - ./scripts:/app/scripts
       - ./config:/app/config
     environment:
       - PYTHONUNBUFFERED=1
-    # Default: run job search
     command: python search_jobs.py
+    profiles:
+      - legacy
 
-  # Alias for running analysis
+  # ============================================================================
+  # ANALYSIS SERVICE
+  # ============================================================================
+  # Runs analysis on existing results
+  # Use: docker-compose --profile analyze up analyze --build
   analyze:
     build: .
-    container_name: jobspy_analyze
+    container_name: job_analyze
     volumes:
       - ./results:/app/results
       - ./data:/app/data
@@ -34,10 +97,15 @@ services:
     profiles:
       - analyze
 
-  # Interactive dashboard for job results analysis
+  # ============================================================================
+  # DASHBOARD SERVICE
+  # ============================================================================
+  # Interactive Streamlit dashboard for exploring job results
+  # Use: docker-compose --profile dashboard up dashboard --build
+  # Access: http://localhost:8501
   dashboard:
     build: .
-    container_name: jobspy_dashboard
+    container_name: job_dashboard
     ports:
       - "8501:8501"
     volumes:
@@ -46,8 +114,10 @@ services:
       - ./logs:/app/logs
       - ./scripts:/app/scripts
       - ./config:/app/config
+      - ./templates:/app/templates
     environment:
       - PYTHONUNBUFFERED=1
+      - TZ=Europe/Zurich
     command: streamlit run dashboard.py --server.address=0.0.0.0 --server.port=8501
     profiles:
       - dashboard

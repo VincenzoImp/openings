@@ -1,9 +1,11 @@
-# JobSpy Dashboard
+# Job Search Tool
 
-Automated job search and analysis tool using [JobSpy](https://github.com/speedyapply/JobSpy) to aggregate positions from multiple job boards. Features parallel execution, relevance scoring, SQLite persistence, and an interactive Streamlit dashboard.
+Automated job search and analysis tool powered by the [JobSpy](https://github.com/speedyapply/JobSpy) library to aggregate positions from multiple job boards. Features parallel execution, relevance scoring, SQLite persistence, an interactive Streamlit dashboard, **automated scheduling**, and **Telegram notifications**.
 
 ## Features
 
+- **Automated Scheduling**: Run searches at configurable intervals (e.g., every 24 hours)
+- **Telegram Notifications**: Receive instant alerts when new relevant jobs are found
 - **Multi-Site Scraping**: Search LinkedIn, Indeed, Glassdoor, Google Jobs, ZipRecruiter, and more simultaneously
 - **Parallel Execution**: Concurrent searches with ThreadPoolExecutor (~3 min vs ~15 min sequential)
 - **SQLite Persistence**: Track jobs across runs, identify new opportunities, mark as applied
@@ -20,8 +22,8 @@ Automated job search and analysis tool using [JobSpy](https://github.com/speedya
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/jobspy-dashboard.git
-cd jobspy-dashboard
+git clone https://github.com/VincenzoImp/job-search-tool.git
+cd job-search-tool
 
 # Copy example config and customize
 cp config/settings.example.yaml config/settings.yaml
@@ -64,7 +66,7 @@ streamlit run dashboard.py
 ## Project Structure
 
 ```
-jobspy-dashboard/
+job-search-tool/
 ├── config/
 │   ├── settings.yaml          # Your configuration (gitignored)
 │   └── settings.example.yaml  # Example configuration template
@@ -92,7 +94,7 @@ All settings are in `config/settings.yaml`. Copy from `settings.example.yaml` an
 
 The configuration file is extensively documented with comments explaining every parameter, including:
 - All possible values and their meanings
-- JobSpy limitations and workarounds
+- Known limitations and workarounds
 - Site-specific behaviors
 - Best practices and recommendations
 
@@ -314,7 +316,7 @@ docker-compose up --build
 
 ### Python Version
 
-JobSpy requires Python 3.10+. Check your version:
+This tool requires Python 3.10+ (JobSpy library requirement). Check your version:
 
 ```bash
 python3 --version
@@ -351,43 +353,94 @@ sqlite3 data/jobs.db "SELECT site, COUNT(*) FROM jobs GROUP BY site"
 sqlite3 data/jobs.db "SELECT title, company FROM jobs WHERE is_remote = 1 ORDER BY relevance_score DESC"
 ```
 
-## Scheduled Searches
+## Automated Scheduling with Notifications
 
-### Using Cron (Linux/Mac)
+The tool includes built-in scheduling and Telegram notifications - no external cron needed!
+
+### Setup Telegram Notifications
+
+1. **Create a bot with @BotFather**:
+   - Open Telegram and search for `@BotFather`
+   - Send `/newbot` and follow instructions
+   - Copy the bot token (format: `123456789:ABCdefGHIjklMNOpqrsTUVwxyz`)
+
+2. **Get your chat_id**:
+   - Start a chat with your new bot (send any message)
+   - Visit: `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
+   - Look for `"chat":{"id": YOUR_CHAT_ID}`
+
+3. **Configure `config/settings.yaml`**:
+
+```yaml
+scheduler:
+  enabled: true           # Enable scheduled mode
+  interval_hours: 24      # Run every 24 hours
+  run_on_startup: true    # Run immediately when starting
+
+notifications:
+  enabled: true
+  telegram:
+    enabled: true
+    bot_token: "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+    chat_ids:
+      - "987654321"       # Your chat ID
+    min_score_for_notification: 15  # Only notify high-score jobs
+    max_jobs_in_message: 10         # Top 10 jobs in notification
+```
+
+4. **Start the scheduler**:
+
+```bash
+# Using Docker (recommended - runs continuously)
+docker-compose --profile scheduler up scheduler --build -d
+
+# View logs
+docker-compose logs -f scheduler
+
+# Stop
+docker-compose --profile scheduler down
+```
+
+### Notification Example
+
+When new jobs are found, you'll receive a Telegram message like:
+
+```
+🔔 Job Search Tool - New Jobs Found
+━━━━━━━━━━━━━━━━━━━━━
+
+📊 Run Summary
+• Date: 2025-12-23 09:00
+• Total found: 150
+• New: 12
+• Avg score: 24.5
+
+━━━━━━━━━━━━━━━━━━━━━
+
+🏆 Top 5 New Jobs
+
+1️⃣ Blockchain Engineer
+   🏢 ETH Zurich
+   📍 Zurich, Switzerland
+   ⭐ Score: 48
+   View Job →
+
+2️⃣ PhD Researcher - Distributed Systems
+   🏢 EPFL
+   📍 Lausanne, Switzerland
+   ⭐ Score: 42
+   View Job →
+...
+```
+
+### Alternative: Using Cron (Manual Scheduling)
+
+If you prefer external scheduling:
 
 ```bash
 # Run daily at 9 AM
 crontab -e
-0 9 * * * cd /path/to/jobspy-dashboard && docker-compose up
-```
-
-### Using launchd (Mac)
-
-Create `~/Library/LaunchAgents/com.jobspy.daily.plist`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.jobspy.daily</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/local/bin/docker-compose</string>
-        <string>up</string>
-    </array>
-    <key>WorkingDirectory</key>
-    <string>/path/to/jobspy-dashboard</string>
-    <key>StartCalendarInterval</key>
-    <dict>
-        <key>Hour</key>
-        <integer>9</integer>
-        <key>Minute</key>
-        <integer>0</integer>
-    </dict>
-</dict>
-</plist>
+0 9 * * * cd /path/to/job-search-tool && docker-compose up
 ```
 
 ## Example Output
@@ -443,7 +496,7 @@ MIT License
 
 ## Support
 
-- **JobSpy issues**: https://github.com/speedyapply/JobSpy/issues
+- **JobSpy library issues**: https://github.com/speedyapply/JobSpy/issues
 - **This project**: Open an issue on GitHub
 
 ---

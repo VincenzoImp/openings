@@ -510,6 +510,84 @@ profile:
   target: "Senior Software Engineer, Tech Lead"
 
 # =============================================================================
+# SCHEDULER SETTINGS - Automated periodic execution
+# =============================================================================
+# Enable scheduling to run job searches automatically at regular intervals.
+# When disabled (default), the tool runs once and exits (backward compatible).
+scheduler:
+  # ---------------------------------------------------------------------------
+  # enabled (bool): Enable scheduled execution
+  # ---------------------------------------------------------------------------
+  # - false : Run once and exit (default, backward compatible)
+  # - true  : Run continuously at specified interval
+  enabled: false
+
+  # ---------------------------------------------------------------------------
+  # interval_hours (int): Time between search runs
+  # ---------------------------------------------------------------------------
+  # Common values:
+  #   - 6   : Four times a day (aggressive)
+  #   - 12  : Twice a day (morning and evening)
+  #   - 24  : Once a day (recommended)
+  #   - 48  : Every two days (conservative)
+  interval_hours: 24
+
+  # ---------------------------------------------------------------------------
+  # run_on_startup (bool): Execute search immediately on startup
+  # ---------------------------------------------------------------------------
+  # - true  : Run search immediately, then schedule next runs
+  # - false : Wait for first scheduled time before running
+  run_on_startup: true
+
+  # ---------------------------------------------------------------------------
+  # retry_on_failure (bool): Retry if search fails
+  # ---------------------------------------------------------------------------
+  retry_on_failure: true
+
+  # ---------------------------------------------------------------------------
+  # retry_delay_minutes (int): Wait time before retry after failure
+  # ---------------------------------------------------------------------------
+  retry_delay_minutes: 30
+
+# =============================================================================
+# NOTIFICATIONS SETTINGS - Send alerts for new jobs
+# =============================================================================
+# Configure notifications to receive alerts when new jobs are found.
+# Currently supports Telegram. More channels can be added in the future.
+notifications:
+  # ---------------------------------------------------------------------------
+  # enabled (bool): Master switch for all notifications
+  # ---------------------------------------------------------------------------
+  enabled: false
+
+  # ---------------------------------------------------------------------------
+  # TELEGRAM NOTIFICATIONS
+  # ---------------------------------------------------------------------------
+  # To set up Telegram notifications:
+  #
+  # 1. Create a bot with @BotFather on Telegram:
+  #    - Open Telegram and search for @BotFather
+  #    - Send /newbot and follow the instructions
+  #    - Copy the bot token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+  #
+  # 2. Get your chat_id:
+  #    - Start a chat with your new bot
+  #    - Send any message to the bot
+  #    - Visit: https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates
+  #    - Look for "chat":{"id": YOUR_CHAT_ID}
+  #
+  # 3. Configure below with your bot_token and chat_id
+  #
+  telegram:
+    enabled: false
+    bot_token: ""  # Your bot token from @BotFather
+    chat_ids:      # List of chat IDs to notify
+      - ""         # Your personal chat ID
+    send_summary: true        # Send summary after each run
+    min_score_for_notification: 0  # Only notify for jobs with score >= this
+    max_jobs_in_message: 10   # Max jobs to include in notification
+
+# =============================================================================
 # REFERENCE: SUPPORTED COUNTRIES FOR Indeed/Glassdoor
 # =============================================================================
 #
