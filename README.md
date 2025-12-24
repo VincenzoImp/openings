@@ -1,6 +1,6 @@
 # Job Search Tool
 
-Automated job search and analysis tool powered by the [JobSpy](https://github.com/speedyapply/JobSpy) library to aggregate positions from multiple job boards. Features parallel execution, relevance scoring, SQLite persistence, an interactive Streamlit dashboard, **automated scheduling**, and **Telegram notifications**.
+Automated job search and analysis tool powered by the [JobSpy](https://github.com/speedyapply/JobSpy) library to aggregate positions from multiple job boards. Features parallel execution, relevance scoring, SQLite persistence, an interactive Streamlit dashboard, automated scheduling, and Telegram notifications.
 
 ## Features
 
@@ -18,7 +18,7 @@ Automated job search and analysis tool powered by the [JobSpy](https://github.co
 
 ## Quick Start
 
-### Option 1: Using Docker (Recommended)
+### Using Docker (Recommended)
 
 ```bash
 # Clone the repository
@@ -29,74 +29,45 @@ cd job-search-tool
 cp config/settings.example.yaml config/settings.yaml
 # Edit config/settings.yaml with your preferences
 
-# Build and run job search
+# Run once
 docker-compose up --build
 
-# Run analysis
-docker-compose --profile analyze up analyze
+# Or run continuously with scheduler + notifications
+docker-compose --profile scheduler up scheduler -d
 
 # Launch interactive dashboard
 docker-compose --profile dashboard up dashboard
-# Then open http://localhost:8501 in your browser
-
-# Results saved in ./results/ and ./data/
+# Open http://localhost:8501
 ```
 
-### Option 2: Local Python (Requires Python 3.10+)
+### Using Local Python (3.10+)
 
 ```bash
-# Install dependencies
 pip install -r requirements.txt
-
-# Copy example config
 cp config/settings.example.yaml config/settings.yaml
-
-# Run job search
-cd scripts
-python search_jobs.py
-
-# Analyze results
-python analyze_jobs.py
-
-# Launch dashboard
-streamlit run dashboard.py
-# Then open http://localhost:8501 in your browser
+cd scripts && python main.py
 ```
 
-## Project Structure
+## How It Works
 
 ```
-job-search-tool/
-├── config/
-│   ├── settings.yaml          # Your configuration (gitignored)
-│   └── settings.example.yaml  # Example configuration template
-├── scripts/
-│   ├── search_jobs.py         # Main job search (parallel execution)
-│   ├── analyze_jobs.py        # Results analysis and reporting
-│   ├── dashboard.py           # Interactive Streamlit dashboard
-│   ├── config.py              # Configuration loader with validation
-│   ├── logger.py              # Structured logging with rotation
-│   ├── database.py            # SQLite persistence for job tracking
-│   └── models.py              # Type-safe dataclasses
-├── results/                    # CSV/Excel output (gitignored)
-├── data/                       # SQLite database (gitignored)
-├── logs/                       # Log files (gitignored)
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-├── CLAUDE.md                   # Developer documentation
-└── README.md
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   JobSpy    │────▶│   Scoring   │────▶│   SQLite    │────▶│  Telegram   │
+│  Scraper    │     │   Engine    │     │  Database   │     │    Bot      │
+└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+      ▲                                        │
+      └────────────────────────────────────────┘
+                   Deduplication
 ```
+
+1. **Scrape**: JobSpy fetches listings from configured sites in parallel
+2. **Score**: Each job gets a relevance score based on keyword matches
+3. **Store**: SQLite tracks all jobs, identifies new vs already-seen
+4. **Notify**: Telegram sends top new matches above score threshold
 
 ## Configuration
 
-All settings are in `config/settings.yaml`. Copy from `settings.example.yaml` and customize.
-
-The configuration file is extensively documented with comments explaining every parameter, including:
-- All possible values and their meanings
-- Known limitations and workarounds
-- Site-specific behaviors
-- Best practices and recommendations
+All settings are in `config/settings.yaml`. Copy from `settings.example.yaml` and customize. The configuration file is extensively documented with comments explaining every parameter.
 
 ### Search Settings
 
@@ -133,6 +104,12 @@ queries:
   # Add your own categories
 ```
 
+**Query Syntax Tips** (especially for Indeed):
+- Use `""` for exact match: `"software engineer"`
+- Use `-` to exclude: `software -marketing -sales`
+- Use `OR` for alternatives: `(python OR java OR c++)`
+- Use `()` for grouping: `(senior OR lead) engineer`
+
 ### Relevance Scoring
 
 ```yaml
@@ -164,6 +141,75 @@ retry:
   backoff_factor: 2         # Exponential multiplier
 ```
 
+### Scheduler & Notifications
+
+```yaml
+scheduler:
+  enabled: true             # Enable scheduled mode
+  interval_hours: 24        # Run every 24 hours
+  run_on_startup: true      # Run immediately when starting
+
+notifications:
+  enabled: true
+  telegram:
+    enabled: true
+    bot_token: "YOUR_BOT_TOKEN"      # From @BotFather
+    chat_ids: ["YOUR_CHAT_ID"]
+    min_score_for_notification: 15   # Only notify high-score jobs
+    max_jobs_in_message: 10          # Top 10 jobs in notification
+```
+
+## Setting Up Telegram Notifications
+
+1. **Create a bot with @BotFather**:
+   - Open Telegram and search for `@BotFather`
+   - Send `/newbot` and follow instructions
+   - Copy the bot token (format: `123456789:ABCdefGHIjklMNOpqrsTUVwxyz`)
+
+2. **Get your chat_id**:
+   - Start a chat with your new bot (send any message)
+   - Visit: `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
+   - Look for `"chat":{"id": YOUR_CHAT_ID}`
+
+3. **Configure `config/settings.yaml`** with your bot_token and chat_id
+
+4. **Start the scheduler**:
+   ```bash
+   docker-compose --profile scheduler up scheduler -d
+   ```
+
+### Notification Example
+
+When new jobs are found, you'll receive a Telegram message like:
+
+```
+🔔 Job Search Tool - New Jobs Found
+━━━━━━━━━━━━━━━━━━━━━
+
+📊 Run Summary
+• Date: 2025-12-23 09:00
+• Total found: 150
+• New: 12
+• Avg score: 24.5
+
+━━━━━━━━━━━━━━━━━━━━━
+
+🏆 Top 5 New Jobs
+
+1️⃣ Backend Engineer
+   🏢 TechCorp Inc.
+   📍 Berlin, Germany
+   ⭐ Score: 48
+   View Job →
+
+2️⃣ Full Stack Developer
+   🏢 Startup AG
+   📍 Remote
+   ⭐ Score: 42
+   View Job →
+...
+```
+
 ## Output Files
 
 ### Database (`data/jobs.db`) - PRIMARY STORAGE
@@ -193,9 +239,7 @@ When enabled (default), generates:
 | `relevant_jobs_YYYYMMDD_HHMMSS.csv` | Jobs above score threshold |
 | `relevant_jobs_YYYYMMDD_HHMMSS.xlsx` | Excel with highlighting |
 
-### Database Schema (`data/jobs.db`)
-
-SQLite database tracking all jobs with full details:
+### Database Schema
 
 | Column | Description |
 |--------|-------------|
@@ -214,10 +258,6 @@ SQLite database tracking all jobs with full details:
 | `relevance_score` | Calculated score |
 | `applied` | Application status |
 
-### Logs (`logs/search.log`)
-
-Structured logs with timestamps, rotation, and levels (INFO, WARNING, ERROR).
-
 ## Interactive Dashboard
 
 The dashboard provides a powerful interface for analyzing and filtering job results.
@@ -234,37 +274,16 @@ The dashboard provides a powerful interface for analyzing and filtering job resu
 
 ### Launch Dashboard
 
-**Using Docker:**
 ```bash
+# Using Docker
 docker-compose --profile dashboard up dashboard
+# Open http://localhost:8501
+
+# Using Local Python
+cd scripts && streamlit run dashboard.py
 ```
-
-**Using Local Python:**
-```bash
-cd scripts
-streamlit run dashboard.py
-```
-
-Then open http://localhost:8501 in your browser.
-
-### Dashboard Filters
-
-| Filter | Description |
-|--------|-------------|
-| Search | Text search in title, company, description |
-| Job Level | LinkedIn seniority levels (Entry, Associate, Mid-Senior, etc.) |
-| Job Sites | Filter by source (LinkedIn, Indeed, Glassdoor) |
-| Job Type | fulltime, parttime, internship, contract |
-| Remote Only | Show only remote positions |
-| Salary Range | Min/max annual salary |
-| Relevance Score | Minimum score threshold |
-| Date Posted | Jobs after a specific date |
-| Companies | Select specific companies |
-| Hide Applied | Hide jobs marked as applied |
 
 ## Data Sources
-
-The tool scrapes jobs from:
 
 | Site | Coverage | Rate Limiting | Notes |
 |------|----------|---------------|-------|
@@ -275,9 +294,8 @@ The tool scrapes jobs from:
 | **ZipRecruiter** | USA/Canada | Moderate | North America only |
 | **Bayt** | Middle East | Minimal | UAE, Saudi Arabia, etc. |
 | **Naukri** | India | Minimal | India only |
-| **BDJobs** | Bangladesh | Minimal | Bangladesh only |
 
-## Supported Countries
+### Supported Countries
 
 | Region | Countries |
 |--------|-----------|
@@ -313,9 +331,7 @@ Indeed can only use ONE of these filters at a time:
 
 ## Troubleshooting
 
-### Rate Limiting
-
-If you encounter errors or empty results:
+### Rate Limiting / Empty Results
 
 1. Reduce `parallel.max_workers` to 3
 2. Reduce `search.results_wanted` to 20
@@ -326,7 +342,6 @@ If you encounter errors or empty results:
 ### Docker Issues
 
 ```bash
-# Rebuild from scratch
 docker-compose down
 docker system prune -f
 docker-compose up --build
@@ -341,13 +356,6 @@ python3 --version
 ```
 
 If below 3.10, use Docker instead.
-
-### No Results Found
-
-1. Check internet connection
-2. Increase `search.hours_old` (e.g., 1440 for 60 days)
-3. Reduce number of queries/locations
-4. Try again later (sites may be blocking)
 
 ## Database Queries
 
@@ -371,135 +379,33 @@ sqlite3 data/jobs.db "SELECT site, COUNT(*) FROM jobs GROUP BY site"
 sqlite3 data/jobs.db "SELECT title, company FROM jobs WHERE is_remote = 1 ORDER BY relevance_score DESC"
 ```
 
-## Automated Scheduling with Notifications
-
-The tool includes built-in scheduling and Telegram notifications - no external cron needed!
-
-### Setup Telegram Notifications
-
-1. **Create a bot with @BotFather**:
-   - Open Telegram and search for `@BotFather`
-   - Send `/newbot` and follow instructions
-   - Copy the bot token (format: `123456789:ABCdefGHIjklMNOpqrsTUVwxyz`)
-
-2. **Get your chat_id**:
-   - Start a chat with your new bot (send any message)
-   - Visit: `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
-   - Look for `"chat":{"id": YOUR_CHAT_ID}`
-
-3. **Configure `config/settings.yaml`**:
-
-```yaml
-scheduler:
-  enabled: true           # Enable scheduled mode
-  interval_hours: 24      # Run every 24 hours
-  run_on_startup: true    # Run immediately when starting
-
-notifications:
-  enabled: true
-  telegram:
-    enabled: true
-    bot_token: "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
-    chat_ids:
-      - "987654321"       # Your chat ID
-    min_score_for_notification: 15  # Only notify high-score jobs
-    max_jobs_in_message: 10         # Top 10 jobs in notification
-```
-
-4. **Start the scheduler**:
-
-```bash
-# Using Docker (recommended - runs continuously)
-docker-compose --profile scheduler up scheduler --build -d
-
-# View logs
-docker-compose logs -f scheduler
-
-# Stop
-docker-compose --profile scheduler down
-```
-
-### Notification Example
-
-When new jobs are found, you'll receive a Telegram message like:
+## Project Structure
 
 ```
-🔔 Job Search Tool - New Jobs Found
-━━━━━━━━━━━━━━━━━━━━━
-
-📊 Run Summary
-• Date: 2025-12-23 09:00
-• Total found: 150
-• New: 12
-• Avg score: 24.5
-
-━━━━━━━━━━━━━━━━━━━━━
-
-🏆 Top 5 New Jobs
-
-1️⃣ Blockchain Engineer
-   🏢 ETH Zurich
-   📍 Zurich, Switzerland
-   ⭐ Score: 48
-   View Job →
-
-2️⃣ PhD Researcher - Distributed Systems
-   🏢 EPFL
-   📍 Lausanne, Switzerland
-   ⭐ Score: 42
-   View Job →
-...
+job-search-tool/
+├── config/
+│   ├── settings.yaml          # Your configuration (gitignored)
+│   └── settings.example.yaml  # Example template with full documentation
+├── scripts/
+│   ├── main.py                # Unified entry point (scheduler + notifications)
+│   ├── search_jobs.py         # Core job search with parallel execution
+│   ├── scheduler.py           # APScheduler integration
+│   ├── notifier.py            # Telegram notification system
+│   ├── dashboard.py           # Streamlit interactive dashboard
+│   ├── database.py            # SQLite persistence
+│   ├── config.py              # Configuration loader
+│   ├── logger.py              # Structured logging
+│   └── models.py              # Type-safe dataclasses
+├── templates/                  # Jinja2 templates for notifications
+├── results/                    # CSV/Excel output (gitignored)
+├── data/                       # SQLite database (gitignored)
+├── logs/                       # Log files (gitignored)
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+├── CLAUDE.md                   # Developer documentation
+└── README.md
 ```
-
-### Alternative: Using Cron (Manual Scheduling)
-
-If you prefer external scheduling:
-
-```bash
-# Run daily at 9 AM
-crontab -e
-0 9 * * * cd /path/to/job-search-tool && docker-compose up
-```
-
-## Example Output
-
-```
-============================================================
-  SEARCHING FOR JOBS
-============================================================
-12:00:01 | INFO | Total search tasks: 120
-12:00:01 | INFO | Parallel workers: 5
-12:00:05 | INFO | [1/120] (0%) Found 23 jobs: software engineer @ Zurich
-12:00:07 | INFO | [2/120] (1%) Found 15 jobs: backend developer @ Remote
-...
-12:03:45 | INFO | Job search complete: 100 succeeded, 20 failed out of 120 total
-
-============================================================
-  TOP 10 MOST RELEVANT JOBS
-============================================================
-1. Senior Software Engineer
-   Company: Tech Startup Inc
-   Location: Zurich, Switzerland
-   Relevance Score: 45
-
-2. Backend Engineer - Python
-   Company: FinTech Corp
-   Location: Remote
-   Relevance Score: 42
-...
-
-============================================================
-  SEARCH COMPLETE
-============================================================
-12:03:48 | INFO | Duration: 3m 47s
-12:03:48 | INFO | Total unique jobs: 187
-12:03:48 | INFO | Highly relevant jobs: 45
-12:03:48 | INFO | New jobs (first time seen): 12
-```
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
@@ -509,6 +415,8 @@ MIT License
 
 - [JobSpy](https://github.com/speedyapply/JobSpy) - The underlying job scraping library
 - [Streamlit](https://streamlit.io/) - Dashboard framework
+- [APScheduler](https://apscheduler.readthedocs.io/) - Scheduling
+- [python-telegram-bot](https://python-telegram-bot.org/) - Telegram integration
 - [Pandas](https://pandas.pydata.org/) - Data manipulation
 - [Tenacity](https://github.com/jd/tenacity) - Retry logic
 
@@ -516,7 +424,3 @@ MIT License
 
 - **JobSpy library issues**: https://github.com/speedyapply/JobSpy/issues
 - **This project**: Open an issue on GitHub
-
----
-
-**Good luck with your job search!**
