@@ -21,18 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated documentation with scheduling and notification setup guides
 - Improved Docker configuration with service profiles
 
-## [1.1.0] - 2025-12-22
-
-### Added
-
-- Optional CSV/Excel export (can be disabled in config)
-- Improved documentation
-
-### Fixed
-
-- Telegram MarkdownV2 escape characters
-- Scheduler next_run_time calculation bugs
-
 ## [1.0.0] - 2025-12-21
 
 ### Added
@@ -48,6 +36,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Structured Logging**: File and console logs with rotation
 - **Docker Support**: Containerized environment for cross-platform compatibility
 
-[2.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v1.1.0...v2.0.0
-[1.1.0]: https://github.com/VincenzoImp/job-search-tool/compare/v1.0.0...v1.1.0
+[2.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/VincenzoImp/job-search-tool/releases/tag/v1.0.0
