@@ -1,5 +1,5 @@
 """
-Logging configuration for Switzerland Jobs Search.
+Logging configuration for Job Search Tool.
 
 Provides structured logging with file rotation and colored console output.
 """
@@ -71,7 +71,7 @@ def setup_logging(config: Config) -> logging.Logger:
         Configured logger instance.
     """
     # Create logger
-    logger = logging.getLogger("switzerland_jobs")
+    logger = logging.getLogger("job_search")
     logger.setLevel(getattr(logging, config.logging.level.upper(), logging.INFO))
 
     # Remove existing handlers
@@ -119,8 +119,8 @@ def get_logger(name: str | None = None) -> logging.Logger:
         Logger instance.
     """
     if name:
-        return logging.getLogger(f"switzerland_jobs.{name}")
-    return logging.getLogger("switzerland_jobs")
+        return logging.getLogger(f"job_search.{name}")
+    return logging.getLogger("job_search")
 
 
 class ProgressLogger:

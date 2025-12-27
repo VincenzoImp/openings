@@ -152,6 +152,15 @@ search:
   offset: 0
 
   # ---------------------------------------------------------------------------
+  # country_indeed (str): Country for Indeed domain
+  # ---------------------------------------------------------------------------
+  # Indeed uses country-specific domains. Set this to match your target country.
+  # See the REFERENCE section at the end of this file for a full list of
+  # supported countries.
+  # Common values: "USA", "UK", "Germany", "France", "Canada", "Australia"
+  country_indeed: "USA"
+
+  # ---------------------------------------------------------------------------
   # enforce_annual_salary (bool): Normalize all salaries to annual
   # ---------------------------------------------------------------------------
   # - true  : Convert hourly/monthly/weekly to yearly for comparison
@@ -446,6 +455,64 @@ retry:
   #   - Retry 2: 4 seconds
   #   - Retry 3: 8 seconds
   backoff_factor: 2
+
+# =============================================================================
+# THROTTLING SETTINGS - Rate limit prevention
+# =============================================================================
+# Throttling adds delays between requests to prevent rate limiting from job
+# boards. This is especially important for LinkedIn which has aggressive
+# rate limiting.
+#
+# Without throttling, running many queries (e.g., 100+ searches) will likely
+# result in rate limiting, IP blocks, or failed queries.
+throttling:
+  # ---------------------------------------------------------------------------
+  # enabled (bool): Enable/disable throttling
+  # ---------------------------------------------------------------------------
+  # - true  : Add delays between requests (recommended)
+  # - false : No delays (faster but higher rate limit risk)
+  enabled: true
+
+  # ---------------------------------------------------------------------------
+  # default_delay (float): Default delay between requests in seconds
+  # ---------------------------------------------------------------------------
+  # Applied when no site-specific delay is configured.
+  # Higher values = less risk of rate limiting but slower execution.
+  default_delay: 1.5
+
+  # ---------------------------------------------------------------------------
+  # site_delays (dict): Per-site delay overrides in seconds
+  # ---------------------------------------------------------------------------
+  # Different job boards have different rate limiting thresholds:
+  # - LinkedIn: Very aggressive, needs higher delays
+  # - Indeed: More lenient, lower delays acceptable
+  # - Glassdoor: Moderate rate limiting
+  #
+  # Adjust based on your experience with rate limiting.
+  site_delays:
+    linkedin: 3.0      # Most aggressive rate limiting
+    indeed: 1.0        # More lenient
+    glassdoor: 1.5     # Moderate
+    google: 2.0        # Moderate
+    ziprecruiter: 1.5  # Moderate
+
+  # ---------------------------------------------------------------------------
+  # jitter (float): Random variation added to delays (0.0 to 1.0)
+  # ---------------------------------------------------------------------------
+  # Adds randomness to delays to avoid detection patterns.
+  # Example: jitter=0.3 with delay=2.0 → actual delay between 1.4-2.6s
+  # - 0.0 : No jitter (fixed delays)
+  # - 0.3 : 30% variation (recommended)
+  # - 0.5 : 50% variation
+  jitter: 0.3
+
+  # ---------------------------------------------------------------------------
+  # rate_limit_cooldown (float): Cooldown after rate limit error in seconds
+  # ---------------------------------------------------------------------------
+  # When a rate limit error is detected (429, "too many requests", etc.),
+  # wait this long before retrying. Higher values give the server more time
+  # to reset its rate limit counters.
+  rate_limit_cooldown: 30.0
 
 # =============================================================================
 # LOGGING SETTINGS - Logging system configuration

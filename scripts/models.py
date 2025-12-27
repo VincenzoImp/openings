@@ -1,5 +1,5 @@
 """
-Data models for Switzerland Jobs Search.
+Data models for Job Search Tool.
 
 Provides type-safe dataclasses for jobs and search results.
 """

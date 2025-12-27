@@ -24,7 +24,7 @@ from search_jobs import (
     print_banner,
     print_top_jobs,
     save_results,
-    search_switzerland_jobs,
+    search_jobs,
 )
 
 if TYPE_CHECKING:
@@ -61,7 +61,7 @@ def run_job_search() -> bool:
         logger.info(f"Database: {db_stats['total_jobs']} jobs tracked")
 
         # Search for jobs
-        all_jobs, summary = search_switzerland_jobs(config)
+        all_jobs, summary = search_jobs(config)
 
         if all_jobs is None or len(all_jobs) == 0:
             logger.warning("No jobs found in this search")
