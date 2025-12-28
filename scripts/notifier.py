@@ -7,6 +7,7 @@ Sends alerts when new jobs are found via various channels (Telegram, etc.).
 from __future__ import annotations
 
 import asyncio
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
@@ -14,6 +15,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+from logger import get_logger
 
 if TYPE_CHECKING:
     from config import Config, TelegramConfig
@@ -78,12 +81,16 @@ class TelegramNotifier(BaseNotifier):
         self.config = config
         self._bot = None
         self._jinja_env = None
+        self.logger = get_logger("telegram_notifier")
+
+        # Use environment variable if available (safer than config file)
+        self.bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", config.bot_token)
 
     def is_configured(self) -> bool:
         """Check if Telegram is properly configured."""
         return (
             self.config.enabled
-            and bool(self.config.bot_token)
+            and bool(self.bot_token)
             and len(self.config.chat_ids) > 0
             and self.config.chat_ids[0] != ""
         )
@@ -234,7 +241,7 @@ class TelegramNotifier(BaseNotifier):
             from telegram.constants import ParseMode
             from telegram.error import TelegramError
 
-            bot = Bot(token=self.config.bot_token)
+            bot = Bot(token=self.bot_token)
             message = self._build_summary_message(data)
 
             success_count = 0
@@ -250,17 +257,18 @@ class TelegramNotifier(BaseNotifier):
                         disable_web_page_preview=True,
                     )
                     success_count += 1
+                    self.logger.debug(f"Successfully sent notification to chat {chat_id}")
                 except TelegramError as e:
                     # Log error but continue with other recipients
-                    print(f"Failed to send to {chat_id}: {e}")
+                    self.logger.error(f"Failed to send to chat {chat_id}: {e}")
 
             return success_count > 0
 
         except ImportError:
-            print("python-telegram-bot not installed. Run: pip install python-telegram-bot")
+            self.logger.error("python-telegram-bot not installed. Run: pip install python-telegram-bot")
             return False
         except Exception as e:
-            print(f"Telegram notification error: {e}")
+            self.logger.error(f"Telegram notification error: {e}")
             return False
 
 
@@ -280,6 +288,7 @@ class NotificationManager:
         """
         self.config = config
         self._notifiers: list[BaseNotifier] = []
+        self.logger = get_logger("notification_manager")
         self._setup_notifiers()
 
     def _setup_notifiers(self) -> None:
@@ -314,7 +323,7 @@ class NotificationManager:
             try:
                 results[channel_name] = await notifier.send_notification(data)
             except Exception as e:
-                print(f"Error sending notification via {channel_name}: {e}")
+                self.logger.error(f"Error sending notification via {channel_name}: {e}")
                 results[channel_name] = False
 
         return results
@@ -329,7 +338,14 @@ class NotificationManager:
         Returns:
             Dictionary mapping channel name to success status.
         """
-        return asyncio.run(self.send_all(data))
+        try:
+            # Check if we're in an async context
+            loop = asyncio.get_running_loop()
+            # If we got here, we're in an async context - create task
+            return loop.run_until_complete(self.send_all(data))
+        except RuntimeError:
+            # No running loop, safe to use asyncio.run()
+            return asyncio.run(self.send_all(data))
 
 
 def create_notification_data(
@@ -359,6 +375,6 @@ def create_notification_data(
         new_jobs_count=len(new_jobs),
         updated_jobs_count=updated_count,
         avg_score=avg_score,
-        top_jobs=sorted_jobs[:10],
+        top_jobs=sorted_jobs,  # Pass all jobs, let notifier apply max_jobs_in_message
         all_new_jobs=sorted_jobs,
     )

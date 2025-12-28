@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import Counter
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
@@ -282,7 +282,7 @@ def analyze_remote(df: pd.DataFrame) -> pd.Series | None:
     return remote_counts
 
 
-def generate_report(df: pd.DataFrame, config: Config) -> dict[str, any]:
+def generate_report(df: pd.DataFrame, config: Config) -> dict[str, Any]:
     """
     Generate a comprehensive analysis report.
 

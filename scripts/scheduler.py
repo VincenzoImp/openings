@@ -9,7 +9,7 @@ from __future__ import annotations
 import signal
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Callable
 
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -99,16 +99,15 @@ class JobSearchScheduler:
         self.logger.info(f"Scheduling retry in {delay_minutes} minutes...")
 
         if self._scheduler:
-            retry_time = datetime.now()
+            retry_time = datetime.now() + timedelta(minutes=delay_minutes)
             self._scheduler.add_job(
                 self._execute_job,
                 trigger="date",
-                run_date=datetime.now().replace(
-                    minute=(datetime.now().minute + delay_minutes) % 60
-                ),
+                run_date=retry_time,
                 id="retry_job",
                 replace_existing=True,
             )
+            self._logger.info(f"Retry scheduled at {retry_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
     def run_once(self) -> bool:
         """

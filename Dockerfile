@@ -10,16 +10,15 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies (for some Python packages)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy requirements first (for better layer caching)
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install system dependencies and Python packages in one layer, then clean up
+RUN apt-get update && apt-get install -y --no-install-recommends gcc \
+    && pip install --no-cache-dir -r requirements.txt \
+    && apt-get purge -y gcc \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy application code
 COPY scripts/ ./scripts/

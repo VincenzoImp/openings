@@ -2,32 +2,35 @@
 # Install with: pip install -r requirements.txt
 
 # Core job scraping library (requires Python 3.10+)
-python-jobspy>=1.1.80
+python-jobspy>=1.1.80,<2.0.0
 
 # Data manipulation and analysis
-pandas>=2.0.0
+pandas>=2.0.0,<3.0.0
 
 # Excel file generation with formatting
-openpyxl>=3.1.0
+openpyxl>=3.1.0,<4.0.0
 
 # Data visualization (optional, for analyze_jobs.py charts)
-matplotlib>=3.7.0
-seaborn>=0.12.0
+matplotlib>=3.7.0,<4.0.0
+seaborn>=0.12.0,<1.0.0
 
 # Configuration management (YAML support)
-pyyaml>=6.0.0
+pyyaml>=6.0.0,<7.0.0
 
 # Retry logic with exponential backoff for rate limiting
-tenacity>=8.0.0
+tenacity>=8.0.0,<9.0.0
 
 # Interactive dashboard for job results analysis
-streamlit>=1.28.0
+streamlit>=1.28.0,<2.0.0
 
 # Scheduling for automated periodic execution
-APScheduler>=3.10.0
+APScheduler>=3.10.0,<4.0.0
 
 # Telegram bot notifications
-python-telegram-bot>=21.0
+python-telegram-bot>=21.0,<22.0
 
 # Template engine for notification formatting
-Jinja2>=3.1.0
+Jinja2>=3.1.0,<4.0.0
+
+# Fuzzy string matching for post-filtering
+rapidfuzz>=3.0.0,<4.0.0

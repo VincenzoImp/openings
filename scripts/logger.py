@@ -32,7 +32,7 @@ class Colors:
 
 
 class ColoredFormatter(logging.Formatter):
-    """Custom formatter that adds colors to log levels in console output."""
+    """Custom formatter that adds colors to log levels in console output (only if TTY)."""
 
     LEVEL_COLORS = {
         logging.DEBUG: Colors.GRAY,
@@ -42,13 +42,19 @@ class ColoredFormatter(logging.Formatter):
         logging.CRITICAL: Colors.RED + Colors.BOLD,
     }
 
-    def format(self, record: logging.LogRecord) -> str:
-        """Format log record with colors."""
-        # Add color to level name
-        color = self.LEVEL_COLORS.get(record.levelno, Colors.RESET)
-        record.levelname = f"{color}{record.levelname}{Colors.RESET}"
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Check if output is a TTY (terminal)
+        self.use_colors = sys.stdout.isatty()
 
-        # Add color to message based on content
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log record with colors (only if TTY)."""
+        if self.use_colors:
+            # Add color to level name
+            color = self.LEVEL_COLORS.get(record.levelno, Colors.RESET)
+            record.levelname = f"{color}{record.levelname}{Colors.RESET}"
+
+        # Format message
         message = super().format(record)
 
         return message

@@ -515,6 +515,56 @@ throttling:
   rate_limit_cooldown: 30.0
 
 # =============================================================================
+# POST-FILTER SETTINGS - Validate search results match query terms
+# =============================================================================
+# Post-filtering validates that returned jobs actually match the search query
+# and location. Uses fuzzy matching to handle typos and character variations.
+#
+# This is important because job boards often return "related" results that
+# don't match the original query (e.g., searching for "Zurich" jobs but
+# getting results from other cities).
+post_filter:
+  # ---------------------------------------------------------------------------
+  # enabled (bool): Enable fuzzy post-filtering
+  # ---------------------------------------------------------------------------
+  # - true  : Filter jobs that don't match query terms (recommended)
+  # - false : Keep all returned jobs (may include irrelevant results)
+  enabled: true
+
+  # ---------------------------------------------------------------------------
+  # min_similarity (int): Minimum similarity score for fuzzy matching (0-100)
+  # ---------------------------------------------------------------------------
+  # How closely a word must match to be considered a hit:
+  #   - 100 : Exact match only
+  #   - 90  : Very strict (zurich = zurich, but not zurih)
+  #   - 80  : Recommended (zurich ≈ zürich ≈ zuerich)
+  #   - 70  : Lenient (allows more typos)
+  #   - 60  : Very lenient (may cause false positives)
+  min_similarity: 80
+
+  # ---------------------------------------------------------------------------
+  # check_query_terms (bool): Verify all query terms are in job data
+  # ---------------------------------------------------------------------------
+  # If true, ALL words from the search query must be found (fuzzy) in:
+  # title, description, company, or location.
+  #
+  # Example: query "python developer zurich"
+  #   - "python" must be found somewhere in the job
+  #   - "developer" must be found somewhere in the job
+  #   - "zurich" is handled by check_location below
+  check_query_terms: true
+
+  # ---------------------------------------------------------------------------
+  # check_location (bool): Verify location matches search location
+  # ---------------------------------------------------------------------------
+  # If true, at least one word from the search location must match.
+  # Skipped if location is "Remote" (remote jobs can be anywhere).
+  #
+  # Example: location "Zurich, Switzerland"
+  #   - Job location must contain "zurich" OR "switzerland" (fuzzy)
+  check_location: true
+
+# =============================================================================
 # LOGGING SETTINGS - Logging system configuration
 # =============================================================================
 logging:

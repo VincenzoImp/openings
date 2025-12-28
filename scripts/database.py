@@ -142,9 +142,12 @@ class JobDatabase:
             for migration in self.MIGRATE_COLUMNS:
                 try:
                     cursor.execute(migration)
-                except sqlite3.OperationalError:
-                    # Column already exists, skip
-                    pass
+                except sqlite3.OperationalError as e:
+                    error_msg = str(e).lower()
+                    # Only ignore "duplicate column" errors
+                    if "duplicate column" not in error_msg and "already exists" not in error_msg:
+                        self.logger.error(f"Migration failed: {migration}")
+                        raise
 
             conn.commit()
 
@@ -294,14 +297,19 @@ class JobDatabase:
         Returns:
             Set of job IDs that are not in the database.
         """
+        if not job_ids:
+            return set()
+
         existing_ids = set()
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            for job_id in job_ids:
-                cursor.execute(self.SELECT_BY_ID, (job_id,))
-                if cursor.fetchone():
-                    existing_ids.add(job_id)
+            # Use batch query instead of N+1 queries
+            placeholders = ",".join("?" * len(job_ids))
+            query = f"SELECT job_id FROM jobs WHERE job_id IN ({placeholders})"
+            cursor.execute(query, job_ids)
+            existing_ids = {row[0] for row in cursor.fetchall()}
+            cursor.close()
 
         return set(job_ids) - existing_ids
 

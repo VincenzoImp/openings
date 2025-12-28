@@ -63,11 +63,11 @@ def load_database() -> pd.DataFrame | None:
         return None
 
     try:
-        conn = sqlite3.connect(DATABASE_PATH)
-        df = pd.read_sql_query("SELECT * FROM jobs", conn)
-        conn.close()
+        with sqlite3.connect(DATABASE_PATH) as conn:
+            df = pd.read_sql_query("SELECT * FROM jobs", conn)
         return df
-    except Exception:
+    except Exception as e:
+        st.error(f"Error loading database: {e}")
         return None
 
 

@@ -9,6 +9,7 @@ Integrates job search, database persistence, and notifications.
 from __future__ import annotations
 
 import sys
+import traceback
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -114,7 +115,6 @@ def run_job_search() -> bool:
 
     except Exception as e:
         logger.error(f"Search failed with error: {e}")
-        import traceback
         logger.error(traceback.format_exc())
         return False
 
