@@ -131,7 +131,7 @@ def apply_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
 
     # Remote filter
     if filters.get("remote_only") and "is_remote" in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df["is_remote"] == True]
+        filtered_df = filtered_df[filtered_df["is_remote"].fillna(False)]
 
     # Salary range filter
     if filters.get("min_salary") and "min_amount" in filtered_df.columns:
@@ -163,7 +163,7 @@ def apply_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
     # Applied filter (database only)
     if "applied" in filtered_df.columns:
         if filters.get("hide_applied"):
-            filtered_df = filtered_df[filtered_df["applied"] != True]
+            filtered_df = filtered_df[~filtered_df["applied"].fillna(False)]
 
     return filtered_df
 

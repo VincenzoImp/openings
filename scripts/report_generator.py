@@ -242,7 +242,7 @@ def generate_excel_report(jobs: list[JobDBRecord]) -> BytesIO:
             for row_num in range(2, len(df) + 2):
                 cell = worksheet.cell(row=row_num, column=score_col)
                 try:
-                    if cell.value and int(cell.value) >= 30:
+                    if cell.value is not None and float(cell.value) >= 30:
                         cell.fill = high_score_fill
                 except (ValueError, TypeError):
                     pass
