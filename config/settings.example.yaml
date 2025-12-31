@@ -328,9 +328,19 @@ queries:
 # RELEVANCE SCORING - Scoring system to filter relevant jobs
 # =============================================================================
 #
-# The scoring system assigns points to jobs based on keywords found
-# in the title, description, and company name. Jobs with score > threshold
-# are saved as "relevant".
+# The scoring system is FULLY DYNAMIC: it iterates over all keyword categories
+# defined below and applies the corresponding weight. You can add, remove, or
+# rename categories freely - just ensure the category names match between
+# 'weights' and 'keywords'.
+#
+# How it works:
+#   1. For each category in 'keywords', check if ANY keyword matches the job
+#   2. If matched, add the category's weight from 'weights' to the score
+#   3. Jobs with total score >= threshold are marked as "relevant"
+#
+# IMPORTANT: Category names in 'weights' must match those in 'keywords'.
+#            If a category has keywords but no weight, it defaults to 0.
+#            If a category has weight but no keywords, it's ignored.
 #
 scoring:
   # ---------------------------------------------------------------------------
@@ -343,37 +353,39 @@ scoring:
   threshold: 10
 
   # ---------------------------------------------------------------------------
-  # weights (dict): Weights for each keyword category
+  # weights (dict): Points added when a category matches
   # ---------------------------------------------------------------------------
-  # Each category adds its weight to the score if at least one
-  # keyword from the category is found in the job.
+  # Each category adds its weight to the score if at least one keyword
+  # from that category is found in the job (title, description, company, location).
   #
   # CUSTOMIZATION: Increase weights for areas more important to you,
-  # reduce or zero out less relevant ones.
+  # reduce or set to 0 for less relevant ones. Add new categories as needed.
   weights:
     primary_skills: 20      # Your main expertise
     secondary_skills: 15    # Skills you're comfortable with
     technologies: 12        # Specific tech stack matches
-    seniority_match: 10     # Matching your level
+    seniority: 10           # Matching your experience level
     company_type: 8         # Preferred company types
-    remote_bonus: 5         # Remote work preference
-    location_bonus: 5       # Preferred locations
+    remote: 5               # Remote work preference
+    locations: 5            # Preferred locations/cities
 
   # ---------------------------------------------------------------------------
   # keywords (dict): Keyword lists for each category
   # ---------------------------------------------------------------------------
-  # Keywords are searched in lowercase in the combined text of:
-  # title + description + company name
+  # Keywords are searched (case-insensitive) in the combined text of:
+  # title + description + company name + location
   #
   # TIPS:
   # - Add variants (e.g., "javascript", "js")
-  # - Include synonyms and translations
+  # - Include synonyms and common misspellings
   # - More specific keywords = fewer false positives
+  # - You can add any custom category (e.g., "blockchain", "healthcare")
   keywords:
     primary_skills:
       - "software engineer"
       - "backend"
       - "full-stack"
+      - "fullstack"
       - "developer"
       - "programmer"
 
@@ -390,17 +402,20 @@ scoring:
       - "typescript"
       - "react"
       - "node.js"
+      - "nodejs"
       - "postgresql"
       - "docker"
       - "kubernetes"
       - "aws"
       - "gcp"
+      - "azure"
 
     seniority:
       - "senior"
       - "staff"
       - "lead"
       - "principal"
+      - "architect"
 
     company_type:
       - "startup"
@@ -411,8 +426,15 @@ scoring:
     remote:
       - "remote"
       - "work from home"
+      - "wfh"
       - "distributed"
       - "hybrid"
+
+    locations:
+      - "san francisco"
+      - "new york"
+      - "seattle"
+      - "austin"
 
 # =============================================================================
 # PARALLELISM SETTINGS - Parallel execution configuration

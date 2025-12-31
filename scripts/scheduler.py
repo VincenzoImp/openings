@@ -107,7 +107,7 @@ class JobSearchScheduler:
                 id="retry_job",
                 replace_existing=True,
             )
-            self._logger.info(f"Retry scheduled at {retry_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            self.logger.info(f"Retry scheduled at {retry_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
     def run_once(self) -> bool:
         """
