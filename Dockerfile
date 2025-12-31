@@ -34,11 +34,13 @@ WORKDIR /app/scripts
 # Environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
-ENV TZ=Europe/Zurich
+# Timezone is now configurable via logging.timezone in settings.yaml
+# or override with: docker run -e TZ=America/New_York ...
+ENV TZ=UTC
 
-# Health check for scheduled mode
-HEALTHCHECK --interval=5m --timeout=10s --start-period=30s --retries=3 \
-    CMD python -c "import sys; sys.exit(0)"
+# Health check - verifies imports, config, database, and directories
+HEALTHCHECK --interval=5m --timeout=30s --start-period=60s --retries=3 \
+    CMD python healthcheck.py
 
 # Default command - uses main.py which handles both modes
 CMD ["python", "main.py"]

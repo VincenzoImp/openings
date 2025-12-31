@@ -9,7 +9,6 @@
 #   scheduler.enabled: true
 #   notifications.enabled: true
 #   notifications.telegram.enabled: true
-#   notifications.telegram.bot_token: "YOUR_BOT_TOKEN"
 #   notifications.telegram.chat_ids: ["YOUR_CHAT_ID"]
 
 services:
@@ -29,10 +28,8 @@ services:
       - ./logs:/app/logs
       - ./scripts:/app/scripts
       - ./config:/app/config
-      - ./templates:/app/templates
     environment:
       - PYTHONUNBUFFERED=1
-      - TZ=Europe/Zurich
     command: python main.py
     profiles:
       - scheduler
@@ -45,16 +42,15 @@ services:
   jobsearch:
     build: .
     container_name: job_search
+    restart: on-failure:3
     volumes:
       - ./results:/app/results
       - ./data:/app/data
       - ./logs:/app/logs
       - ./scripts:/app/scripts
       - ./config:/app/config
-      - ./templates:/app/templates
     environment:
       - PYTHONUNBUFFERED=1
-      - TZ=Europe/Zurich
     command: python main.py
 
   # ============================================================================
@@ -106,6 +102,7 @@ services:
   dashboard:
     build: .
     container_name: job_dashboard
+    restart: unless-stopped
     ports:
       - "8501:8501"
     volumes:
@@ -114,10 +111,8 @@ services:
       - ./logs:/app/logs
       - ./scripts:/app/scripts
       - ./config:/app/config
-      - ./templates:/app/templates
     environment:
       - PYTHONUNBUFFERED=1
-      - TZ=Europe/Zurich
     command: streamlit run dashboard.py --server.address=0.0.0.0 --server.port=8501
     profiles:
       - dashboard
