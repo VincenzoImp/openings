@@ -15,6 +15,7 @@ Automated job search and analysis tool powered by the [JobSpy](https://github.co
 - **Excel Export**: Clickable links, colored headers, conditional formatting
 - **Retry Logic**: Exponential backoff with tenacity for rate limit handling
 - **Structured Logging**: File and console logs with rotation
+- **Test Suite**: Comprehensive tests with pytest (60+ tests)
 
 ## Quick Start
 
@@ -83,7 +84,8 @@ search:
     - "linkedin"            # Global coverage, aggressive rate limiting
     - "glassdoor"           # Good company insights
   locations:
-    - "Zurich, Switzerland"
+    - "San Francisco, CA"
+    - "New York, NY"
     - "Remote"
   distance: 50              # Search radius in miles (~80 km)
   is_remote: false          # true = remote only
@@ -393,18 +395,58 @@ job-search-tool/
 │   ├── notifier.py            # Telegram notification system
 │   ├── dashboard.py           # Streamlit interactive dashboard
 │   ├── database.py            # SQLite persistence
-│   ├── config.py              # Configuration loader
+│   ├── config.py              # Configuration loader with validation
 │   ├── logger.py              # Structured logging
-│   └── models.py              # Type-safe dataclasses
-├── templates/                  # Jinja2 templates for notifications
+│   ├── models.py              # Type-safe dataclasses
+│   └── healthcheck.py         # Docker health check script
+├── tests/                      # Test suite (pytest)
+│   ├── test_models.py         # Tests for data models
+│   ├── test_config.py         # Tests for configuration
+│   ├── test_database.py       # Tests for database operations
+│   └── test_scoring.py        # Tests for scoring functions
 ├── results/                    # CSV/Excel output (gitignored)
 ├── data/                       # SQLite database (gitignored)
 ├── logs/                       # Log files (gitignored)
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
+├── requirements-dev.txt        # Development dependencies
+├── pytest.ini                  # Test configuration
 ├── CLAUDE.md                   # Developer documentation
 └── README.md
+```
+
+## Development
+
+### Running Tests
+
+```bash
+# Install dev dependencies
+pip install -r requirements-dev.txt
+
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=scripts --cov-report=html
+
+# Run specific test file
+pytest tests/test_config.py -v
+```
+
+### Type Checking
+
+```bash
+pip install mypy
+mypy scripts/
+```
+
+### Code Quality
+
+```bash
+pip install ruff black
+ruff check scripts/
+black scripts/
 ```
 
 ## License

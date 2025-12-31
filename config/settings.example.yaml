@@ -618,6 +618,22 @@ logging:
   # search.log, search.log.1, search.log.2, ..., search.log.5
   backup_count: 5
 
+  # ---------------------------------------------------------------------------
+  # timezone (str): Timezone for log timestamps
+  # ---------------------------------------------------------------------------
+  # Uses standard timezone names (IANA/Olson format).
+  # Examples:
+  #   - "UTC"              : Coordinated Universal Time (default)
+  #   - "America/New_York" : US Eastern Time
+  #   - "America/Los_Angeles" : US Pacific Time
+  #   - "Europe/London"    : UK Time
+  #   - "Europe/Zurich"    : Central European Time
+  #   - "Europe/Berlin"    : Central European Time
+  #   - "Asia/Tokyo"       : Japan Standard Time
+  #   - "Australia/Sydney" : Australian Eastern Time
+  #
+  timezone: "UTC"
+
 # =============================================================================
 # OUTPUT SETTINGS - Output and persistence configuration
 # =============================================================================

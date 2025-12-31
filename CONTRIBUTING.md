@@ -137,7 +137,7 @@ job-search-tool/
 │   ├── config.py         # Config loader
 │   ├── logger.py         # Logging
 │   └── models.py         # Data classes
-├── templates/            # Jinja2 templates
+├── tests/                # Test suite (pytest)
 ├── results/              # Output files (gitignored)
 ├── data/                 # Database (gitignored)
 └── logs/                 # Log files (gitignored)
@@ -178,7 +178,23 @@ job-search-tool/
 
 ## Testing
 
-Currently, the project uses manual testing. When testing your changes:
+The project has a comprehensive test suite with 60+ tests. Run tests before submitting:
+
+```bash
+# Install dev dependencies
+pip install -r requirements-dev.txt
+
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=scripts --cov-report=html
+
+# Run specific test file
+pytest tests/test_config.py -v
+```
+
+When testing your changes also:
 
 - Run a full job search with various configurations
 - Test the dashboard with sample data

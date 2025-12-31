@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2025-12-31
+
+### Added
+
+- **Test Suite**: Comprehensive pytest test suite with 60+ tests covering models, config, database, and scoring
+- **Health Check**: Real Docker health check script that verifies imports, config, database, and directories
+- **Input Validation**: Comprehensive validation for all numeric configuration parameters
+- **Timezone Config**: New `logging.timezone` setting for customizable log timestamps
+- **Dev Dependencies**: New `requirements-dev.txt` with pytest, mypy, ruff, black
+
+### Fixed
+
+- **CRITICAL**: Added missing `self.logger` in `database.py` - was causing `AttributeError` on migration failures
+- **CRITICAL**: Fixed async/sync bridge in `notifier.py` - `send_all_sync()` now works correctly in async contexts
+- **CRITICAL**: Increased job ID hash from 16 to 64 characters (full SHA256) to prevent collisions
+- Exception handling in `search_jobs.py` now uses specific exception types instead of broad `except Exception`
+- Removed unnecessary DataFrame copies in `filter_relevant_jobs()` for better memory usage
+
+### Changed
+
+- Default timezone changed from hardcoded `Europe/Zurich` to configurable `UTC`
+- Docker restart policies now consistent across all services
+
 ## [2.4.0] - 2025-12-31
 
 ### Changed
@@ -87,7 +110,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Telegram Notifications**: Receive instant alerts when new relevant jobs are found
 - **Unified Entry Point**: New `main.py` script that integrates scheduling and notifications
 - **Report Generator**: Formatting utilities for notification messages
-- **Jinja2 Templates**: Customizable message templates for Telegram notifications
 - **Docker Scheduler Profile**: New `docker-compose --profile scheduler` for continuous execution
 
 ### Changed
@@ -110,6 +132,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Structured Logging**: File and console logs with rotation
 - **Docker Support**: Containerized environment for cross-platform compatibility
 
+[2.5.0]: https://github.com/VincenzoImp/job-search-tool/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/VincenzoImp/job-search-tool/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/VincenzoImp/job-search-tool/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/VincenzoImp/job-search-tool/compare/v2.1.0...v2.2.0
