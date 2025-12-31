@@ -113,7 +113,7 @@ class TelegramNotifier(BaseNotifier):
             parts.append("   🏠 Remote")
 
         if job.job_url:
-            parts.append(f"   [View Job →]({job.job_url})")
+            parts.append(f"   [View Job →]({self._escape_url(job.job_url)})")
 
         return "\n".join(parts)
 
@@ -136,6 +136,23 @@ class TelegramNotifier(BaseNotifier):
         for char in special_chars:
             result = result.replace(char, f"\\{char}")
         return result
+
+    def _escape_url(self, url: str) -> str:
+        """
+        Escape URL for use inside Markdown link parentheses.
+
+        In MarkdownV2 links [text](url), only ) and \\ need escaping in the URL.
+
+        Args:
+            url: URL to escape.
+
+        Returns:
+            Escaped URL safe for MarkdownV2 links.
+        """
+        if not url:
+            return ""
+        # Only escape ) and \ inside URLs for MarkdownV2
+        return url.replace("\\", "\\\\").replace(")", "\\)")
 
     def _build_summary_message(self, data: NotificationData) -> str:
         """
@@ -219,6 +236,8 @@ class TelegramNotifier(BaseNotifier):
             bot = Bot(token=self.bot_token)
             message = self._build_summary_message(data)
 
+            self.logger.info(f"Sending Telegram notification to {len(self.config.chat_ids)} recipient(s)")
+
             success_count = 0
             for chat_id in self.config.chat_ids:
                 if not chat_id:
@@ -232,10 +251,11 @@ class TelegramNotifier(BaseNotifier):
                         disable_web_page_preview=True,
                     )
                     success_count += 1
-                    self.logger.debug(f"Successfully sent notification to chat {chat_id}")
+                    self.logger.info(f"Telegram notification sent to chat {chat_id}")
                 except TelegramError as e:
-                    # Log error but continue with other recipients
+                    # Log the full error for debugging MarkdownV2 issues
                     self.logger.error(f"Failed to send to chat {chat_id}: {e}")
+                    self.logger.debug(f"Message that failed:\n{message[:500]}...")
 
             return success_count > 0
 
