@@ -38,11 +38,15 @@ class Job:
         """
         Generate unique ID for job based on title, company, and location.
 
+        Uses full 64-character SHA256 hash to prevent collisions.
+        With 16 chars (64 bits), collision probability becomes significant
+        at ~2^32 (~4 billion) jobs. Full hash provides 256 bits of security.
+
         Returns:
-            SHA256 hash of job identifiers.
+            Full SHA256 hash of job identifiers.
         """
         identifier = f"{self.title}|{self.company}|{self.location}".lower()
-        return hashlib.sha256(identifier.encode()).hexdigest()[:16]
+        return hashlib.sha256(identifier.encode()).hexdigest()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Job:

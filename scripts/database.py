@@ -18,6 +18,7 @@ import pandas as pd
 if TYPE_CHECKING:
     from config import Config
 
+from logger import get_logger
 from models import Job, JobDBRecord
 
 
@@ -127,6 +128,7 @@ class JobDatabase:
             db_path: Path to SQLite database file.
         """
         self.db_path = db_path
+        self.logger = get_logger("database")
         self._init_db()
 
     def _init_db(self) -> None:

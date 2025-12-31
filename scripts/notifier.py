@@ -7,25 +7,16 @@ Sends alerts when new jobs are found via various channels (Telegram, etc.).
 from __future__ import annotations
 
 import asyncio
-import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 from typing import TYPE_CHECKING
-
-from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from logger import get_logger
 
 if TYPE_CHECKING:
     from config import Config, TelegramConfig
     from models import JobDBRecord
-
-
-# Base directory for templates
-BASE_DIR = Path(__file__).parent.parent.resolve()
-TEMPLATES_DIR = BASE_DIR / "templates"
 
 
 @dataclass
@@ -80,11 +71,8 @@ class TelegramNotifier(BaseNotifier):
         """
         self.config = config
         self._bot = None
-        self._jinja_env = None
         self.logger = get_logger("telegram_notifier")
-
-        # Use environment variable if available (safer than config file)
-        self.bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", config.bot_token)
+        self.bot_token = config.bot_token or ""
 
     def is_configured(self) -> bool:
         """Check if Telegram is properly configured."""
@@ -94,19 +82,6 @@ class TelegramNotifier(BaseNotifier):
             and len(self.config.chat_ids) > 0
             and self.config.chat_ids[0] != ""
         )
-
-    def _get_jinja_env(self) -> Environment:
-        """Get Jinja2 environment for template rendering."""
-        if self._jinja_env is None:
-            if TEMPLATES_DIR.exists():
-                self._jinja_env = Environment(
-                    loader=FileSystemLoader(str(TEMPLATES_DIR)),
-                    autoescape=select_autoescape(["html", "xml"]),
-                )
-            else:
-                # Fallback: create environment without file loader
-                self._jinja_env = Environment(autoescape=False)
-        return self._jinja_env
 
     def _format_job_message(self, job: JobDBRecord, index: int) -> str:
         """
@@ -332,6 +307,8 @@ class NotificationManager:
         """
         Synchronous wrapper for send_all.
 
+        Handles both sync and async contexts correctly.
+
         Args:
             data: Notification data.
 
@@ -339,13 +316,19 @@ class NotificationManager:
             Dictionary mapping channel name to success status.
         """
         try:
-            # Check if we're in an async context
+            # Check if we're already in an async context
             loop = asyncio.get_running_loop()
-            # If we got here, we're in an async context - create task
-            return loop.run_until_complete(self.send_all(data))
         except RuntimeError:
-            # No running loop, safe to use asyncio.run()
+            # No running loop - safe to use asyncio.run()
             return asyncio.run(self.send_all(data))
+
+        # We're in an async context - need to handle differently
+        # Create a new thread to run the async code
+        import concurrent.futures
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(asyncio.run, self.send_all(data))
+            return future.result(timeout=60)
 
 
 def create_notification_data(
