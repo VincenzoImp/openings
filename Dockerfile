@@ -23,8 +23,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends gcc \
 # Copy application code
 COPY scripts/ ./scripts/
 COPY config/ ./config/
-COPY templates/ ./templates/
-
 # Create output directories
 RUN mkdir -p /app/results /app/data /app/logs
 
