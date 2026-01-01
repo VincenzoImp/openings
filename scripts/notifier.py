@@ -7,6 +7,7 @@ Sends alerts when new jobs are found via various channels (Telegram, etc.).
 from __future__ import annotations
 
 import asyncio
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
@@ -28,8 +29,7 @@ class NotificationData:
     new_jobs_count: int
     updated_jobs_count: int
     avg_score: float
-    top_jobs: list[JobDBRecord]
-    all_new_jobs: list[JobDBRecord]
+    new_jobs: list[JobDBRecord]  # All new jobs, sorted by score descending
 
 
 class BaseNotifier(ABC):
@@ -117,6 +117,9 @@ class TelegramNotifier(BaseNotifier):
 
         return "\n".join(parts)
 
+    # Precompiled regex for MarkdownV2 escaping (faster than loop)
+    _MARKDOWN_ESCAPE_PATTERN = re.compile(r'([_*\[\]()~`>#+=|{}.!\-\\])')
+
     def _escape_markdown(self, text: str) -> str:
         """
         Escape special characters for Telegram MarkdownV2.
@@ -129,13 +132,7 @@ class TelegramNotifier(BaseNotifier):
         """
         if not text:
             return ""
-
-        # Characters that need escaping in MarkdownV2
-        special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-        result = str(text)
-        for char in special_chars:
-            result = result.replace(char, f"\\{char}")
-        return result
+        return self._MARKDOWN_ESCAPE_PATTERN.sub(r'\\\1', str(text))
 
     def _escape_url(self, url: str) -> str:
         """
@@ -156,6 +153,12 @@ class TelegramNotifier(BaseNotifier):
 
     # Telegram message limit is 4096 chars, we use 10 jobs per chunk to be safe
     JOBS_PER_CHUNK = 10
+
+    def __init_subclass__(cls, **kwargs):
+        """Validate JOBS_PER_CHUNK in subclasses."""
+        super().__init_subclass__(**kwargs)
+        if hasattr(cls, 'JOBS_PER_CHUNK') and cls.JOBS_PER_CHUNK < 1:
+            raise ValueError("JOBS_PER_CHUNK must be >= 1")
 
     def _build_header_message(self, data: NotificationData, total_jobs_to_notify: int) -> str:
         """
@@ -243,7 +246,7 @@ class TelegramNotifier(BaseNotifier):
         """
         # Filter jobs by minimum score
         filtered_jobs = [
-            job for job in data.top_jobs
+            job for job in data.new_jobs
             if job.relevance_score >= self.config.min_score_for_notification
         ]
         jobs_to_send = filtered_jobs[:self.config.max_jobs_in_message]
@@ -275,7 +278,7 @@ class TelegramNotifier(BaseNotifier):
 
             # Filter jobs by minimum score
             filtered_jobs = [
-                job for job in data.all_new_jobs
+                job for job in data.new_jobs
                 if job.relevance_score >= self.config.min_score_for_notification
             ]
             jobs_to_send = filtered_jobs[:self.config.max_jobs_in_message]
@@ -456,6 +459,5 @@ def create_notification_data(
         new_jobs_count=len(new_jobs),
         updated_jobs_count=updated_count,
         avg_score=avg_score,
-        top_jobs=sorted_jobs,  # Pass all jobs, let notifier apply max_jobs_in_message
-        all_new_jobs=sorted_jobs,
+        new_jobs=sorted_jobs,
     )

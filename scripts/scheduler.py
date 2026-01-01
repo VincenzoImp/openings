@@ -7,8 +7,6 @@ Provides automated periodic execution of job searches using APScheduler.
 from __future__ import annotations
 
 import signal
-import sys
-import time
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Callable
 
@@ -47,12 +45,16 @@ class JobSearchScheduler:
         self._run_count = 0
 
     def _setup_signal_handlers(self) -> None:
-        """Set up signal handlers for graceful shutdown."""
+        """Set up signal handlers for graceful shutdown.
+
+        Note: We don't call sys.exit() here because APScheduler's BlockingScheduler
+        will handle the shutdown gracefully when stop() is called. Calling sys.exit()
+        can interrupt cleanup and cause issues with database connections.
+        """
 
         def shutdown_handler(signum: int, frame) -> None:
-            self.logger.info(f"Received signal {signum}, shutting down...")
+            self.logger.info(f"Received signal {signum}, requesting graceful shutdown...")
             self.stop()
-            sys.exit(0)
 
         signal.signal(signal.SIGINT, shutdown_handler)
         signal.signal(signal.SIGTERM, shutdown_handler)

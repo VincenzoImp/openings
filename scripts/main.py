@@ -10,10 +10,7 @@ from __future__ import annotations
 
 import sys
 import traceback
-from datetime import datetime
 from typing import TYPE_CHECKING
-
-import pandas as pd
 
 from config import get_config, reload_config
 from database import cleanup_old_jobs, get_database, recalculate_all_scores
@@ -254,10 +251,10 @@ def main() -> int:
             channels.append("Telegram")
         logger.info(f"Notifications: {', '.join(channels) if channels else 'None configured'}")
 
-    # Recalculate scores for existing jobs at startup (only once)
+    # Recalculate scores for existing jobs at startup (if enabled)
     db = get_database(config)
     db_stats = db.get_statistics()
-    if db_stats['total_jobs'] > 0:
+    if config.database.recalculate_scores_on_startup and db_stats['total_jobs'] > 0:
         logger.info(f"Recalculating scores for {db_stats['total_jobs']} existing jobs...")
         recalculate_all_scores(db, config)
 

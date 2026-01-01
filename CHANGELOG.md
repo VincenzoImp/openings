@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-01-01
+
+### Fixed
+
+- **SQLite Variable Limit**: Added batch querying (`SQLITE_VAR_LIMIT = 500`) to handle large job ID sets without hitting SQLite's 999 variable limit
+- **Lock Duration**: Optimized deduplication to minimize lock scope (compute outside lock, quick set operations inside)
+- **Scoring Config Mutation**: Fixed `_parse_scoring_config` to create new dicts instead of mutating defaults
+- **Logger Levelname**: ColoredFormatter now restores original levelname after formatting
+- **Excel Empty Check**: Added DataFrame empty check before Excel save to prevent errors
+- **Environment Variable Warning**: Added warning when Telegram bot token env var is not resolved
+
+### Changed
+
+- **NotificationData Simplified**: Consolidated `top_jobs`/`all_new_jobs` into single `new_jobs` field (sorted by score descending)
+- **Precompiled Regex**: Added precompiled regex for MarkdownV2 escaping in notifier (performance improvement)
+- **JOBS_PER_CHUNK Validation**: Added `__init_subclass__` to validate the constant in TelegramNotifier
+- **Docker Memory Limits**: Added to all services in docker-compose.yml (legacy, analyze, dashboard)
+
+### Removed
+
+- Unused imports in scheduler.py (`sys`, `time`), main.py (`pandas`, `datetime`), search_jobs.py (`hashlib`)
+
+## [2.5.4] - 2026-01-01
+
+### Added
+
+- **Database Cleanup**: New `database.cleanup_enabled` and `database.cleanup_days` settings to automatically remove old jobs
+- **Chunked Telegram Messages**: Messages now split into chunks of 10 jobs to avoid Telegram's 4096 character limit
+
+### Changed
+
+- Score recalculation moved to startup only (not every search iteration)
+- Improved documentation with ASCII architecture diagrams
+
 ## [2.5.3] - 2026-01-01
 
 ### Added
@@ -155,6 +189,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Structured Logging**: File and console logs with rotation
 - **Docker Support**: Containerized environment for cross-platform compatibility
 
+[3.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v2.5.4...v3.0.0
+[2.5.4]: https://github.com/VincenzoImp/job-search-tool/compare/v2.5.3...v2.5.4
 [2.5.3]: https://github.com/VincenzoImp/job-search-tool/compare/v2.5.2...v2.5.3
 [2.5.2]: https://github.com/VincenzoImp/job-search-tool/compare/v2.5.1...v2.5.2
 [2.5.1]: https://github.com/VincenzoImp/job-search-tool/compare/v2.5.0...v2.5.1

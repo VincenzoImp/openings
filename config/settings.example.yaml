@@ -681,6 +681,40 @@ output:
   save_excel: true
 
 # =============================================================================
+# DATABASE SETTINGS - Database maintenance and cleanup
+# =============================================================================
+database:
+  # ---------------------------------------------------------------------------
+  # cleanup_enabled (bool): Automatically remove old jobs from database
+  # ---------------------------------------------------------------------------
+  # When enabled, jobs that haven't been seen for 'cleanup_days' days
+  # will be deleted from the database during each run.
+  # - true  : Enable automatic cleanup
+  # - false : Keep all jobs forever (default)
+  cleanup_enabled: false
+
+  # ---------------------------------------------------------------------------
+  # cleanup_days (int): Remove jobs not seen in the last N days
+  # ---------------------------------------------------------------------------
+  # Jobs with last_seen older than this threshold will be deleted.
+  # Only applies when cleanup_enabled is true.
+  # Common values:
+  #   - 30  : Keep jobs seen in the last month
+  #   - 60  : Keep jobs seen in the last 2 months
+  #   - 90  : Keep jobs seen in the last 3 months (recommended)
+  cleanup_days: 90
+
+  # ---------------------------------------------------------------------------
+  # recalculate_scores_on_startup (bool): Recalculate scores for existing jobs
+  # ---------------------------------------------------------------------------
+  # When enabled, all existing jobs in the database will have their
+  # relevance scores recalculated using the current scoring configuration
+  # at startup. This is useful when you change your scoring criteria.
+  # - true  : Recalculate scores on each startup (default)
+  # - false : Keep existing scores
+  recalculate_scores_on_startup: true
+
+# =============================================================================
 # PROFILE INFORMATION - Profile information for display
 # =============================================================================
 # These values are used only for the banner and reports,

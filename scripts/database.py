@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from config import Config
 
 from logger import get_logger
-from models import Job, JobDBRecord
+from models import Job, JobDBRecord, generate_job_id
 
 
 class JobDatabase:
@@ -153,6 +153,10 @@ class JobDatabase:
 
             conn.commit()
 
+    # SQLite has a limit of 999 variables per query (SQLITE_MAX_VARIABLE_NUMBER)
+    # We use a conservative chunk size to stay well under this limit
+    SQLITE_VAR_LIMIT = 500
+
     @contextmanager
     def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
         """
@@ -170,6 +174,36 @@ class JobDatabase:
             yield conn
         finally:
             conn.close()
+
+    def _batch_query_existing_ids(self, job_ids: list[str]) -> set[str]:
+        """
+        Query existing job IDs in batches to avoid SQLite variable limit.
+
+        SQLite has a limit of 999 variables per query. This method chunks
+        the input list to stay under that limit.
+
+        Args:
+            job_ids: List of job IDs to check.
+
+        Returns:
+            Set of job IDs that exist in the database.
+        """
+        if not job_ids:
+            return set()
+
+        existing_ids: set[str] = set()
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            for i in range(0, len(job_ids), self.SQLITE_VAR_LIMIT):
+                chunk = job_ids[i : i + self.SQLITE_VAR_LIMIT]
+                placeholders = ",".join("?" * len(chunk))
+                query = f"SELECT job_id FROM jobs WHERE job_id IN ({placeholders})"
+                cursor.execute(query, chunk)
+                existing_ids.update(row[0] for row in cursor.fetchall())
+
+        return existing_ids
 
     def job_exists(self, job_id: str) -> bool:
         """
@@ -262,7 +296,10 @@ class JobDatabase:
 
     def save_jobs_from_dataframe(self, df: pd.DataFrame) -> tuple[int, int]:
         """
-        Save jobs from DataFrame to database.
+        Save jobs from DataFrame to database using batch operations.
+
+        Uses a single query to check existing jobs and executemany for inserts,
+        reducing database round-trips from O(2n) to O(2).
 
         Args:
             df: DataFrame with job data.
@@ -270,28 +307,70 @@ class JobDatabase:
         Returns:
             Tuple of (new_count, updated_count).
         """
-        new_count = 0
-        updated_count = 0
+        if df.empty:
+            return 0, 0
+
+        today = date.today()
+
+        # Prepare all job data first
+        jobs_data = []
+        job_ids = []
 
         for _, row in df.iterrows():
             row_dict = row.to_dict()
             job = Job.from_dict(row_dict)
 
-            # Extract additional fields not in Job dataclass
-            site = row_dict.get("site")
-            job_level = row_dict.get("job_level")
-            company_url = row_dict.get("company_url")
+            # Convert date_posted to string for SQLite
+            date_posted_str = None
+            if job.date_posted:
+                date_posted_str = (
+                    job.date_posted.isoformat()
+                    if hasattr(job.date_posted, "isoformat")
+                    else str(job.date_posted)
+                )
 
-            if self.save_job(job, site=site, job_level=job_level, company_url=company_url):
-                new_count += 1
-            else:
-                updated_count += 1
+            jobs_data.append((
+                job.job_id,
+                job.title,
+                job.company,
+                job.location,
+                job.job_url,
+                row_dict.get("site"),
+                job.job_type,
+                job.is_remote,
+                row_dict.get("job_level"),
+                job.description,
+                date_posted_str,
+                job.min_amount,
+                job.max_amount,
+                job.currency,
+                row_dict.get("company_url"),
+                today,
+                today,
+                job.relevance_score,
+                False,
+            ))
+            job_ids.append(job.job_id)
+
+        # Query existing job IDs using batch method to handle SQLite variable limit
+        existing_ids = self._batch_query_existing_ids(job_ids)
+
+        # Batch insert/update all jobs
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.executemany(self.INSERT_OR_UPDATE, jobs_data)
+            conn.commit()
+
+        new_count = len(job_ids) - len(existing_ids)
+        updated_count = len(existing_ids)
 
         return new_count, updated_count
 
     def get_new_job_ids(self, job_ids: list[str]) -> set[str]:
         """
         Identify which job IDs are new (not in database).
+
+        Uses batch querying to handle SQLite's variable limit.
 
         Args:
             job_ids: List of job IDs to check.
@@ -302,22 +381,15 @@ class JobDatabase:
         if not job_ids:
             return set()
 
-        existing_ids = set()
-
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            # Use batch query instead of N+1 queries
-            placeholders = ",".join("?" * len(job_ids))
-            query = f"SELECT job_id FROM jobs WHERE job_id IN ({placeholders})"
-            cursor.execute(query, job_ids)
-            existing_ids = {row[0] for row in cursor.fetchall()}
-            cursor.close()
-
+        existing_ids = self._batch_query_existing_ids(job_ids)
         return set(job_ids) - existing_ids
 
     def filter_new_jobs(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Filter DataFrame to only include new jobs.
+
+        Uses the generate_job_id utility directly for efficiency
+        instead of creating full Job objects.
 
         Args:
             df: DataFrame with job data.
@@ -328,18 +400,21 @@ class JobDatabase:
         if df.empty:
             return df
 
-        # Generate job IDs
-        def generate_job_id(row: pd.Series) -> str:
-            job = Job.from_dict(row.to_dict())
-            return job.job_id
-
+        # Generate job IDs using utility function (faster than creating Job objects)
         df = df.copy()
-        df["job_id"] = df.apply(generate_job_id, axis=1)
+        df["job_id"] = df.apply(
+            lambda row: generate_job_id(
+                str(row.get("title", "")),
+                str(row.get("company", "")),
+                str(row.get("location", "")),
+            ),
+            axis=1,
+        )
 
-        # Get new job IDs
+        # Get new job IDs (uses batch querying internally)
         new_ids = self.get_new_job_ids(df["job_id"].tolist())
 
-        # Filter
+        # Filter and remove temporary column
         return df[df["job_id"].isin(new_ids)].drop(columns=["job_id"])
 
     def get_all_jobs(self) -> list[JobDBRecord]:
@@ -516,6 +591,61 @@ class JobDatabase:
             applied=bool(row["applied"]),
         )
 
+    def update_scores_batch(self, updates: list[tuple[str, int]]) -> int:
+        """
+        Batch update relevance scores for multiple jobs.
+
+        Args:
+            updates: List of (job_id, new_score) tuples.
+
+        Returns:
+            Number of jobs updated.
+        """
+        if not updates:
+            return 0
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            # SQLite executemany expects (score, job_id) order to match UPDATE SET ? WHERE ?
+            cursor.executemany(
+                "UPDATE jobs SET relevance_score = ? WHERE job_id = ?",
+                [(score, job_id) for job_id, score in updates],
+            )
+            conn.commit()
+            return cursor.rowcount
+
+    def delete_jobs_older_than(self, days: int) -> int:
+        """
+        Delete jobs not seen in the specified number of days.
+
+        Args:
+            days: Delete jobs with last_seen older than this many days.
+
+        Returns:
+            Number of jobs deleted.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Count jobs to be deleted
+            cursor.execute(
+                "SELECT COUNT(*) FROM jobs WHERE last_seen < date('now', ?)",
+                (f"-{days} days",),
+            )
+            count = cursor.fetchone()[0]
+
+            if count == 0:
+                return 0
+
+            # Delete old jobs
+            cursor.execute(
+                "DELETE FROM jobs WHERE last_seen < date('now', ?)",
+                (f"-{days} days",),
+            )
+            conn.commit()
+
+        return count
+
 
 def get_database(config: Config) -> JobDatabase:
     """
@@ -547,7 +677,6 @@ def recalculate_all_scores(db: JobDatabase, config: Config) -> int:
     from search_jobs import calculate_relevance_score
 
     logger = get_logger("database")
-    updated = 0
 
     # Get all jobs
     all_jobs = db.get_all_jobs()
@@ -558,30 +687,26 @@ def recalculate_all_scores(db: JobDatabase, config: Config) -> int:
 
     logger.info(f"Recalculating scores for {len(all_jobs)} jobs...")
 
-    with db._get_connection() as conn:
-        cursor = conn.cursor()
+    # Calculate new scores and collect updates
+    updates = []
+    for job in all_jobs:
+        # Build a dict-like object for scoring calculation
+        job_data = {
+            "title": job.title or "",
+            "description": job.description or "",
+            "company": job.company or "",
+            "location": job.location or "",
+        }
 
-        for job in all_jobs:
-            # Build a dict-like object for scoring calculation
-            job_data = {
-                "title": job.title or "",
-                "description": job.description or "",
-                "company": job.company or "",
-                "location": job.location or "",
-            }
+        # Calculate new score
+        new_score = calculate_relevance_score(job_data, config)
 
-            # Calculate new score
-            new_score = calculate_relevance_score(job_data, config)
+        # Only update if different
+        if new_score != job.relevance_score:
+            updates.append((job.job_id, new_score))
 
-            # Update if different
-            if new_score != job.relevance_score:
-                cursor.execute(
-                    "UPDATE jobs SET relevance_score = ? WHERE job_id = ?",
-                    (new_score, job.job_id),
-                )
-                updated += 1
-
-        conn.commit()
+    # Batch update using public method
+    updated = db.update_scores_batch(updates) if updates else 0
 
     logger.info(f"Recalculated scores: {updated} jobs updated")
     return updated
@@ -600,26 +725,11 @@ def cleanup_old_jobs(db: JobDatabase, days: int) -> int:
     """
     logger = get_logger("database")
 
-    with db._get_connection() as conn:
-        cursor = conn.cursor()
+    count = db.delete_jobs_older_than(days)
 
-        # Count jobs to be deleted
-        cursor.execute(
-            "SELECT COUNT(*) FROM jobs WHERE last_seen < date('now', ?)",
-            (f"-{days} days",),
-        )
-        count = cursor.fetchone()[0]
+    if count == 0:
+        logger.info(f"No jobs older than {days} days to clean up")
+    else:
+        logger.info(f"Cleaned up {count} jobs not seen in {days}+ days")
 
-        if count == 0:
-            logger.info(f"No jobs older than {days} days to clean up")
-            return 0
-
-        # Delete old jobs
-        cursor.execute(
-            "DELETE FROM jobs WHERE last_seen < date('now', ?)",
-            (f"-{days} days",),
-        )
-        conn.commit()
-
-    logger.info(f"Cleaned up {count} jobs not seen in {days}+ days")
     return count

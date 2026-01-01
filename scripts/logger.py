@@ -50,14 +50,15 @@ class ColoredFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         """Format log record with colors (only if TTY)."""
         if self.use_colors:
-            # Add color to level name
+            # Save original levelname and restore after formatting
+            original_levelname = record.levelname
             color = self.LEVEL_COLORS.get(record.levelno, Colors.RESET)
             record.levelname = f"{color}{record.levelname}{Colors.RESET}"
-
-        # Format message
-        message = super().format(record)
-
-        return message
+            try:
+                return super().format(record)
+            finally:
+                record.levelname = original_levelname
+        return super().format(record)
 
 
 class PlainFormatter(logging.Formatter):

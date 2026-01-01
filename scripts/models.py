@@ -12,6 +12,26 @@ from datetime import date, datetime
 from typing import Any
 
 
+def generate_job_id(title: str, company: str, location: str) -> str:
+    """
+    Generate unique ID for a job based on title, company, and location.
+
+    Uses full 64-character SHA256 hash to prevent collisions.
+    With 16 chars (64 bits), collision probability becomes significant
+    at ~2^32 (~4 billion) jobs. Full hash provides 256 bits of security.
+
+    Args:
+        title: Job title.
+        company: Company name.
+        location: Job location.
+
+    Returns:
+        Full SHA256 hash of job identifiers.
+    """
+    identifier = f"{title}|{company}|{location}".lower()
+    return hashlib.sha256(identifier.encode()).hexdigest()
+
+
 @dataclass
 class Job:
     """Represents a single job listing."""
@@ -38,15 +58,10 @@ class Job:
         """
         Generate unique ID for job based on title, company, and location.
 
-        Uses full 64-character SHA256 hash to prevent collisions.
-        With 16 chars (64 bits), collision probability becomes significant
-        at ~2^32 (~4 billion) jobs. Full hash provides 256 bits of security.
-
         Returns:
             Full SHA256 hash of job identifiers.
         """
-        identifier = f"{self.title}|{self.company}|{self.location}".lower()
-        return hashlib.sha256(identifier.encode()).hexdigest()
+        return generate_job_id(self.title, self.company, self.location)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Job:
