@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 from config import get_config, reload_config
-from database import get_database
+from database import get_database, recalculate_all_scores
 from logger import get_logger, log_section, setup_logging
 from notifier import NotificationManager, create_notification_data
 from scheduler import create_scheduler
@@ -60,6 +60,10 @@ def run_job_search() -> bool:
         db = get_database(config)
         db_stats = db.get_statistics()
         logger.info(f"Database: {db_stats['total_jobs']} jobs tracked")
+
+        # Recalculate scores for existing jobs with current config
+        if db_stats['total_jobs'] > 0:
+            recalculate_all_scores(db, config)
 
         # Search for jobs
         all_jobs, summary = search_jobs(config)

@@ -528,3 +528,60 @@ def get_database(config: Config) -> JobDatabase:
         JobDatabase instance.
     """
     return JobDatabase(config.database_path)
+
+
+def recalculate_all_scores(db: JobDatabase, config: Config) -> int:
+    """
+    Recalculate relevance scores for all jobs in the database.
+
+    Uses the current scoring configuration from settings.yaml to
+    recalculate scores for all existing jobs.
+
+    Args:
+        db: Database instance.
+        config: Configuration with current scoring settings.
+
+    Returns:
+        Number of jobs updated.
+    """
+    from search_jobs import calculate_relevance_score
+
+    logger = get_logger("database")
+    updated = 0
+
+    # Get all jobs
+    all_jobs = db.get_all_jobs()
+
+    if not all_jobs:
+        logger.info("No jobs in database to recalculate")
+        return 0
+
+    logger.info(f"Recalculating scores for {len(all_jobs)} jobs...")
+
+    with db._get_connection() as conn:
+        cursor = conn.cursor()
+
+        for job in all_jobs:
+            # Build a dict-like object for scoring calculation
+            job_data = {
+                "title": job.title or "",
+                "description": job.description or "",
+                "company": job.company or "",
+                "location": job.location or "",
+            }
+
+            # Calculate new score
+            new_score = calculate_relevance_score(job_data, config)
+
+            # Update if different
+            if new_score != job.relevance_score:
+                cursor.execute(
+                    "UPDATE jobs SET relevance_score = ? WHERE job_id = ?",
+                    (new_score, job.job_id),
+                )
+                updated += 1
+
+        conn.commit()
+
+    logger.info(f"Recalculated scores: {updated} jobs updated")
+    return updated
