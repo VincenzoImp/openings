@@ -1,211 +1,447 @@
 # Contributing to Job Search Tool
 
-Thank you for your interest in contributing to Job Search Tool! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing to the Job Search Tool. This document provides guidelines and best practices for contributing to the project.
+
+---
+
+## Table of Contents
+
+- [Getting Started](#getting-started)
+- [Development Environment](#development-environment)
+- [Code Standards](#code-standards)
+- [Testing Requirements](#testing-requirements)
+- [Pull Request Process](#pull-request-process)
+- [Issue Guidelines](#issue-guidelines)
+- [Architecture Overview](#architecture-overview)
+- [Common Contribution Scenarios](#common-contribution-scenarios)
+
+---
 
 ## Getting Started
 
 ### Prerequisites
 
-- Python 3.10 or higher (required by JobSpy library)
-- Docker and Docker Compose (optional, but recommended)
-- Git
+| Requirement | Version | Notes |
+|-------------|---------|-------|
+| Python | 3.10+ | Required by JobSpy library |
+| Docker | 20.10+ | Optional, recommended for testing |
+| Git | 2.30+ | Version control |
 
-### Development Setup
+### Initial Setup
 
-1. **Fork and clone the repository**
+```bash
+# 1. Fork the repository on GitHub
 
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/job-search-tool.git
-   cd job-search-tool
-   ```
+# 2. Clone your fork
+git clone https://github.com/YOUR_USERNAME/job-search-tool.git
+cd job-search-tool
 
-2. **Create a virtual environment**
+# 3. Add upstream remote
+git remote add upstream https://github.com/VincenzoImp/job-search-tool.git
 
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+# 4. Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-3. **Install dependencies**
+# 5. Install dependencies
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+# 6. Create configuration
+cp config/settings.example.yaml config/settings.yaml
 
-4. **Copy the configuration template**
+# 7. Verify setup
+pytest
+```
 
-   ```bash
-   cp config/settings.example.yaml config/settings.yaml
-   ```
+---
 
-5. **Run the tool to verify setup**
+## Development Environment
 
-   ```bash
-   cd scripts
-   python main.py
-   ```
-
-## How to Contribute
-
-### Reporting Bugs
-
-Before creating a bug report, please check existing issues to avoid duplicates.
-
-When reporting a bug, include:
-
-- A clear and descriptive title
-- Steps to reproduce the issue
-- Expected behavior vs actual behavior
-- Your environment (OS, Python version, Docker version if applicable)
-- Relevant log output from `logs/search.log`
-- Your configuration (redact sensitive data like API tokens)
-
-### Suggesting Features
-
-Feature suggestions are welcome! Please include:
-
-- A clear description of the feature
-- The problem it solves or use case it enables
-- Any implementation ideas you have
-- Whether you'd be willing to implement it
-
-### Pull Requests
-
-1. **Create a branch** for your changes:
-
-   ```bash
-   git checkout -b feature/your-feature-name
-   # or
-   git checkout -b fix/your-bug-fix
-   ```
-
-2. **Make your changes** following the code style guidelines below
-
-3. **Test your changes**:
-
-   - Run a job search to verify functionality
-   - Test with Docker: `docker-compose up --build`
-   - If you modified the dashboard: `streamlit run scripts/dashboard.py`
-
-4. **Commit your changes** with a descriptive message:
-
-   ```bash
-   git commit -m "Add feature: description of what you added"
-   # or
-   git commit -m "Fix: description of what you fixed"
-   ```
-
-5. **Push and create a Pull Request**:
-
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-## Code Style Guidelines
-
-### Python
-
-- Follow PEP 8 style guidelines
-- Use type hints for function parameters and return values
-- Add docstrings for public functions and classes
-- Keep functions focused and single-purpose
-
-### Configuration
-
-- Add new settings to both `settings.example.yaml` and document them
-- Use descriptive names and add comments explaining options
-- Provide sensible defaults
-
-### Documentation
-
-- Update README.md for user-facing changes
-- Update CLAUDE.md for developer/architecture changes
-- Add entries to CHANGELOG.md for notable changes
-
-## Project Structure
+### Directory Structure
 
 ```
 job-search-tool/
-├── config/               # Configuration files
-├── scripts/              # Python source code
-│   ├── main.py           # Entry point
-│   ├── search_jobs.py    # Core search logic
-│   ├── scheduler.py      # Scheduling
-│   ├── notifier.py       # Notifications
-│   ├── dashboard.py      # Streamlit UI
-│   ├── database.py       # SQLite persistence
-│   ├── config.py         # Config loader
-│   ├── logger.py         # Logging
-│   └── models.py         # Data classes
-├── tests/                # Test suite (pytest)
-├── results/              # Output files (gitignored)
-├── data/                 # Database (gitignored)
-└── logs/                 # Log files (gitignored)
+├── scripts/          # Python source code
+├── tests/            # Test suite
+├── config/           # Configuration files
+├── results/          # Output (gitignored)
+├── data/             # Database (gitignored)
+└── logs/             # Logs (gitignored)
 ```
 
-## Adding New Features
-
-### Adding a New Scoring Category
-
-1. Add keywords to `config/settings.example.yaml`:
-
-   ```yaml
-   scoring:
-     keywords:
-       my_category:
-         - "keyword1"
-         - "keyword2"
-     weights:
-       my_category: 10
-   ```
-
-2. The scoring logic in `search_jobs.py` dynamically reads from config, so no code changes needed!
-
-### Adding a New Database Column
-
-1. Add to `CREATE_TABLE` in `database.py`
-2. Add migration statement to `MIGRATE_COLUMNS` list
-3. Update relevant SQL queries
-4. Update `JobDBRecord` dataclass in `models.py`
-5. Update related methods in `database.py`
-
-### Adding a New Notification Channel
-
-1. Create a new class extending `BaseNotifier` in `notifier.py`
-2. Implement the `send()` method
-3. Add configuration in `config.py`
-4. Register the notifier in `NotificationManager`
-
-## Testing
-
-The project has a comprehensive test suite with 60+ tests. Run tests before submitting:
+### Running the Application
 
 ```bash
-# Install dev dependencies
-pip install -r requirements-dev.txt
+# Single search
+cd scripts && python main.py
 
-# Run all tests
-pytest
+# With Docker
+docker compose up --build
 
-# Run with coverage
-pytest --cov=scripts --cov-report=html
-
-# Run specific test file
-pytest tests/test_config.py -v
+# Dashboard
+streamlit run scripts/dashboard.py
 ```
 
-When testing your changes also:
+### Development Tools
 
-- Run a full job search with various configurations
-- Test the dashboard with sample data
-- Verify Docker builds and runs correctly
-- Check logs for any warnings or errors
+```bash
+# Type checking
+mypy scripts/
+
+# Linting
+ruff check scripts/
+
+# Formatting
+black scripts/
+
+# All tests
+pytest
+
+# Coverage report
+pytest --cov=scripts --cov-report=html
+```
+
+---
+
+## Code Standards
+
+### Python Style
+
+We follow PEP 8 with the following specifics:
+
+| Aspect | Standard |
+|--------|----------|
+| Line length | 88 characters (Black default) |
+| Quotes | Double quotes for strings |
+| Imports | Sorted with isort, grouped |
+| Docstrings | Google style |
+
+### Type Hints
+
+All public functions must have type hints:
+
+```python
+def calculate_score(job: dict, config: Config) -> int:
+    """
+    Calculate relevance score for a job.
+
+    Args:
+        job: Job data dictionary.
+        config: Configuration object.
+
+    Returns:
+        Integer relevance score.
+    """
+    pass
+```
+
+### Docstrings
+
+Use Google style docstrings:
+
+```python
+def function_name(param1: str, param2: int = 10) -> bool:
+    """
+    Brief description of function.
+
+    Longer description if needed. Can span multiple lines
+    and include additional context.
+
+    Args:
+        param1: Description of param1.
+        param2: Description of param2. Defaults to 10.
+
+    Returns:
+        Description of return value.
+
+    Raises:
+        ValueError: When param1 is empty.
+    """
+    pass
+```
+
+### Error Handling
+
+```python
+# Specific exceptions
+try:
+    result = risky_operation()
+except ConnectionError:
+    logger.error("Network connection failed")
+    raise
+except ValueError as e:
+    logger.warning(f"Invalid value: {e}")
+    return default_value
+
+# Avoid bare except
+# BAD: except:
+# GOOD: except Exception as e:
+```
+
+### Logging
+
+```python
+from logger import get_logger
+
+logger = get_logger(__name__)
+
+# Use appropriate levels
+logger.debug("Detailed debugging info")
+logger.info("General progress updates")
+logger.warning("Something unexpected but handled")
+logger.error("Error that needs attention")
+```
+
+---
+
+## Testing Requirements
+
+### Test Structure
+
+```
+tests/
+├── conftest.py          # Shared fixtures
+├── test_models.py       # Data model tests
+├── test_config.py       # Configuration tests
+├── test_database.py     # Database operation tests
+└── test_scoring.py      # Scoring function tests
+```
+
+### Writing Tests
+
+```python
+import pytest
+from models import Job
+
+class TestJob:
+    """Tests for Job dataclass."""
+
+    def test_job_id_generation(self):
+        """Job ID should be SHA256 hash of title+company+location."""
+        job = Job(
+            title="Software Engineer",
+            company="TechCorp",
+            location="Remote",
+        )
+        assert len(job.job_id) == 64
+        assert job.job_id.isalnum()
+
+    def test_job_id_deterministic(self):
+        """Same inputs should produce same job ID."""
+        job1 = Job(title="Dev", company="Co", location="NYC")
+        job2 = Job(title="Dev", company="Co", location="NYC")
+        assert job1.job_id == job2.job_id
+
+    @pytest.mark.parametrize("title,expected", [
+        ("", "empty-title-hash"),
+        ("Test", "valid-hash"),
+    ])
+    def test_edge_cases(self, title, expected):
+        """Test edge cases for job ID generation."""
+        # Test implementation
+        pass
+```
+
+### Test Coverage
+
+Aim for high coverage on critical modules:
+
+| Module | Target Coverage |
+|--------|-----------------|
+| models.py | 95%+ |
+| config.py | 90%+ |
+| database.py | 85%+ |
+| search_jobs.py | 80%+ |
+
+### Running Tests
+
+```bash
+# All tests
+pytest
+
+# Specific file
+pytest tests/test_config.py
+
+# Specific test
+pytest tests/test_models.py::TestJob::test_job_id_generation
+
+# With coverage
+pytest --cov=scripts --cov-report=html
+
+# Verbose output
+pytest -v
+
+# Stop on first failure
+pytest -x
+```
+
+---
+
+## Pull Request Process
+
+### Branch Naming
+
+```
+feature/description-of-feature
+fix/description-of-bug
+docs/what-was-documented
+refactor/what-was-refactored
+```
+
+### Commit Messages
+
+Follow conventional commits:
+
+```
+type(scope): brief description
+
+Longer description if needed. Explain what and why,
+not how (the code shows how).
+
+Fixes #123
+```
+
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
+
+### PR Checklist
+
+Before submitting:
+
+- [ ] Code follows style guidelines
+- [ ] Type hints added for new functions
+- [ ] Docstrings added for public functions
+- [ ] Tests written for new functionality
+- [ ] All tests pass (`pytest`)
+- [ ] Type check passes (`mypy scripts/`)
+- [ ] Linting passes (`ruff check scripts/`)
+- [ ] Documentation updated if needed
+
+### Review Process
+
+1. Open PR against `main` branch
+2. Ensure CI checks pass
+3. Request review from maintainers
+4. Address feedback
+5. Maintainer merges when approved
+
+---
+
+## Issue Guidelines
+
+### Bug Reports
+
+Include:
+
+1. **Summary**: Brief description of the issue
+2. **Environment**: OS, Python version, Docker version
+3. **Steps to Reproduce**: Numbered list of steps
+4. **Expected Behavior**: What should happen
+5. **Actual Behavior**: What actually happens
+6. **Logs**: Relevant output from `logs/search.log`
+7. **Configuration**: Relevant settings (redact secrets)
+
+### Feature Requests
+
+Include:
+
+1. **Problem Statement**: What problem does this solve?
+2. **Proposed Solution**: How would it work?
+3. **Alternatives Considered**: Other approaches?
+4. **Implementation Notes**: Any technical considerations?
+
+---
+
+## Architecture Overview
+
+### Core Modules
+
+| Module | Responsibility |
+|--------|---------------|
+| `main.py` | Entry point, orchestration |
+| `search_jobs.py` | Job search execution |
+| `scheduler.py` | Periodic scheduling |
+| `notifier.py` | Notification delivery |
+| `database.py` | Data persistence |
+| `config.py` | Configuration loading |
+| `models.py` | Data structures |
+
+### Data Flow
+
+```
+Configuration → Search Engine → Scoring → Database → Notifications
+                     ↑                        |
+                     └── Deduplication ───────┘
+```
+
+### Extension Points
+
+1. **Notification Channels**: Implement `BaseNotifier`
+2. **Scoring Categories**: Add to YAML config
+3. **Job Sources**: Extend JobSpy integration
+4. **Output Formats**: Add export functions
+
+---
+
+## Common Contribution Scenarios
+
+### Adding a Scoring Category
+
+No code changes needed:
+
+```yaml
+# config/settings.yaml
+scoring:
+  weights:
+    new_category: 15
+  keywords:
+    new_category:
+      - "keyword1"
+      - "keyword2"
+```
+
+### Adding a Database Column
+
+1. Add to `CREATE_TABLE` in `database.py`
+2. Add to `MIGRATE_COLUMNS` list
+3. Update SQL queries
+4. Add to `JobDBRecord` dataclass
+5. Update serialization methods
+6. Add tests
+
+### Adding a Notification Channel
+
+1. Create class extending `BaseNotifier`:
+
+```python
+class SlackNotifier(BaseNotifier):
+    async def send_notification(self, data: NotificationData) -> bool:
+        # Implementation
+        pass
+
+    def is_configured(self) -> bool:
+        return bool(self.config.webhook_url)
+```
+
+2. Add configuration dataclass
+3. Register in `NotificationManager`
+4. Add tests
+5. Update documentation
+
+### Adding a Configuration Option
+
+1. Add to appropriate dataclass in `config.py`
+2. Add parsing logic with validation
+3. Add to `settings.example.yaml` with documentation
+4. Add tests
+5. Update CLAUDE.md
+
+---
 
 ## Questions?
 
-If you have questions about contributing, feel free to:
-
-- Open a GitHub issue with your question
-- Check existing issues and discussions
+- **General questions**: Open a GitHub issue
+- **Bug reports**: Use the bug report template
+- **Feature requests**: Use the feature request template
 
 Thank you for contributing!

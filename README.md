@@ -1,98 +1,376 @@
 # Job Search Tool
 
-Automated job search and analysis tool powered by the [JobSpy](https://github.com/speedyapply/JobSpy) library to aggregate positions from multiple job boards. Features parallel execution, relevance scoring, SQLite persistence, an interactive Streamlit dashboard, automated scheduling, and Telegram notifications.
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](https://www.docker.com/)
+
+An automated job search aggregation and analysis platform that collects listings from multiple job boards, applies intelligent relevance scoring, and delivers real-time notifications for matching opportunities.
+
+Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, this tool provides enterprise-grade features including parallel execution, persistent storage, scheduled automation, and multi-channel notifications.
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+  - [Search Settings](#search-settings)
+  - [Query Definition](#query-definition)
+  - [Relevance Scoring](#relevance-scoring)
+  - [Scheduling and Notifications](#scheduling-and-notifications)
+- [Telegram Integration](#telegram-integration)
+- [Interactive Dashboard](#interactive-dashboard)
+- [Data Storage](#data-storage)
+- [Troubleshooting](#troubleshooting)
+- [Development](#development)
+- [License](#license)
+
+---
 
 ## Features
 
-- **Automated Scheduling**: Run searches at configurable intervals (e.g., every 24 hours)
-- **Telegram Notifications**: Receive instant alerts when new relevant jobs are found
-- **Multi-Site Scraping**: Search LinkedIn, Indeed, Glassdoor, Google Jobs, ZipRecruiter, and more simultaneously
-- **Parallel Execution**: Concurrent searches with ThreadPoolExecutor (~3 min vs ~15 min sequential)
-- **SQLite Persistence**: Track jobs across runs, identify new opportunities, mark as applied
-- **YAML Configuration**: Fully customizable queries, scoring, and settings without code changes
-- **Relevance Scoring**: Automatic scoring based on configurable keywords and weights
-- **Interactive Dashboard**: Streamlit-based UI for filtering, sorting, and analyzing results
-- **Excel Export**: Clickable links, colored headers, conditional formatting
-- **Retry Logic**: Exponential backoff with tenacity for rate limit handling
-- **Structured Logging**: File and console logs with rotation
-- **Test Suite**: Comprehensive tests with pytest (60+ tests)
+### Core Capabilities
+
+| Feature | Description |
+|---------|-------------|
+| **Multi-Source Aggregation** | Simultaneously scrapes LinkedIn, Indeed, Glassdoor, Google Jobs, ZipRecruiter, and regional boards |
+| **Intelligent Scoring** | Configurable keyword-based relevance scoring with weighted categories |
+| **Persistent Tracking** | SQLite database tracks all jobs across runs, identifies new opportunities |
+| **Automated Scheduling** | APScheduler-based periodic execution with configurable intervals |
+| **Real-Time Notifications** | Telegram alerts for high-scoring new jobs |
+| **Interactive Dashboard** | Streamlit-based UI for filtering, analysis, and export |
+
+### Technical Features
+
+| Feature | Description |
+|---------|-------------|
+| **Parallel Execution** | ThreadPoolExecutor with configurable worker count |
+| **Rate Limit Prevention** | Per-site throttling with jitter to avoid detection |
+| **Fuzzy Matching** | Post-filter validation using fuzzy string matching |
+| **Retry Logic** | Exponential backoff with tenacity for transient failures |
+| **Dynamic Rescoring** | Automatic rescoring of existing jobs when criteria change |
+| **Comprehensive Testing** | 60+ pytest tests covering all core functionality |
+
+---
+
+## Architecture
+
+### System Overview
+
+```
+╔═══════════════════════════════════════════════════════════════════════════════════╗
+║                                JOB SEARCH TOOL                                    ║
+╠═══════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                   ║
+║  ┌─────────────────────────────────────────────────────────────────────────────┐  ║
+║  │                            📄 CONFIGURATION                                 │  ║
+║  │         settings.yaml: queries, scoring, keywords, schedule, telegram       │  ║
+║  └─────────────────────────────────────────────────────────────────────────────┘  ║
+║                                       │                                           ║
+║                                       ▼                                           ║
+║  ┌─────────────────────────────────────────────────────────────────────────────┐  ║
+║  │                          ⏰ SCHEDULER (APScheduler)                         │  ║
+║  │              Single-shot mode  OR  Continuous (every N hours)               │  ║
+║  └─────────────────────────────────────────────────────────────────────────────┘  ║
+║                                       │                                           ║
+║                     ┌─────────────────┼─────────────────┐                         ║
+║                     ▼                 ▼                 ▼                         ║
+║  ┌─────────────────────────────────────────────────────────────────────────────┐  ║
+║  │                        🔍 PARALLEL SEARCH ENGINE                            │  ║
+║  │                                                                             │  ║
+║  │    ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │  ║
+║  │    │  Indeed  │  │ LinkedIn │  │Glassdoor │  │  Google  │  │   ...    │    │  ║
+║  │    └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘    │  ║
+║  │         │             │             │             │             │          │  ║
+║  │         └─────────────┴─────────────┴─────────────┴─────────────┘          │  ║
+║  │                                     │                                       │  ║
+║  │                      ┌──────────────┴──────────────┐                       │  ║
+║  │                      │   🛡️ THROTTLING + JITTER    │                       │  ║
+║  │                      │    (Rate limit prevention)  │                       │  ║
+║  │                      └──────────────┬──────────────┘                       │  ║
+║  └─────────────────────────────────────┼───────────────────────────────────────┘  ║
+║                                        ▼                                          ║
+║  ┌─────────────────────────────────────────────────────────────────────────────┐  ║
+║  │                          ⚙️ PROCESSING PIPELINE                             │  ║
+║  │                                                                             │  ║
+║  │   ┌───────────────┐     ┌───────────────┐     ┌───────────────┐            │  ║
+║  │   │ Deduplication │────▶│    Scoring    │────▶│   Filtering   │            │  ║
+║  │   │  (SHA256 ID)  │     │  (Keywords)   │     │  (Threshold)  │            │  ║
+║  │   └───────────────┘     └───────────────┘     └───────────────┘            │  ║
+║  │                                                       │                     │  ║
+║  └───────────────────────────────────────────────────────┼─────────────────────┘  ║
+║                                                          ▼                        ║
+║  ┌─────────────────────────────────────────────────────────────────────────────┐  ║
+║  │                             💾 DATA LAYER                                   │  ║
+║  │                                                                             │  ║
+║  │   ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐          │  ║
+║  │   │ SQLite Database │   │   CSV / Excel   │   │    Dashboard    │          │  ║
+║  │   │ (Primary Store) │   │   (Optional)    │   │   (Streamlit)   │          │  ║
+║  │   │                 │   │                 │   │                 │          │  ║
+║  │   │  • All jobs     │   │ • all_jobs.csv  │   │  • Filters      │          │  ║
+║  │   │  • first_seen   │   │ • relevant.xlsx │   │  • Charts       │          │  ║
+║  │   │  • last_seen    │   │                 │   │  • Export       │          │  ║
+║  │   │  • applied flag │   │                 │   │                 │          │  ║
+║  │   └────────┬────────┘   └─────────────────┘   └─────────────────┘          │  ║
+║  │            │                                                                │  ║
+║  └────────────┼────────────────────────────────────────────────────────────────┘  ║
+║               ▼                                                                   ║
+║  ┌─────────────────────────────────────────────────────────────────────────────┐  ║
+║  │                         📬 NOTIFICATION SYSTEM                              │  ║
+║  │                                                                             │  ║
+║  │   ┌─────────────────┐       ┌───────────────────────────────────────────┐  │  ║
+║  │   │   New Jobs Only │──────▶│                TELEGRAM                   │  │  ║
+║  │   │  (score >= min) │       │                                           │  │  ║
+║  │   └─────────────────┘       │  🔔 Job Search Tool - New Jobs Found      │  │  ║
+║  │                             │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━           │  │  ║
+║  │                             │  📊 Run Summary                           │  │  ║
+║  │                             │  • Total: 150  • New: 12                  │  │  ║
+║  │                             │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━           │  │  ║
+║  │                             │  1️⃣ Backend Engineer                      │  │  ║
+║  │                             │     🏢 TechCorp   📍 Remote               │  │  ║
+║  │                             │     ⭐ Score: 48  [View →]                │  │  ║
+║  │                             └───────────────────────────────────────────┘  │  ║
+║  └─────────────────────────────────────────────────────────────────────────────┘  ║
+║                                                                                   ║
+╚═══════════════════════════════════════════════════════════════════════════════════╝
+```
+
+### Detailed Execution Flow
+
+```
+                                 ╔═══════════════════╗
+                                 ║      STARTUP      ║
+                                 ╚═════════╤═════════╝
+                                           │
+                         ┌─────────────────┴─────────────────┐
+                         ▼                                   ▼
+              ┌────────────────────┐              ┌────────────────────┐
+              │   Load settings    │              │   Connect to DB    │
+              │  (settings.yaml)   │              │    (jobs.db)       │
+              └─────────┬──────────┘              └─────────┬──────────┘
+                        │                                   │
+                        └─────────────────┬─────────────────┘
+                                          ▼
+                         ┌─────────────────────────────────┐
+                         │      RECALCULATE SCORES         │
+                         │  ┌───────────────────────────┐  │
+                         │  │ Apply current config to   │  │◄── Only at startup
+                         │  │ all existing jobs in DB   │  │    (not every cycle)
+                         │  └───────────────────────────┘  │
+                         └────────────────┬────────────────┘
+                                          │
+                    ┌─────────────────────┴─────────────────────┐
+                    ▼                                           ▼
+         ╔════════════════════╗                    ╔════════════════════╗
+         ║   SINGLE-SHOT MODE ║                    ║   SCHEDULED MODE   ║
+         ║  scheduler: false  ║                    ║  scheduler: true   ║
+         ║  Run once and exit ║                    ║  Run every N hours ║
+         ╚══════════╤═════════╝                    ╚══════════╤═════════╝
+                    │                                         │
+                    └───────────────────┬─────────────────────┘
+                                        ▼
+╔═══════════════════════════════════════════════════════════════════════════════════╗
+║                              🔄 SEARCH CYCLE                                      ║◄──┐
+╠═══════════════════════════════════════════════════════════════════════════════════╣   │
+║                                                                                   ║   │
+║  ┌─────────────────────────────────────────────────────────────────────────────┐  ║   │
+║  │ 1. CLEANUP OLD JOBS (if database.cleanup_enabled: true)                     │  ║   │
+║  │    Delete jobs with last_seen > cleanup_days ago                            │  ║   │
+║  └─────────────────────────────────────────────────────────────────────────────┘  ║   │
+║                                        │                                          ║   │
+║                                        ▼                                          ║   │
+║  ┌─────────────────────────────────────────────────────────────────────────────┐  ║   │
+║  │ 2. PARALLEL SEARCH                                                          │  ║   │
+║  │                                                                             │  ║   │
+║  │    For each (query, location) combination:                                  │  ║   │
+║  │                                                                             │  ║   │
+║  │    ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐                  │  ║   │
+║  │    │ Worker 1 │  │ Worker 2 │  │ Worker 3 │  │ Worker 4 │   (parallel)     │  ║   │
+║  │    │ "python" │  │"backend" │  │ "data"   │  │  "devops"│                  │  ║   │
+║  │    │  Zurich  │  │  Zurich  │  │  Remote  │  │  Remote  │                  │  ║   │
+║  │    └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘                  │  ║   │
+║  │         │             │             │             │                         │  ║   │
+║  │         ▼             ▼             ▼             ▼                         │  ║   │
+║  │    ┌────────────────────────────────────────────────────────────────────┐  │  ║   │
+║  │    │                    THROTTLING (per-site delays)                    │  │  ║   │
+║  │    │     LinkedIn: 3.0s  │  Indeed: 1.0s  │  Glassdoor: 1.5s           │  │  ║   │
+║  │    │                    + random jitter (±30%)                          │  │  ║   │
+║  │    └────────────────────────────────────────────────────────────────────┘  │  ║   │
+║  └─────────────────────────────────────────────────────────────────────────────┘  ║   │
+║                                        │                                          ║   │
+║                                        ▼                                          ║   │
+║  ┌─────────────────────────────────────────────────────────────────────────────┐  ║   │
+║  │ 3. COMBINE & DEDUPLICATE                                                    │  ║   │
+║  │    job_id = SHA256(title + company + location)  →  64-char unique hash      │  ║   │
+║  └─────────────────────────────────────────────────────────────────────────────┘  ║   │
+║                                        │                                          ║   │
+║                                        ▼                                          ║   │
+║  ┌─────────────────────────────────────────────────────────────────────────────┐  ║   │
+║  │ 4. CALCULATE RELEVANCE SCORES                                               │  ║   │
+║  │                                                                             │  ║   │
+║  │    For each job:                                                            │  ║   │
+║  │    ┌─────────────────────────────────────────────────────────────────────┐  │  ║   │
+║  │    │  text = title + description + company + location                    │  │  ║   │
+║  │    │                                                                     │  │  ║   │
+║  │    │  for category in scoring.keywords:                                  │  │  ║   │
+║  │    │      if any keyword matches (case-insensitive):                     │  │  ║   │
+║  │    │          score += weights[category]                                 │  │  ║   │
+║  │    │                                                                     │  │  ║   │
+║  │    │  Example: "blockchain" matched → +25, "python" matched → +15        │  │  ║   │
+║  │    └─────────────────────────────────────────────────────────────────────┘  │  ║   │
+║  └─────────────────────────────────────────────────────────────────────────────┘  ║   │
+║                                        │                                          ║   │
+║                                        ▼                                          ║   │
+║  ┌─────────────────────────────────────────────────────────────────────────────┐  ║   │
+║  │ 5. FILTER BY THRESHOLD                                                      │  ║   │
+║  │    Keep only jobs where: score >= scoring.threshold                         │  ║   │
+║  └─────────────────────────────────────────────────────────────────────────────┘  ║   │
+║                                        │                                          ║   │
+║                        ┌───────────────┴───────────────┐                          ║   │
+║                        ▼                               ▼                          ║   │
+║           ┌────────────────────────┐      ┌────────────────────────┐              ║   │
+║           │    6a. SAVE TO DB      │      │  6b. SAVE CSV/EXCEL    │              ║   │
+║           │                        │      │     (if enabled)       │              ║   │
+║           │  UPSERT logic:         │      │                        │              ║   │
+║           │  • New job → INSERT    │      │  • all_jobs.csv        │              ║   │
+║           │  • Existing → UPDATE   │      │  • relevant_jobs.xlsx  │              ║   │
+║           │    (last_seen, score)  │      │                        │              ║   │
+║           └───────────┬────────────┘      └────────────────────────┘              ║   │
+║                       │                                                           ║   │
+║                       ▼                                                           ║   │
+║  ┌─────────────────────────────────────────────────────────────────────────────┐  ║   │
+║  │ 7. IDENTIFY NEW JOBS                                                        │  ║   │
+║  │    New = jobs where first_seen = today (never seen before)                  │  ║   │
+║  └─────────────────────────────────────────────────────────────────────────────┘  ║   │
+║                                        │                                          ║   │
+║                                        ▼                                          ║   │
+║  ┌─────────────────────────────────────────────────────────────────────────────┐  ║   │
+║  │ 8. SEND TELEGRAM NOTIFICATION                                               │  ║   │
+║  │                                                                             │  ║   │
+║  │    Filter:  score >= min_score_for_notification                             │  ║   │
+║  │    Limit:   max_jobs_in_message                                             │  ║   │
+║  │    Format:  Chunked messages (10 jobs per message to avoid 4096 char limit) │  ║   │
+║  └─────────────────────────────────────────────────────────────────────────────┘  ║   │
+║                                        │                                          ║   │
+╠════════════════════════════════════════╧══════════════════════════════════════════╣   │
+║                              CYCLE COMPLETE                                       ║   │
+║                                                                                   ║   │
+║    Scheduled mode?  ─────────────────────────────────────▶  Wait N hours  ────────╫───┘
+║         │                                                                         ║
+║         ▼                                                                         ║
+║    Single-shot mode?  ─────────────────────────────────▶  EXIT                    ║
+║                                                                                   ║
+╚═══════════════════════════════════════════════════════════════════════════════════╝
+```
+
+### Key Components
+
+| Component | File | Responsibility |
+|-----------|------|----------------|
+| **Entry Point** | `main.py` | Orchestrates startup, scheduling, execution |
+| **Search Engine** | `search_jobs.py` | Parallel scraping, scoring, filtering |
+| **Scheduler** | `scheduler.py` | APScheduler wrapper, retry logic |
+| **Notifications** | `notifier.py` | Telegram message formatting and sending |
+| **Database** | `database.py` | SQLite CRUD, deduplication, cleanup |
+| **Configuration** | `config.py` | YAML loading, validation, type safety |
+| **Dashboard** | `dashboard.py` | Streamlit UI for analysis |
+
+---
 
 ## Quick Start
 
-### Using Docker (Recommended)
+### Prerequisites
+
+- Docker and Docker Compose (recommended), OR
+- Python 3.10 or higher
+
+### Option 1: Docker (Recommended)
 
 ```bash
 # Clone the repository
 git clone https://github.com/VincenzoImp/job-search-tool.git
 cd job-search-tool
 
-# Copy example config and customize
+# Create configuration file
 cp config/settings.example.yaml config/settings.yaml
-# Edit config/settings.yaml with your preferences
 
-# Run once
-docker-compose up --build
+# Edit configuration with your preferences
+# nano config/settings.yaml
 
-# Or run continuously with scheduler + notifications
-docker-compose --profile scheduler up scheduler -d
+# Run a single search
+docker compose up --build
 
-# Launch interactive dashboard
-docker-compose --profile dashboard up dashboard
-# Open http://localhost:8501
+# Or run continuously with scheduler
+docker compose --profile scheduler up scheduler -d
+
+# Launch the dashboard
+docker compose --profile dashboard up dashboard
+# Access at http://localhost:8501
 ```
 
-### Using Local Python (3.10+)
+### Option 2: Local Python
 
 ```bash
+# Clone and navigate
+git clone https://github.com/VincenzoImp/job-search-tool.git
+cd job-search-tool
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Create configuration
 cp config/settings.example.yaml config/settings.yaml
+
+# Run the search
 cd scripts && python main.py
+
+# Launch dashboard
+streamlit run dashboard.py
 ```
 
-## How It Works
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   JobSpy    │────▶│   Scoring   │────▶│   SQLite    │────▶│  Telegram   │
-│  Scraper    │     │   Engine    │     │  Database   │     │    Bot      │
-└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
-      ▲                                        │
-      └────────────────────────────────────────┘
-                   Deduplication
-```
-
-1. **Scrape**: JobSpy fetches listings from configured sites in parallel
-2. **Score**: Each job gets a relevance score based on keyword matches
-3. **Store**: SQLite tracks all jobs, identifies new vs already-seen
-4. **Notify**: Telegram sends top new matches above score threshold
+---
 
 ## Configuration
 
-All settings are in `config/settings.yaml`. Copy from `settings.example.yaml` and customize. The configuration file is extensively documented with comments explaining every parameter.
+All settings are defined in `config/settings.yaml`. The example file (`settings.example.yaml`) contains comprehensive documentation for every parameter.
 
 ### Search Settings
 
 ```yaml
 search:
-  results_wanted: 30        # Results per query per site (max ~1000)
-  hours_old: 168            # 168 = 7 days, 720 = 30 days
-  job_types:
+  results_wanted: 50          # Maximum results per query per site
+  hours_old: 168              # Job posting age limit (168 = 7 days)
+
+  job_types:                  # Filter by employment type
     - "fulltime"
     - "contract"
-  sites:
-    - "indeed"              # Best coverage, minimal rate limiting
-    - "linkedin"            # Global coverage, aggressive rate limiting
-    - "glassdoor"           # Good company insights
-  locations:
+    - "internship"
+
+  sites:                      # Job boards to search
+    - "indeed"                # Best coverage, minimal rate limiting
+    - "linkedin"              # Global reach, aggressive rate limiting
+    - "glassdoor"             # Company insights included
+
+  locations:                  # Geographic targets
     - "San Francisco, CA"
     - "New York, NY"
     - "Remote"
-  distance: 50              # Search radius in miles (~80 km)
-  is_remote: false          # true = remote only
-  linkedin_fetch_description: true  # Get full descriptions (slower)
+
+  distance: 50                # Search radius in miles (~80 km)
+  is_remote: false            # Set true to search remote-only positions
+
+  linkedin_fetch_description: true  # Fetch full job descriptions (slower)
 ```
 
-### Search Queries
+### Query Definition
+
+Queries are organized into logical categories for maintainability:
 
 ```yaml
 queries:
@@ -100,109 +378,162 @@ queries:
     - "software engineer"
     - "backend developer"
     - "full-stack developer"
-  data:
+
+  data_science:
     - "data engineer"
     - "data scientist"
-  # Add your own categories
+    - "machine learning engineer"
+
+  devops:
+    - "devops engineer"
+    - "site reliability engineer"
+    - "platform engineer"
 ```
 
 **Query Syntax Tips** (especially for Indeed):
-- Use `""` for exact match: `"software engineer"`
-- Use `-` to exclude: `software -marketing -sales`
-- Use `OR` for alternatives: `(python OR java OR c++)`
-- Use `()` for grouping: `(senior OR lead) engineer`
+- Exact match: `"software engineer"` (with quotes)
+- Exclusion: `software -marketing -sales`
+- Alternatives: `(python OR java OR golang)`
+- Grouping: `(senior OR lead) engineer`
 
 ### Relevance Scoring
 
+The scoring system is fully configuration-driven with no hardcoded categories:
+
 ```yaml
 scoring:
-  threshold: 10             # Minimum score to be "relevant"
-  weights:
-    primary_skills: 20      # Your main expertise
-    technologies: 12        # Tech stack matches
-    seniority_match: 10     # Level matching
+  threshold: 15               # Minimum score to be considered "relevant"
+
+  weights:                    # Points awarded per category match
+    primary_skills: 25        # High priority matches
+    technologies: 15          # Tech stack alignment
+    experience_level: 10      # Seniority matching
+    locations: 5              # Preferred locations
+    avoid: -30                # Negative scoring for unwanted terms
+
   keywords:
     primary_skills:
       - "software engineer"
       - "backend"
+      - "distributed systems"
+
     technologies:
       - "python"
-      - "javascript"
-      - "react"
+      - "kubernetes"
+      - "postgresql"
+
+    experience_level:
+      - "junior"
+      - "entry level"
+      - "new grad"
+
+    locations:
+      - "remote"
+      - "san francisco"
+
+    avoid:                    # Penalize senior roles if targeting entry-level
+      - "senior"
+      - "10+ years"
+      - "director"
 ```
 
-**Note**: When you modify scoring criteria, all existing jobs in the database are automatically rescored on the next run. No need to clear the database or rebuild Docker.
+**Scoring Behavior:**
+- For each job, text is extracted from: title, description, company, location
+- Each category is checked for keyword matches (case-insensitive)
+- If ANY keyword from a category matches, that category's weight is added
+- Final score determines if the job is "relevant" (score >= threshold)
 
-### Parallelism & Retry
+**Dynamic Rescoring**: When you modify scoring criteria, existing jobs in the database are automatically rescored on the next run. No database reset required.
 
-```yaml
-parallel:
-  max_workers: 5            # Concurrent searches (3-5 recommended)
-
-retry:
-  max_attempts: 3           # Retry failed requests
-  base_delay: 2             # Initial delay (seconds)
-  backoff_factor: 2         # Exponential multiplier
-```
-
-### Scheduler & Notifications
+### Scheduling and Notifications
 
 ```yaml
 scheduler:
-  enabled: true             # Enable scheduled mode
-  interval_hours: 24        # Run every 24 hours
-  run_on_startup: true      # Run immediately when starting
+  enabled: true               # Enable scheduled execution
+  interval_hours: 24          # Run every 24 hours
+  run_on_startup: true        # Execute immediately when started
+  retry_on_failure: true      # Retry failed searches
+  retry_delay_minutes: 30     # Wait before retry
 
 notifications:
   enabled: true
   telegram:
     enabled: true
-    bot_token: "YOUR_BOT_TOKEN"      # From @BotFather
-    chat_ids: ["YOUR_CHAT_ID"]
-    min_score_for_notification: 15   # Only notify high-score jobs
-    max_jobs_in_message: 10          # Top 10 jobs in notification
+    bot_token: "YOUR_BOT_TOKEN"       # From @BotFather
+    chat_ids:
+      - "YOUR_CHAT_ID"                # Your Telegram user ID
+    min_score_for_notification: 20    # Only notify for high-scoring jobs
+    max_jobs_in_message: 50           # Maximum jobs per notification
 ```
 
-## Setting Up Telegram Notifications
+### Rate Limiting Prevention
 
-1. **Create a bot with @BotFather**:
+```yaml
+throttling:
+  enabled: true               # Highly recommended
+  default_delay: 1.5          # Seconds between requests
+  site_delays:
+    linkedin: 3.0             # LinkedIn is aggressive
+    indeed: 1.0               # Indeed is lenient
+    glassdoor: 1.5
+  jitter: 0.3                 # Random variation (30%)
+  rate_limit_cooldown: 30.0   # Pause after hitting rate limit
+
+parallel:
+  max_workers: 4              # Concurrent searches (3-5 recommended)
+```
+
+---
+
+## Telegram Integration
+
+### Setup Instructions
+
+1. **Create a Telegram Bot**
    - Open Telegram and search for `@BotFather`
-   - Send `/newbot` and follow instructions
-   - Copy the bot token (format: `123456789:ABCdefGHIjklMNOpqrsTUVwxyz`)
+   - Send `/newbot` and follow the prompts
+   - Save the bot token (format: `123456789:ABCdefGHIjklMNOpqrsTUVwxyz`)
 
-2. **Get your chat_id**:
-   - Start a chat with your new bot (send any message)
-   - Visit: `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
-   - Look for `"chat":{"id": YOUR_CHAT_ID}`
+2. **Get Your Chat ID**
+   - Start a conversation with your new bot (send any message)
+   - Visit: `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates`
+   - Find `"chat":{"id": YOUR_CHAT_ID}` in the response
 
-3. **Configure `config/settings.yaml`** with your bot_token and chat_id
-
-4. **Start the scheduler**:
-   ```bash
-   docker-compose --profile scheduler up scheduler -d
+3. **Configure the Tool**
+   ```yaml
+   notifications:
+     enabled: true
+     telegram:
+       enabled: true
+       bot_token: "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+       chat_ids:
+         - "987654321"
    ```
 
-### Notification Example
+4. **Test the Integration**
+   ```bash
+   docker compose --profile scheduler up scheduler
+   ```
 
-When new jobs are found, you'll receive a Telegram message like:
+### Notification Format
 
 ```
 🔔 Job Search Tool - New Jobs Found
 ━━━━━━━━━━━━━━━━━━━━━
 
 📊 Run Summary
-• Date: 2025-12-23 09:00
+• Date: 2025-12-31 09:00
 • Total found: 150
 • New: 12
-• Avg score: 24.5
+• Avg score: 28.5
 
 ━━━━━━━━━━━━━━━━━━━━━
 
-🏆 Top 5 New Jobs
+🏆 12 New Jobs (score ≥ 20)
 
 1️⃣ Backend Engineer
    🏢 TechCorp Inc.
-   📍 Berlin, Germany
+   📍 San Francisco, CA
    ⭐ Score: 48
    View Job →
 
@@ -214,257 +545,227 @@ When new jobs are found, you'll receive a Telegram message like:
 ...
 ```
 
-## Output Files
-
-### Database (`data/jobs.db`) - PRIMARY STORAGE
-
-The SQLite database is the **core storage** used by the system for:
-- Tracking all jobs seen across runs
-- Identifying new vs already-seen jobs
-- Determining which jobs to notify about
-- Marking jobs as "applied"
-
-### Results Directory (`results/`) - OPTIONAL
-
-CSV/Excel files are optional exports for human review. Disable with:
-
-```yaml
-output:
-  save_csv: false
-  save_excel: false
-```
-
-When enabled (default), generates:
-
-| File | Description |
-|------|-------------|
-| `all_jobs_YYYYMMDD_HHMMSS.csv` | All jobs found |
-| `all_jobs_YYYYMMDD_HHMMSS.xlsx` | Excel with formatting |
-| `relevant_jobs_YYYYMMDD_HHMMSS.csv` | Jobs above score threshold |
-| `relevant_jobs_YYYYMMDD_HHMMSS.xlsx` | Excel with highlighting |
-
-### Database Schema
-
-| Column | Description |
-|--------|-------------|
-| `job_id` | Unique identifier (SHA256 hash) |
-| `title`, `company`, `location` | Basic job info |
-| `job_url` | Link to job posting |
-| `site` | Source (indeed, linkedin, glassdoor) |
-| `job_type` | fulltime, contract, internship, etc. |
-| `is_remote` | Remote work available |
-| `job_level` | Seniority level (LinkedIn) |
-| `description` | Full job description |
-| `date_posted` | When job was posted |
-| `min_amount`, `max_amount`, `currency` | Salary information |
-| `company_url` | Company page URL |
-| `first_seen`, `last_seen` | Tracking dates |
-| `relevance_score` | Calculated score |
-| `applied` | Application status |
+---
 
 ## Interactive Dashboard
 
-The dashboard provides a powerful interface for analyzing and filtering job results.
+The Streamlit dashboard provides powerful analysis and filtering capabilities.
 
 ### Features
 
-- **Multiple data sources**: Load from CSV files or SQLite database
-- **Comprehensive filtering**: Text search, job level, sites, companies, locations, job types, remote status, salary range, relevance score, date posted
-- **Statistics view**: Total jobs, average score, top sources, remote jobs count
-- **Interactive charts**: Jobs by source, score distribution
-- **Sortable table**: Customize columns, sort by any field, clickable job links
-- **Job details view**: Full description and metadata
-- **Export**: Download filtered results as CSV or Excel
+- **Multiple Data Sources**: Load from CSV files or SQLite database
+- **Advanced Filtering**: Text search, job type, site, company, location, salary range, score threshold, date range
+- **Visual Analytics**: Charts for source distribution, score distribution, job type breakdown
+- **Sortable Results**: Customize columns, sort by any field
+- **Job Details**: Full description and metadata view
+- **Export Options**: Download filtered results as CSV or Excel
 
-### Launch Dashboard
+### Launch
 
 ```bash
-# Using Docker
-docker-compose --profile dashboard up dashboard
-# Open http://localhost:8501
+# Docker
+docker compose --profile dashboard up dashboard
+# Access at http://localhost:8501
 
-# Using Local Python
+# Local
 cd scripts && streamlit run dashboard.py
 ```
 
-## Data Sources
+---
 
-| Site | Coverage | Rate Limiting | Notes |
-|------|----------|---------------|-------|
-| **Indeed** | Best | Minimal | 100 jobs/page, supports all filters |
-| **LinkedIn** | Global | Aggressive | 25 jobs/page, 3-7s delays, guest API |
-| **Glassdoor** | Good | Moderate | GraphQL API, company insights |
-| **Google Jobs** | Aggregator | Minimal | Requires specific query syntax |
-| **ZipRecruiter** | USA/Canada | Moderate | North America only |
-| **Bayt** | Middle East | Minimal | UAE, Saudi Arabia, etc. |
-| **Naukri** | India | Minimal | India only |
+## Data Storage
 
-### Supported Countries
+### Primary Storage: SQLite Database
 
-| Region | Countries |
-|--------|-----------|
-| North America | USA, Canada |
-| Europe | UK, Germany, France, Netherlands, Switzerland, Ireland, Spain, Italy, Austria, Belgium, Denmark, Finland, Norway, Sweden, Poland, Portugal |
-| Asia | India, Singapore, Hong Kong, Japan, South Korea, China |
-| Oceania | Australia, New Zealand |
-| Middle East | UAE, Saudi Arabia, Israel |
-| South America | Brazil, Argentina, Mexico |
+The SQLite database (`data/jobs.db`) is the primary storage mechanism:
 
-## Known Limitations
+| Column | Type | Description |
+|--------|------|-------------|
+| `job_id` | TEXT | Unique SHA256 hash (title + company + location) |
+| `title` | TEXT | Job title |
+| `company` | TEXT | Company name |
+| `location` | TEXT | Job location |
+| `job_url` | TEXT | Direct link to posting |
+| `site` | TEXT | Source (indeed, linkedin, glassdoor) |
+| `job_type` | TEXT | Employment type |
+| `is_remote` | BOOLEAN | Remote work available |
+| `description` | TEXT | Full job description |
+| `date_posted` | DATE | Original posting date |
+| `min_amount`, `max_amount` | REAL | Salary range |
+| `currency` | TEXT | Salary currency |
+| `first_seen` | DATE | First discovered |
+| `last_seen` | DATE | Most recent occurrence |
+| `relevance_score` | INTEGER | Calculated score |
+| `applied` | BOOLEAN | Application tracking |
 
-### Indeed Filter Exclusivity
+### Useful Database Queries
 
-Indeed can only use ONE of these filters at a time:
-- `hours_old` (date filtering)
-- `job_type` + `is_remote`
-- `easy_apply`
+```bash
+# View statistics
+sqlite3 data/jobs.db "SELECT COUNT(*), AVG(relevance_score) FROM jobs"
 
-**We prioritize `hours_old` for fresh results.** If you need job type filtering, set `hours_old: null`.
+# Today's new jobs
+sqlite3 data/jobs.db "SELECT title, company, relevance_score FROM jobs WHERE first_seen = date('now') ORDER BY relevance_score DESC"
 
-### LinkedIn Rate Limiting
+# Top unapplied jobs
+sqlite3 data/jobs.db "SELECT title, company, relevance_score FROM jobs WHERE applied = 0 ORDER BY relevance_score DESC LIMIT 10"
 
-- Built-in delays: 3-7 seconds between requests
-- Hard limit at ~1000 results
-- Heavy rate limiting around 10th page
-- `linkedin_fetch_description=True` doubles request count
+# Mark job as applied
+sqlite3 data/jobs.db "UPDATE jobs SET applied = 1 WHERE job_id = 'your_job_id'"
 
-### Glassdoor Issues
+# Distribution by source
+sqlite3 data/jobs.db "SELECT site, COUNT(*) as count FROM jobs GROUP BY site ORDER BY count DESC"
 
-- "Location not parsed" errors for locations not in database
-- 400/429 errors indicate rate limiting
+# Remote opportunities
+sqlite3 data/jobs.db "SELECT title, company FROM jobs WHERE is_remote = 1 ORDER BY relevance_score DESC LIMIT 20"
+```
+
+### Optional Exports
+
+CSV and Excel exports are optional and controlled by configuration:
+
+```yaml
+output:
+  save_csv: true              # Generate CSV files
+  save_excel: true            # Generate formatted Excel files
+```
+
+When enabled, files are saved to `results/` with timestamps:
+- `all_jobs_YYYYMMDD_HHMMSS.csv/xlsx` - All discovered jobs
+- `relevant_jobs_YYYYMMDD_HHMMSS.csv/xlsx` - Jobs above score threshold
+
+---
 
 ## Troubleshooting
 
-### Rate Limiting / Empty Results
+### Rate Limiting (Empty Results, 429 Errors)
 
-1. Reduce `parallel.max_workers` to 3
-2. Reduce `search.results_wanted` to 20
-3. Increase `retry.base_delay` to 5
-4. Run at different times of day
-5. Consider using proxies for heavy usage
+```yaml
+# Adjust these settings in config/settings.yaml:
+throttling:
+  enabled: true
+  default_delay: 2.5          # Increase delay
+  site_delays:
+    linkedin: 5.0             # LinkedIn needs more time
+
+parallel:
+  max_workers: 2              # Reduce concurrency
+
+search:
+  results_wanted: 20          # Reduce per-query results
+```
 
 ### Docker Issues
 
 ```bash
-docker-compose down
+# Full rebuild
+docker compose down
 docker system prune -f
-docker-compose up --build
+docker compose up --build
+```
+
+### Database Locked
+
+SQLite supports only one writer at a time:
+
+```bash
+# Stop any running processes
+docker compose down
+
+# Or wait for the current operation to complete
 ```
 
 ### Python Version
 
-This tool requires Python 3.10+ (JobSpy library requirement). Check your version:
+JobSpy requires Python 3.10+:
 
 ```bash
 python3 --version
+# If below 3.10, use Docker instead
 ```
 
-If below 3.10, use Docker instead.
+---
 
-## Database Queries
+## Development
 
-```bash
-# Statistics
-sqlite3 data/jobs.db "SELECT COUNT(*), AVG(relevance_score) FROM jobs"
-
-# New jobs today
-sqlite3 data/jobs.db "SELECT title, company FROM jobs WHERE first_seen = date('now')"
-
-# Top jobs not yet applied
-sqlite3 data/jobs.db "SELECT title, company, relevance_score FROM jobs WHERE applied = 0 ORDER BY relevance_score DESC LIMIT 10"
-
-# Mark job as applied
-sqlite3 data/jobs.db "UPDATE jobs SET applied = 1 WHERE job_id = 'abc123...'"
-
-# Jobs by site
-sqlite3 data/jobs.db "SELECT site, COUNT(*) FROM jobs GROUP BY site"
-
-# Remote jobs
-sqlite3 data/jobs.db "SELECT title, company FROM jobs WHERE is_remote = 1 ORDER BY relevance_score DESC"
-```
-
-## Project Structure
+### Project Structure
 
 ```
 job-search-tool/
 ├── config/
-│   ├── settings.yaml          # Your configuration (gitignored)
-│   └── settings.example.yaml  # Example template with full documentation
+│   ├── settings.yaml          # User configuration (gitignored)
+│   └── settings.example.yaml  # Documented template
 ├── scripts/
-│   ├── main.py                # Unified entry point (scheduler + notifications)
-│   ├── search_jobs.py         # Core job search with parallel execution
+│   ├── main.py                # Unified entry point
+│   ├── search_jobs.py         # Core search with parallel execution
 │   ├── scheduler.py           # APScheduler integration
-│   ├── notifier.py            # Telegram notification system
-│   ├── dashboard.py           # Streamlit interactive dashboard
+│   ├── notifier.py            # Telegram notifications
+│   ├── dashboard.py           # Streamlit UI
 │   ├── database.py            # SQLite persistence
-│   ├── config.py              # Configuration loader with validation
+│   ├── config.py              # Configuration loader
 │   ├── logger.py              # Structured logging
 │   ├── models.py              # Type-safe dataclasses
-│   └── healthcheck.py         # Docker health check script
-├── tests/                      # Test suite (pytest)
-│   ├── test_models.py         # Tests for data models
-│   ├── test_config.py         # Tests for configuration
-│   ├── test_database.py       # Tests for database operations
-│   └── test_scoring.py        # Tests for scoring functions
+│   └── healthcheck.py         # Docker health checks
+├── tests/                      # Pytest test suite
 ├── results/                    # CSV/Excel output (gitignored)
 ├── data/                       # SQLite database (gitignored)
 ├── logs/                       # Log files (gitignored)
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
-├── requirements-dev.txt        # Development dependencies
-├── pytest.ini                  # Test configuration
-├── CLAUDE.md                   # Developer documentation
-└── README.md
+├── requirements-dev.txt
+└── pytest.ini
 ```
-
-## Development
 
 ### Running Tests
 
 ```bash
-# Install dev dependencies
+# Install development dependencies
 pip install -r requirements-dev.txt
 
 # Run all tests
 pytest
 
-# Run with coverage
+# With coverage report
 pytest --cov=scripts --cov-report=html
 
-# Run specific test file
+# Specific test file
 pytest tests/test_config.py -v
-```
-
-### Type Checking
-
-```bash
-pip install mypy
-mypy scripts/
 ```
 
 ### Code Quality
 
 ```bash
-pip install ruff black
+# Type checking
+mypy scripts/
+
+# Linting
 ruff check scripts/
+
+# Formatting
 black scripts/
 ```
 
+---
+
 ## License
 
-MIT License
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+---
 
 ## Acknowledgments
 
-- [JobSpy](https://github.com/speedyapply/JobSpy) - The underlying job scraping library
+- [JobSpy](https://github.com/speedyapply/JobSpy) - Core job scraping library
 - [Streamlit](https://streamlit.io/) - Dashboard framework
-- [APScheduler](https://apscheduler.readthedocs.io/) - Scheduling
+- [APScheduler](https://apscheduler.readthedocs.io/) - Task scheduling
 - [python-telegram-bot](https://python-telegram-bot.org/) - Telegram integration
 - [Pandas](https://pandas.pydata.org/) - Data manipulation
 - [Tenacity](https://github.com/jd/tenacity) - Retry logic
 
+---
+
 ## Support
 
-- **JobSpy library issues**: https://github.com/speedyapply/JobSpy/issues
-- **This project**: Open an issue on GitHub
+- **JobSpy Issues**: [github.com/speedyapply/JobSpy/issues](https://github.com/speedyapply/JobSpy/issues)
+- **This Project**: [Open an issue](https://github.com/VincenzoImp/job-search-tool/issues)
