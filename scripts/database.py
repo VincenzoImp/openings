@@ -585,3 +585,41 @@ def recalculate_all_scores(db: JobDatabase, config: Config) -> int:
 
     logger.info(f"Recalculated scores: {updated} jobs updated")
     return updated
+
+
+def cleanup_old_jobs(db: JobDatabase, days: int) -> int:
+    """
+    Delete jobs not seen in the specified number of days.
+
+    Args:
+        db: Database instance.
+        days: Delete jobs with last_seen older than this many days.
+
+    Returns:
+        Number of jobs deleted.
+    """
+    logger = get_logger("database")
+
+    with db._get_connection() as conn:
+        cursor = conn.cursor()
+
+        # Count jobs to be deleted
+        cursor.execute(
+            "SELECT COUNT(*) FROM jobs WHERE last_seen < date('now', ?)",
+            (f"-{days} days",),
+        )
+        count = cursor.fetchone()[0]
+
+        if count == 0:
+            logger.info(f"No jobs older than {days} days to clean up")
+            return 0
+
+        # Delete old jobs
+        cursor.execute(
+            "DELETE FROM jobs WHERE last_seen < date('now', ?)",
+            (f"-{days} days",),
+        )
+        conn.commit()
+
+    logger.info(f"Cleaned up {count} jobs not seen in {days}+ days")
+    return count

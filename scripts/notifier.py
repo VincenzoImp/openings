@@ -154,15 +154,19 @@ class TelegramNotifier(BaseNotifier):
         # Only escape ) and \ inside URLs for MarkdownV2
         return url.replace("\\", "\\\\").replace(")", "\\)")
 
-    def _build_summary_message(self, data: NotificationData) -> str:
+    # Telegram message limit is 4096 chars, we use 10 jobs per chunk to be safe
+    JOBS_PER_CHUNK = 10
+
+    def _build_header_message(self, data: NotificationData, total_jobs_to_notify: int) -> str:
         """
-        Build the summary notification message.
+        Build the header/summary message (sent first).
 
         Args:
             data: Notification data.
+            total_jobs_to_notify: Total number of jobs that will be notified.
 
         Returns:
-            Formatted message string.
+            Formatted header message string.
         """
         lines = [
             "🔔 *Job Search Tool \\- New Jobs Found*",
@@ -176,36 +180,20 @@ class TelegramNotifier(BaseNotifier):
             f"• Avg score: {self._escape_markdown(f'{data.avg_score:.1f}')}",
         ]
 
-        if data.new_jobs_count == 0:
+        if data.new_jobs_count == 0 or total_jobs_to_notify == 0:
             lines.extend([
                 "",
                 "━━━━━━━━━━━━━━━━━━━━━",
                 "",
-                "ℹ️ No new jobs found in this search\\.",
+                "ℹ️ No new jobs matching notification criteria\\.",
             ])
         else:
-            # Filter jobs by minimum score
-            filtered_jobs = [
-                job for job in data.top_jobs
-                if job.relevance_score >= self.config.min_score_for_notification
-            ]
-
-            if filtered_jobs:
-                lines.extend([
-                    "",
-                    "━━━━━━━━━━━━━━━━━━━━━",
-                    "",
-                    f"🏆 *Top {min(len(filtered_jobs), self.config.max_jobs_in_message)} New Jobs*",
-                    "",
-                ])
-
-                for idx, job in enumerate(filtered_jobs[:self.config.max_jobs_in_message], 1):
-                    lines.append(self._format_job_message(job, idx))
-                    lines.append("")
-
-                if len(data.all_new_jobs) > self.config.max_jobs_in_message:
-                    remaining = len(data.all_new_jobs) - self.config.max_jobs_in_message
-                    lines.append(f"📋 \\.\\.\\. and {remaining} more jobs in database")
+            lines.extend([
+                "",
+                "━━━━━━━━━━━━━━━━━━━━━",
+                "",
+                f"🏆 *{total_jobs_to_notify} New Jobs* \\(score ≥ {self.config.min_score_for_notification}\\)",
+            ])
 
         lines.extend([
             "",
@@ -215,9 +203,59 @@ class TelegramNotifier(BaseNotifier):
 
         return "\n".join(lines)
 
+    def _build_jobs_chunk_message(self, jobs: list, start_index: int, chunk_num: int, total_chunks: int) -> str:
+        """
+        Build a message for a chunk of jobs.
+
+        Args:
+            jobs: List of jobs for this chunk.
+            start_index: Starting index for numbering (1-based).
+            chunk_num: Current chunk number (1-based).
+            total_chunks: Total number of chunks.
+
+        Returns:
+            Formatted jobs chunk message.
+        """
+        lines = []
+
+        if total_chunks > 1:
+            lines.append(f"📋 *Jobs \\({chunk_num}/{total_chunks}\\)*")
+            lines.append("")
+
+        for idx, job in enumerate(jobs, start_index):
+            lines.append(self._format_job_message(job, idx))
+            lines.append("")
+
+        return "\n".join(lines)
+
+    def _build_summary_message(self, data: NotificationData) -> str:
+        """
+        Build the summary notification message (legacy single-message format).
+
+        This is kept for backward compatibility but send_notification now uses
+        chunked messages for large job lists.
+
+        Args:
+            data: Notification data.
+
+        Returns:
+            Formatted message string.
+        """
+        # Filter jobs by minimum score
+        filtered_jobs = [
+            job for job in data.top_jobs
+            if job.relevance_score >= self.config.min_score_for_notification
+        ]
+        jobs_to_send = filtered_jobs[:self.config.max_jobs_in_message]
+
+        return self._build_header_message(data, len(jobs_to_send))
+
     async def send_notification(self, data: NotificationData) -> bool:
         """
-        Send Telegram notification.
+        Send Telegram notification with chunked messages for large job lists.
+
+        Sends a header message first, then jobs in chunks of JOBS_PER_CHUNK (10)
+        to avoid hitting Telegram's 4096 character message limit.
 
         Args:
             data: Notification data.
@@ -234,9 +272,38 @@ class TelegramNotifier(BaseNotifier):
             from telegram.error import TelegramError
 
             bot = Bot(token=self.bot_token)
-            message = self._build_summary_message(data)
 
-            self.logger.info(f"Sending Telegram notification to {len(self.config.chat_ids)} recipient(s)")
+            # Filter jobs by minimum score
+            filtered_jobs = [
+                job for job in data.all_new_jobs
+                if job.relevance_score >= self.config.min_score_for_notification
+            ]
+            jobs_to_send = filtered_jobs[:self.config.max_jobs_in_message]
+            total_jobs = len(jobs_to_send)
+
+            # Build header message
+            header_message = self._build_header_message(data, total_jobs)
+
+            # Build job chunk messages
+            job_messages = []
+            if total_jobs > 0:
+                total_chunks = (total_jobs + self.JOBS_PER_CHUNK - 1) // self.JOBS_PER_CHUNK
+                for chunk_idx in range(total_chunks):
+                    start_idx = chunk_idx * self.JOBS_PER_CHUNK
+                    end_idx = min(start_idx + self.JOBS_PER_CHUNK, total_jobs)
+                    chunk_jobs = jobs_to_send[start_idx:end_idx]
+                    chunk_message = self._build_jobs_chunk_message(
+                        jobs=chunk_jobs,
+                        start_index=start_idx + 1,  # 1-based indexing
+                        chunk_num=chunk_idx + 1,
+                        total_chunks=total_chunks,
+                    )
+                    job_messages.append(chunk_message)
+
+            self.logger.info(
+                f"Sending Telegram notification to {len(self.config.chat_ids)} recipient(s): "
+                f"1 header + {len(job_messages)} job chunk(s)"
+            )
 
             success_count = 0
             for chat_id in self.config.chat_ids:
@@ -244,18 +311,29 @@ class TelegramNotifier(BaseNotifier):
                     continue
 
                 try:
+                    # Send header message first
                     await bot.send_message(
                         chat_id=chat_id,
-                        text=message,
+                        text=header_message,
                         parse_mode=ParseMode.MARKDOWN_V2,
                         disable_web_page_preview=True,
                     )
+
+                    # Send job chunks
+                    for idx, job_message in enumerate(job_messages):
+                        await bot.send_message(
+                            chat_id=chat_id,
+                            text=job_message,
+                            parse_mode=ParseMode.MARKDOWN_V2,
+                            disable_web_page_preview=True,
+                        )
+
                     success_count += 1
                     self.logger.info(f"Telegram notification sent to chat {chat_id}")
                 except TelegramError as e:
                     # Log the full error for debugging MarkdownV2 issues
                     self.logger.error(f"Failed to send to chat {chat_id}: {e}")
-                    self.logger.debug(f"Message that failed:\n{message[:500]}...")
+                    self.logger.debug(f"Header message:\n{header_message[:500]}...")
 
             return success_count > 0
 

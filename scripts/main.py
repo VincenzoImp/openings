@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 from config import get_config, reload_config
-from database import get_database, recalculate_all_scores
+from database import cleanup_old_jobs, get_database, recalculate_all_scores
 from logger import get_logger, log_section, setup_logging
 from notifier import NotificationManager, create_notification_data
 from scheduler import create_scheduler
@@ -61,9 +61,9 @@ def run_job_search() -> bool:
         db_stats = db.get_statistics()
         logger.info(f"Database: {db_stats['total_jobs']} jobs tracked")
 
-        # Recalculate scores for existing jobs with current config
-        if db_stats['total_jobs'] > 0:
-            recalculate_all_scores(db, config)
+        # Cleanup old jobs if enabled
+        if config.database.cleanup_enabled and db_stats['total_jobs'] > 0:
+            cleanup_old_jobs(db, config.database.cleanup_days)
 
         # Search for jobs
         all_jobs, summary = search_jobs(config)
@@ -253,6 +253,13 @@ def main() -> int:
         if config.notifications.telegram.enabled:
             channels.append("Telegram")
         logger.info(f"Notifications: {', '.join(channels) if channels else 'None configured'}")
+
+    # Recalculate scores for existing jobs at startup (only once)
+    db = get_database(config)
+    db_stats = db.get_statistics()
+    if db_stats['total_jobs'] > 0:
+        logger.info(f"Recalculating scores for {db_stats['total_jobs']} existing jobs...")
+        recalculate_all_scores(db, config)
 
     # Create scheduler
     scheduler = create_scheduler(config, run_job_search)
