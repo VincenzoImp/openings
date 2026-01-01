@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.0.0] - 2026-01-01
 
+### Added
+
+- **Top Jobs Overall in Notifications**: Telegram notifications now show two sections:
+  - 🆕 New Jobs - Jobs found in the current search run
+  - 🏆 Top Jobs Overall - Best jobs from the entire database (configurable via `include_top_overall` and `max_top_overall`)
+- **New Database Methods**: `get_top_jobs(limit, min_score)` and `get_job_count()` for notification support
+- **Configurable jobs_per_chunk**: Now exposed in settings.yaml (previously hardcoded constant)
+
 ### Fixed
 
 - **SQLite Variable Limit**: Added batch querying (`SQLITE_VAR_LIMIT = 500`) to handle large job ID sets without hitting SQLite's 999 variable limit
@@ -18,9 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **NotificationData Simplified**: Consolidated `top_jobs`/`all_new_jobs` into single `new_jobs` field (sorted by score descending)
+- **NotificationData Enhanced**: Added `top_jobs_overall` and `total_jobs_in_db` fields for comprehensive notifications
 - **Precompiled Regex**: Added precompiled regex for MarkdownV2 escaping in notifier (performance improvement)
-- **JOBS_PER_CHUNK Validation**: Added `__init_subclass__` to validate the constant in TelegramNotifier
 - **Docker Memory Limits**: Added to all services in docker-compose.yml (legacy, analyze, dashboard)
 
 ### Removed

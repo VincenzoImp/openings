@@ -1,283 +1,474 @@
-# ╔═══════════════════════════════════════════════════════════════════════════╗
-# ║                    JOB SEARCH TOOL - EXAMPLE CONFIGURATION                ║
-# ║                                                                           ║
-# ║  This is a GENERIC example for tech job searches.                         ║
-# ║  Copy this file to settings.yaml and customize for your needs.            ║
-# ║                                                                           ║
-# ║  Based on JobSpy v1.1.82 - https://github.com/speedyapply/JobSpy          ║
-# ╚═══════════════════════════════════════════════════════════════════════════╝
+# ╔═══════════════════════════════════════════════════════════════════════════════╗
+# ║                      JOB SEARCH TOOL - CONFIGURATION REFERENCE                 ║
+# ║                                                                                ║
+# ║  This is a comprehensive example configuration file with ALL available        ║
+# ║  options documented in detail. All values shown are the DEFAULT values.       ║
+# ║                                                                                ║
+# ║  GETTING STARTED:                                                              ║
+# ║  1. Copy this file to settings.yaml in the same directory                     ║
+# ║  2. Customize the values according to your needs                              ║
+# ║  3. At minimum, update: locations, queries, and scoring keywords              ║
+# ║                                                                                ║
+# ║  Based on JobSpy v1.1.82 - https://github.com/speedyapply/JobSpy              ║
+# ╚═══════════════════════════════════════════════════════════════════════════════╝
+
 
 # =============================================================================
-# SEARCH SETTINGS - Main search parameters
+#                              SEARCH SETTINGS
 # =============================================================================
+# These settings control how the job search is performed, including which
+# sites to scrape, how many results to fetch, and various filters.
+# =============================================================================
+
 search:
   # ---------------------------------------------------------------------------
-  # results_wanted (int): Number of results requested PER QUERY PER SITE
+  # results_wanted (integer, default: 50)
   # ---------------------------------------------------------------------------
-  # - JobSpy default: 15
-  # - Practical maximum: ~1000 (limit imposed by job boards)
-  # - WARNING: High values increase execution time and risk of
-  #   rate limiting (especially on LinkedIn)
-  # - Recommended: 20-50 for frequent searches, 100+ for rare searches
-  results_wanted: 30
+  # The number of job results to request PER QUERY PER SITE.
+  #
+  # How it works:
+  # - If you have 5 queries and 3 sites, with results_wanted=50, you could
+  #   potentially get up to 5 × 3 × 50 = 750 jobs (before deduplication)
+  # - In practice, you'll get fewer due to duplicates and site limitations
+  #
+  # Practical limits:
+  # - Maximum effective value is ~1000 (hard limit imposed by job boards)
+  # - LinkedIn has aggressive rate limiting around page 10 (~250 results)
+  # - Higher values increase scraping time and rate limit risk
+  #
+  # Recommended values:
+  # - 20-50: For quick searches or when rate limited
+  # - 50-100: Normal usage (default)
+  # - 100-200: Comprehensive searches (slower, higher rate limit risk)
+  # ---------------------------------------------------------------------------
+  results_wanted: 50
 
   # ---------------------------------------------------------------------------
-  # hours_old (int): Filter jobs posted within the last N hours
+  # hours_old (integer, default: 720)
   # ---------------------------------------------------------------------------
-  # - Common values:
-  #   - 24    = last day
-  #   - 72    = last 3 days
-  #   - 168   = last week
-  #   - 720   = last 30 days
-  #   - 1440  = last 60 days
-  #   - 2160  = last 90 days
-  # - IMPORTANT NOTE (Indeed limitation):
-  #   On Indeed, hours_old is MUTUALLY EXCLUSIVE with job_type and is_remote.
-  #   If you set hours_old, job_type is SILENTLY IGNORED.
-  # - NOTE: ZipRecruiter and Glassdoor round up to the next day
-  hours_old: 168
+  # Filter to only show jobs posted within the last N hours.
+  #
+  # Common values:
+  # - 24: Last 24 hours (1 day) - fresh postings only
+  # - 48: Last 2 days
+  # - 72: Last 3 days
+  # - 168: Last week (7 days)
+  # - 336: Last 2 weeks
+  # - 720: Last 30 days (default)
+  #
+  # IMPORTANT - Indeed limitation:
+  # Indeed can only use ONE of these filters at a time:
+  # - hours_old (date filter)
+  # - job_type + is_remote (combined)
+  # - easy_apply
+  # This tool prioritizes hours_old for fresher results.
+  # ---------------------------------------------------------------------------
+  hours_old: 720
 
   # ---------------------------------------------------------------------------
-  # job_type (str): Contract type to search for
+  # job_types (list of strings, default: ["fulltime"])
   # ---------------------------------------------------------------------------
-  # Possible values (use the first one in the list):
-  #   - "fulltime"   : Full-time (also: vollzeit, 100%, etc.)
-  #   - "parttime"   : Part-time (also: teilzeit)
-  #   - "contract"   : Contract/Freelance
-  #   - "temporary"  : Temporary
-  #   - "internship" : Internship/Traineeship (also: praktikum)
-  #   - "perdiem"    : Per diem
-  #   - "nights"     : Night shift
-  #   - "summer"     : Summer position
-  #   - "volunteer"  : Volunteer
+  # Filter jobs by contract/employment type.
   #
-  # LIMITATIONS:
-  #   - Indeed: DOES NOT WORK if hours_old is set (see above)
-  #   - LinkedIn: Always works
-  #   - Glassdoor: Always works
+  # Available options:
+  # - fulltime: Full-time positions (permanent, 40 hours/week)
+  # - parttime: Part-time positions (less than 40 hours/week)
+  # - contract: Contract/freelance work (fixed term)
+  # - temporary: Temporary positions
+  # - internship: Internship positions (students/recent grads)
+  # - perdiem: Per diem (paid daily, on-call)
+  # - nights: Night shift positions
+  # - summer: Summer jobs/seasonal
+  # - volunteer: Volunteer positions (unpaid)
   #
-  # NOTE: In our implementation, we prioritize hours_old (freshness)
-  # so job_type is only used if hours_old is not set.
+  # You can specify multiple types:
+  # job_types:
+  #   - "fulltime"
+  #   - "contract"
+  #   - "internship"
+  #
+  # Note: Not all job boards support all types. Unsupported types are ignored.
+  # ---------------------------------------------------------------------------
   job_types:
     - "fulltime"
-    - "contract"
-    - "internship"
 
   # ---------------------------------------------------------------------------
-  # sites (list[str]): Sites to scrape jobs from
+  # sites (list of strings, default: ["indeed", "linkedin", "glassdoor"])
   # ---------------------------------------------------------------------------
+  # Job boards to scrape. Each site is queried for each query-location pair.
+  #
   # Available sites:
+  # - indeed: Best coverage, supports most countries, minimal rate limiting
+  # - linkedin: Good coverage, aggressive rate limiting, requires delays
+  # - glassdoor: Good for company reviews, may have location parsing issues
+  # - google: Google Jobs aggregator (requires special google_search_term syntax)
+  # - zip_recruiter: US-focused job board
+  # - bayt: Middle East job board
+  # - naukri: India job board
+  # - bdjobs: Bangladesh job board
   #
-  # RECOMMENDED (work globally):
-  #   - "indeed"     : BEST - No rate limiting, global coverage
-  #                    Uses country-specific domains (indeed.com, de.indeed.com, etc.)
-  #   - "linkedin"   : GOOD but aggressive rate limiting (~10 pages max)
-  #                    Uses guest API (no login), 25 jobs/page
-  #                    Internal delay: 3-7 seconds between requests
-  #   - "glassdoor"  : GOOD - Good company insights
-  #                    May have location parsing issues
+  # Site-specific notes:
+  # - LinkedIn: Built-in 3-7 second delays, hard limit at 1000 results
+  # - Glassdoor: May return "location not parsed" for some queries
+  # - Google: Requires google_search_term for best results
   #
-  # OTHER SITES (regional):
-  #   - "google"        : Requires google_search_term with specific syntax
-  #                       Normal search_term DOES NOT work well
-  #   - "zip_recruiter" : USA/Canada ONLY
-  #   - "bayt"          : Middle East (UAE, Saudi, etc.)
-  #   - "naukri"        : India
-  #   - "bdjobs"        : Bangladesh
-  #
-  # NOTE: JobSpy scrapes all sites IN PARALLEL internally
+  # Recommended for most users:
+  # sites:
+  #   - "indeed"
+  #   - "linkedin"
+  #   - "glassdoor"
+  # ---------------------------------------------------------------------------
   sites:
     - "indeed"
     - "linkedin"
     - "glassdoor"
 
   # ---------------------------------------------------------------------------
-  # locations (list[str]): Locations to search in
+  # locations (list of strings, default: ["Remote"])
   # ---------------------------------------------------------------------------
-  # Recommended format: "City, Country" or "City, State" (for USA)
+  # Geographic locations to search for jobs.
   #
-  # For LinkedIn: location is the ONLY geographic filter (searches globally)
-  # For Indeed/Glassdoor: use country-specific domains + location for precision
+  # Format examples:
+  # - "Remote": Search for remote positions
+  # - "New York, NY": City and state (USA)
+  # - "London, UK": City and country
+  # - "Zurich, Switzerland": City and country (Europe)
+  # - "San Francisco Bay Area": Regional search
   #
-  # Valid examples:
-  #   - "San Francisco, CA"      : San Francisco Bay Area
-  #   - "New York, NY"           : New York City
-  #   - "London, UK"             : London, United Kingdom
-  #   - "Berlin, Germany"        : Berlin, Germany
-  #   - "Remote"                 : Remote positions only
+  # Tips:
+  # - Use the official spelling (e.g., "Zürich" may work differently than "Zurich")
+  # - Add both variations if unsure: ["Zurich, Switzerland", "Zürich, Switzerland"]
+  # - Each location multiplies the number of queries (more locations = longer runtime)
+  # - The "distance" setting controls the search radius around each location
   #
-  # NOTE: Too many locations = too many queries = more time and rate limiting
+  # Example for multiple locations:
+  # locations:
+  #   - "Remote"
+  #   - "New York, NY"
+  #   - "San Francisco, CA"
+  #   - "London, UK"
+  # ---------------------------------------------------------------------------
   locations:
-    - "San Francisco, CA"
-    - "New York, NY"
     - "Remote"
 
   # ---------------------------------------------------------------------------
-  # distance (int): Search radius in MILES
+  # distance (integer, default: 50)
   # ---------------------------------------------------------------------------
-  # - JobSpy default: 50 miles (~80 km)
-  # - Recommended values:
-  #   - 25  : City only (~40 km)
-  #   - 50  : Metropolitan area (~80 km)
-  #   - 100 : Region (~160 km)
+  # Search radius in miles around each location.
+  #
+  # Common values:
+  # - 10: Very local (city center only)
+  # - 25: Local area
+  # - 50: Metropolitan area (default)
+  # - 100: Regional
+  # - 200+: Wide area search
+  #
+  # Notes:
+  # - This setting is ignored for "Remote" searches
+  # - Some job boards may interpret this differently
+  # - 50 miles ≈ 80 kilometers
+  # ---------------------------------------------------------------------------
   distance: 50
 
   # ---------------------------------------------------------------------------
-  # is_remote (bool): Filter for remote-only jobs
+  # is_remote (boolean, default: false)
   # ---------------------------------------------------------------------------
-  # - true  : Only 100% remote jobs
-  # - false : All jobs (default)
+  # Filter to show ONLY remote positions.
   #
-  # Indeed LIMITATION: is_remote is part of the composite filter with job_type
-  # If hours_old is set, is_remote is IGNORED on Indeed
+  # Values:
+  # - false: Show all jobs (remote and on-site) - default
+  # - true: Show only remote jobs
+  #
+  # When to use:
+  # - Set to true if you're exclusively looking for remote work
+  # - Keep as false if you want to see all options
+  # - You can also add "Remote" to locations list for a softer approach
+  #
+  # Note: This is a strict filter. If set to true, non-remote jobs are excluded
+  # even if they match all other criteria.
+  # ---------------------------------------------------------------------------
   is_remote: false
 
   # ---------------------------------------------------------------------------
-  # easy_apply (bool): Filter for easy apply jobs
+  # easy_apply (boolean or null, default: null)
   # ---------------------------------------------------------------------------
-  # - true  : Only jobs with "Easy Apply" (application on the site)
-  # - false : All jobs (default)
-  # - null  : Don't apply filter
+  # Filter jobs by easy apply availability.
   #
-  # NOTE: LinkedIn Easy Apply filter no longer works (deprecated)
-  # LIMITATION: On Indeed, easy_apply is mutually exclusive with hours_old
+  # Values:
+  # - null: No filter, show all jobs (default)
+  # - true: Only show jobs with easy apply option
+  # - false: Only show jobs WITHOUT easy apply
+  #
+  # "Easy Apply" means you can apply directly through the job board without
+  # being redirected to the company's website.
+  #
+  # IMPORTANT: On Indeed, this filter is mutually exclusive with hours_old
+  # and job_type+is_remote. This tool prioritizes hours_old.
+  # ---------------------------------------------------------------------------
   easy_apply: null
 
   # ---------------------------------------------------------------------------
-  # offset (int): Start search from a specific offset
+  # offset (integer, default: 0)
   # ---------------------------------------------------------------------------
-  # - Default: 0 (start from the beginning)
-  # - Useful for: Manual pagination, resuming interrupted searches
-  # - Example: offset=100 skips the first 100 results
+  # Start search results from this offset (pagination).
+  #
+  # How it works:
+  # - offset=0: Start from the first result (default)
+  # - offset=50: Skip the first 50 results, start from result 51
+  # - offset=100: Skip the first 100 results
+  #
+  # Use cases:
+  # - Pagination: Get more results in subsequent runs
+  # - Resume interrupted search: Continue from where you left off
+  # - Skip already-seen results: Useful for very frequent searches
+  #
+  # Note: Most users should leave this at 0. The tool handles deduplication
+  # automatically via the SQLite database.
+  # ---------------------------------------------------------------------------
   offset: 0
 
   # ---------------------------------------------------------------------------
-  # country_indeed (str): Country for Indeed domain
+  # country_indeed (string, default: "USA")
   # ---------------------------------------------------------------------------
-  # Indeed uses country-specific domains. Set this to match your target country.
-  # See the REFERENCE section at the end of this file for a full list of
-  # supported countries.
-  # Common values: "USA", "UK", "Germany", "France", "Canada", "Australia"
+  # Country code for Indeed domain selection.
+  #
+  # Indeed has different domains for different countries (indeed.com, indeed.co.uk,
+  # indeed.ch, etc.). This setting determines which Indeed domain to query.
+  #
+  # Common values:
+  # - "USA": indeed.com (default)
+  # - "UK": indeed.co.uk
+  # - "Germany": indeed.de
+  # - "France": indeed.fr
+  # - "Canada": indeed.ca
+  # - "Australia": indeed.com.au
+  # - "Switzerland": indeed.ch
+  # - "Netherlands": indeed.nl
+  #
+  # See the REFERENCE section at the bottom for full country list.
+  #
+  # Important: This should match your primary search location for best results.
+  # ---------------------------------------------------------------------------
   country_indeed: "USA"
 
   # ---------------------------------------------------------------------------
-  # enforce_annual_salary (bool): Normalize all salaries to annual
+  # enforce_annual_salary (boolean, default: true)
   # ---------------------------------------------------------------------------
-  # - true  : Convert hourly/monthly/weekly to yearly for comparison
-  #           Formulas: hourly*2080, monthly*12, weekly*52, daily*260
-  # - false : Keep original interval
+  # Convert all salary information to annual amounts.
   #
-  # RECOMMENDED: true for easy salary comparison
+  # Values:
+  # - true: Convert hourly/monthly/weekly salaries to annual (default)
+  # - false: Keep original salary format
+  #
+  # Benefits of true (recommended):
+  # - Easier comparison across jobs with different pay periods
+  # - Consistent sorting and filtering by salary
+  # - Hourly rates are converted assuming 40 hours/week, 52 weeks/year
+  #
+  # Example conversions (when true):
+  # - $50/hour → $104,000/year
+  # - $8,000/month → $96,000/year
+  # ---------------------------------------------------------------------------
   enforce_annual_salary: true
 
   # ---------------------------------------------------------------------------
-  # description_format (str): Job description format
+  # description_format (string, default: "markdown")
   # ---------------------------------------------------------------------------
-  # Possible values:
-  #   - "markdown" : Convert HTML to Markdown (default, recommended)
-  #   - "html"     : Keep original HTML
-  #   - "plain"    : Plain text without formatting
+  # Format for job descriptions returned by the scraper.
   #
-  # NOTE: "markdown" is best for text analysis and relevance scoring
+  # Options:
+  # - "markdown": Formatted with Markdown syntax (default, recommended)
+  # - "html": Raw HTML from the job posting
+  # - "plain": Plain text, all formatting stripped
+  #
+  # Markdown is recommended because:
+  # - Human-readable in the database and CSV files
+  # - Preserves structure (headers, lists, bold/italic)
+  # - Easy to convert to other formats if needed
+  # - Works well with text analysis and keyword matching
+  # ---------------------------------------------------------------------------
   description_format: "markdown"
 
   # ---------------------------------------------------------------------------
-  # verbose (int): JobSpy log verbosity level
+  # verbose (integer, default: 1)
   # ---------------------------------------------------------------------------
-  # Values:
-  #   - 0 : Errors only (quietest)
-  #   - 1 : Errors + warnings (recommended)
-  #   - 2 : All logs (very verbose, JobSpy default)
+  # JobSpy library verbosity level. Controls what the underlying scraper logs.
   #
-  # NOTE: We have our own logging system, so 1 reduces noise
+  # Levels:
+  # - 0: Errors only (quietest)
+  # - 1: Errors and warnings (default, recommended)
+  # - 2: All messages including debug info (very noisy)
+  #
+  # This is separate from the tool's own logging (configured in the logging
+  # section below). Level 1 is recommended to see important warnings about
+  # rate limiting or parsing issues without excessive noise.
+  # ---------------------------------------------------------------------------
   verbose: 1
 
   # ---------------------------------------------------------------------------
-  # LINKEDIN-SPECIFIC PARAMETERS
+  # linkedin_fetch_description (boolean, default: true)
   # ---------------------------------------------------------------------------
-
-  # linkedin_fetch_description (bool): Download full LinkedIn description
-  # - true  : Makes additional request for each job to get:
-  #           - Full description
-  #           - Direct job URL
-  #           - Job level, industry, function
-  # - false : Only basic data from the list (faster)
+  # Fetch full job descriptions from LinkedIn.
   #
-  # WARNING: Increases requests by O(n), slows down significantly and
-  # increases rate limiting risk. Use with caution.
+  # Values:
+  # - true: Make additional request to get full description (default)
+  # - false: Use only the preview/snippet from search results
+  #
+  # Trade-offs:
+  # - true: More complete data, better for keyword matching and scoring
+  #         BUT doubles the number of requests (slower, more rate limit risk)
+  # - false: Faster, less rate limit risk, but incomplete descriptions
+  #
+  # Recommendation: Keep as true unless you're hitting rate limits frequently.
+  # The full descriptions are important for accurate relevance scoring.
+  # ---------------------------------------------------------------------------
   linkedin_fetch_description: true
 
-  # linkedin_company_ids (list[int]): Filter by LinkedIn company IDs
-  # - Search only for jobs from specific companies
-  # - Find the ID from URL: linkedin.com/company/[name]/... -> numeric ID
-  # - Example: [1035, 1441] for Google and Microsoft
-  # - null or empty list = all companies
+  # ---------------------------------------------------------------------------
+  # linkedin_company_ids (list of integers or null, default: null)
+  # ---------------------------------------------------------------------------
+  # Filter LinkedIn results to specific companies by their LinkedIn IDs.
+  #
+  # Values:
+  # - null: Search all companies (default)
+  # - [id1, id2, ...]: Only show jobs from these specific companies
+  #
+  # How to find a company's LinkedIn ID:
+  # 1. Go to the company's LinkedIn page
+  # 2. Look at the URL or page source for a numeric ID
+  # 3. Or use LinkedIn's API
+  #
+  # Example:
+  # linkedin_company_ids:
+  #   - 1441
+  #   - 2587638
+  #
+  # Use case: Focused search on specific target companies (e.g., FAANG only)
+  # ---------------------------------------------------------------------------
   linkedin_company_ids: null
 
   # ---------------------------------------------------------------------------
-  # GOOGLE JOBS-SPECIFIC PARAMETERS
+  # google_search_term (string or null, default: null)
   # ---------------------------------------------------------------------------
-
-  # google_search_term (str): Specific query for Google Jobs
-  # - REQUIRED if you use "google" in sites
-  # - Normal search_term DOES NOT work well with Google
-  # - Syntax: Copy exactly from Google Jobs search bar
-  # - Examples:
-  #   - "software engineer jobs near San Francisco since yesterday"
-  #   - "data scientist jobs in New York remote"
+  # Special query syntax for Google Jobs.
   #
-  # HOW TO FIND THE CORRECT SYNTAX:
-  # 1. Go to Google and search "software engineer jobs"
-  # 2. Click on "Jobs" in the results
-  # 3. Apply desired filters (location, date, etc.)
-  # 4. Copy the text from the search bar
+  # Google Jobs uses a different query format than other job boards.
+  # If you want to use Google Jobs effectively, you need to provide the
+  # exact search term as it appears in the Google Jobs search bar.
+  #
+  # How to get the correct syntax:
+  # 1. Go to Google and search for jobs (google.com/search?q=software+engineer+jobs)
+  # 2. Copy the exact query string from the URL
+  #
+  # Values:
+  # - null: Use the regular search_term for Google Jobs (default, may not work well)
+  # - "string": Use this exact string for Google Jobs queries
+  #
+  # Example:
+  # google_search_term: "software engineer jobs in new york"
+  #
+  # Note: If you don't set this, Google Jobs results may be inconsistent.
+  # Consider removing "google" from the sites list if you don't configure this.
+  # ---------------------------------------------------------------------------
   google_search_term: null
 
   # ---------------------------------------------------------------------------
-  # PROXY AND NETWORK PARAMETERS
+  # proxies (list of strings or null, default: null)
   # ---------------------------------------------------------------------------
-
-  # proxies (list[str]): Proxy list to avoid rate limiting
-  # - Format: ['user:pass@host:port', 'host:port', 'localhost']
-  # - 'localhost' = direct connection
-  # - Proxies are used in round-robin across sites
-  # - RECOMMENDED for heavy LinkedIn scraping
-  # - Example:
-  #   proxies:
-  #     - "user:pass@proxy1.example.com:8080"
-  #     - "proxy2.example.com:3128"
-  #     - "localhost"
+  # Proxy servers to use for requests (helps avoid rate limiting).
+  #
+  # Format options:
+  # - "user:pass@host:port": Authenticated proxy
+  # - "host:port": Unauthenticated proxy
+  # - "localhost": Use localhost as proxy
+  #
+  # Values:
+  # - null: No proxies, use direct connection (default)
+  # - ["proxy1", "proxy2", ...]: List of proxy servers to rotate through
+  #
+  # Example:
+  # proxies:
+  #   - "user123:pass456@proxy.example.com:8080"
+  #   - "192.168.1.100:3128"
+  #
+  # When to use:
+  # - Heavy scraping (1000+ jobs per day)
+  # - Running into frequent rate limits
+  # - Need to appear from different geographic locations
+  #
+  # Note: You're responsible for proxy reliability and legality.
+  # ---------------------------------------------------------------------------
   proxies: null
 
-  # ca_cert (str): Path to CA certificate for HTTPS proxies
-  # - Required only for proxies with self-signed certificates
-  # - Example: "/path/to/ca-bundle.crt"
+  # ---------------------------------------------------------------------------
+  # ca_cert (string or null, default: null)
+  # ---------------------------------------------------------------------------
+  # Path to CA certificate file for HTTPS proxy verification.
+  #
+  # Values:
+  # - null: Use system default certificates (default)
+  # - "/path/to/ca-bundle.crt": Path to custom CA certificate file
+  #
+  # When to use:
+  # - Using corporate proxies with custom certificates
+  # - Self-signed certificates in your proxy chain
+  #
+  # Example:
+  # ca_cert: "/etc/ssl/certs/corporate-ca.crt"
+  #
+  # Note: Most users don't need this. Only relevant if using HTTPS proxies
+  # with custom certificate authorities.
+  # ---------------------------------------------------------------------------
   ca_cert: null
 
-  # user_agent (str): Custom User-Agent
-  # - null = use JobSpy default (may be outdated)
-  # - Useful if you receive many blocks
-  # - Example: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  # ---------------------------------------------------------------------------
+  # user_agent (string or null, default: null)
+  # ---------------------------------------------------------------------------
+  # Custom User-Agent header for HTTP requests.
+  #
+  # Values:
+  # - null: Use JobSpy's default User-Agent (default)
+  # - "Custom User Agent String": Use this exact string
+  #
+  # The User-Agent identifies the client making the request. Job boards may
+  # block or rate limit based on User-Agent patterns.
+  #
+  # Example:
+  # user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  #
+  # When to use:
+  # - Being blocked by specific job boards
+  # - Want to appear as a specific browser
+  # - Debugging request issues
+  #
+  # Note: Most users don't need this. The default works well in most cases.
+  # ---------------------------------------------------------------------------
   user_agent: null
 
+
 # =============================================================================
-# SEARCH QUERIES - Search queries organized by category
+#                              SEARCH QUERIES
 # =============================================================================
+# Define the job titles and keywords to search for. Queries are organized
+# into categories for better organization, but all queries from all categories
+# are combined and run together.
 #
-# TIPS FOR EFFECTIVE QUERIES (especially Indeed):
-# - Use "" for exact match: "software engineer"
-# - Use - to exclude: software -marketing -sales
-# - Use OR for alternatives: (python OR java OR c++)
-# - Use () for grouping: (senior OR lead) engineer
+# How it works:
+# - Each query is run against each site for each location
+# - Total searches = queries × sites × locations
+# - Example: 10 queries × 3 sites × 2 locations = 60 total searches
 #
-# ADVANCED INDEED QUERY EXAMPLE:
-# '"software engineer" (python OR java) -marketing -sales senior'
+# Tips for effective queries:
+# - Use exact job titles as they appear on job boards
+# - Include variations (e.g., "software engineer" AND "software developer")
+# - Be specific enough to get relevant results
+# - Too broad queries (like "engineer") will return too many irrelevant results
 #
-# NOTE: Indeed also searches in the description, so you might get
-# irrelevant results. Use exclusions (-) to filter.
-#
+# Categories are just for organization - name them whatever makes sense to you.
+# =============================================================================
+
 queries:
-  # Software Engineering roles
+  # Software Engineering roles - general titles
   software_engineering:
     - "software engineer"
     - "backend engineer"
@@ -285,7 +476,7 @@ queries:
     - "full-stack developer"
     - "software developer"
 
-  # DevOps & Infrastructure
+  # DevOps and Infrastructure roles
   devops:
     - "devops engineer"
     - "site reliability engineer"
@@ -293,93 +484,112 @@ queries:
     - "platform engineer"
     - "infrastructure engineer"
 
-  # Data roles
+  # Data-focused roles
   data:
     - "data engineer"
     - "data scientist"
     - "data analyst"
     - "machine learning engineer"
-    - "ML engineer"
 
-  # Specific technologies (customize to your stack)
+  # Technology-specific searches
   technologies:
     - "Python developer"
     - "JavaScript developer"
     - "React developer"
     - "Node.js developer"
-    - "Go developer"
-    - "Rust developer"
 
-  # Senior/Lead roles
+  # Senior/Leadership positions
   senior:
     - "senior software engineer"
     - "staff engineer"
     - "tech lead"
-    - "engineering manager"
 
-  # Entry level / Internships
+  # Entry-level and internship positions
   entry_level:
     - "junior developer"
     - "software engineer intern"
     - "new grad software engineer"
-    - "entry level developer"
+
 
 # =============================================================================
-# RELEVANCE SCORING - Scoring system to filter relevant jobs
+#                            RELEVANCE SCORING
 # =============================================================================
+# The scoring system calculates a relevance score for each job based on
+# keyword matching. Jobs with higher scores are more relevant to your profile.
 #
-# The scoring system is FULLY DYNAMIC: it iterates over all keyword categories
-# defined below and applies the corresponding weight. You can add, remove, or
-# rename categories freely - just ensure the category names match between
-# 'weights' and 'keywords'.
+# How scoring works:
+# 1. For each job, create searchable text from: title + description + company + location
+# 2. For each category in 'keywords', check if ANY keyword in that category matches
+# 3. If matched, add the category's weight from 'weights' to the total score
+# 4. Jobs with total score >= threshold are considered "relevant"
 #
-# How it works:
-#   1. For each category in 'keywords', check if ANY keyword matches the job
-#   2. If matched, add the category's weight from 'weights' to the score
-#   3. Jobs with total score >= threshold are marked as "relevant"
+# IMPORTANT: Category names in 'weights' MUST match those in 'keywords'.
+# If a category exists in keywords but not in weights, its weight defaults to 0.
 #
-# IMPORTANT: Category names in 'weights' must match those in 'keywords'.
-#            If a category has keywords but no weight, it defaults to 0.
-#            If a category has weight but no keywords, it's ignored.
-#
+# You can use NEGATIVE weights to penalize unwanted matches:
+# - Example: senior_positions: -50 would subtract 50 points for jobs with "senior" in title
+# =============================================================================
+
 scoring:
   # ---------------------------------------------------------------------------
-  # threshold (int): Minimum score to consider a job "relevant"
+  # threshold (integer, default: 10)
   # ---------------------------------------------------------------------------
-  # - 0   : All jobs (no filter)
-  # - 10  : Light filter (default)
-  # - 20  : Medium filter
-  # - 30+ : Aggressive filter (only highly relevant jobs)
+  # Minimum score for a job to be considered "relevant".
+  #
+  # Jobs with score >= threshold:
+  # - Appear in the "relevant_jobs" CSV/Excel files
+  # - Are highlighted in the dashboard
+  # - May trigger notifications (depending on notification settings)
+  #
+  # Jobs with score < threshold:
+  # - Still saved to database and "all_jobs" files
+  # - Just not flagged as "relevant"
+  #
+  # Recommended values:
+  # - 5-10: Lenient (more jobs marked relevant)
+  # - 10-20: Moderate (default)
+  # - 20-30: Strict (fewer, more targeted jobs)
+  # - 30+: Very strict (only best matches)
+  #
+  # Tip: Start with a low threshold and increase it once you see the results.
+  # ---------------------------------------------------------------------------
   threshold: 10
 
   # ---------------------------------------------------------------------------
-  # weights (dict): Points added when a category matches
+  # weights (dict of category: points)
   # ---------------------------------------------------------------------------
-  # Each category adds its weight to the score if at least one keyword
-  # from that category is found in the job (title, description, company, location).
+  # Points awarded when keywords from each category are found in a job.
   #
-  # CUSTOMIZATION: Increase weights for areas more important to you,
-  # reduce or set to 0 for less relevant ones. Add new categories as needed.
+  # Design your weights based on priority:
+  # - High priority categories: 15-25 points
+  # - Medium priority: 10-15 points
+  # - Nice-to-have: 5-10 points
+  # - Neutral/tracking: 0 points
+  # - Penalties (avoid these): -10 to -50 points
+  #
+  # Remember: A job only gets points ONCE per category, regardless of how
+  # many keywords from that category match.
+  # ---------------------------------------------------------------------------
   weights:
-    primary_skills: 20      # Your main expertise
-    secondary_skills: 15    # Skills you're comfortable with
-    technologies: 12        # Specific tech stack matches
-    seniority: 10           # Matching your experience level
-    company_type: 8         # Preferred company types
-    remote: 5               # Remote work preference
-    locations: 5            # Preferred locations/cities
+    primary_skills: 20      # Core job titles/roles you're targeting
+    secondary_skills: 15    # Related skills and areas
+    technologies: 12        # Programming languages and tools you know
+    seniority: 10           # Experience level markers
+    company_type: 8         # Type of company you prefer
+    remote: 5               # Work arrangement preferences
+    locations: 5            # Preferred locations (beyond search locations)
 
   # ---------------------------------------------------------------------------
-  # keywords (dict): Keyword lists for each category
+  # keywords (dict of category: list of keywords)
   # ---------------------------------------------------------------------------
-  # Keywords are searched (case-insensitive) in the combined text of:
-  # title + description + company name + location
+  # Keywords to search for in each category. Matching is case-insensitive.
   #
-  # TIPS:
-  # - Add variants (e.g., "javascript", "js")
-  # - Include synonyms and common misspellings
-  # - More specific keywords = fewer false positives
-  # - You can add any custom category (e.g., "blockchain", "healthcare")
+  # Tips:
+  # - Include variations and synonyms
+  # - Use lowercase (matching is case-insensitive anyway)
+  # - Include common abbreviations (e.g., "k8s" for Kubernetes)
+  # - Be specific enough to avoid false positives
+  # ---------------------------------------------------------------------------
   keywords:
     primary_skills:
       - "software engineer"
@@ -430,473 +640,944 @@ scoring:
       - "distributed"
       - "hybrid"
 
-    locations:
-      - "san francisco"
-      - "new york"
-      - "seattle"
-      - "austin"
+    # Empty list means no keywords for this category (add your own if needed)
+    locations: []
+
 
 # =============================================================================
-# PARALLELISM SETTINGS - Parallel execution configuration
+#                           PARALLEL EXECUTION
 # =============================================================================
+# Settings for concurrent query execution. The tool uses Python's
+# ThreadPoolExecutor to run multiple searches in parallel.
+# =============================================================================
+
 parallel:
   # ---------------------------------------------------------------------------
-  # max_workers (int): Number of parallel workers for queries
+  # max_workers (integer, default: 3)
   # ---------------------------------------------------------------------------
-  # - Each worker executes one query+location simultaneously
-  # - NOTE: JobSpy internally already parallelizes sites
-  # - Too many workers = more rate limiting
-  # - Recommended values:
-  #   - 3  : Conservative (less rate limiting)
-  #   - 5  : Balanced (default)
-  #   - 10 : Aggressive (only with proxies)
-  max_workers: 5
+  # Maximum number of concurrent search threads.
+  #
+  # How it affects performance:
+  # - Higher = faster overall execution, but more rate limit risk
+  # - Lower = slower execution, but gentler on job boards
+  #
+  # Recommended values:
+  # - 1-2: Very conservative (for sensitive job boards)
+  # - 3: Conservative/balanced (default, recommended)
+  # - 4-5: Moderate (faster but some rate limit risk)
+  # - 6-8: Aggressive (fast but high rate limit risk)
+  #
+  # Note: JobSpy itself also uses internal parallelism for sites, so even
+  # max_workers=1 will still make concurrent requests to different job boards.
+  #
+  # Trade-off guide:
+  # | Workers | 100 Searches | Rate Limit Risk |
+  # |---------|--------------|-----------------|
+  # | 1       | ~30 min      | Minimal         |
+  # | 3       | ~12 min      | Low             |
+  # | 5       | ~8 min       | Moderate        |
+  # | 8       | ~5 min       | High            |
+  # ---------------------------------------------------------------------------
+  max_workers: 3
+
 
 # =============================================================================
-# RETRY SETTINGS - Retry handling for transient errors
+#                           RETRY CONFIGURATION
 # =============================================================================
+# Settings for automatic retry when requests fail. Uses exponential backoff
+# (each retry waits longer than the previous one).
+# =============================================================================
+
 retry:
   # ---------------------------------------------------------------------------
-  # max_attempts (int): Maximum number of attempts per query
+  # max_attempts (integer, default: 3)
   # ---------------------------------------------------------------------------
-  # Includes initial attempt, so 3 = 1 attempt + 2 retries
+  # Maximum number of attempts per query (including the initial attempt).
+  #
+  # Values:
+  # - 1: No retries (fail immediately on error)
+  # - 2-3: Normal retry behavior (default)
+  # - 4-5: More persistent (for unreliable networks)
+  #
+  # Each failed attempt waits longer before retrying (exponential backoff).
+  # ---------------------------------------------------------------------------
   max_attempts: 3
 
   # ---------------------------------------------------------------------------
-  # base_delay (float): Base delay between retries in seconds
+  # base_delay (float, default: 3.0)
   # ---------------------------------------------------------------------------
-  # Actual delay uses exponential backoff:
-  # delay = base_delay * (backoff_factor ^ attempt_number)
-  base_delay: 2
+  # Initial delay in seconds before the first retry.
+  #
+  # Subsequent retries use: base_delay * (backoff_factor ^ attempt_number)
+  #
+  # Example with base_delay=3 and backoff_factor=2:
+  # - 1st retry: 3 seconds
+  # - 2nd retry: 6 seconds
+  # - 3rd retry: 12 seconds
+  #
+  # Increase this if you're hitting rate limits frequently.
+  # ---------------------------------------------------------------------------
+  base_delay: 3.0
 
   # ---------------------------------------------------------------------------
-  # backoff_factor (float): Multiplication factor for exponential backoff
+  # backoff_factor (float, default: 2.0)
   # ---------------------------------------------------------------------------
-  # Example with base_delay=2, backoff_factor=2:
-  #   - Retry 1: 2 seconds
-  #   - Retry 2: 4 seconds
-  #   - Retry 3: 8 seconds
-  backoff_factor: 2
+  # Multiplication factor for exponential backoff.
+  #
+  # Values:
+  # - 1.0: Linear backoff (same delay each time)
+  # - 1.5: Gentle exponential growth
+  # - 2.0: Standard exponential growth (default)
+  # - 3.0: Aggressive exponential growth
+  #
+  # Higher values = longer waits between retries = more time for rate limits to reset.
+  # ---------------------------------------------------------------------------
+  backoff_factor: 2.0
+
 
 # =============================================================================
-# THROTTLING SETTINGS - Rate limit prevention
+#                              THROTTLING
 # =============================================================================
-# Throttling adds delays between requests to prevent rate limiting from job
-# boards. This is especially important for LinkedIn which has aggressive
-# rate limiting.
+# Rate limiting settings to prevent getting blocked by job boards.
+# Adds delays between requests to appear more like a human user.
 #
-# Without throttling, running many queries (e.g., 100+ searches) will likely
-# result in rate limiting, IP blocks, or failed queries.
+# Why throttling matters:
+# - Job boards detect and block automated scraping
+# - Rate limits result in empty results or IP bans
+# - Proper throttling ensures consistent, long-term access
+# =============================================================================
+
 throttling:
   # ---------------------------------------------------------------------------
-  # enabled (bool): Enable/disable throttling
+  # enabled (boolean, default: true)
   # ---------------------------------------------------------------------------
-  # - true  : Add delays between requests (recommended)
-  # - false : No delays (faster but higher rate limit risk)
+  # Master switch for throttling.
+  #
+  # Values:
+  # - true: Enable delays between requests (default, recommended)
+  # - false: No delays (faster but high rate limit risk)
+  #
+  # Only disable for testing or if you're using proxies with rotation.
+  # ---------------------------------------------------------------------------
   enabled: true
 
   # ---------------------------------------------------------------------------
-  # default_delay (float): Default delay between requests in seconds
+  # default_delay (float, default: 2.0)
   # ---------------------------------------------------------------------------
-  # Applied when no site-specific delay is configured.
-  # Higher values = less risk of rate limiting but slower execution.
-  default_delay: 1.5
-
-  # ---------------------------------------------------------------------------
-  # site_delays (dict): Per-site delay overrides in seconds
-  # ---------------------------------------------------------------------------
-  # Different job boards have different rate limiting thresholds:
-  # - LinkedIn: Very aggressive, needs higher delays
-  # - Indeed: More lenient, lower delays acceptable
-  # - Glassdoor: Moderate rate limiting
+  # Default delay in seconds between requests.
   #
-  # Adjust based on your experience with rate limiting.
-  site_delays:
-    linkedin: 3.0      # Most aggressive rate limiting
-    indeed: 1.0        # More lenient
-    glassdoor: 1.5     # Moderate
-    google: 2.0        # Moderate
-    ziprecruiter: 1.5  # Moderate
+  # This is used for sites not listed in site_delays.
+  #
+  # Recommended values:
+  # - 1.0-1.5: Minimal delay (higher rate limit risk)
+  # - 2.0: Balanced (default)
+  # - 3.0-4.0: Conservative (for sensitive job boards)
+  # ---------------------------------------------------------------------------
+  default_delay: 2.0
 
   # ---------------------------------------------------------------------------
-  # jitter (float): Random variation added to delays (0.0 to 1.0)
+  # site_delays (dict of site: delay)
   # ---------------------------------------------------------------------------
-  # Adds randomness to delays to avoid detection patterns.
-  # Example: jitter=0.3 with delay=2.0 → actual delay between 1.4-2.6s
-  # - 0.0 : No jitter (fixed delays)
-  # - 0.3 : 30% variation (recommended)
-  # - 0.5 : 50% variation
+  # Per-site delay overrides. Different job boards have different rate limits.
+  #
+  # Site-specific recommendations:
+  # - LinkedIn: 4.0+ (very aggressive rate limiting)
+  # - Indeed: 1.5 (relatively lenient)
+  # - Glassdoor: 2.0 (moderate)
+  # - Google: 2.5 (moderate)
+  # - ZipRecruiter: 2.0 (moderate)
+  #
+  # If you're getting blocked by a specific site, increase its delay.
+  # ---------------------------------------------------------------------------
+  site_delays:
+    linkedin: 4.0
+    indeed: 1.5
+    glassdoor: 2.0
+    google: 2.5
+    ziprecruiter: 2.0
+
+  # ---------------------------------------------------------------------------
+  # jitter (float, default: 0.3)
+  # ---------------------------------------------------------------------------
+  # Random variation added to delays to appear more human-like.
+  #
+  # Value range: 0.0 to 1.0 (represents percentage of delay)
+  #
+  # How it works:
+  # - jitter=0.3 with delay=2.0 means actual delay will be 2.0 ± 0.6 seconds
+  # - Randomness makes requests less predictable and harder to detect
+  #
+  # Recommended values:
+  # - 0.0: No randomness (not recommended)
+  # - 0.2-0.3: Moderate randomness (default)
+  # - 0.4-0.5: High randomness
+  # ---------------------------------------------------------------------------
   jitter: 0.3
 
   # ---------------------------------------------------------------------------
-  # rate_limit_cooldown (float): Cooldown after rate limit error in seconds
+  # rate_limit_cooldown (float, default: 60.0)
   # ---------------------------------------------------------------------------
-  # When a rate limit error is detected (429, "too many requests", etc.),
-  # wait this long before retrying. Higher values give the server more time
-  # to reset its rate limit counters.
-  rate_limit_cooldown: 30.0
+  # Cooldown period in seconds after encountering a rate limit error.
+  #
+  # When a rate limit (HTTP 429) is detected:
+  # 1. Current request fails
+  # 2. Wait for this many seconds
+  # 3. Retry the request
+  #
+  # Recommended values:
+  # - 30.0: Quick recovery (may not be enough)
+  # - 60.0: Standard cooldown (default)
+  # - 120.0: Conservative (for persistent rate limiting)
+  # ---------------------------------------------------------------------------
+  rate_limit_cooldown: 60.0
+
 
 # =============================================================================
-# POST-FILTER SETTINGS - Validate search results match query terms
+#                            POST-FILTERING
 # =============================================================================
-# Post-filtering validates that returned jobs actually match the search query
-# and location. Uses fuzzy matching to handle typos and character variations.
+# Validates that returned jobs actually match your search criteria.
+# Job boards sometimes return "related" results that don't match the query.
 #
-# This is important because job boards often return "related" results that
-# don't match the original query (e.g., searching for "Zurich" jobs but
-# getting results from other cities).
+# Uses fuzzy matching to handle:
+# - Typos in job titles
+# - Character variations (ü vs u, ö vs o)
+# - Slight differences in terminology
+# =============================================================================
+
 post_filter:
   # ---------------------------------------------------------------------------
-  # enabled (bool): Enable fuzzy post-filtering
+  # enabled (boolean, default: true)
   # ---------------------------------------------------------------------------
-  # - true  : Filter jobs that don't match query terms (recommended)
-  # - false : Keep all returned jobs (may include irrelevant results)
+  # Enable fuzzy post-filtering of results.
+  #
+  # Values:
+  # - true: Validate that jobs match query terms (default, recommended)
+  # - false: Accept all results from job boards without validation
+  #
+  # Benefits of enabling:
+  # - Removes irrelevant "related" jobs
+  # - Improves signal-to-noise ratio
+  # - Better quality results for scoring
+  #
+  # Only disable if you're getting too few results and want to see everything.
+  # ---------------------------------------------------------------------------
   enabled: true
 
   # ---------------------------------------------------------------------------
-  # min_similarity (int): Minimum similarity score for fuzzy matching (0-100)
+  # min_similarity (integer, default: 80)
   # ---------------------------------------------------------------------------
-  # How closely a word must match to be considered a hit:
-  #   - 100 : Exact match only
-  #   - 90  : Very strict (zurich = zurich, but not zurih)
-  #   - 80  : Recommended (zurich ≈ zürich ≈ zuerich)
-  #   - 70  : Lenient (allows more typos)
-  #   - 60  : Very lenient (may cause false positives)
+  # Minimum similarity score (0-100) for fuzzy matching.
+  #
+  # This controls how strictly terms must match:
+  # - 100: Exact match required
+  # - 90: Very strict (minor typos allowed)
+  # - 80: Moderate (default, handles most variations)
+  # - 70: Lenient (significant differences allowed)
+  # - 60: Very lenient
+  #
+  # Examples at 80% similarity:
+  # - "zürich" matches "zurich" ✓
+  # - "pytohn" matches "python" ✓ (typo)
+  # - "developer" matches "development" ✗ (too different)
+  # ---------------------------------------------------------------------------
   min_similarity: 80
 
   # ---------------------------------------------------------------------------
-  # check_query_terms (bool): Verify all query terms are in job data
+  # check_query_terms (boolean, default: true)
   # ---------------------------------------------------------------------------
-  # If true, ALL words from the search query must be found (fuzzy) in:
-  # title, description, company, or location.
+  # Verify that all query words appear in the job data.
   #
-  # Example: query "python developer zurich"
-  #   - "python" must be found somewhere in the job
-  #   - "developer" must be found somewhere in the job
-  #   - "zurich" is handled by check_location below
+  # Values:
+  # - true: All words in your query must be found in the job (default)
+  # - false: Don't check query terms
+  #
+  # Example: Query "python developer"
+  # - Job must contain "python" somewhere (title, description, company)
+  # - Job must also contain "developer" somewhere
+  # - Both terms use fuzzy matching (min_similarity threshold)
+  # ---------------------------------------------------------------------------
   check_query_terms: true
 
   # ---------------------------------------------------------------------------
-  # check_location (bool): Verify location matches search location
+  # check_location (boolean, default: true)
   # ---------------------------------------------------------------------------
-  # If true, at least one word from the search location must match.
-  # Skipped if location is "Remote" (remote jobs can be anywhere).
+  # Verify that job location matches search location.
   #
-  # Example: location "Zurich, Switzerland"
-  #   - Job location must contain "zurich" OR "switzerland" (fuzzy)
+  # Values:
+  # - true: Location must match (default)
+  # - false: Don't check location
+  #
+  # Notes:
+  # - Skipped for "Remote" searches
+  # - Uses fuzzy matching (handles Zurich/Zürich/Zuerich)
+  # - Checks city OR country (e.g., "Zurich" OR "Switzerland")
+  # ---------------------------------------------------------------------------
   check_location: true
 
+
 # =============================================================================
-# LOGGING SETTINGS - Logging system configuration
+#                               LOGGING
 # =============================================================================
+# Configure logging output for debugging and monitoring.
+# Logs are written to both console (with colors) and file (plain text).
+# =============================================================================
+
 logging:
   # ---------------------------------------------------------------------------
-  # level (str): Minimum log level to record
+  # level (string, default: "INFO")
   # ---------------------------------------------------------------------------
-  # Values (from most to least verbose):
-  #   - "DEBUG"   : Everything, including debug details
-  #   - "INFO"    : Normal progress (default)
-  #   - "WARNING" : Only warnings and errors
-  #   - "ERROR"   : Only errors
+  # Minimum log level to record.
+  #
+  # Options (from most to least verbose):
+  # - "DEBUG": Everything, including detailed internal operations
+  # - "INFO": Normal operation messages (default, recommended)
+  # - "WARNING": Only warnings and errors
+  # - "ERROR": Only errors
+  #
+  # Use DEBUG for troubleshooting issues.
+  # Use WARNING/ERROR for quiet production operation.
+  # ---------------------------------------------------------------------------
   level: "INFO"
 
   # ---------------------------------------------------------------------------
-  # file (str): Log file path (relative to project root)
+  # file (string, default: "logs/search.log")
+  # ---------------------------------------------------------------------------
+  # Path to the log file.
+  #
+  # The directory will be created automatically if it doesn't exist.
+  # Log rotation is handled automatically (see max_size_mb and backup_count).
   # ---------------------------------------------------------------------------
   file: "logs/search.log"
 
   # ---------------------------------------------------------------------------
-  # max_size_mb (int): Maximum log file size in MB
+  # max_size_mb (integer, default: 10)
   # ---------------------------------------------------------------------------
-  # When reached, the file is rotated (renamed with .1, .2, etc.)
+  # Maximum log file size in megabytes before rotation.
+  #
+  # When the log file reaches this size:
+  # 1. Current log is renamed to search.log.1
+  # 2. Previous backups are rotated (search.log.1 → search.log.2, etc.)
+  # 3. Oldest backup is deleted if backup_count is exceeded
+  # 4. New log file is created
+  # ---------------------------------------------------------------------------
   max_size_mb: 10
 
   # ---------------------------------------------------------------------------
-  # backup_count (int): Number of backup log files to keep
+  # backup_count (integer, default: 5)
   # ---------------------------------------------------------------------------
-  # Example: with backup_count=5, you'll have:
-  # search.log, search.log.1, search.log.2, ..., search.log.5
+  # Number of backup log files to keep.
+  #
+  # Values:
+  # - 0: No backups (only current log file)
+  # - 5: Keep 5 rotated files (default)
+  # - 10: Keep 10 rotated files
+  #
+  # With max_size_mb=10 and backup_count=5, you'll have up to ~60MB of logs.
+  # ---------------------------------------------------------------------------
   backup_count: 5
 
   # ---------------------------------------------------------------------------
-  # timezone (str): Timezone for log timestamps
+  # timezone (string, default: "UTC")
   # ---------------------------------------------------------------------------
-  # Uses standard timezone names (IANA/Olson format).
-  # Examples:
-  #   - "UTC"              : Coordinated Universal Time (default)
-  #   - "America/New_York" : US Eastern Time
-  #   - "America/Los_Angeles" : US Pacific Time
-  #   - "Europe/London"    : UK Time
-  #   - "Europe/Zurich"    : Central European Time
-  #   - "Europe/Berlin"    : Central European Time
-  #   - "Asia/Tokyo"       : Japan Standard Time
-  #   - "Australia/Sydney" : Australian Eastern Time
+  # Timezone for log timestamps.
   #
+  # Uses standard timezone names (IANA Time Zone Database).
+  #
+  # Common values:
+  # - "UTC": Coordinated Universal Time (default)
+  # - "Europe/Zurich": Central European Time
+  # - "Europe/London": British Time
+  # - "America/New_York": Eastern Time
+  # - "America/Los_Angeles": Pacific Time
+  # - "Asia/Tokyo": Japan Time
+  #
+  # Full list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+  # ---------------------------------------------------------------------------
   timezone: "UTC"
 
+
 # =============================================================================
-# OUTPUT SETTINGS - Output and persistence configuration
+#                               DATABASE
 # =============================================================================
+# SQLite database settings for job persistence and tracking.
+# The database stores all jobs found and tracks new vs seen jobs.
+# =============================================================================
+
+database:
+  # ---------------------------------------------------------------------------
+  # cleanup_enabled (boolean, default: false)
+  # ---------------------------------------------------------------------------
+  # Automatically delete old jobs from the database.
+  #
+  # Values:
+  # - false: Keep all jobs forever (default)
+  # - true: Delete jobs not seen in cleanup_days
+  #
+  # When to enable:
+  # - Database is getting too large
+  # - You only care about recent jobs
+  # - Running on limited storage
+  #
+  # Cleanup runs automatically at the start of each search.
+  # ---------------------------------------------------------------------------
+  cleanup_enabled: false
+
+  # ---------------------------------------------------------------------------
+  # cleanup_days (integer, default: 60)
+  # ---------------------------------------------------------------------------
+  # Delete jobs not seen in this many days.
+  #
+  # Only applies when cleanup_enabled is true.
+  #
+  # A job's "last_seen" date is updated every time it appears in search results.
+  # Jobs that haven't appeared in cleanup_days are assumed to be expired/filled.
+  #
+  # Recommended values:
+  # - 14: Aggressive cleanup (2 weeks)
+  # - 30: Moderate cleanup
+  # - 60: Conservative cleanup (default, jobs can stay open for a while)
+  # - 90: Very conservative (3 months)
+  # ---------------------------------------------------------------------------
+  cleanup_days: 60
+
+  # ---------------------------------------------------------------------------
+  # recalculate_scores_on_startup (boolean, default: true)
+  # ---------------------------------------------------------------------------
+  # Recalculate relevance scores for all existing jobs on startup.
+  #
+  # Values:
+  # - true: Update all scores using current scoring config (default)
+  # - false: Keep existing scores unchanged
+  #
+  # When true:
+  # - All jobs get rescored with current weights/keywords
+  # - Useful when you've changed your scoring criteria
+  # - No need to rebuild database to apply new scoring
+  # - Adds a few seconds to startup time
+  #
+  # When false:
+  # - Faster startup
+  # - Scores only calculated for new jobs
+  # - Old jobs keep their original scores
+  # ---------------------------------------------------------------------------
+  recalculate_scores_on_startup: true
+
+
+# =============================================================================
+#                                OUTPUT
+# =============================================================================
+# Configure where and how results are saved.
+# The SQLite database is always used (required for core functionality).
+# CSV and Excel files are optional exports for human review.
+# =============================================================================
+
 output:
   # ---------------------------------------------------------------------------
-  # results_dir (str): Directory for CSV/Excel output
+  # results_dir (string, default: "results")
+  # ---------------------------------------------------------------------------
+  # Directory for CSV and Excel output files.
+  #
+  # Files created (when enabled):
+  # - all_jobs_YYYYMMDD_HHMMSS.csv: All jobs from this search run
+  # - all_jobs_YYYYMMDD_HHMMSS.xlsx: Excel version with formatting
+  # - relevant_jobs_YYYYMMDD_HHMMSS.csv: Jobs above score threshold
+  # - relevant_jobs_YYYYMMDD_HHMMSS.xlsx: Excel with highlighting
+  #
+  # Directory is created automatically if it doesn't exist.
   # ---------------------------------------------------------------------------
   results_dir: "results"
 
   # ---------------------------------------------------------------------------
-  # data_dir (str): Directory for SQLite database
+  # data_dir (string, default: "data")
+  # ---------------------------------------------------------------------------
+  # Directory for the SQLite database.
+  #
+  # The database is the primary data store for:
+  # - All jobs ever found
+  # - First seen / last seen dates
+  # - Applied status tracking
+  # - Deduplication across runs
+  #
+  # Directory is created automatically if it doesn't exist.
   # ---------------------------------------------------------------------------
   data_dir: "data"
 
   # ---------------------------------------------------------------------------
-  # database_file (str): SQLite database filename
+  # database_file (string, default: "jobs.db")
   # ---------------------------------------------------------------------------
-  # The SQLite database is the PRIMARY storage for job tracking.
-  # It's used for:
-  #   - Tracking all jobs seen across runs
-  #   - Identifying new vs already-seen jobs
-  #   - Determining which jobs to notify about
-  #   - Marking jobs as "applied"
+  # SQLite database filename (within data_dir).
+  #
+  # The full path will be: {data_dir}/{database_file}
+  # Example: data/jobs.db
+  #
+  # The database schema is created automatically on first run.
+  # Migrations are applied automatically when new columns are added.
+  # ---------------------------------------------------------------------------
   database_file: "jobs.db"
 
   # ---------------------------------------------------------------------------
-  # save_csv (bool): Save results to CSV files
+  # save_csv (boolean, default: true)
   # ---------------------------------------------------------------------------
-  # - true  : Generate CSV files in results_dir (default)
-  # - false : Skip CSV generation
+  # Save results to CSV files.
   #
-  # NOTE: CSV files are OPTIONAL - used only for human review/export.
-  # The core system uses the SQLite database for all logic.
+  # Values:
+  # - true: Generate CSV files after each search (default)
+  # - false: Skip CSV generation
+  #
+  # CSV files are useful for:
+  # - Quick viewing in spreadsheet software
+  # - Importing into other tools
+  # - Simple backups
+  #
+  # Note: The SQLite database is always the primary data store.
+  # CSV files are supplementary exports.
+  # ---------------------------------------------------------------------------
   save_csv: true
 
   # ---------------------------------------------------------------------------
-  # save_excel (bool): Save results to Excel files
+  # save_excel (boolean, default: true)
   # ---------------------------------------------------------------------------
-  # - true  : Generate Excel files with formatting (default)
-  # - false : Skip Excel generation
+  # Save results to Excel files.
   #
-  # NOTE: Excel files are OPTIONAL - used only for human review/export.
-  # The core system uses the SQLite database for all logic.
-  # Excel files include: colored headers, clickable URLs, conditional formatting.
+  # Values:
+  # - true: Generate Excel files after each search (default)
+  # - false: Skip Excel generation
+  #
+  # Excel files include:
+  # - Formatted headers with colors
+  # - Clickable hyperlinks for job URLs
+  # - Conditional formatting for high scores
+  # - Frozen header row
+  # - Auto-sized columns
+  #
+  # Note: Requires openpyxl library (included in requirements.txt).
+  # ---------------------------------------------------------------------------
   save_excel: true
 
-# =============================================================================
-# DATABASE SETTINGS - Database maintenance and cleanup
-# =============================================================================
-database:
-  # ---------------------------------------------------------------------------
-  # cleanup_enabled (bool): Automatically remove old jobs from database
-  # ---------------------------------------------------------------------------
-  # When enabled, jobs that haven't been seen for 'cleanup_days' days
-  # will be deleted from the database during each run.
-  # - true  : Enable automatic cleanup
-  # - false : Keep all jobs forever (default)
-  cleanup_enabled: false
-
-  # ---------------------------------------------------------------------------
-  # cleanup_days (int): Remove jobs not seen in the last N days
-  # ---------------------------------------------------------------------------
-  # Jobs with last_seen older than this threshold will be deleted.
-  # Only applies when cleanup_enabled is true.
-  # Common values:
-  #   - 30  : Keep jobs seen in the last month
-  #   - 60  : Keep jobs seen in the last 2 months
-  #   - 90  : Keep jobs seen in the last 3 months (recommended)
-  cleanup_days: 90
-
-  # ---------------------------------------------------------------------------
-  # recalculate_scores_on_startup (bool): Recalculate scores for existing jobs
-  # ---------------------------------------------------------------------------
-  # When enabled, all existing jobs in the database will have their
-  # relevance scores recalculated using the current scoring configuration
-  # at startup. This is useful when you change your scoring criteria.
-  # - true  : Recalculate scores on each startup (default)
-  # - false : Keep existing scores
-  recalculate_scores_on_startup: true
 
 # =============================================================================
-# PROFILE INFORMATION - Profile information for display
+#                               PROFILE
 # =============================================================================
-# These values are used only for the banner and reports,
-# they do not affect the search.
+# Your profile information, displayed in the banner and used for context.
+# This is purely informational and does not affect search behavior.
+# =============================================================================
+
 profile:
+  # ---------------------------------------------------------------------------
+  # name (string, default: "Your Name")
+  # ---------------------------------------------------------------------------
+  # Your name, displayed in the startup banner.
+  # ---------------------------------------------------------------------------
   name: "Your Name"
+
+  # ---------------------------------------------------------------------------
+  # current_position (string, default: "Current Role @ Company")
+  # ---------------------------------------------------------------------------
+  # Your current job title and company.
+  # ---------------------------------------------------------------------------
   current_position: "Current Role @ Company"
+
+  # ---------------------------------------------------------------------------
+  # visiting_position (string, default: "")
+  # ---------------------------------------------------------------------------
+  # Secondary position if applicable (e.g., visiting researcher).
+  # Leave empty if not applicable.
+  # ---------------------------------------------------------------------------
+  visiting_position: ""
+
+  # ---------------------------------------------------------------------------
+  # research_focus (string, default: "")
+  # ---------------------------------------------------------------------------
+  # Your research focus or specialization.
+  # Leave empty if not applicable.
+  # ---------------------------------------------------------------------------
+  research_focus: ""
+
+  # ---------------------------------------------------------------------------
+  # publication (string, default: "")
+  # ---------------------------------------------------------------------------
+  # Notable publication or academic achievement.
+  # Leave empty if not applicable.
+  # ---------------------------------------------------------------------------
+  publication: ""
+
+  # ---------------------------------------------------------------------------
+  # grant (string, default: "")
+  # ---------------------------------------------------------------------------
+  # Grant or funding information.
+  # Leave empty if not applicable.
+  # ---------------------------------------------------------------------------
+  grant: ""
+
+  # ---------------------------------------------------------------------------
+  # skills (string, default: "Python, JavaScript, React, PostgreSQL")
+  # ---------------------------------------------------------------------------
+  # Comma-separated list of your key skills.
+  # ---------------------------------------------------------------------------
   skills: "Python, JavaScript, React, PostgreSQL"
+
+  # ---------------------------------------------------------------------------
+  # target (string, default: "Senior Software Engineer, Tech Lead")
+  # ---------------------------------------------------------------------------
+  # Target roles you're looking for.
+  # ---------------------------------------------------------------------------
   target: "Senior Software Engineer, Tech Lead"
 
+
 # =============================================================================
-# SCHEDULER SETTINGS - Automated periodic execution
+#                              SCHEDULER
 # =============================================================================
-# Enable scheduling to run job searches automatically at regular intervals.
-# When disabled (default), the tool runs once and exits (backward compatible).
+# Automated scheduling settings for running periodic job searches.
+# When enabled, the tool runs continuously and searches at regular intervals.
+# =============================================================================
+
 scheduler:
   # ---------------------------------------------------------------------------
-  # enabled (bool): Enable scheduled execution
+  # enabled (boolean, default: false)
   # ---------------------------------------------------------------------------
-  # - false : Run once and exit (default, backward compatible)
-  # - true  : Run continuously at specified interval
+  # Enable scheduled (continuous) execution mode.
+  #
+  # Values:
+  # - false: Single-shot mode - run once and exit (default)
+  # - true: Scheduled mode - run continuously at intervals
+  #
+  # In scheduled mode:
+  # - Tool runs forever (until stopped)
+  # - Searches run every interval_hours
+  # - Notifications sent when new jobs found
+  # - Graceful shutdown on SIGINT/SIGTERM
+  #
+  # Docker usage:
+  # docker-compose --profile scheduler up scheduler
+  # ---------------------------------------------------------------------------
   enabled: false
 
   # ---------------------------------------------------------------------------
-  # interval_hours (int): Time between search runs
+  # interval_hours (integer, default: 24)
   # ---------------------------------------------------------------------------
+  # Hours between scheduled search runs.
+  #
   # Common values:
-  #   - 6   : Four times a day (aggressive)
-  #   - 12  : Twice a day (morning and evening)
-  #   - 24  : Once a day (recommended)
-  #   - 48  : Every two days (conservative)
+  # - 4: Every 4 hours (aggressive, may hit rate limits)
+  # - 12: Twice daily
+  # - 24: Once daily (default, recommended)
+  # - 48: Every 2 days (conservative)
+  #
+  # Consider your search volume and rate limit tolerance when setting this.
+  # ---------------------------------------------------------------------------
   interval_hours: 24
 
   # ---------------------------------------------------------------------------
-  # run_on_startup (bool): Execute search immediately on startup
+  # run_on_startup (boolean, default: true)
   # ---------------------------------------------------------------------------
-  # - true  : Run search immediately, then schedule next runs
-  # - false : Wait for first scheduled time before running
+  # Execute a search immediately when starting in scheduled mode.
+  #
+  # Values:
+  # - true: Run search immediately, then start schedule (default)
+  # - false: Wait for first scheduled interval before running
+  #
+  # Recommended: true, so you get immediate feedback that everything works.
+  # ---------------------------------------------------------------------------
   run_on_startup: true
 
   # ---------------------------------------------------------------------------
-  # retry_on_failure (bool): Retry if search fails
+  # retry_on_failure (boolean, default: true)
+  # ---------------------------------------------------------------------------
+  # Retry the search if it fails.
+  #
+  # Values:
+  # - true: Schedule a retry after retry_delay_minutes (default)
+  # - false: Skip failed run, wait for next scheduled interval
+  #
+  # Failures can happen due to:
+  # - Network issues
+  # - Rate limiting
+  # - Job board downtime
   # ---------------------------------------------------------------------------
   retry_on_failure: true
 
   # ---------------------------------------------------------------------------
-  # retry_delay_minutes (int): Wait time before retry after failure
+  # retry_delay_minutes (integer, default: 30)
+  # ---------------------------------------------------------------------------
+  # Minutes to wait before retrying a failed search.
+  #
+  # Only applies when retry_on_failure is true.
+  #
+  # Recommended values:
+  # - 15: Quick retry
+  # - 30: Standard (default)
+  # - 60: Conservative (gives more time for issues to resolve)
   # ---------------------------------------------------------------------------
   retry_delay_minutes: 30
 
+
 # =============================================================================
-# NOTIFICATIONS SETTINGS - Send alerts for new jobs
+#                            NOTIFICATIONS
 # =============================================================================
-# Configure notifications to receive alerts when new jobs are found.
-# Currently supports Telegram. More channels can be added in the future.
+# Configure notification channels for alerts when new relevant jobs are found.
+# Currently supports Telegram. More channels may be added in the future.
+# =============================================================================
+
 notifications:
   # ---------------------------------------------------------------------------
-  # enabled (bool): Master switch for all notifications
+  # enabled (boolean, default: false)
+  # ---------------------------------------------------------------------------
+  # Master switch for all notification channels.
+  #
+  # Values:
+  # - false: No notifications sent (default)
+  # - true: Send notifications through enabled channels
+  #
+  # Individual channels (like telegram.enabled) must also be enabled.
   # ---------------------------------------------------------------------------
   enabled: false
 
-  # ---------------------------------------------------------------------------
+  # -------------------------------------------------------------------------
   # TELEGRAM NOTIFICATIONS
-  # ---------------------------------------------------------------------------
-  # To set up Telegram notifications:
+  # -------------------------------------------------------------------------
+  # Receive instant alerts when new relevant jobs are found via Telegram bot.
   #
-  # 1. Create a bot with @BotFather on Telegram:
-  #    - Open Telegram and search for @BotFather
-  #    - Send /newbot and follow the instructions
-  #    - Copy the bot token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
-  #
-  # 2. Get your chat_id:
-  #    - Start a chat with your new bot
-  #    - Send any message to the bot
-  #    - Visit: https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates
-  #    - Look for "chat":{"id": YOUR_CHAT_ID}
-  #
-  # 3. Configure below with your bot_token and chat_id
-  #
+  # Setup steps:
+  # 1. Open Telegram and message @BotFather
+  # 2. Send /newbot and follow the prompts
+  # 3. Copy the bot token (format: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+  # 4. Start a chat with your new bot (send any message)
+  # 5. Get your chat_id by visiting:
+  #    https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates
+  #    Look for "chat":{"id": YOUR_CHAT_ID}
+  # 6. Configure bot_token and chat_ids below
+  # -------------------------------------------------------------------------
   telegram:
+    # -----------------------------------------------------------------------
+    # enabled (boolean, default: false)
+    # -----------------------------------------------------------------------
+    # Enable Telegram notifications.
+    #
+    # Both notifications.enabled AND telegram.enabled must be true
+    # for Telegram notifications to work.
+    # -----------------------------------------------------------------------
     enabled: false
-    bot_token: ""  # Your bot token from @BotFather
-    chat_ids:      # List of chat IDs to notify
-      - ""         # Your personal chat ID
-    send_summary: true        # Send summary after each run
-    min_score_for_notification: 0  # Only notify for jobs with score >= this
-    max_jobs_in_message: 10   # Max jobs to include in notification
+
+    # -----------------------------------------------------------------------
+    # bot_token (string, default: "")
+    # -----------------------------------------------------------------------
+    # Your Telegram bot token from @BotFather.
+    #
+    # Format: "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+    #
+    # Security options:
+    # 1. Direct value: "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+    # 2. Environment variable: "$TELEGRAM_BOT_TOKEN"
+    # 3. Named env var: "$MY_BOT_TOKEN"
+    #
+    # Using environment variables is more secure as the token
+    # won't be visible in your config file.
+    # -----------------------------------------------------------------------
+    bot_token: ""
+
+    # -----------------------------------------------------------------------
+    # chat_ids (list of strings, default: [])
+    # -----------------------------------------------------------------------
+    # Telegram chat IDs to send notifications to.
+    #
+    # Each ID should be a string (even though they're numeric).
+    # You can notify multiple chats/users by adding multiple IDs.
+    #
+    # Example:
+    # chat_ids:
+    #   - "123456789"       # Your personal chat
+    #   - "-987654321"      # A group chat (negative ID)
+    # -----------------------------------------------------------------------
+    chat_ids: []
+
+    # -----------------------------------------------------------------------
+    # send_summary (boolean, default: true)
+    # -----------------------------------------------------------------------
+    # Send a summary message after each search run.
+    #
+    # The summary includes:
+    # - Number of new jobs found
+    # - Average relevance score
+    # - List of top new jobs
+    # -----------------------------------------------------------------------
+    send_summary: true
+
+    # -----------------------------------------------------------------------
+    # min_score_for_notification (integer, default: 0)
+    # -----------------------------------------------------------------------
+    # Minimum relevance score for a job to be included in notifications.
+    #
+    # Values:
+    # - 0: Include all jobs (default)
+    # - 10+: Only jobs above this score
+    # - 20+: Only high-scoring jobs
+    #
+    # Use this to reduce notification noise by only alerting for
+    # highly relevant jobs.
+    # -----------------------------------------------------------------------
+    min_score_for_notification: 0
+
+    # -----------------------------------------------------------------------
+    # max_jobs_in_message (integer, default: 20)
+    # -----------------------------------------------------------------------
+    # Maximum number of jobs to include in notifications overall.
+    #
+    # This is the total number of jobs that will be sent across all messages.
+    # Jobs are sorted by score descending, so top jobs are sent first.
+    #
+    # Recommended values:
+    # - 10-20: Concise (default, manageable list)
+    # - 30-50: Comprehensive (more jobs to review)
+    # - 100+: Very comprehensive (many messages)
+    # -----------------------------------------------------------------------
+    max_jobs_in_message: 20
+
+    # -----------------------------------------------------------------------
+    # jobs_per_chunk (integer, default: 10, max: 15)
+    # -----------------------------------------------------------------------
+    # Number of jobs to include in each Telegram message.
+    #
+    # Telegram has a 4096 character limit per message. This setting controls
+    # how many jobs are sent in each individual message before splitting
+    # to the next message.
+    #
+    # IMPORTANT: Maximum is 15 due to Telegram's character limit.
+    # Higher values risk message truncation or send failures.
+    #
+    # Recommended values:
+    # - 5: Very short messages (quick to read)
+    # - 10: Balanced (default)
+    # - 15: Longer messages (fewer messages total)
+    # -----------------------------------------------------------------------
+    jobs_per_chunk: 10
+
+    # -----------------------------------------------------------------------
+    # include_top_overall (boolean, default: true)
+    # -----------------------------------------------------------------------
+    # Whether to include the top jobs from the entire database in notifications,
+    # in addition to new jobs. This helps you keep track of the best opportunities
+    # even if they were found in previous runs.
+    #
+    # When enabled, notifications will show two sections:
+    # 1. 🆕 New Jobs - Jobs found in this search run
+    # 2. 🏆 Top Jobs Overall - Best jobs from entire database
+    #
+    # This is useful because:
+    # - You might miss a great job if you didn't check notifications immediately
+    # - Reminds you of opportunities you haven't applied to yet
+    # - Helps prioritize which jobs to focus on
+    # -----------------------------------------------------------------------
+    include_top_overall: true
+
+    # -----------------------------------------------------------------------
+    # max_top_overall (integer, default: 10)
+    # -----------------------------------------------------------------------
+    # Maximum number of top jobs from the entire database to include in
+    # notifications when include_top_overall is enabled.
+    #
+    # These are the highest-scoring jobs across ALL search runs, sorted by
+    # relevance score. Jobs that have been marked as "applied" may still
+    # appear here as reminders.
+    #
+    # Recommended values:
+    # - 5: Quick overview of best opportunities
+    # - 10: Good balance (default)
+    # - 20: Comprehensive view of top opportunities
+    # -----------------------------------------------------------------------
+    max_top_overall: 10
+
 
 # =============================================================================
-# REFERENCE: SUPPORTED COUNTRIES FOR Indeed/Glassdoor
+#                         REFERENCE: SUPPORTED COUNTRIES
 # =============================================================================
+# Indeed and Glassdoor support different countries. Use the exact country
+# name as shown below for the country_indeed setting.
 #
-# Indeed supports these countries (use exact name):
-# * = also supported by Glassdoor
+# Indeed supports these countries:
+# (* = also supported by Glassdoor)
 #
-# ┌────────────────────┬────────────────┬────────────────┬────────────────┐
-# │ Argentina          │ Australia*     │ Austria*       │ Bahrain        │
-# │ Belgium*           │ Brazil*        │ Canada*        │ Chile          │
-# │ China              │ Colombia       │ Costa Rica     │ Czech Republic │
-# │ Denmark            │ Ecuador        │ Egypt          │ Finland        │
-# │ France*            │ Germany*       │ Greece         │ Hong Kong*     │
-# │ Hungary            │ India*         │ Indonesia      │ Ireland*       │
-# │ Israel             │ Italy*         │ Japan          │ Kuwait         │
-# │ Luxembourg         │ Malaysia       │ Mexico*        │ Morocco        │
-# │ Netherlands*       │ New Zealand*   │ Nigeria        │ Norway         │
-# │ Oman               │ Pakistan       │ Panama         │ Peru           │
-# │ Philippines        │ Poland         │ Portugal       │ Qatar          │
-# │ Romania            │ Saudi Arabia   │ Singapore*     │ South Africa   │
-# │ South Korea        │ Spain*         │ Sweden         │ Switzerland*   │
-# │ Taiwan             │ Thailand       │ Turkey         │ Ukraine        │
-# │ United Arab Emirates│ UK*           │ USA*           │ Uruguay        │
-# │ Venezuela          │ Vietnam*       │                │                │
-# └────────────────────┴────────────────┴────────────────┴────────────────┘
+# Americas:
+#   Argentina, Brazil*, Canada*, Chile, Colombia, Costa Rica, Ecuador,
+#   Mexico*, Panama, Peru, USA*, Uruguay, Venezuela
 #
-# =============================================================================
-# REFERENCE: JOB OUTPUT COLUMNS (DataFrame columns returned by JobSpy)
-# =============================================================================
+# Europe:
+#   Austria*, Belgium*, Czech Republic, Denmark, Finland, France*, Germany*,
+#   Greece, Hungary, Ireland*, Italy*, Luxembourg, Netherlands*, Norway,
+#   Poland, Portugal, Romania, Spain*, Sweden, Switzerland*, Turkey,
+#   Ukraine, UK*
 #
-# Standard columns (all sites):
-#   - id                : Unique job ID (format: site-id)
-#   - site              : Source (indeed, linkedin, glassdoor, etc.)
-#   - job_url           : Job URL on the site
-#   - job_url_direct    : Direct URL to the company (if available)
-#   - title             : Job title
-#   - company           : Company name
-#   - location          : Formatted location (city, state, country)
-#   - date_posted       : Publication date
-#   - job_type          : Contract type (fulltime, parttime, etc.)
-#   - salary_source     : Salary source (direct_data or description)
-#   - interval          : Salary interval (yearly, monthly, hourly, etc.)
-#   - min_amount        : Minimum salary
-#   - max_amount        : Maximum salary
-#   - currency          : Currency (USD, CHF, EUR, etc.)
-#   - is_remote         : Boolean if remote
-#   - description       : Full description
-#   - emails            : Emails found in description
+# Middle East & Africa:
+#   Bahrain, Egypt, Israel, Kuwait, Morocco, Nigeria, Oman, Pakistan,
+#   Qatar, Saudi Arabia, South Africa, United Arab Emirates
 #
-# LinkedIn-specific columns:
-#   - job_level         : Level (entry, mid-senior, director, etc.)
-#   - job_function      : Function (Engineering, Research, etc.)
-#   - company_industry  : Company sector
-#
-# Indeed-specific columns:
-#   - company_url       : Company page URL
-#   - company_logo      : Company logo URL
-#   - company_addresses : Company addresses
-#   - company_num_employees : Number of employees
-#   - company_revenue   : Company revenue
-#   - company_description : Company description
-#
-# Naukri-specific columns (India):
-#   - skills            : Required skills
-#   - experience_range  : Required experience range
-#   - company_rating    : Company rating
-#   - company_reviews_count : Number of reviews
-#   - vacancy_count     : Number of open positions
-#   - work_from_home_type : WFH type (Hybrid, Remote, etc.)
+# Asia Pacific:
+#   Australia*, China, Hong Kong*, India*, Indonesia, Japan, Malaysia,
+#   New Zealand*, Philippines, Singapore*, South Korea, Taiwan, Thailand,
+#   Vietnam*
 #
 # =============================================================================
-# KNOWN LIMITATIONS & ISSUES
+
+
 # =============================================================================
+#                      REFERENCE: JOBSPY OUTPUT COLUMNS
+# =============================================================================
+# JobSpy returns these columns in the DataFrame. Not all columns are
+# populated for all job boards.
 #
-# 1. Indeed Filter Exclusivity:
-#    - Only ONE of: hours_old, (job_type + is_remote), easy_apply
-#    - If you use hours_old, job_type is silently ignored
+# Core job information:
+#   id, site, job_url, job_url_direct, title, company, location,
+#   date_posted, job_type, is_remote, job_level, description
 #
-# 2. LinkedIn Rate Limiting:
-#    - Aggressive rate limit (~10 pages max without proxies)
-#    - Internal delay 3-7 seconds between requests
-#    - linkedin_fetch_description doubles the requests
+# Salary information:
+#   salary_source, interval, min_amount, max_amount, currency
 #
-# 3. Glassdoor Issues:
-#    - "Location not parsed" for locations not in Glassdoor database
-#    - 400/429 errors for rate limiting
+# Company information:
+#   company_url, company_logo, company_url_direct, company_industry,
+#   company_addresses, company_num_employees, company_revenue,
+#   company_description, company_rating, company_reviews_count
 #
-# 4. Google Jobs:
-#    - Requires google_search_term with specific syntax
-#    - Normal search_term doesn't work well
-#    - Syntax: copy from Google Jobs search bar
+# Additional details:
+#   job_function, listing_type, emails, skills, experience_range,
+#   vacancy_count, work_from_home_type
 #
-# 5. ZipRecruiter:
-#    - USA and Canada ONLY
-#    - Does not work for other countries
+# =============================================================================
+
+
+# =============================================================================
+#                         REFERENCE: KNOWN LIMITATIONS
+# =============================================================================
+# Important limitations to be aware of when using this tool:
+#
+# 1. Indeed Filter Exclusivity
+#    Indeed can only use ONE of these filters at a time:
+#    - hours_old (date filter) ← We prioritize this
+#    - job_type + is_remote
+#    - easy_apply
+#    This tool prioritizes hours_old for fresher results.
+#
+# 2. LinkedIn Rate Limiting
+#    - Built-in 3-7 second delays between requests
+#    - Hard limit at approximately 1000 results
+#    - Heavy rate limiting typically occurs around page 10 (~250 results)
+#    - linkedin_fetch_description=true doubles the number of requests
+#
+# 3. Glassdoor Location Parsing
+#    - "Location not parsed" errors occur when location doesn't match
+#      Glassdoor's internal location database
+#    - Try using standard city/country format
+#
+# 4. Google Jobs
+#    - Requires specific google_search_term syntax for best results
+#    - Copy the exact query from Google Jobs search bar
+#    - Regular search_term may not work as expected
+#
+# 5. SQLite Concurrency
+#    - SQLite only supports one writer at a time
+#    - Don't run multiple search instances simultaneously
+#
+# 6. Job ID Collisions
+#    - Jobs are identified by SHA256 hash of title+company+location
+#    - Same job posted on multiple sites will have the same ID (intended)
+#    - Full 64-character hash prevents collisions in large databases
 #
 # =============================================================================

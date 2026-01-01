@@ -30,6 +30,8 @@ class NotificationData:
     updated_jobs_count: int
     avg_score: float
     new_jobs: list[JobDBRecord]  # All new jobs, sorted by score descending
+    top_jobs_overall: list[JobDBRecord]  # Top jobs from entire database, sorted by score
+    total_jobs_in_db: int = 0  # Total number of jobs in database
 
 
 class BaseNotifier(ABC):
@@ -151,28 +153,30 @@ class TelegramNotifier(BaseNotifier):
         # Only escape ) and \ inside URLs for MarkdownV2
         return url.replace("\\", "\\\\").replace(")", "\\)")
 
-    # Telegram message limit is 4096 chars, we use 10 jobs per chunk to be safe
-    JOBS_PER_CHUNK = 10
+    @property
+    def jobs_per_chunk(self) -> int:
+        """Get jobs per chunk from config (Telegram has 4096 char limit)."""
+        return self.config.jobs_per_chunk
 
-    def __init_subclass__(cls, **kwargs):
-        """Validate JOBS_PER_CHUNK in subclasses."""
-        super().__init_subclass__(**kwargs)
-        if hasattr(cls, 'JOBS_PER_CHUNK') and cls.JOBS_PER_CHUNK < 1:
-            raise ValueError("JOBS_PER_CHUNK must be >= 1")
-
-    def _build_header_message(self, data: NotificationData, total_jobs_to_notify: int) -> str:
+    def _build_header_message(
+        self,
+        data: NotificationData,
+        total_new_jobs: int,
+        total_top_overall: int,
+    ) -> str:
         """
         Build the header/summary message (sent first).
 
         Args:
             data: Notification data.
-            total_jobs_to_notify: Total number of jobs that will be notified.
+            total_new_jobs: Number of new jobs that will be notified.
+            total_top_overall: Number of top overall jobs that will be notified.
 
         Returns:
             Formatted header message string.
         """
         lines = [
-            "🔔 *Job Search Tool \\- New Jobs Found*",
+            "🔔 *Job Search Tool \\- Run Complete*",
             "━━━━━━━━━━━━━━━━━━━━━",
             "",
             "📊 *Run Summary*",
@@ -181,22 +185,21 @@ class TelegramNotifier(BaseNotifier):
             f"• New: {data.new_jobs_count}",
             f"• Updated: {data.updated_jobs_count}",
             f"• Avg score: {self._escape_markdown(f'{data.avg_score:.1f}')}",
+            f"• Jobs in DB: {data.total_jobs_in_db}",
         ]
 
-        if data.new_jobs_count == 0 or total_jobs_to_notify == 0:
-            lines.extend([
-                "",
-                "━━━━━━━━━━━━━━━━━━━━━",
-                "",
-                "ℹ️ No new jobs matching notification criteria\\.",
-            ])
+        lines.extend([
+            "",
+            "━━━━━━━━━━━━━━━━━━━━━",
+        ])
+
+        if total_new_jobs > 0:
+            lines.append(f"🆕 *{total_new_jobs} New Jobs* \\(score ≥ {self.config.min_score_for_notification}\\)")
         else:
-            lines.extend([
-                "",
-                "━━━━━━━━━━━━━━━━━━━━━",
-                "",
-                f"🏆 *{total_jobs_to_notify} New Jobs* \\(score ≥ {self.config.min_score_for_notification}\\)",
-            ])
+            lines.append("ℹ️ No new jobs matching notification criteria\\.")
+
+        if total_top_overall > 0:
+            lines.append(f"🏆 *{total_top_overall} Top Jobs Overall* \\(from database\\)")
 
         lines.extend([
             "",
@@ -205,6 +208,19 @@ class TelegramNotifier(BaseNotifier):
         ])
 
         return "\n".join(lines)
+
+    def _build_section_header(self, title: str, emoji: str) -> str:
+        """
+        Build a section header message for job lists.
+
+        Args:
+            title: Section title (e.g., "New Jobs", "Top Jobs Overall").
+            emoji: Emoji to use for the section.
+
+        Returns:
+            Formatted section header string.
+        """
+        return f"{emoji} *{self._escape_markdown(title)}*\n━━━━━━━━━━━━━━━━━━━━━"
 
     def _build_jobs_chunk_message(self, jobs: list, start_index: int, chunk_num: int, total_chunks: int) -> str:
         """
@@ -257,7 +273,7 @@ class TelegramNotifier(BaseNotifier):
         """
         Send Telegram notification with chunked messages for large job lists.
 
-        Sends a header message first, then jobs in chunks of JOBS_PER_CHUNK (10)
+        Sends a header message first, then jobs in chunks (configurable via jobs_per_chunk)
         to avoid hitting Telegram's 4096 character message limit.
 
         Args:
@@ -276,36 +292,64 @@ class TelegramNotifier(BaseNotifier):
 
             bot = Bot(token=self.bot_token)
 
-            # Filter jobs by minimum score
-            filtered_jobs = [
+            # Filter NEW jobs by minimum score
+            filtered_new_jobs = [
                 job for job in data.new_jobs
                 if job.relevance_score >= self.config.min_score_for_notification
             ]
-            jobs_to_send = filtered_jobs[:self.config.max_jobs_in_message]
-            total_jobs = len(jobs_to_send)
+            new_jobs_to_send = filtered_new_jobs[:self.config.max_jobs_in_message]
+            total_new_jobs = len(new_jobs_to_send)
+
+            # Get TOP JOBS OVERALL (from entire database)
+            top_overall_to_send = []
+            if self.config.include_top_overall and data.top_jobs_overall:
+                top_overall_to_send = data.top_jobs_overall[:self.config.max_top_overall]
+            total_top_overall = len(top_overall_to_send)
 
             # Build header message
-            header_message = self._build_header_message(data, total_jobs)
+            header_message = self._build_header_message(data, total_new_jobs, total_top_overall)
 
-            # Build job chunk messages
-            job_messages = []
-            if total_jobs > 0:
-                total_chunks = (total_jobs + self.JOBS_PER_CHUNK - 1) // self.JOBS_PER_CHUNK
+            # Build NEW JOBS chunk messages
+            new_job_messages = []
+            if total_new_jobs > 0:
+                chunk_size = self.jobs_per_chunk
+                total_chunks = (total_new_jobs + chunk_size - 1) // chunk_size
                 for chunk_idx in range(total_chunks):
-                    start_idx = chunk_idx * self.JOBS_PER_CHUNK
-                    end_idx = min(start_idx + self.JOBS_PER_CHUNK, total_jobs)
-                    chunk_jobs = jobs_to_send[start_idx:end_idx]
+                    start_idx = chunk_idx * chunk_size
+                    end_idx = min(start_idx + chunk_size, total_new_jobs)
+                    chunk_jobs = new_jobs_to_send[start_idx:end_idx]
                     chunk_message = self._build_jobs_chunk_message(
                         jobs=chunk_jobs,
                         start_index=start_idx + 1,  # 1-based indexing
                         chunk_num=chunk_idx + 1,
                         total_chunks=total_chunks,
                     )
-                    job_messages.append(chunk_message)
+                    new_job_messages.append(chunk_message)
+
+            # Build TOP JOBS OVERALL chunk messages
+            top_overall_messages = []
+            if total_top_overall > 0:
+                # Add section header for top jobs overall
+                section_header = self._build_section_header("Top Jobs Overall", "🏆")
+                top_overall_messages.append(section_header)
+
+                chunk_size = self.jobs_per_chunk
+                total_chunks = (total_top_overall + chunk_size - 1) // chunk_size
+                for chunk_idx in range(total_chunks):
+                    start_idx = chunk_idx * chunk_size
+                    end_idx = min(start_idx + chunk_size, total_top_overall)
+                    chunk_jobs = top_overall_to_send[start_idx:end_idx]
+                    chunk_message = self._build_jobs_chunk_message(
+                        jobs=chunk_jobs,
+                        start_index=start_idx + 1,  # 1-based indexing
+                        chunk_num=chunk_idx + 1,
+                        total_chunks=total_chunks,
+                    )
+                    top_overall_messages.append(chunk_message)
 
             self.logger.info(
                 f"Sending Telegram notification to {len(self.config.chat_ids)} recipient(s): "
-                f"1 header + {len(job_messages)} job chunk(s)"
+                f"1 header + {len(new_job_messages)} new job chunk(s) + {len(top_overall_messages)} top overall chunk(s)"
             )
 
             success_count = 0
@@ -322,11 +366,30 @@ class TelegramNotifier(BaseNotifier):
                         disable_web_page_preview=True,
                     )
 
-                    # Send job chunks
-                    for idx, job_message in enumerate(job_messages):
+                    # Send NEW JOBS section header if there are new jobs
+                    if new_job_messages:
+                        new_jobs_header = self._build_section_header("New Jobs", "🆕")
+                        await bot.send_message(
+                            chat_id=chat_id,
+                            text=new_jobs_header,
+                            parse_mode=ParseMode.MARKDOWN_V2,
+                            disable_web_page_preview=True,
+                        )
+
+                    # Send new job chunks
+                    for job_message in new_job_messages:
                         await bot.send_message(
                             chat_id=chat_id,
                             text=job_message,
+                            parse_mode=ParseMode.MARKDOWN_V2,
+                            disable_web_page_preview=True,
+                        )
+
+                    # Send TOP JOBS OVERALL chunks (includes section header)
+                    for top_message in top_overall_messages:
+                        await bot.send_message(
+                            chat_id=chat_id,
+                            text=top_message,
                             parse_mode=ParseMode.MARKDOWN_V2,
                             disable_web_page_preview=True,
                         )
@@ -437,6 +500,8 @@ def create_notification_data(
     updated_count: int,
     total_found: int,
     avg_score: float,
+    top_jobs_overall: list[JobDBRecord] | None = None,
+    total_jobs_in_db: int = 0,
 ) -> NotificationData:
     """
     Create NotificationData from search results.
@@ -446,12 +511,21 @@ def create_notification_data(
         updated_count: Number of jobs that were updated (already existed).
         total_found: Total jobs found in this search.
         avg_score: Average relevance score.
+        top_jobs_overall: Top jobs from the entire database (not just new).
+        total_jobs_in_db: Total number of jobs in the database.
 
     Returns:
         NotificationData ready for sending.
     """
     # Sort by score for top jobs
     sorted_jobs = sorted(new_jobs, key=lambda j: j.relevance_score, reverse=True)
+
+    # Sort top jobs overall by score (should already be sorted, but ensure)
+    sorted_top_overall = []
+    if top_jobs_overall:
+        sorted_top_overall = sorted(
+            top_jobs_overall, key=lambda j: j.relevance_score, reverse=True
+        )
 
     return NotificationData(
         run_timestamp=datetime.now(),
@@ -460,4 +534,6 @@ def create_notification_data(
         updated_jobs_count=updated_count,
         avg_score=avg_score,
         new_jobs=sorted_jobs,
+        top_jobs_overall=sorted_top_overall,
+        total_jobs_in_db=total_jobs_in_db,
     )

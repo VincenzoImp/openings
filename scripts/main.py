@@ -155,8 +155,19 @@ def _send_notifications(
         # Get new jobs from database (jobs first seen today)
         new_jobs = db.get_jobs_first_seen_today()
 
-        if not new_jobs:
-            logger.info("No new jobs to notify about")
+        # Get top jobs overall from database (for notifications)
+        top_jobs_overall = []
+        total_jobs_in_db = 0
+        telegram_config = config.notifications.telegram
+        if telegram_config.include_top_overall:
+            top_jobs_overall = db.get_top_jobs(
+                limit=telegram_config.max_top_overall,
+                min_score=telegram_config.min_score_for_notification,
+            )
+            total_jobs_in_db = db.get_job_count()
+
+        if not new_jobs and not top_jobs_overall:
+            logger.info("No new jobs or top jobs to notify about")
             return
 
         # Calculate average score
@@ -168,6 +179,8 @@ def _send_notifications(
             updated_count=updated_count,
             total_found=total_found,
             avg_score=avg_score,
+            top_jobs_overall=top_jobs_overall,
+            total_jobs_in_db=total_jobs_in_db,
         )
 
         # Send notifications
@@ -205,12 +218,25 @@ def _send_empty_notification(config: Config, db: JobDatabase) -> None:
         # Get database stats for context
         stats = db.get_statistics()
 
-        # Create empty notification data
+        # Get top jobs overall even when no new jobs found
+        top_jobs_overall = []
+        total_jobs_in_db = 0
+        telegram_config = config.notifications.telegram
+        if telegram_config.include_top_overall:
+            top_jobs_overall = db.get_top_jobs(
+                limit=telegram_config.max_top_overall,
+                min_score=telegram_config.min_score_for_notification,
+            )
+            total_jobs_in_db = db.get_job_count()
+
+        # Create notification data
         notification_data = create_notification_data(
             new_jobs=[],
             updated_count=0,
             total_found=stats.get("seen_today", 0),
             avg_score=stats.get("avg_relevance_score", 0),
+            top_jobs_overall=top_jobs_overall,
+            total_jobs_in_db=total_jobs_in_db,
         )
 
         # Send notifications

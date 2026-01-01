@@ -223,6 +223,9 @@ def telegram_config():
         send_summary=True,
         min_score_for_notification=10,
         max_jobs_in_message=5,
+        jobs_per_chunk=10,
+        include_top_overall=True,
+        max_top_overall=10,
     )
 
 
@@ -324,6 +327,8 @@ def sample_notification_data(sample_job_db_record):
         updated_jobs_count=2,
         avg_score=25.5,
         new_jobs=[sample_job_db_record],
+        top_jobs_overall=[sample_job_db_record],
+        total_jobs_in_db=100,
     )
 
 
@@ -339,6 +344,8 @@ def empty_notification_data():
         updated_jobs_count=0,
         avg_score=0.0,
         new_jobs=[],
+        top_jobs_overall=[],
+        total_jobs_in_db=0,
     )
 
 

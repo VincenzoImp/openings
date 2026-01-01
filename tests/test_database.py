@@ -217,3 +217,62 @@ class TestJobDatabase:
         filtered = temp_db.filter_new_jobs(df)
 
         assert len(filtered) == 0
+
+    def test_get_top_jobs(self, temp_db):
+        """Test get_top_jobs returns jobs sorted by score."""
+        from models import Job
+
+        # Create jobs with different scores
+        jobs = [
+            Job.from_dict({"title": "Low", "company": "Corp", "location": "NYC", "relevance_score": 10}),
+            Job.from_dict({"title": "High", "company": "Corp", "location": "NYC", "relevance_score": 50}),
+            Job.from_dict({"title": "Medium", "company": "Corp", "location": "NYC", "relevance_score": 30}),
+        ]
+
+        for job in jobs:
+            temp_db.save_job(job)
+
+        # Get top 2 jobs
+        top_jobs = temp_db.get_top_jobs(limit=2)
+
+        assert len(top_jobs) == 2
+        assert top_jobs[0].relevance_score == 50  # Highest first
+        assert top_jobs[1].relevance_score == 30  # Second highest
+
+    def test_get_top_jobs_with_min_score(self, temp_db):
+        """Test get_top_jobs respects min_score filter."""
+        from models import Job
+
+        # Create jobs with different scores
+        jobs = [
+            Job.from_dict({"title": "Low", "company": "Corp", "location": "NYC", "relevance_score": 10}),
+            Job.from_dict({"title": "High", "company": "Corp", "location": "NYC", "relevance_score": 50}),
+            Job.from_dict({"title": "Medium", "company": "Corp", "location": "NYC", "relevance_score": 30}),
+        ]
+
+        for job in jobs:
+            temp_db.save_job(job)
+
+        # Get jobs with min score 25
+        top_jobs = temp_db.get_top_jobs(limit=10, min_score=25)
+
+        assert len(top_jobs) == 2
+        assert all(job.relevance_score >= 25 for job in top_jobs)
+
+    def test_get_job_count(self, temp_db):
+        """Test get_job_count returns correct count."""
+        from models import Job
+
+        # Empty database
+        assert temp_db.get_job_count() == 0
+
+        # Add some jobs
+        jobs = [
+            Job.from_dict({"title": f"Job {i}", "company": "Corp", "location": "NYC"})
+            for i in range(5)
+        ]
+
+        for job in jobs:
+            temp_db.save_job(job)
+
+        assert temp_db.get_job_count() == 5

@@ -435,6 +435,51 @@ class JobDatabase:
 
         return records
 
+    def get_top_jobs(self, limit: int = 10, min_score: int = 0) -> list[JobDBRecord]:
+        """
+        Get top jobs from database ordered by relevance score.
+
+        Args:
+            limit: Maximum number of jobs to return.
+            min_score: Minimum relevance score to include.
+
+        Returns:
+            List of JobDBRecord instances sorted by score descending.
+        """
+        records = []
+
+        query = """
+            SELECT job_id, title, company, location, job_url, site, job_type,
+                   is_remote, job_level, description, date_posted, min_amount,
+                   max_amount, currency, company_url, first_seen, last_seen,
+                   relevance_score, applied
+            FROM jobs
+            WHERE relevance_score >= ?
+            ORDER BY relevance_score DESC
+            LIMIT ?
+        """
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, (min_score, limit))
+
+            for row in cursor.fetchall():
+                records.append(self._row_to_record(row))
+
+        return records
+
+    def get_job_count(self) -> int:
+        """
+        Get total count of jobs in database.
+
+        Returns:
+            Total number of jobs.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM jobs")
+            return cursor.fetchone()[0]
+
     def get_jobs_first_seen_today(self) -> list[JobDBRecord]:
         """
         Get jobs that were first seen today.

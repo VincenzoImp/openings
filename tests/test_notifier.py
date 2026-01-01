@@ -256,18 +256,25 @@ class TestTelegramNotifierFormatting:
 
     def test_build_header_message(self, notifier, sample_notification_data):
         """Test header message building."""
-        header = notifier._build_header_message(sample_notification_data, 5)
+        header = notifier._build_header_message(sample_notification_data, 5, 3)
 
         assert "Job Search Tool" in header
         assert "Run Summary" in header
         assert "New:" in header
         assert "Total found:" in header
+        assert "Jobs in DB:" in header
 
     def test_build_header_message_no_jobs(self, notifier, empty_notification_data):
         """Test header message when no jobs found."""
-        header = notifier._build_header_message(empty_notification_data, 0)
+        header = notifier._build_header_message(empty_notification_data, 0, 0)
 
         assert "No new jobs" in header or "notification criteria" in header
+
+    def test_build_header_message_with_top_overall(self, notifier, sample_notification_data):
+        """Test header message shows top overall section."""
+        header = notifier._build_header_message(sample_notification_data, 3, 5)
+
+        assert "5 Top Jobs Overall" in header or "Top Jobs Overall" in header
 
     def test_build_jobs_chunk_message(self, notifier, sample_job_db_record):
         """Test jobs chunk message building."""
@@ -312,6 +319,8 @@ class TestTelegramNotifierSend:
                 updated_jobs_count=0,
                 avg_score=0,
                 new_jobs=[],
+                top_jobs_overall=[],
+                total_jobs_in_db=0,
             )
         )
 
@@ -367,6 +376,8 @@ class TestTelegramNotifierSend:
             updated_jobs_count=0,
             avg_score=20.0,
             new_jobs=[low_score_job, high_score_job],
+            top_jobs_overall=[],
+            total_jobs_in_db=10,
         )
 
         with patch("telegram.Bot") as mock_bot_class:
@@ -480,9 +491,9 @@ class TestTelegramNotifierChunking:
         """Create a TelegramNotifier with small chunk size for testing."""
         return TelegramNotifier(telegram_config)
 
-    def test_jobs_per_chunk_constant(self, notifier):
-        """Test JOBS_PER_CHUNK is set correctly."""
-        assert notifier.JOBS_PER_CHUNK == 10
+    def test_jobs_per_chunk_property(self, notifier):
+        """Test jobs_per_chunk property returns config value."""
+        assert notifier.jobs_per_chunk == 10
 
     @pytest.mark.asyncio
     async def test_multiple_chunks_sent(self, notifier):
@@ -504,6 +515,8 @@ class TestTelegramNotifierChunking:
             updated_jobs_count=0,
             avg_score=50.0,
             new_jobs=jobs,
+            top_jobs_overall=[],
+            total_jobs_in_db=100,
         )
 
         with patch("telegram.Bot") as mock_bot_class:
@@ -513,6 +526,6 @@ class TestTelegramNotifierChunking:
 
             await notifier.send_notification(data)
 
-            # Should send: 1 header + 2 job chunks = 3 messages per chat
-            # With 2 chat_ids, that's 6 total calls
-            assert mock_bot.send_message.call_count >= 3
+            # Should send: 1 header + 1 section header + 2 job chunks = 4 messages per chat
+            # With 2 chat_ids, that's 8 total calls
+            assert mock_bot.send_message.call_count >= 4

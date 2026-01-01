@@ -229,6 +229,24 @@ class TestTelegramConfigValidation:
         with pytest.raises(ValueError, match="max_jobs_in_message must be at least 1"):
             _parse_telegram_config({"telegram": {"max_jobs_in_message": 0}})
 
+    def test_jobs_per_chunk_minimum(self):
+        """Test jobs_per_chunk must be at least 1."""
+        with pytest.raises(ValueError, match="jobs_per_chunk must be at least 1"):
+            _parse_telegram_config({"telegram": {"jobs_per_chunk": 0}})
+
+    def test_jobs_per_chunk_maximum(self):
+        """Test jobs_per_chunk must be at most 15 (Telegram limit)."""
+        with pytest.raises(ValueError, match="jobs_per_chunk must be at most 15"):
+            _parse_telegram_config({"telegram": {"jobs_per_chunk": 20}})
+
+    def test_jobs_per_chunk_valid(self):
+        """Test valid jobs_per_chunk values."""
+        config = _parse_telegram_config({"telegram": {"jobs_per_chunk": 10}})
+        assert config.jobs_per_chunk == 10
+
+        config = _parse_telegram_config({"telegram": {"jobs_per_chunk": 15}})
+        assert config.jobs_per_chunk == 15
+
     def test_chat_ids_normalized(self):
         """Test chat_ids are normalized to strings."""
         config = _parse_telegram_config({
