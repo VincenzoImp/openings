@@ -98,7 +98,7 @@ class TelegramNotifier(BaseNotifier):
         """
         # Emoji for position
         position_emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
-        emoji = position_emojis[index - 1] if index <= 10 else f"{index}."
+        emoji = position_emojis[index - 1] if index <= 10 else f"{index}\\."
 
         # Build message parts
         parts = [f"{emoji} *{self._escape_markdown(job.title)}*"]
