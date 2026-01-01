@@ -131,6 +131,8 @@ scoring:
       - "react"
 ```
 
+**Note**: When you modify scoring criteria, all existing jobs in the database are automatically rescored on the next run. No need to clear the database or rebuild Docker.
+
 ### Parallelism & Retry
 
 ```yaml
