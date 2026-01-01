@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.3] - 2026-01-01
+
+### Added
+
+- **Score Recalculation on Startup**: All existing jobs in the database now have their relevance scores recalculated on startup using the current scoring configuration
+- New `recalculate_all_scores()` function in `database.py`
+
+### Changed
+
+- No rebuild needed when changing scoring criteria - just modify `settings.yaml` and run `docker compose up`
+
+## [2.5.2] - 2025-12-31
+
+### Fixed
+
+- **Telegram MarkdownV2**: Fixed URL escaping in Telegram notifications - URLs with special characters now display correctly
+
 ## [2.5.1] - 2025-12-31
 
 ### Fixed
@@ -138,6 +155,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Structured Logging**: File and console logs with rotation
 - **Docker Support**: Containerized environment for cross-platform compatibility
 
+[2.5.3]: https://github.com/VincenzoImp/job-search-tool/compare/v2.5.2...v2.5.3
+[2.5.2]: https://github.com/VincenzoImp/job-search-tool/compare/v2.5.1...v2.5.2
 [2.5.1]: https://github.com/VincenzoImp/job-search-tool/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/VincenzoImp/job-search-tool/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/VincenzoImp/job-search-tool/compare/v2.3.0...v2.4.0
