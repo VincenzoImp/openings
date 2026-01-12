@@ -377,22 +377,34 @@ class TelegramNotifier(BaseNotifier):
                         )
 
                     # Send new job chunks
-                    for job_message in new_job_messages:
-                        await bot.send_message(
-                            chat_id=chat_id,
-                            text=job_message,
-                            parse_mode=ParseMode.MARKDOWN_V2,
-                            disable_web_page_preview=True,
-                        )
+                    for chunk_idx, job_message in enumerate(new_job_messages, 1):
+                        try:
+                            await bot.send_message(
+                                chat_id=chat_id,
+                                text=job_message,
+                                parse_mode=ParseMode.MARKDOWN_V2,
+                                disable_web_page_preview=True,
+                            )
+                        except TelegramError as chunk_err:
+                            self.logger.error(
+                                f"Failed to send new jobs chunk {chunk_idx}/{len(new_job_messages)}: {chunk_err}"
+                            )
+                            self.logger.debug(f"Failed message length: {len(job_message)} chars")
 
                     # Send TOP JOBS OVERALL chunks (includes section header)
-                    for top_message in top_overall_messages:
-                        await bot.send_message(
-                            chat_id=chat_id,
-                            text=top_message,
-                            parse_mode=ParseMode.MARKDOWN_V2,
-                            disable_web_page_preview=True,
-                        )
+                    for chunk_idx, top_message in enumerate(top_overall_messages, 1):
+                        try:
+                            await bot.send_message(
+                                chat_id=chat_id,
+                                text=top_message,
+                                parse_mode=ParseMode.MARKDOWN_V2,
+                                disable_web_page_preview=True,
+                            )
+                        except TelegramError as chunk_err:
+                            self.logger.error(
+                                f"Failed to send top overall chunk {chunk_idx}/{len(top_overall_messages)}: {chunk_err}"
+                            )
+                            self.logger.debug(f"Failed message length: {len(top_message)} chars")
 
                     success_count += 1
                     self.logger.info(f"Telegram notification sent to chat {chat_id}")

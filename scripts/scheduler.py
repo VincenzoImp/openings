@@ -98,8 +98,10 @@ class JobSearchScheduler:
         if self._scheduler and self.config.scheduler.enabled:
             jobs = self._scheduler.get_jobs()
             main_job = next((j for j in jobs if j.id == "main_job"), None)
-            if main_job and main_job.next_run_time:
-                self.logger.info(f"Next scheduled run: {main_job.next_run_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            if main_job:
+                next_run = getattr(main_job, 'next_run_time', None)
+                if next_run:
+                    self.logger.info(f"Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
 
     def _schedule_next_run(self, current_run_start: datetime) -> None:
         """
