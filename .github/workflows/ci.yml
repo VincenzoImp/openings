@@ -59,7 +59,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Security audit
-        run: pip-audit
+        run: pip-audit --ignore-vuln CVE-2025-46656  # markdownify pinned by python-jobspy<0.14.0
 
   docker:
     runs-on: ubuntu-latest

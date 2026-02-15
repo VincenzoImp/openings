@@ -34,6 +34,3 @@ Jinja2>=3.1.0,<4.0.0
 
 # Fuzzy string matching for post-filtering
 rapidfuzz>=3.0.0,<4.0.0
-
-# Pin markdownify to fix CVE-2025-46656 (transitive dependency)
-markdownify>=0.14.1
