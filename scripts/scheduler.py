@@ -43,6 +43,7 @@ class JobSearchScheduler:
         self._running = False
         self._last_run_success = False
         self._run_count = 0
+        self._consecutive_failures = 0
 
     def _setup_signal_handlers(self) -> None:
         """Set up signal handlers for graceful shutdown.
@@ -77,16 +78,24 @@ class JobSearchScheduler:
 
             if self._last_run_success:
                 self.logger.info("Scheduled search completed successfully")
+                self._consecutive_failures = 0
             else:
-                self.logger.warning("Scheduled search completed with issues")
+                self._consecutive_failures += 1
+                self.logger.warning(
+                    f"Scheduled search completed with issues "
+                    f"(consecutive failures: {self._consecutive_failures})"
+                )
 
-                # Retry logic
+                # Retry logic with max retries limit
                 if self.config.scheduler.retry_on_failure:
                     self._schedule_retry()
 
         except Exception as e:
             self._last_run_success = False
-            self.logger.error(f"Scheduled search failed: {e}")
+            self._consecutive_failures += 1
+            self.logger.error(
+                f"Scheduled search failed (consecutive failures: {self._consecutive_failures}): {e}"
+            )
 
             if self.config.scheduler.retry_on_failure:
                 self._schedule_retry()
@@ -143,9 +152,20 @@ class JobSearchScheduler:
             self.logger.debug(f"Scheduled next run at {next_run_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
     def _schedule_retry(self) -> None:
-        """Schedule a retry after failure."""
+        """Schedule a retry after failure, respecting max_retries limit."""
+        max_retries = self.config.scheduler.max_retries
+        if max_retries > 0 and self._consecutive_failures >= max_retries:
+            self.logger.error(
+                f"Max retries reached ({max_retries}). "
+                "Will not retry until next scheduled run."
+            )
+            return
+
         delay_minutes = self.config.scheduler.retry_delay_minutes
-        self.logger.info(f"Scheduling retry in {delay_minutes} minutes...")
+        self.logger.info(
+            f"Scheduling retry {self._consecutive_failures}/{max_retries or '∞'} "
+            f"in {delay_minutes} minutes..."
+        )
 
         if self._scheduler:
             retry_time = datetime.now() + timedelta(minutes=delay_minutes)
