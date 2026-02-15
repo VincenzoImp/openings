@@ -26,8 +26,10 @@ services:
       - ./results:/app/results
       - ./data:/app/data
       - ./logs:/app/logs
-      - ./scripts:/app/scripts
       - ./config:/app/config
+    env_file:
+      - path: .env
+        required: false
     environment:
       - PYTHONUNBUFFERED=1
     command: python main.py
@@ -47,8 +49,10 @@ services:
       - ./results:/app/results
       - ./data:/app/data
       - ./logs:/app/logs
-      - ./scripts:/app/scripts
       - ./config:/app/config
+    env_file:
+      - path: .env
+        required: false
     environment:
       - PYTHONUNBUFFERED=1
     command: python main.py
@@ -66,8 +70,10 @@ services:
       - ./results:/app/results
       - ./data:/app/data
       - ./logs:/app/logs
-      - ./scripts:/app/scripts
       - ./config:/app/config
+    env_file:
+      - path: .env
+        required: false
     environment:
       - PYTHONUNBUFFERED=1
     command: python search_jobs.py
@@ -87,8 +93,10 @@ services:
       - ./results:/app/results
       - ./data:/app/data
       - ./logs:/app/logs
-      - ./scripts:/app/scripts
       - ./config:/app/config
+    env_file:
+      - path: .env
+        required: false
     environment:
       - PYTHONUNBUFFERED=1
     command: python analyze_jobs.py
@@ -111,8 +119,10 @@ services:
       - ./results:/app/results
       - ./data:/app/data
       - ./logs:/app/logs
-      - ./scripts:/app/scripts
       - ./config:/app/config
+    env_file:
+      - path: .env
+        required: false
     environment:
       - PYTHONUNBUFFERED=1
     command: streamlit run dashboard.py --server.address=0.0.0.0 --server.port=8501
