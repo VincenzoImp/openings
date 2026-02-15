@@ -14,16 +14,15 @@ Exit codes:
 """
 
 import sys
-from pathlib import Path
 
 
 def check_imports() -> bool:
     """Verify required modules can be imported."""
     try:
-        import pandas
-        import jobspy
-        import yaml
-        import sqlite3
+        import pandas  # noqa: F401
+        import jobspy  # noqa: F401
+        import yaml  # noqa: F401
+        import sqlite3  # noqa: F401
         return True
     except ImportError as e:
         print(f"Import error: {e}", file=sys.stderr)

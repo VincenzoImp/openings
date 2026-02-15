@@ -28,7 +28,6 @@ from search_jobs import (
 if TYPE_CHECKING:
     from config import Config
     from database import JobDatabase
-    from models import JobDBRecord
 
 
 def run_job_search() -> bool:

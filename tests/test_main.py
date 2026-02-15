@@ -8,11 +8,6 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-# Mock rapidfuzz before importing main (which imports search_jobs which imports rapidfuzz)
-if "rapidfuzz" not in sys.modules:
-    sys.modules["rapidfuzz"] = MagicMock()
-    sys.modules["rapidfuzz.fuzz"] = MagicMock()
-
 
 class TestRunJobSearch:
     """Tests for run_job_search function."""
