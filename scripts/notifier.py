@@ -269,7 +269,8 @@ class TelegramNotifier(BaseNotifier):
         ]
         jobs_to_send = filtered_jobs[:self.config.max_jobs_in_message]
 
-        return self._build_header_message(data, len(jobs_to_send))
+        total_top_overall = len(data.top_jobs_overall) if data.top_jobs_overall else 0
+        return self._build_header_message(data, len(jobs_to_send), total_top_overall)
 
     async def send_notification(self, data: NotificationData) -> bool:
         """
