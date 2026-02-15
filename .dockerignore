@@ -49,3 +49,22 @@ tmp/
 .pytest_cache/
 .coverage
 htmlcov/
+tests/
+pytest.ini
+
+# CI/CD
+.github/
+
+# Development
+requirements-dev.txt
+.pre-commit-config.yaml
+CONTRIBUTING.md
+
+# Type checking and linting caches
+.mypy_cache/
+.ruff_cache/
+
+# Environment files
+.env
+.env.*
+docker-compose.override.yml

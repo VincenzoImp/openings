@@ -5,6 +5,8 @@
 pytest>=7.4.0,<8.0.0
 pytest-cov>=4.1.0,<5.0.0
 pytest-asyncio>=0.21.0,<1.0.0  # For async test support (notifier tests)
+pytest-timeout>=2.2.0,<3.0.0  # Catch hanging tests
+pytest-randomly>=3.15.0,<4.0.0  # Detect test order dependencies
 
 # Type checking
 mypy>=1.5.0,<2.0.0
@@ -13,3 +15,6 @@ types-PyYAML>=6.0.0,<7.0.0
 # Code quality
 ruff>=0.1.0,<1.0.0
 black>=23.0.0,<24.0.0
+
+# Security
+pip-audit>=2.7.0,<3.0.0

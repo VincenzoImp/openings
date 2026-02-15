@@ -62,8 +62,14 @@ htmlcov/
 .tox/
 .nox/
 
-# Type checking
+# Type checking and linting
 .mypy_cache/
+.ruff_cache/
 
 # Docker
 .docker/
+docker-compose.override.yml
+
+# Environment files (may contain secrets)
+.env
+.env.*
