@@ -101,7 +101,8 @@ class TelegramNotifier(BaseNotifier):
         emoji = position_emojis[index - 1] if index <= 10 else f"{index}\\."
 
         # Build message parts
-        parts = [f"{emoji} *{self._escape_markdown(job.title)}*"]
+        title = job.title if job.title else "Untitled"
+        parts = [f"{emoji} *{self._escape_markdown(title)}*"]
 
         if job.company:
             parts.append(f"   🏢 {self._escape_markdown(job.company)}")
@@ -109,7 +110,8 @@ class TelegramNotifier(BaseNotifier):
         if job.location:
             parts.append(f"   📍 {self._escape_markdown(job.location)}")
 
-        parts.append(f"   ⭐ Score: {job.relevance_score}")
+        score = job.relevance_score if job.relevance_score is not None else 0
+        parts.append(f"   ⭐ Score: {score}")
 
         if job.is_remote:
             parts.append("   🏠 Remote")
@@ -493,18 +495,24 @@ class NotificationManager:
         """
         try:
             # Check if we're already in an async context
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
         except RuntimeError:
             # No running loop - safe to use asyncio.run()
             return asyncio.run(self.send_all(data))
 
-        # We're in an async context - need to handle differently
-        # Create a new thread to run the async code
+        # We're in an async context - run in a separate thread with its own loop
         import concurrent.futures
 
+        def _run_in_new_loop() -> dict[str, bool]:
+            loop = asyncio.new_event_loop()
+            try:
+                return loop.run_until_complete(self.send_all(data))
+            finally:
+                loop.close()
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(asyncio.run, self.send_all(data))
-            return future.result(timeout=60)
+            future = executor.submit(_run_in_new_loop)
+            return future.result(timeout=120)
 
 
 def create_notification_data(
