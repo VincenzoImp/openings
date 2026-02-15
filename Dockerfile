@@ -1,30 +1,47 @@
-# Job Search Tool - Docker Container
+# Job Search Tool - Docker Container (Multi-stage Build)
 # Python 3.11 with job search dependencies
 #
 # Supports two modes:
 # - Single-shot: Run once and exit (default, backward compatible)
 # - Scheduled: Run continuously at configured intervals (set scheduler.enabled=true)
 
+# =============================================================================
+# Stage 1: Builder - Install dependencies with build tools
+# =============================================================================
+FROM python:3.11-slim AS builder
+
+WORKDIR /tmp
+
+COPY requirements.txt .
+
+RUN apt-get update && apt-get install -y --no-install-recommends gcc \
+    && pip install --no-cache-dir --prefix=/install -r requirements.txt \
+    && rm -rf /var/lib/apt/lists/*
+
+# =============================================================================
+# Stage 2: Runtime - Clean image without build tools
+# =============================================================================
 FROM python:3.11-slim
+
+# Create non-root user
+RUN useradd -m -u 1000 -s /bin/bash appuser
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements first (for better layer caching)
-COPY requirements.txt .
-
-# Install system dependencies and Python packages in one layer, then clean up
-RUN apt-get update && apt-get install -y --no-install-recommends gcc \
-    && pip install --no-cache-dir -r requirements.txt \
-    && apt-get purge -y gcc \
-    && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/*
+# Copy installed Python packages from builder
+COPY --from=builder /install /usr/local
 
 # Copy application code
-COPY scripts/ ./scripts/
-COPY config/ ./config/
-# Create output directories
-RUN mkdir -p /app/results /app/data /app/logs
+COPY --chown=appuser:appuser scripts/ ./scripts/
+COPY --chown=appuser:appuser config/ ./config/
+
+# Create output directories with correct ownership
+RUN mkdir -p /app/results /app/data /app/logs \
+    && chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
 
 # Set working directory to scripts
 WORKDIR /app/scripts
