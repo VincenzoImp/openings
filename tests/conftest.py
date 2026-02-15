@@ -26,6 +26,21 @@ sys.modules["jobspy"] = MagicMock()
 
 
 # =============================================================================
+# GLOBAL STATE RESET
+# =============================================================================
+
+
+@pytest.fixture(autouse=True)
+def _reset_config_singleton():
+    """Reset the config singleton between tests to prevent state leakage."""
+    import config as config_module
+
+    original = config_module._config
+    yield
+    config_module._config = original
+
+
+# =============================================================================
 # JOB FIXTURES
 # =============================================================================
 

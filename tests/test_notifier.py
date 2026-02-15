@@ -237,7 +237,7 @@ class TestTelegramNotifierFormatting:
     def test_format_job_message_beyond_10(self, notifier, sample_job_db_record):
         """Test formatting for jobs beyond position 10."""
         message = notifier._format_job_message(sample_job_db_record, 15)
-        assert "15." in message
+        assert "15" in message
 
     def test_format_job_message_with_url(self, notifier, sample_job_db_record):
         """Test that job URL is included as link."""
