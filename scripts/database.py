@@ -129,6 +129,7 @@ class JobDatabase:
         """
         self.db_path = db_path
         self.logger = get_logger("database")
+        self._conn: sqlite3.Connection | None = None
         self._init_db()
 
     def _init_db(self) -> None:
@@ -137,6 +138,12 @@ class JobDatabase:
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
+
+            # Enable WAL mode for better concurrency (readers don't block writers)
+            cursor.execute("PRAGMA journal_mode=WAL")
+            # Set busy timeout to avoid immediate failures on concurrent access
+            cursor.execute("PRAGMA busy_timeout=5000")
+
             cursor.execute(self.CREATE_TABLE)
             cursor.execute(self.CREATE_INDEX)
 
@@ -153,6 +160,21 @@ class JobDatabase:
 
             conn.commit()
 
+    def close(self) -> None:
+        """Close the persistent database connection."""
+        if self._conn is not None:
+            try:
+                self._conn.close()
+            except sqlite3.Error:
+                pass
+            self._conn = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
     # SQLite has a limit of 999 variables per query (SQLITE_MAX_VARIABLE_NUMBER)
     # We use a conservative chunk size to stay well under this limit
     SQLITE_VAR_LIMIT = 500
@@ -162,18 +184,24 @@ class JobDatabase:
         """
         Get database connection with context manager.
 
+        Uses a persistent connection for better performance. The connection
+        is reused across calls and only created once.
+
         Yields:
             SQLite connection.
         """
-        conn = sqlite3.connect(
-            self.db_path,
-            detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
-        )
-        conn.row_factory = sqlite3.Row
+        if self._conn is None:
+            self._conn = sqlite3.connect(
+                self.db_path,
+                detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
+            )
+            self._conn.row_factory = sqlite3.Row
         try:
-            yield conn
-        finally:
-            conn.close()
+            yield self._conn
+        except sqlite3.Error:
+            # On error, close and discard the connection so next call gets a fresh one
+            self.close()
+            raise
 
     def _batch_query_existing_ids(self, job_ids: list[str]) -> set[str]:
         """
