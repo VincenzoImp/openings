@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-02-15
+
+### Added
+
+- **CI Pipeline**: GitHub Actions workflow with test matrix (Python 3.11/3.12), pip-audit security scan, and Docker build verification
+- **Pre-commit Hooks**: Ruff lint/format, trailing whitespace, end-of-file fixer, detect-private-key
+- **Scheduler Max Retries**: New `scheduler.max_retries` setting (default: 3, 0 = unlimited) to stop infinite retry loops
+- **Consecutive Failure Tracking**: Scheduler tracks `_consecutive_failures` counter, resets on success
+- **Config Cross-Validation**: Warns when scoring `weights` and `keywords` categories are mismatched
+- **Bot Token Warning**: Warns when Telegram bot_token is hardcoded in config file (recommends env var)
+- **Description Format Validation**: `search.description_format` validated against `{markdown, html, plain}`
+- **Main Entry Point Tests**: 7 new tests for `run_job_search()` and `main()` functions
+- **Config Singleton Reset**: Autouse fixture in conftest.py prevents state leakage between tests
+
+### Fixed
+
+- **SQLite WAL Mode**: Database now uses WAL journal mode + `busy_timeout=5000` for better concurrent access
+- **Persistent DB Connection**: Connection reused across calls with auto-reconnect on error (was creating new connection per operation)
+- **Thread Safety**: Deduplication `append` moved inside lock in search_jobs.py to prevent concurrent list mutations
+- **DataFrame Side-Effect**: `filter_relevant_jobs` now works on a copy instead of mutating input DataFrame
+- **Unicode Normalization**: `_normalize_text` uses `unicodedata.normalize("NFKD")` instead of manual 14-char replacement table
+- **Null Safety**: Telegram `_format_job_message` handles None `title` and `relevance_score`
+- **Async/Sync Bridge**: `send_all_sync` uses `asyncio.new_event_loop()` in thread instead of `asyncio.run()` (avoids nested loop issues)
+
+### Changed
+
+- **Dockerfile**: Multi-stage build with non-root user (`appuser`, UID 1000) for security
+- **Docker Compose**: Removed `./scripts` volume mount from all services (was overriding built image, defeating Docker purpose)
+- **Docker Compose**: Added `env_file: .env` (optional) to all services for secret management
+- **.gitignore**: Added `.env`, `.env.*`, `.ruff_cache/`, `docker-compose.override.yml`
+- **.dockerignore**: Added test files, dev configs, type checking caches, env files
+- **requirements-dev.txt**: Added `pytest-timeout`, `pytest-randomly`, `pip-audit`
+
+## [3.0.2] - 2026-01-12
+
+### Fixed
+
+- **Scheduler Interval**: Now calculated from run start to start (not end to start) for consistent intervals
+- **Long-Running Jobs**: Scheduler skips to next future slot when run duration exceeds interval
+- **Telegram Chunking**: Each chunk sent independently (one failed chunk doesn't stop others)
+- **DateTrigger**: Fixed `next_run_time` attribute error with DateTrigger jobs
+
+### Changed
+
+- Replaced `IntervalTrigger` with `DateTrigger` for precise start-to-start scheduling
+- Added `JOB_SEARCH_CONFIG` environment variable for config file override
+
 ## [3.0.1] - 2026-01-01
 
 ### Removed
@@ -202,6 +249,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Structured Logging**: File and console logs with rotation
 - **Docker Support**: Containerized environment for cross-platform compatibility
 
+[3.1.0]: https://github.com/VincenzoImp/job-search-tool/compare/v3.0.2...v3.1.0
+[3.0.2]: https://github.com/VincenzoImp/job-search-tool/compare/v3.0.1...v3.0.2
 [3.0.1]: https://github.com/VincenzoImp/job-search-tool/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v2.5.4...v3.0.0
 [2.5.4]: https://github.com/VincenzoImp/job-search-tool/compare/v2.5.3...v2.5.4

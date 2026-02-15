@@ -1,6 +1,7 @@
 # Job Search Tool
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![CI](https://github.com/VincenzoImp/job-search-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/VincenzoImp/job-search-tool/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](https://www.docker.com/)
 
@@ -51,7 +52,8 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 | **Fuzzy Matching** | Post-filter validation using fuzzy string matching |
 | **Retry Logic** | Exponential backoff with tenacity for transient failures |
 | **Dynamic Rescoring** | Automatic rescoring of existing jobs when criteria change |
-| **Comprehensive Testing** | 60+ pytest tests covering all core functionality |
+| **CI/CD Pipeline** | GitHub Actions with test matrix, security audit, Docker build |
+| **Comprehensive Testing** | 160+ pytest tests covering all core functionality |
 
 ---
 
@@ -273,7 +275,7 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 | **Search Engine** | `search_jobs.py` | Parallel scraping, scoring, filtering |
 | **Scheduler** | `scheduler.py` | APScheduler wrapper, retry logic |
 | **Notifications** | `notifier.py` | Telegram message formatting and sending |
-| **Database** | `database.py` | SQLite CRUD, deduplication, cleanup |
+| **Database** | `database.py` | SQLite CRUD, deduplication, cleanup (WAL mode) |
 | **Configuration** | `config.py` | YAML loading, validation, type safety |
 | **Dashboard** | `dashboard.py` | Streamlit UI for analysis |
 
@@ -284,7 +286,7 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 ### Prerequisites
 
 - Docker and Docker Compose (recommended), OR
-- Python 3.10 or higher
+- Python 3.11 or higher
 
 ### Option 1: Docker (Recommended)
 
@@ -454,6 +456,7 @@ scheduler:
   run_on_startup: true        # Execute immediately when started
   retry_on_failure: true      # Retry failed searches
   retry_delay_minutes: 30     # Wait before retry
+  max_retries: 3              # Max consecutive retries (0 = unlimited)
 
 notifications:
   enabled: true
@@ -500,6 +503,24 @@ parallel:
    - Find `"chat":{"id": YOUR_CHAT_ID}` in the response
 
 3. **Configure the Tool**
+
+   Option A - Environment variable (recommended):
+   ```bash
+   # Create a .env file (gitignored)
+   echo 'TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz' > .env
+   ```
+   ```yaml
+   # config/settings.yaml
+   notifications:
+     enabled: true
+     telegram:
+       enabled: true
+       bot_token: "$TELEGRAM_BOT_TOKEN"   # References env var
+       chat_ids:
+         - "987654321"
+   ```
+
+   Option B - Direct value (not recommended for production):
    ```yaml
    notifications:
      enabled: true
@@ -666,7 +687,7 @@ docker compose up --build
 
 ### Database Locked
 
-SQLite supports only one writer at a time:
+The database uses WAL mode and `busy_timeout=5000` to handle concurrent access, but SQLite still supports only one writer at a time:
 
 ```bash
 # Stop any running processes
@@ -677,11 +698,11 @@ docker compose down
 
 ### Python Version
 
-JobSpy requires Python 3.10+:
+JobSpy requires Python 3.11+:
 
 ```bash
 python3 --version
-# If below 3.10, use Docker instead
+# If below 3.11, use Docker instead
 ```
 
 ---
@@ -693,25 +714,36 @@ python3 --version
 ```
 job-search-tool/
 ├── config/
-│   ├── settings.yaml          # User configuration (gitignored)
-│   └── settings.example.yaml  # Documented template
+│   ├── settings.yaml              # User configuration (gitignored)
+│   └── settings.example.yaml      # Documented template
 ├── scripts/
-│   ├── main.py                # Unified entry point
-│   ├── search_jobs.py         # Core search with parallel execution
-│   ├── scheduler.py           # APScheduler integration
-│   ├── notifier.py            # Telegram notifications
-│   ├── dashboard.py           # Streamlit UI
-│   ├── database.py            # SQLite persistence
-│   ├── config.py              # Configuration loader
-│   ├── logger.py              # Structured logging
-│   ├── models.py              # Type-safe dataclasses
-│   └── healthcheck.py         # Docker health checks
-├── tests/                      # Pytest test suite
-├── results/                    # CSV/Excel output (gitignored)
-├── data/                       # SQLite database (gitignored)
-├── logs/                       # Log files (gitignored)
-├── Dockerfile
+│   ├── main.py                    # Unified entry point
+│   ├── search_jobs.py             # Core search with parallel execution
+│   ├── scheduler.py               # APScheduler integration
+│   ├── notifier.py                # Telegram notifications
+│   ├── dashboard.py               # Streamlit UI
+│   ├── database.py                # SQLite persistence (WAL mode)
+│   ├── config.py                  # Configuration loader + validation
+│   ├── logger.py                  # Structured logging
+│   ├── models.py                  # Type-safe dataclasses
+│   └── healthcheck.py             # Docker health checks
+├── tests/                          # 160+ pytest tests
+│   ├── conftest.py                # Shared fixtures
+│   ├── test_main.py               # Entry point tests
+│   ├── test_config.py             # Configuration validation
+│   ├── test_database.py           # Database CRUD
+│   ├── test_notifier.py           # Notification tests
+│   ├── test_scheduler.py          # Scheduler tests
+│   ├── test_models.py             # Model tests
+│   ├── test_scoring.py            # Scoring tests
+│   └── test_logger.py             # Logger tests
+├── .github/workflows/ci.yml       # CI pipeline
+├── results/                        # CSV/Excel output (gitignored)
+├── data/                           # SQLite database (gitignored)
+├── logs/                           # Log files (gitignored)
+├── Dockerfile                      # Multi-stage build, non-root user
 ├── docker-compose.yml
+├── .pre-commit-config.yaml         # Ruff, trailing whitespace, etc.
 ├── requirements.txt
 ├── requirements-dev.txt
 └── pytest.ini
@@ -736,6 +768,9 @@ pytest tests/test_config.py -v
 ### Code Quality
 
 ```bash
+# Run pre-commit hooks (ruff lint + format, trailing whitespace, etc.)
+pre-commit run --all-files
+
 # Type checking
 mypy scripts/
 
@@ -743,7 +778,7 @@ mypy scripts/
 ruff check scripts/
 
 # Formatting
-black scripts/
+ruff format scripts/
 ```
 
 ---
