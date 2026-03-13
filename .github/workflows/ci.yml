@@ -31,12 +31,6 @@ jobs:
           pip install pre-commit
           pre-commit run --all-files
 
-      - name: Lint with ruff
-        run: ruff check scripts/
-
-      - name: Check formatting with ruff
-        run: ruff format --check scripts/ tests/
-
       - name: Type check with mypy
         run: mypy scripts/ --ignore-missing-imports
         continue-on-error: false
