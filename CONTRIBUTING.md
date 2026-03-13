@@ -93,7 +93,7 @@ mypy scripts/
 ruff check scripts/
 
 # Formatting
-black scripts/
+ruff format scripts/
 
 # All tests
 pytest
@@ -112,9 +112,9 @@ We follow PEP 8 with the following specifics:
 
 | Aspect | Standard |
 |--------|----------|
-| Line length | 88 characters (Black default) |
+| Line length | 88 characters (Ruff default) |
 | Quotes | Double quotes for strings |
-| Imports | Sorted with isort, grouped |
+| Imports | Sorted with ruff, grouped |
 | Docstrings | Google style |
 
 ### Type Hints
@@ -201,11 +201,21 @@ logger.error("Error that needs attention")
 
 ```
 tests/
-├── conftest.py          # Shared fixtures
+├── conftest.py          # Shared fixtures + global state reset
 ├── test_models.py       # Data model tests
 ├── test_config.py       # Configuration tests
 ├── test_database.py     # Database operation tests
-└── test_scoring.py      # Scoring function tests
+├── test_scoring.py      # Scoring function tests
+├── test_main.py         # Entry point tests
+├── test_notifier.py     # Notification tests
+├── test_scheduler.py    # Scheduler lifecycle tests
+├── test_logger.py       # Logger tests
+├── test_exporter.py     # CSV/Excel export tests
+├── test_healthcheck.py  # Health check tests
+├── test_report_generator.py  # Report generation tests
+├── test_analyze_jobs.py      # Analysis utility tests
+├── test_search_jobs.py       # Search engine tests
+└── test_vector_store.py      # Vector store tests
 ```
 
 ### Writing Tests
@@ -365,13 +375,17 @@ Include:
 | `database.py` | Data persistence |
 | `config.py` | Configuration loading |
 | `models.py` | Data structures |
+| `scoring.py` | Relevance scoring |
+| `exporter.py` | CSV/Excel export |
+| `vector_store.py` | Semantic search |
+| `vector_commands.py` | Vector backfill/sync |
 
 ### Data Flow
 
 ```
 Configuration → Search Engine → Scoring → Database → Notifications
-                     ↑                        |
-                     └── Deduplication ───────┘
+                     ↑                        |            ↓
+                     └── Deduplication ───────┘      Vector Store
 ```
 
 ### Extension Points

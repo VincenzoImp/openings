@@ -42,6 +42,8 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 | **Automated Scheduling** | APScheduler-based periodic execution with configurable intervals |
 | **Real-Time Notifications** | Telegram alerts for high-scoring new jobs |
 | **Interactive Dashboard** | Streamlit-based UI for filtering, analysis, and export |
+| **Semantic Search** | ChromaDB + sentence-transformers for natural language job search |
+| **Bookmarks & Actions** | Bookmark, delete, and mark jobs as applied directly from dashboard |
 
 ### Technical Features
 
@@ -53,7 +55,8 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 | **Retry Logic** | Exponential backoff with tenacity for transient failures |
 | **Dynamic Rescoring** | Automatic rescoring of existing jobs when criteria change |
 | **CI/CD Pipeline** | GitHub Actions with test matrix, security audit, Docker build |
-| **Comprehensive Testing** | 160+ pytest tests covering all core functionality |
+| **Comprehensive Testing** | 320+ pytest tests covering all core functionality |
+| **Vector Embeddings** | Local sentence-transformer model for semantic similarity |
 
 ---
 
@@ -277,7 +280,11 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 | **Notifications** | `notifier.py` | Telegram message formatting and sending |
 | **Database** | `database.py` | SQLite CRUD, deduplication, cleanup (WAL mode) |
 | **Configuration** | `config.py` | YAML loading, validation, type safety |
-| **Dashboard** | `dashboard.py` | Streamlit UI for analysis |
+| **Scoring** | `scoring.py` | Relevance scoring engine |
+| **Exporter** | `exporter.py` | CSV/Excel export with sanitization |
+| **Dashboard** | `dashboard.py` | Unified Job Search Hub with semantic search |
+| **Vector Store** | `vector_store.py` | ChromaDB semantic search |
+| **Vector Commands** | `vector_commands.py` | Embedding backfill and sync |
 
 ---
 
@@ -469,6 +476,19 @@ notifications:
     max_jobs_in_message: 50           # Maximum jobs per notification
 ```
 
+### Vector Search
+
+```yaml
+vector_search:
+  enabled: true                 # Enable semantic search (default: true)
+  model_name: "all-MiniLM-L6-v2"  # Embedding model (~80MB)
+  persist_dir: "data/chroma"   # ChromaDB storage
+  embed_on_save: true          # Auto-embed new jobs
+  default_results: 20          # Max semantic search results
+  backfill_on_startup: true    # Embed existing jobs at startup
+  batch_size: 100              # Embedding batch size
+```
+
 ### Rate Limiting Prevention
 
 ```yaml
@@ -574,12 +594,14 @@ The Streamlit dashboard provides powerful analysis and filtering capabilities.
 
 ### Features
 
-- **Multiple Data Sources**: Load from CSV files or SQLite database
-- **Advanced Filtering**: Text search, job type, site, company, location, salary range, score threshold, date range
-- **Visual Analytics**: Charts for source distribution, score distribution, job type breakdown
-- **Sortable Results**: Customize columns, sort by any field
-- **Job Details**: Full description and metadata view
-- **Export Options**: Download filtered results as CSV or Excel
+- **Semantic Search**: Natural language queries find conceptually similar jobs
+- **Advanced Filtering**: Site, score range, job type, remote, date range, bookmarks
+- **Card-Based Display**: Rich job cards with score badges, similarity indicators
+- **Inline Actions**: Mark applied, bookmark, delete, open URL from each card
+- **Bulk Operations**: Select multiple jobs for batch actions
+- **Analytics Tab**: Charts for source distribution, score breakdown, trends
+- **Database Management**: Delete old jobs, export data
+- **Pagination**: 20 jobs per page with navigation
 
 ### Launch
 
@@ -618,6 +640,7 @@ The SQLite database (`data/jobs.db`) is the primary storage mechanism:
 | `last_seen` | DATE | Most recent occurrence |
 | `relevance_score` | INTEGER | Calculated score |
 | `applied` | BOOLEAN | Application tracking |
+| `bookmarked` | BOOLEAN | Bookmark tracking |
 
 ### Useful Database Queries
 
@@ -726,8 +749,12 @@ job-search-tool/
 │   ├── config.py                  # Configuration loader + validation
 │   ├── logger.py                  # Structured logging
 │   ├── models.py                  # Type-safe dataclasses
+│   ├── scoring.py                 # Relevance scoring (extracted from search_jobs.py)
+│   ├── exporter.py                # CSV/Excel export
+│   ├── vector_store.py            # ChromaDB vector store
+│   ├── vector_commands.py         # Vector backfill/sync
 │   └── healthcheck.py             # Docker health checks
-├── tests/                          # 160+ pytest tests
+├── tests/                          # 320+ pytest tests
 │   ├── conftest.py                # Shared fixtures
 │   ├── test_main.py               # Entry point tests
 │   ├── test_config.py             # Configuration validation
@@ -736,7 +763,13 @@ job-search-tool/
 │   ├── test_scheduler.py          # Scheduler tests
 │   ├── test_models.py             # Model tests
 │   ├── test_scoring.py            # Scoring tests
-│   └── test_logger.py             # Logger tests
+│   ├── test_logger.py             # Logger tests
+│   ├── test_exporter.py           # Exporter tests
+│   ├── test_healthcheck.py        # Health check tests
+│   ├── test_report_generator.py   # Report generator tests
+│   ├── test_analyze_jobs.py       # Analysis tests
+│   ├── test_search_jobs.py        # Search engine tests
+│   └── test_vector_store.py       # Vector store tests
 ├── .github/workflows/ci.yml       # CI pipeline
 ├── results/                        # CSV/Excel output (gitignored)
 ├── data/                           # SQLite database (gitignored)
@@ -797,6 +830,8 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 - [python-telegram-bot](https://python-telegram-bot.org/) - Telegram integration
 - [Pandas](https://pandas.pydata.org/) - Data manipulation
 - [Tenacity](https://github.com/jd/tenacity) - Retry logic
+- [ChromaDB](https://www.trychroma.com/) - Vector database for semantic search
+- [sentence-transformers](https://www.sbert.net/) - Text embedding models
 
 ---
 

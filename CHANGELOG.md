@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-03-13
+
+### Added
+
+- **Semantic Vector Search**: ChromaDB + sentence-transformers integration for natural language job search
+- **New Module `vector_store.py`**: `JobVectorStore` class with add, search, delete, backfill operations
+- **New Module `vector_commands.py`**: `backfill_embeddings()` and `sync_deletions()` utilities
+- **New Module `scoring.py`**: Extracted relevance scoring engine from search_jobs.py
+- **New Module `exporter.py`**: Extracted CSV/Excel export with formula injection protection from search_jobs.py
+- **Unified Dashboard**: Rewritten `dashboard.py` as "Job Search Hub" with semantic search, card-based display, inline actions
+- **Bookmark Feature**: `bookmarked` column in database, `toggle_bookmark()` method
+- **Delete Feature**: `delete_job()` and `delete_jobs()` methods in database
+- **Bulk Operations**: Select multiple jobs for batch bookmark/delete/apply from dashboard
+- **VectorSearchConfig**: New configuration section (`vector_search`) with model, persistence, and backfill settings
+- **New Tests**: test_exporter.py (14), test_search_jobs.py (20), test_healthcheck.py (12), test_report_generator.py (16), test_analyze_jobs.py (16), test_vector_store.py (34)
+- **Pre-commit in CI**: Pre-commit hooks now run as part of the CI pipeline
+
+### Changed
+
+- **Frozen Dataclasses**: `Job`, `JobDBRecord`, `SearchResult` are now `@dataclass(frozen=True)` for immutability
+- **Module Extraction**: Scoring and export logic moved from `search_jobs.py` to dedicated modules
+- **Dashboard Rewrite**: Old multi-page dashboard replaced with unified single-page hub
+- **CI Coverage Threshold**: Raised from 50% to 60%
+- **Test Count**: From 160 to ~324 tests
+- **Dependencies**: Added chromadb, sentence-transformers; removed Jinja2; moved matplotlib/seaborn to dev
+
+### Fixed
+
+- **Pandas 3.x Compatibility**: Excel column sizing uses `.str.len()` instead of `.map(len)`
+- **Excel Sanitization**: `+/-` only escaped when followed by digit (avoids corrupting text like "-some description")
+- **Config Validation**: `warnings.warn()` replaced with `logger.warning()` throughout config.py
+- **Circular Imports**: database.py imports scoring from `scoring` module instead of `search_jobs`
+
 ## [3.1.0] - 2026-02-15
 
 ### Added
@@ -249,6 +282,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Structured Logging**: File and console logs with rotation
 - **Docker Support**: Containerized environment for cross-platform compatibility
 
+[4.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v3.1.0...v4.0.0
 [3.1.0]: https://github.com/VincenzoImp/job-search-tool/compare/v3.0.2...v3.1.0
 [3.0.2]: https://github.com/VincenzoImp/job-search-tool/compare/v3.0.1...v3.0.2
 [3.0.1]: https://github.com/VincenzoImp/job-search-tool/compare/v3.0.0...v3.0.1
