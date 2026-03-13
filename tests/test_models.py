@@ -1,11 +1,9 @@
 """Tests for models module."""
 
-import hashlib
 import sys
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
-import pytest
 
 # Add scripts directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
@@ -138,13 +136,14 @@ class TestSearchSummary:
 
     def test_duration_after_finish(self):
         """Test duration after finish() is called."""
-        import time
+        from datetime import timedelta
 
         summary = SearchSummary()
-        time.sleep(0.1)  # Wait a bit
+        # Directly set start_time to a known past value instead of using time.sleep
+        summary.start_time = summary.start_time - timedelta(seconds=5)
         summary.finish()
 
-        assert summary.duration_seconds > 0
+        assert summary.duration_seconds >= 4.0
         assert summary.end_time is not None
 
     def test_duration_formatted(self):

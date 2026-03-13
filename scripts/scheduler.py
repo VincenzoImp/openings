@@ -54,7 +54,9 @@ class JobSearchScheduler:
         """
 
         def shutdown_handler(signum: int, frame) -> None:
-            self.logger.info(f"Received signal {signum}, requesting graceful shutdown...")
+            self.logger.info(
+                f"Received signal {signum}, requesting graceful shutdown..."
+            )
             self.stop()
 
         signal.signal(signal.SIGINT, shutdown_handler)
@@ -71,7 +73,9 @@ class JobSearchScheduler:
             self._schedule_next_run(run_start)
 
         log_section(self.logger, f"SCHEDULED RUN #{self._run_count}")
-        self.logger.info(f"Starting scheduled search at {run_start.strftime('%Y-%m-%d %H:%M:%S')}")
+        self.logger.info(
+            f"Starting scheduled search at {run_start.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
 
         try:
             self._last_run_success = self.job_function()
@@ -101,16 +105,20 @@ class JobSearchScheduler:
                 self._schedule_retry()
 
         run_duration = (datetime.now() - run_start).total_seconds()
-        self.logger.info(f"Run #{self._run_count} completed in {run_duration:.1f} seconds")
+        self.logger.info(
+            f"Run #{self._run_count} completed in {run_duration:.1f} seconds"
+        )
 
         # Log next scheduled run
         if self._scheduler and self.config.scheduler.enabled:
             jobs = self._scheduler.get_jobs()
             main_job = next((j for j in jobs if j.id == "main_job"), None)
             if main_job:
-                next_run = getattr(main_job, 'next_run_time', None)
+                next_run = getattr(main_job, "next_run_time", None)
                 if next_run:
-                    self.logger.info(f"Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+                    self.logger.info(
+                        f"Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}"
+                    )
 
     def _schedule_next_run(self, current_run_start: datetime) -> None:
         """
@@ -149,7 +157,9 @@ class JobSearchScheduler:
                 replace_existing=True,
                 max_instances=1,
             )
-            self.logger.debug(f"Scheduled next run at {next_run_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            self.logger.debug(
+                f"Scheduled next run at {next_run_time.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
 
     def _schedule_retry(self) -> None:
         """Schedule a retry after failure, respecting max_retries limit."""
@@ -176,7 +186,9 @@ class JobSearchScheduler:
                 id="retry_job",
                 replace_existing=True,
             )
-            self.logger.info(f"Retry scheduled at {retry_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            self.logger.info(
+                f"Retry scheduled at {retry_time.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
 
     def run_once(self) -> bool:
         """
@@ -224,7 +236,9 @@ class JobSearchScheduler:
             self._execute_job()
         else:
             # Schedule first run after interval_hours from now
-            first_run_time = datetime.now() + timedelta(hours=self.config.scheduler.interval_hours)
+            first_run_time = datetime.now() + timedelta(
+                hours=self.config.scheduler.interval_hours
+            )
             self._scheduler.add_job(
                 self._execute_job,
                 trigger=DateTrigger(run_date=first_run_time),
@@ -232,7 +246,9 @@ class JobSearchScheduler:
                 name="Job Search",
                 max_instances=1,
             )
-            self.logger.info(f"First run scheduled at {first_run_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            self.logger.info(
+                f"First run scheduled at {first_run_time.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
 
         # Start the scheduler (this blocks)
         self.logger.info("Scheduler started, waiting for next run...")
@@ -266,7 +282,9 @@ class JobSearchScheduler:
         return self._run_count
 
 
-def create_scheduler(config: Config, job_function: Callable[[], bool]) -> JobSearchScheduler:
+def create_scheduler(
+    config: Config, job_function: Callable[[], bool]
+) -> JobSearchScheduler:
     """
     Factory function to create a JobSearchScheduler.
 

@@ -10,14 +10,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 from config import (
     Config,
-    LoggingConfig,
-    ParallelConfig,
-    PostFilterConfig,
-    RetryConfig,
-    ScoringConfig,
-    SearchConfig,
-    ThrottlingConfig,
-    TelegramConfig,
     _parse_parallel_config,
     _parse_retry_config,
     _parse_throttling_config,
@@ -52,13 +44,15 @@ class TestRetryConfigValidation:
 
     def test_valid_retry_config(self):
         """Test valid retry configuration."""
-        config = _parse_retry_config({
-            "retry": {
-                "max_attempts": 5,
-                "base_delay": 3.0,
-                "backoff_factor": 2.5,
+        config = _parse_retry_config(
+            {
+                "retry": {
+                    "max_attempts": 5,
+                    "base_delay": 3.0,
+                    "backoff_factor": 2.5,
+                }
             }
-        })
+        )
         assert config.max_attempts == 5
         assert config.base_delay == 3.0
         assert config.backoff_factor == 2.5
@@ -84,13 +78,15 @@ class TestThrottlingConfigValidation:
 
     def test_valid_throttling_config(self):
         """Test valid throttling configuration."""
-        config = _parse_throttling_config({
-            "throttling": {
-                "enabled": True,
-                "default_delay": 2.0,
-                "jitter": 0.5,
+        config = _parse_throttling_config(
+            {
+                "throttling": {
+                    "enabled": True,
+                    "default_delay": 2.0,
+                    "jitter": 0.5,
+                }
             }
-        })
+        )
         assert config.enabled is True
         assert config.default_delay == 2.0
         assert config.jitter == 0.5
@@ -113,11 +109,9 @@ class TestThrottlingConfigValidation:
     def test_site_delay_negative(self):
         """Test site delays cannot be negative."""
         with pytest.raises(ValueError, match="site_delays"):
-            _parse_throttling_config({
-                "throttling": {
-                    "site_delays": {"linkedin": -1.0}
-                }
-            })
+            _parse_throttling_config(
+                {"throttling": {"site_delays": {"linkedin": -1.0}}}
+            )
 
 
 class TestPostFilterConfigValidation:
@@ -125,23 +119,29 @@ class TestPostFilterConfigValidation:
 
     def test_valid_post_filter_config(self):
         """Test valid post-filter configuration."""
-        config = _parse_post_filter_config({
-            "post_filter": {
-                "enabled": True,
-                "min_similarity": 85,
+        config = _parse_post_filter_config(
+            {
+                "post_filter": {
+                    "enabled": True,
+                    "min_similarity": 85,
+                }
             }
-        })
+        )
         assert config.enabled is True
         assert config.min_similarity == 85
 
     def test_min_similarity_range_low(self):
         """Test min_similarity must be >= 0."""
-        with pytest.raises(ValueError, match="min_similarity must be between 0 and 100"):
+        with pytest.raises(
+            ValueError, match="min_similarity must be between 0 and 100"
+        ):
             _parse_post_filter_config({"post_filter": {"min_similarity": -10}})
 
     def test_min_similarity_range_high(self):
         """Test min_similarity must be <= 100."""
-        with pytest.raises(ValueError, match="min_similarity must be between 0 and 100"):
+        with pytest.raises(
+            ValueError, match="min_similarity must be between 0 and 100"
+        ):
             _parse_post_filter_config({"post_filter": {"min_similarity": 150}})
 
 
@@ -150,14 +150,16 @@ class TestLoggingConfigValidation:
 
     def test_valid_logging_config(self):
         """Test valid logging configuration."""
-        config = _parse_logging_config({
-            "logging": {
-                "level": "DEBUG",
-                "max_size_mb": 20,
-                "backup_count": 3,
-                "timezone": "America/New_York",
+        config = _parse_logging_config(
+            {
+                "logging": {
+                    "level": "DEBUG",
+                    "max_size_mb": 20,
+                    "backup_count": 3,
+                    "timezone": "America/New_York",
+                }
             }
-        })
+        )
         assert config.level == "DEBUG"
         assert config.max_size_mb == 20
         assert config.backup_count == 3
@@ -165,7 +167,7 @@ class TestLoggingConfigValidation:
 
     def test_max_size_mb_positive(self):
         """Test max_size_mb must be positive."""
-        with pytest.raises(ValueError, match="max_size_mb must be positive"):
+        with pytest.raises(ValueError, match="max_size_mb must be at least 1"):
             _parse_logging_config({"logging": {"max_size_mb": 0}})
 
     def test_backup_count_non_negative(self):
@@ -179,20 +181,22 @@ class TestSchedulerConfigValidation:
 
     def test_valid_scheduler_config(self):
         """Test valid scheduler configuration."""
-        config = _parse_scheduler_config({
-            "scheduler": {
-                "enabled": True,
-                "interval_hours": 12,
-                "retry_delay_minutes": 15,
+        config = _parse_scheduler_config(
+            {
+                "scheduler": {
+                    "enabled": True,
+                    "interval_hours": 12,
+                    "retry_delay_minutes": 15,
+                }
             }
-        })
+        )
         assert config.enabled is True
         assert config.interval_hours == 12
         assert config.retry_delay_minutes == 15
 
     def test_interval_hours_positive(self):
         """Test interval_hours must be positive."""
-        with pytest.raises(ValueError, match="interval_hours must be positive"):
+        with pytest.raises(ValueError, match="interval_hours must be at least 1"):
             _parse_scheduler_config({"scheduler": {"interval_hours": 0}})
 
     def test_retry_delay_non_negative(self):
@@ -206,14 +210,16 @@ class TestTelegramConfigValidation:
 
     def test_valid_telegram_config(self):
         """Test valid telegram configuration."""
-        config = _parse_telegram_config({
-            "telegram": {
-                "enabled": True,
-                "bot_token": "123456:ABC",
-                "chat_ids": ["12345", "67890"],
-                "max_jobs_in_message": 20,
+        config = _parse_telegram_config(
+            {
+                "telegram": {
+                    "enabled": True,
+                    "bot_token": "123456:ABC",
+                    "chat_ids": ["12345", "67890"],
+                    "max_jobs_in_message": 20,
+                }
             }
-        })
+        )
         assert config.enabled is True
         assert config.bot_token == "123456:ABC"
         assert config.chat_ids == ["12345", "67890"]
@@ -221,7 +227,9 @@ class TestTelegramConfigValidation:
 
     def test_min_score_non_negative(self):
         """Test min_score_for_notification cannot be negative."""
-        with pytest.raises(ValueError, match="min_score_for_notification cannot be negative"):
+        with pytest.raises(
+            ValueError, match="min_score_for_notification cannot be negative"
+        ):
             _parse_telegram_config({"telegram": {"min_score_for_notification": -5}})
 
     def test_max_jobs_minimum(self):
@@ -249,11 +257,13 @@ class TestTelegramConfigValidation:
 
     def test_chat_ids_normalized(self):
         """Test chat_ids are normalized to strings."""
-        config = _parse_telegram_config({
-            "telegram": {
-                "chat_ids": [12345, "67890", "", None, "  99999  "],
+        config = _parse_telegram_config(
+            {
+                "telegram": {
+                    "chat_ids": [12345, "67890", "", None, "  99999  "],
+                }
             }
-        })
+        )
         # Empty and None values should be filtered out
         assert "12345" in config.chat_ids
         assert "67890" in config.chat_ids
@@ -291,10 +301,12 @@ class TestConfigQueries:
 
     def test_get_all_queries_flattened(self):
         """Test get_all_queries flattens all categories."""
-        config = Config(queries={
-            "category1": ["query1", "query2"],
-            "category2": ["query3"],
-        })
+        config = Config(
+            queries={
+                "category1": ["query1", "query2"],
+                "category2": ["query3"],
+            }
+        )
 
         queries = config.get_all_queries()
 

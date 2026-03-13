@@ -20,6 +20,12 @@ if TYPE_CHECKING:
 
 from logger import get_logger
 from models import Job, JobDBRecord, generate_job_id
+from scoring import calculate_relevance_score
+
+_JOB_COLUMNS = """job_id, title, company, location, job_url,
+    site, job_type, is_remote, job_level, description,
+    date_posted, min_amount, max_amount, currency, company_url,
+    first_seen, last_seen, relevance_score, applied"""
 
 
 class JobDatabase:
@@ -99,20 +105,14 @@ class JobDatabase:
 
     SELECT_BY_ID = "SELECT job_id FROM jobs WHERE job_id = ?"
 
-    SELECT_ALL = """
-        SELECT job_id, title, company, location, job_url,
-               site, job_type, is_remote, job_level, description,
-               date_posted, min_amount, max_amount, currency, company_url,
-               first_seen, last_seen, relevance_score, applied
+    SELECT_ALL = f"""
+        SELECT {_JOB_COLUMNS}
         FROM jobs
         ORDER BY last_seen DESC, relevance_score DESC
     """
 
-    SELECT_NEW = """
-        SELECT job_id, title, company, location, job_url,
-               site, job_type, is_remote, job_level, description,
-               date_posted, min_amount, max_amount, currency, company_url,
-               first_seen, last_seen, relevance_score, applied
+    SELECT_NEW = f"""
+        SELECT {_JOB_COLUMNS}
         FROM jobs
         WHERE first_seen = ?
         ORDER BY relevance_score DESC
@@ -154,7 +154,10 @@ class JobDatabase:
                 except sqlite3.OperationalError as e:
                     error_msg = str(e).lower()
                     # Only ignore "duplicate column" errors
-                    if "duplicate column" not in error_msg and "already exists" not in error_msg:
+                    if (
+                        "duplicate column" not in error_msg
+                        and "already exists" not in error_msg
+                    ):
                         self.logger.error(f"Migration failed: {migration}")
                         raise
 
@@ -248,9 +251,13 @@ class JobDatabase:
             cursor.execute(self.SELECT_BY_ID, (job_id,))
             return cursor.fetchone() is not None
 
-    def save_job(self, job: Job, site: str | None = None,
-                 job_level: str | None = None,
-                 company_url: str | None = None) -> bool:
+    def save_job(
+        self,
+        job: Job,
+        site: str | None = None,
+        job_level: str | None = None,
+        company_url: str | None = None,
+    ) -> bool:
         """
         Save or update a job in the database.
 
@@ -269,7 +276,11 @@ class JobDatabase:
         # Convert date_posted to string for SQLite
         date_posted_str = None
         if job.date_posted:
-            date_posted_str = job.date_posted.isoformat() if hasattr(job.date_posted, 'isoformat') else str(job.date_posted)
+            date_posted_str = (
+                job.date_posted.isoformat()
+                if hasattr(job.date_posted, "isoformat")
+                else str(job.date_posted)
+            )
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -344,9 +355,9 @@ class JobDatabase:
         jobs_data = []
         job_ids = []
 
-        for _, row in df.iterrows():
-            row_dict = row.to_dict()
-            job = Job.from_dict(row_dict)
+        records = df.to_dict("records")
+        for record in records:
+            job = Job.from_dict(record)
 
             # Convert date_posted to string for SQLite
             date_posted_str = None
@@ -357,27 +368,29 @@ class JobDatabase:
                     else str(job.date_posted)
                 )
 
-            jobs_data.append((
-                job.job_id,
-                job.title,
-                job.company,
-                job.location,
-                job.job_url,
-                row_dict.get("site"),
-                job.job_type,
-                job.is_remote,
-                row_dict.get("job_level"),
-                job.description,
-                date_posted_str,
-                job.min_amount,
-                job.max_amount,
-                job.currency,
-                row_dict.get("company_url"),
-                today,
-                today,
-                job.relevance_score,
-                False,
-            ))
+            jobs_data.append(
+                (
+                    job.job_id,
+                    job.title,
+                    job.company,
+                    job.location,
+                    job.job_url,
+                    record.get("site"),
+                    job.job_type,
+                    job.is_remote,
+                    record.get("job_level"),
+                    job.description,
+                    date_posted_str,
+                    job.min_amount,
+                    job.max_amount,
+                    job.currency,
+                    record.get("company_url"),
+                    today,
+                    today,
+                    job.relevance_score,
+                    False,
+                )
+            )
             job_ids.append(job.job_id)
 
         # Query existing job IDs using batch method to handle SQLite variable limit
@@ -476,11 +489,8 @@ class JobDatabase:
         """
         records = []
 
-        query = """
-            SELECT job_id, title, company, location, job_url, site, job_type,
-                   is_remote, job_level, description, date_posted, min_amount,
-                   max_amount, currency, company_url, first_seen, last_seen,
-                   relevance_score, applied
+        query = f"""
+            SELECT {_JOB_COLUMNS}
             FROM jobs
             WHERE relevance_score >= ?
             ORDER BY relevance_score DESC
@@ -635,6 +645,7 @@ class JobDatabase:
         Returns:
             JobDBRecord instance.
         """
+
         # Helper to safely get column value (handles missing columns in old DBs)
         def get_col(name: str, default=None):
             try:
@@ -747,8 +758,6 @@ def recalculate_all_scores(db: JobDatabase, config: Config) -> int:
     Returns:
         Number of jobs updated.
     """
-    from search_jobs import calculate_relevance_score
-
     logger = get_logger("database")
 
     # Get all jobs

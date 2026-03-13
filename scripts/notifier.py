@@ -15,6 +15,19 @@ from typing import TYPE_CHECKING
 
 from logger import get_logger
 
+try:
+    from telegram import Bot
+    from telegram.constants import ParseMode
+    from telegram.error import TelegramError
+except ImportError:
+    Bot = None  # type: ignore[assignment, misc]
+    ParseMode = None  # type: ignore[assignment, misc]
+    TelegramError = None  # type: ignore[assignment, misc]
+
+# Position emoji constants for numbered job lists
+POSITION_EMOJIS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+MAX_EMOJI_POSITIONS = 10
+
 if TYPE_CHECKING:
     from config import Config, TelegramConfig
     from models import JobDBRecord
@@ -30,7 +43,9 @@ class NotificationData:
     updated_jobs_count: int
     avg_score: float
     new_jobs: list[JobDBRecord]  # All new jobs, sorted by score descending
-    top_jobs_overall: list[JobDBRecord]  # Top jobs from entire database, sorted by score
+    top_jobs_overall: list[
+        JobDBRecord
+    ]  # Top jobs from entire database, sorted by score
     total_jobs_in_db: int = 0  # Total number of jobs in database
 
 
@@ -97,8 +112,11 @@ class TelegramNotifier(BaseNotifier):
             Formatted job string in Markdown.
         """
         # Emoji for position
-        position_emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
-        emoji = position_emojis[index - 1] if index <= 10 else f"{index}\\."
+        emoji = (
+            POSITION_EMOJIS[index - 1]
+            if index <= MAX_EMOJI_POSITIONS
+            else f"{index}\\."
+        )
 
         # Build message parts
         title = job.title if job.title else "Untitled"
@@ -122,7 +140,7 @@ class TelegramNotifier(BaseNotifier):
         return "\n".join(parts)
 
     # Precompiled regex for MarkdownV2 escaping (faster than loop)
-    _MARKDOWN_ESCAPE_PATTERN = re.compile(r'([_*\[\]()~`>#+=|{}.!\-\\])')
+    _MARKDOWN_ESCAPE_PATTERN = re.compile(r"([_*\[\]()~`>#+=|{}.!\-\\])")
 
     def _escape_markdown(self, text: str) -> str:
         """
@@ -136,7 +154,7 @@ class TelegramNotifier(BaseNotifier):
         """
         if not text:
             return ""
-        return self._MARKDOWN_ESCAPE_PATTERN.sub(r'\\\1', str(text))
+        return self._MARKDOWN_ESCAPE_PATTERN.sub(r"\\\1", str(text))
 
     def _escape_url(self, url: str) -> str:
         """
@@ -190,24 +208,32 @@ class TelegramNotifier(BaseNotifier):
             f"• Jobs in DB: {data.total_jobs_in_db}",
         ]
 
-        lines.extend([
-            "",
-            "━━━━━━━━━━━━━━━━━━━━━",
-        ])
+        lines.extend(
+            [
+                "",
+                "━━━━━━━━━━━━━━━━━━━━━",
+            ]
+        )
 
         if total_new_jobs > 0:
-            lines.append(f"🆕 *{total_new_jobs} New Jobs* \\(score ≥ {self.config.min_score_for_notification}\\)")
+            lines.append(
+                f"🆕 *{total_new_jobs} New Jobs* \\(score ≥ {self.config.min_score_for_notification}\\)"
+            )
         else:
             lines.append("ℹ️ No new jobs matching notification criteria\\.")
 
         if total_top_overall > 0:
-            lines.append(f"🏆 *{total_top_overall} Top Jobs Overall* \\(from database\\)")
+            lines.append(
+                f"🏆 *{total_top_overall} Top Jobs Overall* \\(from database\\)"
+            )
 
-        lines.extend([
-            "",
-            "━━━━━━━━━━━━━━━━━━━━━",
-            "🤖 Job Search Tool",
-        ])
+        lines.extend(
+            [
+                "",
+                "━━━━━━━━━━━━━━━━━━━━━",
+                "🤖 Job Search Tool",
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -224,7 +250,9 @@ class TelegramNotifier(BaseNotifier):
         """
         return f"{emoji} *{self._escape_markdown(title)}*\n━━━━━━━━━━━━━━━━━━━━━"
 
-    def _build_jobs_chunk_message(self, jobs: list, start_index: int, chunk_num: int, total_chunks: int) -> str:
+    def _build_jobs_chunk_message(
+        self, jobs: list, start_index: int, chunk_num: int, total_chunks: int
+    ) -> str:
         """
         Build a message for a chunk of jobs.
 
@@ -264,10 +292,11 @@ class TelegramNotifier(BaseNotifier):
         """
         # Filter jobs by minimum score
         filtered_jobs = [
-            job for job in data.new_jobs
+            job
+            for job in data.new_jobs
             if job.relevance_score >= self.config.min_score_for_notification
         ]
-        jobs_to_send = filtered_jobs[:self.config.max_jobs_in_message]
+        jobs_to_send = filtered_jobs[: self.config.max_jobs_in_message]
 
         total_top_overall = len(data.top_jobs_overall) if data.top_jobs_overall else 0
         return self._build_header_message(data, len(jobs_to_send), total_top_overall)
@@ -289,28 +318,32 @@ class TelegramNotifier(BaseNotifier):
             return False
 
         try:
-            from telegram import Bot
-            from telegram.constants import ParseMode
-            from telegram.error import TelegramError
+            if Bot is None:
+                raise ImportError("python-telegram-bot not installed")
 
             bot = Bot(token=self.bot_token)
 
             # Filter NEW jobs by minimum score
             filtered_new_jobs = [
-                job for job in data.new_jobs
+                job
+                for job in data.new_jobs
                 if job.relevance_score >= self.config.min_score_for_notification
             ]
-            new_jobs_to_send = filtered_new_jobs[:self.config.max_jobs_in_message]
+            new_jobs_to_send = filtered_new_jobs[: self.config.max_jobs_in_message]
             total_new_jobs = len(new_jobs_to_send)
 
             # Get TOP JOBS OVERALL (from entire database)
             top_overall_to_send = []
             if self.config.include_top_overall and data.top_jobs_overall:
-                top_overall_to_send = data.top_jobs_overall[:self.config.max_top_overall]
+                top_overall_to_send = data.top_jobs_overall[
+                    : self.config.max_top_overall
+                ]
             total_top_overall = len(top_overall_to_send)
 
             # Build header message
-            header_message = self._build_header_message(data, total_new_jobs, total_top_overall)
+            header_message = self._build_header_message(
+                data, total_new_jobs, total_top_overall
+            )
 
             # Build NEW JOBS chunk messages
             new_job_messages = []
@@ -392,7 +425,9 @@ class TelegramNotifier(BaseNotifier):
                             self.logger.error(
                                 f"Failed to send new jobs chunk {chunk_idx}/{len(new_job_messages)}: {chunk_err}"
                             )
-                            self.logger.debug(f"Failed message length: {len(job_message)} chars")
+                            self.logger.debug(
+                                f"Failed message length: {len(job_message)} chars"
+                            )
 
                     # Send TOP JOBS OVERALL chunks (includes section header)
                     for chunk_idx, top_message in enumerate(top_overall_messages, 1):
@@ -407,7 +442,9 @@ class TelegramNotifier(BaseNotifier):
                             self.logger.error(
                                 f"Failed to send top overall chunk {chunk_idx}/{len(top_overall_messages)}: {chunk_err}"
                             )
-                            self.logger.debug(f"Failed message length: {len(top_message)} chars")
+                            self.logger.debug(
+                                f"Failed message length: {len(top_message)} chars"
+                            )
 
                     success_count += 1
                     self.logger.info(f"Telegram notification sent to chat {chat_id}")
@@ -419,7 +456,9 @@ class TelegramNotifier(BaseNotifier):
             return success_count > 0
 
         except ImportError:
-            self.logger.error("python-telegram-bot not installed. Run: pip install python-telegram-bot")
+            self.logger.error(
+                "python-telegram-bot not installed. Run: pip install python-telegram-bot"
+            )
             return False
         except Exception as e:
             self.logger.error(f"Telegram notification error: {e}")

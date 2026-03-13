@@ -8,7 +8,6 @@ Tests for logging functionality including:
 - Log section formatting
 """
 
-import io
 import logging
 import sys
 import tempfile
@@ -126,7 +125,7 @@ class TestColoredFormatter:
     def test_level_colors_mapping(self):
         """Test that different log levels have different colors."""
         with patch("sys.stdout.isatty", return_value=True):
-            formatter = ColoredFormatter(fmt="%(levelname)s")
+            ColoredFormatter(fmt="%(levelname)s")
 
             assert ColoredFormatter.LEVEL_COLORS[logging.DEBUG] == Colors.GRAY
             assert ColoredFormatter.LEVEL_COLORS[logging.INFO] == Colors.GREEN

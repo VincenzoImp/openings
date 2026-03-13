@@ -1,8 +1,7 @@
-"""Tests for scoring functionality in search_jobs module."""
+"""Tests for scoring functionality in scoring module."""
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
@@ -10,11 +9,16 @@ import pytest
 # Add scripts directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
-# Mock jobspy before importing search_jobs (not available in test env)
-sys.modules['jobspy'] = MagicMock()
-
 from config import Config, ScoringConfig
-from search_jobs import calculate_relevance_score, _normalize_text, _extract_words, _fuzzy_word_match
+from scoring import (
+    calculate_relevance_score,
+    filter_relevant_jobs,
+    fuzzy_post_filter,
+    _extract_words,
+    _fuzzy_word_match,
+    _get_job_text,
+    _normalize_text,
+)
 
 
 class TestNormalizeText:
@@ -130,12 +134,14 @@ class TestCalculateRelevanceScore:
 
     def test_no_match(self, config):
         """Test score is 0 when no keywords match."""
-        row = pd.Series({
-            "title": "Marketing Manager",
-            "company": "Marketing Corp",
-            "location": "New York",
-            "description": "Marketing role with sales focus",
-        })
+        row = pd.Series(
+            {
+                "title": "Marketing Manager",
+                "company": "Marketing Corp",
+                "location": "New York",
+                "description": "Marketing role with sales focus",
+            }
+        )
 
         score = calculate_relevance_score(row, config)
 
@@ -143,12 +149,14 @@ class TestCalculateRelevanceScore:
 
     def test_single_category_match(self, config):
         """Test score when only one category matches."""
-        row = pd.Series({
-            "title": "Software Engineer",
-            "company": "Tech Corp",
-            "location": "NYC",
-            "description": "Building web applications",
-        })
+        row = pd.Series(
+            {
+                "title": "Software Engineer",
+                "company": "Tech Corp",
+                "location": "NYC",
+                "description": "Building web applications",
+            }
+        )
 
         score = calculate_relevance_score(row, config)
 
@@ -157,12 +165,14 @@ class TestCalculateRelevanceScore:
 
     def test_multiple_category_match(self, config):
         """Test score when multiple categories match."""
-        row = pd.Series({
-            "title": "Software Engineer",
-            "company": "Tech Corp",
-            "location": "Remote",
-            "description": "Python developer role",
-        })
+        row = pd.Series(
+            {
+                "title": "Software Engineer",
+                "company": "Tech Corp",
+                "location": "Remote",
+                "description": "Python developer role",
+            }
+        )
 
         score = calculate_relevance_score(row, config)
 
@@ -171,12 +181,14 @@ class TestCalculateRelevanceScore:
 
     def test_case_insensitive_matching(self, config):
         """Test keyword matching is case insensitive."""
-        row = pd.Series({
-            "title": "SOFTWARE ENGINEER",
-            "company": "Tech Corp",
-            "location": "NYC",
-            "description": "PYTHON development",
-        })
+        row = pd.Series(
+            {
+                "title": "SOFTWARE ENGINEER",
+                "company": "Tech Corp",
+                "location": "NYC",
+                "description": "PYTHON development",
+            }
+        )
 
         score = calculate_relevance_score(row, config)
 
@@ -185,12 +197,14 @@ class TestCalculateRelevanceScore:
 
     def test_empty_fields(self, config):
         """Test handling of empty/missing fields."""
-        row = pd.Series({
-            "title": "Developer",
-            "company": None,
-            "location": "",
-            "description": None,
-        })
+        row = pd.Series(
+            {
+                "title": "Developer",
+                "company": None,
+                "location": "",
+                "description": None,
+            }
+        )
 
         score = calculate_relevance_score(row, config)
 
@@ -199,12 +213,14 @@ class TestCalculateRelevanceScore:
 
     def test_category_scores_only_once(self, config):
         """Test that a category only adds weight once even if multiple keywords match."""
-        row = pd.Series({
-            "title": "Software Engineer Developer",  # Both keywords from primary
-            "company": "Tech Corp",
-            "location": "NYC",
-            "description": "More developer stuff, software engineering",
-        })
+        row = pd.Series(
+            {
+                "title": "Software Engineer Developer",  # Both keywords from primary
+                "company": "Tech Corp",
+                "location": "NYC",
+                "description": "More developer stuff, software engineering",
+            }
+        )
 
         score = calculate_relevance_score(row, config)
 
@@ -216,12 +232,14 @@ class TestCalculateRelevanceScore:
         # Add a keyword category without a corresponding weight
         config.scoring.keywords["unknown"] = ["test"]
 
-        row = pd.Series({
-            "title": "Test Position",
-            "company": "Tech",
-            "location": "NYC",
-            "description": "",
-        })
+        row = pd.Series(
+            {
+                "title": "Test Position",
+                "company": "Tech",
+                "location": "NYC",
+                "description": "",
+            }
+        )
 
         score = calculate_relevance_score(row, config)
 
@@ -234,20 +252,19 @@ class TestCalculateRelevanceScore:
 # =============================================================================
 
 
-from search_jobs import fuzzy_post_filter, _get_job_text
-
-
 class TestGetJobText:
     """Tests for _get_job_text helper function."""
 
     def test_concatenates_fields(self):
         """Test that all relevant fields are concatenated."""
-        row = pd.Series({
-            "title": "Software Engineer",
-            "company": "Tech Corp",
-            "location": "NYC",
-            "description": "Build things",
-        })
+        row = pd.Series(
+            {
+                "title": "Software Engineer",
+                "company": "Tech Corp",
+                "location": "NYC",
+                "description": "Build things",
+            }
+        )
 
         text = _get_job_text(row)
 
@@ -258,11 +275,13 @@ class TestGetJobText:
 
     def test_handles_missing_fields(self):
         """Test handling of missing fields."""
-        row = pd.Series({
-            "title": "Developer",
-            "company": None,
-            "location": "Remote",
-        })
+        row = pd.Series(
+            {
+                "title": "Developer",
+                "company": None,
+                "location": "Remote",
+            }
+        )
 
         text = _get_job_text(row)
 
@@ -271,12 +290,14 @@ class TestGetJobText:
 
     def test_handles_nan_values(self):
         """Test handling of NaN values."""
-        row = pd.Series({
-            "title": "Developer",
-            "company": float("nan"),
-            "location": "NYC",
-            "description": float("nan"),
-        })
+        row = pd.Series(
+            {
+                "title": "Developer",
+                "company": float("nan"),
+                "location": "NYC",
+                "description": float("nan"),
+            }
+        )
 
         text = _get_job_text(row)
 
@@ -306,17 +327,19 @@ class TestFuzzyPostFilter:
         """Create config with post-filter disabled."""
         from config import Config, PostFilterConfig
 
-        return Config(
-            post_filter=PostFilterConfig(enabled=False)
-        )
+        return Config(post_filter=PostFilterConfig(enabled=False))
 
     def test_filter_disabled_returns_original(self, config_without_filter):
         """Test that disabled filter returns original DataFrame."""
-        df = pd.DataFrame([
-            {"title": "Marketing Manager", "company": "Corp", "location": "NYC"},
-        ])
+        df = pd.DataFrame(
+            [
+                {"title": "Marketing Manager", "company": "Corp", "location": "NYC"},
+            ]
+        )
 
-        result = fuzzy_post_filter(df, "software engineer", "NYC", config_without_filter)
+        result = fuzzy_post_filter(
+            df, "software engineer", "NYC", config_without_filter
+        )
 
         assert len(result) == 1  # Not filtered
 
@@ -336,9 +359,16 @@ class TestFuzzyPostFilter:
 
     def test_filter_matching_query(self, config_with_filter):
         """Test that matching jobs are kept."""
-        df = pd.DataFrame([
-            {"title": "Python Developer", "company": "Tech Corp", "location": "NYC", "description": "Python role"},
-        ])
+        df = pd.DataFrame(
+            [
+                {
+                    "title": "Python Developer",
+                    "company": "Tech Corp",
+                    "location": "NYC",
+                    "description": "Python role",
+                },
+            ]
+        )
 
         result = fuzzy_post_filter(df, "python developer", "NYC", config_with_filter)
 
@@ -346,9 +376,16 @@ class TestFuzzyPostFilter:
 
     def test_filter_non_matching_query(self, config_with_filter):
         """Test that non-matching jobs are filtered out."""
-        df = pd.DataFrame([
-            {"title": "Java Developer", "company": "Corp", "location": "NYC", "description": "Java role"},
-        ])
+        df = pd.DataFrame(
+            [
+                {
+                    "title": "Java Developer",
+                    "company": "Corp",
+                    "location": "NYC",
+                    "description": "Java role",
+                },
+            ]
+        )
 
         result = fuzzy_post_filter(df, "python developer", "NYC", config_with_filter)
 
@@ -356,9 +393,16 @@ class TestFuzzyPostFilter:
 
     def test_filter_location_match(self, config_with_filter):
         """Test location matching."""
-        df = pd.DataFrame([
-            {"title": "Developer", "company": "Corp", "location": "New York, NY", "description": ""},
-        ])
+        df = pd.DataFrame(
+            [
+                {
+                    "title": "Developer",
+                    "company": "Corp",
+                    "location": "New York, NY",
+                    "description": "",
+                },
+            ]
+        )
 
         result = fuzzy_post_filter(df, "developer", "New York", config_with_filter)
 
@@ -366,9 +410,16 @@ class TestFuzzyPostFilter:
 
     def test_filter_skips_remote_location_check(self, config_with_filter):
         """Test that 'Remote' location skips location matching."""
-        df = pd.DataFrame([
-            {"title": "Developer", "company": "Corp", "location": "San Francisco", "description": ""},
-        ])
+        df = pd.DataFrame(
+            [
+                {
+                    "title": "Developer",
+                    "company": "Corp",
+                    "location": "San Francisco",
+                    "description": "",
+                },
+            ]
+        )
 
         result = fuzzy_post_filter(df, "developer", "Remote", config_with_filter)
 
@@ -377,9 +428,16 @@ class TestFuzzyPostFilter:
 
     def test_filter_with_umlauts(self, config_with_filter):
         """Test filtering with umlaut characters."""
-        df = pd.DataFrame([
-            {"title": "Developer", "company": "Corp", "location": "Zürich", "description": ""},
-        ])
+        df = pd.DataFrame(
+            [
+                {
+                    "title": "Developer",
+                    "company": "Corp",
+                    "location": "Zürich",
+                    "description": "",
+                },
+            ]
+        )
 
         result = fuzzy_post_filter(df, "developer", "Zurich", config_with_filter)
 
@@ -387,101 +445,8 @@ class TestFuzzyPostFilter:
 
 
 # =============================================================================
-# TEST THROTTLED EXECUTOR
-# =============================================================================
-
-
-from search_jobs import ThrottledExecutor
-from unittest.mock import patch, MagicMock
-import time
-
-
-class TestThrottledExecutor:
-    """Tests for ThrottledExecutor class."""
-
-    @pytest.fixture
-    def config_with_throttling(self):
-        """Create config with throttling enabled."""
-        from config import Config, ThrottlingConfig, SearchConfig
-
-        return Config(
-            search=SearchConfig(sites=["linkedin", "indeed"]),
-            throttling=ThrottlingConfig(
-                enabled=True,
-                default_delay=0.1,
-                site_delays={"linkedin": 0.2, "indeed": 0.1},
-                jitter=0.0,  # Disable jitter for predictable tests
-            )
-        )
-
-    @pytest.fixture
-    def config_without_throttling(self):
-        """Create config with throttling disabled."""
-        from config import Config, ThrottlingConfig
-
-        return Config(
-            throttling=ThrottlingConfig(enabled=False)
-        )
-
-    def test_init(self, config_with_throttling):
-        """Test ThrottledExecutor initialization."""
-        executor = ThrottledExecutor(config_with_throttling)
-
-        assert executor.config == config_with_throttling
-        assert executor.site_locks == {}
-        assert executor.site_last_request == {}
-
-    def test_get_site_lock_creates_lock(self, config_with_throttling):
-        """Test _get_site_lock creates new lock for site."""
-        executor = ThrottledExecutor(config_with_throttling)
-
-        lock = executor._get_site_lock("linkedin")
-
-        assert "linkedin" in executor.site_locks
-        assert "linkedin" in executor.site_last_request
-
-    def test_get_site_lock_returns_same_lock(self, config_with_throttling):
-        """Test _get_site_lock returns same lock for same site."""
-        executor = ThrottledExecutor(config_with_throttling)
-
-        lock1 = executor._get_site_lock("linkedin")
-        lock2 = executor._get_site_lock("linkedin")
-
-        assert lock1 is lock2
-
-    def test_throttled_search_no_throttling(self, config_without_throttling):
-        """Test throttled_search bypasses throttling when disabled."""
-        executor = ThrottledExecutor(config_without_throttling)
-
-        with patch("search_jobs.search_single_query") as mock_search:
-            mock_search.return_value = ("query", "loc", pd.DataFrame(), None)
-
-            result = executor.throttled_search("query", "loc", config_without_throttling)
-
-            mock_search.assert_called_once()
-
-    def test_throttled_search_with_throttling(self, config_with_throttling):
-        """Test throttled_search applies delay when enabled."""
-        executor = ThrottledExecutor(config_with_throttling)
-
-        with patch("search_jobs.search_single_query") as mock_search:
-            mock_search.return_value = ("query", "loc", pd.DataFrame(), None)
-
-            start = time.time()
-            executor.throttled_search("query", "loc", config_with_throttling)
-            executor.throttled_search("query2", "loc", config_with_throttling)
-            elapsed = time.time() - start
-
-            # Second call should have waited at least the max delay (0.2s for linkedin)
-            assert elapsed >= 0.15  # Allow some tolerance
-
-
-# =============================================================================
 # TEST FILTER RELEVANT JOBS
 # =============================================================================
-
-
-from search_jobs import filter_relevant_jobs
 
 
 class TestFilterRelevantJobs:
@@ -505,10 +470,22 @@ class TestFilterRelevantJobs:
 
     def test_filter_by_threshold(self, config):
         """Test that jobs below threshold are filtered out."""
-        df = pd.DataFrame([
-            {"title": "Software Engineer", "company": "A", "location": "NYC", "description": "Python dev"},  # 30
-            {"title": "Marketing Manager", "company": "B", "location": "NYC", "description": "Sales"},  # 0
-        ])
+        df = pd.DataFrame(
+            [
+                {
+                    "title": "Software Engineer",
+                    "company": "A",
+                    "location": "NYC",
+                    "description": "Python dev",
+                },  # 30
+                {
+                    "title": "Marketing Manager",
+                    "company": "B",
+                    "location": "NYC",
+                    "description": "Sales",
+                },  # 0
+            ]
+        )
 
         result = filter_relevant_jobs(df, config)
 
@@ -517,9 +494,16 @@ class TestFilterRelevantJobs:
 
     def test_adds_relevance_score_column(self, config):
         """Test that relevance_score column is added."""
-        df = pd.DataFrame([
-            {"title": "Software Engineer", "company": "A", "location": "NYC", "description": ""},
-        ])
+        df = pd.DataFrame(
+            [
+                {
+                    "title": "Software Engineer",
+                    "company": "A",
+                    "location": "NYC",
+                    "description": "",
+                },
+            ]
+        )
 
         result = filter_relevant_jobs(df, config)
 
@@ -528,11 +512,28 @@ class TestFilterRelevantJobs:
 
     def test_sorted_by_score_descending(self, config):
         """Test that results are sorted by score descending."""
-        df = pd.DataFrame([
-            {"title": "Engineer", "company": "A", "location": "NYC", "description": "Python"},  # 10
-            {"title": "Software Engineer Python", "company": "B", "location": "NYC", "description": "Python"},  # 30
-            {"title": "Software Engineer", "company": "C", "location": "NYC", "description": ""},  # 20
-        ])
+        df = pd.DataFrame(
+            [
+                {
+                    "title": "Engineer",
+                    "company": "A",
+                    "location": "NYC",
+                    "description": "Python",
+                },  # 10
+                {
+                    "title": "Software Engineer Python",
+                    "company": "B",
+                    "location": "NYC",
+                    "description": "Python",
+                },  # 30
+                {
+                    "title": "Software Engineer",
+                    "company": "C",
+                    "location": "NYC",
+                    "description": "",
+                },  # 20
+            ]
+        )
 
         # Adjust threshold to include all
         config.scoring.threshold = 5

@@ -26,15 +26,23 @@ jobs:
         run: |
           pip install -r requirements.txt -r requirements-dev.txt
 
+      - name: Run pre-commit hooks
+        run: |
+          pip install pre-commit
+          pre-commit run --all-files
+
       - name: Lint with ruff
         run: ruff check scripts/
 
+      - name: Check formatting with ruff
+        run: ruff format --check scripts/ tests/
+
       - name: Type check with mypy
         run: mypy scripts/ --ignore-missing-imports
-        continue-on-error: true  # TODO: fix all mypy errors and make strict
+        continue-on-error: false
 
       - name: Run tests
-        run: pytest --cov=scripts --cov-report=xml --cov-fail-under=50
+        run: pytest --cov=scripts --cov-report=xml --cov-fail-under=60
 
       - name: Upload coverage
         if: matrix.python-version == '3.11'

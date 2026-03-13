@@ -9,7 +9,7 @@ This module provides centralized fixtures used across all test modules:
 
 import sys
 import tempfile
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -200,7 +200,6 @@ def test_config(scoring_config):
         RetryConfig,
         SchedulerConfig,
         SearchConfig,
-        TelegramConfig,
         ThrottlingConfig,
     )
 
@@ -361,6 +360,25 @@ def empty_notification_data():
         new_jobs=[],
         top_jobs_overall=[],
         total_jobs_in_db=0,
+    )
+
+
+# =============================================================================
+# EXPORTER FIXTURES
+# =============================================================================
+
+
+@pytest.fixture
+def export_dataframe() -> pd.DataFrame:
+    """Create a DataFrame suitable for export testing."""
+    return pd.DataFrame(
+        {
+            "title": ["Software Engineer", "Data Scientist"],
+            "company": ["Corp A", "Corp B"],
+            "location": ["NYC", "SF"],
+            "relevance_score": [30, 25],
+            "job_url": ["https://example.com/1", "https://example.com/2"],
+        }
     )
 
 

@@ -12,6 +12,32 @@ from datetime import date, datetime
 from typing import Any
 
 
+def _parse_date(value: object) -> date | None:
+    """
+    Parse a date value from various formats.
+
+    Handles strings (YYYY-MM-DD), date objects, and datetime objects.
+
+    Args:
+        value: The value to parse as a date.
+
+    Returns:
+        A date object, or None if parsing fails or value is falsy.
+    """
+    if not value:
+        return None
+    if isinstance(value, str):
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").date()
+        except ValueError:
+            return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return None
+
+
 def generate_job_id(title: str, company: str, location: str) -> str:
     """
     Generate unique ID for a job based on title, company, and location.
@@ -32,7 +58,7 @@ def generate_job_id(title: str, company: str, location: str) -> str:
     return hashlib.sha256(identifier.encode()).hexdigest()
 
 
-@dataclass
+@dataclass(frozen=True)
 class Job:
     """Represents a single job listing."""
 
@@ -75,31 +101,8 @@ class Job:
             Job instance.
         """
         # Handle date parsing
-        date_posted = None
-        if data.get("date_posted"):
-            date_val = data["date_posted"]
-            if isinstance(date_val, str):
-                try:
-                    date_posted = datetime.strptime(date_val, "%Y-%m-%d").date()
-                except ValueError:
-                    pass
-            elif isinstance(date_val, (date, datetime)):
-                date_posted = (
-                    date_val.date() if isinstance(date_val, datetime) else date_val
-                )
-
-        search_date = None
-        if data.get("search_date"):
-            date_val = data["search_date"]
-            if isinstance(date_val, str):
-                try:
-                    search_date = datetime.strptime(date_val, "%Y-%m-%d").date()
-                except ValueError:
-                    pass
-            elif isinstance(date_val, (date, datetime)):
-                search_date = (
-                    date_val.date() if isinstance(date_val, datetime) else date_val
-                )
+        date_posted = _parse_date(data.get("date_posted"))
+        search_date = _parse_date(data.get("search_date"))
 
         return cls(
             title=str(data.get("title", "")),
@@ -134,9 +137,7 @@ class Job:
             "location": self.location,
             "job_url": self.job_url,
             "description": self.description,
-            "date_posted": (
-                self.date_posted.isoformat() if self.date_posted else None
-            ),
+            "date_posted": (self.date_posted.isoformat() if self.date_posted else None),
             "job_type": self.job_type,
             "is_remote": self.is_remote,
             "min_amount": self.min_amount,
@@ -145,14 +146,12 @@ class Job:
             "interval": self.interval,
             "search_query": self.search_query,
             "search_location": self.search_location,
-            "search_date": (
-                self.search_date.isoformat() if self.search_date else None
-            ),
+            "search_date": (self.search_date.isoformat() if self.search_date else None),
             "relevance_score": self.relevance_score,
         }
 
 
-@dataclass
+@dataclass(frozen=True)
 class SearchResult:
     """Represents results from a single search query."""
 
@@ -203,7 +202,7 @@ class SearchSummary:
         self.end_time = datetime.now()
 
 
-@dataclass
+@dataclass(frozen=True)
 class JobDBRecord:
     """Database record for a job with full details."""
 
@@ -228,9 +227,13 @@ class JobDBRecord:
     applied: bool = False
 
     @classmethod
-    def from_job(cls, job: Job, site: str | None = None,
-                 job_level: str | None = None,
-                 company_url: str | None = None) -> JobDBRecord:
+    def from_job(
+        cls,
+        job: Job,
+        site: str | None = None,
+        job_level: str | None = None,
+        company_url: str | None = None,
+    ) -> JobDBRecord:
         """
         Create database record from Job.
 

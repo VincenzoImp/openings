@@ -8,7 +8,9 @@
 # =============================================================================
 # Stage 1: Builder - Install dependencies with build tools
 # =============================================================================
-FROM python:3.11-slim AS builder
+# NOTE: Pin to a specific patch version for reproducible builds.
+# TODO: Consider using --require-hashes in pip install for supply-chain security.
+FROM python:3.11.12-slim AS builder
 
 WORKDIR /tmp
 
@@ -21,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends gcc \
 # =============================================================================
 # Stage 2: Runtime - Clean image without build tools
 # =============================================================================
-FROM python:3.11-slim
+FROM python:3.11.12-slim
 
 # Create non-root user
 RUN useradd -m -u 1000 -s /bin/bash appuser

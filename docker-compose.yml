@@ -33,6 +33,8 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     command: python main.py
+    networks:
+      - jobsearch-net
     profiles:
       - scheduler
 
@@ -55,6 +57,8 @@ services:
         required: false
     environment:
       - PYTHONUNBUFFERED=1
+    networks:
+      - jobsearch-net
     command: python main.py
 
   # ============================================================================
@@ -76,6 +80,8 @@ services:
         required: false
     environment:
       - PYTHONUNBUFFERED=1
+    networks:
+      - jobsearch-net
     command: python search_jobs.py
     profiles:
       - legacy
@@ -99,6 +105,8 @@ services:
         required: false
     environment:
       - PYTHONUNBUFFERED=1
+    networks:
+      - jobsearch-net
     command: python analyze_jobs.py
     profiles:
       - analyze
@@ -114,7 +122,7 @@ services:
     container_name: job_dashboard
     restart: unless-stopped
     ports:
-      - "8501:8501"
+      - "127.0.0.1:8501:8501"
     volumes:
       - ./results:/app/results
       - ./data:/app/data
@@ -125,6 +133,12 @@ services:
         required: false
     environment:
       - PYTHONUNBUFFERED=1
-    command: streamlit run dashboard.py --server.address=0.0.0.0 --server.port=8501
+    networks:
+      - jobsearch-net
+    command: streamlit run dashboard.py --server.address=127.0.0.1 --server.port=8501
     profiles:
       - dashboard
+
+networks:
+  jobsearch-net:
+    driver: bridge

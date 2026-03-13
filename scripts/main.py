@@ -14,14 +14,14 @@ from typing import TYPE_CHECKING
 
 from config import get_config, reload_config
 from database import cleanup_old_jobs, get_database, recalculate_all_scores
+from exporter import save_results
 from logger import get_logger, log_section, setup_logging
 from notifier import NotificationManager, create_notification_data
 from scheduler import create_scheduler
+from scoring import filter_relevant_jobs
 from search_jobs import (
-    filter_relevant_jobs,
     print_banner,
     print_top_jobs,
-    save_results,
     search_jobs,
 )
 
@@ -58,7 +58,7 @@ def run_job_search() -> bool:
         logger.info(f"Database: {db_stats['total_jobs']} jobs tracked")
 
         # Cleanup old jobs if enabled
-        if config.database.cleanup_enabled and db_stats['total_jobs'] > 0:
+        if config.database.cleanup_enabled and db_stats["total_jobs"] > 0:
             cleanup_old_jobs(db, config.database.cleanup_days)
 
         # Search for jobs
@@ -101,7 +101,9 @@ def run_job_search() -> bool:
 
         # Send notifications for new jobs
         if new_count > 0:
-            _send_notifications(config, db, new_count, updated_count, len(relevant_jobs))
+            _send_notifications(
+                config, db, new_count, updated_count, len(relevant_jobs)
+            )
 
         # Print summary
         log_section(logger, "SEARCH COMPLETE")
@@ -170,7 +172,9 @@ def _send_notifications(
             return
 
         # Calculate average score
-        avg_score = sum(j.relevance_score for j in new_jobs) / len(new_jobs) if new_jobs else 0
+        avg_score = (
+            sum(j.relevance_score for j in new_jobs) / len(new_jobs) if new_jobs else 0
+        )
 
         # Create notification data
         notification_data = create_notification_data(
@@ -274,13 +278,17 @@ def main() -> int:
         channels = []
         if config.notifications.telegram.enabled:
             channels.append("Telegram")
-        logger.info(f"Notifications: {', '.join(channels) if channels else 'None configured'}")
+        logger.info(
+            f"Notifications: {', '.join(channels) if channels else 'None configured'}"
+        )
 
     # Recalculate scores for existing jobs at startup (if enabled)
     db = get_database(config)
     db_stats = db.get_statistics()
-    if config.database.recalculate_scores_on_startup and db_stats['total_jobs'] > 0:
-        logger.info(f"Recalculating scores for {db_stats['total_jobs']} existing jobs...")
+    if config.database.recalculate_scores_on_startup and db_stats["total_jobs"] > 0:
+        logger.info(
+            f"Recalculating scores for {db_stats['total_jobs']} existing jobs..."
+        )
         recalculate_all_scores(db, config)
 
     # Create scheduler

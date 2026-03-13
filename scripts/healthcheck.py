@@ -23,6 +23,7 @@ def check_imports() -> bool:
         import jobspy  # noqa: F401
         import yaml  # noqa: F401
         import sqlite3  # noqa: F401
+
         return True
     except ImportError as e:
         print(f"Import error: {e}", file=sys.stderr)
@@ -33,6 +34,7 @@ def check_config() -> bool:
     """Verify configuration can be loaded."""
     try:
         from config import load_config
+
         config = load_config()
         return config is not None
     except Exception as e:
@@ -60,6 +62,7 @@ def check_directories() -> bool:
     """Verify required directories exist and are writable."""
     try:
         from config import get_config
+
         config = get_config()
 
         dirs_to_check = [

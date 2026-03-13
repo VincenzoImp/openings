@@ -19,6 +19,33 @@ if TYPE_CHECKING:
     from models import JobDBRecord
 
 
+def _sanitize_excel_value(value: object) -> object:
+    """Escape values that could trigger Excel formula injection."""
+    if not isinstance(value, str) or not value:
+        return value
+    first = value[0]
+    if first in ("=", "@"):
+        return "'" + value
+    if (
+        first in ("+", "-")
+        and len(value) > 1
+        and (value[1].isdigit() or value[1] in ("=", "+", "-", "@"))
+    ):
+        return "'" + value
+    return value
+
+
+def _sanitize_dataframe_for_excel(df: pd.DataFrame) -> pd.DataFrame:
+    """Return a copy of *df* with text columns sanitized against formula injection."""
+    sanitized = df.copy()
+    text_cols = sanitized.select_dtypes(include=["object"]).columns
+    for col in text_cols:
+        sanitized[col] = sanitized[col].map(
+            lambda v: _sanitize_excel_value(v) if pd.notna(v) else v
+        )
+    return sanitized
+
+
 @dataclass
 class SearchReport:
     """Container for search report data."""
@@ -59,25 +86,31 @@ def generate_text_summary(report: SearchReport) -> str:
     ]
 
     if report.new_jobs > 0 and report.top_jobs:
-        lines.extend([
-            "TOP NEW JOBS",
-            "-" * 40,
-        ])
+        lines.extend(
+            [
+                "TOP NEW JOBS",
+                "-" * 40,
+            ]
+        )
 
         for idx, job in enumerate(report.top_jobs[:10], 1):
-            lines.extend([
-                f"\n{idx}. {job.title}",
-                f"   Company:  {job.company}",
-                f"   Location: {job.location}",
-                f"   Score:    {job.relevance_score}",
-            ])
+            lines.extend(
+                [
+                    f"\n{idx}. {job.title}",
+                    f"   Company:  {job.company}",
+                    f"   Location: {job.location}",
+                    f"   Score:    {job.relevance_score}",
+                ]
+            )
             if job.job_url:
                 lines.append(f"   URL:      {job.job_url}")
 
-    lines.extend([
-        "",
-        "=" * 60,
-    ])
+    lines.extend(
+        [
+            "",
+            "=" * 60,
+        ]
+    )
 
     return "\n".join(lines)
 
@@ -110,10 +143,12 @@ def generate_markdown_summary(report: SearchReport, max_jobs: int = 10) -> str:
     ]
 
     if report.new_jobs > 0 and report.top_jobs:
-        lines.extend([
-            "## Top New Jobs",
-            "",
-        ])
+        lines.extend(
+            [
+                "## Top New Jobs",
+                "",
+            ]
+        )
 
         for idx, job in enumerate(report.top_jobs[:max_jobs], 1):
             lines.append(f"### {idx}. {job.title}")
@@ -153,23 +188,25 @@ def jobs_to_dataframe(jobs: list[JobDBRecord]) -> pd.DataFrame:
 
     data = []
     for job in jobs:
-        data.append({
-            "title": job.title,
-            "company": job.company,
-            "location": job.location,
-            "relevance_score": job.relevance_score,
-            "site": job.site,
-            "job_type": job.job_type,
-            "is_remote": job.is_remote,
-            "job_level": job.job_level,
-            "date_posted": job.date_posted,
-            "min_amount": job.min_amount,
-            "max_amount": job.max_amount,
-            "currency": job.currency,
-            "job_url": job.job_url,
-            "first_seen": job.first_seen,
-            "last_seen": job.last_seen,
-        })
+        data.append(
+            {
+                "title": job.title,
+                "company": job.company,
+                "location": job.location,
+                "relevance_score": job.relevance_score,
+                "site": job.site,
+                "job_type": job.job_type,
+                "is_remote": job.is_remote,
+                "job_level": job.job_level,
+                "date_posted": job.date_posted,
+                "min_amount": job.min_amount,
+                "max_amount": job.max_amount,
+                "currency": job.currency,
+                "job_url": job.job_url,
+                "first_seen": job.first_seen,
+                "last_seen": job.last_seen,
+            }
+        )
 
     return pd.DataFrame(data)
 
@@ -188,13 +225,23 @@ def generate_excel_report(jobs: list[JobDBRecord]) -> BytesIO:
 
     if df.empty:
         # Return empty Excel with headers only
-        df = pd.DataFrame(columns=[
-            "title", "company", "location", "relevance_score",
-            "site", "job_type", "is_remote", "job_level",
-            "date_posted", "job_url"
-        ])
+        df = pd.DataFrame(
+            columns=[
+                "title",
+                "company",
+                "location",
+                "relevance_score",
+                "site",
+                "job_type",
+                "is_remote",
+                "job_level",
+                "date_posted",
+                "job_url",
+            ]
+        )
 
     buffer = BytesIO()
+    df = _sanitize_dataframe_for_excel(df)
 
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="New Jobs")
@@ -222,7 +269,9 @@ def generate_excel_report(jobs: list[JobDBRecord]) -> BytesIO:
             else:
                 max_length = len(str(column))
             adjusted_width = min(max_length + 2, 50)
-            worksheet.column_dimensions[get_column_letter(col_num)].width = adjusted_width
+            worksheet.column_dimensions[
+                get_column_letter(col_num)
+            ].width = adjusted_width
 
         # Make URLs clickable
         if "job_url" in df.columns and len(df) > 0:

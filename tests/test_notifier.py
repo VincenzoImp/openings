@@ -20,7 +20,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 from config import Config, NotificationsConfig, TelegramConfig
 from models import JobDBRecord
 from notifier import (
-    BaseNotifier,
     NotificationData,
     NotificationManager,
     TelegramNotifier,
@@ -70,18 +69,30 @@ class TestNotificationData:
         """Test that jobs are sorted by relevance score."""
         jobs = [
             JobDBRecord(
-                job_id="1", title="Low", company="A", location="NYC",
-                relevance_score=10, first_seen=datetime.now().date(),
+                job_id="1",
+                title="Low",
+                company="A",
+                location="NYC",
+                relevance_score=10,
+                first_seen=datetime.now().date(),
                 last_seen=datetime.now().date(),
             ),
             JobDBRecord(
-                job_id="2", title="High", company="B", location="NYC",
-                relevance_score=50, first_seen=datetime.now().date(),
+                job_id="2",
+                title="High",
+                company="B",
+                location="NYC",
+                relevance_score=50,
+                first_seen=datetime.now().date(),
                 last_seen=datetime.now().date(),
             ),
             JobDBRecord(
-                job_id="3", title="Mid", company="C", location="NYC",
-                relevance_score=30, first_seen=datetime.now().date(),
+                job_id="3",
+                title="Mid",
+                company="C",
+                location="NYC",
+                relevance_score=30,
+                first_seen=datetime.now().date(),
                 last_seen=datetime.now().date(),
             ),
         ]
@@ -239,18 +250,36 @@ class TestTelegramNotifierFormatting:
         message = notifier._format_job_message(sample_job_db_record, 15)
         assert "15" in message
 
-    def test_format_job_message_with_url(self, notifier, sample_job_db_record):
+    def test_format_job_message_with_url(self, notifier):
         """Test that job URL is included as link."""
-        sample_job_db_record.job_url = "https://example.com/job/123"
-        message = notifier._format_job_message(sample_job_db_record, 1)
+        job = JobDBRecord(
+            job_id="test123",
+            title="Software Engineer",
+            company="Test Corp",
+            location="New York, NY",
+            job_url="https://example.com/job/123",
+            first_seen=datetime.now().date(),
+            last_seen=datetime.now().date(),
+            relevance_score=25,
+        )
+        message = notifier._format_job_message(job, 1)
 
         assert "View Job" in message
         assert "https://example.com/job/123" in message
 
-    def test_format_job_message_remote_badge(self, notifier, sample_job_db_record):
+    def test_format_job_message_remote_badge(self, notifier):
         """Test that remote badge is shown for remote jobs."""
-        sample_job_db_record.is_remote = True
-        message = notifier._format_job_message(sample_job_db_record, 1)
+        job = JobDBRecord(
+            job_id="test123",
+            title="Software Engineer",
+            company="Test Corp",
+            location="New York, NY",
+            is_remote=True,
+            first_seen=datetime.now().date(),
+            last_seen=datetime.now().date(),
+            relevance_score=25,
+        )
+        message = notifier._format_job_message(job, 1)
 
         assert "🏠" in message or "Remote" in message
 
@@ -270,7 +299,9 @@ class TestTelegramNotifierFormatting:
 
         assert "No new jobs" in header or "notification criteria" in header
 
-    def test_build_header_message_with_top_overall(self, notifier, sample_notification_data):
+    def test_build_header_message_with_top_overall(
+        self, notifier, sample_notification_data
+    ):
         """Test header message shows top overall section."""
         header = notifier._build_header_message(sample_notification_data, 3, 5)
 
@@ -284,7 +315,9 @@ class TestTelegramNotifierFormatting:
         # Should contain job details
         assert "Software Engineer" in message or "Software\\ Engineer" in message
 
-    def test_build_jobs_chunk_message_with_pagination(self, notifier, sample_job_db_record):
+    def test_build_jobs_chunk_message_with_pagination(
+        self, notifier, sample_job_db_record
+    ):
         """Test chunk message includes pagination when multiple chunks."""
         jobs = [sample_job_db_record]
         message = notifier._build_jobs_chunk_message(jobs, 1, 2, 3)
@@ -329,7 +362,7 @@ class TestTelegramNotifierSend:
     @pytest.mark.asyncio
     async def test_send_notification_success(self, notifier, sample_notification_data):
         """Test successful notification sending."""
-        with patch("telegram.Bot") as mock_bot_class:
+        with patch("notifier.Bot") as mock_bot_class:
             mock_bot = AsyncMock()
             mock_bot.send_message = AsyncMock(return_value=MagicMock())
             mock_bot_class.return_value = mock_bot
@@ -341,9 +374,11 @@ class TestTelegramNotifierSend:
             assert mock_bot.send_message.call_count >= 1
 
     @pytest.mark.asyncio
-    async def test_send_notification_telegram_error(self, notifier, sample_notification_data):
+    async def test_send_notification_telegram_error(
+        self, notifier, sample_notification_data
+    ):
         """Test handling of Telegram API errors."""
-        with patch("telegram.Bot") as mock_bot_class:
+        with patch("notifier.Bot") as mock_bot_class:
             mock_bot = AsyncMock()
             mock_bot.send_message = AsyncMock(side_effect=Exception("API Error"))
             mock_bot_class.return_value = mock_bot
@@ -359,13 +394,21 @@ class TestTelegramNotifierSend:
         telegram_config.min_score_for_notification = 20
 
         low_score_job = JobDBRecord(
-            job_id="1", title="Low", company="A", location="NYC",
-            relevance_score=10, first_seen=datetime.now().date(),
+            job_id="1",
+            title="Low",
+            company="A",
+            location="NYC",
+            relevance_score=10,
+            first_seen=datetime.now().date(),
             last_seen=datetime.now().date(),
         )
         high_score_job = JobDBRecord(
-            job_id="2", title="High", company="B", location="NYC",
-            relevance_score=30, first_seen=datetime.now().date(),
+            job_id="2",
+            title="High",
+            company="B",
+            location="NYC",
+            relevance_score=30,
+            first_seen=datetime.now().date(),
             last_seen=datetime.now().date(),
         )
 
@@ -380,7 +423,7 @@ class TestTelegramNotifierSend:
             total_jobs_in_db=10,
         )
 
-        with patch("telegram.Bot") as mock_bot_class:
+        with patch("notifier.Bot") as mock_bot_class:
             mock_bot = AsyncMock()
             mock_bot.send_message = AsyncMock(return_value=MagicMock())
             mock_bot_class.return_value = mock_bot
@@ -402,9 +445,7 @@ class TestNotificationManager:
 
     def test_init_no_notifiers_when_disabled(self):
         """Test no notifiers are set up when notifications disabled."""
-        config = Config(
-            notifications=NotificationsConfig(enabled=False)
-        )
+        config = Config(notifications=NotificationsConfig(enabled=False))
         manager = NotificationManager(config)
 
         assert manager.has_configured_notifiers() is False
@@ -438,7 +479,9 @@ class TestNotificationManager:
         assert manager.has_configured_notifiers() is False
 
     @pytest.mark.asyncio
-    async def test_send_all_returns_results(self, telegram_config, sample_notification_data):
+    async def test_send_all_returns_results(
+        self, telegram_config, sample_notification_data
+    ):
         """Test send_all returns dict of results."""
         config = Config(
             notifications=NotificationsConfig(
@@ -501,8 +544,12 @@ class TestTelegramNotifierChunking:
         # Create 15 jobs (should result in 2 chunks)
         jobs = [
             JobDBRecord(
-                job_id=str(i), title=f"Job {i}", company="Corp", location="NYC",
-                relevance_score=50, first_seen=datetime.now().date(),
+                job_id=str(i),
+                title=f"Job {i}",
+                company="Corp",
+                location="NYC",
+                relevance_score=50,
+                first_seen=datetime.now().date(),
                 last_seen=datetime.now().date(),
             )
             for i in range(15)
@@ -519,7 +566,7 @@ class TestTelegramNotifierChunking:
             total_jobs_in_db=100,
         )
 
-        with patch("telegram.Bot") as mock_bot_class:
+        with patch("notifier.Bot") as mock_bot_class:
             mock_bot = AsyncMock()
             mock_bot.send_message = AsyncMock(return_value=MagicMock())
             mock_bot_class.return_value = mock_bot

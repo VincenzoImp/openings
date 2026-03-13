@@ -1,43 +1,19 @@
 """Tests for database module."""
 
 import sys
-import tempfile
 from datetime import date
 from pathlib import Path
 
 import pandas as pd
-import pytest
 
 # Add scripts directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 from models import Job
-from database import JobDatabase
 
 
 class TestJobDatabase:
     """Tests for JobDatabase class."""
-
-    @pytest.fixture
-    def temp_db(self):
-        """Create a temporary database for testing."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "test.db"
-            db = JobDatabase(db_path)
-            yield db
-
-    @pytest.fixture
-    def sample_job(self):
-        """Create a sample job for testing."""
-        return Job(
-            title="Software Engineer",
-            company="Test Corp",
-            location="New York, NY",
-            job_url="https://example.com/job/123",
-            description="Build amazing things",
-            is_remote=True,
-            relevance_score=25,
-        )
 
     def test_database_creation(self, temp_db):
         """Test database and tables are created."""
@@ -168,10 +144,22 @@ class TestJobDatabase:
 
     def test_save_jobs_from_dataframe(self, temp_db):
         """Test save_jobs_from_dataframe."""
-        df = pd.DataFrame([
-            {"title": "Job 1", "company": "Corp A", "location": "NYC", "site": "linkedin"},
-            {"title": "Job 2", "company": "Corp B", "location": "LA", "site": "indeed"},
-        ])
+        df = pd.DataFrame(
+            [
+                {
+                    "title": "Job 1",
+                    "company": "Corp A",
+                    "location": "NYC",
+                    "site": "linkedin",
+                },
+                {
+                    "title": "Job 2",
+                    "company": "Corp B",
+                    "location": "LA",
+                    "site": "indeed",
+                },
+            ]
+        )
 
         new_count, updated_count = temp_db.save_jobs_from_dataframe(df)
 
@@ -183,12 +171,14 @@ class TestJobDatabase:
 
     def test_relevance_score_only_increases(self, temp_db, sample_job):
         """Test relevance score only updates if higher."""
-        sample_job.relevance_score = 30
-        temp_db.save_job(sample_job)
+        from dataclasses import replace
+
+        high_score_job = replace(sample_job, relevance_score=30)
+        temp_db.save_job(high_score_job)
 
         # Save with lower score
-        sample_job.relevance_score = 10
-        temp_db.save_job(sample_job)
+        low_score_job = replace(sample_job, relevance_score=10)
+        temp_db.save_job(low_score_job)
 
         jobs = temp_db.get_all_jobs()
         assert jobs[0].relevance_score == 30  # Should keep higher score
@@ -200,10 +190,12 @@ class TestJobDatabase:
         temp_db.save_job(job1)
 
         # Create DataFrame with existing and new job
-        df = pd.DataFrame([
-            {"title": "Existing", "company": "Corp", "location": "NYC"},
-            {"title": "New Job", "company": "Corp", "location": "LA"},
-        ])
+        df = pd.DataFrame(
+            [
+                {"title": "Existing", "company": "Corp", "location": "NYC"},
+                {"title": "New Job", "company": "Corp", "location": "LA"},
+            ]
+        )
 
         filtered = temp_db.filter_new_jobs(df)
 
@@ -224,9 +216,30 @@ class TestJobDatabase:
 
         # Create jobs with different scores
         jobs = [
-            Job.from_dict({"title": "Low", "company": "Corp", "location": "NYC", "relevance_score": 10}),
-            Job.from_dict({"title": "High", "company": "Corp", "location": "NYC", "relevance_score": 50}),
-            Job.from_dict({"title": "Medium", "company": "Corp", "location": "NYC", "relevance_score": 30}),
+            Job.from_dict(
+                {
+                    "title": "Low",
+                    "company": "Corp",
+                    "location": "NYC",
+                    "relevance_score": 10,
+                }
+            ),
+            Job.from_dict(
+                {
+                    "title": "High",
+                    "company": "Corp",
+                    "location": "NYC",
+                    "relevance_score": 50,
+                }
+            ),
+            Job.from_dict(
+                {
+                    "title": "Medium",
+                    "company": "Corp",
+                    "location": "NYC",
+                    "relevance_score": 30,
+                }
+            ),
         ]
 
         for job in jobs:
@@ -245,9 +258,30 @@ class TestJobDatabase:
 
         # Create jobs with different scores
         jobs = [
-            Job.from_dict({"title": "Low", "company": "Corp", "location": "NYC", "relevance_score": 10}),
-            Job.from_dict({"title": "High", "company": "Corp", "location": "NYC", "relevance_score": 50}),
-            Job.from_dict({"title": "Medium", "company": "Corp", "location": "NYC", "relevance_score": 30}),
+            Job.from_dict(
+                {
+                    "title": "Low",
+                    "company": "Corp",
+                    "location": "NYC",
+                    "relevance_score": 10,
+                }
+            ),
+            Job.from_dict(
+                {
+                    "title": "High",
+                    "company": "Corp",
+                    "location": "NYC",
+                    "relevance_score": 50,
+                }
+            ),
+            Job.from_dict(
+                {
+                    "title": "Medium",
+                    "company": "Corp",
+                    "location": "NYC",
+                    "relevance_score": 30,
+                }
+            ),
         ]
 
         for job in jobs:

@@ -14,7 +14,10 @@ types-PyYAML>=6.0.0,<7.0.0
 
 # Code quality
 ruff>=0.1.0,<1.0.0
-black>=23.0.0,<24.0.0
 
 # Security
 pip-audit>=2.7.0,<3.0.0
+
+# Data visualization (optional, for analyze_jobs.py charts)
+matplotlib>=3.7.0,<4.0.0
+seaborn>=0.12.0,<1.0.0
