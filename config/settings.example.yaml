@@ -143,13 +143,12 @@ search:
   #
   # Example for multiple locations:
   # locations:
-  #   - "Remote"
   #   - "New York, NY"
   #   - "San Francisco, CA"
   #   - "London, UK"
   # ---------------------------------------------------------------------------
   locations:
-    - "Remote"
+    - "New York, NY"
 
   # ---------------------------------------------------------------------------
   # distance (integer, default: 50)

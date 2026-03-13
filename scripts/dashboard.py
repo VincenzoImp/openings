@@ -537,10 +537,11 @@ def _render_job_card(job: dict[str, Any], idx: int, config: Config) -> None:
             label_app = "Unapply" if job.get("applied") else "Mark applied"
             if st.button(label_app, key=f"app_{jid}_{idx}", use_container_width=True):
                 db = _get_db(config)
-                db.mark_as_applied(jid)
+                db.toggle_applied(jid)
                 db.close()
                 _clear_caches()
-                st.toast(f"Updated '{title[:30]}'")
+                action_word_app = "Unapplied" if job.get("applied") else "Applied"
+                st.toast(f"{action_word_app} '{title[:30]}'")
                 st.rerun()
 
         with a2:
@@ -796,7 +797,7 @@ def _render_db_management(jobs: list[dict[str, Any]], config: Config) -> None:
 
     if selected:
         st.info(f"{len(selected)} job(s) selected.")
-        b1, b2, b3 = st.columns(3)
+        b1, b2, b3, b4 = st.columns(4)
 
         with b1:
             if st.button(
@@ -824,6 +825,17 @@ def _render_db_management(jobs: list[dict[str, Any]], config: Config) -> None:
                 st.rerun()
 
         with b3:
+            if st.button(f"Mark {len(selected)} unapplied", key="bulk_unapply"):
+                db = _get_db(config)
+                for jid in selected:
+                    db.mark_as_unapplied(jid)
+                db.close()
+                st.session_state["selected_jobs"] = set()
+                _clear_caches()
+                st.toast(f"Marked {len(selected)} job(s) as unapplied")
+                st.rerun()
+
+        with b4:
             if st.button("Clear selection", key="bulk_clear"):
                 st.session_state["selected_jobs"] = set()
                 st.rerun()

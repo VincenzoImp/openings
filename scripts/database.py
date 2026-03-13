@@ -121,6 +121,7 @@ class JobDatabase:
     """
 
     MARK_APPLIED = "UPDATE jobs SET applied = TRUE WHERE job_id = ?"
+    MARK_UNAPPLIED = "UPDATE jobs SET applied = FALSE WHERE job_id = ?"
 
     def __init__(self, db_path: Path):
         """
@@ -556,6 +557,50 @@ class JobDatabase:
             cursor.execute(self.MARK_APPLIED, (job_id,))
             conn.commit()
             return cursor.rowcount > 0
+
+    def mark_as_unapplied(self, job_id: str) -> bool:
+        """
+        Mark a job as unapplied.
+
+        Args:
+            job_id: Unique job identifier.
+
+        Returns:
+            True if job was updated, False if not found.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(self.MARK_UNAPPLIED, (job_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def toggle_applied(self, job_id: str) -> bool:
+        """
+        Toggle applied status for a job.
+
+        Args:
+            job_id: Unique job identifier.
+
+        Returns:
+            New applied state (True if now applied, False if unapplied).
+
+        Raises:
+            ValueError: If job_id is not found in the database.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT applied FROM jobs WHERE job_id = ?", (job_id,))
+            row = cursor.fetchone()
+            if row is None:
+                raise ValueError(f"Job not found: {job_id}")
+
+            new_state = not bool(row[0])
+            cursor.execute(
+                "UPDATE jobs SET applied = ? WHERE job_id = ?",
+                (new_state, job_id),
+            )
+            conn.commit()
+            return new_state
 
     def delete_job(self, job_id: str) -> bool:
         """
