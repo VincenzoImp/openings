@@ -147,7 +147,9 @@ class JobVectorStore:
 
             if ids:
                 self._collection.upsert(
-                    ids=ids, documents=documents, metadatas=metadatas
+                    ids=ids,
+                    documents=documents,
+                    metadatas=metadatas,  # type: ignore[arg-type]
                 )
                 total += len(ids)
 
@@ -230,7 +232,7 @@ class JobVectorStore:
                         job_id=job_id,
                         distance=distance,
                         similarity=similarity,
-                        metadata=metadata,
+                        metadata=dict(metadata),
                     )
                 )
 
