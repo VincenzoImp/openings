@@ -164,7 +164,7 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
                     │  │ 1. Recalculate scores (scoring.py)│  │
                     │  │ 2. Backfill vector embeddings     │  │
                     │  │    (embed missing jobs into       │  │
-                    │  │     ChromaDB if backfill_on_start) │  │
+                    │  │     ChromaDB if backfill_on_startup)│  │
                     │  └───────────────────────────────────┘  │
                     └───────────────────┬─────────────────────┘
                                         │
