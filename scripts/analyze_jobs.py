@@ -301,7 +301,7 @@ def generate_report(df: pd.DataFrame, config: Config) -> dict[str, Any]:
     log_subsection(logger, "OVERVIEW")
     logger.info(f"  Total jobs analyzed: {len(df)}")
 
-    report = {
+    report: dict[str, Any] = {
         "total_jobs": len(df),
     }
 
