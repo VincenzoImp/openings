@@ -316,9 +316,9 @@ class TestJobSearchSchedulerExecuteJob:
             # Should have scheduled the next run (main_job) but NOT a retry
             calls = mock_sched.add_job.call_args_list
             retry_calls = [c for c in calls if c.kwargs.get("id") == "retry_job"]
-            assert len(retry_calls) == 0, (
-                "Should not schedule a retry when retry_on_failure is False"
-            )
+            assert (
+                len(retry_calls) == 0
+            ), "Should not schedule a retry when retry_on_failure is False"
 
 
 # =============================================================================
