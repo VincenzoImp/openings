@@ -93,23 +93,33 @@ def setup_logging(config: Config) -> logging.Logger:
     console_handler.setFormatter(console_format)
     logger.addHandler(console_handler)
 
-    # File handler with rotation
+    # File handler with rotation (skip if directory is not writable)
     log_path = config.log_path
-    log_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = RotatingFileHandler(
+            log_path,
+            maxBytes=config.logging.max_size_mb * 1024 * 1024,
+            backupCount=config.logging.backup_count,
+            encoding="utf-8",
+        )
+        file_handler.setLevel(logging.DEBUG)
+        file_format = PlainFormatter(
+            fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        file_handler.setFormatter(file_format)
+        logger.addHandler(file_handler)
+    except PermissionError:
+        logger.warning(
+            "Cannot write to log file %s (permission denied). "
+            "Continuing with console-only logging.",
+            log_path,
+        )
 
-    file_handler = RotatingFileHandler(
-        log_path,
-        maxBytes=config.logging.max_size_mb * 1024 * 1024,
-        backupCount=config.logging.backup_count,
-        encoding="utf-8",
-    )
-    file_handler.setLevel(logging.DEBUG)
-    file_format = PlainFormatter(
-        fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    file_handler.setFormatter(file_format)
-    logger.addHandler(file_handler)
+    # Suppress noisy third-party loggers
+    logging.getLogger("jobspy").setLevel(logging.CRITICAL)
+    logging.getLogger("chromadb").setLevel(logging.WARNING)
 
     return logger
 

@@ -122,7 +122,7 @@ services:
     container_name: job_dashboard
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8501:8501"
+      - "8501:8501"
     volumes:
       - ./results:/app/results
       - ./data:/app/data
