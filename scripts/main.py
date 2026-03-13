@@ -112,10 +112,21 @@ def run_job_search() -> bool:
         # Embed new jobs in vector store
         if config.vector_search.enabled and config.vector_search.embed_on_save:
             try:
+                from models import generate_job_id
                 from vector_store import get_vector_store
 
+                # Add job_id column so vector store can use it as document ID
+                df_for_vs = relevant_jobs.copy()
+                df_for_vs["job_id"] = df_for_vs.apply(
+                    lambda r: generate_job_id(
+                        str(r.get("title", "")),
+                        str(r.get("company", "")),
+                        str(r.get("location", "")),
+                    ),
+                    axis=1,
+                )
                 vs = get_vector_store(config.data_path, config.vector_search.model_name)
-                vs.add_jobs_from_dataframe(relevant_jobs)
+                vs.add_jobs_from_dataframe(df_for_vs)
             except Exception as e:
                 logger.warning(f"Vector store embedding failed: {e}")
 

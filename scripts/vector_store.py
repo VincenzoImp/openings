@@ -62,7 +62,7 @@ class JobVectorStore:
         self._client = chromadb.PersistentClient(path=str(self._persist_dir))
         self._collection = self._client.get_or_create_collection(
             name=self.COLLECTION_NAME,
-            embedding_function=self._embedding_fn,
+            embedding_function=self._embedding_fn,  # type: ignore[arg-type]
             metadata={"hnsw:space": "cosine"},
         )
         logger.info(
@@ -268,7 +268,7 @@ class JobVectorStore:
         self._client.delete_collection(self.COLLECTION_NAME)
         self._collection = self._client.get_or_create_collection(
             name=self.COLLECTION_NAME,
-            embedding_function=self._embedding_fn,
+            embedding_function=self._embedding_fn,  # type: ignore[arg-type]
             metadata={"hnsw:space": "cosine"},
         )
         logger.info("Vector store reset")
