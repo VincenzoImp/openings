@@ -11,10 +11,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import chromadb
-from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+from chromadb.utils.embedding_functions import (  # type: ignore[attr-defined]
+    SentenceTransformerEmbeddingFunction,
+)
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -85,12 +87,12 @@ class JobVectorStore:
                 parts.append(str(val).strip())
         return " | ".join(parts)
 
-    def _build_metadata(self, record: dict) -> dict:
+    def _build_metadata(self, record: dict[str, Any]) -> dict[str, Any]:
         """Extract metadata fields from a job record.
 
         ChromaDB metadata values must be str, int, float, or bool.
         """
-        meta: dict = {}
+        meta: dict[str, Any] = {}
         for field in self.METADATA_FIELDS:
             val = record.get(field)
             if val is not None and str(val).lower() not in ("nan", "none", ""):
@@ -123,7 +125,7 @@ class JobVectorStore:
             batch = jobs[i : i + batch_size]
             ids: list[str] = []
             documents: list[str] = []
-            metadatas: list[dict] = []
+            metadatas: list[dict[str, Any]] = []
 
             for job in batch:
                 job_id = str(job.get("job_id", ""))
@@ -204,19 +206,23 @@ class JobVectorStore:
 
         n = min(n_results, self._collection.count())
 
+        _include: list = ["distances", "metadatas"]  # type: ignore[type-arg]
         results = self._collection.query(
             query_texts=[query],
             n_results=n,
             where=where,
-            include=["distances", "metadatas"],
+            include=_include,
         )
 
         search_results: list[SemanticSearchResult] = []
-        if results and results["ids"] and results["ids"][0]:
+        distances = results.get("distances") or []
+        metadatas = results.get("metadatas") or []
+        ids = results.get("ids") or []
+        if ids and ids[0]:
             for job_id, distance, metadata in zip(
-                results["ids"][0],
-                results["distances"][0],
-                results["metadatas"][0],
+                ids[0],
+                distances[0] if distances else [],
+                metadatas[0] if metadatas else [],
             ):
                 similarity = max(0.0, min(1.0, 1.0 - distance))
                 search_results.append(
@@ -238,7 +244,8 @@ class JobVectorStore:
         if not job_ids:
             return
         # ChromaDB raises if we delete IDs that don't exist; filter first.
-        existing = set(self._collection.get(ids=job_ids, include=[])["ids"])
+        _include: list = []  # type: ignore[type-arg]
+        existing = set(self._collection.get(ids=job_ids, include=_include)["ids"])
         to_delete = [jid for jid in job_ids if jid in existing]
         if to_delete:
             self._collection.delete(ids=to_delete)
@@ -246,7 +253,8 @@ class JobVectorStore:
 
     def get_embedded_ids(self) -> set[str]:
         """Return all job IDs currently in the vector store."""
-        result = self._collection.get(include=[])
+        _include: list = []  # type: ignore[type-arg]
+        result = self._collection.get(include=_include)
         return set(result["ids"])
 
     def count(self) -> int:
