@@ -25,7 +25,7 @@ from scoring import calculate_relevance_score
 _JOB_COLUMNS = """job_id, title, company, location, job_url,
     site, job_type, is_remote, job_level, description,
     date_posted, min_amount, max_amount, currency, company_url,
-    first_seen, last_seen, relevance_score, applied"""
+    first_seen, last_seen, relevance_score, applied, bookmarked"""
 
 
 class JobDatabase:
@@ -56,7 +56,8 @@ class JobDatabase:
             first_seen DATE NOT NULL,
             last_seen DATE NOT NULL,
             relevance_score INTEGER DEFAULT 0,
-            applied BOOLEAN DEFAULT FALSE
+            applied BOOLEAN DEFAULT FALSE,
+            bookmarked BOOLEAN DEFAULT FALSE
         )
     """
 
@@ -76,14 +77,15 @@ class JobDatabase:
         "ALTER TABLE jobs ADD COLUMN max_amount REAL",
         "ALTER TABLE jobs ADD COLUMN currency TEXT",
         "ALTER TABLE jobs ADD COLUMN company_url TEXT",
+        "ALTER TABLE jobs ADD COLUMN bookmarked BOOLEAN DEFAULT FALSE",
     ]
 
     INSERT_OR_UPDATE = """
         INSERT INTO jobs (job_id, title, company, location, job_url,
                           site, job_type, is_remote, job_level, description,
                           date_posted, min_amount, max_amount, currency, company_url,
-                          first_seen, last_seen, relevance_score, applied)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          first_seen, last_seen, relevance_score, applied, bookmarked)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(job_id) DO UPDATE SET
             last_seen = excluded.last_seen,
             relevance_score = CASE
@@ -306,6 +308,7 @@ class JobDatabase:
                     today,
                     job.relevance_score,
                     False,
+                    False,
                 ),
             )
             conn.commit()
@@ -388,6 +391,7 @@ class JobDatabase:
                     today,
                     today,
                     job.relevance_score,
+                    False,
                     False,
                 )
             )
@@ -553,6 +557,104 @@ class JobDatabase:
             conn.commit()
             return cursor.rowcount > 0
 
+    def delete_job(self, job_id: str) -> bool:
+        """
+        Delete a single job from the database.
+
+        Args:
+            job_id: Unique job identifier.
+
+        Returns:
+            True if job was deleted, False if not found.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM jobs WHERE job_id = ?", (job_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def delete_jobs(self, job_ids: list[str]) -> int:
+        """
+        Delete multiple jobs from the database.
+
+        Args:
+            job_ids: List of job IDs to delete.
+
+        Returns:
+            Number of jobs deleted.
+        """
+        if not job_ids:
+            return 0
+
+        total_deleted = 0
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            for i in range(0, len(job_ids), self.SQLITE_VAR_LIMIT):
+                chunk = job_ids[i : i + self.SQLITE_VAR_LIMIT]
+                placeholders = ",".join("?" * len(chunk))
+                cursor.execute(
+                    f"DELETE FROM jobs WHERE job_id IN ({placeholders})", chunk
+                )
+                total_deleted += cursor.rowcount
+
+            conn.commit()
+
+        return total_deleted
+
+    def toggle_bookmark(self, job_id: str) -> bool:
+        """
+        Toggle bookmark status for a job.
+
+        Args:
+            job_id: Unique job identifier.
+
+        Returns:
+            New bookmark state (True if now bookmarked, False if unbookmarked).
+
+        Raises:
+            ValueError: If job_id is not found in the database.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT bookmarked FROM jobs WHERE job_id = ?", (job_id,))
+            row = cursor.fetchone()
+            if row is None:
+                raise ValueError(f"Job not found: {job_id}")
+
+            new_state = not bool(row[0])
+            cursor.execute(
+                "UPDATE jobs SET bookmarked = ? WHERE job_id = ?",
+                (new_state, job_id),
+            )
+            conn.commit()
+            return new_state
+
+    def get_job_by_id(self, job_id: str) -> JobDBRecord | None:
+        """
+        Get a single job by its ID.
+
+        Args:
+            job_id: Unique job identifier.
+
+        Returns:
+            JobDBRecord if found, None otherwise.
+        """
+        query = f"""
+            SELECT {_JOB_COLUMNS}
+            FROM jobs
+            WHERE job_id = ?
+        """
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, (job_id,))
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            return self._row_to_record(row)
+
     def get_statistics(self) -> dict[str, int]:
         """
         Get database statistics.
@@ -630,6 +732,7 @@ class JobDatabase:
                     "last_seen": record.last_seen,
                     "relevance_score": record.relevance_score,
                     "applied": record.applied,
+                    "bookmarked": record.bookmarked,
                 }
             )
 
@@ -673,6 +776,7 @@ class JobDatabase:
             last_seen=row["last_seen"],
             relevance_score=row["relevance_score"],
             applied=bool(row["applied"]),
+            bookmarked=bool(get_col("bookmarked", False)),
         )
 
     def update_scores_batch(self, updates: list[tuple[str, int]]) -> int:

@@ -23,6 +23,7 @@ results/*.json
 data/*.db
 data/*.sqlite
 data/*.sqlite3
+data/chroma/
 !data/.gitkeep
 
 # Logs

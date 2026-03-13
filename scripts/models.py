@@ -225,6 +225,7 @@ class JobDBRecord:
     last_seen: date = field(default_factory=date.today)
     relevance_score: int = 0
     applied: bool = False
+    bookmarked: bool = False
 
     @classmethod
     def from_job(

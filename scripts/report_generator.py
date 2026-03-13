@@ -263,7 +263,7 @@ def generate_excel_report(jobs: list[JobDBRecord]) -> BytesIO:
         for col_num, column in enumerate(df.columns, 1):
             if len(df) > 0:
                 max_length = max(
-                    df[column].astype(str).map(len).max(),
+                    df[column].fillna("").astype(str).str.len().max(),
                     len(str(column)),
                 )
             else:

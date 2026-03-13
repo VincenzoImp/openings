@@ -59,7 +59,20 @@ def run_job_search() -> bool:
 
         # Cleanup old jobs if enabled
         if config.database.cleanup_enabled and db_stats["total_jobs"] > 0:
-            cleanup_old_jobs(db, config.database.cleanup_days)
+            deleted_count = cleanup_old_jobs(db, config.database.cleanup_days)
+
+            # Sync vector store deletions
+            if config.vector_search.enabled and deleted_count > 0:
+                try:
+                    from vector_store import get_vector_store
+                    from vector_commands import sync_deletions
+
+                    vs = get_vector_store(
+                        config.data_path, config.vector_search.model_name
+                    )
+                    sync_deletions(db, vs)
+                except Exception as e:
+                    logger.warning(f"Vector store sync failed: {e}")
 
         # Search for jobs
         all_jobs, summary = search_jobs(config)
@@ -95,6 +108,16 @@ def run_job_search() -> bool:
         summary.new_jobs = new_count
 
         logger.info(f"Database updated: {new_count} new, {updated_count} existing")
+
+        # Embed new jobs in vector store
+        if config.vector_search.enabled and config.vector_search.embed_on_save:
+            try:
+                from vector_store import get_vector_store
+
+                vs = get_vector_store(config.data_path, config.vector_search.model_name)
+                vs.add_jobs_from_dataframe(relevant_jobs)
+            except Exception as e:
+                logger.warning(f"Vector store embedding failed: {e}")
 
         # Print top matches
         print_top_jobs(relevant_jobs)
@@ -290,6 +313,19 @@ def main() -> int:
             f"Recalculating scores for {db_stats['total_jobs']} existing jobs..."
         )
         recalculate_all_scores(db, config)
+
+    # Vector store backfill
+    if config.vector_search.enabled and config.vector_search.backfill_on_startup:
+        try:
+            from vector_store import get_vector_store
+            from vector_commands import backfill_embeddings
+
+            vs = get_vector_store(config.data_path, config.vector_search.model_name)
+            backfilled = backfill_embeddings(db, vs, config.vector_search.batch_size)
+            if backfilled:
+                logger.info(f"Backfilled {backfilled} jobs into vector store")
+        except Exception as e:
+            logger.warning(f"Vector store backfill failed: {e}")
 
     # Create scheduler
     scheduler = create_scheduler(config, run_job_search)

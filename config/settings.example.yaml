@@ -1488,6 +1488,23 @@ notifications:
 
 
 # =============================================================================
+#                           SEMANTIC VECTOR SEARCH
+# =============================================================================
+# Uses ChromaDB + sentence-transformers for natural language job search.
+# Query like "remote python backend distributed systems" to find matching jobs.
+# Model runs locally (~80MB), no external API needed.
+
+vector_search:
+  enabled: true
+  model_name: "all-MiniLM-L6-v2"
+  persist_dir: "data/chroma"
+  embed_on_save: true
+  default_results: 20
+  backfill_on_startup: true
+  batch_size: 100
+
+
+# =============================================================================
 #                         REFERENCE: SUPPORTED COUNTRIES
 # =============================================================================
 # Indeed and Glassdoor support different countries. Use the exact country

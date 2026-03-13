@@ -39,7 +39,7 @@ COPY --chown=appuser:appuser scripts/ ./scripts/
 COPY --chown=appuser:appuser config/ ./config/
 
 # Create output directories with correct ownership
-RUN mkdir -p /app/results /app/data /app/logs \
+RUN mkdir -p /app/results /app/data /app/data/chroma /app/logs \
     && chown -R appuser:appuser /app
 
 # Switch to non-root user
