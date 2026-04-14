@@ -11,12 +11,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 from config import (
     Config,
     _parse_parallel_config,
-    _parse_retry_config,
-    _parse_throttling_config,
-    _parse_post_filter_config,
     _parse_logging_config,
+    _parse_post_filter_config,
+    _parse_retry_config,
     _parse_scheduler_config,
     _parse_telegram_config,
+    _parse_throttling_config,
+    VectorSearchConfig,
 )
 
 
@@ -281,6 +282,7 @@ class TestConfigPaths:
         assert isinstance(config.results_path, Path)
         assert isinstance(config.data_path, Path)
         assert isinstance(config.database_path, Path)
+        assert isinstance(config.chroma_path, Path)
         assert isinstance(config.log_path, Path)
 
     def test_database_path_composition(self):
@@ -288,6 +290,14 @@ class TestConfigPaths:
         config = Config()
 
         assert config.database_path == config.data_path / config.output.database_file
+
+    def test_chroma_path_uses_vector_persist_dir(self):
+        """Test chroma_path honors vector_search.persist_dir."""
+        config = Config(
+            vector_search=VectorSearchConfig(persist_dir="custom/chroma-store")
+        )
+
+        assert config.chroma_path.as_posix().endswith("custom/chroma-store")
 
 
 class TestConfigQueries:

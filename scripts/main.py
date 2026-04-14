@@ -68,7 +68,7 @@ def run_job_search() -> bool:
                     from vector_commands import sync_deletions
 
                     vs = get_vector_store(
-                        config.data_path, config.vector_search.model_name
+                        config.chroma_path, config.vector_search.model_name
                     )
                     sync_deletions(db, vs)
                 except Exception as e:
@@ -90,6 +90,14 @@ def run_job_search() -> bool:
 
         # Filter relevant jobs
         relevant_jobs = filter_relevant_jobs(all_jobs, config)
+        filtered_relevant_jobs = db.filter_blacklisted_jobs(relevant_jobs)
+        blacklisted_removed = len(relevant_jobs) - len(filtered_relevant_jobs)
+        if blacklisted_removed > 0:
+            logger.info(
+                "Skipped %d blacklisted relevant job(s) before saving",
+                blacklisted_removed,
+            )
+        relevant_jobs = filtered_relevant_jobs
         summary.relevant_jobs = len(relevant_jobs)
 
         if len(relevant_jobs) == 0:
@@ -125,7 +133,9 @@ def run_job_search() -> bool:
                     ),
                     axis=1,
                 )
-                vs = get_vector_store(config.data_path, config.vector_search.model_name)
+                vs = get_vector_store(
+                    config.chroma_path, config.vector_search.model_name
+                )
                 vs.add_jobs_from_dataframe(df_for_vs)
             except Exception as e:
                 logger.warning(f"Vector store embedding failed: {e}")
@@ -331,7 +341,7 @@ def main() -> int:
             from vector_store import get_vector_store
             from vector_commands import backfill_embeddings
 
-            vs = get_vector_store(config.data_path, config.vector_search.model_name)
+            vs = get_vector_store(config.chroma_path, config.vector_search.model_name)
             backfilled = backfill_embeddings(db, vs, config.vector_search.batch_size)
             if backfilled:
                 logger.info(f"Backfilled {backfilled} jobs into vector store")

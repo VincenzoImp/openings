@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import sys
 from datetime import date, datetime, timedelta
-from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from config import Config, load_config  # noqa: E402
 from database import JobDatabase  # noqa: E402
+from exporter import dataframe_to_excel_bytes  # noqa: E402
 from models import JobDBRecord  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -132,12 +132,12 @@ def _fetch_statistics(db_path: str) -> dict[str, Any]:
 
 
 @st.cache_resource
-def _get_vector_store_cached(data_dir: str, model_name: str) -> Any:
+def _get_vector_store_cached(persist_dir: str, model_name: str) -> Any:
     """Return a persistent JobVectorStore instance."""
     if not VECTOR_AVAILABLE:
         return None
     try:
-        return get_vector_store(Path(data_dir), model_name=model_name)
+        return get_vector_store(Path(persist_dir), model_name=model_name)
     except Exception:
         return None
 
@@ -234,6 +234,37 @@ def _clear_caches() -> None:
 def _get_db(config: Config) -> JobDatabase:
     """Get a fresh (non-cached) database handle for write operations."""
     return JobDatabase(config.database_path)
+
+
+def _sync_vector_store_deletions(config: Config, db: JobDatabase) -> None:
+    """Keep the vector index aligned after manual deletions from the dashboard."""
+    if not (VECTOR_AVAILABLE and config.vector_search.enabled):
+        return
+
+    try:
+        from vector_commands import sync_deletions
+
+        vs = _get_vector_store_cached(
+            str(config.chroma_path),
+            config.vector_search.model_name,
+        )
+        if vs is not None:
+            sync_deletions(db, vs)
+    except Exception:
+        # The dashboard should remain usable even if vector sync fails.
+        pass
+
+
+def _blacklist_jobs_and_refresh(job_ids: list[str], config: Config) -> int:
+    """Blacklist jobs, remove them from the active DB, and refresh caches."""
+    db = _get_db(config)
+    try:
+        count = db.blacklist_jobs(job_ids)
+        if count > 0:
+            _sync_vector_store_deletions(config, db)
+        return count
+    finally:
+        db.close()
 
 
 def _init_session_state() -> None:
@@ -349,7 +380,11 @@ def _render_sidebar(
         q3.metric("Applied", stats.get("applied", 0))
         bookmarked_count = sum(1 for j in jobs if j.get("bookmarked"))
         q4.metric("Bookmarked", bookmarked_count)
-        st.caption(f"Avg score: {stats.get('avg_relevance_score', 0)}")
+        st.caption(
+            "Avg score: "
+            f"{stats.get('avg_relevance_score', 0)}"
+            f" • Blacklisted: {stats.get('blacklisted', 0)}"
+        )
 
         st.markdown("---")
 
@@ -440,7 +475,7 @@ def _apply_semantic_search(
     acts as a filter.
     """
     vs = _get_vector_store_cached(
-        str(config.data_path), config.vector_search.model_name
+        str(config.chroma_path), config.vector_search.model_name
     )
     if vs is None:
         return jobs
@@ -564,12 +599,12 @@ def _render_job_card(job: dict[str, Any], idx: int, config: Config) -> None:
                 type="secondary",
                 use_container_width=True,
             ):
-                db = _get_db(config)
-                db.delete_job(jid)
-                db.close()
-                _clear_caches()
-                st.toast(f"Deleted '{title[:30]}'")
-                st.rerun()
+                count = _blacklist_jobs_and_refresh([jid], config)
+                if count > 0:
+                    _clear_caches()
+                    st.toast(f"Deleted and blacklisted '{title[:30]}'")
+                    st.rerun()
+                st.warning("Job not found in database.")
 
         with a4:
             url = job.get("job_url")
@@ -741,12 +776,13 @@ def _render_db_management(jobs: list[dict[str, Any]], config: Config) -> None:
     stats = _fetch_statistics(str(config.database_path))
 
     st.subheader("Database overview")
-    m1, m2, m3, m4, m5 = st.columns(5)
+    m1, m2, m3, m4, m5, m6 = st.columns(6)
     m1.metric("Total jobs", stats.get("total_jobs", 0))
     m2.metric("Seen today", stats.get("seen_today", 0))
     m3.metric("New today", stats.get("new_today", 0))
     m4.metric("Applied", stats.get("applied", 0))
     m5.metric("Avg score", stats.get("avg_relevance_score", 0))
+    m6.metric("Blacklisted", stats.get("blacklisted", 0))
 
     st.markdown("---")
 
@@ -779,11 +815,10 @@ def _render_db_management(jobs: list[dict[str, Any]], config: Config) -> None:
             if export_df.empty:
                 st.warning("Database is empty.")
             else:
-                buf = BytesIO()
-                export_df.to_excel(buf, index=False, engine="openpyxl")
+                excel_bytes = dataframe_to_excel_bytes(export_df)
                 st.download_button(
                     "Download Excel",
-                    buf.getvalue(),
+                    excel_bytes,
                     file_name=f"jobs_full_{date.today().isoformat()}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key="dl_full_xlsx",
@@ -805,12 +840,10 @@ def _render_db_management(jobs: list[dict[str, Any]], config: Config) -> None:
                 type="primary",
                 key="bulk_del",
             ):
-                db = _get_db(config)
-                count = db.delete_jobs(list(selected))
-                db.close()
+                count = _blacklist_jobs_and_refresh(list(selected), config)
                 st.session_state["selected_jobs"] = set()
                 _clear_caches()
-                st.toast(f"Deleted {count} job(s)")
+                st.toast(f"Deleted and blacklisted {count} job(s)")
                 st.rerun()
 
         with b2:
@@ -863,13 +896,12 @@ def _render_db_management(jobs: list[dict[str, Any]], config: Config) -> None:
             disabled=confirm_text != "DELETE",
             key="btn_delete_all",
         ):
-            db = _get_db(config)
             all_ids = [j["job_id"] for j in jobs]
             if all_ids:
-                db.delete_jobs(all_ids)
-            db.close()
+                _blacklist_jobs_and_refresh(all_ids, config)
             _clear_caches()
-            st.toast("All jobs deleted.")
+            st.session_state["selected_jobs"] = set()
+            st.toast("All jobs deleted and blacklisted.")
             st.rerun()
 
 
@@ -916,7 +948,7 @@ def main() -> None:
         VECTOR_AVAILABLE
         and config.vector_search.enabled
         and _get_vector_store_cached(
-            str(config.data_path),
+            str(config.chroma_path),
             config.vector_search.model_name,
         )
         is not None
@@ -991,8 +1023,43 @@ def main() -> None:
             page = st.session_state.get("current_page", 0)
             start = page * JOBS_PER_PAGE
             end = min(start + JOBS_PER_PAGE, total_filtered)
+            page_jobs = filtered_jobs[start:end]
+            selected_jobs: set[str] = st.session_state.get("selected_jobs", set())
 
-            for i, job in enumerate(filtered_jobs[start:end]):
+            action1, action2, action3 = st.columns([1, 1, 2])
+            with action1:
+                if st.button(
+                    "Select page",
+                    key="jobs_select_page",
+                    use_container_width=True,
+                ):
+                    st.session_state["selected_jobs"].update(
+                        job["job_id"] for job in page_jobs
+                    )
+                    st.rerun()
+            with action2:
+                if st.button(
+                    "Clear selection",
+                    key="jobs_clear_selection",
+                    use_container_width=True,
+                ):
+                    st.session_state["selected_jobs"] = set()
+                    st.rerun()
+            with action3:
+                if st.button(
+                    f"Delete {len(selected_jobs)} selected",
+                    key="jobs_delete_selected",
+                    type="primary",
+                    disabled=not selected_jobs,
+                    use_container_width=True,
+                ):
+                    count = _blacklist_jobs_and_refresh(list(selected_jobs), config)
+                    st.session_state["selected_jobs"] = set()
+                    _clear_caches()
+                    st.toast(f"Deleted and blacklisted {count} job(s)")
+                    st.rerun()
+
+            for i, job in enumerate(page_jobs):
                 _render_job_card(job, start + i, config)
 
             _render_pagination(total_filtered, position="bottom")

@@ -7,6 +7,7 @@ Handles saving job search results to CSV and formatted Excel files.
 from __future__ import annotations
 
 from datetime import datetime
+from io import BytesIO
 
 import pandas as pd
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -56,6 +57,87 @@ def _sanitize_dataframe_for_excel(df: pd.DataFrame) -> pd.DataFrame:
     return sanitized
 
 
+def _write_excel_workbook(jobs_df: pd.DataFrame, output: str | BytesIO) -> None:
+    """Write a formatted Excel workbook to a path or in-memory buffer."""
+    safe_df = _sanitize_dataframe_for_excel(jobs_df)
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        safe_df.to_excel(writer, index=False, sheet_name="Jobs")
+        worksheet = writer.sheets["Jobs"]
+
+        # Format header row
+        header_fill = PatternFill(
+            start_color="4472C4", end_color="4472C4", fill_type="solid"
+        )
+        header_font = Font(bold=True, color="FFFFFF")
+
+        for col_num, _column_title in enumerate(jobs_df.columns, 1):
+            cell = worksheet.cell(row=1, column=col_num)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center")
+
+        # Auto-adjust column widths
+        for col_num, column in enumerate(jobs_df.columns, 1):
+            # Handle empty columns or all-NaN columns gracefully
+            col_max = jobs_df[column].astype(str).map(len).max()
+            if pd.isna(col_max):
+                col_max = 0
+            max_length = max(int(col_max), len(str(column)))
+            adjusted_width = min(max_length + 2, MAX_COLUMN_WIDTH)
+            worksheet.column_dimensions[
+                get_column_letter(col_num)
+            ].width = adjusted_width
+
+        # Make URLs clickable
+        if "job_url" in jobs_df.columns:
+            url_col = jobs_df.columns.get_loc("job_url") + 1
+            for row_num in range(2, len(jobs_df) + 2):
+                cell = worksheet.cell(row=row_num, column=url_col)
+                if cell.value and str(cell.value).startswith("http"):
+                    cell.hyperlink = cell.value
+                    cell.font = Font(color="0563C1", underline="single")
+
+        # Freeze header row
+        worksheet.freeze_panes = "A2"
+
+        # Conditional formatting for relevance score
+        if "relevance_score" in jobs_df.columns:
+            score_col = jobs_df.columns.get_loc("relevance_score") + 1
+            high_score_fill = PatternFill(
+                start_color="C6EFCE", end_color="C6EFCE", fill_type="solid"
+            )
+            for row_num in range(2, len(jobs_df) + 2):
+                cell = worksheet.cell(row=row_num, column=score_col)
+                try:
+                    if (
+                        cell.value is not None
+                        and float(cell.value) >= HIGH_SCORE_THRESHOLD
+                    ):
+                        cell.fill = high_score_fill
+                except (ValueError, TypeError):
+                    # Skip cells with non-numeric values
+                    pass
+
+
+def dataframe_to_excel_bytes(jobs_df: pd.DataFrame) -> bytes:
+    """
+    Render a formatted Excel workbook in memory.
+
+    Args:
+        jobs_df: DataFrame to serialize.
+
+    Returns:
+        Excel workbook bytes, or ``b""`` for empty data.
+    """
+    if len(jobs_df) == 0:
+        return b""
+
+    buffer = BytesIO()
+    _write_excel_workbook(jobs_df, buffer)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
 def save_results(
     jobs_df: pd.DataFrame,
     config: Config,
@@ -102,64 +184,7 @@ def save_results(
             excel_file = results_dir / f"{filename_prefix}_{timestamp}.xlsx"
 
             try:
-                safe_df = _sanitize_dataframe_for_excel(jobs_df)
-                with pd.ExcelWriter(excel_file, engine="openpyxl") as writer:
-                    safe_df.to_excel(writer, index=False, sheet_name="Jobs")
-                    worksheet = writer.sheets["Jobs"]
-
-                    # Format header row
-                    header_fill = PatternFill(
-                        start_color="4472C4", end_color="4472C4", fill_type="solid"
-                    )
-                    header_font = Font(bold=True, color="FFFFFF")
-
-                    for col_num, column_title in enumerate(jobs_df.columns, 1):
-                        cell = worksheet.cell(row=1, column=col_num)
-                        cell.fill = header_fill
-                        cell.font = header_font
-                        cell.alignment = Alignment(horizontal="center")
-
-                    # Auto-adjust column widths
-                    for col_num, column in enumerate(jobs_df.columns, 1):
-                        # Handle empty columns or all-NaN columns gracefully
-                        col_max = jobs_df[column].astype(str).map(len).max()
-                        if pd.isna(col_max):
-                            col_max = 0
-                        max_length = max(int(col_max), len(str(column)))
-                        adjusted_width = min(max_length + 2, MAX_COLUMN_WIDTH)
-                        worksheet.column_dimensions[
-                            get_column_letter(col_num)
-                        ].width = adjusted_width
-
-                    # Make URLs clickable
-                    if "job_url" in jobs_df.columns:
-                        url_col = jobs_df.columns.get_loc("job_url") + 1
-                        for row_num in range(2, len(jobs_df) + 2):
-                            cell = worksheet.cell(row=row_num, column=url_col)
-                            if cell.value and str(cell.value).startswith("http"):
-                                cell.hyperlink = cell.value
-                                cell.font = Font(color="0563C1", underline="single")
-
-                    # Freeze header row
-                    worksheet.freeze_panes = "A2"
-
-                    # Conditional formatting for relevance score
-                    if "relevance_score" in jobs_df.columns:
-                        score_col = jobs_df.columns.get_loc("relevance_score") + 1
-                        high_score_fill = PatternFill(
-                            start_color="C6EFCE", end_color="C6EFCE", fill_type="solid"
-                        )
-                        for row_num in range(2, len(jobs_df) + 2):
-                            cell = worksheet.cell(row=row_num, column=score_col)
-                            try:
-                                if (
-                                    cell.value is not None
-                                    and float(cell.value) >= HIGH_SCORE_THRESHOLD
-                                ):
-                                    cell.fill = high_score_fill
-                            except (ValueError, TypeError):
-                                # Skip cells with non-numeric values
-                                pass
+                _write_excel_workbook(jobs_df, str(excel_file))
 
                 logger.info(f"Saved Excel: {excel_file}")
                 excel_path = str(excel_file)
