@@ -1,144 +1,51 @@
-# Job Search Tool - Docker Compose Configuration
-#
-# Usage:
-#   docker-compose up --build              # Single-shot mode (default)
-#   docker-compose up scheduler --build    # Scheduled mode with notifications
-#   docker-compose up dashboard --build    # Interactive dashboard
-#
-# For scheduled mode, configure settings.yaml:
-#   scheduler.enabled: true
-#   notifications.enabled: true
-#   notifications.telegram.enabled: true
-#   notifications.telegram.chat_ids: ["YOUR_CHAT_ID"]
+name: job-search-tool
+
+x-job-search-base: &job-search-base
+  image: ${JOB_SEARCH_IMAGE:-vincenzoimp/job-search-tool:latest}
+  user: "${JOB_SEARCH_UID:-1000}:${JOB_SEARCH_GID:-1000}"
+  env_file:
+    - path: .env
+      required: false
+  volumes:
+    - ./config:/app/config
+    - ./data:/app/data
+    - ./results:/app/results
+    - ./logs:/app/logs
 
 services:
-  # ============================================================================
-  # SCHEDULER SERVICE (Recommended for automated operation)
-  # ============================================================================
-  # Runs continuously with configurable interval (default: 24 hours)
-  # Sends notifications via Telegram when new jobs are found
-  # Use: docker-compose up scheduler --build
-  scheduler:
-    build: .
-    container_name: job_search_scheduler
-    restart: unless-stopped
-    volumes:
-      - ./results:/app/results
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./config:/app/config
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      - PYTHONUNBUFFERED=1
+  init-config:
+    <<: *job-search-base
+    command: python bootstrap_config.py --write-settings
+    restart: "no"
+
+  jobsearch:
+    <<: *job-search-base
     command: python main.py
-    networks:
-      - jobsearch-net
+    environment:
+      JOB_SEARCH_MODE: single
+    restart: on-failure:3
+
+  scheduler:
+    <<: *job-search-base
+    command: python main.py
+    environment:
+      JOB_SEARCH_MODE: scheduled
+    restart: unless-stopped
     profiles:
       - scheduler
 
-  # ============================================================================
-  # SINGLE-SHOT SERVICE (Backward compatible default)
-  # ============================================================================
-  # Runs once and exits - original behavior
-  # Use: docker-compose up --build
-  jobsearch:
-    build: .
-    container_name: job_search
-    restart: on-failure:3
-    volumes:
-      - ./results:/app/results
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./config:/app/config
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      - PYTHONUNBUFFERED=1
-    networks:
-      - jobsearch-net
-    command: python main.py
-
-  # ============================================================================
-  # LEGACY SINGLE-SHOT (Runs original search_jobs.py directly)
-  # ============================================================================
-  # For backward compatibility - skips new main.py entry point
-  # Use: docker-compose --profile legacy up legacy --build
-  legacy:
-    build: .
-    container_name: job_search_legacy
-    restart: on-failure:3
-    volumes:
-      - ./results:/app/results
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./config:/app/config
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      - PYTHONUNBUFFERED=1
-    networks:
-      - jobsearch-net
-    command: python search_jobs.py
-    profiles:
-      - legacy
-
-  # ============================================================================
-  # ANALYSIS SERVICE
-  # ============================================================================
-  # Runs analysis on existing results
-  # Use: docker-compose --profile analyze up analyze --build
   analyze:
-    build: .
-    container_name: job_analyze
-    restart: on-failure:3
-    volumes:
-      - ./results:/app/results
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./config:/app/config
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      - PYTHONUNBUFFERED=1
-    networks:
-      - jobsearch-net
+    <<: *job-search-base
     command: python analyze_jobs.py
+    restart: on-failure:3
     profiles:
       - analyze
 
-  # ============================================================================
-  # DASHBOARD SERVICE
-  # ============================================================================
-  # Interactive Streamlit dashboard for exploring job results
-  # Use: docker-compose --profile dashboard up dashboard --build
-  # Access: http://localhost:8501
   dashboard:
-    build: .
-    container_name: job_dashboard
+    <<: *job-search-base
+    command: streamlit run dashboard.py --server.address=0.0.0.0 --server.port=8501
     restart: unless-stopped
     ports:
-      - "8501:8501"
-    volumes:
-      - ./results:/app/results
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./config:/app/config
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      - PYTHONUNBUFFERED=1
-    networks:
-      - jobsearch-net
-    command: streamlit run dashboard.py --server.address=0.0.0.0 --server.port=8501
+      - "${JOB_SEARCH_DASHBOARD_PORT:-8501}:8501"
     profiles:
       - dashboard
-
-networks:
-  jobsearch-net:
-    driver: bridge

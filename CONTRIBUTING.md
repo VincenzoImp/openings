@@ -23,7 +23,7 @@ Thank you for your interest in contributing to the Job Search Tool. This documen
 
 | Requirement | Version | Notes |
 |-------------|---------|-------|
-| Python | 3.10+ | Required by JobSpy library |
+| Python | 3.11+ | Recommended local version; CI runs on 3.11 and 3.12 |
 | Docker | 20.10+ | Optional, recommended for testing |
 | Git | 2.30+ | Version control |
 
@@ -40,17 +40,19 @@ cd job-search-tool
 git remote add upstream https://github.com/VincenzoImp/job-search-tool.git
 
 # 4. Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
 # 5. Install dependencies
 pip install -r requirements.txt
 pip install -r requirements-dev.txt
 
-# 6. Create configuration
+# 6. Create configuration for local Python runs
 cp config/settings.example.yaml config/settings.yaml
 
 # 7. Verify setup
+pre-commit run --all-files
+mypy scripts/ --ignore-missing-imports
 pytest
 ```
 
@@ -76,24 +78,29 @@ job-search-tool/
 # Single search
 cd scripts && python main.py
 
-# With Docker
-docker compose up --build
+# With the published Docker Hub image
+docker compose pull
+docker compose run --rm init-config
+docker compose up jobsearch
+
+# With a local Docker build of your current checkout
+docker compose -f docker-compose.yml -f docker-compose.dev.yml build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up jobsearch
 
 # Dashboard
-streamlit run scripts/dashboard.py
+docker compose --profile dashboard up dashboard
+# or, for local Python development:
+cd scripts && streamlit run dashboard.py
 ```
 
 ### Development Tools
 
 ```bash
 # Type checking
-mypy scripts/
+mypy scripts/ --ignore-missing-imports
 
-# Linting
-ruff check scripts/
-
-# Formatting
-ruff format scripts/
+# Linting + formatting + repo hygiene
+pre-commit run --all-files
 
 # All tests
 pytest
@@ -323,9 +330,10 @@ Before submitting:
 - [ ] Docstrings added for public functions
 - [ ] Tests written for new functionality
 - [ ] All tests pass (`pytest`)
-- [ ] Type check passes (`mypy scripts/`)
-- [ ] Linting passes (`ruff check scripts/`)
+- [ ] Type check passes (`mypy scripts/ --ignore-missing-imports`)
+- [ ] Pre-commit passes (`pre-commit run --all-files`)
 - [ ] Documentation updated if needed
+- [ ] Docker-related changes were sanity-checked with `docker compose config`
 
 ### Review Process
 

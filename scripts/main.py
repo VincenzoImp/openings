@@ -8,6 +8,7 @@ Integrates job search, database persistence, and notifications.
 
 from __future__ import annotations
 
+import os
 import sys
 import traceback
 from typing import TYPE_CHECKING
@@ -297,6 +298,35 @@ def _send_empty_notification(config: Config, db: JobDatabase) -> None:
         logger.error(f"Error sending empty notification: {e}")
 
 
+def _resolve_scheduled_mode(config: Config) -> bool:
+    """
+    Resolve execution mode from config, optionally overridden by environment.
+
+    Supported values:
+    - JOB_SEARCH_MODE=single
+    - JOB_SEARCH_MODE=scheduled
+    """
+    raw_mode = os.environ.get("JOB_SEARCH_MODE", "").strip().lower()
+    if not raw_mode:
+        return config.scheduler.enabled
+
+    logger = get_logger("main")
+
+    if raw_mode in {"single", "single-shot", "oneshot"}:
+        logger.info("Execution mode overridden by JOB_SEARCH_MODE=single")
+        return False
+
+    if raw_mode in {"scheduled", "scheduler"}:
+        logger.info("Execution mode overridden by JOB_SEARCH_MODE=scheduled")
+        return True
+
+    logger.warning(
+        "Ignoring invalid JOB_SEARCH_MODE=%r; expected 'single' or 'scheduled'",
+        raw_mode,
+    )
+    return config.scheduler.enabled
+
+
 def main() -> int:
     """
     Main entry point.
@@ -310,11 +340,12 @@ def main() -> int:
     # Initial config load
     config = get_config()
     logger = setup_logging(config)
+    scheduled_mode = _resolve_scheduled_mode(config)
 
     log_section(logger, "JOB SEARCH TOOL STARTING")
-    logger.info(f"Mode: {'Scheduled' if config.scheduler.enabled else 'Single-shot'}")
+    logger.info(f"Mode: {'Scheduled' if scheduled_mode else 'Single-shot'}")
 
-    if config.scheduler.enabled:
+    if scheduled_mode:
         logger.info(f"Interval: {config.scheduler.interval_hours} hours")
         logger.info(f"Run on startup: {config.scheduler.run_on_startup}")
 
@@ -352,7 +383,7 @@ def main() -> int:
     scheduler = create_scheduler(config, run_job_search)
 
     try:
-        if config.scheduler.enabled:
+        if scheduled_mode:
             # Scheduled mode - runs continuously
             scheduler.start()
         else:

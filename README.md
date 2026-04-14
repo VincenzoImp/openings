@@ -43,7 +43,7 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 | **Real-Time Notifications** | Telegram alerts for high-scoring new jobs |
 | **Interactive Dashboard** | Streamlit-based UI for filtering, analysis, and export |
 | **Semantic Search** | ChromaDB + sentence-transformers for natural language job search |
-| **Bookmarks & Actions** | Bookmark, delete, and mark jobs as applied directly from dashboard |
+| **Bookmarks & Actions** | Bookmark, apply/unapply, and delete jobs directly from dashboard with persistent blacklist support |
 
 ### Technical Features
 
@@ -55,7 +55,7 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 | **Retry Logic** | Exponential backoff with tenacity for transient failures |
 | **Dynamic Rescoring** | Automatic rescoring of existing jobs when criteria change |
 | **CI/CD Pipeline** | GitHub Actions with test matrix, security audit, Docker build |
-| **Comprehensive Testing** | 320+ pytest tests covering all core functionality |
+| **Comprehensive Testing** | 330+ pytest tests covering all core functionality |
 | **Vector Embeddings** | Local sentence-transformer model for semantic similarity |
 
 ---
@@ -294,21 +294,29 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 - Docker and Docker Compose (recommended), OR
 - Python 3.11 or higher
 
-### Option 1: Docker (Recommended)
+### Option 1: Docker Hub Image (Recommended)
 
 ```bash
 # Clone the repository
 git clone https://github.com/VincenzoImp/job-search-tool.git
 cd job-search-tool
 
-# Create configuration file
-cp config/settings.example.yaml config/settings.yaml
+# Optional on Linux: align container writes with your host user
+export JOB_SEARCH_UID=$(id -u)
+export JOB_SEARCH_GID=$(id -g)
+
+# Start from the published Docker Hub image
+cp .env.example .env
+docker compose pull
+
+# Scaffold editable config/settings.yaml from the bundled template
+docker compose run --rm init-config
 
 # Edit configuration with your preferences
 # nano config/settings.yaml
 
 # Run a single search
-docker compose up --build
+docker compose up jobsearch
 
 # Or run continuously with scheduler
 docker compose --profile scheduler up scheduler -d
@@ -317,6 +325,17 @@ docker compose --profile scheduler up scheduler -d
 docker compose --profile dashboard up dashboard
 # Access at http://localhost:8501
 ```
+
+`docker-compose.yml` pulls `vincenzoimp/job-search-tool:latest` by default, so no local image build is required.
+The `jobsearch` and `scheduler` services also force the expected runtime mode via `JOB_SEARCH_MODE`, so Compose behaves consistently even if `scheduler.enabled` differs inside `config/settings.yaml`.
+
+### Compose Services
+
+- `init-config`: Creates `config/settings.yaml` and `config/settings.example.yaml` from the bundled image template
+- `jobsearch`: Runs a single search cycle and exits
+- `scheduler`: Keeps the application running with APScheduler (use `--profile scheduler`)
+- `dashboard`: Starts the Streamlit UI on port `8501` (use `--profile dashboard`)
+- `analyze`: Runs the analysis utilities against the existing database (use `--profile analyze`)
 
 ### Option 2: Local Python
 
@@ -340,6 +359,17 @@ cd scripts && python main.py
 
 # Launch dashboard
 streamlit run dashboard.py
+```
+
+### Option 3: Local Docker Build (Developer Workflow)
+
+```bash
+# Build the image from your local checkout instead of Docker Hub
+docker compose -f docker-compose.yml -f docker-compose.dev.yml build
+
+# Then use the same services as the Docker Hub workflow
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up jobsearch
+docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile dashboard up dashboard
 ```
 
 ---
@@ -596,21 +626,51 @@ The Streamlit dashboard provides powerful analysis and filtering capabilities.
 - **Semantic Search**: Natural language queries find conceptually similar jobs
 - **Advanced Filtering**: Site, score range, job type, remote, date range, bookmarks
 - **Card-Based Display**: Rich job cards with score badges, similarity indicators
-- **Inline Actions**: Mark applied, bookmark, delete, open URL from each card
-- **Bulk Operations**: Select multiple jobs for batch actions
+- **Inline Actions**: Mark applied, bookmark, delete-and-blacklist, open URL from each card
+- **Bulk Operations**: Select multiple jobs for batch apply, bookmark, and delete actions
 - **Analytics Tab**: Charts for source distribution, score breakdown, trends
-- **Database Management**: Delete old jobs, export data
+- **Database Management**: Review database stats, export data, and manage blacklisted deletions
 - **Pagination**: 20 jobs per page with navigation
+
+Deleting a job from the dashboard is persistent: the job is removed from the active `jobs` table and its internal `job_id` is stored in a blacklist so future searches skip it automatically.
 
 ### Launch
 
 ```bash
-# Docker
+# Docker Hub image
 docker compose --profile dashboard up dashboard
 # Access at http://localhost:8501
 
 # Local
 cd scripts && streamlit run dashboard.py
+```
+
+### Direct Docker Hub Usage
+
+If you prefer `docker run` instead of Compose:
+
+```bash
+docker pull vincenzoimp/job-search-tool:latest
+
+mkdir -p config data results logs
+
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -v "$PWD/config:/app/config" \
+  -v "$PWD/data:/app/data" \
+  -v "$PWD/results:/app/results" \
+  -v "$PWD/logs:/app/logs" \
+  vincenzoimp/job-search-tool:latest \
+  python bootstrap_config.py --write-settings
+
+# Edit config/settings.yaml, then run the search
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -v "$PWD/config:/app/config" \
+  -v "$PWD/data:/app/data" \
+  -v "$PWD/results:/app/results" \
+  -v "$PWD/logs:/app/logs" \
+  vincenzoimp/job-search-tool:latest
 ```
 
 ---
@@ -640,6 +700,10 @@ The SQLite database (`data/jobs.db`) is the primary storage mechanism:
 | `relevance_score` | INTEGER | Calculated score |
 | `applied` | BOOLEAN | Application tracking |
 | `bookmarked` | BOOLEAN | Bookmark tracking |
+
+Deleted jobs are also tracked in a separate `deleted_jobs` table. When you delete a job from the dashboard, the tool stores its internal `job_id` in that blacklist and future search runs will skip it instead of re-inserting it into `jobs`.
+
+The blacklist uses the same internal identifier used for deduplication: `SHA256(title + company + location)`. If a future posting changes enough to generate a different internal ID, it will be treated as a new job.
 
 ### Useful Database Queries
 
@@ -701,10 +765,16 @@ search:
 ### Docker Issues
 
 ```bash
-# Full rebuild
-docker compose down
+# Refresh the published image
+docker compose pull
+docker compose up jobsearch
+```
+
+```bash
+# Full local rebuild (developer workflow)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 docker system prune -f
-docker compose up --build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
 ### Database Locked
@@ -738,8 +808,11 @@ job-search-tool/
 ├── config/
 │   ├── settings.yaml              # User configuration (gitignored)
 │   └── settings.example.yaml      # Documented template
+├── docker/
+│   └── entrypoint.sh              # Runtime bootstrap + Docker guidance
 ├── scripts/
 │   ├── main.py                    # Unified entry point
+│   ├── bootstrap_config.py        # Generate editable config for Docker users
 │   ├── search_jobs.py             # Core search with parallel execution
 │   ├── scheduler.py               # APScheduler integration
 │   ├── notifier.py                # Telegram notifications
@@ -753,8 +826,9 @@ job-search-tool/
 │   ├── vector_store.py            # ChromaDB vector store
 │   ├── vector_commands.py         # Vector backfill/sync
 │   └── healthcheck.py             # Docker health checks
-├── tests/                          # 320+ pytest tests
+├── tests/                          # 330+ pytest tests
 │   ├── conftest.py                # Shared fixtures
+│   ├── test_bootstrap_config.py   # Docker config bootstrap tests
 │   ├── test_main.py               # Entry point tests
 │   ├── test_config.py             # Configuration validation
 │   ├── test_database.py           # Database CRUD
@@ -770,16 +844,28 @@ job-search-tool/
 │   ├── test_search_jobs.py        # Search engine tests
 │   └── test_vector_store.py       # Vector store tests
 ├── .github/workflows/ci.yml       # CI pipeline
+├── .github/workflows/publish-docker.yml
 ├── results/                        # CSV/Excel output (gitignored)
 ├── data/                           # SQLite database (gitignored)
 ├── logs/                           # Log files (gitignored)
-├── Dockerfile                      # Multi-stage build, non-root user
-├── docker-compose.yml
+├── Dockerfile                      # Multi-stage build with OCI metadata
+├── docker-compose.yml              # Docker Hub-first runtime stack
+├── docker-compose.dev.yml          # Local-build override for developers
 ├── .pre-commit-config.yaml         # Ruff, trailing whitespace, etc.
 ├── requirements.txt
 ├── requirements-dev.txt
 └── pytest.ini
 ```
+
+### Docker Publishing
+
+The repository includes `.github/workflows/publish-docker.yml` for multi-arch Docker Hub publishing with OCI labels, SBOM, and provenance attestations.
+
+Maintainers should configure:
+
+- `DOCKERHUB_USERNAME` repository secret
+- `DOCKERHUB_TOKEN` repository secret
+- optional `DOCKERHUB_IMAGE` repository variable if you want a different image name than `vincenzoimp/job-search-tool`
 
 ### Running Tests
 

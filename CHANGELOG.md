@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Persistent Deleted-Job Blacklist**: Deleting jobs from the dashboard now stores their internal `job_id` in a dedicated blacklist so future searches skip them automatically
+- **Dashboard Bulk Delete Improvements**: Added clearer multi-select delete flows in the jobs view and kept vector-store deletions in sync
+- **Docker Hub Publishing Workflow**: Added a dedicated GitHub Actions workflow for multi-arch Docker Hub publishing with OCI labels, SBOM, and provenance attestations
+- **Docker Config Bootstrap**: Added `init-config`, `docker/entrypoint.sh`, and `bootstrap_config.py` so users can scaffold `config/settings.yaml` directly from the image
+- **Local Docker Build Override**: Added `docker-compose.dev.yml` for contributors who want Compose UX while testing a local image build
+
+### Changed
+
+- **Docker UX**: `docker-compose.yml` is now Docker Hub-first and documents `jobsearch`, `scheduler`, `dashboard`, `analyze`, and `init-config` as the main user-facing services
+- **Execution Mode Override**: Added `JOB_SEARCH_MODE` so Compose can force single-shot vs scheduled behavior without requiring users to toggle `scheduler.enabled`
+- **Secure Dependency Baseline**: Updated the sentence-transformer / transformers stack and pinned `torch` for a more reproducible CPU-oriented Docker build
+- **Contributor Onboarding**: Updated contributor docs to match the current Compose and CI workflow
+
+### Fixed
+
+- **Dashboard Excel Export**: Dashboard exports now reuse the shared Excel sanitization path to prevent formula injection regressions
+- **Vector Store Config Respect**: The vector store now honors the configured persistence directory and recreates its singleton when path or model settings change
+- **Test/Docs Drift**: Documentation now reflects the current 330+ test suite and the new deleted-job blacklist behavior
+
 ## [4.1.1] - 2026-03-13
 
 ### Fixed

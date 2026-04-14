@@ -1,0 +1,20 @@
+x-local-build: &local-build
+  build:
+    context: .
+  image: ${JOB_SEARCH_DEV_IMAGE:-job-search-tool:dev}
+
+services:
+  init-config:
+    <<: *local-build
+
+  jobsearch:
+    <<: *local-build
+
+  scheduler:
+    <<: *local-build
+
+  analyze:
+    <<: *local-build
+
+  dashboard:
+    <<: *local-build
