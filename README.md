@@ -43,7 +43,7 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 | **Real-Time Notifications** | Telegram alerts for high-scoring new jobs |
 | **Interactive Dashboard** | Streamlit-based UI for filtering, analysis, and export |
 | **Semantic Search** | ChromaDB + sentence-transformers for natural language job search |
-| **Bookmarks & Actions** | Bookmark, delete, and mark jobs as applied directly from dashboard |
+| **Bookmarks & Actions** | Bookmark, apply/unapply, and delete jobs directly from dashboard with persistent blacklist support |
 
 ### Technical Features
 
@@ -55,7 +55,7 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 | **Retry Logic** | Exponential backoff with tenacity for transient failures |
 | **Dynamic Rescoring** | Automatic rescoring of existing jobs when criteria change |
 | **CI/CD Pipeline** | GitHub Actions with test matrix, security audit, Docker build |
-| **Comprehensive Testing** | 320+ pytest tests covering all core functionality |
+| **Comprehensive Testing** | 330+ pytest tests covering all core functionality |
 | **Vector Embeddings** | Local sentence-transformer model for semantic similarity |
 
 ---
@@ -328,6 +328,14 @@ docker compose --profile dashboard up dashboard
 
 `docker-compose.yml` pulls `vincenzoimp/job-search-tool:latest` by default, so no local image build is required.
 The `jobsearch` and `scheduler` services also force the expected runtime mode via `JOB_SEARCH_MODE`, so Compose behaves consistently even if `scheduler.enabled` differs inside `config/settings.yaml`.
+
+### Compose Services
+
+- `init-config`: Creates `config/settings.yaml` and `config/settings.example.yaml` from the bundled image template
+- `jobsearch`: Runs a single search cycle and exits
+- `scheduler`: Keeps the application running with APScheduler (use `--profile scheduler`)
+- `dashboard`: Starts the Streamlit UI on port `8501` (use `--profile dashboard`)
+- `analyze`: Runs the analysis utilities against the existing database (use `--profile analyze`)
 
 ### Option 2: Local Python
 
@@ -618,11 +626,13 @@ The Streamlit dashboard provides powerful analysis and filtering capabilities.
 - **Semantic Search**: Natural language queries find conceptually similar jobs
 - **Advanced Filtering**: Site, score range, job type, remote, date range, bookmarks
 - **Card-Based Display**: Rich job cards with score badges, similarity indicators
-- **Inline Actions**: Mark applied, bookmark, delete, open URL from each card
-- **Bulk Operations**: Select multiple jobs for batch actions
+- **Inline Actions**: Mark applied, bookmark, delete-and-blacklist, open URL from each card
+- **Bulk Operations**: Select multiple jobs for batch apply, bookmark, and delete actions
 - **Analytics Tab**: Charts for source distribution, score breakdown, trends
-- **Database Management**: Delete old jobs, export data
+- **Database Management**: Review database stats, export data, and manage blacklisted deletions
 - **Pagination**: 20 jobs per page with navigation
+
+Deleting a job from the dashboard is persistent: the job is removed from the active `jobs` table and its internal `job_id` is stored in a blacklist so future searches skip it automatically.
 
 ### Launch
 
@@ -690,6 +700,10 @@ The SQLite database (`data/jobs.db`) is the primary storage mechanism:
 | `relevance_score` | INTEGER | Calculated score |
 | `applied` | BOOLEAN | Application tracking |
 | `bookmarked` | BOOLEAN | Bookmark tracking |
+
+Deleted jobs are also tracked in a separate `deleted_jobs` table. When you delete a job from the dashboard, the tool stores its internal `job_id` in that blacklist and future search runs will skip it instead of re-inserting it into `jobs`.
+
+The blacklist uses the same internal identifier used for deduplication: `SHA256(title + company + location)`. If a future posting changes enough to generate a different internal ID, it will be treated as a new job.
 
 ### Useful Database Queries
 
@@ -812,7 +826,7 @@ job-search-tool/
 │   ├── vector_store.py            # ChromaDB vector store
 │   ├── vector_commands.py         # Vector backfill/sync
 │   └── healthcheck.py             # Docker health checks
-├── tests/                          # 320+ pytest tests
+├── tests/                          # 330+ pytest tests
 │   ├── conftest.py                # Shared fixtures
 │   ├── test_bootstrap_config.py   # Docker config bootstrap tests
 │   ├── test_main.py               # Entry point tests
