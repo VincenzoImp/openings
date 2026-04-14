@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Execution Mode Override**: Added `JOB_SEARCH_MODE` so Compose can force single-shot vs scheduled behavior without requiring users to toggle `scheduler.enabled`
 - **Secure Dependency Baseline**: Updated the sentence-transformer / transformers stack and pinned `torch` for a more reproducible CPU-oriented Docker build
 - **Contributor Onboarding**: Updated contributor docs to match the current Compose and CI workflow
-- **Docker Publish Strategy**: `main` now publishes a faster `linux/amd64` image, while version tags publish the full multi-arch release set
+- **Docker Publish Strategy**: `main` now publishes a faster `linux/amd64` image, while version tags publish the full multi-arch release set and refresh `latest`
 
 ### Fixed
 
