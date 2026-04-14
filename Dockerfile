@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 # Job Search Tool - Docker Container (Multi-stage Build)
 # Python 3.11 with job search dependencies
 #
@@ -5,27 +7,33 @@
 # - Single-shot: Run once and exit (default, backward compatible)
 # - Scheduled: Run continuously at configured intervals (set scheduler.enabled=true)
 
+FROM ghcr.io/astral-sh/uv:0.11.6 AS uv
+
 # =============================================================================
 # Stage 1: Builder - Install dependencies with build tools
 # =============================================================================
 # NOTE: Pin to a specific patch version for reproducible builds.
-# TODO: Consider using --require-hashes in pip install for supply-chain security.
 FROM python:3.11.12-slim AS builder
 
-ARG TORCH_VERSION=2.10.0
+WORKDIR /app
 
-WORKDIR /tmp
+COPY --from=uv /uv /uvx /bin/
 
-COPY requirements.txt .
+ENV UV_LINK_MODE=copy
+ENV UV_PYTHON_DOWNLOADS=never
+ENV UV_TORCH_BACKEND=cpu
 
-# Keep the published image CPU-only unless users intentionally build their own GPU variant.
-RUN apt-get update && apt-get install -y --no-install-recommends gcc \
-    && pip install --no-cache-dir --prefix=/install \
-        --index-url https://download.pytorch.org/whl/cpu \
-        torch=="${TORCH_VERSION}" \
-    && PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu \
-        pip install --no-cache-dir --prefix=/install -r requirements.txt \
+COPY pyproject.toml uv.lock ./
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    apt-get update && apt-get install -y --no-install-recommends gcc \
+    && uv sync --locked --no-dev --no-install-project \
     && rm -rf /var/lib/apt/lists/*
+
+COPY scripts/ ./scripts/
+COPY config/settings.example.yaml ./config/settings.example.yaml
+COPY config/settings.example.yaml /opt/job-search-tool/defaults/settings.example.yaml
+COPY docker/entrypoint.sh /usr/local/bin/job-search-entrypoint
 
 # =============================================================================
 # Stage 2: Runtime - Clean image without build tools
@@ -53,19 +61,16 @@ RUN useradd -m -u 1000 -s /bin/bash appuser
 # Set working directory
 WORKDIR /app
 
-# Copy installed Python packages from builder
-COPY --from=builder /install /usr/local
-
-# Copy application code
-COPY --chown=appuser:appuser scripts/ ./scripts/
-COPY --chown=appuser:appuser config/settings.example.yaml ./config/settings.example.yaml
-COPY --chown=appuser:appuser config/settings.example.yaml /opt/job-search-tool/defaults/settings.example.yaml
-COPY docker/entrypoint.sh /usr/local/bin/job-search-entrypoint
+# Copy application environment and code from builder
+COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
+COPY --from=builder --chown=appuser:appuser /app/scripts /app/scripts
+COPY --from=builder --chown=appuser:appuser /app/config/settings.example.yaml /app/config/settings.example.yaml
+COPY --from=builder --chown=appuser:appuser /opt/job-search-tool/defaults/settings.example.yaml /opt/job-search-tool/defaults/settings.example.yaml
+COPY --from=builder /usr/local/bin/job-search-entrypoint /usr/local/bin/job-search-entrypoint
 
 # Create output directories with correct ownership
 RUN chmod +x /usr/local/bin/job-search-entrypoint \
-    && mkdir -p /app/results /app/data /app/data/chroma /app/logs /opt/job-search-tool/defaults \
-    && chown -R appuser:appuser /app /opt/job-search-tool
+    && install -d -o appuser -g appuser /app/results /app/data /app/data/chroma /app/logs /opt/job-search-tool/defaults
 
 # Switch to non-root user
 USER appuser
@@ -74,6 +79,7 @@ USER appuser
 WORKDIR /app/scripts
 
 # Environment variables
+ENV PATH=/app/.venv/bin:$PATH
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV JOB_SEARCH_CONFIG=/app/config/settings.yaml

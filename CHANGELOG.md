@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **uv Project Tooling**: Added `pyproject.toml` and `uv.lock` so local setup, CI, and Docker builds resolve from the same locked dependency graph
+- **Split Docker Publish Workflows**: Added dedicated `publish-main.yml` and `publish-release.yml` workflows to separate fast `main` publishes from full multi-arch release publishing
+
+### Changed
+
+- **CI Dependency Sync**: Test and security jobs now install dependencies with `uv` instead of `pip install -r ...`, improving setup consistency and cache reuse
+- **Docker Builder Install Path**: The image builder now installs from `uv.lock` with `uv sync --locked --no-install-project`, keeping runtime layers aligned with CI
+- **Publish Scope**: `main` publishes are now path-filtered to Docker/runtime-affecting files, so docs-only merges stop triggering image rebuilds
+- **Docker Build Caching**: Builder-stage dependency install now uses a dedicated uv cache mount in addition to Buildx cache scopes
+- **Developer Documentation**: README and CONTRIBUTING now describe `uv sync` and `uv run` as the default local workflow while keeping Docker Compose as the recommended runtime path
+
 ## [4.2.1] - 2026-04-14
 
 ### Fixed

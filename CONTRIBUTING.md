@@ -39,21 +39,18 @@ cd job-search-tool
 # 3. Add upstream remote
 git remote add upstream https://github.com/VincenzoImp/job-search-tool.git
 
-# 4. Create virtual environment
-python3 -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+# 4. Install uv if needed: https://docs.astral.sh/uv/getting-started/installation/
 
-# 5. Install dependencies
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
+# 5. Create/sync the project environment from the lockfile
+uv sync --locked --no-install-project
 
 # 6. Create configuration for local Python runs
 cp config/settings.example.yaml config/settings.yaml
 
 # 7. Verify setup
-pre-commit run --all-files
-mypy scripts/ --ignore-missing-imports
-pytest
+uv run pre-commit run --all-files
+uv run mypy scripts/ --ignore-missing-imports
+uv run pytest
 ```
 
 ---
@@ -76,7 +73,7 @@ job-search-tool/
 
 ```bash
 # Single search
-cd scripts && python main.py
+cd scripts && uv run python main.py
 
 # With the published Docker Hub image
 docker compose pull
@@ -90,23 +87,23 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up jobsearch
 # Dashboard
 docker compose --profile dashboard up dashboard
 # or, for local Python development:
-cd scripts && streamlit run dashboard.py
+cd scripts && uv run streamlit run dashboard.py
 ```
 
 ### Development Tools
 
 ```bash
 # Type checking
-mypy scripts/ --ignore-missing-imports
+uv run mypy scripts/ --ignore-missing-imports
 
 # Linting + formatting + repo hygiene
-pre-commit run --all-files
+uv run pre-commit run --all-files
 
 # All tests
-pytest
+uv run pytest
 
 # Coverage report
-pytest --cov=scripts --cov-report=html
+uv run pytest --cov=scripts --cov-report=html
 ```
 
 ---
@@ -275,22 +272,22 @@ Aim for high coverage on critical modules:
 
 ```bash
 # All tests
-pytest
+uv run pytest
 
 # Specific file
-pytest tests/test_config.py
+uv run pytest tests/test_config.py
 
 # Specific test
-pytest tests/test_models.py::TestJob::test_job_id_generation
+uv run pytest tests/test_models.py::TestJob::test_job_id_generation
 
 # With coverage
-pytest --cov=scripts --cov-report=html
+uv run pytest --cov=scripts --cov-report=html
 
 # Verbose output
-pytest -v
+uv run pytest -v
 
 # Stop on first failure
-pytest -x
+uv run pytest -x
 ```
 
 ---
@@ -329,9 +326,9 @@ Before submitting:
 - [ ] Type hints added for new functions
 - [ ] Docstrings added for public functions
 - [ ] Tests written for new functionality
-- [ ] All tests pass (`pytest`)
-- [ ] Type check passes (`mypy scripts/ --ignore-missing-imports`)
-- [ ] Pre-commit passes (`pre-commit run --all-files`)
+- [ ] All tests pass (`uv run pytest`)
+- [ ] Type check passes (`uv run mypy scripts/ --ignore-missing-imports`)
+- [ ] Pre-commit passes (`uv run pre-commit run --all-files`)
 - [ ] Documentation updated if needed
 - [ ] Docker-related changes were sanity-checked with `docker compose config`
 

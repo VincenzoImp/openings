@@ -1,5 +1,6 @@
 # Development dependencies for Job Search Tool
-# Install with: pip install -r requirements-dev.txt
+# Primary dependency metadata now lives in pyproject.toml / uv.lock.
+# Keep this compatibility mirror aligned when dev dependencies change.
 
 # Testing
 pytest>=7.4.0,<8.0.0
@@ -17,7 +18,3 @@ ruff>=0.1.0,<1.0.0
 
 # Security
 pip-audit>=2.7.0,<3.0.0
-
-# Data visualization (optional, for analyze_jobs.py charts)
-matplotlib>=3.7.0,<4.0.0
-seaborn>=0.12.0,<1.0.0

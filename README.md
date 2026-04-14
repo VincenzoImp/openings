@@ -408,21 +408,19 @@ This is the cleanest no-clone setup because you still get `init-config`, `jobsea
 git clone https://github.com/VincenzoImp/job-search-tool.git
 cd job-search-tool
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+# Install uv if needed: https://docs.astral.sh/uv/getting-started/installation/
 
-# Install dependencies
-pip install -r requirements.txt
+# Create/sync the project environment from the lockfile
+uv sync --locked --no-install-project
 
 # Create configuration
 cp config/settings.example.yaml config/settings.yaml
 
 # Run the search
-cd scripts && python main.py
+cd scripts && uv run python main.py
 
 # Launch dashboard
-streamlit run dashboard.py
+uv run streamlit run dashboard.py
 ```
 
 ### Option 4: Local Docker Build (Developer Workflow)
@@ -705,8 +703,8 @@ Deleting a job from the dashboard is persistent: the job is removed from the act
 docker compose --profile dashboard up dashboard
 # Access at http://localhost:8501
 
-# Local
-cd scripts && streamlit run dashboard.py
+# Local Python
+cd scripts && uv run streamlit run dashboard.py
 ```
 
 ### Standalone Docker Compose Without Cloning
@@ -919,7 +917,8 @@ job-search-tool/
 │   ├── test_search_jobs.py        # Search engine tests
 │   └── test_vector_store.py       # Vector store tests
 ├── .github/workflows/ci.yml       # CI pipeline
-├── .github/workflows/publish-docker.yml
+├── .github/workflows/publish-main.yml
+├── .github/workflows/publish-release.yml
 ├── results/                        # CSV/Excel output (gitignored)
 ├── data/                           # SQLite database (gitignored)
 ├── logs/                           # Log files (gitignored)
@@ -927,20 +926,27 @@ job-search-tool/
 ├── docker-compose.yml              # Docker Hub-first runtime stack
 ├── docker-compose.dev.yml          # Local-build override for developers
 ├── .pre-commit-config.yaml         # Ruff, trailing whitespace, etc.
-├── requirements.txt
-├── requirements-dev.txt
+├── pyproject.toml                  # Dependency metadata for uv
+├── uv.lock                         # Locked dependency resolution for CI/Docker
+├── requirements.txt                # Compatibility dependency mirror
+├── requirements-dev.txt            # Compatibility dev dependency mirror
 └── pytest.ini
 ```
 
 ### Docker Publishing
 
-The repository includes `.github/workflows/publish-docker.yml` for Docker Hub publishing with OCI labels, SBOM, and provenance attestations.
+The repository includes two Docker Hub publishing workflows:
+
+- `.github/workflows/publish-main.yml` for fast `main` publishes
+- `.github/workflows/publish-release.yml` for versioned releases with attestations
 
 Publishing policy:
 
 - pushes to `main` publish a fast `linux/amd64` image for `main` and `sha-*`
+- `publish-main.yml` is path-filtered so docs-only changes do not rebuild and republish the image
 - version tags such as `v4.2.0` publish the full multi-arch release (`linux/amd64` + `linux/arm64`) and refresh `latest`
 - workflow concurrency is enabled so older in-flight publishes on the same ref are cancelled automatically
+- `uv.lock` is the dependency source of truth for CI and Docker image builds
 
 Maintainers should configure:
 
@@ -951,33 +957,33 @@ Maintainers should configure:
 ### Running Tests
 
 ```bash
-# Install development dependencies
-pip install -r requirements-dev.txt
+# Sync the locked development environment
+uv sync --locked --no-install-project
 
 # Run all tests
-pytest
+uv run pytest
 
 # With coverage report
-pytest --cov=scripts --cov-report=html
+uv run pytest --cov=scripts --cov-report=html
 
 # Specific test file
-pytest tests/test_config.py -v
+uv run pytest tests/test_config.py -v
 ```
 
 ### Code Quality
 
 ```bash
 # Run pre-commit hooks (ruff lint + format, trailing whitespace, etc.)
-pre-commit run --all-files
+uv run pre-commit run --all-files
 
 # Type checking
-mypy scripts/
+uv run mypy scripts/ --ignore-missing-imports
 
 # Linting
-ruff check scripts/
+uv run ruff check scripts/
 
 # Formatting
-ruff format scripts/
+uv run ruff format scripts/
 ```
 
 ---

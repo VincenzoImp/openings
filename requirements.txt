@@ -1,5 +1,6 @@
 # Job Search Tool - Python Dependencies
-# Install with: pip install -r requirements.txt
+# Primary dependency metadata now lives in pyproject.toml / uv.lock.
+# Keep this compatibility mirror aligned when runtime dependencies change.
 
 # Core job scraping library (requires Python 3.10+)
 python-jobspy>=1.1.80,<2.0.0
