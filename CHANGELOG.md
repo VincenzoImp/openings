@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [4.3.0] - 2026-04-14
 
 ### Added
 
@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Publish Scope**: `main` publishes are now path-filtered to Docker/runtime-affecting files, so docs-only merges stop triggering image rebuilds
 - **Docker Build Caching**: Builder-stage dependency install now uses a dedicated uv cache mount in addition to Buildx cache scopes
 - **Developer Documentation**: README and CONTRIBUTING now describe `uv sync` and `uv run` as the default local workflow while keeping Docker Compose as the recommended runtime path
+
+### Fixed
+
+- **CI uv Action Pinning**: GitHub Actions now pins `astral-sh/setup-uv@v8.0.0`, avoiding resolution failures on floating major tags
+- **Runtime Image Ownership**: Docker runtime setup now creates writable app directories explicitly instead of recursively chowning the bundled virtual environment
+
+### Removed
+
+- **Unused Plotting Dev Dependencies**: Removed `matplotlib` and `seaborn` from development dependencies because they were no longer used by `analyze_jobs.py` or the test/tooling stack
 
 ## [4.2.1] - 2026-04-14
 
