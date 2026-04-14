@@ -294,21 +294,29 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 - Docker and Docker Compose (recommended), OR
 - Python 3.11 or higher
 
-### Option 1: Docker (Recommended)
+### Option 1: Docker Hub Image (Recommended)
 
 ```bash
 # Clone the repository
 git clone https://github.com/VincenzoImp/job-search-tool.git
 cd job-search-tool
 
-# Create configuration file
-cp config/settings.example.yaml config/settings.yaml
+# Optional on Linux: align container writes with your host user
+export JOB_SEARCH_UID=$(id -u)
+export JOB_SEARCH_GID=$(id -g)
+
+# Start from the published Docker Hub image
+cp .env.example .env
+docker compose pull
+
+# Scaffold editable config/settings.yaml from the bundled template
+docker compose run --rm init-config
 
 # Edit configuration with your preferences
 # nano config/settings.yaml
 
 # Run a single search
-docker compose up --build
+docker compose up jobsearch
 
 # Or run continuously with scheduler
 docker compose --profile scheduler up scheduler -d
@@ -317,6 +325,9 @@ docker compose --profile scheduler up scheduler -d
 docker compose --profile dashboard up dashboard
 # Access at http://localhost:8501
 ```
+
+`docker-compose.yml` pulls `vincenzoimp/job-search-tool:latest` by default, so no local image build is required.
+The `jobsearch` and `scheduler` services also force the expected runtime mode via `JOB_SEARCH_MODE`, so Compose behaves consistently even if `scheduler.enabled` differs inside `config/settings.yaml`.
 
 ### Option 2: Local Python
 
@@ -340,6 +351,17 @@ cd scripts && python main.py
 
 # Launch dashboard
 streamlit run dashboard.py
+```
+
+### Option 3: Local Docker Build (Developer Workflow)
+
+```bash
+# Build the image from your local checkout instead of Docker Hub
+docker compose -f docker-compose.yml -f docker-compose.dev.yml build
+
+# Then use the same services as the Docker Hub workflow
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up jobsearch
+docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile dashboard up dashboard
 ```
 
 ---
@@ -605,12 +627,40 @@ The Streamlit dashboard provides powerful analysis and filtering capabilities.
 ### Launch
 
 ```bash
-# Docker
+# Docker Hub image
 docker compose --profile dashboard up dashboard
 # Access at http://localhost:8501
 
 # Local
 cd scripts && streamlit run dashboard.py
+```
+
+### Direct Docker Hub Usage
+
+If you prefer `docker run` instead of Compose:
+
+```bash
+docker pull vincenzoimp/job-search-tool:latest
+
+mkdir -p config data results logs
+
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -v "$PWD/config:/app/config" \
+  -v "$PWD/data:/app/data" \
+  -v "$PWD/results:/app/results" \
+  -v "$PWD/logs:/app/logs" \
+  vincenzoimp/job-search-tool:latest \
+  python bootstrap_config.py --write-settings
+
+# Edit config/settings.yaml, then run the search
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -v "$PWD/config:/app/config" \
+  -v "$PWD/data:/app/data" \
+  -v "$PWD/results:/app/results" \
+  -v "$PWD/logs:/app/logs" \
+  vincenzoimp/job-search-tool:latest
 ```
 
 ---
@@ -701,10 +751,16 @@ search:
 ### Docker Issues
 
 ```bash
-# Full rebuild
-docker compose down
+# Refresh the published image
+docker compose pull
+docker compose up jobsearch
+```
+
+```bash
+# Full local rebuild (developer workflow)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 docker system prune -f
-docker compose up --build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
 ### Database Locked
@@ -738,8 +794,11 @@ job-search-tool/
 ├── config/
 │   ├── settings.yaml              # User configuration (gitignored)
 │   └── settings.example.yaml      # Documented template
+├── docker/
+│   └── entrypoint.sh              # Runtime bootstrap + Docker guidance
 ├── scripts/
 │   ├── main.py                    # Unified entry point
+│   ├── bootstrap_config.py        # Generate editable config for Docker users
 │   ├── search_jobs.py             # Core search with parallel execution
 │   ├── scheduler.py               # APScheduler integration
 │   ├── notifier.py                # Telegram notifications
@@ -755,6 +814,7 @@ job-search-tool/
 │   └── healthcheck.py             # Docker health checks
 ├── tests/                          # 320+ pytest tests
 │   ├── conftest.py                # Shared fixtures
+│   ├── test_bootstrap_config.py   # Docker config bootstrap tests
 │   ├── test_main.py               # Entry point tests
 │   ├── test_config.py             # Configuration validation
 │   ├── test_database.py           # Database CRUD
@@ -770,16 +830,28 @@ job-search-tool/
 │   ├── test_search_jobs.py        # Search engine tests
 │   └── test_vector_store.py       # Vector store tests
 ├── .github/workflows/ci.yml       # CI pipeline
+├── .github/workflows/publish-docker.yml
 ├── results/                        # CSV/Excel output (gitignored)
 ├── data/                           # SQLite database (gitignored)
 ├── logs/                           # Log files (gitignored)
-├── Dockerfile                      # Multi-stage build, non-root user
-├── docker-compose.yml
+├── Dockerfile                      # Multi-stage build with OCI metadata
+├── docker-compose.yml              # Docker Hub-first runtime stack
+├── docker-compose.dev.yml          # Local-build override for developers
 ├── .pre-commit-config.yaml         # Ruff, trailing whitespace, etc.
 ├── requirements.txt
 ├── requirements-dev.txt
 └── pytest.ini
 ```
+
+### Docker Publishing
+
+The repository includes `.github/workflows/publish-docker.yml` for multi-arch Docker Hub publishing with OCI labels, SBOM, and provenance attestations.
+
+Maintainers should configure:
+
+- `DOCKERHUB_USERNAME` repository secret
+- `DOCKERHUB_TOKEN` repository secret
+- optional `DOCKERHUB_IMAGE` repository variable if you want a different image name than `vincenzoimp/job-search-tool`
 
 ### Running Tests
 

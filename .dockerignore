@@ -34,6 +34,7 @@ logs/
 # Documentation (not needed in container)
 README.md
 CLAUDE.md
+AGENTS.md
 LICENSE
 
 # Temporary files
@@ -68,3 +69,6 @@ CONTRIBUTING.md
 .env
 .env.*
 docker-compose.override.yml
+
+# Local user config should never be baked into an image build context
+config/settings.yaml
