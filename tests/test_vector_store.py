@@ -30,8 +30,10 @@ def _reset_vector_store_singleton():
     import vector_store as vs_module
 
     original = vs_module._vector_store
+    original_key = getattr(vs_module, "_vector_store_key", None)
     yield
     vs_module._vector_store = original
+    vs_module._vector_store_key = original_key
 
 
 @pytest.fixture
@@ -387,9 +389,10 @@ class TestGetVectorStore:
         import vector_store as vs_module
 
         vs_module._vector_store = None
+        vs_module._vector_store_key = None
 
         with patch.object(_mock_chromadb, "PersistentClient", return_value=mock_client):
-            store = vs_module.get_vector_store(data_dir=tmp_path)
+            store = vs_module.get_vector_store(persist_dir=tmp_path / "chroma")
 
         assert store is not None
         assert isinstance(store, vs_module.JobVectorStore)
@@ -399,12 +402,32 @@ class TestGetVectorStore:
         import vector_store as vs_module
 
         vs_module._vector_store = None
+        vs_module._vector_store_key = None
 
         with patch.object(_mock_chromadb, "PersistentClient", return_value=mock_client):
-            store1 = vs_module.get_vector_store(data_dir=tmp_path)
-            store2 = vs_module.get_vector_store(data_dir=tmp_path)
+            store1 = vs_module.get_vector_store(persist_dir=tmp_path / "chroma")
+            store2 = vs_module.get_vector_store(persist_dir=tmp_path / "chroma")
 
         assert store1 is store2
+
+    def test_recreates_singleton_when_config_changes(self, mock_client, tmp_path):
+        """Test singleton refreshes when path or model changes."""
+        import vector_store as vs_module
+
+        vs_module._vector_store = None
+        vs_module._vector_store_key = None
+
+        with patch.object(_mock_chromadb, "PersistentClient", return_value=mock_client):
+            store1 = vs_module.get_vector_store(
+                persist_dir=tmp_path / "chroma-a",
+                model_name="model-a",
+            )
+            store2 = vs_module.get_vector_store(
+                persist_dir=tmp_path / "chroma-b",
+                model_name="model-b",
+            )
+
+        assert store1 is not store2
 
 
 # =============================================================================

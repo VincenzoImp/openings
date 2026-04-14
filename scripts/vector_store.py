@@ -279,27 +279,30 @@ class JobVectorStore:
 # ------------------------------------------------------------------
 
 _vector_store: JobVectorStore | None = None
+_vector_store_key: tuple[str, str] | None = None
 
 
 def get_vector_store(
-    data_dir: Path,
+    persist_dir: Path,
     model_name: str = "all-MiniLM-L6-v2",
 ) -> JobVectorStore:
     """Get or create the singleton :class:`JobVectorStore`.
 
     Args:
-        data_dir: Base data directory (e.g. ``config.data_path``).
-            The ChromaDB files are stored under ``<data_dir>/chroma/``.
+        persist_dir: Full path where the ChromaDB collection should live.
         model_name: Sentence-transformer model to use for embeddings.
 
     Returns:
         The shared ``JobVectorStore`` instance.
     """
-    global _vector_store
-    if _vector_store is None:
-        chroma_path = Path(data_dir) / "chroma"
+    global _vector_store, _vector_store_key
+    resolved_path = Path(persist_dir).expanduser().resolve()
+    requested_key = (str(resolved_path), model_name)
+
+    if _vector_store is None or _vector_store_key != requested_key:
         _vector_store = JobVectorStore(
-            persist_dir=chroma_path,
+            persist_dir=resolved_path,
             model_name=model_name,
         )
+        _vector_store_key = requested_key
     return _vector_store

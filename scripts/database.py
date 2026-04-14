@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import contextmanager
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Generator
 
@@ -26,6 +26,8 @@ _JOB_COLUMNS = """job_id, title, company, location, job_url,
     site, job_type, is_remote, job_level, description,
     date_posted, min_amount, max_amount, currency, company_url,
     first_seen, last_seen, relevance_score, applied, bookmarked"""
+
+_DELETED_JOB_COLUMNS = "job_id, title, company, location, blacklisted_at"
 
 
 class JobDatabase:
@@ -63,6 +65,21 @@ class JobDatabase:
 
     CREATE_INDEX = """
         CREATE INDEX IF NOT EXISTS idx_jobs_last_seen ON jobs(last_seen)
+    """
+
+    CREATE_DELETED_TABLE = """
+        CREATE TABLE IF NOT EXISTS deleted_jobs (
+            job_id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            company TEXT NOT NULL,
+            location TEXT NOT NULL,
+            blacklisted_at TEXT NOT NULL
+        )
+    """
+
+    CREATE_DELETED_INDEX = """
+        CREATE INDEX IF NOT EXISTS idx_deleted_jobs_blacklisted_at
+        ON deleted_jobs(blacklisted_at)
     """
 
     # Migration: Add new columns to existing databases
@@ -149,6 +166,8 @@ class JobDatabase:
 
             cursor.execute(self.CREATE_TABLE)
             cursor.execute(self.CREATE_INDEX)
+            cursor.execute(self.CREATE_DELETED_TABLE)
+            cursor.execute(self.CREATE_DELETED_INDEX)
 
             # Run migrations for existing databases
             for migration in self.MIGRATE_COLUMNS:
@@ -239,6 +258,48 @@ class JobDatabase:
 
         return existing_ids
 
+    def _batch_query_blacklisted_ids(self, job_ids: list[str]) -> set[str]:
+        """
+        Query blacklisted job IDs in batches to avoid SQLite variable limits.
+
+        Args:
+            job_ids: List of job IDs to check.
+
+        Returns:
+            Set of job IDs that are currently blacklisted.
+        """
+        if not job_ids:
+            return set()
+
+        blacklisted_ids: set[str] = set()
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            for i in range(0, len(job_ids), self.SQLITE_VAR_LIMIT):
+                chunk = job_ids[i : i + self.SQLITE_VAR_LIMIT]
+                placeholders = ",".join("?" * len(chunk))
+                query = (
+                    f"SELECT job_id FROM deleted_jobs WHERE job_id IN ({placeholders})"
+                )
+                cursor.execute(query, chunk)
+                blacklisted_ids.update(row[0] for row in cursor.fetchall())
+
+        return blacklisted_ids
+
+    def _add_job_ids_to_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Return a copy of *df* with a computed ``job_id`` column."""
+        df_with_ids = df.copy()
+        df_with_ids["job_id"] = df_with_ids.apply(
+            lambda row: generate_job_id(
+                str(row.get("title", "")),
+                str(row.get("company", "")),
+                str(row.get("location", "")),
+            ),
+            axis=1,
+        )
+        return df_with_ids
+
     def job_exists(self, job_id: str) -> bool:
         """
         Check if job exists in database.
@@ -253,6 +314,42 @@ class JobDatabase:
             cursor = conn.cursor()
             cursor.execute(self.SELECT_BY_ID, (job_id,))
             return cursor.fetchone() is not None
+
+    def is_job_blacklisted(self, job_id: str) -> bool:
+        """
+        Check whether a job ID is present in the deleted-job blacklist.
+
+        Args:
+            job_id: Unique job identifier.
+
+        Returns:
+            True if blacklisted, False otherwise.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT job_id FROM deleted_jobs WHERE job_id = ?",
+                (job_id,),
+            )
+            return cursor.fetchone() is not None
+
+    def get_blacklisted_job_ids(self, job_ids: list[str] | None = None) -> set[str]:
+        """
+        Return blacklisted job IDs.
+
+        Args:
+            job_ids: Optional subset of IDs to check. If omitted, returns all.
+
+        Returns:
+            Set of blacklisted job IDs.
+        """
+        if job_ids is not None:
+            return self._batch_query_blacklisted_ids(job_ids)
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT job_id FROM deleted_jobs")
+            return {row[0] for row in cursor.fetchall()}
 
     def save_job(
         self,
@@ -273,6 +370,10 @@ class JobDatabase:
         Returns:
             True if job is new, False if updated.
         """
+        if self.is_job_blacklisted(job.job_id):
+            self.logger.info("Skipping blacklisted job: %s", job.job_id)
+            return False
+
         today = date.today()
         is_new = not self.job_exists(job.job_id)
 
@@ -330,6 +431,8 @@ class JobDatabase:
         updated_count = 0
 
         for job in jobs:
+            if self.is_job_blacklisted(job.job_id):
+                continue
             if self.save_job(job):
                 new_count += 1
             else:
@@ -353,13 +456,29 @@ class JobDatabase:
         if df.empty:
             return 0, 0
 
+        df_with_ids = self._add_job_ids_to_dataframe(df)
+        blacklisted_ids = self._batch_query_blacklisted_ids(
+            df_with_ids["job_id"].tolist()
+        )
+        if blacklisted_ids:
+            df_with_ids = df_with_ids[
+                ~df_with_ids["job_id"].isin(blacklisted_ids)
+            ].copy()
+            self.logger.info(
+                "Skipped %d blacklisted job(s) while saving search results",
+                len(blacklisted_ids),
+            )
+
+        if df_with_ids.empty:
+            return 0, 0
+
         today = date.today()
 
         # Prepare all job data first
         jobs_data = []
         job_ids = []
 
-        records = df.to_dict("records")
+        records = df_with_ids.to_dict("records")
         for record in records:
             job = Job.from_dict(record)
 
@@ -428,7 +547,8 @@ class JobDatabase:
             return set()
 
         existing_ids = self._batch_query_existing_ids(job_ids)
-        return set(job_ids) - existing_ids
+        blacklisted_ids = self._batch_query_blacklisted_ids(job_ids)
+        return set(job_ids) - existing_ids - blacklisted_ids
 
     def filter_new_jobs(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -446,22 +566,36 @@ class JobDatabase:
         if df.empty:
             return df
 
-        # Generate job IDs using utility function (faster than creating Job objects)
-        df = df.copy()
-        df["job_id"] = df.apply(
-            lambda row: generate_job_id(
-                str(row.get("title", "")),
-                str(row.get("company", "")),
-                str(row.get("location", "")),
-            ),
-            axis=1,
-        )
+        df = self._add_job_ids_to_dataframe(df)
 
         # Get new job IDs (uses batch querying internally)
         new_ids = self.get_new_job_ids(df["job_id"].tolist())
 
         # Filter and remove temporary column
         return df[df["job_id"].isin(new_ids)].drop(columns=["job_id"])
+
+    def filter_blacklisted_jobs(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Remove blacklisted jobs from a DataFrame using the internal job identifier.
+
+        Args:
+            df: DataFrame with job data.
+
+        Returns:
+            DataFrame without blacklisted jobs.
+        """
+        if df.empty:
+            return df
+
+        df_with_ids = self._add_job_ids_to_dataframe(df)
+        blacklisted_ids = self._batch_query_blacklisted_ids(
+            df_with_ids["job_id"].tolist()
+        )
+        if not blacklisted_ids:
+            return df
+
+        filtered = df_with_ids[~df_with_ids["job_id"].isin(blacklisted_ids)].copy()
+        return filtered.drop(columns=["job_id"])
 
     def get_all_jobs(self) -> list[JobDBRecord]:
         """
@@ -618,6 +752,18 @@ class JobDatabase:
             conn.commit()
             return cursor.rowcount > 0
 
+    def blacklist_job(self, job_id: str) -> bool:
+        """
+        Delete a job from the main table and persist its ID in the blacklist.
+
+        Args:
+            job_id: Unique job identifier.
+
+        Returns:
+            True if the job was blacklisted and removed, False otherwise.
+        """
+        return self.blacklist_jobs([job_id]) > 0
+
     def delete_jobs(self, job_ids: list[str]) -> int:
         """
         Delete multiple jobs from the database.
@@ -647,6 +793,51 @@ class JobDatabase:
             conn.commit()
 
         return total_deleted
+
+    def blacklist_jobs(self, job_ids: list[str]) -> int:
+        """
+        Blacklist multiple jobs and remove them from the active job table.
+
+        Future searches will skip blacklisted IDs when saving results.
+
+        Args:
+            job_ids: List of job IDs to blacklist.
+
+        Returns:
+            Number of active jobs removed and blacklisted.
+        """
+        if not job_ids:
+            return 0
+
+        total_blacklisted = 0
+        unique_job_ids = list(dict.fromkeys(job_ids))
+        blacklisted_at = datetime.now().isoformat(timespec="seconds")
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            for i in range(0, len(unique_job_ids), self.SQLITE_VAR_LIMIT):
+                chunk = unique_job_ids[i : i + self.SQLITE_VAR_LIMIT]
+                placeholders = ",".join("?" * len(chunk))
+
+                cursor.execute(
+                    f"""
+                    INSERT OR REPLACE INTO deleted_jobs ({_DELETED_JOB_COLUMNS})
+                    SELECT job_id, title, company, location, ?
+                    FROM jobs
+                    WHERE job_id IN ({placeholders})
+                    """,
+                    [blacklisted_at, *chunk],
+                )
+                cursor.execute(
+                    f"DELETE FROM jobs WHERE job_id IN ({placeholders})",
+                    chunk,
+                )
+                total_blacklisted += cursor.rowcount
+
+            conn.commit()
+
+        return total_blacklisted
 
     def toggle_bookmark(self, job_id: str) -> bool:
         """
@@ -730,6 +921,10 @@ class JobDatabase:
             cursor.execute("SELECT COUNT(*) FROM jobs WHERE applied = TRUE")
             applied = cursor.fetchone()[0]
 
+            # Blacklisted
+            cursor.execute("SELECT COUNT(*) FROM deleted_jobs")
+            blacklisted = cursor.fetchone()[0]
+
             # Average relevance score
             cursor.execute("SELECT AVG(relevance_score) FROM jobs")
             avg_score = cursor.fetchone()[0] or 0
@@ -739,6 +934,7 @@ class JobDatabase:
             "seen_today": seen_today,
             "new_today": new_today,
             "applied": applied,
+            "blacklisted": blacklisted,
             "avg_relevance_score": round(avg_score, 1),
         }
 

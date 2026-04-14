@@ -41,6 +41,7 @@ class TestRunJobSearch:
         mock_db = MagicMock()
         mock_db.get_statistics.return_value = {"total_jobs": 5}
         mock_db.save_jobs_from_dataframe.return_value = (2, 3)
+        mock_db.filter_blacklisted_jobs.side_effect = lambda df: df
         mock_get_db.return_value = mock_db
 
         mock_summary = MagicMock()
@@ -78,6 +79,7 @@ class TestRunJobSearch:
 
         mock_db = MagicMock()
         mock_db.get_statistics.return_value = {"total_jobs": 0}
+        mock_db.filter_blacklisted_jobs.side_effect = lambda df: df
         mock_get_db.return_value = mock_db
 
         mock_summary = MagicMock()
@@ -109,6 +111,7 @@ class TestRunJobSearch:
 
         mock_db = MagicMock()
         mock_db.get_statistics.return_value = {"total_jobs": 0}
+        mock_db.filter_blacklisted_jobs.side_effect = lambda df: df
         mock_get_db.return_value = mock_db
 
         mock_search.side_effect = RuntimeError("Search failed")
