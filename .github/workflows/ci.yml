@@ -17,6 +17,7 @@ on:
       - "CONTRIBUTING.md"
       - "AGENTS.md"
       - "LICENSE"
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -128,6 +129,7 @@ jobs:
         run: uvx --python 3.11 --from 'pip-audit==2.9.0' pip-audit --ignore-vuln CVE-2025-46656 -r .tmp/requirements-audit.txt  # markdownify pinned by python-jobspy<0.14.0
 
   docker:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

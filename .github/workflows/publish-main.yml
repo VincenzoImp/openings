@@ -1,20 +1,6 @@
 name: Publish Docker Image (Main)
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - ".dockerignore"
-      - "Dockerfile"
-      - "docker/**"
-      - "docker-compose.yml"
-      - "scripts/**"
-      - "config/settings.example.yaml"
-      - "pyproject.toml"
-      - "uv.lock"
-      - ".github/workflows/publish-main.yml"
-      - ".github/workflows/publish-release.yml"
   workflow_dispatch:
 
 concurrency:
@@ -26,6 +12,7 @@ env:
 
 jobs:
   docker:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read

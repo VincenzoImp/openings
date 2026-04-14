@@ -937,14 +937,15 @@ job-search-tool/
 
 The repository includes two Docker Hub publishing workflows:
 
-- `.github/workflows/publish-main.yml` for fast `main` publishes
-- `.github/workflows/publish-release.yml` for versioned releases with attestations
+- `.github/workflows/publish-release.yml` is the automatic release path for version tags
+- `.github/workflows/publish-main.yml` is a manual maintainer-only escape hatch for publishing the current `main` branch
 
 Publishing policy:
 
-- pushes to `main` publish a fast `linux/amd64` image for `main` and `sha-*`
-- `publish-main.yml` is path-filtered so docs-only changes do not rebuild and republish the image
+- pull requests run the Docker smoke build in CI so image regressions are caught before merge
+- pushes to `main` run validation jobs, but do not automatically republish Docker images
 - version tags such as `v4.2.0` publish the full multi-arch release (`linux/amd64` + `linux/arm64`) and refresh `latest`
+- `publish-main.yml` can be triggered manually when maintainers intentionally want a fresh `main` / `sha-*` image
 - workflow concurrency is enabled so older in-flight publishes on the same ref are cancelled automatically
 - `uv.lock` is the dependency source of truth for CI and Docker image builds
 
