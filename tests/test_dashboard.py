@@ -84,7 +84,9 @@ def test_dashboard_smoke_renders_and_escapes_html(monkeypatch, tmp_path: Path) -
     app.run(timeout=10)
 
     assert len(app.exception) == 0
-    title_markup = next(markdown.value for markdown in app.markdown if "Evil" in markdown.value)
+    title_markup = next(
+        markdown.value for markdown in app.markdown if "Evil" in markdown.value
+    )
     assert "<b>Evil</b>" not in title_markup
     assert "&lt;b&gt;Evil&lt;/b&gt;" in title_markup
 
