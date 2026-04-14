@@ -337,7 +337,71 @@ The `jobsearch` and `scheduler` services also force the expected runtime mode vi
 - `dashboard`: Starts the Streamlit UI on port `8501` (use `--profile dashboard`)
 - `analyze`: Runs the analysis utilities against the existing database (use `--profile analyze`)
 
-### Option 2: Local Python
+### Option 2: Standalone Docker Compose (No Clone)
+
+If you want the clean Compose workflow without cloning this repository, create an empty folder and add this minimal `docker-compose.yml`:
+
+```yaml
+name: job-search-tool
+
+x-job-search-base: &job-search-base
+  image: vincenzoimp/job-search-tool:latest
+  user: "${JOB_SEARCH_UID:-1000}:${JOB_SEARCH_GID:-1000}"
+  volumes:
+    - ./config:/app/config
+    - ./data:/app/data
+    - ./results:/app/results
+    - ./logs:/app/logs
+
+services:
+  init-config:
+    <<: *job-search-base
+    command: python bootstrap_config.py --write-settings
+    restart: "no"
+
+  jobsearch:
+    <<: *job-search-base
+    command: python main.py
+    environment:
+      JOB_SEARCH_MODE: single
+
+  scheduler:
+    <<: *job-search-base
+    command: python main.py
+    environment:
+      JOB_SEARCH_MODE: scheduled
+    profiles:
+      - scheduler
+
+  dashboard:
+    <<: *job-search-base
+    command: streamlit run dashboard.py --server.address=0.0.0.0 --server.port=8501
+    ports:
+      - "8501:8501"
+    profiles:
+      - dashboard
+```
+
+Then run:
+
+```bash
+mkdir -p config data results logs
+
+# Optional on Linux: align container writes with your host user
+export JOB_SEARCH_UID=$(id -u)
+export JOB_SEARCH_GID=$(id -g)
+
+docker compose pull
+docker compose run --rm init-config
+
+# Edit config/settings.yaml, then:
+docker compose up jobsearch
+docker compose --profile dashboard up dashboard
+```
+
+This is the cleanest no-clone setup because you still get `init-config`, `jobsearch`, `scheduler`, and `dashboard` as named services instead of remembering long `docker run` commands.
+
+### Option 3: Local Python
 
 ```bash
 # Clone and navigate
@@ -361,7 +425,7 @@ cd scripts && python main.py
 streamlit run dashboard.py
 ```
 
-### Option 3: Local Docker Build (Developer Workflow)
+### Option 4: Local Docker Build (Developer Workflow)
 
 ```bash
 # Build the image from your local checkout instead of Docker Hub
@@ -643,6 +707,17 @@ docker compose --profile dashboard up dashboard
 
 # Local
 cd scripts && streamlit run dashboard.py
+```
+
+### Standalone Docker Compose Without Cloning
+
+If you do not want to clone this repository, the cleanest Docker-only path is still Compose. Use the standalone `docker-compose.yml` example from the Quick Start section above, then run:
+
+```bash
+docker compose pull
+docker compose run --rm init-config
+docker compose up jobsearch
+docker compose --profile dashboard up dashboard
 ```
 
 ### Direct Docker Hub Usage

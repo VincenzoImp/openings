@@ -18,6 +18,7 @@ from analyze_jobs import (
     analyze_remote,
     analyze_salary,
     generate_report,
+    load_latest_results,
 )
 
 
@@ -170,3 +171,37 @@ class TestGenerateReport:
         result = generate_report(sample_df, config)
         assert "total_jobs" in result
         assert result["total_jobs"] == 3
+
+
+class TestLoadLatestResults:
+    """Tests for loading the newest CSV export."""
+
+    def test_prefers_latest_mtime(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock
+
+        results_dir = tmp_path / "results"
+        results_dir.mkdir()
+
+        older = results_dir / "relevant_jobs_old.csv"
+        newer = results_dir / "relevant_jobs_new.csv"
+        older.write_text("title,company,location\nOld,Corp,Remote\n", encoding="utf-8")
+        newer.write_text("title,company,location\nNew,Corp,Remote\n", encoding="utf-8")
+
+        older_mtime = 1_700_000_000
+        newer_mtime = older_mtime + 60
+        older.touch()
+        newer.touch()
+        older.chmod(0o644)
+        newer.chmod(0o644)
+        import os
+
+        os.utime(older, (older_mtime, older_mtime))
+        os.utime(newer, (newer_mtime, newer_mtime))
+
+        config = MagicMock()
+        config.results_path = results_dir
+
+        df = load_latest_results(config)
+
+        assert df is not None
+        assert df.iloc[0]["title"] == "New"

@@ -62,19 +62,21 @@ class JobSearchScheduler:
         signal.signal(signal.SIGINT, shutdown_handler)
         signal.signal(signal.SIGTERM, shutdown_handler)
 
-    def _execute_job(self) -> None:
+    def _execute_job(self, *, is_retry: bool = False) -> None:
         """Execute the job search with error handling and retry logic."""
         self._run_count += 1
         run_start = datetime.now()
 
         # Schedule next run immediately based on START time (not end time)
         # This ensures consistent interval from start-to-start
-        if self._scheduler and self.config.scheduler.enabled:
+        if self._scheduler and self.config.scheduler.enabled and not is_retry:
             self._schedule_next_run(run_start)
 
-        log_section(self.logger, f"SCHEDULED RUN #{self._run_count}")
+        run_label = "RETRY RUN" if is_retry else "SCHEDULED RUN"
+        log_section(self.logger, f"{run_label} #{self._run_count}")
         self.logger.info(
-            f"Starting scheduled search at {run_start.strftime('%Y-%m-%d %H:%M:%S')}"
+            f"Starting {'retry' if is_retry else 'scheduled'} search at "
+            f"{run_start.strftime('%Y-%m-%d %H:%M:%S')}"
         )
 
         try:
@@ -110,7 +112,7 @@ class JobSearchScheduler:
         )
 
         # Log next scheduled run
-        if self._scheduler and self.config.scheduler.enabled:
+        if self._scheduler and self.config.scheduler.enabled and not is_retry:
             jobs = self._scheduler.get_jobs()
             main_job = next((j for j in jobs if j.id == "main_job"), None)
             if main_job:
@@ -154,6 +156,7 @@ class JobSearchScheduler:
                 trigger=DateTrigger(run_date=next_run_time),
                 id="main_job",
                 name="Job Search",
+                kwargs={"is_retry": False},
                 replace_existing=True,
                 max_instances=1,
             )
@@ -184,6 +187,7 @@ class JobSearchScheduler:
                 trigger="date",
                 run_date=retry_time,
                 id="retry_job",
+                kwargs={"is_retry": True},
                 replace_existing=True,
             )
             self.logger.info(
@@ -244,6 +248,7 @@ class JobSearchScheduler:
                 trigger=DateTrigger(run_date=first_run_time),
                 id="main_job",
                 name="Job Search",
+                kwargs={"is_retry": False},
                 max_instances=1,
             )
             self.logger.info(

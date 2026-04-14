@@ -891,6 +891,44 @@ class JobDatabase:
                 return None
             return self._row_to_record(row)
 
+    def get_jobs_by_ids(self, job_ids: list[str]) -> list[JobDBRecord]:
+        """
+        Get multiple jobs by their IDs, preserving the requested order.
+
+        Args:
+            job_ids: List of unique job identifiers.
+
+        Returns:
+            List of matching JobDBRecord instances.
+        """
+        if not job_ids:
+            return []
+
+        unique_job_ids = list(dict.fromkeys(job_ids))
+        records_by_id: dict[str, JobDBRecord] = {}
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            for i in range(0, len(unique_job_ids), self.SQLITE_VAR_LIMIT):
+                chunk = unique_job_ids[i : i + self.SQLITE_VAR_LIMIT]
+                placeholders = ",".join("?" * len(chunk))
+                query = f"""
+                    SELECT {_JOB_COLUMNS}
+                    FROM jobs
+                    WHERE job_id IN ({placeholders})
+                """
+                cursor.execute(query, chunk)
+                for row in cursor.fetchall():
+                    record = self._row_to_record(row)
+                    records_by_id[record.job_id] = record
+
+        return [
+            records_by_id[job_id]
+            for job_id in unique_job_ids
+            if job_id in records_by_id
+        ]
+
     def get_statistics(self) -> dict[str, int]:
         """
         Get database statistics.

@@ -57,6 +57,20 @@ def _sanitize_dataframe_for_excel(df: pd.DataFrame) -> pd.DataFrame:
     return sanitized
 
 
+def dataframe_to_csv_bytes(jobs_df: pd.DataFrame) -> bytes:
+    """
+    Render CSV bytes with spreadsheet-formula sanitization applied.
+
+    Args:
+        jobs_df: DataFrame to serialize.
+
+    Returns:
+        UTF-8 encoded CSV bytes.
+    """
+    safe_df = _sanitize_dataframe_for_excel(jobs_df)
+    return safe_df.to_csv(index=False).encode("utf-8")
+
+
 def _write_excel_workbook(jobs_df: pd.DataFrame, output: str | BytesIO) -> None:
     """Write a formatted Excel workbook to a path or in-memory buffer."""
     safe_df = _sanitize_dataframe_for_excel(jobs_df)
@@ -171,7 +185,8 @@ def save_results(
     # Save to CSV
     if config.output.save_csv:
         csv_file = results_dir / f"{filename_prefix}_{timestamp}.csv"
-        jobs_df.to_csv(csv_file, index=False)
+        safe_csv_df = _sanitize_dataframe_for_excel(jobs_df)
+        safe_csv_df.to_csv(csv_file, index=False)
         logger.info(f"Saved CSV: {csv_file}")
         csv_path = str(csv_file)
 

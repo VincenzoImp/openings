@@ -7,6 +7,7 @@ analytics, and database management for the Job Search Tool.
 
 from __future__ import annotations
 
+import html
 import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -32,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from config import Config, load_config  # noqa: E402
 from database import JobDatabase  # noqa: E402
-from exporter import dataframe_to_excel_bytes  # noqa: E402
+from exporter import dataframe_to_csv_bytes, dataframe_to_excel_bytes  # noqa: E402
 from models import JobDBRecord  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -171,6 +172,11 @@ def _record_to_dict(r: JobDBRecord) -> dict[str, Any]:
         "applied": r.applied,
         "bookmarked": r.bookmarked,
     }
+
+
+def _escape_html_text(value: object) -> str:
+    """Escape scraped text before rendering it inside HTML-enabled markdown."""
+    return html.escape("" if value is None else str(value), quote=True)
 
 
 def _score_badge_html(score: int) -> str:
@@ -526,6 +532,7 @@ def _render_job_card(job: dict[str, Any], idx: int, config: Config) -> None:
         # ---- Header row: title + tags | score badge ----
         hdr_left, hdr_right = st.columns([5, 1])
         with hdr_left:
+            safe_title = _escape_html_text(title)
             tags = ""
             if job.get("applied"):
                 tags += '<span class="tag tag-applied">Applied</span>'
@@ -533,7 +540,10 @@ def _render_job_card(job: dict[str, Any], idx: int, config: Config) -> None:
                 tags += '<span class="tag tag-bookmarked">Bookmarked</span>'
             if is_remote:
                 tags += '<span class="tag tag-remote">Remote</span>'
-            st.markdown(f"**{title}** &nbsp;{tags}", unsafe_allow_html=True)
+            st.markdown(
+                f"<strong>{safe_title}</strong> &nbsp;{tags}",
+                unsafe_allow_html=True,
+            )
 
         with hdr_right:
             badge = _score_badge_html(score)
@@ -542,22 +552,22 @@ def _render_job_card(job: dict[str, Any], idx: int, config: Config) -> None:
             st.markdown(badge, unsafe_allow_html=True)
 
         # ---- Meta lines ----
-        meta_parts: list[str] = [p for p in [company, location] if p]
+        meta_parts: list[str] = [_escape_html_text(p) for p in [company, location] if p]
         if job_type:
-            meta_parts.append(job_type.replace("_", " ").title())
+            meta_parts.append(_escape_html_text(job_type.replace("_", " ").title()))
         meta1 = " &middot; ".join(meta_parts)
 
         meta2_parts: list[str] = []
         if site:
-            meta2_parts.append(site.title())
+            meta2_parts.append(_escape_html_text(site.title()))
         posted_ago = _days_ago(date_posted)
         if posted_ago:
-            meta2_parts.append(f"Posted {posted_ago}")
+            meta2_parts.append(_escape_html_text(f"Posted {posted_ago}"))
         if salary:
-            meta2_parts.append(salary)
+            meta2_parts.append(_escape_html_text(salary))
         job_level = job.get("job_level")
         if job_level:
-            meta2_parts.append(job_level.title())
+            meta2_parts.append(_escape_html_text(job_level.title()))
         meta2 = " &middot; ".join(meta2_parts)
 
         st.markdown(
@@ -798,7 +808,7 @@ def _render_db_management(jobs: list[dict[str, Any]], config: Config) -> None:
             if export_df.empty:
                 st.warning("Database is empty.")
             else:
-                csv = export_df.to_csv(index=False).encode("utf-8")
+                csv = dataframe_to_csv_bytes(export_df)
                 st.download_button(
                     "Download full CSV",
                     csv,

@@ -40,7 +40,7 @@ def load_latest_results(config: Config) -> pd.DataFrame | None:
     results_dir = config.results_path
 
     if not results_dir.exists():
-        logger.error("No results directory found. Run search_jobs.py first.")
+        logger.error("No results directory found. Run main.py first.")
         return None
 
     # Find latest CSV file (prefer relevant_jobs over all_jobs)
@@ -50,10 +50,10 @@ def load_latest_results(config: Config) -> pd.DataFrame | None:
         csv_files = list(results_dir.glob("all_jobs_*.csv"))
 
     if not csv_files:
-        logger.error("No job results found. Run search_jobs.py first.")
+        logger.error("No job results found. Run main.py first.")
         return None
 
-    latest_file = max(csv_files, key=lambda f: f.stat().st_ctime)
+    latest_file = max(csv_files, key=lambda f: f.stat().st_mtime)
     logger.info(f"Loading: {latest_file.name}")
 
     try:

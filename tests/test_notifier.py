@@ -434,6 +434,57 @@ class TestTelegramNotifierSend:
             # Check that message was sent
             assert mock_bot.send_message.called
 
+    @pytest.mark.asyncio
+    async def test_send_notification_respects_send_summary_flag(
+        self, notifier, telegram_config, sample_notification_data
+    ):
+        """Test summary header is skipped when send_summary is disabled."""
+        telegram_config.send_summary = False
+        notifier = TelegramNotifier(telegram_config)
+
+        with patch("notifier.Bot") as mock_bot_class:
+            mock_bot = AsyncMock()
+            mock_bot.send_message = AsyncMock(return_value=MagicMock())
+            mock_bot_class.return_value = mock_bot
+
+            result = await notifier.send_notification(sample_notification_data)
+
+        assert result is True
+        sent_texts = [
+            call.kwargs["text"] for call in mock_bot.send_message.call_args_list
+        ]
+        assert all("Run Summary" not in text for text in sent_texts)
+
+    @pytest.mark.asyncio
+    async def test_send_notification_returns_false_when_nothing_to_send(
+        self, telegram_config
+    ):
+        """Test disabling all output paths does not report a fake success."""
+        telegram_config.send_summary = False
+        telegram_config.include_top_overall = False
+        notifier = TelegramNotifier(telegram_config)
+
+        empty_data = NotificationData(
+            run_timestamp=datetime.now(),
+            total_jobs_found=0,
+            new_jobs_count=0,
+            updated_jobs_count=0,
+            avg_score=0,
+            new_jobs=[],
+            top_jobs_overall=[],
+            total_jobs_in_db=0,
+        )
+
+        with patch("notifier.Bot") as mock_bot_class:
+            mock_bot = AsyncMock()
+            mock_bot.send_message = AsyncMock(return_value=MagicMock())
+            mock_bot_class.return_value = mock_bot
+
+            result = await notifier.send_notification(empty_data)
+
+        assert result is False
+        mock_bot.send_message.assert_not_called()
+
 
 # =============================================================================
 # TEST NOTIFICATION MANAGER

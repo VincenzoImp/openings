@@ -130,6 +130,17 @@ class TestJobDatabase:
         assert len(jobs) == 1
         assert jobs[0].first_seen == date.today()
 
+    def test_get_jobs_by_ids_preserves_requested_order(self, temp_db):
+        """Test batched retrieval returns rows in the caller's requested order."""
+        first_job = Job(title="First", company="Corp", location="Remote")
+        second_job = Job(title="Second", company="Corp", location="Remote")
+        temp_db.save_job(first_job)
+        temp_db.save_job(second_job)
+
+        jobs = temp_db.get_jobs_by_ids([second_job.job_id, first_job.job_id])
+
+        assert [job.title for job in jobs] == ["Second", "First"]
+
     def test_mark_as_applied(self, temp_db, sample_job):
         """Test mark_as_applied updates job status."""
         temp_db.save_job(sample_job)

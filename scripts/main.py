@@ -17,6 +17,7 @@ from config import get_config, reload_config
 from database import cleanup_old_jobs, get_database, recalculate_all_scores
 from exporter import save_results
 from logger import get_logger, log_section, setup_logging
+from models import generate_job_id
 from notifier import NotificationManager, create_notification_data
 from scheduler import create_scheduler
 from scoring import filter_relevant_jobs
@@ -29,6 +30,30 @@ from search_jobs import (
 if TYPE_CHECKING:
     from config import Config
     from database import JobDatabase
+    from models import JobDBRecord
+
+
+def _extract_job_ids_from_dataframe(jobs_df) -> list[str]:
+    """Build ordered unique job IDs from a result DataFrame."""
+    job_ids = []
+    seen_ids: set[str] = set()
+    for record in jobs_df.to_dict("records"):
+        job_id = generate_job_id(
+            str(record.get("title", "")),
+            str(record.get("company", "")),
+            str(record.get("location", "")),
+        )
+        if job_id not in seen_ids:
+            seen_ids.add(job_id)
+            job_ids.append(job_id)
+    return job_ids
+
+
+def _get_current_run_new_job_ids(db: JobDatabase, jobs_df) -> list[str]:
+    """Return the subset of result IDs that are new in the current run."""
+    current_job_ids = _extract_job_ids_from_dataframe(jobs_df)
+    new_job_id_set = db.get_new_job_ids(current_job_ids)
+    return [job_id for job_id in current_job_ids if job_id in new_job_id_set]
 
 
 def run_job_search() -> bool:
@@ -112,16 +137,19 @@ def run_job_search() -> bool:
         log_section(logger, "SAVING FILTERED RESULTS")
         save_results(relevant_jobs, config, "relevant_jobs")
 
+        current_run_new_job_ids = _get_current_run_new_job_ids(db, relevant_jobs)
+
         # Save to database and identify new jobs
         new_count, updated_count = db.save_jobs_from_dataframe(relevant_jobs)
         summary.new_jobs = new_count
 
         logger.info(f"Database updated: {new_count} new, {updated_count} existing")
 
+        current_run_new_jobs = db.get_jobs_by_ids(current_run_new_job_ids)
+
         # Embed new jobs in vector store
         if config.vector_search.enabled and config.vector_search.embed_on_save:
             try:
-                from models import generate_job_id
                 from vector_store import get_vector_store
 
                 # Add job_id column so vector store can use it as document ID
@@ -145,9 +173,13 @@ def run_job_search() -> bool:
         print_top_jobs(relevant_jobs)
 
         # Send notifications for new jobs
-        if new_count > 0:
+        if current_run_new_jobs:
             _send_notifications(
-                config, db, new_count, updated_count, len(relevant_jobs)
+                config,
+                db,
+                current_run_new_jobs,
+                updated_count,
+                len(relevant_jobs),
             )
 
         # Print summary
@@ -169,7 +201,7 @@ def run_job_search() -> bool:
 def _send_notifications(
     config: Config,
     db: JobDatabase,
-    new_count: int,
+    new_jobs: list[JobDBRecord],
     updated_count: int,
     total_found: int,
 ) -> None:
@@ -179,7 +211,7 @@ def _send_notifications(
     Args:
         config: Configuration object.
         db: Database instance.
-        new_count: Number of new jobs.
+        new_jobs: Jobs discovered for the first time in the current run.
         updated_count: Number of updated jobs.
         total_found: Total jobs found.
     """
@@ -198,9 +230,6 @@ def _send_notifications(
     log_section(logger, "SENDING NOTIFICATIONS")
 
     try:
-        # Get new jobs from database (jobs first seen today)
-        new_jobs = db.get_jobs_first_seen_today()
-
         # Get top jobs overall from database (for notifications)
         top_jobs_overall = []
         total_jobs_in_db = 0

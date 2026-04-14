@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 from exporter import (
     _sanitize_dataframe_for_excel,
     _sanitize_excel_value,
+    dataframe_to_csv_bytes,
     dataframe_to_excel_bytes,
     save_results,
 )
@@ -158,6 +159,22 @@ class TestSaveResults:
         assert len(loaded) == 2
         assert "title" in loaded.columns
 
+    def test_save_csv_sanitizes_formulas(self, output_config):
+        """Test that CSV output also sanitizes spreadsheet formula payloads."""
+        dangerous_df = pd.DataFrame(
+            {
+                "title": ['=HYPERLINK("http://evil","click")'],
+                "company": ["Corp"],
+                "location": ["Remote"],
+            }
+        )
+        output_config.output.save_excel = False
+
+        csv_path, _ = save_results(dangerous_df, output_config)
+
+        loaded = pd.read_csv(csv_path)
+        assert loaded.iloc[0]["title"].startswith("'=")
+
     def test_save_excel(self, output_config, sample_df, tmp_path):
         """Test saving to Excel creates a file."""
         output_config.output.save_csv = False
@@ -258,6 +275,24 @@ class TestDataframeToExcelBytes:
     def test_returns_empty_bytes_for_empty_dataframe(self):
         """Test empty DataFrames short-circuit cleanly."""
         assert dataframe_to_excel_bytes(pd.DataFrame()) == b""
+
+
+class TestDataframeToCsvBytes:
+    """Tests for in-memory CSV rendering."""
+
+    def test_sanitizes_formula_values(self):
+        """Test CSV bytes use the same spreadsheet safety rules as file exports."""
+        csv_bytes = dataframe_to_csv_bytes(
+            pd.DataFrame(
+                {
+                    "title": ["=CMD()"],
+                    "company": ["Corp"],
+                }
+            )
+        )
+
+        loaded = pd.read_csv(BytesIO(csv_bytes))
+        assert loaded.iloc[0]["title"] == "'=CMD()"
 
     def test_sanitizes_excel_output(self):
         """Test exported in-memory Excel keeps formula-like strings escaped."""

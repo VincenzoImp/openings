@@ -354,6 +354,7 @@ class TestJobSearchSchedulerRetry:
         call_kwargs = mock_sched.add_job.call_args
         assert call_kwargs.kwargs.get("trigger") == "date"
         assert call_kwargs.kwargs.get("id") == "retry_job"
+        assert call_kwargs.kwargs.get("kwargs") == {"is_retry": True}
         assert call_kwargs.kwargs.get("replace_existing") is True
 
     def test_schedule_retry_uses_configured_delay(self, config):
@@ -386,6 +387,21 @@ class TestJobSearchSchedulerRetry:
 
         # Should not raise
         scheduler._schedule_retry()
+
+    def test_retry_run_does_not_reschedule_main_job(self, config):
+        """Test retries do not shift the regular main-job cadence."""
+        mock_job = MagicMock(return_value=True)
+        scheduler = JobSearchScheduler(config, mock_job)
+
+        mock_sched = MagicMock()
+        scheduler._scheduler = mock_sched
+
+        scheduler._execute_job(is_retry=True)
+
+        scheduled_ids = [
+            call.kwargs.get("id") for call in mock_sched.add_job.call_args_list
+        ]
+        assert "main_job" not in scheduled_ids
 
 
 # =============================================================================

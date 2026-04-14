@@ -121,6 +121,85 @@ class TestRunJobSearch:
 
         assert result is False
 
+    @patch("main.reload_config")
+    @patch("main.setup_logging")
+    @patch("main.get_database")
+    @patch("main.print_banner")
+    @patch("main.search_jobs")
+    @patch("main.filter_relevant_jobs")
+    @patch("main.save_results")
+    @patch("main.print_top_jobs")
+    @patch("main._send_notifications")
+    def test_notifications_only_include_current_run_new_jobs(
+        self,
+        mock_send_notifications,
+        mock_print_top,
+        mock_save,
+        mock_filter,
+        mock_search,
+        mock_banner,
+        mock_get_db,
+        mock_setup_log,
+        mock_reload,
+    ):
+        """Test notifications use only jobs that are new in the current run."""
+        from main import run_job_search
+        from models import JobDBRecord, generate_job_id
+
+        mock_config = MagicMock()
+        mock_config.database.cleanup_enabled = False
+        mock_config.notifications.enabled = True
+        mock_config.notifications.telegram.include_top_overall = True
+        mock_config.vector_search.enabled = False
+        mock_reload.return_value = mock_config
+
+        relevant_df = pd.DataFrame(
+            [
+                {
+                    "title": "New Role",
+                    "company": "Acme",
+                    "location": "Remote",
+                },
+                {
+                    "title": "Existing Role",
+                    "company": "Acme",
+                    "location": "Remote",
+                },
+            ]
+        )
+        new_job_id = generate_job_id("New Role", "Acme", "Remote")
+
+        mock_db = MagicMock()
+        mock_db.get_statistics.return_value = {"total_jobs": 5}
+        mock_db.filter_blacklisted_jobs.side_effect = lambda df: df
+        mock_db.get_new_job_ids.return_value = {new_job_id}
+        mock_db.save_jobs_from_dataframe.return_value = (1, 1)
+        mock_db.get_jobs_by_ids.return_value = [
+            JobDBRecord(
+                job_id=new_job_id,
+                title="New Role",
+                company="Acme",
+                location="Remote",
+                relevance_score=25,
+                first_seen=pd.Timestamp("2026-04-14").date(),
+                last_seen=pd.Timestamp("2026-04-14").date(),
+            )
+        ]
+        mock_get_db.return_value = mock_db
+
+        mock_summary = MagicMock()
+        mock_search.return_value = (relevant_df, mock_summary)
+        mock_filter.return_value = relevant_df
+
+        result = run_job_search()
+
+        assert result is True
+        mock_db.get_jobs_by_ids.assert_called_once_with([new_job_id])
+        mock_send_notifications.assert_called_once()
+        notified_jobs = mock_send_notifications.call_args.args[2]
+        assert len(notified_jobs) == 1
+        assert notified_jobs[0].title == "New Role"
+
 
 class TestMain:
     """Tests for main() entry point."""

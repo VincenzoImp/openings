@@ -135,7 +135,7 @@ class TestSearchSingleQuery:
         )
 
         with (
-            patch("search_jobs.scrape_jobs", return_value=mock_df),
+            patch("search_jobs.scrape_jobs", return_value=mock_df) as mock_scrape,
             patch("search_jobs.fuzzy_post_filter", return_value=mock_df),
         ):
             query, loc, result_df, error = search_single_query(
@@ -147,6 +147,55 @@ class TestSearchSingleQuery:
             assert result_df is not None
             assert len(result_df) == 1
             assert error is None
+            assert mock_scrape.call_args.kwargs["job_type"] == "fulltime"
+
+    def test_search_respects_multiple_job_types(self, config):
+        """Test search issues one JobSpy request per configured job type."""
+        from search_jobs import search_single_query
+
+        config.search.job_types = ["fulltime", "contract"]
+        fulltime_df = pd.DataFrame(
+            [
+                {
+                    "title": "Dev",
+                    "company": "Corp",
+                    "location": "NYC",
+                    "description": "fulltime",
+                }
+            ]
+        )
+        contract_df = pd.DataFrame(
+            [
+                {
+                    "title": "Contract Dev",
+                    "company": "Corp",
+                    "location": "NYC",
+                    "description": "contract",
+                }
+            ]
+        )
+
+        with (
+            patch(
+                "search_jobs.scrape_jobs",
+                side_effect=[fulltime_df, contract_df],
+            ) as mock_scrape,
+            patch(
+                "search_jobs.fuzzy_post_filter",
+                side_effect=lambda df, *_args: df,
+            ),
+        ):
+            _query, _loc, result_df, error = search_single_query(
+                "developer", "NYC", config
+            )
+
+        assert error is None
+        assert result_df is not None
+        assert len(result_df) == 2
+        assert [call.kwargs["job_type"] for call in mock_scrape.call_args_list] == [
+            "fulltime",
+            "contract",
+        ]
 
     def test_search_returns_none(self, config):
         """Test search with no results returns None."""

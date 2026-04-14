@@ -340,10 +340,12 @@ class TelegramNotifier(BaseNotifier):
                 ]
             total_top_overall = len(top_overall_to_send)
 
-            # Build header message
-            header_message = self._build_header_message(
-                data, total_new_jobs, total_top_overall
-            )
+            # Build header message only when summary output is enabled.
+            header_message = ""
+            if self.config.send_summary:
+                header_message = self._build_header_message(
+                    data, total_new_jobs, total_top_overall
+                )
 
             # Build NEW JOBS chunk messages
             new_job_messages = []
@@ -383,9 +385,15 @@ class TelegramNotifier(BaseNotifier):
                     )
                     top_overall_messages.append(chunk_message)
 
+            if not header_message and not new_job_messages and not top_overall_messages:
+                self.logger.info("Nothing to send for Telegram notification")
+                return False
+
             self.logger.info(
                 f"Sending Telegram notification to {len(self.config.chat_ids)} recipient(s): "
-                f"1 header + {len(new_job_messages)} new job chunk(s) + {len(top_overall_messages)} top overall chunk(s)"
+                f"{1 if header_message else 0} header + "
+                f"{len(new_job_messages)} new job chunk(s) + "
+                f"{len(top_overall_messages)} top overall chunk(s)"
             )
 
             success_count = 0
@@ -394,13 +402,14 @@ class TelegramNotifier(BaseNotifier):
                     continue
 
                 try:
-                    # Send header message first
-                    await bot.send_message(
-                        chat_id=chat_id,
-                        text=header_message,
-                        parse_mode=ParseMode.MARKDOWN_V2,
-                        disable_web_page_preview=True,
-                    )
+                    # Send header message first when summary output is enabled.
+                    if header_message:
+                        await bot.send_message(
+                            chat_id=chat_id,
+                            text=header_message,
+                            parse_mode=ParseMode.MARKDOWN_V2,
+                            disable_web_page_preview=True,
+                        )
 
                     # Send NEW JOBS section header if there are new jobs
                     if new_job_messages:
