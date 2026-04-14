@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.2] - 2026-04-14
+
 ### Changed
 
-- **Release Workflow Simplification**: Docker images now publish automatically from version tags only, while `publish-main.yml` is a manual maintainer workflow and CI keeps the Docker smoke build on pull requests instead of every push to `main`
+- **Release Workflow Simplification**: Docker images now publish automatically from version tags only, while `publish-main.yml` is now a manual maintainer workflow and CI keeps the Docker smoke build on pull requests instead of every push to `main`
+- **Release Documentation Alignment**: Updated the README and changelog so the documented release flow matches the actual GitHub Actions behavior
 
 ## [4.3.1] - 2026-04-14
 
@@ -384,6 +387,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Structured Logging**: File and console logs with rotation
 - **Docker Support**: Containerized environment for cross-platform compatibility
 
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v4.3.2...HEAD
+[4.3.2]: https://github.com/VincenzoImp/job-search-tool/compare/v4.3.1...v4.3.2
+[4.3.1]: https://github.com/VincenzoImp/job-search-tool/compare/v4.3.0...v4.3.1
+[4.3.0]: https://github.com/VincenzoImp/job-search-tool/compare/v4.2.1...v4.3.0
+[4.2.1]: https://github.com/VincenzoImp/job-search-tool/compare/v4.2.0...v4.2.1
+[4.2.0]: https://github.com/VincenzoImp/job-search-tool/compare/v4.1.1...v4.2.0
 [4.1.1]: https://github.com/VincenzoImp/job-search-tool/compare/v4.1.0...v4.1.1
 [4.1.0]: https://github.com/VincenzoImp/job-search-tool/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v3.1.0...v4.0.0
