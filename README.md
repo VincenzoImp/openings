@@ -859,7 +859,13 @@ job-search-tool/
 
 ### Docker Publishing
 
-The repository includes `.github/workflows/publish-docker.yml` for multi-arch Docker Hub publishing with OCI labels, SBOM, and provenance attestations.
+The repository includes `.github/workflows/publish-docker.yml` for Docker Hub publishing with OCI labels, SBOM, and provenance attestations.
+
+Publishing policy:
+
+- pushes to `main` publish a fast `linux/amd64` image for `latest`, `main`, and `sha-*`
+- version tags such as `v4.2.0` publish the full multi-arch release (`linux/amd64` + `linux/arm64`)
+- workflow concurrency is enabled so older in-flight publishes on the same ref are cancelled automatically
 
 Maintainers should configure:
 
