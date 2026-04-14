@@ -34,8 +34,7 @@ def test_bootstrap_config_does_not_overwrite_existing_settings(tmp_path: Path) -
 
     assert result.settings_created is False
     assert (
-        settings_path.read_text(encoding="utf-8")
-        == "search:\n  results_wanted: 99\n"
+        settings_path.read_text(encoding="utf-8") == "search:\n  results_wanted: 99\n"
     )
 
 
