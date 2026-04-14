@@ -10,6 +10,7 @@ import hashlib
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
+import unicodedata
 
 
 def _parse_date(value: object) -> date | None:
@@ -54,8 +55,13 @@ def generate_job_id(title: str, company: str, location: str) -> str:
     Returns:
         Full SHA256 hash of job identifiers.
     """
-    identifier = f"{title}|{company}|{location}".lower()
-    return hashlib.sha256(identifier.encode()).hexdigest()
+    parts = []
+    for value in (title, company, location):
+        normalized = unicodedata.normalize("NFKC", value or "")
+        normalized = " ".join(normalized.split())
+        parts.append(normalized.casefold())
+    identifier = "|".join(parts)
+    return hashlib.sha256(identifier.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True)

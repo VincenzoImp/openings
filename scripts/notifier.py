@@ -401,6 +401,7 @@ class TelegramNotifier(BaseNotifier):
                 if not chat_id:
                     continue
 
+                chat_success = True
                 try:
                     # Send header message first when summary output is enabled.
                     if header_message:
@@ -431,6 +432,7 @@ class TelegramNotifier(BaseNotifier):
                                 disable_web_page_preview=True,
                             )
                         except TelegramError as chunk_err:
+                            chat_success = False
                             self.logger.error(
                                 f"Failed to send new jobs chunk {chunk_idx}/{len(new_job_messages)}: {chunk_err}"
                             )
@@ -448,6 +450,7 @@ class TelegramNotifier(BaseNotifier):
                                 disable_web_page_preview=True,
                             )
                         except TelegramError as chunk_err:
+                            chat_success = False
                             self.logger.error(
                                 f"Failed to send top overall chunk {chunk_idx}/{len(top_overall_messages)}: {chunk_err}"
                             )
@@ -455,8 +458,16 @@ class TelegramNotifier(BaseNotifier):
                                 f"Failed message length: {len(top_message)} chars"
                             )
 
-                    success_count += 1
-                    self.logger.info(f"Telegram notification sent to chat {chat_id}")
+                    if chat_success:
+                        success_count += 1
+                        self.logger.info(
+                            f"Telegram notification sent to chat {chat_id}"
+                        )
+                    else:
+                        self.logger.warning(
+                            "Telegram notification had delivery errors for chat %s",
+                            chat_id,
+                        )
                 except TelegramError as e:
                     # Log the full error for debugging MarkdownV2 issues
                     self.logger.error(f"Failed to send to chat {chat_id}: {e}")

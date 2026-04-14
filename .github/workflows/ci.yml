@@ -3,17 +3,63 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "README.md"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "AGENTS.md"
+      - "LICENSE"
   pull_request:
     branches: [main]
+    paths-ignore:
+      - "README.md"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "AGENTS.md"
+      - "LICENSE"
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   UV_VERSION: "0.11.6"
   UV_TORCH_BACKEND: cpu
 
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+          cache-suffix: quality
+
+      - name: Sync dependencies
+        run: uv sync --locked --no-install-project
+
+      - name: Run pre-commit hooks
+        run: uv run pre-commit run --all-files
+
+      - name: Type check with mypy
+        run: uv run mypy scripts/ --ignore-missing-imports
+
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
 
@@ -38,15 +84,13 @@ jobs:
       - name: Sync dependencies
         run: uv sync --locked --no-install-project
 
-      - name: Run pre-commit hooks
-        run: uv run pre-commit run --all-files
-
-      - name: Type check with mypy
-        run: uv run mypy scripts/ --ignore-missing-imports
-        continue-on-error: false
+      - name: Run tests with coverage
+        if: matrix.python-version == '3.11'
+        run: uv run pytest --cov=scripts --cov-report=xml --cov-fail-under=60
 
       - name: Run tests
-        run: uv run pytest --cov=scripts --cov-report=xml --cov-fail-under=60
+        if: matrix.python-version != '3.11'
+        run: uv run pytest
 
       - name: Upload coverage
         if: matrix.python-version == '3.11'
@@ -103,5 +147,4 @@ jobs:
           sbom: false
 
       - name: Test health check
-        run: |
-          docker run --rm job-search-tool:test python healthcheck.py || echo "Health check requires config file - expected in CI"
+        run: docker run --rm -e JOB_SEARCH_BOOTSTRAP_CONFIG=1 job-search-tool:test python healthcheck.py

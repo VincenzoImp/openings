@@ -433,3 +433,26 @@ class TestSetupLogging:
             handler_count2 = len(logger2.handlers)
 
             assert handler_count1 == handler_count2
+
+    def test_setup_logging_closes_replaced_file_handlers(self, temp_log_dir):
+        """Test repeated setup closes the previous rotating file handler."""
+        log_path = temp_log_dir / "test.log"
+        config = Config(
+            logging=LoggingConfig(
+                level="INFO",
+                file=str(log_path),
+            )
+        )
+
+        with patch.object(Config, "log_path", log_path):
+            logger = setup_logging(config)
+            old_file_handler = next(
+                handler
+                for handler in logger.handlers
+                if isinstance(handler, logging.handlers.RotatingFileHandler)
+            )
+
+            logger = setup_logging(config)
+
+            assert old_file_handler not in logger.handlers
+            assert old_file_handler.stream is None or old_file_handler.stream.closed

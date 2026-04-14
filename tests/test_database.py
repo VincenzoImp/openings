@@ -1,5 +1,7 @@
 """Tests for database module."""
 
+import hashlib
+import sqlite3
 import sys
 from datetime import date
 from pathlib import Path
@@ -407,3 +409,90 @@ class TestJobDatabase:
             temp_db.save_job(job)
 
         assert temp_db.get_job_count() == 5
+
+    def test_database_migrates_legacy_job_ids(self, temp_db_path):
+        """Test old hash IDs are normalized on first open without losing records."""
+        from database import JobDatabase
+        from models import generate_job_id
+
+        def legacy_job_id(title: str, company: str, location: str) -> str:
+            raw = f"{title}|{company}|{location}".lower()
+            return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+        active_title = "  Senior   Engineer  "
+        active_company = "Acme"
+        active_location = "Remote"
+        blacklisted_title = "Legacy\u00a0Role"
+
+        with sqlite3.connect(temp_db_path) as conn:
+            conn.execute(JobDatabase.CREATE_TABLE)
+            conn.execute(JobDatabase.CREATE_DELETED_TABLE)
+            conn.execute(
+                """
+                INSERT INTO jobs (
+                    job_id, title, company, location, job_url,
+                    site, job_type, is_remote, job_level, description,
+                    date_posted, min_amount, max_amount, currency, company_url,
+                    first_seen, last_seen, relevance_score, applied, bookmarked
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    legacy_job_id(active_title, active_company, active_location),
+                    active_title,
+                    active_company,
+                    active_location,
+                    None,
+                    "linkedin",
+                    "fulltime",
+                    True,
+                    "senior",
+                    "desc",
+                    "2024-01-15",
+                    None,
+                    None,
+                    "USD",
+                    None,
+                    "2024-01-15",
+                    "2024-01-16",
+                    25,
+                    False,
+                    True,
+                ),
+            )
+            conn.execute(
+                """
+                INSERT INTO deleted_jobs (
+                    job_id, title, company, location, blacklisted_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    legacy_job_id(blacklisted_title, active_company, active_location),
+                    blacklisted_title,
+                    active_company,
+                    active_location,
+                    "2024-01-17T12:00:00",
+                ),
+            )
+            conn.commit()
+
+        db = JobDatabase(temp_db_path)
+        active_job_id = generate_job_id(
+            "Senior Engineer",
+            active_company,
+            active_location,
+        )
+        blacklisted_job_id = generate_job_id(
+            "Legacy Role",
+            active_company,
+            active_location,
+        )
+
+        jobs = db.get_all_jobs()
+
+        assert len(jobs) == 1
+        assert jobs[0].job_id == active_job_id
+        assert db.job_exists(active_job_id) is True
+        assert db.is_job_blacklisted(blacklisted_job_id) is True
+        db.close()

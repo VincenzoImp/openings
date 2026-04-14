@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from io import BytesIO
 import sys
 import textwrap
 import types
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 from streamlit.testing.v1 import AppTest
 
@@ -117,3 +119,26 @@ def test_dashboard_bulk_delete_blacklists_selected_jobs(
 
     assert stats["total_jobs"] == 0
     assert stats["blacklisted"] == 2
+
+
+def test_filtered_jobs_csv_bytes_sanitizes_formula_payloads(monkeypatch) -> None:
+    """Filtered dashboard CSV exports should use the sanitized exporter path."""
+    vector_store_stub = types.ModuleType("vector_store")
+    vector_store_stub.get_vector_store = lambda *args, **kwargs: None
+    monkeypatch.setitem(sys.modules, "vector_store", vector_store_stub)
+    sys.modules.pop("dashboard", None)
+
+    from dashboard import _filtered_jobs_csv_bytes
+
+    csv_bytes = _filtered_jobs_csv_bytes(
+        [
+            {
+                "title": '=HYPERLINK("http://evil","click")',
+                "company": "Corp",
+                "location": "Remote",
+            }
+        ]
+    )
+
+    loaded = pd.read_csv(BytesIO(csv_bytes))
+    assert loaded.iloc[0]["title"].startswith("'=")

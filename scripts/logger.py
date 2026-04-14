@@ -80,8 +80,10 @@ def setup_logging(config: Config) -> logging.Logger:
     logger = logging.getLogger("job_search")
     logger.setLevel(getattr(logging, config.logging.level.upper(), logging.INFO))
 
-    # Remove existing handlers
-    logger.handlers.clear()
+    # Remove and close existing handlers so repeated setup calls don't leak FDs.
+    for handler in list(logger.handlers):
+        logger.removeHandler(handler)
+        handler.close()
 
     # Console handler with colors
     console_handler = logging.StreamHandler(sys.stdout)

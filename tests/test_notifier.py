@@ -485,6 +485,54 @@ class TestTelegramNotifierSend:
         assert result is False
         mock_bot.send_message.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_send_notification_returns_false_on_partial_chunk_failure(
+        self,
+        telegram_config,
+    ):
+        """A chat should not count as successful if the job chunks fail to deliver."""
+        telegram_config.chat_ids = ["12345"]
+        notifier = TelegramNotifier(telegram_config)
+
+        data = NotificationData(
+            run_timestamp=datetime.now(),
+            total_jobs_found=1,
+            new_jobs_count=1,
+            updated_jobs_count=0,
+            avg_score=50.0,
+            new_jobs=[
+                JobDBRecord(
+                    job_id="1",
+                    title="Job 1",
+                    company="Corp",
+                    location="Remote",
+                    relevance_score=50,
+                    first_seen=datetime.now().date(),
+                    last_seen=datetime.now().date(),
+                )
+            ],
+            top_jobs_overall=[],
+            total_jobs_in_db=1,
+        )
+
+        with (
+            patch("notifier.TelegramError", Exception),
+            patch("notifier.Bot") as mock_bot_class,
+        ):
+            mock_bot = AsyncMock()
+            mock_bot.send_message = AsyncMock(
+                side_effect=[
+                    MagicMock(),  # summary header
+                    MagicMock(),  # new jobs section header
+                    Exception("chunk failed"),  # actual content chunk
+                ]
+            )
+            mock_bot_class.return_value = mock_bot
+
+            result = await notifier.send_notification(data)
+
+        assert result is False
+
 
 # =============================================================================
 # TEST NOTIFICATION MANAGER

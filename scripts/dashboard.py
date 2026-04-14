@@ -242,6 +242,13 @@ def _get_db(config: Config) -> JobDatabase:
     return JobDatabase(config.database_path)
 
 
+def _filtered_jobs_csv_bytes(jobs: list[dict[str, Any]]) -> bytes:
+    """Serialize filtered jobs with spreadsheet-formula sanitization applied."""
+    if not jobs:
+        return b""
+    return dataframe_to_csv_bytes(pd.DataFrame(jobs))
+
+
 def _sync_vector_store_deletions(config: Config, db: JobDatabase) -> None:
     """Keep the vector index aligned after manual deletions from the dashboard."""
     if not (VECTOR_AVAILABLE and config.vector_search.enabled):
@@ -396,7 +403,7 @@ def _render_sidebar(
 
         # -- Export / Reset --
         if jobs:
-            csv_bytes = pd.DataFrame(jobs).to_csv(index=False).encode("utf-8")
+            csv_bytes = _filtered_jobs_csv_bytes(jobs)
             st.download_button(
                 "Export filtered CSV",
                 csv_bytes,
@@ -1085,7 +1092,4 @@ def main() -> None:
 # Execution
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    main()
-else:
-    # Invoked via `streamlit run scripts/dashboard.py`
     main()

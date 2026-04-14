@@ -8,7 +8,7 @@ from pathlib import Path
 # Add scripts directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
-from models import Job, JobDBRecord, SearchSummary
+from models import Job, JobDBRecord, SearchSummary, generate_job_id
 
 
 class TestJob:
@@ -46,6 +46,21 @@ class TestJob:
         job2 = Job(title="Engineer", company="Corp", location="NYC")
 
         assert job1.job_id != job2.job_id
+
+    def test_job_id_ignores_trivial_whitespace_differences(self):
+        """Test that leading/trailing and repeated whitespace do not change the ID."""
+        job1 = Job(title="Senior Engineer", company="Acme", location="Remote")
+        job2 = Job(title="  Senior   Engineer  ", company="Acme", location="Remote")
+
+        assert job1.job_id == job2.job_id
+
+    def test_job_id_normalizes_unicode_whitespace(self):
+        """Test that equivalent Unicode spacing normalizes to the same ID."""
+        assert generate_job_id("Senior Engineer", "Acme", "Remote") == generate_job_id(
+            "Senior\u00a0Engineer",
+            "Acme",
+            "Remote",
+        )
 
     def test_job_from_dict(self):
         """Test Job.from_dict() conversion."""

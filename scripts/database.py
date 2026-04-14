@@ -22,12 +22,38 @@ from logger import get_logger
 from models import Job, JobDBRecord, generate_job_id
 from scoring import calculate_relevance_score
 
-_JOB_COLUMNS = """job_id, title, company, location, job_url,
-    site, job_type, is_remote, job_level, description,
-    date_posted, min_amount, max_amount, currency, company_url,
-    first_seen, last_seen, relevance_score, applied, bookmarked"""
+_JOB_FIELD_NAMES = (
+    "job_id",
+    "title",
+    "company",
+    "location",
+    "job_url",
+    "site",
+    "job_type",
+    "is_remote",
+    "job_level",
+    "description",
+    "date_posted",
+    "min_amount",
+    "max_amount",
+    "currency",
+    "company_url",
+    "first_seen",
+    "last_seen",
+    "relevance_score",
+    "applied",
+    "bookmarked",
+)
+_JOB_COLUMNS = ", ".join(_JOB_FIELD_NAMES)
 
-_DELETED_JOB_COLUMNS = "job_id, title, company, location, blacklisted_at"
+_DELETED_JOB_FIELD_NAMES = (
+    "job_id",
+    "title",
+    "company",
+    "location",
+    "blacklisted_at",
+)
+_DELETED_JOB_COLUMNS = ", ".join(_DELETED_JOB_FIELD_NAMES)
 
 
 class JobDatabase:
@@ -80,6 +106,13 @@ class JobDatabase:
     CREATE_DELETED_INDEX = """
         CREATE INDEX IF NOT EXISTS idx_deleted_jobs_blacklisted_at
         ON deleted_jobs(blacklisted_at)
+    """
+
+    CREATE_META_TABLE = """
+        CREATE TABLE IF NOT EXISTS app_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
     """
 
     # Migration: Add new columns to existing databases
@@ -168,6 +201,7 @@ class JobDatabase:
             cursor.execute(self.CREATE_INDEX)
             cursor.execute(self.CREATE_DELETED_TABLE)
             cursor.execute(self.CREATE_DELETED_INDEX)
+            cursor.execute(self.CREATE_META_TABLE)
 
             # Run migrations for existing databases
             for migration in self.MIGRATE_COLUMNS:
@@ -182,6 +216,16 @@ class JobDatabase:
                     ):
                         self.logger.error(f"Migration failed: {migration}")
                         raise
+
+            if self._get_meta_value(cursor, "job_id_format") != "normalized_v2":
+                migrated_jobs, migrated_blacklist = self._migrate_job_ids(cursor)
+                self._set_meta_value(cursor, "job_id_format", "normalized_v2")
+                if migrated_jobs or migrated_blacklist:
+                    self.logger.info(
+                        "Normalized stored job IDs: %d active, %d blacklisted",
+                        migrated_jobs,
+                        migrated_blacklist,
+                    )
 
             conn.commit()
 
@@ -257,6 +301,184 @@ class JobDatabase:
                 existing_ids.update(row[0] for row in cursor.fetchall())
 
         return existing_ids
+
+    @staticmethod
+    def _get_meta_value(cursor: sqlite3.Cursor, key: str) -> str | None:
+        """Return a value from the app metadata table."""
+        cursor.execute("SELECT value FROM app_meta WHERE key = ?", (key,))
+        row = cursor.fetchone()
+        return row[0] if row is not None else None
+
+    @staticmethod
+    def _set_meta_value(cursor: sqlite3.Cursor, key: str, value: str) -> None:
+        """Store a value in the app metadata table."""
+        cursor.execute(
+            """
+            INSERT INTO app_meta (key, value)
+            VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """,
+            (key, value),
+        )
+
+    @staticmethod
+    def _is_missing_value(value: object) -> bool:
+        """Return True for empty/whitespace-only values."""
+        return value is None or (isinstance(value, str) and not value.strip())
+
+    @classmethod
+    def _merge_job_record(
+        cls,
+        base: dict[str, object],
+        candidate: dict[str, object],
+    ) -> None:
+        """Merge duplicate normalized job rows into a single record."""
+        for field in (
+            "title",
+            "company",
+            "location",
+            "job_url",
+            "site",
+            "job_type",
+            "is_remote",
+            "job_level",
+            "date_posted",
+            "min_amount",
+            "max_amount",
+            "currency",
+            "company_url",
+        ):
+            if cls._is_missing_value(base.get(field)) and not cls._is_missing_value(
+                candidate.get(field)
+            ):
+                base[field] = candidate[field]
+
+        candidate_description = candidate.get("description")
+        base_description = base.get("description")
+        if not cls._is_missing_value(candidate_description) and (
+            cls._is_missing_value(base_description)
+            or len(str(candidate_description)) > len(str(base_description))
+        ):
+            base["description"] = candidate_description
+
+        first_seen_values = [
+            str(value)
+            for value in (base.get("first_seen"), candidate.get("first_seen"))
+            if value is not None
+        ]
+        if first_seen_values:
+            base["first_seen"] = min(first_seen_values)
+
+        last_seen_values = [
+            str(value)
+            for value in (base.get("last_seen"), candidate.get("last_seen"))
+            if value is not None
+        ]
+        if last_seen_values:
+            base["last_seen"] = max(last_seen_values)
+
+        base["relevance_score"] = max(
+            int(str(base.get("relevance_score") or 0)),
+            int(str(candidate.get("relevance_score") or 0)),
+        )
+        base["applied"] = bool(base.get("applied")) or bool(candidate.get("applied"))
+        base["bookmarked"] = bool(base.get("bookmarked")) or bool(
+            candidate.get("bookmarked")
+        )
+
+    @classmethod
+    def _merge_deleted_job_record(
+        cls,
+        base: dict[str, object],
+        candidate: dict[str, object],
+    ) -> None:
+        """Merge duplicate normalized blacklist rows."""
+        for field in ("title", "company", "location"):
+            if cls._is_missing_value(base.get(field)) and not cls._is_missing_value(
+                candidate.get(field)
+            ):
+                base[field] = candidate[field]
+
+        timestamps = [
+            str(value)
+            for value in (base.get("blacklisted_at"), candidate.get("blacklisted_at"))
+            if value is not None
+        ]
+        if timestamps:
+            base["blacklisted_at"] = min(timestamps)
+
+    def _migrate_job_ids(self, cursor: sqlite3.Cursor) -> tuple[int, int]:
+        """Normalize historical job IDs and merge duplicates created by formatting."""
+        migrated_jobs = 0
+        migrated_blacklist = 0
+
+        cursor.execute(f"SELECT {_JOB_COLUMNS} FROM jobs")
+        job_rows = cursor.fetchall()
+        merged_jobs: dict[str, dict[str, object]] = {}
+        for row in job_rows:
+            record = {field: row[field] for field in _JOB_FIELD_NAMES}
+            canonical_job_id = generate_job_id(
+                str(record["title"] or ""),
+                str(record["company"] or ""),
+                str(record["location"] or ""),
+            )
+            if canonical_job_id != record["job_id"]:
+                migrated_jobs += 1
+            record["job_id"] = canonical_job_id
+
+            existing = merged_jobs.get(canonical_job_id)
+            if existing is None:
+                merged_jobs[canonical_job_id] = record
+            else:
+                self._merge_job_record(existing, record)
+
+        if migrated_jobs or len(merged_jobs) != len(job_rows):
+            cursor.execute("DELETE FROM jobs")
+            cursor.executemany(
+                f"""
+                INSERT INTO jobs ({_JOB_COLUMNS})
+                VALUES ({",".join("?" for _ in _JOB_FIELD_NAMES)})
+                """,
+                [
+                    tuple(record[field] for field in _JOB_FIELD_NAMES)
+                    for record in merged_jobs.values()
+                ],
+            )
+
+        cursor.execute(f"SELECT {_DELETED_JOB_COLUMNS} FROM deleted_jobs")
+        deleted_rows = cursor.fetchall()
+        merged_deleted_jobs: dict[str, dict[str, object]] = {}
+        for row in deleted_rows:
+            record = {field: row[field] for field in _DELETED_JOB_FIELD_NAMES}
+            canonical_job_id = generate_job_id(
+                str(record["title"] or ""),
+                str(record["company"] or ""),
+                str(record["location"] or ""),
+            )
+            if canonical_job_id != record["job_id"]:
+                migrated_blacklist += 1
+            record["job_id"] = canonical_job_id
+
+            existing = merged_deleted_jobs.get(canonical_job_id)
+            if existing is None:
+                merged_deleted_jobs[canonical_job_id] = record
+            else:
+                self._merge_deleted_job_record(existing, record)
+
+        if migrated_blacklist or len(merged_deleted_jobs) != len(deleted_rows):
+            cursor.execute("DELETE FROM deleted_jobs")
+            cursor.executemany(
+                f"""
+                INSERT INTO deleted_jobs ({_DELETED_JOB_COLUMNS})
+                VALUES ({",".join("?" for _ in _DELETED_JOB_FIELD_NAMES)})
+                """,
+                [
+                    tuple(record[field] for field in _DELETED_JOB_FIELD_NAMES)
+                    for record in merged_deleted_jobs.values()
+                ],
+            )
+
+        return migrated_jobs, migrated_blacklist
 
     def _batch_query_blacklisted_ids(self, job_ids: list[str]) -> set[str]:
         """

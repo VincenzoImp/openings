@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.1] - 2026-04-14
+
+### Changed
+
+- **CI Pipeline Efficiency**: Split formatting/type checks out of the Python-version matrix, keep coverage on Python 3.11 only, skip docs-only runs, and cancel superseded in-flight CI runs
+- **Docker CI Validation**: The Docker job now bootstraps a real config and runs the health check for the built image instead of masking failures
+
+### Fixed
+
+- **Dashboard CSV Safety**: Filtered dashboard CSV exports now reuse the shared spreadsheet sanitization path, preventing formula-injection regressions
+- **Logger Handler Lifecycle**: Repeated logging setup now closes replaced handlers, avoiding file-descriptor leaks in long-lived scheduled runs
+- **Telegram Delivery Reporting**: Notification success now reflects whether job chunks were actually delivered instead of treating partial failures as success
+- **Stable Job IDs**: Internal job IDs now normalize trivial whitespace and Unicode spacing differences, and existing databases/blacklists are migrated automatically on startup
+- **Dashboard Import Side Effects**: Importing `dashboard.py` no longer executes the Streamlit app outside `streamlit run`
+
 ## [4.3.0] - 2026-04-14
 
 ### Added
