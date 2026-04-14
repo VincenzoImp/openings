@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+from io import BytesIO
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
+from openpyxl import load_workbook
 
 # Add scripts directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
-from exporter import _sanitize_dataframe_for_excel, _sanitize_excel_value, save_results
+from exporter import (
+    _sanitize_dataframe_for_excel,
+    _sanitize_excel_value,
+    dataframe_to_excel_bytes,
+    save_results,
+)
 
 
 # =============================================================================
@@ -243,3 +250,27 @@ class TestSaveResults:
         # Read back and verify sanitization
         loaded = pd.read_excel(excel_path)
         assert loaded.iloc[0]["title"] == "'=CMD()"
+
+
+class TestDataframeToExcelBytes:
+    """Tests for in-memory Excel rendering."""
+
+    def test_returns_empty_bytes_for_empty_dataframe(self):
+        """Test empty DataFrames short-circuit cleanly."""
+        assert dataframe_to_excel_bytes(pd.DataFrame()) == b""
+
+    def test_sanitizes_excel_output(self):
+        """Test exported in-memory Excel keeps formula-like strings escaped."""
+        df = pd.DataFrame(
+            {
+                "title": ["=CMD()"],
+                "company": ["Corp"],
+                "relevance_score": [42],
+            }
+        )
+
+        excel_bytes = dataframe_to_excel_bytes(df)
+
+        workbook = load_workbook(BytesIO(excel_bytes))
+        worksheet = workbook["Jobs"]
+        assert worksheet["A2"].value == "'=CMD()"

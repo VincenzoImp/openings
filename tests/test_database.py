@@ -40,6 +40,30 @@ class TestJobDatabase:
 
         assert temp_db.job_exists(sample_job.job_id) is True
 
+    def test_blacklist_job_removes_active_job(self, temp_db, sample_job):
+        """Test blacklisting removes a job and persists its identifier."""
+        temp_db.save_job(sample_job)
+
+        result = temp_db.blacklist_job(sample_job.job_id)
+
+        assert result is True
+        assert temp_db.job_exists(sample_job.job_id) is False
+        assert temp_db.is_job_blacklisted(sample_job.job_id) is True
+        assert temp_db.get_all_jobs() == []
+
+        stats = temp_db.get_statistics()
+        assert stats["blacklisted"] == 1
+
+    def test_save_job_skips_blacklisted(self, temp_db, sample_job):
+        """Test blacklisted jobs are not re-saved into the active table."""
+        temp_db.save_job(sample_job)
+        temp_db.blacklist_job(sample_job.job_id)
+
+        is_new = temp_db.save_job(sample_job)
+
+        assert is_new is False
+        assert temp_db.get_all_jobs() == []
+
     def test_get_new_job_ids(self, temp_db, sample_job):
         """Test get_new_job_ids identifies unseen jobs."""
         temp_db.save_job(sample_job)
@@ -48,6 +72,17 @@ class TestJobDatabase:
         job_ids = [sample_job.job_id, new_job.job_id]
 
         new_ids = temp_db.get_new_job_ids(job_ids)
+
+        assert sample_job.job_id not in new_ids
+        assert new_job.job_id in new_ids
+
+    def test_get_new_job_ids_excludes_blacklisted(self, temp_db, sample_job):
+        """Test blacklisted jobs are never considered new again."""
+        temp_db.save_job(sample_job)
+        temp_db.blacklist_job(sample_job.job_id)
+
+        new_job = Job(title="New Role", company="Other Corp", location="LA")
+        new_ids = temp_db.get_new_job_ids([sample_job.job_id, new_job.job_id])
 
         assert sample_job.job_id not in new_ids
         assert new_job.job_id in new_ids
@@ -122,6 +157,7 @@ class TestJobDatabase:
         assert stats["new_today"] == 1
         assert stats["seen_today"] == 1
         assert stats["applied"] == 0
+        assert stats["blacklisted"] == 0
 
     def test_export_to_dataframe(self, temp_db, sample_job):
         """Test export_to_dataframe creates valid DataFrame."""
@@ -169,6 +205,38 @@ class TestJobDatabase:
         jobs = temp_db.get_all_jobs()
         assert len(jobs) == 2
 
+    def test_save_jobs_from_dataframe_skips_blacklisted(self, temp_db):
+        """Test save_jobs_from_dataframe ignores blacklisted identifiers."""
+        blacklisted_job = Job(title="Job 1", company="Corp A", location="NYC")
+        temp_db.save_job(blacklisted_job)
+        temp_db.blacklist_job(blacklisted_job.job_id)
+
+        df = pd.DataFrame(
+            [
+                {
+                    "title": "Job 1",
+                    "company": "Corp A",
+                    "location": "NYC",
+                    "site": "linkedin",
+                },
+                {
+                    "title": "Job 2",
+                    "company": "Corp B",
+                    "location": "LA",
+                    "site": "indeed",
+                },
+            ]
+        )
+
+        new_count, updated_count = temp_db.save_jobs_from_dataframe(df)
+
+        assert new_count == 1
+        assert updated_count == 0
+
+        jobs = temp_db.get_all_jobs()
+        assert len(jobs) == 1
+        assert jobs[0].title == "Job 2"
+
     def test_relevance_score_only_increases(self, temp_db, sample_job):
         """Test relevance score only updates if higher."""
         from dataclasses import replace
@@ -193,6 +261,24 @@ class TestJobDatabase:
         df = pd.DataFrame(
             [
                 {"title": "Existing", "company": "Corp", "location": "NYC"},
+                {"title": "New Job", "company": "Corp", "location": "LA"},
+            ]
+        )
+
+        filtered = temp_db.filter_new_jobs(df)
+
+        assert len(filtered) == 1
+        assert filtered.iloc[0]["title"] == "New Job"
+
+    def test_filter_new_jobs_excludes_blacklisted(self, temp_db):
+        """Test filter_new_jobs excludes jobs that were manually blacklisted."""
+        blacklisted_job = Job(title="Do Not Keep", company="Corp", location="NYC")
+        temp_db.save_job(blacklisted_job)
+        temp_db.blacklist_job(blacklisted_job.job_id)
+
+        df = pd.DataFrame(
+            [
+                {"title": "Do Not Keep", "company": "Corp", "location": "NYC"},
                 {"title": "New Job", "company": "Corp", "location": "LA"},
             ]
         )
