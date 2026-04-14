@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.1] - 2026-04-14
+
+### Fixed
+
+- **Search Job-Type Filtering**: `search.job_types` is now applied to JobSpy requests so configured employment-type filters affect real searches
+- **Run-Scoped Notifications**: Telegram notifications now include only jobs that are new in the current run instead of replaying all jobs first seen on the same day
+- **Dashboard HTML Escaping**: Job metadata rendered with `unsafe_allow_html=True` is now escaped first to avoid markup injection from scraped content
+- **CSV Formula Injection Protection**: CSV exports now reuse the spreadsheet sanitization path already used for Excel exports
+- **Scheduler Retry Drift**: Retry runs no longer shift the cadence of the main scheduled job
+- **Latest Results Detection**: `analyze_jobs.py` now uses file modification time (`mtime`) when picking the latest results export
+- **CI Formatting Consistency**: Dashboard smoke-test formatting now matches `ruff format`, keeping `main` green in CI
+
+## [4.2.0] - 2026-04-14
+
 ### Added
 
 - **Persistent Deleted-Job Blacklist**: Deleting jobs from the dashboard now stores their internal `job_id` in a dedicated blacklist so future searches skip them automatically
