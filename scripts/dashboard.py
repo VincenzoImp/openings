@@ -33,7 +33,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from config import Config, load_config  # noqa: E402
 from database import JobDatabase  # noqa: E402
-from exporter import dataframe_to_csv_bytes, dataframe_to_excel_bytes  # noqa: E402
+from exporter import (  # noqa: E402
+    dataframe_to_csv_bytes,
+    export_dataframe,
+)
 from models import JobDBRecord  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -783,137 +786,213 @@ def _render_analytics(jobs: list[dict[str, Any]]) -> None:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def _render_db_management(jobs: list[dict[str, Any]], config: Config) -> None:
-    """Render database stats, export options, and bulk operations."""
+def _render_db_management(
+    jobs: list[dict[str, Any]],
+    filtered_jobs: list[dict[str, Any]],
+    config: Config,
+) -> None:
+    """Render the Database tab: health, histogram, smart cleanup, export, danger."""
     stats = _fetch_statistics(str(config.database_path))
 
-    st.subheader("Database overview")
+    # ------------------------------------------------------------------ Health
+    st.subheader("Health")
+    db_path = config.database_path
+    db_size_mb = (
+        round(db_path.stat().st_size / (1024 * 1024), 2) if db_path.exists() else 0
+    )
     m1, m2, m3, m4, m5, m6 = st.columns(6)
-    m1.metric("Total jobs", stats.get("total_jobs", 0))
-    m2.metric("Seen today", stats.get("seen_today", 0))
-    m3.metric("New today", stats.get("new_today", 0))
+    m1.metric("Total", stats.get("total_jobs", 0))
+    m2.metric("Avg score", stats.get("avg_relevance_score", 0))
+    bookmarked_count = sum(1 for j in jobs if j.get("bookmarked"))
+    m3.metric("Bookmarked", bookmarked_count)
     m4.metric("Applied", stats.get("applied", 0))
-    m5.metric("Avg score", stats.get("avg_relevance_score", 0))
-    m6.metric("Blacklisted", stats.get("blacklisted", 0))
+    m5.metric("Blacklisted", stats.get("blacklisted", 0))
+    m6.metric("DB size (MB)", db_size_mb)
 
     st.markdown("---")
 
-    # ---- Export ----
+    # ---------------------------------------------------------- Score distribution
+    st.subheader("Score distribution")
+    db = _get_db(config)
+    try:
+        distribution = db.get_score_distribution(bin_size=5)
+    finally:
+        db.close()
+
+    if distribution:
+        dist_df = pd.DataFrame(distribution, columns=["score_bin", "count"]).set_index(
+            "score_bin"
+        )
+        st.bar_chart(dist_df)
+        st.caption(
+            f"Reference lines: save_threshold = {config.scoring.save_threshold}, "
+            f"notify_threshold = {config.scoring.notify_threshold}"
+        )
+    else:
+        st.info("Database is empty.")
+
+    st.markdown("---")
+
+    # -------------------------------------------------------------- Smart cleanup
+    st.subheader("Smart cleanup")
+    st.caption(
+        "Bookmarked and applied jobs are always protected. Previews reflect "
+        "jobs that would actually be removed."
+    )
+
+    db = _get_db(config)
+    try:
+        # Card 1: below score
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            below_score = st.number_input(
+                "Delete jobs below score",
+                value=int(config.scoring.save_threshold),
+                step=1,
+                key="cleanup_below_score_value",
+            )
+            preview = db.count_jobs_below_score(int(below_score))
+            st.caption(f"{preview} job(s) would be removed.")
+        with c2:
+            if st.button(
+                "Delete", key="cleanup_below_score_btn", disabled=preview == 0
+            ):
+                n = db.delete_jobs_below_score(int(below_score))
+                _sync_vector_store_deletions(config, db)
+                _clear_caches()
+                st.toast(f"Deleted {n} job(s) below score {below_score}")
+                st.rerun()
+
+        # Card 2: stale
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            stale_days = st.number_input(
+                "Delete stale jobs older than (days)",
+                value=int(config.database.retention.max_age_days),
+                min_value=1,
+                step=1,
+                key="cleanup_stale_value",
+            )
+            preview = db.count_stale_jobs(int(stale_days))
+            st.caption(f"{preview} job(s) would be removed.")
+        with c2:
+            if st.button("Delete", key="cleanup_stale_btn", disabled=preview == 0):
+                n = db.delete_stale_jobs(int(stale_days))
+                _sync_vector_store_deletions(config, db)
+                _clear_caches()
+                st.toast(f"Deleted {n} stale job(s)")
+                st.rerun()
+
+        # Card 3: blacklist purge
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            bl_days = st.number_input(
+                "Purge blacklist older than (days)",
+                value=int(config.database.retention.purge_blacklist_after_days),
+                min_value=1,
+                step=1,
+                key="cleanup_blacklist_value",
+            )
+            preview = db.count_blacklist_older_than(int(bl_days))
+            st.caption(f"{preview} blacklist row(s) would be purged.")
+        with c2:
+            if st.button("Purge", key="cleanup_blacklist_btn", disabled=preview == 0):
+                n = db.purge_blacklist(older_than_days=int(bl_days))
+                _clear_caches()
+                st.toast(f"Purged {n} blacklist row(s)")
+                st.rerun()
+
+        # Card 4: full reconcile
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            st.markdown("**Apply settings.yaml retention now**")
+            st.caption("Runs the same reconciliation that fires at every boot.")
+        with c2:
+            if st.button("Reconcile", key="cleanup_reconcile_btn"):
+                report = db.reconcile_with_config(config)
+                _sync_vector_store_deletions(config, db)
+                _clear_caches()
+                st.toast(
+                    f"Reconciled: {report.total_deleted} removed "
+                    f"({report.deleted_below_score} score, "
+                    f"{report.deleted_stale} stale, "
+                    f"{report.purged_blacklist} blacklist)"
+                )
+                st.rerun()
+    finally:
+        db.close()
+
+    st.markdown("---")
+
+    # ----------------------------------------------------------------- Export
     st.subheader("Export")
+    st.caption("Exports use the currently filtered job view from the Jobs tab.")
     ex1, ex2 = st.columns(2)
+    if filtered_jobs:
+        df_for_export = pd.DataFrame(filtered_jobs)
+    else:
+        df_for_export = None
 
     with ex1:
-        if st.button("Generate CSV export", key="db_csv"):
-            db = _get_db(config)
-            export_df = db.export_to_dataframe()
-            db.close()
-            if export_df.empty:
-                st.warning("Database is empty.")
-            else:
-                csv = dataframe_to_csv_bytes(export_df)
-                st.download_button(
-                    "Download full CSV",
-                    csv,
-                    file_name=f"jobs_full_{date.today().isoformat()}.csv",
-                    mime="text/csv",
-                    key="dl_full_csv",
+        if st.button("Export CSV", key="db_csv", disabled=df_for_export is None):
+            if df_for_export is not None:
+                out = export_dataframe(
+                    df_for_export, config.results_path, "jobs_filtered", "csv"
                 )
+                st.toast(f"Saved: {out.name}")
+                with out.open("rb") as fh:
+                    st.download_button(
+                        "Download CSV",
+                        fh.read(),
+                        file_name=out.name,
+                        mime="text/csv",
+                        key="dl_csv_export",
+                    )
 
     with ex2:
-        if st.button("Generate Excel export", key="db_xlsx"):
-            db = _get_db(config)
-            export_df = db.export_to_dataframe()
-            db.close()
-            if export_df.empty:
-                st.warning("Database is empty.")
-            else:
-                excel_bytes = dataframe_to_excel_bytes(export_df)
-                st.download_button(
-                    "Download Excel",
-                    excel_bytes,
-                    file_name=f"jobs_full_{date.today().isoformat()}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="dl_full_xlsx",
+        if st.button("Export Excel", key="db_xlsx", disabled=df_for_export is None):
+            if df_for_export is not None:
+                out = export_dataframe(
+                    df_for_export, config.results_path, "jobs_filtered", "excel"
                 )
+                st.toast(f"Saved: {out.name}")
+                with out.open("rb") as fh:
+                    st.download_button(
+                        "Download Excel",
+                        fh.read(),
+                        file_name=out.name,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="dl_xlsx_export",
+                    )
 
     st.markdown("---")
 
-    # ---- Bulk operations ----
-    st.subheader("Bulk operations")
-    selected: set[str] = st.session_state.get("selected_jobs", set())
-
-    if selected:
-        st.info(f"{len(selected)} job(s) selected.")
-        b1, b2, b3, b4 = st.columns(4)
-
-        with b1:
-            if st.button(
-                f"Delete {len(selected)} selected",
-                type="primary",
-                key="bulk_del",
-            ):
-                count = _blacklist_jobs_and_refresh(list(selected), config)
-                st.session_state["selected_jobs"] = set()
-                _clear_caches()
-                st.toast(f"Deleted and blacklisted {count} job(s)")
-                st.rerun()
-
-        with b2:
-            if st.button(f"Mark {len(selected)} applied", key="bulk_apply"):
-                db = _get_db(config)
-                for jid in selected:
-                    db.mark_as_applied(jid)
-                db.close()
-                st.session_state["selected_jobs"] = set()
-                _clear_caches()
-                st.toast(f"Marked {len(selected)} job(s) as applied")
-                st.rerun()
-
-        with b3:
-            if st.button(f"Mark {len(selected)} unapplied", key="bulk_unapply"):
-                db = _get_db(config)
-                for jid in selected:
-                    db.mark_as_unapplied(jid)
-                db.close()
-                st.session_state["selected_jobs"] = set()
-                _clear_caches()
-                st.toast(f"Marked {len(selected)} job(s) as unapplied")
-                st.rerun()
-
-        with b4:
-            if st.button("Clear selection", key="bulk_clear"):
-                st.session_state["selected_jobs"] = set()
-                st.rerun()
-    else:
-        st.caption(
-            "Select jobs using the checkboxes on job cards to enable bulk operations."
-        )
-
-    st.markdown("---")
-
-    # ---- Danger zone ----
+    # --------------------------------------------------------------- Danger zone
     st.subheader("Danger zone")
-    with st.expander("Delete ALL jobs"):
+    with st.expander("Full reset"):
         st.warning(
-            "This will permanently remove every job from the database. "
-            "This action cannot be undone."
+            "This wipes BOTH the jobs table AND the blacklist, including "
+            "bookmarked/applied entries. Cannot be undone."
         )
         confirm_text = st.text_input(
             'Type "DELETE" to confirm',
             key="confirm_delete_all",
         )
         if st.button(
-            "Delete all jobs",
+            "Wipe everything",
             type="primary",
             disabled=confirm_text != "DELETE",
             key="btn_delete_all",
         ):
-            all_ids = [j["job_id"] for j in jobs]
-            if all_ids:
-                _blacklist_jobs_and_refresh(all_ids, config)
+            db = _get_db(config)
+            try:
+                jobs_n, bl_n = db.reset_all()
+                _sync_vector_store_deletions(config, db)
+            finally:
+                db.close()
             _clear_caches()
             st.session_state["selected_jobs"] = set()
-            st.toast("All jobs deleted and blacklisted.")
+            st.toast(f"Wiped {jobs_n} job(s) and {bl_n} blacklist row(s)")
             st.rerun()
 
 
@@ -1075,7 +1154,7 @@ def main() -> None:
         _render_analytics(filtered_jobs)
 
     with tab_db:
-        _render_db_management(all_jobs, config)
+        _render_db_management(all_jobs, filtered_jobs, config)
 
 
 # ---------------------------------------------------------------------------

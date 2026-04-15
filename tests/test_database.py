@@ -11,6 +11,8 @@ import pandas as pd
 # Add scripts directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
+from config import Config, DatabaseConfig, RetentionConfig, ScoringConfig
+from database import ReconciliationReport
 from models import Job
 
 
@@ -496,3 +498,244 @@ class TestJobDatabase:
         assert db.job_exists(active_job_id) is True
         assert db.is_job_blacklisted(blacklisted_job_id) is True
         db.close()
+
+
+def _make_config(
+    save_threshold: int = 10,
+    max_age_days: int = 30,
+    purge_blacklist_after_days: int = 90,
+) -> Config:
+    return Config(
+        scoring=ScoringConfig(
+            save_threshold=save_threshold,
+            notify_threshold=save_threshold + 10,
+        ),
+        database=DatabaseConfig(
+            retention=RetentionConfig(
+                max_age_days=max_age_days,
+                purge_blacklist_after_days=purge_blacklist_after_days,
+            ),
+        ),
+    )
+
+
+class TestRetentionMethods:
+    """Tests for the retention / reconciliation API."""
+
+    def test_delete_jobs_below_score(self, temp_db):
+        from dataclasses import replace
+
+        low = Job.from_dict(
+            {"title": "Low", "company": "C", "location": "NYC", "relevance_score": 5}
+        )
+        high = Job.from_dict(
+            {"title": "High", "company": "C", "location": "NYC", "relevance_score": 40}
+        )
+        temp_db.save_job(low)
+        temp_db.save_job(high)
+
+        deleted = temp_db.delete_jobs_below_score(10)
+
+        assert deleted == 1
+        remaining = [j.title for j in temp_db.get_all_jobs()]
+        assert remaining == ["High"]
+        _ = replace  # keep import used
+
+    def test_delete_jobs_below_score_protects_bookmarked(self, temp_db):
+        low_bm = Job.from_dict(
+            {"title": "LowBM", "company": "C", "location": "NYC", "relevance_score": 2}
+        )
+        temp_db.save_job(low_bm)
+        temp_db.toggle_bookmark(low_bm.job_id)
+
+        deleted = temp_db.delete_jobs_below_score(10)
+
+        assert deleted == 0
+        assert temp_db.job_exists(low_bm.job_id)
+
+    def test_delete_jobs_below_score_protects_applied(self, temp_db):
+        job = Job.from_dict(
+            {
+                "title": "Applied",
+                "company": "C",
+                "location": "NYC",
+                "relevance_score": 1,
+            }
+        )
+        temp_db.save_job(job)
+        temp_db.mark_as_applied(job.job_id)
+
+        assert temp_db.delete_jobs_below_score(10) == 0
+        assert temp_db.job_exists(job.job_id)
+
+    def test_delete_stale_jobs_protects_bookmarks(self, temp_db, temp_db_path):
+        # Insert a job with an old last_seen directly via SQL.
+        old_job = Job.from_dict(
+            {"title": "Old", "company": "C", "location": "NYC", "relevance_score": 50}
+        )
+        temp_db.save_job(old_job)
+        temp_db.toggle_bookmark(old_job.job_id)
+
+        with temp_db._get_connection() as conn:
+            conn.execute(
+                "UPDATE jobs SET last_seen = date('now', '-120 days') WHERE job_id = ?",
+                (old_job.job_id,),
+            )
+            conn.commit()
+
+        assert temp_db.delete_stale_jobs(30) == 0
+        assert temp_db.job_exists(old_job.job_id)
+
+    def test_delete_stale_jobs_removes_old(self, temp_db):
+        old_job = Job.from_dict(
+            {"title": "Old", "company": "C", "location": "NYC", "relevance_score": 50}
+        )
+        temp_db.save_job(old_job)
+        with temp_db._get_connection() as conn:
+            conn.execute(
+                "UPDATE jobs SET last_seen = date('now', '-120 days') WHERE job_id = ?",
+                (old_job.job_id,),
+            )
+            conn.commit()
+
+        assert temp_db.delete_stale_jobs(30) == 1
+        assert not temp_db.job_exists(old_job.job_id)
+
+    def test_purge_blacklist_all(self, temp_db):
+        job = Job.from_dict({"title": "Bad", "company": "C", "location": "NYC"})
+        temp_db.save_job(job)
+        temp_db.blacklist_job(job.job_id)
+
+        assert temp_db.purge_blacklist() == 1
+        assert temp_db.get_blacklisted_job_ids() == set()
+
+    def test_purge_blacklist_only_older_than(self, temp_db):
+        old_job = Job.from_dict({"title": "Old", "company": "C", "location": "NYC"})
+        fresh_job = Job.from_dict({"title": "Fresh", "company": "C", "location": "NYC"})
+        temp_db.save_job(old_job)
+        temp_db.save_job(fresh_job)
+        temp_db.blacklist_job(old_job.job_id)
+        temp_db.blacklist_job(fresh_job.job_id)
+
+        # Age the old blacklist row.
+        with temp_db._get_connection() as conn:
+            conn.execute(
+                "UPDATE deleted_jobs SET blacklisted_at = datetime('now', '-200 days') "
+                "WHERE job_id = ?",
+                (old_job.job_id,),
+            )
+            conn.commit()
+
+        deleted = temp_db.purge_blacklist(older_than_days=90)
+
+        assert deleted == 1
+        remaining = temp_db.get_blacklisted_job_ids()
+        assert fresh_job.job_id in remaining
+        assert old_job.job_id not in remaining
+
+    def test_get_score_distribution(self, temp_db):
+        for title, score in [("A", 3), ("B", 7), ("C", 12), ("D", 14), ("E", 20)]:
+            temp_db.save_job(
+                Job.from_dict(
+                    {
+                        "title": title,
+                        "company": "C",
+                        "location": "NYC",
+                        "relevance_score": score,
+                    }
+                )
+            )
+
+        bins = dict(temp_db.get_score_distribution(bin_size=5))
+
+        assert bins[0] == 1  # score 3
+        assert bins[5] == 1  # score 7
+        assert bins[10] == 2  # scores 12, 14
+        assert bins[20] == 1  # score 20
+
+    def test_get_score_distribution_empty(self, temp_db):
+        assert temp_db.get_score_distribution() == []
+
+    def test_count_helpers(self, temp_db):
+        below = Job.from_dict(
+            {"title": "Low", "company": "C", "location": "NYC", "relevance_score": 5}
+        )
+        above = Job.from_dict(
+            {"title": "High", "company": "C", "location": "NYC", "relevance_score": 50}
+        )
+        temp_db.save_job(below)
+        temp_db.save_job(above)
+
+        assert temp_db.count_jobs_below_score(10) == 1
+        assert temp_db.count_jobs_below_score(100) == 2
+        assert temp_db.count_stale_jobs(30) == 0
+
+    def test_reconcile_with_config(self, temp_db):
+        low = Job.from_dict(
+            {"title": "Low", "company": "C", "location": "NYC", "relevance_score": 2}
+        )
+        high = Job.from_dict(
+            {"title": "High", "company": "C", "location": "NYC", "relevance_score": 50}
+        )
+        temp_db.save_job(low)
+        temp_db.save_job(high)
+
+        cfg = _make_config(save_threshold=10)
+        report = temp_db.reconcile_with_config(cfg)
+
+        assert isinstance(report, ReconciliationReport)
+        assert report.deleted_below_score == 1
+        assert report.total_deleted == 1
+        assert temp_db.job_exists(high.job_id)
+        assert not temp_db.job_exists(low.job_id)
+
+    def test_reconcile_is_idempotent(self, temp_db):
+        low = Job.from_dict(
+            {"title": "Low", "company": "C", "location": "NYC", "relevance_score": 1}
+        )
+        temp_db.save_job(low)
+
+        cfg = _make_config(save_threshold=10)
+        first = temp_db.reconcile_with_config(cfg)
+        second = temp_db.reconcile_with_config(cfg)
+
+        assert first.total_deleted == 1
+        assert second.total_deleted == 0
+
+    def test_reconcile_protects_bookmarked_and_applied(self, temp_db):
+        bm = Job.from_dict(
+            {"title": "BM", "company": "C", "location": "NYC", "relevance_score": 1}
+        )
+        applied = Job.from_dict(
+            {"title": "AP", "company": "C", "location": "NYC", "relevance_score": 1}
+        )
+        temp_db.save_job(bm)
+        temp_db.save_job(applied)
+        temp_db.toggle_bookmark(bm.job_id)
+        temp_db.mark_as_applied(applied.job_id)
+
+        cfg = _make_config(save_threshold=10)
+        report = temp_db.reconcile_with_config(cfg)
+
+        assert report.total_deleted == 0
+        assert report.protected_bookmarked == 1
+        assert report.protected_applied == 1
+        assert temp_db.job_exists(bm.job_id)
+        assert temp_db.job_exists(applied.job_id)
+
+    def test_reset_all_wipes_everything(self, temp_db):
+        keep = Job.from_dict(
+            {"title": "Keep", "company": "C", "location": "NYC", "relevance_score": 50}
+        )
+        temp_db.save_job(keep)
+        temp_db.toggle_bookmark(keep.job_id)  # Protected — but reset ignores that.
+        gone = Job.from_dict({"title": "Gone", "company": "C", "location": "NYC"})
+        temp_db.save_job(gone)
+        temp_db.blacklist_job(gone.job_id)
+
+        jobs_count, blacklist_count = temp_db.reset_all()
+
+        assert jobs_count == 1
+        assert blacklist_count == 1
+        assert temp_db.get_all_jobs() == []
+        assert temp_db.get_blacklisted_job_ids() == set()

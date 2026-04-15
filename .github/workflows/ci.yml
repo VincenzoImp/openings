@@ -149,4 +149,7 @@ jobs:
           sbom: false
 
       - name: Test health check
-        run: docker run --rm job-search-tool:test python healthcheck.py
+        run: |
+          docker run --rm \
+            -v "$PWD/config/settings.example.yaml:/data/config/settings.yaml:ro" \
+            job-search-tool:test python healthcheck.py

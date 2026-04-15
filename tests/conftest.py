@@ -175,7 +175,8 @@ def scoring_config():
     from config import ScoringConfig
 
     return ScoringConfig(
-        threshold=10,
+        save_threshold=0,
+        notify_threshold=10,
         weights={
             "primary": 20,
             "secondary": 10,
@@ -197,7 +198,6 @@ def test_config(scoring_config):
         DatabaseConfig,
         LoggingConfig,
         NotificationsConfig,
-        OutputConfig,
         ParallelConfig,
         PostFilterConfig,
         ProfileConfig,
@@ -218,11 +218,10 @@ def test_config(scoring_config):
         scoring=scoring_config,
         parallel=ParallelConfig(max_workers=2),
         retry=RetryConfig(max_attempts=2, base_delay=0.1, backoff_factor=1.5),
-        throttling=ThrottlingConfig(enabled=False),  # Disable for faster tests
+        throttling=ThrottlingConfig(enabled=False),
         post_filter=PostFilterConfig(enabled=True, min_similarity=80),
         logging=LoggingConfig(level="DEBUG"),
-        database=DatabaseConfig(cleanup_enabled=False),
-        output=OutputConfig(save_csv=False, save_excel=False),  # Skip file I/O in tests
+        database=DatabaseConfig(),
         profile=ProfileConfig(name="Test User"),
         scheduler=SchedulerConfig(),
         notifications=NotificationsConfig(enabled=False),
@@ -239,7 +238,6 @@ def telegram_config():
         bot_token="123456:ABC-test-token",
         chat_ids=["12345", "67890"],
         send_summary=True,
-        min_score_for_notification=10,
         max_jobs_in_message=5,
         jobs_per_chunk=10,
         include_top_overall=True,

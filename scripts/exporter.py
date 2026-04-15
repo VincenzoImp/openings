@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
 
 import pandas as pd
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from config import Config
 from logger import get_logger
 
 # Score threshold for highlighting in Excel
@@ -152,59 +152,42 @@ def dataframe_to_excel_bytes(jobs_df: pd.DataFrame) -> bytes:
     return buffer.getvalue()
 
 
-def save_results(
+def export_dataframe(
     jobs_df: pd.DataFrame,
-    config: Config,
-    filename_prefix: str = "jobs",
-) -> tuple[str, str]:
-    """
-    Save results to CSV and Excel with formatting.
+    output_dir: Path,
+    basename: str,
+    fmt: str,
+) -> Path:
+    """Export ``jobs_df`` to ``output_dir`` on demand.
+
+    Creates ``output_dir`` lazily — no side effects unless this helper is
+    actually called. Always applies spreadsheet-formula sanitization.
 
     Args:
-        jobs_df: DataFrame to save.
-        config: Configuration object.
-        filename_prefix: Prefix for output files.
+        jobs_df: DataFrame to serialize.
+        output_dir: Target directory (created if missing).
+        basename: File name stem (timestamp is appended).
+        fmt: Either ``"csv"`` or ``"excel"``.
 
     Returns:
-        Tuple of (csv_path, excel_path).
+        Absolute path of the written file.
     """
-    logger = get_logger("output")
+    if fmt not in ("csv", "excel"):
+        raise ValueError(f"fmt must be 'csv' or 'excel', got {fmt!r}")
 
-    # Check if any output is enabled
-    if not config.output.save_csv and not config.output.save_excel:
-        logger.info("File output disabled (save_csv and save_excel are both false)")
-        return "", ""
-
-    results_dir = config.results_path
-    results_dir.mkdir(parents=True, exist_ok=True)
+    logger = get_logger("exporter")
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    csv_path = ""
-    excel_path = ""
+    if fmt == "csv":
+        out = output_dir / f"{basename}_{timestamp}.csv"
+        safe_df = _sanitize_dataframe_for_excel(jobs_df)
+        safe_df.to_csv(out, index=False)
+        logger.info("Exported CSV: %s", out)
+        return out
 
-    # Save to CSV
-    if config.output.save_csv:
-        csv_file = results_dir / f"{filename_prefix}_{timestamp}.csv"
-        safe_csv_df = _sanitize_dataframe_for_excel(jobs_df)
-        safe_csv_df.to_csv(csv_file, index=False)
-        logger.info(f"Saved CSV: {csv_file}")
-        csv_path = str(csv_file)
-
-    # Save to Excel with formatting
-    if config.output.save_excel:
-        # Skip Excel if DataFrame is empty
-        if len(jobs_df) == 0:
-            logger.debug("Skipping Excel save for empty DataFrame")
-        else:
-            excel_file = results_dir / f"{filename_prefix}_{timestamp}.xlsx"
-
-            try:
-                _write_excel_workbook(jobs_df, str(excel_file))
-
-                logger.info(f"Saved Excel: {excel_file}")
-                excel_path = str(excel_file)
-
-            except Exception as e:
-                logger.warning(f"Could not save Excel file: {e}")
-
-    return csv_path, excel_path
+    out = output_dir / f"{basename}_{timestamp}.xlsx"
+    _write_excel_workbook(jobs_df, str(out))
+    logger.info("Exported Excel: %s", out)
+    return out

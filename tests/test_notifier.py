@@ -24,6 +24,8 @@ from notifier import (
     NotificationManager,
     TelegramNotifier,
     create_notification_data,
+    create_reconcile_notification_data,
+    format_reconcile_message,
 )
 
 
@@ -388,51 +390,24 @@ class TestTelegramNotifierSend:
             # Should return False on error
             assert result is False
 
-    @pytest.mark.asyncio
-    async def test_send_notification_filters_by_score(self, notifier, telegram_config):
-        """Test that jobs below min_score are filtered out."""
-        telegram_config.min_score_for_notification = 20
+    def test_reconcile_notification_formatting(self):
+        """ReconcileNotificationData → Telegram-safe MarkdownV2 text."""
+        from database import ReconciliationReport
 
-        low_score_job = JobDBRecord(
-            job_id="1",
-            title="Low",
-            company="A",
-            location="NYC",
-            relevance_score=10,
-            first_seen=datetime.now().date(),
-            last_seen=datetime.now().date(),
+        report = ReconciliationReport(
+            deleted_below_score=4,
+            deleted_stale=3,
+            purged_blacklist=2,
         )
-        high_score_job = JobDBRecord(
-            job_id="2",
-            title="High",
-            company="B",
-            location="NYC",
-            relevance_score=30,
-            first_seen=datetime.now().date(),
-            last_seen=datetime.now().date(),
-        )
+        data = create_reconcile_notification_data(report)
 
-        data = NotificationData(
-            run_timestamp=datetime.now(),
-            total_jobs_found=2,
-            new_jobs_count=2,
-            updated_jobs_count=0,
-            avg_score=20.0,
-            new_jobs=[low_score_job, high_score_job],
-            top_jobs_overall=[],
-            total_jobs_in_db=10,
-        )
+        msg = format_reconcile_message(data)
 
-        with patch("notifier.Bot") as mock_bot_class:
-            mock_bot = AsyncMock()
-            mock_bot.send_message = AsyncMock(return_value=MagicMock())
-            mock_bot_class.return_value = mock_bot
-
-            notifier = TelegramNotifier(telegram_config)
-            await notifier.send_notification(data)
-
-            # Check that message was sent
-            assert mock_bot.send_message.called
+        assert "Startup cleanup" in msg
+        assert "Total removed: 9" in msg
+        assert "Below save threshold: 4" in msg
+        assert "Stale" in msg
+        assert "Blacklist" in msg
 
     @pytest.mark.asyncio
     async def test_send_notification_respects_send_summary_flag(

@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.0.0] - 2026-04-15
+
+This is a major release. The scoring pipeline, the database retention model, and the dashboard's database management surface have all been rebuilt around a single principle: **`settings.yaml` is the source of truth and the DB reconciles to it at every boot**. Breaking changes are intentional and there is no backwards-compatibility shim — migrating an old `settings.yaml` is a five-minute edit.
+
+### Added
+
+- **`scoring.save_threshold`** and **`scoring.notify_threshold`** — two independent thresholds that split the single `scoring.threshold` into "what enters the archive" (wide, default `0`) and "what triggers notifications and counts as relevant" (narrow, default `20`). The loader refuses configs where `notify_threshold < save_threshold`.
+- **`database.retention`** block with `max_age_days` (default `30`) and `purge_blacklist_after_days` (default `90`). Applied at every boot by the new `reconcile_with_config` pass — no `cleanup_enabled` flag, no opt-in: if you don't want retention, raise the limits.
+- **Reconciliation at boot** — after `recalculate_all_scores`, the tool now runs `db.reconcile_with_config(config)` which drops jobs below `save_threshold`, drops stale jobs, purges the blacklist, and syncs the vector store. Idempotent: running it twice in a row is a no-op. If anything was removed, a summary is pushed to Telegram (`🧹 Startup cleanup: X jobs removed`).
+- **SQL-level protection invariant** — every DELETE query (except the explicit `reset_all` escape hatch) includes `AND bookmarked = 0 AND applied = 0`. Bookmarked and applied jobs are structurally immune to automatic cleanup, both at boot and from the dashboard's smart-cleanup controls. Not configurable.
+- **Database retention primitives** in `scripts/database.py`: `delete_jobs_below_score`, `delete_stale_jobs` (renamed from `cleanup_old_jobs`/`delete_jobs_older_than`), `purge_blacklist`, `get_score_distribution`, `count_jobs_below_score`, `count_stale_jobs`, `count_blacklist_older_than`, `reconcile_with_config`, `reset_all`. Dedicated SQL index on `relevance_score` so score-based cleanups stay O(log n).
+- **New Database tab in the Streamlit dashboard** — a full management surface with five sections:
+  - **Health**: total jobs, bookmarked, applied, blacklisted, average score, DB size on disk.
+  - **Score distribution**: dynamic histogram from `get_score_distribution`, with vertical reference lines drawn at both `save_threshold` and `notify_threshold`.
+  - **Smart cleanup**: four cards with live preview counts before confirmation — *Delete below score N* (default = current `save_threshold`), *Delete stale older than N days*, *Purge blacklist older than N days*, and **Apply `settings.yaml` retention now** which calls `reconcile_with_config` against the live config and shows the `ReconciliationReport` in the UI.
+  - **Export**: on-demand CSV/Excel of the currently filtered view.
+  - **Danger zone**: Full reset with text-confirmed `DELETE` that truncates the `jobs` table, the `deleted_jobs` blacklist, and the ChromaDB collection in one shot (the only path that bypasses the bookmarked/applied invariant).
+- **`ReconcileNotificationData`** + `format_reconcile_message` + `NotificationManager.send_reconcile_sync` in `scripts/notifier.py` for the startup cleanup summary.
+- **`Partitions`** dataclass in `scripts/scoring.py` — the new `partition_by_thresholds(scored, config)` returns a `Partitions(scored, to_save, to_notify)` so the main flow reads as score → partition → save → embed → notify without any threshold arithmetic at the call site.
+
+### Changed (BREAKING)
+
+- **`scoring.threshold` is gone**. Replace with `scoring.save_threshold` + `scoring.notify_threshold`. Old single-threshold configs are rejected — the loader does not translate them.
+- **`scoring.notify_threshold >= scoring.save_threshold` is enforced** as a hard error at load time. Notifying about jobs you don't even archive is nonsensical, so the loader treats it as a config bug, not a warning.
+- **`database.cleanup_enabled`, `database.cleanup_days`, and `database.recalculate_scores_on_startup` are gone**. Score recalculation at boot is always on (it's cheap and deterministic). Age-based cleanup is always on via `database.retention.max_age_days`. There is no longer a knob to turn either feature off — set `max_age_days` to something large if you want "never expire".
+- **`output:` section removed entirely**. The search pipeline no longer writes `all_jobs_*.csv` or `relevant_jobs_*.csv` on every run. CSV and Excel exports are available exclusively from the dashboard's Database tab, triggered on demand. The `results/` directory is created lazily the first time an export happens.
+- **`telegram.min_score_for_notification` removed**. The notify threshold is a relevance concept owned by the scoring engine (`scoring.notify_threshold`), not a Telegram channel setting. The partition of new jobs to notify about is computed upstream by `partition_by_thresholds`; the notifier just receives an already-filtered list.
+- **`filter_relevant_jobs` is gone**. It has been split into `score_jobs(df, config)` (adds the `relevance_score` column) and `partition_by_thresholds(scored, config)` (returns the `Partitions` dataclass). Callers that used to pull the single "relevant" frame now pull `to_save` and `to_notify` independently.
+- **`cleanup_old_jobs` / `delete_jobs_older_than`** → renamed to `delete_stale_jobs`. **`filter_blacklisted_jobs`** → renamed to `exclude_blacklisted`.
+- **Main flow rewritten**. `_prepare_runtime` now runs `rescore_all` → `reconcile_with_config` → vector-store sync → optional Telegram reconcile summary at every boot, for both `scheduler` and `once` modes. `run_job_search` is `search → score → partition → exclude_blacklisted → save → embed → notify(to_notify)` with zero CSV side effects.
+
+### Removed
+
+- `OutputConfig` dataclass and the entire `scripts/exporter.save_results` code path. `scripts/exporter.py` is reduced to a single `export_dataframe(df, output_dir, basename, fmt)` helper used only by the dashboard.
+- Dead `main()` function in `scripts/search_jobs.py` (it duplicated the pipeline; there was only one real entry point).
+- Automatic `all_jobs_*.csv` and `relevant_jobs_*.csv` files from the results folder on every scheduled run.
+
+### Migration
+
+For an existing v6 `settings.yaml`, five edits:
+
+1. In `scoring:`, replace `threshold: N` with:
+   ```yaml
+   save_threshold: 0
+   notify_threshold: N
+   ```
+   Pick `save_threshold: 0` for a wide archive (recommended) or raise it if you want the DB to stay narrow.
+2. In `database:`, delete `cleanup_enabled`, `cleanup_days`, and `recalculate_scores_on_startup`, and replace with:
+   ```yaml
+   retention:
+     max_age_days: 30        # use your old cleanup_days value here
+     purge_blacklist_after_days: 90
+   ```
+3. Delete the entire `output:` section.
+4. In `notifications.telegram:`, delete `min_score_for_notification`. If you had it set to a non-zero value, copy that value to `scoring.notify_threshold` instead — that preserves your existing notification bar exactly.
+5. Restart the tool. The first boot will rescore every existing job and run reconciliation; expect a one-off cleanup Telegram message if any of your stored jobs fall below the new `save_threshold`, are stale beyond `max_age_days`, or belong to a purged blacklist entry. Bookmarked and applied jobs are protected.
+
+### Why
+
+Before this release, `scoring.threshold` did triple duty: it decided what got saved, what got exported, and what counted as "relevant" for notifications. That meant the dashboard could only ever show jobs that had already passed the single narrow filter — there was no room for exploration, no way to investigate borderline matches, and tuning the keywords meant permanently losing the jobs scored under the old pesi. On top of that, retention was a per-iteration age-based sweep that would happily delete a job you had just bookmarked.
+
+The split fixes all of that in one pass. `save_threshold` makes the DB an archive you can actually browse; `notify_threshold` keeps Telegram focused on the jobs worth waking up for; reconciliation makes `settings.yaml` dichiarativo (edit the file, restart, the DB catches up); and the SQL-level bookmark/applied protection turns the dashboard's cleanup tools into something you can click confidently.
+
+### Test plan
+
+- 375 tests pass, 0 failures (+14 over the v6.0.8 baseline of 361). New coverage: `reconcile_with_config` idempotency, SQL-level bookmark/applied protection across every retention primitive, cross-section validation of `notify_threshold >= save_threshold`, `Partitions` carving, dashboard smart-cleanup preview counts, `ReconcileNotificationData` formatting.
+- `ruff check` and `ruff format` both clean across `scripts/` and `tests/`.
+- CI fully green on PR #7 (test 3.11, test 3.12, quality, security, docker).
+- The Docker healthcheck step in `.github/workflows/ci.yml` now bind-mounts `config/settings.example.yaml` into `/data/config/settings.yaml` so `healthcheck.py` runs end-to-end against a real config through the entrypoint's boot guard — a pre-existing CI bug from v6.0.1 is also fixed as part of this release.
+
 ## [6.0.8] - 2026-04-15
 
 ### Changed
@@ -254,7 +324,8 @@ No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-
 
 Entries prior to v4.3.1 have been archived. The git history on `main` plus the tagged commits are the authoritative source for anything older.
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.8...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v7.0.0...HEAD
+[7.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.8...v7.0.0
 [6.0.8]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.7...v6.0.8
 [6.0.7]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.6...v6.0.7
 [6.0.6]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.5...v6.0.6

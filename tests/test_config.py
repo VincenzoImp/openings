@@ -15,6 +15,7 @@ from config import (
     _parse_post_filter_config,
     _parse_retry_config,
     _parse_scheduler_config,
+    _parse_scoring_config,
     _parse_telegram_config,
     _parse_throttling_config,
 )
@@ -254,13 +255,6 @@ class TestTelegramConfigValidation:
         assert config.chat_ids == ["12345", "67890"]
         assert config.max_jobs_in_message == 20
 
-    def test_min_score_non_negative(self):
-        """Test min_score_for_notification cannot be negative."""
-        with pytest.raises(
-            ValueError, match="min_score_for_notification cannot be negative"
-        ):
-            _parse_telegram_config({"telegram": {"min_score_for_notification": -5}})
-
     def test_max_jobs_minimum(self):
         """Test max_jobs_in_message must be at least 1."""
         with pytest.raises(ValueError, match="max_jobs_in_message must be at least 1"):
@@ -343,6 +337,53 @@ class TestConfigPaths:
         finally:
             monkeypatch.delenv("JOB_SEARCH_DATA_DIR", raising=False)
             importlib.reload(config_module)
+
+
+class TestScoringConfigValidation:
+    """Tests for scoring config parsing and cross-section validation."""
+
+    def test_defaults(self):
+        cfg = _parse_scoring_config({})
+        assert cfg.save_threshold == 0
+        assert cfg.notify_threshold == 20
+
+    def test_unknown_threshold_key_is_ignored(self):
+        """Unknown keys like the old 'threshold' must be silently ignored."""
+        cfg = _parse_scoring_config({"scoring": {"threshold": 15}})
+        assert cfg.save_threshold == 0
+        assert cfg.notify_threshold == 20
+
+    def test_notify_must_be_ge_save(self, tmp_path, monkeypatch):
+        import config as config_module
+
+        yaml_file = tmp_path / "settings.yaml"
+        yaml_file.write_text(
+            "scoring:\n  save_threshold: 20\n  notify_threshold: 10\n",
+        )
+        monkeypatch.setattr(config_module, "CONFIG_FILE", yaml_file)
+
+        with pytest.raises(ValueError, match="notify_threshold"):
+            config_module.load_config()
+
+
+class TestDatabaseRetentionConfig:
+    """Tests for database.retention parsing."""
+
+    def test_defaults(self):
+        cfg = Config()
+        assert cfg.database.retention.max_age_days == 30
+        assert cfg.database.retention.purge_blacklist_after_days == 90
+
+    def test_unknown_database_keys_are_ignored(self):
+        """Old cleanup_* keys must be silently ignored, not translated."""
+        import config as config_module
+
+        cfg = config_module._parse_database_config(
+            {"database": {"cleanup_enabled": True, "cleanup_days": 10}}
+        )
+        # Defaults unchanged — legacy keys have no effect whatsoever.
+        assert cfg.retention.max_age_days == 30
+        assert cfg.retention.purge_blacklist_after_days == 90
 
 
 class TestConfigQueries:

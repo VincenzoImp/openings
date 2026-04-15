@@ -42,11 +42,26 @@ class NotificationData:
     new_jobs_count: int
     updated_jobs_count: int
     avg_score: float
-    new_jobs: list[JobDBRecord]  # All new jobs, sorted by score descending
+    new_jobs: list[JobDBRecord]  # Already filtered upstream by notify_threshold
     top_jobs_overall: list[
         JobDBRecord
     ]  # Top jobs from entire database, sorted by score
     total_jobs_in_db: int = 0  # Total number of jobs in database
+    notify_threshold: int = 0  # Informational, used in the header message
+
+
+@dataclass
+class ReconcileNotificationData:
+    """Summary of a boot-time DB reconciliation, for notification purposes."""
+
+    run_timestamp: datetime
+    deleted_below_score: int
+    deleted_stale: int
+    purged_blacklist: int
+
+    @property
+    def total_deleted(self) -> int:
+        return self.deleted_below_score + self.deleted_stale + self.purged_blacklist
 
 
 class BaseNotifier(ABC):
@@ -217,7 +232,7 @@ class TelegramNotifier(BaseNotifier):
 
         if total_new_jobs > 0:
             lines.append(
-                f"🆕 *{total_new_jobs} New Jobs* \\(score ≥ {self.config.min_score_for_notification}\\)"
+                f"🆕 *{total_new_jobs} New Jobs* \\(score ≥ {data.notify_threshold}\\)"
             )
         else:
             lines.append("ℹ️ No new jobs matching notification criteria\\.")
@@ -290,14 +305,7 @@ class TelegramNotifier(BaseNotifier):
         Returns:
             Formatted message string.
         """
-        # Filter jobs by minimum score
-        filtered_jobs = [
-            job
-            for job in data.new_jobs
-            if job.relevance_score >= self.config.min_score_for_notification
-        ]
-        jobs_to_send = filtered_jobs[: self.config.max_jobs_in_message]
-
+        jobs_to_send = list(data.new_jobs)[: self.config.max_jobs_in_message]
         total_top_overall = len(data.top_jobs_overall) if data.top_jobs_overall else 0
         return self._build_header_message(data, len(jobs_to_send), total_top_overall)
 
@@ -323,13 +331,9 @@ class TelegramNotifier(BaseNotifier):
 
             bot = Bot(token=self.bot_token)
 
-            # Filter NEW jobs by minimum score
-            filtered_new_jobs = [
-                job
-                for job in data.new_jobs
-                if job.relevance_score >= self.config.min_score_for_notification
-            ]
-            new_jobs_to_send = filtered_new_jobs[: self.config.max_jobs_in_message]
+            # Upstream is responsible for applying the notify threshold —
+            # we only respect the channel-level message cap here.
+            new_jobs_to_send = list(data.new_jobs)[: self.config.max_jobs_in_message]
             total_new_jobs = len(new_jobs_to_send)
 
             # Get TOP JOBS OVERALL (from entire database)
@@ -485,6 +489,30 @@ class TelegramNotifier(BaseNotifier):
             return False
 
 
+def create_reconcile_notification_data(
+    report,
+) -> ReconcileNotificationData:
+    """Build a ``ReconcileNotificationData`` from a ``ReconciliationReport``."""
+    return ReconcileNotificationData(
+        run_timestamp=datetime.now(),
+        deleted_below_score=report.deleted_below_score,
+        deleted_stale=report.deleted_stale,
+        purged_blacklist=report.purged_blacklist,
+    )
+
+
+def format_reconcile_message(data: ReconcileNotificationData) -> str:
+    """Render a compact Telegram-safe reconciliation summary (MarkdownV2)."""
+    return (
+        "🧹 *Startup cleanup*\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"• Total removed: {data.total_deleted}\n"
+        f"• Below save threshold: {data.deleted_below_score}\n"
+        f"• Stale \\(older than retention\\): {data.deleted_stale}\n"
+        f"• Blacklist rows purged: {data.purged_blacklist}"
+    )
+
+
 class NotificationManager:
     """
     Manages all notification channels.
@@ -574,6 +602,55 @@ class NotificationManager:
             future = executor.submit(_run_in_new_loop)
             return future.result(timeout=120)
 
+    def send_reconcile_sync(self, data: ReconcileNotificationData) -> None:
+        """Send a reconciliation summary via Telegram (best-effort, sync)."""
+        telegram_notifier: TelegramNotifier | None = None
+        for notifier in self._notifiers:
+            if isinstance(notifier, TelegramNotifier):
+                telegram_notifier = notifier
+                break
+        if telegram_notifier is None or not telegram_notifier.is_configured():
+            return
+
+        text = format_reconcile_message(data)
+
+        async def _send() -> None:
+            if Bot is None:
+                return
+            bot = Bot(token=telegram_notifier.bot_token)
+            for chat_id in telegram_notifier.config.chat_ids:
+                if not chat_id:
+                    continue
+                try:
+                    await bot.send_message(
+                        chat_id=chat_id,
+                        text=text,
+                        parse_mode=ParseMode.MARKDOWN_V2,
+                        disable_web_page_preview=True,
+                    )
+                except Exception as e:  # noqa: BLE001
+                    self.logger.warning(
+                        "Failed to send reconcile summary to %s: %s", chat_id, e
+                    )
+
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            asyncio.run(_send())
+            return
+
+        import concurrent.futures
+
+        def _run_in_new_loop() -> None:
+            loop = asyncio.new_event_loop()
+            try:
+                loop.run_until_complete(_send())
+            finally:
+                loop.close()
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            executor.submit(_run_in_new_loop).result(timeout=60)
+
 
 def create_notification_data(
     new_jobs: list[JobDBRecord],
@@ -582,6 +659,7 @@ def create_notification_data(
     avg_score: float,
     top_jobs_overall: list[JobDBRecord] | None = None,
     total_jobs_in_db: int = 0,
+    notify_threshold: int = 0,
 ) -> NotificationData:
     """
     Create NotificationData from search results.
@@ -616,4 +694,5 @@ def create_notification_data(
         new_jobs=sorted_jobs,
         top_jobs_overall=sorted_top_overall,
         total_jobs_in_db=total_jobs_in_db,
+        notify_threshold=notify_threshold,
     )

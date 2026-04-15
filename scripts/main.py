@@ -16,13 +16,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from config import get_config, reload_config
-from database import cleanup_old_jobs, get_database, recalculate_all_scores
-from exporter import save_results
+from database import get_database, recalculate_all_scores
 from logger import get_logger, log_section, setup_logging
 from models import generate_job_id
-from notifier import NotificationManager, create_notification_data
+from notifier import (
+    NotificationManager,
+    create_notification_data,
+    create_reconcile_notification_data,
+)
 from scheduler import create_scheduler
-from scoring import filter_relevant_jobs
+from scoring import partition_by_thresholds, score_jobs
 from search_jobs import (
     print_banner,
     print_top_jobs,
@@ -59,101 +62,56 @@ def _get_current_run_new_job_ids(db: JobDatabase, jobs_df) -> list[str]:
 
 
 def run_job_search() -> bool:
-    """
-    Execute a single job search iteration.
+    """Execute a single job search iteration.
 
-    This function performs the complete search workflow:
-    1. Load configuration
-    2. Search for jobs
-    3. Filter by relevance
-    4. Save to database
-    5. Send notifications for new jobs
-
-    Returns:
-        True if search completed successfully, False otherwise.
+    Pipeline: reload config → search → score → partition by save/notify
+    thresholds → exclude blacklist → upsert → embed → notify on the
+    ``to_notify`` partition.
     """
-    # Reload config to pick up any changes
     config = reload_config()
     logger = setup_logging(config)
 
     try:
-        # Print banner
         print_banner(config)
 
-        # Initialize database
         db = get_database(config)
         db_stats = db.get_statistics()
         logger.info(f"Database: {db_stats['total_jobs']} jobs tracked")
 
-        # Cleanup old jobs if enabled
-        if config.database.cleanup_enabled and db_stats["total_jobs"] > 0:
-            deleted_count = cleanup_old_jobs(db, config.database.cleanup_days)
-
-            # Sync vector store deletions
-            if config.vector_search.enabled and deleted_count > 0:
-                try:
-                    from vector_store import get_vector_store
-                    from vector_commands import sync_deletions
-
-                    vs = get_vector_store(config.chroma_path)
-                    sync_deletions(db, vs)
-                except Exception as e:
-                    logger.warning(f"Vector store sync failed: {e}")
-
-        # Search for jobs
         all_jobs, summary = search_jobs(config)
 
         if all_jobs is None or len(all_jobs) == 0:
             logger.warning("No jobs found in this search")
-
-            # Still send notification if configured (to inform of empty results)
-            _send_empty_notification(config, db)
-            return True  # Not a failure, just no results
-
-        # Save all results
-        log_section(logger, "SAVING ALL RESULTS")
-        save_results(all_jobs, config, "all_jobs")
-
-        # Filter relevant jobs
-        relevant_jobs = filter_relevant_jobs(all_jobs, config)
-        filtered_relevant_jobs = db.filter_blacklisted_jobs(relevant_jobs)
-        blacklisted_removed = len(relevant_jobs) - len(filtered_relevant_jobs)
-        if blacklisted_removed > 0:
-            logger.info(
-                "Skipped %d blacklisted relevant job(s) before saving",
-                blacklisted_removed,
-            )
-        relevant_jobs = filtered_relevant_jobs
-        summary.relevant_jobs = len(relevant_jobs)
-
-        if len(relevant_jobs) == 0:
-            logger.warning("No highly relevant jobs found after filtering")
-            logger.info("Tip: Check the 'all_jobs' file for broader results")
-
             _send_empty_notification(config, db)
             return True
 
-        # Save filtered results
-        log_section(logger, "SAVING FILTERED RESULTS")
-        save_results(relevant_jobs, config, "relevant_jobs")
+        scored = score_jobs(all_jobs, config)
+        partitions = partition_by_thresholds(scored, config)
 
-        current_run_new_job_ids = _get_current_run_new_job_ids(db, relevant_jobs)
+        to_save = db.exclude_blacklisted(partitions.to_save)
+        blacklisted_removed = len(partitions.to_save) - len(to_save)
+        if blacklisted_removed > 0:
+            logger.info(
+                "Skipped %d blacklisted job(s) before saving", blacklisted_removed
+            )
 
-        # Save to database and identify new jobs
-        new_count, updated_count = db.save_jobs_from_dataframe(relevant_jobs)
+        if len(to_save) == 0:
+            logger.warning("No jobs above save_threshold after filtering")
+            _send_empty_notification(config, db)
+            return True
+
+        log_section(logger, "SAVING RESULTS")
+        current_run_new_job_ids = _get_current_run_new_job_ids(db, to_save)
+        new_count, updated_count = db.save_jobs_from_dataframe(to_save)
         summary.new_jobs = new_count
-
+        summary.relevant_jobs = len(to_save)
         logger.info(f"Database updated: {new_count} new, {updated_count} existing")
 
-        current_run_new_jobs = db.get_jobs_by_ids(current_run_new_job_ids)
-
-        # Embed new jobs in vector store
         if config.vector_search.enabled and config.vector_search.embed_on_save:
             try:
                 from vector_store import get_vector_store
 
-                # Add job_id column so vector store can use it as document ID
-                df_for_vs = relevant_jobs.copy()
+                df_for_vs = to_save.copy()
                 df_for_vs["job_id"] = df_for_vs.apply(
                     lambda r: generate_job_id(
                         str(r.get("title", "")),
@@ -167,26 +125,39 @@ def run_job_search() -> bool:
             except Exception as e:
                 logger.warning(f"Vector store embedding failed: {e}")
 
-        # Print top matches
-        print_top_jobs(relevant_jobs)
+        print_top_jobs(to_save)
 
-        # Send notifications for new jobs
-        if current_run_new_jobs:
+        notify_ids = (
+            set(partitions.to_notify["job_id"])
+            if "job_id" in partitions.to_notify.columns
+            else None
+        )
+        if notify_ids is None:
+            notify_job_ids_in_run = [
+                job_id
+                for job_id in current_run_new_job_ids
+                if _job_id_in_frame(partitions.to_notify, job_id)
+            ]
+        else:
+            notify_job_ids_in_run = [
+                jid for jid in current_run_new_job_ids if jid in notify_ids
+            ]
+        new_jobs_to_notify = db.get_jobs_by_ids(notify_job_ids_in_run)
+
+        if new_jobs_to_notify:
             _send_notifications(
                 config,
                 db,
-                current_run_new_jobs,
+                new_jobs_to_notify,
                 updated_count,
-                len(relevant_jobs),
+                len(to_save),
             )
 
-        # Print summary
         log_section(logger, "SEARCH COMPLETE")
         logger.info(f"Duration: {summary.duration_formatted}")
         logger.info(f"Total unique jobs: {summary.unique_jobs}")
-        logger.info(f"Highly relevant jobs: {summary.relevant_jobs}")
+        logger.info(f"Saved jobs (≥ save_threshold): {summary.relevant_jobs}")
         logger.info(f"New jobs (first time seen): {summary.new_jobs}")
-        logger.info("Check the 'results' folder for detailed CSV and Excel files.")
 
         return True
 
@@ -194,6 +165,22 @@ def run_job_search() -> bool:
         logger.error(f"Search failed with error: {e}")
         logger.error(traceback.format_exc())
         return False
+
+
+def _job_id_in_frame(df, job_id: str) -> bool:
+    """Check whether ``job_id`` appears in a DataFrame by recomputing the hash.
+
+    Used when the frame doesn't carry a precomputed ``job_id`` column yet.
+    """
+    for record in df.to_dict("records"):
+        computed = generate_job_id(
+            str(record.get("title", "")),
+            str(record.get("company", "")),
+            str(record.get("location", "")),
+        )
+        if computed == job_id:
+            return True
+    return False
 
 
 def _send_notifications(
@@ -235,7 +222,7 @@ def _send_notifications(
         if telegram_config.include_top_overall:
             top_jobs_overall = db.get_top_jobs(
                 limit=telegram_config.max_top_overall,
-                min_score=telegram_config.min_score_for_notification,
+                min_score=config.scoring.notify_threshold,
             )
             total_jobs_in_db = db.get_job_count()
 
@@ -256,6 +243,7 @@ def _send_notifications(
             avg_score=avg_score,
             top_jobs_overall=top_jobs_overall,
             total_jobs_in_db=total_jobs_in_db,
+            notify_threshold=config.scoring.notify_threshold,
         )
 
         # Send notifications
@@ -300,7 +288,7 @@ def _send_empty_notification(config: Config, db: JobDatabase) -> None:
         if telegram_config.include_top_overall:
             top_jobs_overall = db.get_top_jobs(
                 limit=telegram_config.max_top_overall,
-                min_score=telegram_config.min_score_for_notification,
+                min_score=config.scoring.notify_threshold,
             )
             total_jobs_in_db = db.get_job_count()
 
@@ -312,6 +300,7 @@ def _send_empty_notification(config: Config, db: JobDatabase) -> None:
             avg_score=stats.get("avg_relevance_score", 0),
             top_jobs_overall=top_jobs_overall,
             total_jobs_in_db=total_jobs_in_db,
+            notify_threshold=config.scoring.notify_threshold,
         )
 
         # Send notifications
@@ -350,23 +339,44 @@ def _prepare_runtime(*, scheduled: bool) -> tuple[Config, JobDatabase]:
 
     db = get_database(config)
     db_stats = db.get_statistics()
-    if config.database.recalculate_scores_on_startup and db_stats["total_jobs"] > 0:
+    if db_stats["total_jobs"] > 0:
         logger.info(
             f"Recalculating scores for {db_stats['total_jobs']} existing jobs..."
         )
         recalculate_all_scores(db, config)
 
-    if config.vector_search.enabled and config.vector_search.backfill_on_startup:
+    report = db.reconcile_with_config(config)
+    logger.info(
+        "Reconciliation: %d below score, %d stale, %d blacklist purged",
+        report.deleted_below_score,
+        report.deleted_stale,
+        report.purged_blacklist,
+    )
+
+    if config.vector_search.enabled:
         try:
             from vector_store import get_vector_store
-            from vector_commands import backfill_embeddings
+            from vector_commands import backfill_embeddings, sync_deletions
 
             vs = get_vector_store(config.chroma_path)
-            backfilled = backfill_embeddings(db, vs, config.vector_search.batch_size)
-            if backfilled:
-                logger.info(f"Backfilled {backfilled} jobs into vector store")
+            if report.total_deleted > 0:
+                sync_deletions(db, vs)
+            if config.vector_search.backfill_on_startup:
+                backfilled = backfill_embeddings(
+                    db, vs, config.vector_search.batch_size
+                )
+                if backfilled:
+                    logger.info(f"Backfilled {backfilled} jobs into vector store")
         except Exception as e:
-            logger.warning(f"Vector store backfill failed: {e}")
+            logger.warning(f"Vector store sync/backfill failed: {e}")
+
+    if report.total_deleted > 0 and config.notifications.enabled:
+        try:
+            manager = NotificationManager(config)
+            if manager.has_configured_notifiers():
+                manager.send_reconcile_sync(create_reconcile_notification_data(report))
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Reconcile notification failed: {e}")
 
     return config, db
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from dataclasses import dataclass
 
 import pandas as pd
 from rapidfuzz import fuzz
@@ -287,41 +288,62 @@ def calculate_relevance_score(row: pd.Series, config: Config) -> int:
     return score
 
 
-def filter_relevant_jobs(jobs_df: pd.DataFrame, config: Config) -> pd.DataFrame:
+@dataclass
+class Partitions:
+    """Three-way view of scored search results.
+
+    ``scored`` keeps every row (useful for debug/metrics). ``to_save`` is what
+    will land in the DB. ``to_notify`` is a subset of ``to_save`` above the
+    notification threshold.
     """
-    Add relevance scores and filter jobs by threshold.
 
-    Creates a copy of the input DataFrame with a 'relevance_score' column added,
-    then filters to only include jobs above the scoring threshold.
+    scored: pd.DataFrame
+    to_save: pd.DataFrame
+    to_notify: pd.DataFrame
 
-    Args:
-        jobs_df: DataFrame with all jobs. Not modified.
-        config: Configuration with scoring settings.
 
-    Returns:
-        New DataFrame with relevant jobs (score > threshold), sorted by score descending.
-        The original jobs_df is not modified.
-    """
-    logger = get_logger("filter")
+def score_jobs(jobs_df: pd.DataFrame, config: Config) -> pd.DataFrame:
+    """Return a copy of ``jobs_df`` with a ``relevance_score`` column added."""
+    logger = get_logger("scoring")
+    log_section(logger, "SCORING JOBS")
 
-    log_section(logger, "FILTERING RELEVANT JOBS")
-
-    # Work on a copy to avoid modifying the caller's DataFrame
-    scored_df = jobs_df.copy()
-    scored_df["relevance_score"] = scored_df.apply(
+    scored = jobs_df.copy()
+    scored["relevance_score"] = scored.apply(
         lambda row: calculate_relevance_score(row, config), axis=1
     )
 
-    # Filter by threshold
-    threshold = config.scoring.threshold
-    mask = scored_df["relevance_score"] > threshold
-    relevant_jobs = scored_df.loc[mask].sort_values("relevance_score", ascending=False)
+    if len(scored) > 0:
+        logger.info(
+            "Scored %d jobs (max=%d, avg=%.1f)",
+            len(scored),
+            int(scored["relevance_score"].max()),
+            float(scored["relevance_score"].mean()),
+        )
+    return scored
 
-    logger.info(f"Score threshold: {threshold}")
-    logger.info(f"Relevant jobs found: {len(relevant_jobs)}")
 
-    if len(relevant_jobs) > 0:
-        logger.info(f"Highest score: {relevant_jobs['relevance_score'].max()}")
-        logger.info(f"Average score: {relevant_jobs['relevance_score'].mean():.1f}")
+def partition_by_thresholds(scored: pd.DataFrame, config: Config) -> Partitions:
+    """Carve the scored frame into save/notify partitions."""
+    save_threshold = config.scoring.save_threshold
+    notify_threshold = config.scoring.notify_threshold
 
-    return relevant_jobs
+    logger = get_logger("scoring")
+
+    if scored.empty or "relevance_score" not in scored.columns:
+        empty = scored.iloc[0:0] if not scored.empty else scored
+        return Partitions(scored=scored, to_save=empty, to_notify=empty)
+
+    to_save = scored[scored["relevance_score"] >= save_threshold].sort_values(
+        "relevance_score", ascending=False
+    )
+    to_notify = to_save[to_save["relevance_score"] >= notify_threshold]
+
+    logger.info(
+        "Partitions: %d scored, %d to save (≥%d), %d to notify (≥%d)",
+        len(scored),
+        len(to_save),
+        save_threshold,
+        len(to_notify),
+        notify_threshold,
+    )
+    return Partitions(scored=scored, to_save=to_save, to_notify=to_notify)

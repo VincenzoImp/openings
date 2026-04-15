@@ -538,28 +538,37 @@ queries:
 
 scoring:
   # ---------------------------------------------------------------------------
-  # threshold (integer, default: 10)
+  # save_threshold (integer, default: 0)
   # ---------------------------------------------------------------------------
-  # Minimum score for a job to be considered "relevant".
+  # Minimum score for a job to be saved in the database at all.
   #
-  # Jobs with score >= threshold:
-  # - Appear in the "relevant_jobs" CSV/Excel files
-  # - Are highlighted in the dashboard
-  # - May trigger notifications (depending on notification settings)
+  # - score < save_threshold  → dropped, never stored
+  # - score ≥ save_threshold  → stored, visible in dashboard
   #
-  # Jobs with score < threshold:
-  # - Still saved to database and "all_jobs" files
-  # - Just not flagged as "relevant"
+  # Start at 0 (keep everything) so you can explore freely in the dashboard,
+  # then raise it once you know what "too low to care" looks like for you.
   #
-  # Recommended values:
-  # - 5-10: Lenient (more jobs marked relevant)
-  # - 10-20: Moderate (default)
-  # - 20-30: Strict (fewer, more targeted jobs)
-  # - 30+: Very strict (only best matches)
-  #
-  # Tip: Start with a low threshold and increase it once you see the results.
+  # At every boot, reconciliation re-applies this threshold: any stored job
+  # now scoring below it is removed. Bookmarked and applied jobs are ALWAYS
+  # protected from automatic removal — this is hardcoded, not configurable.
   # ---------------------------------------------------------------------------
-  threshold: 10
+  save_threshold: 0
+
+  # ---------------------------------------------------------------------------
+  # notify_threshold (integer, default: 20)
+  # ---------------------------------------------------------------------------
+  # Minimum score for a job to trigger a notification.
+  #
+  # MUST satisfy: notify_threshold >= save_threshold (the tool will refuse
+  # to load the config otherwise — notifying about jobs that aren't even
+  # stored is nonsensical).
+  #
+  # Typical values:
+  # - 15-20: moderate (default)
+  # - 25-30: only the good ones wake me up
+  # - 40+: only truly excellent matches
+  # ---------------------------------------------------------------------------
+  notify_threshold: 20
 
   # ---------------------------------------------------------------------------
   # weights (dict of category: points)
@@ -1006,66 +1015,33 @@ logging:
 
 database:
   # ---------------------------------------------------------------------------
-  # cleanup_enabled (boolean, default: false)
+  # retention
   # ---------------------------------------------------------------------------
-  # Automatically delete old jobs from the database.
+  # Automatic retention rules applied at every boot by the reconciliation
+  # pass. In order:
+  #   1. Drop jobs below scoring.save_threshold (implicit — no knob here).
+  #   2. Drop jobs whose last_seen is older than retention.max_age_days.
+  #   3. Purge blacklist rows older than retention.purge_blacklist_after_days.
   #
-  # Values:
-  # - false: Keep all jobs forever (default)
-  # - true: Delete jobs not seen in cleanup_days
-  #
-  # When to enable:
-  # - Database is getting too large
-  # - You only care about recent jobs
-  # - Running on limited storage
-  #
-  # Cleanup runs automatically at the start of each search.
+  # Bookmarked and applied jobs are ALWAYS protected from all retention
+  # passes. This invariant is hardcoded at the SQL level and cannot be
+  # disabled; the only escape hatch is the "Full reset" button in the
+  # dashboard's Danger zone.
   # ---------------------------------------------------------------------------
-  cleanup_enabled: false
+  retention:
+    # max_age_days (integer, default: 30)
+    # Delete jobs whose last_seen is older than this many days.
+    max_age_days: 30
 
-  # ---------------------------------------------------------------------------
-  # cleanup_days (integer, default: 60)
-  # ---------------------------------------------------------------------------
-  # Delete jobs not seen in this many days.
-  #
-  # Only applies when cleanup_enabled is true.
-  #
-  # A job's "last_seen" date is updated every time it appears in search results.
-  # Jobs that haven't appeared in cleanup_days are assumed to be expired/filled.
-  #
-  # Recommended values:
-  # - 14: Aggressive cleanup (2 weeks)
-  # - 30: Moderate cleanup
-  # - 60: Conservative cleanup (default, jobs can stay open for a while)
-  # - 90: Very conservative (3 months)
-  # ---------------------------------------------------------------------------
-  cleanup_days: 60
-
-  # ---------------------------------------------------------------------------
-  # recalculate_scores_on_startup (boolean, default: true)
-  # ---------------------------------------------------------------------------
-  # Recalculate relevance scores for all existing jobs on startup.
-  #
-  # Values:
-  # - true: Update all scores using current scoring config (default)
-  # - false: Keep existing scores unchanged
-  #
-  # When true:
-  # - All jobs get rescored with current weights/keywords
-  # - Useful when you've changed your scoring criteria
-  # - No need to rebuild database to apply new scoring
-  # - Adds a few seconds to startup time
-  #
-  # When false:
-  # - Faster startup
-  # - Scores only calculated for new jobs
-  # - Old jobs keep their original scores
-  # ---------------------------------------------------------------------------
-  recalculate_scores_on_startup: true
+    # purge_blacklist_after_days (integer, default: 90)
+    # Drop entries from the deleted_jobs blacklist after this many days.
+    # The blacklist exists to prevent re-importing manually-removed jobs,
+    # but stale entries serve no purpose — purge them periodically.
+    purge_blacklist_after_days: 90
 
 
 # =============================================================================
-#                                OUTPUT
+#                                STORAGE LAYOUT
 # =============================================================================
 # Persistent storage lives under JOB_SEARCH_DATA_DIR (default `/data` inside
 # Docker, repo root in local development) with a fixed layout:
@@ -1073,52 +1049,14 @@ database:
 #   {DATA_DIR}/config/settings.yaml   — this file
 #   {DATA_DIR}/db/jobs.db             — primary SQLite store
 #   {DATA_DIR}/chroma/                — vector store (ChromaDB)
-#   {DATA_DIR}/results/               — CSV/Excel exports (when enabled)
+#   {DATA_DIR}/results/               — CSV/Excel exports (created on demand)
 #   {DATA_DIR}/logs/search.log        — application log
 #
-# Only the CSV/Excel toggles are tunable here; use `JOB_SEARCH_DATA_DIR` to
-# relocate the entire tree.
+# None of these paths are configurable here — use JOB_SEARCH_DATA_DIR to
+# relocate the entire tree. There is no longer an `output:` section: CSV
+# and Excel exports are triggered on-demand from the dashboard's Database
+# tab; the search pipeline itself never writes spreadsheets.
 # =============================================================================
-
-output:
-  # ---------------------------------------------------------------------------
-  # save_csv (boolean, default: true)
-  # ---------------------------------------------------------------------------
-  # Save results to CSV files.
-  #
-  # Values:
-  # - true: Generate CSV files after each search (default)
-  # - false: Skip CSV generation
-  #
-  # CSV files are useful for:
-  # - Quick viewing in spreadsheet software
-  # - Importing into other tools
-  # - Simple backups
-  #
-  # Note: The SQLite database is always the primary data store.
-  # CSV files are supplementary exports.
-  # ---------------------------------------------------------------------------
-  save_csv: true
-
-  # ---------------------------------------------------------------------------
-  # save_excel (boolean, default: true)
-  # ---------------------------------------------------------------------------
-  # Save results to Excel files.
-  #
-  # Values:
-  # - true: Generate Excel files after each search (default)
-  # - false: Skip Excel generation
-  #
-  # Excel files include:
-  # - Formatted headers with colors
-  # - Clickable hyperlinks for job URLs
-  # - Conditional formatting for high scores
-  # - Frozen header row
-  # - Auto-sized columns
-  #
-  # Note: Requires openpyxl library (included in requirements.txt).
-  # ---------------------------------------------------------------------------
-  save_excel: true
 
 
 # =============================================================================
@@ -1356,20 +1294,8 @@ notifications:
     send_summary: true
 
     # -----------------------------------------------------------------------
-    # min_score_for_notification (integer, default: 0)
-    # -----------------------------------------------------------------------
-    # Minimum relevance score for a job to be included in notifications.
-    #
-    # Values:
-    # - 0: Include all jobs (default)
-    # - 10+: Only jobs above this score
-    # - 20+: Only high-scoring jobs
-    #
-    # Use this to reduce notification noise by only alerting for
-    # highly relevant jobs.
-    # -----------------------------------------------------------------------
-    min_score_for_notification: 0
-
+    # NOTE: the notify threshold lives in `scoring.notify_threshold`, not
+    # here. It's a relevance concept, not a channel concept.
     # -----------------------------------------------------------------------
     # max_jobs_in_message (integer, default: 20)
     # -----------------------------------------------------------------------

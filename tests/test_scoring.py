@@ -12,8 +12,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 from config import Config, ScoringConfig
 from scoring import (
     calculate_relevance_score,
-    filter_relevant_jobs,
     fuzzy_post_filter,
+    partition_by_thresholds,
+    score_jobs,
     _extract_words,
     _fuzzy_word_match,
     _get_job_text,
@@ -118,7 +119,8 @@ class TestCalculateRelevanceScore:
         """Create test config with scoring settings."""
         return Config(
             scoring=ScoringConfig(
-                threshold=10,
+                save_threshold=0,
+                notify_threshold=10,
                 weights={
                     "primary": 20,
                     "secondary": 10,
@@ -445,21 +447,19 @@ class TestFuzzyPostFilter:
 
 
 # =============================================================================
-# TEST FILTER RELEVANT JOBS
+# TEST SCORE_JOBS + PARTITION_BY_THRESHOLDS
 # =============================================================================
 
 
-class TestFilterRelevantJobs:
-    """Tests for filter_relevant_jobs function."""
-
+class TestScoreAndPartition:
     @pytest.fixture
     def config(self):
-        """Create config with scoring settings."""
         from config import Config, ScoringConfig
 
         return Config(
             scoring=ScoringConfig(
-                threshold=15,
+                save_threshold=10,
+                notify_threshold=25,
                 weights={"primary": 20, "secondary": 10},
                 keywords={
                     "primary": ["software engineer"],
@@ -468,8 +468,7 @@ class TestFilterRelevantJobs:
             )
         )
 
-    def test_filter_by_threshold(self, config):
-        """Test that jobs below threshold are filtered out."""
+    def test_score_jobs_adds_column(self, config):
         df = pd.DataFrame(
             [
                 {
@@ -477,76 +476,75 @@ class TestFilterRelevantJobs:
                     "company": "A",
                     "location": "NYC",
                     "description": "Python dev",
-                },  # 30
-                {
-                    "title": "Marketing Manager",
-                    "company": "B",
-                    "location": "NYC",
-                    "description": "Sales",
-                },  # 0
-            ]
-        )
-
-        result = filter_relevant_jobs(df, config)
-
-        assert len(result) == 1
-        assert result.iloc[0]["title"] == "Software Engineer"
-
-    def test_adds_relevance_score_column(self, config):
-        """Test that relevance_score column is added."""
-        df = pd.DataFrame(
-            [
-                {
-                    "title": "Software Engineer",
-                    "company": "A",
-                    "location": "NYC",
-                    "description": "",
                 },
             ]
         )
 
-        result = filter_relevant_jobs(df, config)
+        scored = score_jobs(df, config)
 
-        assert "relevance_score" in result.columns
-        assert result.iloc[0]["relevance_score"] == 20
+        assert "relevance_score" in scored.columns
+        assert scored.iloc[0]["relevance_score"] == 30
 
-    def test_sorted_by_score_descending(self, config):
-        """Test that results are sorted by score descending."""
+    def test_partition_separates_save_and_notify(self, config):
         df = pd.DataFrame(
             [
                 {
-                    "title": "Engineer",
+                    "title": "Software Engineer",
                     "company": "A",
                     "location": "NYC",
-                    "description": "Python",
-                },  # 10
-                {
-                    "title": "Software Engineer Python",
-                    "company": "B",
-                    "location": "NYC",
-                    "description": "Python",
-                },  # 30
+                    "description": "Python dev",
+                },  # 30 → save + notify
                 {
                     "title": "Software Engineer",
+                    "company": "B",
+                    "location": "NYC",
+                    "description": "",
+                },  # 20 → save only
+                {
+                    "title": "Marketing",
                     "company": "C",
                     "location": "NYC",
                     "description": "",
-                },  # 20
+                },  # 0 → drop
             ]
         )
 
-        # Adjust threshold to include all
-        config.scoring.threshold = 5
+        scored = score_jobs(df, config)
+        parts = partition_by_thresholds(scored, config)
 
-        result = filter_relevant_jobs(df, config)
+        assert len(parts.scored) == 3
+        assert len(parts.to_save) == 2
+        assert len(parts.to_notify) == 1
+        assert parts.to_notify.iloc[0]["company"] == "A"
 
-        scores = result["relevance_score"].tolist()
+    def test_partition_sorts_to_save_descending(self, config):
+        df = pd.DataFrame(
+            [
+                {
+                    "title": "Software Engineer",
+                    "company": "Low",
+                    "location": "NYC",
+                    "description": "",
+                },  # 20
+                {
+                    "title": "Software Engineer Python",
+                    "company": "High",
+                    "location": "NYC",
+                    "description": "Python",
+                },  # 30
+            ]
+        )
+
+        parts = partition_by_thresholds(score_jobs(df, config), config)
+
+        scores = parts.to_save["relevance_score"].tolist()
         assert scores == sorted(scores, reverse=True)
 
-    def test_empty_dataframe(self, config):
-        """Test filtering empty DataFrame."""
+    def test_empty_frame(self, config):
         df = pd.DataFrame(columns=["title", "company", "location", "description"])
 
-        result = filter_relevant_jobs(df, config)
+        scored = score_jobs(df, config)
+        parts = partition_by_thresholds(scored, config)
 
-        assert len(result) == 0
+        assert len(parts.to_save) == 0
+        assert len(parts.to_notify) == 0

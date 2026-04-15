@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Generator
@@ -56,6 +57,21 @@ _DELETED_JOB_FIELD_NAMES = (
 _DELETED_JOB_COLUMNS = ", ".join(_DELETED_JOB_FIELD_NAMES)
 
 
+@dataclass
+class ReconciliationReport:
+    """Outcome of ``JobDatabase.reconcile_with_config``."""
+
+    deleted_below_score: int = 0
+    deleted_stale: int = 0
+    purged_blacklist: int = 0
+    protected_bookmarked: int = 0
+    protected_applied: int = 0
+
+    @property
+    def total_deleted(self) -> int:
+        return self.deleted_below_score + self.deleted_stale + self.purged_blacklist
+
+
 class JobDatabase:
     """
     SQLite database manager for job persistence.
@@ -91,6 +107,11 @@ class JobDatabase:
 
     CREATE_INDEX = """
         CREATE INDEX IF NOT EXISTS idx_jobs_last_seen ON jobs(last_seen)
+    """
+
+    CREATE_SCORE_INDEX = """
+        CREATE INDEX IF NOT EXISTS idx_jobs_relevance_score
+        ON jobs(relevance_score)
     """
 
     CREATE_DELETED_TABLE = """
@@ -199,6 +220,7 @@ class JobDatabase:
 
             cursor.execute(self.CREATE_TABLE)
             cursor.execute(self.CREATE_INDEX)
+            cursor.execute(self.CREATE_SCORE_INDEX)
             cursor.execute(self.CREATE_DELETED_TABLE)
             cursor.execute(self.CREATE_DELETED_INDEX)
             cursor.execute(self.CREATE_META_TABLE)
@@ -796,7 +818,7 @@ class JobDatabase:
         # Filter and remove temporary column
         return df[df["job_id"].isin(new_ids)].drop(columns=["job_id"])
 
-    def filter_blacklisted_jobs(self, df: pd.DataFrame) -> pd.DataFrame:
+    def exclude_blacklisted(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Remove blacklisted jobs from a DataFrame using the internal job identifier.
 
@@ -1303,37 +1325,177 @@ class JobDatabase:
             conn.commit()
             return cursor.rowcount
 
-    def delete_jobs_older_than(self, days: int) -> int:
-        """
-        Delete jobs not seen in the specified number of days.
+    def delete_stale_jobs(self, max_age_days: int) -> int:
+        """Delete jobs whose ``last_seen`` is older than ``max_age_days``.
 
-        Args:
-            days: Delete jobs with last_seen older than this many days.
-
-        Returns:
-            Number of jobs deleted.
+        Bookmarked and applied jobs are protected at the SQL level.
         """
         with self._get_connection() as conn:
             cursor = conn.cursor()
-
-            # Count jobs to be deleted
             cursor.execute(
-                "SELECT COUNT(*) FROM jobs WHERE last_seen < date('now', ?)",
-                (f"-{days} days",),
-            )
-            count = cursor.fetchone()[0]
-
-            if count == 0:
-                return 0
-
-            # Delete old jobs
-            cursor.execute(
-                "DELETE FROM jobs WHERE last_seen < date('now', ?)",
-                (f"-{days} days",),
+                "DELETE FROM jobs WHERE last_seen < date('now', ?) "
+                "AND bookmarked = 0 AND applied = 0",
+                (f"-{max_age_days} days",),
             )
             conn.commit()
+            return cursor.rowcount
 
-        return count
+    def delete_jobs_below_score(self, score: int) -> int:
+        """Delete jobs with ``relevance_score`` strictly below ``score``.
+
+        Bookmarked and applied jobs are protected at the SQL level.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM jobs WHERE relevance_score < ? "
+                "AND bookmarked = 0 AND applied = 0",
+                (score,),
+            )
+            conn.commit()
+            return cursor.rowcount
+
+    def purge_blacklist(self, older_than_days: int | None = None) -> int:
+        """Delete rows from the blacklist table.
+
+        If ``older_than_days`` is given, only rows blacklisted earlier than
+        that cutoff are removed; otherwise the whole table is cleared.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            if older_than_days is None:
+                cursor.execute("DELETE FROM deleted_jobs")
+            else:
+                cursor.execute(
+                    "DELETE FROM deleted_jobs WHERE blacklisted_at < datetime('now', ?)",
+                    (f"-{older_than_days} days",),
+                )
+            conn.commit()
+            return cursor.rowcount
+
+    def get_score_distribution(self, bin_size: int = 5) -> list[tuple[int, int]]:
+        """Return a list of ``(bin_start, count)`` pairs for histogramming.
+
+        Each bin covers ``[bin_start, bin_start + bin_size)`` of the score
+        axis. The range is derived from the actual min/max in the database.
+        """
+        if bin_size <= 0:
+            raise ValueError(f"bin_size must be positive, got {bin_size}")
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT MIN(relevance_score), MAX(relevance_score), COUNT(*) FROM jobs"
+            )
+            row = cursor.fetchone()
+            if row is None or row[2] == 0:
+                return []
+            lo, hi = int(row[0]), int(row[1])
+
+            start = (lo // bin_size) * bin_size
+            bins: list[tuple[int, int]] = []
+            edge = start
+            while edge <= hi:
+                cursor.execute(
+                    "SELECT COUNT(*) FROM jobs WHERE relevance_score >= ? "
+                    "AND relevance_score < ?",
+                    (edge, edge + bin_size),
+                )
+                bins.append((edge, cursor.fetchone()[0]))
+                edge += bin_size
+            return bins
+
+    def count_jobs_below_score(self, score: int) -> int:
+        """Preview for ``delete_jobs_below_score`` (bookmarks/applied excluded)."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT COUNT(*) FROM jobs WHERE relevance_score < ? "
+                "AND bookmarked = 0 AND applied = 0",
+                (score,),
+            )
+            return int(cursor.fetchone()[0])
+
+    def count_stale_jobs(self, days: int) -> int:
+        """Preview for ``delete_stale_jobs`` (bookmarks/applied excluded)."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT COUNT(*) FROM jobs WHERE last_seen < date('now', ?) "
+                "AND bookmarked = 0 AND applied = 0",
+                (f"-{days} days",),
+            )
+            return int(cursor.fetchone()[0])
+
+    def count_blacklist_older_than(self, days: int) -> int:
+        """Preview for ``purge_blacklist``."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT COUNT(*) FROM deleted_jobs "
+                "WHERE blacklisted_at < datetime('now', ?)",
+                (f"-{days} days",),
+            )
+            return int(cursor.fetchone()[0])
+
+    def reconcile_with_config(self, config: Config) -> ReconciliationReport:
+        """Align the DB with the current settings.yaml retention rules.
+
+        Runs three cleanup passes, in order:
+          1. drop jobs below ``scoring.save_threshold``
+          2. drop stale jobs older than ``database.retention.max_age_days``
+          3. purge blacklist rows older than ``database.retention.purge_blacklist_after_days``
+
+        Bookmarked/applied jobs are always protected. The operation is
+        idempotent: calling it twice in a row yields zeros the second time.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM jobs WHERE bookmarked = 1")
+            protected_bookmarked = int(cursor.fetchone()[0])
+            cursor.execute("SELECT COUNT(*) FROM jobs WHERE applied = 1")
+            protected_applied = int(cursor.fetchone()[0])
+
+        report = ReconciliationReport(
+            protected_bookmarked=protected_bookmarked,
+            protected_applied=protected_applied,
+        )
+        report.deleted_below_score = self.delete_jobs_below_score(
+            config.scoring.save_threshold
+        )
+        report.deleted_stale = self.delete_stale_jobs(
+            config.database.retention.max_age_days
+        )
+        report.purged_blacklist = self.purge_blacklist(
+            older_than_days=config.database.retention.purge_blacklist_after_days
+        )
+
+        self.logger.info(
+            "Reconciled DB: %d below score, %d stale, %d blacklist purged "
+            "(protected: %d bookmarked, %d applied)",
+            report.deleted_below_score,
+            report.deleted_stale,
+            report.purged_blacklist,
+            protected_bookmarked,
+            protected_applied,
+        )
+        return report
+
+    def reset_all(self) -> tuple[int, int]:
+        """Truncate both ``jobs`` and ``deleted_jobs``. Danger zone escape hatch.
+
+        This is the only path that bypasses the bookmark/applied protection.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM jobs")
+            jobs_count = int(cursor.fetchone()[0])
+            cursor.execute("SELECT COUNT(*) FROM deleted_jobs")
+            blacklist_count = int(cursor.fetchone()[0])
+            cursor.execute("DELETE FROM jobs")
+            cursor.execute("DELETE FROM deleted_jobs")
+            conn.commit()
+        return jobs_count, blacklist_count
 
 
 def get_database(config: Config) -> JobDatabase:
@@ -1397,26 +1559,3 @@ def recalculate_all_scores(db: JobDatabase, config: Config) -> int:
 
     logger.info(f"Recalculated scores: {updated} jobs updated")
     return updated
-
-
-def cleanup_old_jobs(db: JobDatabase, days: int) -> int:
-    """
-    Delete jobs not seen in the specified number of days.
-
-    Args:
-        db: Database instance.
-        days: Delete jobs with last_seen older than this many days.
-
-    Returns:
-        Number of jobs deleted.
-    """
-    logger = get_logger("database")
-
-    count = db.delete_jobs_older_than(days)
-
-    if count == 0:
-        logger.info(f"No jobs older than {days} days to clean up")
-    else:
-        logger.info(f"Cleaned up {count} jobs not seen in {days}+ days")
-
-    return count
