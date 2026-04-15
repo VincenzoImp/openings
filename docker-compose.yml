@@ -24,6 +24,7 @@ networks:
 
 volumes:
   jobsearch-data:
+    name: jobsearch-data
 
 services:
   scheduler:

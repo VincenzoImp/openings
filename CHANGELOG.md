@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.6] - 2026-04-15
+
+### Changed (BREAKING)
+
+- **`settings.yaml` is now strictly required** — no default, no fallback, no auto-scaffolding. The entrypoint refuses to start either service if `/data/config/settings.yaml` is missing, exits with a clear actionable error message, and lets Docker's restart policy do the rest. `config/settings.example.yaml` remains a **documentation artefact**: it ships with the repo and inside the image purely to show the expected shape of a valid configuration, and is never copied into the user's data volume automatically.
+- **`docker/entrypoint.sh` rewritten**: it creates the `/data/{config,db,chroma,results,logs}` subtree on every start, then requires `settings.yaml` to exist. The previous first-run "scaffold from template" behaviour from v6.0.0 is gone — it encouraged users to boot with generic placeholder queries and "Your Name" profile strings, which was never the intended UX.
+- **`docker-compose.yml`**: volume declaration now uses `name: jobsearch-data` so Compose doesn't prefix it with the project name. This lets `docker volume create jobsearch-data` (used to pre-seed `settings.yaml`) and the Compose-managed volume reference the same underlying Docker volume.
+
+### Quick Start (new mandatory-config flow)
+
+```bash
+# 1. Grab the documented template
+docker run --rm --entrypoint cat \
+  vincenzoimp/job-search-tool:latest \
+  /opt/job-search-tool/defaults/settings.example.yaml > settings.yaml
+
+# 2. Edit settings.yaml with your queries, scoring, and (optional) Telegram bot
+
+# 3. Inject it into the named volume
+docker volume create jobsearch-data
+docker run --rm \
+  -v jobsearch-data:/data \
+  -v "$PWD/settings.yaml:/src.yaml:ro" \
+  alpine sh -c 'mkdir -p /data/config && cp /src.yaml /data/config/settings.yaml'
+
+# 4. Start the stack
+docker compose up -d
+```
+
+Four explicit steps, zero magic. If you forget step 3 the containers fail loudly with an error message that tells you exactly what to do.
+
+### Migration notes
+
+- If you were relying on v6.0.5's auto-scaffolded default `settings.yaml` (generic Remote software-engineer queries, no Telegram), copy it out first with `docker compose cp` before upgrading, or use the new flow to inject your own.
+- The `settings.example.yaml` file is no longer written to the volume by the container. Your existing `settings.example.yaml` inside the volume from older releases is harmless and can be deleted: `docker run --rm -v jobsearch-data:/data alpine rm /data/config/settings.example.yaml`.
+
 ## [6.0.5] - 2026-04-15
 
 ### Fixed
@@ -190,7 +226,8 @@ No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-
 
 Entries prior to v4.3.1 have been archived. The git history on `main` plus the tagged commits are the authoritative source for anything older.
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.5...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.6...HEAD
+[6.0.6]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.5...v6.0.6
 [6.0.5]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.4...v6.0.5
 [6.0.4]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.3...v6.0.4
 [6.0.3]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.2...v6.0.3

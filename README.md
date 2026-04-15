@@ -289,11 +289,49 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 
 ## Quick Start
 
-You only need Docker. In an empty folder, drop this `docker-compose.yml`:
+You only need Docker. The tool **requires** a user-provided `settings.yaml` — there is no default, no fallback, no auto-generated config. The first-time setup is four explicit steps:
+
+### 1. Get the documented example template
+
+Pick whichever source is more convenient:
+
+```bash
+# From the published Docker Hub image
+docker run --rm --entrypoint cat \
+  vincenzoimp/job-search-tool:latest \
+  /opt/job-search-tool/defaults/settings.example.yaml \
+  > settings.yaml
+```
+
+```bash
+# Or directly from GitHub
+curl -fsSL -o settings.yaml \
+  https://raw.githubusercontent.com/VincenzoImp/job-search-tool/main/config/settings.example.yaml
+```
+
+### 2. Edit `settings.yaml`
+
+Open it in your editor and configure at least `search`, `queries`, and `scoring`. Telegram notifications are off by default — enable them only if you have a bot token.
+
+### 3. Inject it into the volume
+
+```bash
+docker volume create jobsearch-data
+
+docker run --rm \
+  -v jobsearch-data:/data \
+  -v "$PWD/settings.yaml:/src.yaml:ro" \
+  alpine sh -c 'mkdir -p /data/config && cp /src.yaml /data/config/settings.yaml'
+```
+
+### 4. Start the stack
+
+Drop this `docker-compose.yml` in the same folder:
 
 ```yaml
 volumes:
   jobsearch-data:
+    name: jobsearch-data
 
 services:
   scheduler:
@@ -312,40 +350,37 @@ services:
       - jobsearch-data:/data
 ```
 
-Then:
+The `name: jobsearch-data` entry prevents Compose from prefixing the volume with the project name, so the `docker volume create jobsearch-data` above and the volume used by the stack are the same thing.
 
 ```bash
 docker compose up -d
 ```
 
-That's it. On first run the container scaffolds `settings.yaml` from the bundled template inside the managed `jobsearch-data` volume, creates the `config/`, `db/`, `chroma/`, `results/`, `logs/` subtree, and starts the continuous scheduler alongside the dashboard.
+Open **http://localhost:8501** for the dashboard. The scheduler starts its first search immediately and then runs every `scheduler.interval_hours` (24 by default).
 
-Open **http://localhost:8501** for the dashboard.
+If you forget step 3 and start the stack without a `settings.yaml` in the volume, both containers exit with a clear error message explaining exactly what to do next — there's no silent fallback to a generic default.
 
 ### What you get
 
 - **scheduler** — runs the continuous search loop (`main.py scheduler`). `restart: unless-stopped` means it survives crashes, reboots, and rate-limit retries automatically.
 - **dashboard** — Streamlit UI on port `8501` (`main.py dashboard`). Reads the same SQLite database and vector store the scheduler writes to.
-- **One image, one volume** — both services pull `vincenzoimp/job-search-tool:latest` (Docker downloads it once and shares layers). All persistent state (`settings.yaml`, SQLite, ChromaDB vectors, CSV/Excel exports, logs) lives inside the Docker-managed `jobsearch-data` volume.
+- **One image, one volume** — both services pull `vincenzoimp/job-search-tool:latest` (Docker downloads it once and shares layers). All persistent state (SQLite, ChromaDB vectors, CSV/Excel exports, logs) plus your `settings.yaml` lives inside the Docker-managed `jobsearch-data` volume.
 - **Non-root by default** — both containers run as UID 1000 (`appuser`). The named volume inherits ownership from the image at first mount, so you never need host-side `chown` or privileged init steps.
 
-### Configure the tool
+### Updating `settings.yaml` later
 
-After the first `up`, open a shell against the running scheduler to inspect the scaffolded config, or pull it out with `docker compose cp`, edit locally, and copy it back:
+Re-inject it with the same one-liner, then restart the scheduler:
 
 ```bash
-# Copy the generated settings.yaml to your host for editing
-docker compose cp scheduler:/data/config/settings.yaml ./settings.yaml
+docker run --rm \
+  -v jobsearch-data:/data \
+  -v "$PWD/settings.yaml:/src.yaml:ro" \
+  alpine cp /src.yaml /data/config/settings.yaml
 
-# Edit ./settings.yaml with your favourite editor
-# (set locations, queries, scoring, optional Telegram…)
-
-# Push it back into the volume and apply
-docker compose cp ./settings.yaml scheduler:/data/config/settings.yaml
 docker compose restart scheduler
 ```
 
-You can also edit in place inside the container (`docker compose exec scheduler vi /data/config/settings.yaml`), or use the dashboard's own semantic search tab to explore results as the scheduler runs in the background.
+You can also pull the current version out with `docker compose cp jobsearch-scheduler:/data/config/settings.yaml ./settings.yaml`, edit, and push it back the same way.
 
 ### Back up and restore
 
