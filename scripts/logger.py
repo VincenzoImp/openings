@@ -90,6 +90,44 @@ class DedupeFilter(logging.Filter):
         return True
 
 
+# Known JobSpy per-site logger names. JobSpy uses colons as separators, which
+# are *not* hierarchical in Python logging, so each site gets its own
+# independent logger. We pre-configure them at setup time to (a) strip any
+# handlers JobSpy attached at import, (b) force propagation to the root
+# logger where our DedupeFilter lives, and (c) set a sensible level.
+_JOBSPY_LOGGER_NAMES = (
+    "JobSpy",
+    "JobSpy:Indeed",
+    "JobSpy:LinkedIn",
+    "JobSpy:Glassdoor",
+    "JobSpy:Google",
+    "JobSpy:ZipRecruiter",
+    "JobSpy:Bayt",
+    "JobSpy:Naukri",
+    "JobSpy:BDJobs",
+)
+
+
+def _reroute_jobspy_loggers() -> None:
+    """Purge and reconfigure every JobSpy per-site logger.
+
+    JobSpy attaches its own StreamHandler at import time, which bypasses
+    our root-level ``DedupeFilter``. By removing those handlers and forcing
+    propagation back to the root logger, all JobSpy records flow through
+    our filter chain and get deduped like any other noisy third-party log.
+    """
+    for name in _JOBSPY_LOGGER_NAMES:
+        jl = logging.getLogger(name)
+        for handler in list(jl.handlers):
+            jl.removeHandler(handler)
+            try:
+                handler.close()
+            except Exception:
+                pass
+        jl.propagate = True
+        jl.setLevel(logging.WARNING)
+
+
 def setup_logging(config: Config) -> logging.Logger:
     """Configure application-wide logging with console and file handlers.
 
@@ -166,16 +204,23 @@ def setup_logging(config: Config) -> logging.Logger:
     root_logger.setLevel(logging.WARNING)
     _purge_dedupe_filters(root_logger)
     for handler in list(root_logger.handlers):
-        if isinstance(handler, logging.StreamHandler):
-            # Close stale handlers from previous setup_logging calls.
+        # Close every existing handler — libraries may attach non-StreamHandler
+        # variants at import time. We replace them with our own deduped one.
+        try:
             handler.close()
-            root_logger.removeHandler(handler)
+        except Exception:
+            pass
+        root_logger.removeHandler(handler)
 
     root_console = logging.StreamHandler(sys.stdout)
     root_console.setLevel(logging.WARNING)
     root_console.setFormatter(file_format)
     root_console.addFilter(jobspy_dedupe)
     root_logger.addHandler(root_console)
+
+    # Reroute JobSpy's per-site loggers through the root handler we just
+    # installed so they inherit the DedupeFilter and uniform format.
+    _reroute_jobspy_loggers()
 
     # ChromaDB occasionally emits noisy WARNING-level telemetry failures —
     # keep them at WARNING so anything at or above that level still flows.

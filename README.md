@@ -814,7 +814,7 @@ search:
 
 ### Glassdoor: "location not parsed" (HTTP 400)
 
-Glassdoor's API is strict about location string format and rejects many perfectly valid-looking inputs (e.g. `"New York, NY"`, `"San Francisco, CA"`) with a cryptic 400. The default `settings.yaml` shipped with v6.0.4+ does **not** query Glassdoor for exactly this reason.
+Glassdoor's API is strict about location string format and rejects many perfectly valid-looking inputs (e.g. `"New York, NY"`, `"San Francisco, CA"`) with a cryptic 400. The bundled default `settings.yaml` does **not** query Glassdoor for exactly this reason.
 
 If you want Glassdoor coverage, test your location manually first on glassdoor.com and verify that the format you use in `search.locations` resolves cleanly. When it does, re-enable it:
 
@@ -851,6 +851,28 @@ for host in ['apis.indeed.com', 'www.linkedin.com', 'www.glassdoor.com']:
 ```
 
 Persistent failures with `No route to host` point to a host-level networking problem (firewall, conntrack exhaustion, routing misconfiguration) that this tool cannot fix. Check `dmesg`, conntrack (`cat /proc/sys/net/netfilter/nf_conntrack_count`), and MTU.
+
+### Upgrading within v6.x leaves stale settings in the named volume
+
+The `jobsearch-data` Docker volume is persistent on purpose — your database, vector store, and configured `settings.yaml` survive across upgrades. But that means when a newer release ships a cleaner default template (e.g. dropping Glassdoor from `sites`, removing `scheduler.enabled`), your existing volume still contains the old file.
+
+Symptoms: deprecation warnings like `scheduler.enabled is ignored in v6+` in the logs, or errors you thought were fixed (`Glassdoor: location not parsed`).
+
+If your volume doesn't yet contain meaningful state (early setup, template placeholders still in place), the fastest reset is:
+
+```bash
+docker compose down -v              # -v also removes the named volume
+docker compose up -d                # first-run scaffolding from the new template
+```
+
+If you've already customised `settings.yaml` and want to keep it, either pull it out, re-apply the template edits by hand, and push it back:
+
+```bash
+docker compose cp jobsearch-scheduler:/data/config/settings.yaml ./settings.yaml
+# edit ./settings.yaml to remove deprecated keys flagged in the logs
+docker compose cp ./settings.yaml jobsearch-scheduler:/data/config/settings.yaml
+docker compose restart scheduler
+```
 
 ### Database locked
 
@@ -929,7 +951,7 @@ Publishing policy:
 
 - pull requests run the Docker smoke build in CI and execute the healthcheck against the built image — regressions are caught before merge
 - pushes to `main` run validation jobs, but do not automatically republish Docker images
-- version tags such as `v6.0.1` publish the full multi-arch release (`linux/amd64` + `linux/arm64`) and refresh `:latest`
+- version tags (e.g. `v1.2.3`) publish the full multi-arch release (`linux/amd64` + `linux/arm64`) and refresh `:latest`
 - `publish-main.yml` can be triggered manually when maintainers intentionally want a fresh `main` / `sha-*` image
 - workflow concurrency is enabled so older in-flight publishes on the same ref are cancelled automatically
 - `uv.lock` is the dependency source of truth for CI and Docker image builds

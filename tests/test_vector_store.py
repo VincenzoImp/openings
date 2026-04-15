@@ -10,11 +10,13 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
-# Mock chromadb and sentence-transformers before importing
+# Mock chromadb submodules before importing vector_store.
 _mock_chromadb = MagicMock()
+_mock_chromadb_config = MagicMock()
 _mock_chromadb_utils = MagicMock()
 _mock_chromadb_utils_ef = MagicMock()
 sys.modules["chromadb"] = _mock_chromadb
+sys.modules["chromadb.config"] = _mock_chromadb_config
 sys.modules["chromadb.utils"] = _mock_chromadb_utils
 sys.modules["chromadb.utils.embedding_functions"] = _mock_chromadb_utils_ef
 

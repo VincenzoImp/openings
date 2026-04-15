@@ -192,26 +192,36 @@ class TestSchedulerConfigValidation:
         assert config.interval_hours == 12
         assert config.retry_delay_minutes == 15
 
-    def test_legacy_enabled_key_warns_but_parses(self, caplog):
-        """Legacy scheduler.enabled is ignored with a deprecation warning."""
-        import logging
+    def test_legacy_enabled_key_is_accepted_and_recorded(self):
+        """Legacy scheduler.enabled parses and leaves a marker in ``_LEGACY_WARNED``."""
+        import config as config_module
 
-        # The ``job_search`` logger has ``propagate=False`` after
-        # ``setup_logging`` runs, so caplog's root-level handler never sees
-        # the warning. Attach caplog's handler directly to the child logger.
-        cfg_logger = logging.getLogger("job_search.config")
-        cfg_logger.setLevel(logging.WARNING)
-        cfg_logger.addHandler(caplog.handler)
-        try:
-            config = _parse_scheduler_config({"scheduler": {"enabled": True}})
-        finally:
-            cfg_logger.removeHandler(caplog.handler)
+        # Resolve the parser from ``config_module`` rather than the file-level
+        # import, so another test performing ``importlib.reload(config)``
+        # can't leave us holding a stale function reference pointing at a
+        # different ``_LEGACY_WARNED`` set.
+        parse = config_module._parse_scheduler_config
 
-        assert config.interval_hours == 24
-        assert any(
-            "scheduler.enabled is ignored in v6+" in rec.message
-            for rec in caplog.records
-        )
+        config_module._LEGACY_WARNED.clear()
+        cfg = parse({"scheduler": {"enabled": True}})
+
+        assert cfg.interval_hours == 24
+        assert "scheduler_enabled" in config_module._LEGACY_WARNED
+
+    def test_legacy_enabled_key_is_one_shot(self):
+        """The one-shot guard keeps ``_LEGACY_WARNED`` idempotent across parses."""
+        import config as config_module
+
+        parse = config_module._parse_scheduler_config
+        config_module._LEGACY_WARNED.clear()
+
+        # Simulates startup + two scheduler iterations each triggering
+        # reload_config() — three parses, one marker.
+        parse({"scheduler": {"enabled": True}})
+        parse({"scheduler": {"enabled": True}})
+        parse({"scheduler": {"enabled": True}})
+
+        assert config_module._LEGACY_WARNED == {"scheduler_enabled"}
 
     def test_interval_hours_positive(self):
         """Test interval_hours must be positive."""

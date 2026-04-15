@@ -26,6 +26,7 @@ from logger import (
     DedupeFilter,
     PlainFormatter,
     ProgressLogger,
+    _reroute_jobspy_loggers,
     get_logger,
     log_section,
     log_subsection,
@@ -520,3 +521,75 @@ class TestDedupeFilter:
         b = _make_record("any.logger", "hi")
         assert f.filter(a) is True
         assert f.filter(b) is False
+
+
+# =============================================================================
+# TEST JOBSPY LOGGER REROUTE
+# =============================================================================
+
+
+class TestRerouteJobSpyLoggers:
+    """Tests for `_reroute_jobspy_loggers` and its end-to-end effect."""
+
+    def test_strips_existing_handlers_and_forces_propagation(self):
+        """JobSpy loggers should have no handlers and propagate=True afterwards."""
+        target = logging.getLogger("JobSpy:Glassdoor")
+
+        # Simulate JobSpy's import-time configuration: attach a noisy handler
+        # and disable propagation so records can't reach our root handler.
+        junk_handler = logging.StreamHandler()
+        target.addHandler(junk_handler)
+        target.propagate = False
+        target.setLevel(logging.DEBUG)
+
+        try:
+            _reroute_jobspy_loggers()
+            assert junk_handler not in target.handlers
+            assert target.propagate is True
+            assert target.level == logging.WARNING
+        finally:
+            # Reset so the test doesn't leak state.
+            target.handlers.clear()
+            target.propagate = True
+            target.setLevel(logging.NOTSET)
+
+    def test_setup_logging_dedupes_duplicate_jobspy_records(self, tmp_path):
+        """End-to-end: setup_logging + duplicate JobSpy emission → 1 output line."""
+        import io
+
+        from config import Config, LoggingConfig
+
+        config = Config(logging=LoggingConfig(level="DEBUG"))
+        buffer = io.StringIO()
+
+        with patch.object(Config, "log_path", tmp_path / "test.log"):
+            setup_logging(config)
+
+            # Replace the root console StreamHandler's stream with our StringIO
+            # so we can inspect exactly what the deduped handler emits.
+            root = logging.getLogger()
+            stream_handler = next(
+                h
+                for h in root.handlers
+                if isinstance(h, logging.StreamHandler)
+                and not isinstance(h, logging.FileHandler)
+            )
+            stream_handler.stream = buffer
+
+            try:
+                js = logging.getLogger("JobSpy:Glassdoor")
+                js.error("Glassdoor: location not parsed")
+                js.error("Glassdoor: location not parsed")  # duplicate
+                js.error("Glassdoor: location not parsed")  # duplicate
+                js.error("Glassdoor: status code 429")  # distinct
+            finally:
+                # Reset JobSpy logger state so the next test starts clean.
+                js.handlers.clear()
+                js.propagate = True
+                js.setLevel(logging.NOTSET)
+
+        output = buffer.getvalue()
+        # First message should appear exactly once; the two duplicates are dropped.
+        assert output.count("Glassdoor: location not parsed") == 1
+        # The distinct message is a separate key and should still pass through.
+        assert output.count("Glassdoor: status code 429") == 1

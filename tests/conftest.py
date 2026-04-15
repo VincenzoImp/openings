@@ -32,12 +32,16 @@ sys.modules["jobspy"] = MagicMock()
 
 @pytest.fixture(autouse=True)
 def _reset_config_singleton():
-    """Reset the config singleton between tests to prevent state leakage."""
+    """Reset the config singleton and legacy-warning cache between tests."""
     import config as config_module
 
     original = config_module._config
+    original_warned = config_module._LEGACY_WARNED.copy()
+    config_module._LEGACY_WARNED.clear()
     yield
     config_module._config = original
+    config_module._LEGACY_WARNED.clear()
+    config_module._LEGACY_WARNED.update(original_warned)
 
 
 # =============================================================================

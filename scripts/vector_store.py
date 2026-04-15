@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import chromadb
+from chromadb.config import Settings
 from chromadb.utils.embedding_functions import (  # type: ignore[attr-defined]
     DefaultEmbeddingFunction,
 )
@@ -62,7 +63,15 @@ class JobVectorStore:
         self._persist_dir.mkdir(parents=True, exist_ok=True)
 
         self._embedding_fn = DefaultEmbeddingFunction()
-        self._client = chromadb.PersistentClient(path=str(self._persist_dir))
+        # Disable ChromaDB telemetry at the Settings level. The
+        # ANONYMIZED_TELEMETRY env var is not honoured by every bundled
+        # posthog version (it still fires noisy 'capture() takes 1 positional
+        # argument but 3 were given' errors); passing Settings explicitly is
+        # the contract that the ChromaDB client honours end-to-end.
+        self._client = chromadb.PersistentClient(
+            path=str(self._persist_dir),
+            settings=Settings(anonymized_telemetry=False),
+        )
         self._collection = self._client.get_or_create_collection(
             name=self.COLLECTION_NAME,
             embedding_function=self._embedding_fn,  # type: ignore[arg-type]
