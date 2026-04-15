@@ -1,21 +1,22 @@
 name: jobsearch
 
-# Two long-running services sharing a single Docker-managed named volume.
-# Both pull the same image (Docker deduplicates the download) and differ only
-# by the subcommand they run:
+# Two long-running services sharing a single Docker-managed named volume
+# for all application state (database, vector store, results, logs). The
+# user-provided settings.yaml is bind-mounted as a read-only file so it can
+# be edited with any host-side editor.
 #
-#   scheduler  → `python main.py scheduler`  (default; continuous search loop)
+#   scheduler  → `python main.py scheduler`  (continuous search loop)
 #   dashboard  → `python main.py dashboard`  (Streamlit UI on :8501)
 #
-# Both containers run as non-root (`appuser`, UID 1000). Using a named volume
-# instead of a bind mount means Docker inherits ownership from the image, so
-# the non-root container can write without any host-side permission tweaking.
+# Both containers run as non-root (`appuser`, UID 1000) in every environment —
+# no host-side `chown`, no UID override, no privileged init. The named volume
+# inherits ownership from the image; settings.yaml is read-only so the
+# mismatch between host UID and container UID doesn't matter.
 #
-# The network defaults below harden a few home-lab / cloud-VM edge cases:
-#   - IPv6 is disabled on the stack's bridge so Python's getaddrinfo never
-#     tries an unreachable IPv6 address when the host has broken v6 routing.
-#   - Explicit public resolvers bypass the embedded Docker DNS → host DNS
-#     chain, which occasionally returns stale or unreachable upstream IPs.
+# Network defaults harden a couple of common home-lab / cloud-VM edge cases:
+# IPv6 is disabled on the stack bridge (prevents [Errno 113] No route to host
+# from broken dual-stack routing) and explicit public DNS resolvers bypass
+# the embedded Docker DNS → host DNS chain.
 
 networks:
   default:
@@ -40,6 +41,7 @@ services:
         required: false
     volumes:
       - jobsearch-data:/data
+      - ./settings.yaml:/data/config/settings.yaml:ro
 
   dashboard:
     image: vincenzoimp/job-search-tool:latest
@@ -56,3 +58,4 @@ services:
         required: false
     volumes:
       - jobsearch-data:/data
+      - ./settings.yaml:/data/config/settings.yaml:ro

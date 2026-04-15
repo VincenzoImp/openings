@@ -119,7 +119,7 @@ job-search-tool/
 │   └── logs/search.log             # Rotating log
 │
 ├── Dockerfile                      # Multi-stage, single-target build, tini-init
-├── docker-compose.yml              # Two-service stack sharing the `jobsearch-data` named volume
+├── docker-compose.yml              # Two-service stack: `jobsearch-data` volume + bind-mounted `./settings.yaml`
 ├── docker-compose.dev.yml          # Local-build override
 ├── .pre-commit-config.yaml         # Pre-commit hooks (ruff, etc.)
 ├── requirements.txt                # Production dependencies (compat mirror)

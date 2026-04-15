@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.8] - 2026-04-15
+
+### Changed
+
+- **Hybrid volume layout** is now the canonical setup. `settings.yaml` lives on the host as a read-only file bind-mounted directly into each container at `/data/config/settings.yaml`; everything else (SQLite database, ChromaDB vector store, CSV/Excel exports, logs) stays in the Docker-managed named volume `jobsearch-data`. This replaces the v6.0.6/v6.0.7 "inject via `docker run alpine`" workflow which forced users through a one-shot helper container just to write a single file.
+- **User-facing workflow collapses to three steps**: drop `settings.yaml` next to `docker-compose.yml`, drop the compose file, `docker compose up -d`. Updates are `vim settings.yaml && docker compose restart scheduler`. No `docker compose cp`, no `docker run alpine`, no `docker volume create` pre-step.
+- **`docker-compose.yml`**: both services gain a second volume entry — `./settings.yaml:/data/config/settings.yaml:ro` — alongside the existing `jobsearch-data:/data` named volume. The named volume definition still uses `name: jobsearch-data` so the volume's real name is not prefixed by the Compose project.
+- **`README.md` Quick Start rewritten** for the three-step flow. The "Bare `docker run` (no Compose)" section is simplified to match (the old step 2 "inject via alpine" is gone — a single `-v "$PWD/settings.yaml:..."` mount replaces it on each `docker run` invocation). The Data Storage section now has a two-row table that makes the split between the host-side config and the Docker-managed state explicit.
+- **`docker/entrypoint.sh`**: the existing "missing settings.yaml" error path now also detects the common pitfall where Docker Compose auto-creates `./settings.yaml` as a directory (because the host file didn't exist at the time of the first `up`) and emits a targeted `rm -rf ./settings.yaml` recovery hint for that specific case.
+
+### Why
+
+`settings.yaml` is the only artefact the user ever wants to *edit*; the rest is state the tool manages. Keeping the config on the host as a plain file gives you editor-friendly workflows (`vim`, `nano`, `code`, diff against git, back up with `cp`) while the Docker-managed volume takes care of the non-trivial state with zero permission friction — no host-side `chown`, no UID/GID env vars, no `gosu`, no privileged init. It's the same split the official `postgres` image makes between `postgresql.conf` and `PGDATA`.
+
+No code changes — the entrypoint refactor is purely the error-message extension. 361 tests still green.
+
 ## [6.0.7] - 2026-04-15
 
 ### Documentation
@@ -238,7 +254,8 @@ No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-
 
 Entries prior to v4.3.1 have been archived. The git history on `main` plus the tagged commits are the authoritative source for anything older.
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.7...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.8...HEAD
+[6.0.8]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.7...v6.0.8
 [6.0.7]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.6...v6.0.7
 [6.0.6]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.5...v6.0.6
 [6.0.5]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.4...v6.0.5

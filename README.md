@@ -289,44 +289,41 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 
 ## Quick Start
 
-You only need Docker. The tool **requires** a user-provided `settings.yaml` — there is no default, no fallback, no auto-generated config. The first-time setup is four explicit steps:
+You only need Docker. The layout is two files in a folder:
 
-### 1. Get the documented example template
-
-Pick whichever source is more convenient:
-
-```bash
-# From the published Docker Hub image
-docker run --rm --entrypoint cat \
-  vincenzoimp/job-search-tool:latest \
-  /opt/job-search-tool/defaults/settings.example.yaml \
-  > settings.yaml
+```
+my-jobsearch/
+├── docker-compose.yml
+└── settings.yaml
 ```
 
+The tool **requires** a valid `settings.yaml` — there is no default, no fallback, no auto-generated config. Three steps:
+
+### 1. Get `settings.yaml`
+
+Fetch the documented example template and edit it. Pick whichever source is more convenient:
+
 ```bash
-# Or directly from GitHub
+mkdir my-jobsearch && cd my-jobsearch
+
+# Option A — from the published Docker Hub image
+docker run --rm --entrypoint cat vincenzoimp/job-search-tool:latest \
+  /opt/job-search-tool/defaults/settings.example.yaml > settings.yaml
+
+# Option B — directly from GitHub
 curl -fsSL -o settings.yaml \
   https://raw.githubusercontent.com/VincenzoImp/job-search-tool/main/config/settings.example.yaml
 ```
 
-### 2. Edit `settings.yaml`
-
-Open it in your editor and configure at least `search`, `queries`, and `scoring`. Telegram notifications are off by default — enable them only if you have a bot token.
-
-### 3. Inject it into the volume
+Then edit it with any editor (`vim`, `nano`, VS Code, ...):
 
 ```bash
-docker volume create jobsearch-data
-
-docker run --rm \
-  -v jobsearch-data:/data \
-  -v "$PWD/settings.yaml:/src.yaml:ro" \
-  alpine sh -c 'mkdir -p /data/config && cp /src.yaml /data/config/settings.yaml'
+vim settings.yaml
 ```
 
-### 4. Start the stack
+Set at least `search`, `queries`, and `scoring`. Telegram notifications are disabled by default — enable them only if you have a bot token.
 
-Drop this `docker-compose.yml` in the same folder:
+### 2. Drop this `docker-compose.yml` next to `settings.yaml`
 
 ```yaml
 volumes:
@@ -340,6 +337,7 @@ services:
     command: ["python", "main.py", "scheduler"]
     volumes:
       - jobsearch-data:/data
+      - ./settings.yaml:/data/config/settings.yaml:ro
 
   dashboard:
     image: vincenzoimp/job-search-tool:latest
@@ -348,9 +346,10 @@ services:
     ports: ["8501:8501"]
     volumes:
       - jobsearch-data:/data
+      - ./settings.yaml:/data/config/settings.yaml:ro
 ```
 
-The `name: jobsearch-data` entry prevents Compose from prefixing the volume with the project name, so the `docker volume create jobsearch-data` above and the volume used by the stack are the same thing.
+### 3. Start
 
 ```bash
 docker compose up -d
@@ -358,36 +357,42 @@ docker compose up -d
 
 Open **http://localhost:8501** for the dashboard. The scheduler starts its first search immediately and then runs every `scheduler.interval_hours` (24 by default).
 
-If you forget step 3 and start the stack without a `settings.yaml` in the volume, both containers exit with a clear error message explaining exactly what to do next — there's no silent fallback to a generic default.
+### Updating `settings.yaml` later
+
+```bash
+vim settings.yaml                  # edit on your host
+docker compose restart scheduler   # the container re-reads it on restart
+```
+
+That's the whole maintenance loop. `settings.yaml` is bind-mounted as a read-only file, so the container picks up your changes on every restart — no `cp`, no `inject`, no `rebuild`.
+
+### How the split works
+
+| What | Where it lives | Who touches it |
+|---|---|---|
+| `settings.yaml` | A plain file on your host (`./settings.yaml`) | **You**, with any editor |
+| SQLite database, ChromaDB vectors, CSV/Excel exports, logs | The Docker-managed named volume `jobsearch-data` | The container (non-root, UID 1000) |
+
+The split is deliberate. The only thing you ever want to *edit* is `settings.yaml`, so it sits on the host in plain sight. Everything else is internal state Docker owns — no permission issues, no host-side `chown`, no UID/GID gymnastics. It's the same split the official `postgres` image uses for `postgresql.conf` vs. `PGDATA`.
 
 ### What you get
 
-- **scheduler** — runs the continuous search loop (`main.py scheduler`). `restart: unless-stopped` means it survives crashes, reboots, and rate-limit retries automatically.
+- **scheduler** — continuous search loop (`main.py scheduler`). `restart: unless-stopped` makes it survive crashes, reboots, and rate-limit retries automatically.
 - **dashboard** — Streamlit UI on port `8501` (`main.py dashboard`). Reads the same SQLite database and vector store the scheduler writes to.
-- **One image, one volume** — both services pull `vincenzoimp/job-search-tool:latest` (Docker downloads it once and shares layers). All persistent state (SQLite, ChromaDB vectors, CSV/Excel exports, logs) plus your `settings.yaml` lives inside the Docker-managed `jobsearch-data` volume.
-- **Non-root by default** — both containers run as UID 1000 (`appuser`). The named volume inherits ownership from the image at first mount, so you never need host-side `chown` or privileged init steps.
+- **One image, one managed volume, one host file** — both services pull `vincenzoimp/job-search-tool:latest` (Docker downloads it once and shares layers).
+- **Non-root everywhere** — both containers run as UID 1000 (`appuser`). The named volume inherits ownership from the image at first mount and `settings.yaml` is read-only, so there is never a permission issue regardless of your host's Docker daemon configuration.
 
-### Updating `settings.yaml` later
+### Missing or invalid `settings.yaml`
 
-Re-inject it with the same one-liner, then restart the scheduler:
-
-```bash
-docker run --rm \
-  -v jobsearch-data:/data \
-  -v "$PWD/settings.yaml:/src.yaml:ro" \
-  alpine cp /src.yaml /data/config/settings.yaml
-
-docker compose restart scheduler
-```
-
-You can also pull the current version out with `docker compose cp scheduler:/data/config/settings.yaml ./settings.yaml`, edit, and push it back the same way.
+If you run `docker compose up -d` before creating `settings.yaml`, both containers exit with a clear error message (plus a hint about the common "Docker compose created it as a directory because the file wasn't there yet" pitfall). Docker's `restart: unless-stopped` will keep retrying, so as soon as you add the file and `docker compose restart scheduler`, the stack recovers on its own.
 
 ### Back up and restore
 
-The volume holds your entire job database and semantic index. Standard Docker volume backup pattern:
-
 ```bash
-# Snapshot
+# Config: a plain file, back it up however you like
+cp settings.yaml settings.yaml.bak
+
+# Database + vector store: standard Docker volume backup pattern
 docker run --rm -v jobsearch-data:/data -v "$PWD:/backup" \
   alpine tar czf /backup/jobsearch-data.tgz -C /data .
 
@@ -711,7 +716,7 @@ uv run python scripts/main.py dashboard
 
 ### Bare `docker run` (no Compose)
 
-The same three-phase contract as the Compose path: inject `settings.yaml` into the volume first, then start the containers.
+Same split as the Compose path: `settings.yaml` is a host-side file bind-mounted into the container; everything else lives in the named volume `jobsearch-data`.
 
 ```bash
 # 1. Fetch and edit the settings template
@@ -719,46 +724,48 @@ docker run --rm --entrypoint cat vincenzoimp/job-search-tool:latest \
   /opt/job-search-tool/defaults/settings.example.yaml > settings.yaml
 vim settings.yaml
 
-# 2. Create the volume and inject the config
-docker volume create jobsearch-data
-docker run --rm \
-  -v jobsearch-data:/data \
-  -v "$PWD/settings.yaml:/src.yaml:ro" \
-  alpine sh -c 'mkdir -p /data/config && cp /src.yaml /data/config/settings.yaml'
-
-# 3. Start the scheduler (continuous)
+# 2. Start the scheduler (continuous loop)
 docker run -d --name jobsearch-scheduler \
   -v jobsearch-data:/data \
+  -v "$PWD/settings.yaml:/data/config/settings.yaml:ro" \
   --restart unless-stopped \
   vincenzoimp/job-search-tool:latest
 
-# 4. Start the dashboard (Streamlit UI on :8501)
+# 3. Start the dashboard (Streamlit UI on :8501)
 docker run -d --name jobsearch-dashboard \
   -v jobsearch-data:/data \
+  -v "$PWD/settings.yaml:/data/config/settings.yaml:ro" \
   -p 8501:8501 \
   --restart unless-stopped \
   vincenzoimp/job-search-tool:latest \
   python main.py dashboard
 ```
 
-Both containers share the same `jobsearch-data` volume, so the dashboard reads what the scheduler writes. If you skip step 2, both containers exit with the same "missing required configuration" error you'd get under Compose.
+Both containers share the same `jobsearch-data` volume (Docker creates it on first mount) and the same host-side `settings.yaml`. If `./settings.yaml` doesn't exist when you run step 2 or step 3, both containers exit with the same "missing required configuration" error you'd get under Compose.
 
 ---
 
 ## Data Storage
 
-Everything persistent lives inside the Docker-managed `jobsearch-data` volume (or whatever bind mount / named volume you attach at `/data`):
+State lives in two places:
+
+| Kind | Location | Mount type |
+|---|---|---|
+| **Your `settings.yaml`** | A host file next to `docker-compose.yml` | Read-only file bind mount → `/data/config/settings.yaml` |
+| **Database, vector store, results, logs** | Docker-managed volume `jobsearch-data` | Named volume → `/data` |
+
+Inside the container the combined `/data` tree looks like this:
 
 ```
 /data/
-├── config/settings.yaml   # your configuration (required; you inject it — not auto-generated)
-├── db/jobs.db             # primary SQLite store
-├── chroma/                # ChromaDB vector store (semantic search)
-├── results/               # CSV/Excel exports
-└── logs/search.log        # rotating application log
+├── config/settings.yaml   # bind-mounted from ./settings.yaml (read-only)
+├── db/jobs.db             # SQLite store (inside jobsearch-data)
+├── chroma/                # ChromaDB vector store (inside jobsearch-data)
+├── results/               # CSV/Excel exports (inside jobsearch-data)
+└── logs/search.log        # rotating application log (inside jobsearch-data)
 ```
 
-For local Python development `JOB_SEARCH_DATA_DIR` is unset so the repo root stands in for `/data` — all the subdirectories above materialise at the root of your checkout.
+For local Python development `JOB_SEARCH_DATA_DIR` is unset so the repo root stands in for `/data` — all the subdirectories above materialise at the root of your checkout instead of inside the Docker volume.
 
 ### Back up and restore
 
@@ -898,27 +905,23 @@ for host in ['apis.indeed.com', 'www.linkedin.com', 'www.glassdoor.com']:
 
 Persistent failures with `No route to host` point to a host-level networking problem (firewall, conntrack exhaustion, routing misconfiguration) that this tool cannot fix. Check `dmesg`, conntrack (`cat /proc/sys/net/netfilter/nf_conntrack_count`), and MTU.
 
-### Upgrading within v6.x leaves stale settings in the named volume
+### Upgrading with deprecated keys in your `settings.yaml`
 
-The `jobsearch-data` Docker volume is persistent on purpose — your database, vector store, and `settings.yaml` survive across upgrades. But the tool also requires `settings.yaml` to exist (no fallback), so a stale one from a previous setup is what will be loaded after the upgrade.
+`settings.yaml` is a host file next to `docker-compose.yml` — you own it, Docker doesn't. Upgrades that remove or rename keys (for example the old `scheduler.enabled` flag) emit a one-line deprecation warning in the logs rather than breaking. To fix them, just edit the file:
 
-Symptoms: deprecation warnings like `scheduler.enabled is ignored in v6+` in the logs, or errors you thought were fixed because a newer `settings.example.yaml` would have solved them.
-
-The fix is always to refresh `settings.yaml`. Two recipes:
-
-Nuclear (if your volume has no meaningful state yet — early setup, no real DB):
 ```bash
-docker compose down -v              # -v also removes the named volume
-# Then repeat the four-step Quick Start with a fresh settings.yaml
+vim settings.yaml                  # remove the keys flagged by the warning
+docker compose restart scheduler   # reload
 ```
 
-Surgical (keep the existing DB, just replace the config):
+If the database or vector store itself was built against an older schema and you want to start from a clean slate:
+
 ```bash
-docker compose cp scheduler:/data/config/settings.yaml ./settings.yaml
-# edit ./settings.yaml to remove deprecated keys flagged in the logs
-docker compose cp ./settings.yaml scheduler:/data/config/settings.yaml
-docker compose restart scheduler
+docker compose down -v             # removes the jobsearch-data volume and the DB with it
+docker compose up -d               # fresh start, settings.yaml untouched
 ```
+
+`docker compose down -v` only touches the Docker-managed volume — your host-side `settings.yaml` is never affected.
 
 ### Database locked
 
