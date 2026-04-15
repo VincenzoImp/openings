@@ -1,9 +1,10 @@
 """
-Vector store for semantic job search using ChromaDB and sentence-transformers.
+Vector store for semantic job search using ChromaDB's built-in ONNX embedder.
 
 Embeds job text (title + description + company + location) into vectors
-using sentence-transformers, enabling natural language similarity search
-over the job database.
+using ChromaDB's ``DefaultEmbeddingFunction`` (onnxruntime + all-MiniLM-L6-v2),
+enabling natural language similarity search over the job database without
+pulling in torch / sentence-transformers / transformers.
 """
 
 from __future__ import annotations
@@ -15,8 +16,11 @@ from typing import TYPE_CHECKING, Any
 
 import chromadb
 from chromadb.utils.embedding_functions import (  # type: ignore[attr-defined]
-    SentenceTransformerEmbeddingFunction,
+    DefaultEmbeddingFunction,
 )
+
+# Model bundled with ChromaDB's DefaultEmbeddingFunction.
+_DEFAULT_MODEL = "all-MiniLM-L6-v2"
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -37,9 +41,11 @@ class SemanticSearchResult:
 class JobVectorStore:
     """ChromaDB-based vector store for semantic job search.
 
-    Uses sentence-transformers to embed job text (title + description +
+    Uses ChromaDB's built-in ONNX embedder (``DefaultEmbeddingFunction``,
+    bundling ``all-MiniLM-L6-v2``) to embed job text (title + description +
     company + location) into vectors, enabling natural language similarity
-    search across all stored jobs.
+    search across all stored jobs — without requiring torch or
+    sentence-transformers.
     """
 
     COLLECTION_NAME = "jobs"
@@ -54,11 +60,21 @@ class JobVectorStore:
         "job_url",
     )
 
-    def __init__(self, persist_dir: Path, model_name: str = "all-MiniLM-L6-v2") -> None:
+    def __init__(self, persist_dir: Path, model_name: str = _DEFAULT_MODEL) -> None:
         self._persist_dir = Path(persist_dir)
         self._persist_dir.mkdir(parents=True, exist_ok=True)
 
-        self._embedding_fn = SentenceTransformerEmbeddingFunction(model_name=model_name)
+        if model_name and model_name != _DEFAULT_MODEL:
+            logger.warning(
+                "vector_search.model_name=%r is ignored: this build uses "
+                "ChromaDB's DefaultEmbeddingFunction (onnxruntime + %s). "
+                "Remove the setting or set it to %r to silence this warning.",
+                model_name,
+                _DEFAULT_MODEL,
+                _DEFAULT_MODEL,
+            )
+
+        self._embedding_fn = DefaultEmbeddingFunction()
         self._client = chromadb.PersistentClient(path=str(self._persist_dir))
         self._collection = self._client.get_or_create_collection(
             name=self.COLLECTION_NAME,
@@ -284,13 +300,15 @@ _vector_store_key: tuple[str, str] | None = None
 
 def get_vector_store(
     persist_dir: Path,
-    model_name: str = "all-MiniLM-L6-v2",
+    model_name: str = _DEFAULT_MODEL,
 ) -> JobVectorStore:
     """Get or create the singleton :class:`JobVectorStore`.
 
     Args:
         persist_dir: Full path where the ChromaDB collection should live.
-        model_name: Sentence-transformer model to use for embeddings.
+        model_name: Retained for backward compatibility. Ignored — the
+            store always uses ChromaDB's ``DefaultEmbeddingFunction``
+            (onnxruntime + ``all-MiniLM-L6-v2``).
 
     Returns:
         The shared ``JobVectorStore`` instance.

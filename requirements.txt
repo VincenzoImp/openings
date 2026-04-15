@@ -30,10 +30,6 @@ python-telegram-bot>=21.0,<22.0
 rapidfuzz>=3.0.0,<4.0.0
 
 # Vector search with ChromaDB for semantic job matching
+# Uses ChromaDB's built-in ONNX embedder (DefaultEmbeddingFunction, bundling
+# all-MiniLM-L6-v2), so no torch / sentence-transformers / transformers needed.
 chromadb>=0.4.0,<1.0.0
-
-# Sentence embeddings for vector search
-# Keep this aligned with an explicitly safe transformers major.
-sentence-transformers>=5.3.0,<6.0.0
-torch>=2.10.0,<2.11.0
-transformers>=5.0.0,<6.0.0

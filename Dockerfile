@@ -21,7 +21,6 @@ COPY --from=uv /uv /uvx /bin/
 
 ENV UV_LINK_MODE=copy
 ENV UV_PYTHON_DOWNLOADS=never
-ENV UV_TORCH_BACKEND=cpu
 
 COPY pyproject.toml uv.lock ./
 

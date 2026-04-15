@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-04-15
+
+### Changed
+
+- **Lightweight Vector Search**: `JobVectorStore` now uses ChromaDB's built-in `DefaultEmbeddingFunction` (onnxruntime + bundled `all-MiniLM-L6-v2`) instead of `sentence-transformers`. Same embedding model, same search quality, no torch runtime.
+- **Dependency Slimdown**: Removed `torch`, `sentence-transformers`, and `transformers` from runtime dependencies. Docker image size drops by roughly 2.5–3 GB (the previous lock also pulled the full CUDA stack — `nvidia-cublas`, `cudnn`, `nccl`, `triton`, etc. — despite `UV_TORCH_BACKEND=cpu`).
+- **Dockerfile**: Removed the now-unused `UV_TORCH_BACKEND=cpu` build arg.
+
+### Deprecated
+
+- `vector_search.model_name` is now ignored — the store always uses the model bundled with ChromaDB's default embedder. A warning is logged if a non-default value is configured. The setting is retained for backward compatibility and will be removed in a future release.
+
 ## [4.3.2] - 2026-04-14
 
 ### Changed
@@ -387,7 +399,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Structured Logging**: File and console logs with rotation
 - **Docker Support**: Containerized environment for cross-platform compatibility
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v4.3.2...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v4.4.0...HEAD
+[4.4.0]: https://github.com/VincenzoImp/job-search-tool/compare/v4.3.2...v4.4.0
 [4.3.2]: https://github.com/VincenzoImp/job-search-tool/compare/v4.3.1...v4.3.2
 [4.3.1]: https://github.com/VincenzoImp/job-search-tool/compare/v4.3.0...v4.3.1
 [4.3.0]: https://github.com/VincenzoImp/job-search-tool/compare/v4.2.1...v4.3.0

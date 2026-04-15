@@ -1,6 +1,6 @@
 [project]
 name = "job-search-tool"
-version = "4.3.2"
+version = "4.4.0"
 description = "Automated job search aggregation, scoring, notifications, and dashboard tooling."
 requires-python = ">=3.11"
 dependencies = [
@@ -14,9 +14,6 @@ dependencies = [
     "python-telegram-bot>=21.0,<22.0",
     "rapidfuzz>=3.0.0,<4.0.0",
     "chromadb>=0.4.0,<1.0.0",
-    "sentence-transformers>=5.3.0,<6.0.0",
-    "torch>=2.10.0,<2.11.0",
-    "transformers>=5.0.0,<6.0.0",
 ]
 
 [dependency-groups]
