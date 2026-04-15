@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.7] - 2026-04-15
+
+### Documentation
+
+Full-repo coherence audit after the v4.4.0 → v6.0.6 release sprint. All of the following stale references that contradicted the v6.0.6 mandatory-config contract have been corrected:
+
+- **`CLAUDE.md` / `AGENTS.md`**: project-tree comments on `settings.example.yaml` and `entrypoint.sh` no longer claim first-run auto-scaffolding; the "Execution Modes" table is rewritten to reflect the CLI subcommand-driven contract (no `scheduler.enabled` flag); the `main()` docstring matches the actual subcommand dispatch; total test count updated from `~324` to the real `361`.
+- **`README.md`**: Quick Start and Bare-`docker run` sections carry the new mandatory settings.yaml flow end-to-end (no auto-scaffold wording anywhere); project-structure listing describes `settings.example.yaml` as "never copied into the user's volume" and `entrypoint.sh` as "requires user-supplied settings.yaml"; Test count bumps from `355+` / `350+` to `361`; the ASCII execution-flow diagram labels modes with `main.py once` / `main.py scheduler` instead of the removed `scheduler: true/false` flag; `docker compose cp` examples use the Compose service name (`scheduler`) instead of container names; Upgrade Troubleshooting section reframed around "refresh settings.yaml" (no "first-run scaffolding" recipe).
+- **`CONTRIBUTING.md`**: the `cp config/settings.example.yaml config/settings.yaml` step is now explicitly scoped to local Python development, with an inline note that the Docker runtime requires injection into the named volume instead.
+
+No code or Docker-image changes — the v6.0.6 and v6.0.7 images are functionally equivalent. Published Docker tags are refreshed so anyone pulling `:latest` at the new version reads the updated in-image docs and `settings.example.yaml` metadata.
+
 ## [6.0.6] - 2026-04-15
 
 ### Changed (BREAKING)
@@ -226,7 +238,8 @@ No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-
 
 Entries prior to v4.3.1 have been archived. The git history on `main` plus the tagged commits are the authoritative source for anything older.
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.6...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.7...HEAD
+[6.0.7]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.6...v6.0.7
 [6.0.6]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.5...v6.0.6
 [6.0.5]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.4...v6.0.5
 [6.0.4]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.3...v6.0.4

@@ -67,13 +67,13 @@ The Job Search Tool is an automated job aggregation platform built on the [JobSp
 ```
 job-search-tool/
 ├── config/
-│   └── settings.example.yaml      # Bundled template (auto-scaffolded into data/config/ on first run)
+│   └── settings.example.yaml      # Documented reference template (never copied into the user's volume)
 │
 ├── docker/
-│   └── entrypoint.sh              # First-run bootstrap + /data scaffolding (tini-init)
+│   └── entrypoint.sh              # Creates /data subtree; requires user-supplied settings.yaml (tini-init)
 │
 ├── scripts/
-│   ├── main.py                    # Scheduler loop (default) or --once single-shot
+│   ├── main.py                    # CLI entry point with `scheduler` / `once` / `dashboard` subcommands
 │   ├── search_jobs.py             # Core search engine
 │   ├── scheduler.py               # APScheduler wrapper
 │   ├── notifier.py                # Notification channels
@@ -155,13 +155,16 @@ def run_job_search() -> bool:
         True if successful, False on error.
     """
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """
     Application entry point.
 
-    - Determines execution mode (single-shot vs scheduled)
+    - Parses the CLI subcommand (scheduler / once / dashboard)
     - Recalculates scores for existing jobs (once at startup)
-    - Creates and starts scheduler
+    - Dispatches to the right runtime:
+        * `scheduler` → continuous APScheduler loop (default)
+        * `once`      → single search iteration, exits
+        * `dashboard` → `exec`-replaces the process with Streamlit on :8501
 
     Returns:
         Exit code (0 = success, 1 = failure).
@@ -170,10 +173,13 @@ def main() -> int:
 
 **Execution Modes:**
 
-| Mode | Trigger | Behavior |
-|------|---------|----------|
-| Single-shot | `scheduler.enabled: false` | Runs once and exits |
-| Scheduled | `scheduler.enabled: true` | Runs continuously at interval |
+| Mode        | CLI Invocation              | Behavior                                     |
+|-------------|-----------------------------|----------------------------------------------|
+| Scheduled   | `python main.py scheduler`  | Continuous loop, runs every `interval_hours` |
+| Single-shot | `python main.py once`       | Single search iteration then exits           |
+| Dashboard   | `python main.py dashboard`  | Exec-replaces process with Streamlit on :8501 |
+
+The mode is chosen entirely by the CLI subcommand. There is no `scheduler.enabled` flag, no `JOB_SEARCH_MODE` environment variable, and no implicit default beyond "bare `main.py` runs the scheduler".
 
 ### 2. Search Engine (`search_jobs.py`)
 
@@ -866,7 +872,7 @@ pytest tests/test_models.py::test_job_id_generation -v
 | analyze_jobs.py | 16 | Analysis utilities |
 | vector_store.py | 34 | Vector store |
 
-Total: **~324 tests**.
+Total: **361 tests**.
 
 ---
 

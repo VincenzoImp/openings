@@ -45,7 +45,10 @@ git remote add upstream https://github.com/VincenzoImp/job-search-tool.git
 #    (includes streamlit for the dashboard test suite)
 uv sync --locked
 
-# 6. Create configuration for local Python runs
+# 6. Create configuration for local Python runs. The Docker runtime
+#    requires an explicit settings.yaml too, but it lives inside the
+#    named volume and is managed via `docker volume` — this copy is only
+#    for local `uv run python scripts/main.py ...` development.
 cp config/settings.example.yaml config/settings.yaml
 
 # 7. Verify setup

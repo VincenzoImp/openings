@@ -55,7 +55,7 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 | **Retry Logic** | Exponential backoff with tenacity for transient failures |
 | **Dynamic Rescoring** | Automatic rescoring of existing jobs when criteria change |
 | **CI/CD Pipeline** | GitHub Actions with test matrix, security audit, Docker build |
-| **Comprehensive Testing** | 355+ pytest tests covering all core functionality |
+| **Comprehensive Testing** | 361 pytest tests covering all core functionality |
 | **Vector Embeddings** | Local ONNX embeddings via ChromaDB's default function — no torch runtime |
 
 ---
@@ -172,7 +172,7 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
                    ▼                                         ▼
         ╔════════════════════╗                  ╔════════════════════╗
         ║  SINGLE-SHOT MODE  ║                  ║   SCHEDULED MODE   ║
-        ║  scheduler: false  ║                  ║  scheduler: true   ║
+        ║  main.py once      ║                  ║  main.py scheduler ║
         ║  Run once and exit ║                  ║  Run every N hours ║
         ╚═════════╤══════════╝                  ╚═════════╤══════════╝
                   │                                       │
@@ -380,7 +380,7 @@ docker run --rm \
 docker compose restart scheduler
 ```
 
-You can also pull the current version out with `docker compose cp jobsearch-scheduler:/data/config/settings.yaml ./settings.yaml`, edit, and push it back the same way.
+You can also pull the current version out with `docker compose cp scheduler:/data/config/settings.yaml ./settings.yaml`, edit, and push it back the same way.
 
 ### Back up and restore
 
@@ -711,18 +711,29 @@ uv run python scripts/main.py dashboard
 
 ### Bare `docker run` (no Compose)
 
-```bash
-# Create the Docker-managed volume once
-docker volume create jobsearch-data
+The same three-phase contract as the Compose path: inject `settings.yaml` into the volume first, then start the containers.
 
-# Scheduler (continuous)
-docker run -d --name job-search \
+```bash
+# 1. Fetch and edit the settings template
+docker run --rm --entrypoint cat vincenzoimp/job-search-tool:latest \
+  /opt/job-search-tool/defaults/settings.example.yaml > settings.yaml
+vim settings.yaml
+
+# 2. Create the volume and inject the config
+docker volume create jobsearch-data
+docker run --rm \
+  -v jobsearch-data:/data \
+  -v "$PWD/settings.yaml:/src.yaml:ro" \
+  alpine sh -c 'mkdir -p /data/config && cp /src.yaml /data/config/settings.yaml'
+
+# 3. Start the scheduler (continuous)
+docker run -d --name jobsearch-scheduler \
   -v jobsearch-data:/data \
   --restart unless-stopped \
   vincenzoimp/job-search-tool:latest
 
-# Dashboard (Streamlit UI on :8501)
-docker run -d --name job-search-dashboard \
+# 4. Start the dashboard (Streamlit UI on :8501)
+docker run -d --name jobsearch-dashboard \
   -v jobsearch-data:/data \
   -p 8501:8501 \
   --restart unless-stopped \
@@ -730,7 +741,7 @@ docker run -d --name job-search-dashboard \
   python main.py dashboard
 ```
 
-Both containers share the same `jobsearch-data` volume so the dashboard reads what the scheduler writes. On first run the container scaffolds `settings.yaml` automatically.
+Both containers share the same `jobsearch-data` volume, so the dashboard reads what the scheduler writes. If you skip step 2, both containers exit with the same "missing required configuration" error you'd get under Compose.
 
 ---
 
@@ -740,7 +751,7 @@ Everything persistent lives inside the Docker-managed `jobsearch-data` volume (o
 
 ```
 /data/
-├── config/settings.yaml   # your configuration (auto-scaffolded on first run)
+├── config/settings.yaml   # your configuration (required; you inject it — not auto-generated)
 ├── db/jobs.db             # primary SQLite store
 ├── chroma/                # ChromaDB vector store (semantic search)
 ├── results/               # CSV/Excel exports
@@ -889,23 +900,23 @@ Persistent failures with `No route to host` point to a host-level networking pro
 
 ### Upgrading within v6.x leaves stale settings in the named volume
 
-The `jobsearch-data` Docker volume is persistent on purpose — your database, vector store, and configured `settings.yaml` survive across upgrades. But that means when a newer release ships a cleaner default template (e.g. dropping Glassdoor from `sites`, removing `scheduler.enabled`), your existing volume still contains the old file.
+The `jobsearch-data` Docker volume is persistent on purpose — your database, vector store, and `settings.yaml` survive across upgrades. But the tool also requires `settings.yaml` to exist (no fallback), so a stale one from a previous setup is what will be loaded after the upgrade.
 
-Symptoms: deprecation warnings like `scheduler.enabled is ignored in v6+` in the logs, or errors you thought were fixed (`Glassdoor: location not parsed`).
+Symptoms: deprecation warnings like `scheduler.enabled is ignored in v6+` in the logs, or errors you thought were fixed because a newer `settings.example.yaml` would have solved them.
 
-If your volume doesn't yet contain meaningful state (early setup, template placeholders still in place), the fastest reset is:
+The fix is always to refresh `settings.yaml`. Two recipes:
 
+Nuclear (if your volume has no meaningful state yet — early setup, no real DB):
 ```bash
 docker compose down -v              # -v also removes the named volume
-docker compose up -d                # first-run scaffolding from the new template
+# Then repeat the four-step Quick Start with a fresh settings.yaml
 ```
 
-If you've already customised `settings.yaml` and want to keep it, either pull it out, re-apply the template edits by hand, and push it back:
-
+Surgical (keep the existing DB, just replace the config):
 ```bash
-docker compose cp jobsearch-scheduler:/data/config/settings.yaml ./settings.yaml
+docker compose cp scheduler:/data/config/settings.yaml ./settings.yaml
 # edit ./settings.yaml to remove deprecated keys flagged in the logs
-docker compose cp ./settings.yaml jobsearch-scheduler:/data/config/settings.yaml
+docker compose cp ./settings.yaml scheduler:/data/config/settings.yaml
 docker compose restart scheduler
 ```
 
@@ -944,9 +955,9 @@ python3 --version
 ```
 job-search-tool/
 ├── config/
-│   └── settings.example.yaml      # Documented template (copied into data/config/ on first run)
+│   └── settings.example.yaml      # Documented reference template (never copied into the user's volume)
 ├── docker/
-│   └── entrypoint.sh              # First-run bootstrap + /data scaffolding
+│   └── entrypoint.sh              # Creates /data subtree and requires settings.yaml to exist
 ├── scripts/
 │   ├── main.py                    # CLI entry point with `scheduler` / `once` / `dashboard` subcommands
 │   ├── search_jobs.py             # Core search with parallel execution
@@ -962,7 +973,7 @@ job-search-tool/
 │   ├── vector_store.py            # ChromaDB vector store (ONNX embedder)
 │   ├── vector_commands.py         # Vector backfill/sync
 │   └── healthcheck.py             # Docker health checks
-├── tests/                          # 350+ pytest tests
+├── tests/                          # 361 pytest tests
 ├── data/                           # Local dev state (gitignored): db/, chroma/, results/, logs/
 ├── .github/workflows/              # CI + publish-release + publish-main
 ├── Dockerfile                      # Multi-stage build, single image, non-root, tini-init
