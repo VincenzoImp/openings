@@ -42,7 +42,7 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 | **Automated Scheduling** | APScheduler-based periodic execution with configurable intervals |
 | **Real-Time Notifications** | Telegram alerts for high-scoring new jobs |
 | **Interactive Dashboard** | Streamlit-based UI for filtering, analysis, and export |
-| **Semantic Search** | ChromaDB + sentence-transformers for natural language job search |
+| **Semantic Search** | ChromaDB's built-in ONNX embedder (`all-MiniLM-L6-v2`) for natural language job search — no PyTorch required |
 | **Bookmarks & Actions** | Bookmark, apply/unapply, and delete jobs directly from dashboard with persistent blacklist support |
 
 ### Technical Features
@@ -55,8 +55,8 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 | **Retry Logic** | Exponential backoff with tenacity for transient failures |
 | **Dynamic Rescoring** | Automatic rescoring of existing jobs when criteria change |
 | **CI/CD Pipeline** | GitHub Actions with test matrix, security audit, Docker build |
-| **Comprehensive Testing** | 330+ pytest tests covering all core functionality |
-| **Vector Embeddings** | Local sentence-transformer model for semantic similarity |
+| **Comprehensive Testing** | 355+ pytest tests covering all core functionality |
+| **Vector Embeddings** | Local ONNX embeddings via ChromaDB's default function — no torch runtime |
 
 ---
 
@@ -237,10 +237,10 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 ║  │  6a. SAVE TO DB  │  │ 6b. EMBED IN VECTOR  │  │ 6c. SAVE CSV/EXCEL  │    ║   │
 ║  │                  │  │     STORE (ChromaDB)  │  │    (exporter.py)    │    ║   │
 ║  │  UPSERT logic:   │  │                      │  │                      │    ║   │
-║  │  • New → INSERT  │  │  sentence-transformers│  │  • all_jobs.csv     │    ║   │
-║  │  • Old → UPDATE  │  │  embeds job text into │  │  • relevant.xlsx    │    ║   │
-║  │  (last_seen,     │  │  vectors for semantic │  │                      │    ║   │
-║  │   score)         │  │  similarity search    │  │                      │    ║   │
+║  │  • New → INSERT  │  │  ChromaDB ONNX embeds │  │  • all_jobs.csv     │    ║   │
+║  │  • Old → UPDATE  │  │  job text into vectors│  │  • relevant.xlsx    │    ║   │
+║  │  (last_seen,     │  │  for semantic similar-│  │                      │    ║   │
+║  │   score)         │  │  ity search (default) │  │                      │    ║   │
 ║  └────────┬─────────┘  └──────────────────────┘  └──────────────────────┘    ║   │
 ║           │                                                                   ║   │
 ║           ▼                                                                   ║   │
@@ -591,7 +591,7 @@ notifications:
 ```yaml
 vector_search:
   enabled: true                 # Enable semantic search (default: true)
-  model_name: "all-MiniLM-L6-v2"  # Embedding model (~80MB)
+  model_name: "all-MiniLM-L6-v2"  # Ignored: always uses ChromaDB's default ONNX embedder (~80 MB)
   persist_dir: "data/chroma"   # ChromaDB storage
   embed_on_save: true          # Auto-embed new jobs
   default_results: 20          # Max semantic search results
@@ -739,10 +739,10 @@ docker compose up dashboard
 
 ### Direct Docker Hub Usage
 
-If you prefer `docker run` instead of Compose:
+If you prefer `docker run` instead of Compose. For headless usage (no dashboard UI), prefer the slim `:latest-core` tag to save ~200 MB:
 
 ```bash
-docker pull vincenzoimp/job-search-tool:latest
+docker pull vincenzoimp/job-search-tool:latest-core
 
 mkdir -p config data results logs
 
@@ -752,7 +752,7 @@ docker run --rm \
   -v "$PWD/data:/app/data" \
   -v "$PWD/results:/app/results" \
   -v "$PWD/logs:/app/logs" \
-  vincenzoimp/job-search-tool:latest \
+  vincenzoimp/job-search-tool:latest-core \
   python bootstrap_config.py --write-settings
 
 # Edit config/settings.yaml, then run the search
@@ -762,8 +762,10 @@ docker run --rm \
   -v "$PWD/data:/app/data" \
   -v "$PWD/results:/app/results" \
   -v "$PWD/logs:/app/logs" \
-  vincenzoimp/job-search-tool:latest
+  vincenzoimp/job-search-tool:latest-core
 ```
+
+To run the Streamlit dashboard via `docker run`, swap `:latest-core` for `:latest` and add `-p 8501:8501 --entrypoint streamlit vincenzoimp/job-search-tool:latest run dashboard.py --server.address=0.0.0.0 --server.port=8501`.
 
 ---
 
@@ -918,7 +920,7 @@ job-search-tool/
 │   ├── vector_store.py            # ChromaDB vector store
 │   ├── vector_commands.py         # Vector backfill/sync
 │   └── healthcheck.py             # Docker health checks
-├── tests/                          # 330+ pytest tests
+├── tests/                          # 355+ pytest tests
 │   ├── conftest.py                # Shared fixtures
 │   ├── test_bootstrap_config.py   # Docker config bootstrap tests
 │   ├── test_main.py               # Entry point tests
@@ -959,12 +961,17 @@ The repository includes two Docker Hub publishing workflows:
 - `.github/workflows/publish-release.yml` is the automatic release path for version tags
 - `.github/workflows/publish-main.yml` is a manual maintainer-only escape hatch for publishing the current `main` branch
 
+Both workflows build a **matrix of two variants** from the same `Dockerfile` via `--build-arg VARIANT=core|dashboard`:
+
+- **dashboard** (default, includes Streamlit UI) publishes under the unsuffixed tag family: `:latest`, `:vX.Y.Z`, `:vX.Y`, `:vX`, `:sha-<commit>`
+- **core** (slim, no Streamlit, ~200 MB smaller) publishes under the `-core` suffixed tag family: `:latest-core`, `:vX.Y.Z-core`, `:vX.Y-core`, `:vX-core`, `:sha-<commit>-core`, plus the raw `:core` alias
+
 Publishing policy:
 
-- pull requests run the Docker smoke build in CI so image regressions are caught before merge
+- pull requests run the Docker smoke build in CI **for both variants in parallel**, and healthcheck each image — regressions in either build path are caught before merge
 - pushes to `main` run validation jobs, but do not automatically republish Docker images
-- version tags such as `v4.2.0` publish the full multi-arch release (`linux/amd64` + `linux/arm64`) and refresh `latest`
-- `publish-main.yml` can be triggered manually when maintainers intentionally want a fresh `main` / `sha-*` image
+- version tags such as `v5.0.0` publish the full multi-arch release (`linux/amd64` + `linux/arm64`) **for both variants** and refresh both `:latest` and `:latest-core`
+- `publish-main.yml` can be triggered manually when maintainers intentionally want a fresh `main` / `sha-*` image (both variants)
 - workflow concurrency is enabled so older in-flight publishes on the same ref are cancelled automatically
 - `uv.lock` is the dependency source of truth for CI and Docker image builds
 
@@ -1022,8 +1029,7 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 - [python-telegram-bot](https://python-telegram-bot.org/) - Telegram integration
 - [Pandas](https://pandas.pydata.org/) - Data manipulation
 - [Tenacity](https://github.com/jd/tenacity) - Retry logic
-- [ChromaDB](https://www.trychroma.com/) - Vector database for semantic search
-- [sentence-transformers](https://www.sbert.net/) - Text embedding models
+- [ChromaDB](https://www.trychroma.com/) - Vector database for semantic search, with built-in ONNX embedder (`all-MiniLM-L6-v2`)
 
 ---
 

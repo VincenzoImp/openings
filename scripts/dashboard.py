@@ -991,8 +991,8 @@ def main() -> None:
                 )
             else:
                 st.info(
-                    "Semantic search unavailable (install chromadb + "
-                    "sentence-transformers). Using text filter."
+                    "Semantic search unavailable (install chromadb). "
+                    "Using text filter."
                 )
             q_lower = query.strip().lower()
             display_jobs = [

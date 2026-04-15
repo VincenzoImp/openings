@@ -84,8 +84,8 @@ docker compose up jobsearch
 docker compose -f docker-compose.yml -f docker-compose.dev.yml build
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up jobsearch
 
-# Dashboard
-docker compose --profile dashboard up dashboard
+# Dashboard (starts by default with `docker compose up`; run explicitly with)
+docker compose up dashboard
 # or, for local Python development:
 cd scripts && uv run streamlit run dashboard.py
 ```

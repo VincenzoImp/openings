@@ -1489,12 +1489,17 @@ notifications:
 # =============================================================================
 #                           SEMANTIC VECTOR SEARCH
 # =============================================================================
-# Uses ChromaDB + sentence-transformers for natural language job search.
+# Uses ChromaDB's built-in ONNX embedder (`DefaultEmbeddingFunction`, bundled
+# with `all-MiniLM-L6-v2`) for natural language job search. No PyTorch or
+# sentence-transformers required — the model runs locally (~80 MB) via
+# onnxruntime, no external API needed.
+#
 # Query like "remote python backend distributed systems" to find matching jobs.
-# Model runs locally (~80MB), no external API needed.
 
 vector_search:
   enabled: true
+  # Retained for backward compatibility but ignored: ChromaDB's default ONNX
+  # embedder is always used. A warning is logged if you set a different model.
   model_name: "all-MiniLM-L6-v2"
   persist_dir: "data/chroma"
   embed_on_save: true
