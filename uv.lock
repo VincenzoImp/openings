@@ -904,7 +904,7 @@ wheels = [
 
 [[package]]
 name = "job-search-tool"
-version = "5.0.0"
+version = "5.0.1"
 source = { virtual = "." }
 dependencies = [
     { name = "apscheduler" },

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.1] - 2026-04-15
+
+### Documentation
+
+- **Sync stale references** to match the v5.0.0 variant split and v4.4.0 ONNX embedder migration:
+  - `README.md`: feature tables, ASCII execution-flow diagram, Docker Publishing section rewritten for the core/dashboard matrix, `docker run` examples updated to prefer `:latest-core` for headless usage, Acknowledgments cleaned of the removed `sentence-transformers` entry, test count refreshed.
+  - `CONTRIBUTING.md`: dashboard launch command no longer references the removed `--profile dashboard`.
+  - `.env.example`: replaces `JOB_SEARCH_IMAGE` with `JOB_SEARCH_CORE_IMAGE` and `JOB_SEARCH_DASHBOARD_IMAGE`.
+  - `config/settings.example.yaml`: `vector_search` block now documents that `model_name` is ignored and describes the ONNX embedder.
+  - `CLAUDE.md` / `AGENTS.md`: tech stack table, project tree comment on `Dockerfile`, internal changelog (v4.4.0 + v5.0.0 entries added), "Last Updated" date refreshed. `AGENTS.md` is now tracked alongside `CLAUDE.md`.
+  - `scripts/dashboard.py`: "semantic search unavailable" hint no longer mentions the removed `sentence-transformers` package.
+
+No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-for-byte equivalent aside from the `VERSION` build label.
+
 ## [5.0.0] - 2026-04-15
 
 ### Changed (BREAKING)
@@ -420,7 +434,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Structured Logging**: File and console logs with rotation
 - **Docker Support**: Containerized environment for cross-platform compatibility
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v5.0.0...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v5.0.1...HEAD
+[5.0.1]: https://github.com/VincenzoImp/job-search-tool/compare/v5.0.0...v5.0.1
 [5.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v4.4.0...v5.0.0
 [4.4.0]: https://github.com/VincenzoImp/job-search-tool/compare/v4.3.2...v4.4.0
 [4.3.2]: https://github.com/VincenzoImp/job-search-tool/compare/v4.3.1...v4.3.2
