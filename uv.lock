@@ -904,7 +904,7 @@ wheels = [
 
 [[package]]
 name = "job-search-tool"
-version = "4.4.0"
+version = "5.0.0"
 source = { virtual = "." }
 dependencies = [
     { name = "apscheduler" },
@@ -915,8 +915,12 @@ dependencies = [
     { name = "python-telegram-bot" },
     { name = "pyyaml" },
     { name = "rapidfuzz" },
-    { name = "streamlit" },
     { name = "tenacity" },
+]
+
+[package.optional-dependencies]
+dashboard = [
+    { name = "streamlit" },
 ]
 
 [package.dev-dependencies]
@@ -930,6 +934,7 @@ dev = [
     { name = "pytest-randomly" },
     { name = "pytest-timeout" },
     { name = "ruff" },
+    { name = "streamlit" },
     { name = "types-pyyaml" },
 ]
 
@@ -943,9 +948,10 @@ requires-dist = [
     { name = "python-telegram-bot", specifier = ">=21.0,<22.0" },
     { name = "pyyaml", specifier = ">=6.0.0,<7.0.0" },
     { name = "rapidfuzz", specifier = ">=3.0.0,<4.0.0" },
-    { name = "streamlit", specifier = ">=1.28.0,<2.0.0" },
+    { name = "streamlit", marker = "extra == 'dashboard'", specifier = ">=1.28.0,<2.0.0" },
     { name = "tenacity", specifier = ">=8.0.0,<9.0.0" },
 ]
+provides-extras = ["dashboard"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -958,6 +964,7 @@ dev = [
     { name = "pytest-randomly", specifier = ">=3.15.0,<4.0.0" },
     { name = "pytest-timeout", specifier = ">=2.2.0,<3.0.0" },
     { name = "ruff", specifier = ">=0.1.0,<1.0.0" },
+    { name = "streamlit", specifier = ">=1.28.0,<2.0.0" },
     { name = "types-pyyaml", specifier = ">=6.0.0,<7.0.0" },
 ]
 

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-04-15
+
+### Changed (BREAKING)
+
+- **Two Docker image variants**: The project now publishes two variants from the same tag family:
+  - `vincenzoimp/job-search-tool:X.Y.Z` (default, dashboard) — full stack with Streamlit UI, behaves like previous `:latest`.
+  - `vincenzoimp/job-search-tool:X.Y.Z-core` — slim image, Streamlit removed (~200 MB smaller).
+- **Dockerfile rewritten as variant-aware**: Single parameterized `runtime` stage, variant chosen at build time via `--build-arg VARIANT=core|dashboard` (default: `dashboard`). Replaces the previous single-target build.
+- **`docker-compose.yml` wires each service to the right image**: `jobsearch`, `scheduler`, `analyze`, `init-config` → core image (`${JOB_SEARCH_CORE_IMAGE:-vincenzoimp/job-search-tool:latest-core}`); `dashboard` → dashboard image (`${JOB_SEARCH_DASHBOARD_IMAGE:-vincenzoimp/job-search-tool:latest}`). Headless services automatically benefit from the slim image without user intervention.
+- **Dashboard runs by default**: `docker compose up` now starts `jobsearch` + `dashboard` out of the box. The `dashboard` profile has been removed (no longer needed). Old usage `docker compose --profile dashboard up dashboard` becomes `docker compose up dashboard`.
+- **`JOB_SEARCH_IMAGE` env var removed**: Replaced by `JOB_SEARCH_CORE_IMAGE` and `JOB_SEARCH_DASHBOARD_IMAGE`. Users overriding the image via environment variable must update their setup.
+- **`streamlit` moved to optional dependency** `[project.optional-dependencies] dashboard` in `pyproject.toml`. Local `uv sync` (with default dev group) still installs it for test suites; production core builds do not.
+- **Pruned `.venv`** in builder stage: removes `__pycache__`, `*.pyc`, `*.pyo`, `*.pyi`, and bundled `tests/` directories from installed packages before the runtime copy. Saves ~50–100 MB on both image variants.
+- **CI Docker smoke job** now builds both variants in a matrix and runs the healthcheck on each, so regressions in either build path are caught on PRs.
+
+### Migration notes
+
+- **`:latest` still works and still ships Streamlit** — no change for users pulling the default tag for a dashboard deployment.
+- If you override the compose image via `JOB_SEARCH_IMAGE`, replace it with `JOB_SEARCH_CORE_IMAGE` (and optionally `JOB_SEARCH_DASHBOARD_IMAGE` for the dashboard service).
+- If you had scripts doing `docker compose --profile dashboard up`, drop the flag — the dashboard is now a default service.
+
 ## [4.4.0] - 2026-04-15
 
 ### Changed
@@ -399,7 +420,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Structured Logging**: File and console logs with rotation
 - **Docker Support**: Containerized environment for cross-platform compatibility
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v4.4.0...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v5.0.0...HEAD
+[5.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v4.4.0...v5.0.0
 [4.4.0]: https://github.com/VincenzoImp/job-search-tool/compare/v4.3.2...v4.4.0
 [4.3.2]: https://github.com/VincenzoImp/job-search-tool/compare/v4.3.1...v4.3.2
 [4.3.1]: https://github.com/VincenzoImp/job-search-tool/compare/v4.3.0...v4.3.1

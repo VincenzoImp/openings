@@ -17,6 +17,15 @@ jobs:
     permissions:
       contents: read
 
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: dashboard
+            tag_suffix: ""
+          - variant: core
+            tag_suffix: "-core"
+
     steps:
       - uses: actions/checkout@v6
 
@@ -35,10 +44,10 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=sha,prefix=sha-
+            type=ref,event=branch,suffix=${{ matrix.tag_suffix }}
+            type=sha,prefix=sha-,suffix=${{ matrix.tag_suffix }}
 
-      - name: Build and push
+      - name: Build and push (${{ matrix.variant }})
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -46,11 +55,12 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=publish-main-amd64
-          cache-to: type=gha,scope=publish-main-amd64,mode=max
+          cache-from: type=gha,scope=publish-main-${{ matrix.variant }}
+          cache-to: type=gha,scope=publish-main-${{ matrix.variant }},mode=max
           provenance: false
           sbom: false
           build-args: |
+            VARIANT=${{ matrix.variant }}
             VERSION=${{ steps.meta.outputs.version }}
             BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
             VCS_REF=${{ github.sha }}

@@ -131,22 +131,28 @@ jobs:
   docker:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [dashboard, core]
     steps:
       - uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
+      - name: Build Docker image (${{ matrix.variant }})
         uses: docker/build-push-action@v6
         with:
           context: .
           load: true
-          tags: job-search-tool:test
-          cache-from: type=gha,scope=ci-docker
-          cache-to: type=gha,scope=ci-docker,mode=max
+          tags: job-search-tool:test-${{ matrix.variant }}
+          cache-from: type=gha,scope=ci-docker-${{ matrix.variant }}
+          cache-to: type=gha,scope=ci-docker-${{ matrix.variant }},mode=max
           provenance: false
           sbom: false
+          build-args: |
+            VARIANT=${{ matrix.variant }}
 
       - name: Test health check
-        run: docker run --rm -e JOB_SEARCH_BOOTSTRAP_CONFIG=1 job-search-tool:test python healthcheck.py
+        run: docker run --rm -e JOB_SEARCH_BOOTSTRAP_CONFIG=1 job-search-tool:test-${{ matrix.variant }} python healthcheck.py

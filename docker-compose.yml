@@ -1,7 +1,16 @@
 name: job-search-tool
 
+# -----------------------------------------------------------------------------
+# Two images:
+#   - Core (slim, no Streamlit) → used by jobsearch / scheduler / analyze
+#   - Dashboard (full, with Streamlit) → used by the dashboard service
+#
+# Override either via environment variables, e.g.
+#   JOB_SEARCH_CORE_IMAGE=vincenzoimp/job-search-tool:v4.5.0-core
+#   JOB_SEARCH_DASHBOARD_IMAGE=vincenzoimp/job-search-tool:v4.5.0
+# -----------------------------------------------------------------------------
+
 x-job-search-base: &job-search-base
-  image: ${JOB_SEARCH_IMAGE:-vincenzoimp/job-search-tool:latest}
   user: "${JOB_SEARCH_UID:-1000}:${JOB_SEARCH_GID:-1000}"
   env_file:
     - path: .env
@@ -12,21 +21,29 @@ x-job-search-base: &job-search-base
     - ./results:/app/results
     - ./logs:/app/logs
 
+x-job-search-core: &job-search-core
+  <<: *job-search-base
+  image: ${JOB_SEARCH_CORE_IMAGE:-vincenzoimp/job-search-tool:latest-core}
+
+x-job-search-dashboard: &job-search-dashboard
+  <<: *job-search-base
+  image: ${JOB_SEARCH_DASHBOARD_IMAGE:-vincenzoimp/job-search-tool:latest}
+
 services:
   init-config:
-    <<: *job-search-base
+    <<: *job-search-core
     command: python bootstrap_config.py --write-settings
     restart: "no"
 
   jobsearch:
-    <<: *job-search-base
+    <<: *job-search-core
     command: python main.py
     environment:
       JOB_SEARCH_MODE: single
     restart: on-failure:3
 
   scheduler:
-    <<: *job-search-base
+    <<: *job-search-core
     command: python main.py
     environment:
       JOB_SEARCH_MODE: scheduled
@@ -35,17 +52,15 @@ services:
       - scheduler
 
   analyze:
-    <<: *job-search-base
+    <<: *job-search-core
     command: python analyze_jobs.py
     restart: on-failure:3
     profiles:
       - analyze
 
   dashboard:
-    <<: *job-search-base
+    <<: *job-search-dashboard
     command: streamlit run dashboard.py --server.address=0.0.0.0 --server.port=8501
     restart: unless-stopped
     ports:
       - "${JOB_SEARCH_DASHBOARD_PORT:-8501}:8501"
-    profiles:
-      - dashboard

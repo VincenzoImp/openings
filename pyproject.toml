@@ -1,6 +1,6 @@
 [project]
 name = "job-search-tool"
-version = "4.4.0"
+version = "5.0.0"
 description = "Automated job search aggregation, scoring, notifications, and dashboard tooling."
 requires-python = ">=3.11"
 dependencies = [
@@ -9,15 +9,21 @@ dependencies = [
     "openpyxl>=3.1.0,<4.0.0",
     "pyyaml>=6.0.0,<7.0.0",
     "tenacity>=8.0.0,<9.0.0",
-    "streamlit>=1.28.0,<2.0.0",
     "APScheduler>=3.10.0,<4.0.0",
     "python-telegram-bot>=21.0,<22.0",
     "rapidfuzz>=3.0.0,<4.0.0",
     "chromadb>=0.4.0,<1.0.0",
 ]
 
+[project.optional-dependencies]
+# Streamlit dashboard — optional so the slim `core` Docker target can skip it.
+dashboard = [
+    "streamlit>=1.28.0,<2.0.0",
+]
+
 [dependency-groups]
 dev = [
+    "streamlit>=1.28.0,<2.0.0",
     "pytest>=7.4.0,<8.0.0",
     "pytest-cov>=4.1.0,<5.0.0",
     "pytest-asyncio>=0.21.0,<1.0.0",

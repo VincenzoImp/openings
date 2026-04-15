@@ -315,27 +315,42 @@ docker compose run --rm init-config
 # Edit configuration with your preferences
 # nano config/settings.yaml
 
-# Run a single search
-docker compose up jobsearch
+# Run the default stack: single-shot search + dashboard
+docker compose up
 
-# Or run continuously with scheduler
-docker compose --profile scheduler up scheduler -d
+# Or run continuously with scheduler instead of single-shot
+docker compose --profile scheduler up scheduler dashboard -d
 
-# Launch the dashboard
-docker compose --profile dashboard up dashboard
-# Access at http://localhost:8501
+# Dashboard is available at http://localhost:8501
 ```
 
-`docker-compose.yml` pulls `vincenzoimp/job-search-tool:latest` by default, so no local image build is required.
-The `jobsearch` and `scheduler` services also force the expected runtime mode via `JOB_SEARCH_MODE`, so Compose behaves consistently even if `scheduler.enabled` differs inside `config/settings.yaml`.
+`docker compose up` starts both `jobsearch` (single-shot) and `dashboard` by default — no profile flags needed. The `jobsearch` and `scheduler` services force the expected runtime mode via `JOB_SEARCH_MODE`, so Compose behaves consistently even if `scheduler.enabled` differs inside `config/settings.yaml`.
+
+### Two Docker image variants
+
+The project publishes **two variants** of the Docker image from the same tag family:
+
+| Variant | Tag example | Contents | Size |
+|---|---|---|---|
+| **Dashboard** (default) | `vincenzoimp/job-search-tool:latest` | Full stack, includes Streamlit UI | larger |
+| **Core** (slim) | `vincenzoimp/job-search-tool:latest-core` | No Streamlit (~200 MB smaller) | smaller |
+
+`docker-compose.yml` automatically wires headless services (`jobsearch`, `scheduler`, `analyze`, `init-config`) to the **core** image, and the `dashboard` service to the **dashboard** image. You get the weight savings for free without needing to think about it. Override either via `JOB_SEARCH_CORE_IMAGE` / `JOB_SEARCH_DASHBOARD_IMAGE` env vars.
+
+To build locally, pick the variant via `--build-arg VARIANT=core|dashboard`:
+
+```bash
+docker build -t job-search-tool .                               # dashboard (default)
+docker build --build-arg VARIANT=core -t job-search-tool:core . # core (slim)
+```
 
 ### Compose Services
 
-- `init-config`: Creates `config/settings.yaml` and `config/settings.example.yaml` from the bundled image template
-- `jobsearch`: Runs a single search cycle and exits
-- `scheduler`: Keeps the application running with APScheduler (use `--profile scheduler`)
-- `dashboard`: Starts the Streamlit UI on port `8501` (use `--profile dashboard`)
-- `analyze`: Runs the analysis utilities against the existing database (use `--profile analyze`)
+- `init-config`: Creates `config/settings.yaml` and `config/settings.example.yaml` from the bundled image template (core image)
+- `jobsearch`: Runs a single search cycle and exits — **starts by default** (core image)
+- `dashboard`: Starts the Streamlit UI on port `8501` — **starts by default** (dashboard image)
+- `scheduler`: Keeps the application running with APScheduler (opt-in via `--profile scheduler`, core image)
+- `analyze`: Runs the analysis utilities against the existing database (opt-in via `--profile analyze`, core image)
 
 ### Option 2: Standalone Docker Compose (No Clone)
 
@@ -345,7 +360,6 @@ If you want the clean Compose workflow without cloning this repository, create a
 name: job-search-tool
 
 x-job-search-base: &job-search-base
-  image: vincenzoimp/job-search-tool:latest
   user: "${JOB_SEARCH_UID:-1000}:${JOB_SEARCH_GID:-1000}"
   volumes:
     - ./config:/app/config
@@ -353,20 +367,28 @@ x-job-search-base: &job-search-base
     - ./results:/app/results
     - ./logs:/app/logs
 
+x-job-search-core: &job-search-core
+  <<: *job-search-base
+  image: vincenzoimp/job-search-tool:latest-core
+
+x-job-search-dashboard: &job-search-dashboard
+  <<: *job-search-base
+  image: vincenzoimp/job-search-tool:latest
+
 services:
   init-config:
-    <<: *job-search-base
+    <<: *job-search-core
     command: python bootstrap_config.py --write-settings
     restart: "no"
 
   jobsearch:
-    <<: *job-search-base
+    <<: *job-search-core
     command: python main.py
     environment:
       JOB_SEARCH_MODE: single
 
   scheduler:
-    <<: *job-search-base
+    <<: *job-search-core
     command: python main.py
     environment:
       JOB_SEARCH_MODE: scheduled
@@ -374,12 +396,10 @@ services:
       - scheduler
 
   dashboard:
-    <<: *job-search-base
+    <<: *job-search-dashboard
     command: streamlit run dashboard.py --server.address=0.0.0.0 --server.port=8501
     ports:
       - "8501:8501"
-    profiles:
-      - dashboard
 ```
 
 Then run:
@@ -394,12 +414,11 @@ export JOB_SEARCH_GID=$(id -g)
 docker compose pull
 docker compose run --rm init-config
 
-# Edit config/settings.yaml, then:
-docker compose up jobsearch
-docker compose --profile dashboard up dashboard
+# Edit config/settings.yaml, then start the default stack (jobsearch + dashboard):
+docker compose up
 ```
 
-This is the cleanest no-clone setup because you still get `init-config`, `jobsearch`, `scheduler`, and `dashboard` as named services instead of remembering long `docker run` commands.
+Headless services run on the slim `:latest-core` image; the dashboard runs on the full `:latest` image with Streamlit bundled. This is the cleanest no-clone setup because you still get `init-config`, `jobsearch`, `scheduler`, and `dashboard` as named services instead of remembering long `docker run` commands.
 
 ### Option 3: Local Python
 
@@ -431,7 +450,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml build
 
 # Then use the same services as the Docker Hub workflow
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up jobsearch
-docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile dashboard up dashboard
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up dashboard
 ```
 
 ---
@@ -700,7 +719,7 @@ Deleting a job from the dashboard is persistent: the job is removed from the act
 
 ```bash
 # Docker Hub image
-docker compose --profile dashboard up dashboard
+docker compose up dashboard
 # Access at http://localhost:8501
 
 # Local Python
@@ -715,7 +734,7 @@ If you do not want to clone this repository, the cleanest Docker-only path is st
 docker compose pull
 docker compose run --rm init-config
 docker compose up jobsearch
-docker compose --profile dashboard up dashboard
+docker compose up dashboard
 ```
 
 ### Direct Docker Hub Usage

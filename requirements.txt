@@ -17,7 +17,8 @@ pyyaml>=6.0.0,<7.0.0
 # Retry logic with exponential backoff for rate limiting
 tenacity>=8.0.0,<9.0.0
 
-# Interactive dashboard for job results analysis
+# Interactive dashboard for job results analysis (optional — only needed for
+# the `runtime-dashboard` Docker target. Install with `pip install .[dashboard]`.)
 streamlit>=1.28.0,<2.0.0
 
 # Scheduling for automated periodic execution
