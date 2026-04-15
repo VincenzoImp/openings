@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.0.1] - 2026-04-16
+
+Housekeeping release. No functional changes: v7.0.0 introduced the new scoring/retention/dashboard surface, this release finishes the job by removing the dead code and stale documentation that didn't get caught in the main refactor pass.
+
+**-2235 lines, no new features, no config changes.** If you're already running v7.0.0, the upgrade is `docker compose pull && docker compose up -d` with no `settings.yaml` edits required.
+
+### Removed
+
+- **`scripts/report_generator.py`** and its test — dead code, only self-imported. Its Excel formatting helpers were already duplicated in `scripts/exporter.py`.
+- **`scripts/analyze_jobs.py`** and its test — standalone CLI utility (ran via `python analyze_jobs.py` or `docker compose exec scheduler python analyze_jobs.py`) whose entire feature set is now covered by the dashboard's Database tab introduced in v7.0.0: company/location/keyword statistics are shown interactively, the score distribution is a live histogram, and filtering by company is a click on the main tab. Keeping a second implementation of the same thing on the CLI was just maintenance debt.
+- **`AGENTS.md`** — stale duplicate of `CLAUDE.md` that still described the pre-v7 pipeline (`cleanup_old_jobs` per-iteration, `filter_relevant_jobs`, `save_results`, single `scoring.threshold`). It wasn't updated during the v7 refactor and had drifted ~15 documentation blocks away from reality. `CLAUDE.md` is now the single source of truth for developer documentation; if another agent tool needs its own file later, it can be recreated from `CLAUDE.md`.
+- **`.github/workflows/publish-main.yml`** — manual-only (`workflow_dispatch`) Docker publish workflow that had never been triggered. `publish-release.yml` handles real releases (every `v*` tag, multi-arch, SBOM, provenance, semver tag tree); `publish-main.yml` was leftover pre-release infrastructure whose only effect on Docker Hub would have been a confusing `main` tag.
+- **`SearchResult` dataclass** in `scripts/models.py` — unused since before v7 and not to be confused with `vector_store.SemanticSearchResult` which is live.
+- **`mock_logger` fixture** in `tests/conftest.py` — defined at the top-level conftest but with zero consumers; `test_logger.py` has its own locally-scoped fixture of the same name.
+- **`results/.gitkeep`** and **`data/.gitkeep`** — both directories are gitignored and created lazily at runtime (the `results/` directory is only created the first time a user triggers an export from the dashboard's Database tab).
+
+### Changed
+
+- **`README.md`**: flow diagrams rewritten for `save_threshold` / `notify_threshold` partitioning, the "SAVE CSV/EXCEL" box in the pipeline diagram is gone, the "Optional Exports" section is rewritten around dashboard on-demand exports, `min_score_for_notification` is gone from the YAML example (replaced with a pointer to `scoring.notify_threshold`), the Docker Publishing subsection only mentions `publish-release.yml`, and the test count moves from 361 to 335.
+- **`CLAUDE.md`**: project tree no longer lists the removed modules; the "extracted to" note about `filter_relevant_jobs` / `save_results` now correctly reflects that one was split (into `score_jobs` + `partition_by_thresholds`) and the other was removed entirely; a new Dashboard section documents the Database tab's five subsections and the SQL-level bookmarked/applied protection invariant; the `SearchResult` stub is gone; test count updated.
+- **`.dockerignore`**: dropped the `AGENTS.md` entry along with the file itself.
+
+### Test plan
+
+- `pytest`: 335 passed, 0 failed. The delta from v7.0.0 (375 tests) is exactly the sum of the deleted `test_report_generator.py` (15) + `test_analyze_jobs.py` (17) + 8 parameterized variants that lived inside them.
+- `ruff check scripts/ tests/` clean.
+- `ruff format scripts/ tests/` — no files reformatted.
+- CI green on PR #8 before and after the release bump commit.
+
 ## [7.0.0] - 2026-04-15
 
 This is a major release. The scoring pipeline, the database retention model, and the dashboard's database management surface have all been rebuilt around a single principle: **`settings.yaml` is the source of truth and the DB reconciles to it at every boot**. Breaking changes are intentional and there is no backwards-compatibility shim — migrating an old `settings.yaml` is a five-minute edit.
@@ -324,7 +353,8 @@ No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-
 
 Entries prior to v4.3.1 have been archived. The git history on `main` plus the tagged commits are the authoritative source for anything older.
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v7.0.0...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v7.0.1...HEAD
+[7.0.1]: https://github.com/VincenzoImp/job-search-tool/compare/v7.0.0...v7.0.1
 [7.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.8...v7.0.0
 [6.0.8]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.7...v6.0.8
 [6.0.7]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.6...v6.0.7

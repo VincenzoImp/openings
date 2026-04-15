@@ -55,7 +55,7 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 | **Retry Logic** | Exponential backoff with tenacity for transient failures |
 | **Dynamic Rescoring** | Automatic rescoring of existing jobs when criteria change |
 | **CI/CD Pipeline** | GitHub Actions with test matrix, security audit, Docker build |
-| **Comprehensive Testing** | 361 pytest tests covering all core functionality |
+| **Comprehensive Testing** | 375 pytest tests covering all core functionality |
 | **Vector Embeddings** | Local ONNX embeddings via ChromaDB's default function — no torch runtime |
 
 ---
@@ -100,26 +100,27 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 ║  ┌────────────────────────────────────────────────────────────────────────────┐  ║
 ║  │                      ⚙️ PROCESSING PIPELINE (scoring.py)                   │  ║
 ║  │                                                                            │  ║
-║  │   ┌───────────────┐    ┌───────────────┐    ┌───────────────┐              │  ║
-║  │   │ Deduplication │───▶│    Scoring    │───▶│   Filtering   │              │  ║
-║  │   │  (SHA256 ID)  │    │  (Keywords +  │    │  (Threshold)  │              │  ║
-║  │   └───────────────┘    │   Weights)    │    └───────────────┘              │  ║
-║  │                        └───────────────┘           │                       │  ║
+║  │   ┌───────────────┐    ┌───────────────┐    ┌────────────────────┐         │  ║
+║  │   │ Deduplication │───▶│    Scoring    │───▶│    Partitioning    │         │  ║
+║  │   │  (SHA256 ID)  │    │  (Keywords +  │    │ save_threshold /   │         │  ║
+║  │   └───────────────┘    │   Weights)    │    │ notify_threshold   │         │  ║
+║  │                        └───────────────┘    └────────────────────┘         │  ║
+║  │                                                     │                       │  ║
 ║  └────────────────────────────────────────────────────┼───────────────────────┘  ║
 ║                                                       ▼                          ║
 ║  ┌────────────────────────────────────────────────────────────────────────────┐  ║
 ║  │                             💾 DATA LAYER                                  │  ║
 ║  │                                                                            │  ║
-║  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐  ┌────────────┐  │  ║
-║  │  │    SQLite DB   │  │ Vector Store │  │  CSV / Excel  │  │  Dashboard │  │  ║
-║  │  │ (Primary Store)│  │  (ChromaDB)  │  │  (exporter)   │  │ (Streamlit)│  │  ║
-║  │  │               │  │              │  │              │  │            │  │  ║
-║  │  │ • All jobs    │  │ • Embeddings │  │ • all_jobs   │  │ • Semantic │  │  ║
-║  │  │ • first_seen  │◄─┤ • Semantic   │  │ • relevant   │  │   search   │  │  ║
-║  │  │ • last_seen   │  │   search     │  │   .csv/.xlsx │  │ • Bookmark │  │  ║
-║  │  │ • applied     │  │ • Similarity │  │              │  │ • Bulk ops │  │  ║
-║  │  │ • bookmarked  │  │   ranking    │  │              │  │ • Charts   │  │  ║
-║  │  └───────┬───────┘  └──────────────┘  └──────────────┘  └────────────┘  │  ║
+║  │  ┌───────────────┐  ┌───────────────┐  ┌────────────────┐ ┌────────────┐│  ║
+║  │  │    SQLite DB   │  │ Vector Store │  │ Dashboard UI   │ │  On-demand ││  ║
+║  │  │ (Primary Store)│  │  (ChromaDB)  │  │  (Streamlit)   │ │   exports  ││  ║
+║  │  │               │  │              │  │                │ │ (exporter) ││  ║
+║  │  │ • All jobs    │  │ • Embeddings │  │ • Semantic srch│ │            ││  ║
+║  │  │ • first_seen  │◄─┤ • Semantic   │  │ • Bookmark/Apply││• CSV/Excel ││  ║
+║  │  │ • last_seen   │  │   search     │  │ • Database tab │ │  from DB   ││  ║
+║  │  │ • applied     │  │ • Similarity │  │ • Smart cleanup│ │  tab only  ││  ║
+║  │  │ • bookmarked  │  │   ranking    │  │ • Charts       │ │            ││  ║
+║  │  └───────┬───────┘  └──────────────┘  └────────────────┘ └────────────┘│  ║
 ║  │          │                                                               │  ║
 ║  └──────────┼───────────────────────────────────────────────────────────────┘  ║
 ║             ▼                                                                    ║
@@ -183,9 +184,12 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 ╠══════════════════════════════════════════════════════════════════════════════╣   │
 ║                                                                              ║   │
 ║  ┌────────────────────────────────────────────────────────────────────────┐  ║   │
-║  │ 1. CLEANUP OLD JOBS (if database.cleanup_enabled: true)                │  ║   │
-║  │    Delete jobs with last_seen > cleanup_days ago                       │  ║   │
-║  │    Sync deletions from vector store                                    │  ║   │
+║  │ 1. RETENTION RECONCILIATION (runs once per boot, not per cycle)        │  ║   │
+║  │    db.reconcile_with_config(config) applies:                           │  ║   │
+║  │      • database.retention.max_age_days       → delete_stale_jobs       │  ║   │
+║  │      • database.retention.purge_blacklist_after_days → purge_blacklist │  ║   │
+║  │    Bookmarked & applied jobs are protected at the SQL level.           │  ║   │
+║  │    Vector store is synced to match.                                    │  ║   │
 ║  └────────────────────────────────────────────────────────────────────────┘  ║   │
 ║                                       │                                      ║   │
 ║                                       ▼                                      ║   │
@@ -227,21 +231,24 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 ║                                       │                                      ║   │
 ║                                       ▼                                      ║   │
 ║  ┌────────────────────────────────────────────────────────────────────────┐  ║   │
-║  │ 5. FILTER BY THRESHOLD                                                 │  ║   │
-║  │    Keep only jobs where: score >= scoring.threshold                    │  ║   │
+║  │ 5. PARTITION BY THRESHOLDS (scoring.partition_by_thresholds)           │  ║   │
+║  │    to_save   = score >= scoring.save_threshold                         │  ║   │
+║  │    to_notify = score >= scoring.notify_threshold   (notify ≥ save)     │  ║   │
 ║  └────────────────────────────────────────────────────────────────────────┘  ║   │
 ║                                       │                                      ║   │
-║              ┌────────────────────────┼────────────────────────┐              ║   │
-║              ▼                        ▼                        ▼              ║   │
-║  ┌──────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐    ║   │
-║  │  6a. SAVE TO DB  │  │ 6b. EMBED IN VECTOR  │  │ 6c. SAVE CSV/EXCEL  │    ║   │
-║  │                  │  │     STORE (ChromaDB)  │  │    (exporter.py)    │    ║   │
-║  │  UPSERT logic:   │  │                      │  │                      │    ║   │
-║  │  • New → INSERT  │  │  ChromaDB ONNX embeds │  │  • all_jobs.csv     │    ║   │
-║  │  • Old → UPDATE  │  │  job text into vectors│  │  • relevant.xlsx    │    ║   │
-║  │  (last_seen,     │  │  for semantic similar-│  │                      │    ║   │
-║  │   score)         │  │  ity search (default) │  │                      │    ║   │
-║  └────────┬─────────┘  └──────────────────────┘  └──────────────────────┘    ║   │
+║                   ┌───────────────────┴───────────────────┐                  ║   │
+║                   ▼                                       ▼                  ║   │
+║  ┌──────────────────────────┐           ┌──────────────────────────────┐    ║   │
+║  │  6a. SAVE to_save → DB   │           │  6b. EMBED in VECTOR STORE   │    ║   │
+║  │                          │           │       (ChromaDB, ONNX)       │    ║   │
+║  │  UPSERT logic:           │           │                              │    ║   │
+║  │  • exclude_blacklisted() │           │  Embeds to_save rows into    │    ║   │
+║  │  • New → INSERT          │           │  vectors for semantic search │    ║   │
+║  │  • Old → UPDATE          │           │                              │    ║   │
+║  │    (last_seen, score)    │           │  (No automatic CSV/Excel —   │    ║   │
+║  │                          │           │   exports are on-demand from │    ║   │
+║  │                          │           │   the dashboard Database tab)│    ║   │
+║  └────────┬─────────────────┘           └──────────────────────────────┘    ║   │
 ║           │                                                                   ║   │
 ║           ▼                                                                   ║   │
 ║  ┌────────────────────────────────────────────────────────────────────────┐  ║   │
@@ -253,7 +260,7 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 ║  ┌────────────────────────────────────────────────────────────────────────┐  ║   │
 ║  │ 8. SEND TELEGRAM NOTIFICATION                                          │  ║   │
 ║  │                                                                        │  ║   │
-║  │    🆕 New Jobs (score >= min_score_for_notification)                    │  ║   │
+║  │    🆕 New Jobs (score >= scoring.notify_threshold)                      │  ║   │
 ║  │    🏆 Top Jobs Overall (from entire database)                          │  ║   │
 ║  │    Chunked messages (10 jobs per msg to avoid 4096 char limit)         │  ║   │
 ║  └────────────────────────────────────────────────────────────────────────┘  ║   │
@@ -277,10 +284,10 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 | **Search Engine** | `search_jobs.py` | Parallel scraping, scoring, filtering |
 | **Scheduler** | `scheduler.py` | APScheduler wrapper, retry logic |
 | **Notifications** | `notifier.py` | Telegram message formatting and sending |
-| **Database** | `database.py` | SQLite CRUD, deduplication, cleanup (WAL mode) |
+| **Database** | `database.py` | SQLite CRUD, deduplication, retention reconciliation (WAL mode) |
 | **Configuration** | `config.py` | YAML loading, validation, type safety |
 | **Scoring** | `scoring.py` | Relevance scoring engine |
-| **Exporter** | `exporter.py` | CSV/Excel export with sanitization |
+| **Exporter** | `exporter.py` | On-demand CSV/Excel export (dashboard Database tab only) |
 | **Dashboard** | `dashboard.py` | Unified Job Search Hub with semantic search |
 | **Vector Store** | `vector_store.py` | ChromaDB semantic search |
 | **Vector Commands** | `vector_commands.py` | Embedding backfill and sync |
@@ -504,7 +511,9 @@ The scoring system is fully configuration-driven with no hardcoded categories:
 
 ```yaml
 scoring:
-  threshold: 15               # Minimum score to be considered "relevant"
+  save_threshold: 0           # Minimum score to be persisted to the DB
+  notify_threshold: 20        # Minimum score to trigger Telegram notifications
+                              # (must be >= save_threshold; enforced at load time)
 
   weights:                    # Points awarded per category match
     primary_skills: 25        # High priority matches
@@ -543,7 +552,7 @@ scoring:
 - For each job, text is extracted from: title, description, company, location
 - Each category is checked for keyword matches (case-insensitive)
 - If ANY keyword from a category matches, that category's weight is added
-- Final score determines if the job is "relevant" (score >= threshold)
+- A job is saved if its score is at least `save_threshold`, and only notified if it additionally reaches `notify_threshold`
 
 **Dynamic Rescoring**: When you modify scoring criteria, existing jobs in the database are automatically rescored on the next run. No database reset required.
 
@@ -565,8 +574,8 @@ notifications:
     bot_token: "YOUR_BOT_TOKEN"       # From @BotFather
     chat_ids:
       - "YOUR_CHAT_ID"                # Your Telegram user ID
-    min_score_for_notification: 20    # Only notify for high-scoring jobs
     max_jobs_in_message: 50           # Maximum jobs per notification
+    # Notification floor is scoring.notify_threshold (see above) — no per-channel override.
 ```
 
 ### Vector Search
@@ -694,7 +703,7 @@ The Streamlit dashboard provides powerful analysis and filtering capabilities.
 - **Inline Actions**: Mark applied, bookmark, delete-and-blacklist, open URL from each card
 - **Bulk Operations**: Select multiple jobs for batch apply, bookmark, and delete actions
 - **Analytics Tab**: Charts for source distribution, score breakdown, trends
-- **Database Management**: Review database stats, export data, and manage blacklisted deletions
+- **Database Tab**: Health metrics, dynamic score-distribution histogram, four smart-cleanup cards (delete below score, delete stale, purge blacklist, apply `settings.yaml` retention now), on-demand CSV/Excel export, and a Danger zone with a "Full reset" button (the only path that bypasses bookmark/applied protection)
 - **Pagination**: 20 jobs per page with navigation
 
 Deleting a job from the dashboard is persistent: the job is removed from the active `jobs` table and its internal `job_id` is stored in a blacklist so future searches skip it automatically.
@@ -761,7 +770,7 @@ Inside the container the combined `/data` tree looks like this:
 ├── config/settings.yaml   # bind-mounted from ./settings.yaml (read-only)
 ├── db/jobs.db             # SQLite store (inside jobsearch-data)
 ├── chroma/                # ChromaDB vector store (inside jobsearch-data)
-├── results/               # CSV/Excel exports (inside jobsearch-data)
+├── results/               # On-demand CSV/Excel exports from the dashboard (inside jobsearch-data)
 └── logs/search.log        # rotating application log (inside jobsearch-data)
 ```
 
@@ -829,19 +838,17 @@ docker compose exec scheduler sqlite3 /data/db/jobs.db "SELECT site, COUNT(*) as
 docker compose exec scheduler sqlite3 /data/db/jobs.db "SELECT title, company FROM jobs WHERE is_remote = 1 ORDER BY relevance_score DESC LIMIT 20"
 ```
 
-### Optional Exports
+### On-demand Exports
 
-CSV and Excel exports are optional and controlled by configuration:
+The search pipeline never writes spreadsheets. Exports are produced exclusively
+on demand from the dashboard's **Database** tab, which calls
+`scripts/exporter.export_dataframe(df, output_dir, basename, fmt)` with the
+currently filtered rows. Output files land under `{DATA_DIR}/results/` with a
+user-chosen basename and format (`csv` or `excel`), and all cells are sanitized
+against formula injection before being written.
 
-```yaml
-output:
-  save_csv: true              # Generate CSV files
-  save_excel: true            # Generate formatted Excel files
-```
-
-When enabled, files are saved to `results/` with timestamps:
-- `all_jobs_YYYYMMDD_HHMMSS.csv/xlsx` - All discovered jobs
-- `relevant_jobs_YYYYMMDD_HHMMSS.csv/xlsx` - Jobs above score threshold
+There is no `output:` config section, no automatic `all_jobs_*.csv` /
+`relevant_jobs_*.csv` generation, and no toggle to re-enable the old behavior.
 
 ---
 
@@ -976,9 +983,9 @@ job-search-tool/
 │   ├── vector_store.py            # ChromaDB vector store (ONNX embedder)
 │   ├── vector_commands.py         # Vector backfill/sync
 │   └── healthcheck.py             # Docker health checks
-├── tests/                          # 361 pytest tests
+├── tests/                          # 375 pytest tests
 ├── data/                           # Local dev state (gitignored): db/, chroma/, results/, logs/
-├── .github/workflows/              # CI + publish-release + publish-main
+├── .github/workflows/              # CI + publish-release
 ├── Dockerfile                      # Multi-stage build, single image, non-root, tini-init
 ├── docker-compose.yml              # 2 services, 1 image, 1 Docker-managed named volume
 ├── docker-compose.dev.yml          # Local-build override for developers
@@ -989,19 +996,15 @@ job-search-tool/
 
 ### Docker Publishing
 
-The repository includes two Docker Hub publishing workflows:
+The repository publishes Docker Hub images exclusively from version tags:
 
-- `.github/workflows/publish-release.yml` is the automatic release path for version tags
-- `.github/workflows/publish-main.yml` is a manual maintainer-only escape hatch for publishing the current `main` branch
-
-Both publish the same single image, tagged `:latest`, `:vX.Y.Z`, `:vX.Y`, `:vX`, `:sha-<commit>` (release) and `:main`, `:sha-<commit>` (main).
+- `.github/workflows/publish-release.yml` is the automatic release path for version tags, producing `:latest`, `:vX.Y.Z`, `:vX.Y`, `:vX`, and `:sha-<commit>`.
 
 Publishing policy:
 
 - pull requests run the Docker smoke build in CI and execute the healthcheck against the built image — regressions are caught before merge
 - pushes to `main` run validation jobs, but do not automatically republish Docker images
 - version tags (e.g. `v1.2.3`) publish the full multi-arch release (`linux/amd64` + `linux/arm64`) and refresh `:latest`
-- `publish-main.yml` can be triggered manually when maintainers intentionally want a fresh `main` / `sha-*` image
 - workflow concurrency is enabled so older in-flight publishes on the same ref are cancelled automatically
 - `uv.lock` is the dependency source of truth for CI and Docker image builds
 

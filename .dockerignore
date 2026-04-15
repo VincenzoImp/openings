@@ -34,7 +34,6 @@ logs/
 # Documentation (not needed in container)
 README.md
 CLAUDE.md
-AGENTS.md
 LICENSE
 
 # Temporary files

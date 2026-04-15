@@ -317,15 +317,6 @@ def mock_telegram_bot():
         yield mock_bot
 
 
-@pytest.fixture
-def mock_logger():
-    """Mock the logger for testing log output."""
-    with patch("logger.get_logger") as mock:
-        mock_logger = MagicMock()
-        mock.return_value = mock_logger
-        yield mock_logger
-
-
 # =============================================================================
 # NOTIFICATION DATA FIXTURES
 # =============================================================================

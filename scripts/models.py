@@ -157,23 +157,6 @@ class Job:
         }
 
 
-@dataclass(frozen=True)
-class SearchResult:
-    """Represents results from a single search query."""
-
-    query: str
-    location: str
-    jobs: list[Job] = field(default_factory=list)
-    success: bool = True
-    error_message: str | None = None
-    search_time: datetime = field(default_factory=datetime.now)
-
-    @property
-    def job_count(self) -> int:
-        """Get number of jobs found."""
-        return len(self.jobs)
-
-
 @dataclass
 class SearchSummary:
     """Summary statistics for a complete search run."""
