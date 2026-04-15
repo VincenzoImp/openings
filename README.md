@@ -289,18 +289,20 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 
 ## Quick Start
 
-You only need Docker. In an empty folder, drop the following six-line `docker-compose.yml`:
+You only need Docker. In an empty folder, drop this `docker-compose.yml`:
 
 ```yaml
 services:
   scheduler:
-    image: vincenzoimp/job-search-tool:latest-core
+    image: vincenzoimp/job-search-tool:latest
     restart: unless-stopped
+    command: ["python", "main.py", "scheduler"]
     volumes: ["./data:/data"]
 
   dashboard:
     image: vincenzoimp/job-search-tool:latest
     restart: unless-stopped
+    command: ["python", "main.py", "dashboard"]
     ports: ["8501:8501"]
     volumes: ["./data:/data"]
 ```
@@ -311,44 +313,39 @@ Then:
 docker compose up -d
 ```
 
-That's it. On first run the container scaffolds `./data/config/settings.yaml` from the bundled template, creates the `./data/{db,chroma,results,logs}` tree, and starts the scheduler continuously alongside the dashboard. Edit `./data/config/settings.yaml` to configure your queries, scoring keywords, and (optionally) Telegram notifications, then `docker compose restart scheduler` to apply.
+That's it. On first run the container scaffolds `./data/config/settings.yaml` from the bundled template, creates the `./data/{db,chroma,results,logs}` tree, and starts the continuous scheduler alongside the dashboard. Edit `./data/config/settings.yaml` to configure your queries, scoring keywords, and (optionally) Telegram notifications, then `docker compose restart scheduler` to apply.
 
 Open **http://localhost:8501** for the dashboard.
 
 ### What you get
 
-- **scheduler** — runs the continuous search loop on the slim core image (no Streamlit bundled). `restart: unless-stopped` means it survives crashes, reboots, and rate-limit retries automatically.
-- **dashboard** — Streamlit UI on port `8501`, reads the same SQLite database and vector store the scheduler writes to.
-- **One volume, one tree** — everything persistent (`settings.yaml`, SQLite, ChromaDB vectors, CSV/Excel exports, logs) lives under `./data/` so backup is `tar czf backup.tgz data/`.
+- **scheduler** — runs the continuous search loop (`main.py scheduler`). `restart: unless-stopped` means it survives crashes, reboots, and rate-limit retries automatically.
+- **dashboard** — Streamlit UI on port `8501` (`main.py dashboard`). Reads the same SQLite database and vector store the scheduler writes to.
+- **One image, one volume, one tree** — both services pull `vincenzoimp/job-search-tool:latest` (so Docker downloads it once and shares layers). Everything persistent (`settings.yaml`, SQLite, ChromaDB vectors, CSV/Excel exports, logs) lives under `./data/`, so backup is `tar czf backup.tgz data/`.
 
-### Two Docker image variants
+### The `main.py` CLI
 
-The project publishes two variants of the same build:
-
-| Variant | Tag family | Contents |
-|---|---|---|
-| **Dashboard** (default) | `vincenzoimp/job-search-tool:latest` / `:vX.Y.Z` | Full stack, Streamlit UI bundled |
-| **Core** (slim) | `vincenzoimp/job-search-tool:latest-core` / `:vX.Y.Z-core` | No Streamlit (~200 MB smaller) |
-
-The compose file above wires the scheduler to `:latest-core` and the dashboard to `:latest`, so you get the weight savings automatically.
-
-To build locally from source, pick the variant via `--build-arg VARIANT=core|dashboard`:
+The same entry point handles all operating modes via subcommands:
 
 ```bash
-docker build -t job-search-tool .                               # dashboard (default)
-docker build --build-arg VARIANT=core -t job-search-tool:core . # core (slim)
+python main.py                # scheduler (continuous loop, default)
+python main.py scheduler      # same as above, explicit
+python main.py once           # run a single search iteration and exit
+python main.py dashboard      # replace the process with the Streamlit UI
 ```
+
+Both inside the container and during local development this is the only entry point you need.
 
 ### Local Python (for development)
 
 ```bash
 git clone https://github.com/VincenzoImp/job-search-tool.git
 cd job-search-tool
-uv sync --locked                       # install all deps (including streamlit + dev tools)
+uv sync --locked                                # installs all runtime + dev deps
 cp config/settings.example.yaml config/settings.yaml
-cd scripts && uv run python main.py    # runs continuously; add --once for a single iteration
-# Optional dashboard:
-uv run streamlit run dashboard.py
+uv run python scripts/main.py                   # continuous scheduler
+uv run python scripts/main.py once              # single-shot run
+uv run python scripts/main.py dashboard         # streamlit UI on http://localhost:8501
 ```
 
 In local development, `JOB_SEARCH_DATA_DIR` is unset and the project root is used as the root — `db/jobs.db`, `chroma/`, `results/`, `logs/search.log`, `config/settings.yaml` all live at the repo root.
@@ -359,7 +356,7 @@ In local development, `JOB_SEARCH_DATA_DIR` is unset and the project root is use
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-This rebuilds both variants from the local checkout and runs the same two services.
+This rebuilds the single image from the local checkout and runs the two services against it.
 
 ---
 
@@ -636,29 +633,25 @@ docker compose logs -f dashboard
 For local Python development:
 
 ```bash
-cd scripts && uv run streamlit run dashboard.py
+uv run python scripts/main.py dashboard
 ```
 
 ### Bare `docker run` (no Compose)
 
-If you want to run the scheduler without Compose:
-
 ```bash
+# Scheduler (continuous)
 docker run -d --name job-search \
   -v "$PWD/data:/data" \
   --restart unless-stopped \
-  vincenzoimp/job-search-tool:latest-core
-```
+  vincenzoimp/job-search-tool:latest
 
-For the dashboard:
-
-```bash
+# Dashboard (Streamlit UI on :8501)
 docker run -d --name job-search-dashboard \
   -v "$PWD/data:/data" \
   -p 8501:8501 \
   --restart unless-stopped \
   vincenzoimp/job-search-tool:latest \
-  streamlit run dashboard.py --server.address=0.0.0.0 --server.port=8501
+  python main.py dashboard
 ```
 
 Both containers share the same `./data` volume so the dashboard reads what the scheduler writes. On first run the container scaffolds `./data/config/settings.yaml` automatically.
@@ -830,8 +823,8 @@ job-search-tool/
 ├── tests/                          # 350+ pytest tests
 ├── data/                           # Local dev state (gitignored): db/, chroma/, results/, logs/
 ├── .github/workflows/              # CI + publish-release + publish-main
-├── Dockerfile                      # Multi-stage, variant-aware (core | dashboard)
-├── docker-compose.yml              # 2 services, 1 volume (./data:/data), ~20 lines
+├── Dockerfile                      # Multi-stage build, single image, non-root, tini-init
+├── docker-compose.yml              # 2 services, 1 image, 1 volume (./data:/data)
 ├── docker-compose.dev.yml          # Local-build override for developers
 ├── .pre-commit-config.yaml         # Ruff, trailing whitespace, etc.
 ├── pyproject.toml                  # Dependency metadata for uv
@@ -845,17 +838,14 @@ The repository includes two Docker Hub publishing workflows:
 - `.github/workflows/publish-release.yml` is the automatic release path for version tags
 - `.github/workflows/publish-main.yml` is a manual maintainer-only escape hatch for publishing the current `main` branch
 
-Both workflows build a **matrix of two variants** from the same `Dockerfile` via `--build-arg VARIANT=core|dashboard`:
-
-- **dashboard** (default, includes Streamlit UI) publishes under the unsuffixed tag family: `:latest`, `:vX.Y.Z`, `:vX.Y`, `:vX`, `:sha-<commit>`
-- **core** (slim, no Streamlit, ~200 MB smaller) publishes under the `-core` suffixed tag family: `:latest-core`, `:vX.Y.Z-core`, `:vX.Y-core`, `:vX-core`, `:sha-<commit>-core`, plus the raw `:core` alias
+Both publish the same single image, tagged `:latest`, `:vX.Y.Z`, `:vX.Y`, `:vX`, `:sha-<commit>` (release) and `:main`, `:sha-<commit>` (main).
 
 Publishing policy:
 
-- pull requests run the Docker smoke build in CI **for both variants in parallel**, and healthcheck each image — regressions in either build path are caught before merge
+- pull requests run the Docker smoke build in CI and execute the healthcheck against the built image — regressions are caught before merge
 - pushes to `main` run validation jobs, but do not automatically republish Docker images
-- version tags such as `v5.0.0` publish the full multi-arch release (`linux/amd64` + `linux/arm64`) **for both variants** and refresh both `:latest` and `:latest-core`
-- `publish-main.yml` can be triggered manually when maintainers intentionally want a fresh `main` / `sha-*` image (both variants)
+- version tags such as `v6.0.1` publish the full multi-arch release (`linux/amd64` + `linux/arm64`) and refresh `:latest`
+- `publish-main.yml` can be triggered manually when maintainers intentionally want a fresh `main` / `sha-*` image
 - workflow concurrency is enabled so older in-flight publishes on the same ref are cancelled automatically
 - `uv.lock` is the dependency source of truth for CI and Docker image builds
 

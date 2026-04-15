@@ -203,7 +203,7 @@ class TestRunJobSearch:
 class TestMain:
     """Tests for main() entry point."""
 
-    @patch("sys.argv", ["main.py", "--once"])
+    @patch("sys.argv", ["main.py", "once"])
     @patch("main.get_config")
     @patch("main.setup_logging")
     @patch("main.get_database")
@@ -215,7 +215,7 @@ class TestMain:
         mock_setup_log,
         mock_get_config,
     ):
-        """``--once`` runs a single iteration and exits 0 on success."""
+        """``once`` runs a single iteration and exits 0 on success."""
         from main import main
 
         mock_config = MagicMock()
@@ -238,7 +238,7 @@ class TestMain:
         mock_scheduler.run_once.assert_called_once()
         mock_scheduler.start.assert_not_called()
 
-    @patch("sys.argv", ["main.py", "--once"])
+    @patch("sys.argv", ["main.py", "once"])
     @patch("main.get_config")
     @patch("main.setup_logging")
     @patch("main.get_database")
@@ -250,7 +250,7 @@ class TestMain:
         mock_setup_log,
         mock_get_config,
     ):
-        """``--once`` returns 1 when the single run fails."""
+        """``once`` returns 1 when the single run fails."""
         from main import main
 
         mock_config = MagicMock()
@@ -271,7 +271,7 @@ class TestMain:
 
         assert result == 1
 
-    @patch("sys.argv", ["main.py", "--once"])
+    @patch("sys.argv", ["main.py", "once"])
     @patch("main.get_config")
     @patch("main.setup_logging")
     @patch("main.get_database")
@@ -306,7 +306,7 @@ class TestMain:
 
         mock_recalc.assert_called_once_with(mock_db, mock_config)
 
-    @patch("sys.argv", ["main.py", "--once"])
+    @patch("sys.argv", ["main.py", "once"])
     @patch("main.get_config")
     @patch("main.setup_logging")
     @patch("main.get_database")
@@ -353,7 +353,7 @@ class TestMain:
         mock_setup_log,
         mock_get_config,
     ):
-        """Without ``--once``, main() starts the continuous scheduler."""
+        """Default invocation (no subcommand) starts the continuous scheduler."""
         from main import main
 
         mock_config = MagicMock()
@@ -376,3 +376,20 @@ class TestMain:
         assert result == 0
         mock_scheduler.start.assert_called_once()
         mock_scheduler.run_once.assert_not_called()
+
+    @patch("sys.argv", ["main.py", "dashboard"])
+    @patch("main.os.execvp")
+    def test_dashboard_subcommand_execs_streamlit(self, mock_execvp):
+        """``dashboard`` replaces the current process with Streamlit."""
+        from main import main
+
+        main()
+
+        mock_execvp.assert_called_once()
+        cmd, args = mock_execvp.call_args.args
+        assert cmd == "streamlit"
+        assert args[0] == "streamlit"
+        assert args[1] == "run"
+        assert args[2].endswith("dashboard.py")
+        assert "--server.address=0.0.0.0" in args
+        assert "--server.port=8501" in args

@@ -118,9 +118,9 @@ job-search-tool/
 │   ├── results/                    # CSV/Excel exports
 │   └── logs/search.log             # Rotating log
 │
-├── Dockerfile                      # Multi-stage, variant-aware build (core | dashboard), tini-init
+├── Dockerfile                      # Multi-stage, single-target build, tini-init
 ├── docker-compose.yml              # Two-service stack sharing ./data:/data
-├── docker-compose.dev.yml          # Local-build override (rebuilds both variants)
+├── docker-compose.dev.yml          # Local-build override
 ├── .pre-commit-config.yaml         # Pre-commit hooks (ruff, etc.)
 ├── requirements.txt                # Production dependencies (compat mirror)
 ├── requirements-dev.txt            # Development dependencies (compat mirror)
@@ -939,6 +939,16 @@ columns = [
 ---
 
 ## Changelog
+
+### v6.0.1 (2026-04-15)
+
+**Simplification follow-up to v6.0.0:**
+- **Single Docker image** — the dashboard/core split is removed. Both Compose services pull the same `:latest` image (Docker deduplicates the download) and differ only by `command:`.
+- **`main.py` CLI subcommands**: `scheduler` (default), `once`, `dashboard`. `dashboard` `exec`-replaces the process with Streamlit.
+- `streamlit` moves back to main deps (no more `[project.optional-dependencies] dashboard`).
+- Dockerfile becomes single-target (no `ARG VARIANT`, no duplicated builders).
+- CI + publish workflows drop the variant matrix.
+- Fixed a README Quick Start bug from v6.0.0 where the dashboard service was missing its `command:` override.
 
 ### v6.0.0 (2026-04-15)
 

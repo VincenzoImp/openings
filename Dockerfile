@@ -2,27 +2,20 @@
 
 # Job Search Tool — Docker container
 #
-# Two variants, selected via the `VARIANT` build arg:
-#   VARIANT=dashboard (default) — full image with Streamlit UI
-#   VARIANT=core                — slim image, no Streamlit (~200 MB smaller)
+# Single image containing the scheduler, the Streamlit dashboard, and every
+# runtime dependency. The same image runs both Compose services; the two
+# differ only by their command (scheduler loop vs Streamlit UI).
 #
-# Build examples:
-#   docker build -t job-search-tool .                              # dashboard
-#   docker build --build-arg VARIANT=core -t job-search-tool:core .
-#
-# Runtime: everything persistent (config, database, vector store, results,
-# logs) lives under a single volume at /data. Mount it and that's it — no
-# other bind mounts are needed.
-
-ARG VARIANT=dashboard
+# Everything persistent (config, database, vector store, results, logs) lives
+# under a single volume at /data. Mount it and that's it.
 
 FROM ghcr.io/astral-sh/uv:0.11.6 AS uv
 
 # =============================================================================
-# Builder base — tooling, sources, lockfile. No dependency install yet.
+# Builder — install dependencies into a pruned .venv
 # =============================================================================
 # NOTE: Pin to a specific patch version for reproducible builds.
-FROM python:3.11.12-slim AS builder-base
+FROM python:3.11.12-slim AS builder
 
 WORKDIR /app
 
@@ -39,11 +32,6 @@ COPY scripts/ ./scripts/
 COPY config/settings.example.yaml /opt/job-search-tool/defaults/settings.example.yaml
 COPY docker/entrypoint.sh /usr/local/bin/job-search-entrypoint
 
-# =============================================================================
-# Variant builders — install deps into .venv, then prune for size.
-# =============================================================================
-FROM builder-base AS builder-core
-
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-install-project \
     && find /app/.venv -depth \
@@ -51,27 +39,14 @@ RUN --mount=type=cache,target=/root/.cache/uv \
             -o -type f \( -name '*.pyc' -o -name '*.pyo' -o -name '*.pyi' \) \
          \) -exec rm -rf {} +
 
-FROM builder-base AS builder-dashboard
-
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev --no-install-project --extra dashboard \
-    && find /app/.venv -depth \
-         \( -type d \( -name __pycache__ -o -name tests -o -name test \) \
-            -o -type f \( -name '*.pyc' -o -name '*.pyo' -o -name '*.pyi' \) \
-         \) -exec rm -rf {} +
-
-# Variant selector — resolves `builder-${VARIANT}` via the global ARG.
-FROM builder-${VARIANT} AS builder-final
-
 # =============================================================================
-# Runtime — single stage, variant-agnostic.
+# Runtime — single stage used by both the scheduler and the dashboard
 # =============================================================================
 FROM python:3.11.12-slim AS runtime
 
 ARG BUILD_DATE=unknown
 ARG VCS_REF=unknown
 ARG VERSION=dev
-ARG VARIANT=dashboard
 
 LABEL org.opencontainers.image.title="Job Search Tool" \
       org.opencontainers.image.description="Automated job search aggregation, scoring, notifications, and dashboard tooling." \
@@ -81,8 +56,7 @@ LABEL org.opencontainers.image.title="Job Search Tool" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.revision="${VCS_REF}" \
-      org.opencontainers.image.version="${VERSION}" \
-      org.opencontainers.image.variant="${VARIANT}"
+      org.opencontainers.image.version="${VERSION}"
 
 # tini provides clean SIGTERM propagation to the Python process (it becomes PID 1).
 RUN apt-get update && apt-get install -y --no-install-recommends tini \
@@ -95,10 +69,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends tini \
 
 WORKDIR /app
 
-COPY --from=builder-final --chown=appuser:appuser /app/.venv /app/.venv
-COPY --from=builder-final --chown=appuser:appuser /app/scripts /app/scripts
-COPY --from=builder-final --chown=appuser:appuser /opt/job-search-tool/defaults/settings.example.yaml /opt/job-search-tool/defaults/settings.example.yaml
-COPY --from=builder-final /usr/local/bin/job-search-entrypoint /usr/local/bin/job-search-entrypoint
+COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
+COPY --from=builder --chown=appuser:appuser /app/scripts /app/scripts
+COPY --from=builder --chown=appuser:appuser /opt/job-search-tool/defaults/settings.example.yaml /opt/job-search-tool/defaults/settings.example.yaml
+COPY --from=builder /usr/local/bin/job-search-entrypoint /usr/local/bin/job-search-entrypoint
 
 RUN chmod +x /usr/local/bin/job-search-entrypoint
 

@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.1] - 2026-04-15
+
+### Changed
+
+- **Single Docker image**: the dashboard/core variant split from v5.0.0 is removed. One image tree, one tag family (`:latest`, `:vX.Y.Z`, `:vX.Y`, `:vX`, `:sha-<commit>`). Both Compose services pull the same image — Docker downloads it once and shares layers — and differ only by the command they run.
+- **Unified CLI subcommands**: `scripts/main.py` now accepts subcommands:
+  - `python main.py` / `python main.py scheduler` — continuous scheduler loop (default)
+  - `python main.py once` — single-shot run (for cron / CI)
+  - `python main.py dashboard` — `exec`-replaces the process with Streamlit on port 8501
+  Replaces the v6.0.0 transient `--once` flag.
+- **`docker-compose.yml`** uses explicit `command: ["python", "main.py", <subcommand>]` on both services.
+- **Streamlit moved back to main dependencies** in `pyproject.toml`; the `[project.optional-dependencies] dashboard` extra is removed.
+- **Dockerfile** simplified to a single target: no more `ARG VARIANT`, no more `builder-core` / `builder-dashboard` / `builder-final` stages.
+- **CI + publish workflows** drop the `[dashboard, core]` matrix and build once per run.
+- **README Quick Start** fixes a copy-paste bug from v6.0.0 where the dashboard service was missing a `command:` override and would have silently run a second scheduler instead of Streamlit.
+
+### Removed
+
+- Docker image tag families `:latest-core`, `:vX.Y.Z-core`, `:core`, `:sha-<commit>-core`.
+- `--build-arg VARIANT` on the Dockerfile.
+- `[project.optional-dependencies] dashboard` in `pyproject.toml`.
+- CI matrix build of two variants in `.github/workflows/ci.yml`, `publish-release.yml`, `publish-main.yml`.
+
 ## [6.0.0] - 2026-04-15
 
 ### Changed (BREAKING)
@@ -479,7 +502,8 @@ No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-
 - **Structured Logging**: File and console logs with rotation
 - **Docker Support**: Containerized environment for cross-platform compatibility
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.0...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.1...HEAD
+[6.0.1]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.0...v6.0.1
 [6.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v5.0.1...v6.0.0
 [5.0.1]: https://github.com/VincenzoImp/job-search-tool/compare/v5.0.0...v5.0.1
 [5.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v4.4.0...v5.0.0

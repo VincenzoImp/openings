@@ -20,19 +20,6 @@ jobs:
       attestations: write
       id-token: write
 
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Dashboard variant: default, tagged without suffix (`:latest`, `:vX.Y.Z`, ...)
-          - variant: dashboard
-            tag_suffix: ""
-            latest_tag: "latest"
-          # Core variant: slim, tagged with `-core` suffix (`:latest-core`, `:vX.Y.Z-core`, ...)
-          - variant: core
-            tag_suffix: "-core"
-            latest_tag: "latest-core"
-
     steps:
       - uses: actions/checkout@v6
 
@@ -54,13 +41,13 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=sha,prefix=sha-,suffix=${{ matrix.tag_suffix }}
-            type=semver,pattern={{version}},suffix=${{ matrix.tag_suffix }}
-            type=semver,pattern={{major}}.{{minor}},suffix=${{ matrix.tag_suffix }}
-            type=semver,pattern={{major}},suffix=${{ matrix.tag_suffix }}
-            type=raw,value=${{ matrix.latest_tag }}
+            type=sha,prefix=sha-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
 
-      - name: Build and push (${{ matrix.variant }})
+      - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -68,12 +55,11 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=publish-release-${{ matrix.variant }}
-          cache-to: type=gha,scope=publish-release-${{ matrix.variant }},mode=max
+          cache-from: type=gha,scope=publish-release
+          cache-to: type=gha,scope=publish-release,mode=max
           sbom: true
           provenance: mode=max
           build-args: |
-            VARIANT=${{ matrix.variant }}
             VERSION=${{ steps.meta.outputs.version }}
             BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
             VCS_REF=${{ github.sha }}

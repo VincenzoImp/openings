@@ -8,8 +8,11 @@ Integrates job search, database persistence, and notifications.
 
 from __future__ import annotations
 
+import argparse
+import os
 import sys
 import traceback
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from config import get_config, reload_config
@@ -322,26 +325,18 @@ def _send_empty_notification(config: Config, db: JobDatabase) -> None:
         logger.error(f"Error sending empty notification: {e}")
 
 
-def main() -> int:
-    """Main entry point.
+def _prepare_runtime(*, scheduled: bool) -> tuple[Config, JobDatabase]:
+    """Shared startup: load config, set up logging, recalc scores, backfill vectors.
 
-    Starts the APScheduler loop and runs the search pipeline on the configured
-    interval. Single-shot execution is available via ``python main.py --once``
-    for ad-hoc runs and CI.
-
-    Returns:
-        Exit code (0 for success, 1 for failure).
+    Returns the loaded ``Config`` and an initialised ``JobDatabase`` ready for use.
     """
-    scheduled_mode = "--once" not in sys.argv
-
-    # Initial config load
     config = get_config()
     logger = setup_logging(config)
 
     log_section(logger, "JOB SEARCH TOOL STARTING")
-    logger.info(f"Mode: {'Scheduled' if scheduled_mode else 'Single-shot (--once)'}")
+    logger.info(f"Mode: {'Scheduled' if scheduled else 'Single-shot'}")
 
-    if scheduled_mode:
+    if scheduled:
         logger.info(f"Interval: {config.scheduler.interval_hours} hours")
         logger.info(f"Run on startup: {config.scheduler.run_on_startup}")
 
@@ -353,7 +348,6 @@ def main() -> int:
             f"Notifications: {', '.join(channels) if channels else 'None configured'}"
         )
 
-    # Recalculate scores for existing jobs at startup (if enabled)
     db = get_database(config)
     db_stats = db.get_statistics()
     if config.database.recalculate_scores_on_startup and db_stats["total_jobs"] > 0:
@@ -362,7 +356,6 @@ def main() -> int:
         )
         recalculate_all_scores(db, config)
 
-    # Vector store backfill
     if config.vector_search.enabled and config.vector_search.backfill_on_startup:
         try:
             from vector_store import get_vector_store
@@ -375,18 +368,17 @@ def main() -> int:
         except Exception as e:
             logger.warning(f"Vector store backfill failed: {e}")
 
-    # Create scheduler
+    return config, db
+
+
+def _cmd_scheduler() -> int:
+    """Run the continuous APScheduler loop."""
+    logger = get_logger("main")
+    config, _db = _prepare_runtime(scheduled=True)
     scheduler = create_scheduler(config, run_job_search)
 
     try:
-        if scheduled_mode:
-            # Scheduled mode - runs continuously
-            scheduler.start()
-        else:
-            # Single-shot mode - run once and exit
-            success = scheduler.run_once()
-            return 0 if success else 1
-
+        scheduler.start()
     except KeyboardInterrupt:
         logger.info("Interrupted by user")
         return 0
@@ -395,6 +387,73 @@ def main() -> int:
         return 1
 
     return 0
+
+
+def _cmd_once() -> int:
+    """Run a single search iteration and exit."""
+    logger = get_logger("main")
+    config, _db = _prepare_runtime(scheduled=False)
+    scheduler = create_scheduler(config, run_job_search)
+
+    try:
+        success = scheduler.run_once()
+        return 0 if success else 1
+    except KeyboardInterrupt:
+        logger.info("Interrupted by user")
+        return 0
+    except Exception as e:
+        logger.error(f"Fatal error: {e}")
+        return 1
+
+
+def _cmd_dashboard() -> int:
+    """Replace the current process with Streamlit serving the dashboard."""
+    dashboard_py = Path(__file__).parent / "dashboard.py"
+    args = [
+        "streamlit",
+        "run",
+        str(dashboard_py),
+        "--server.address=0.0.0.0",
+        "--server.port=8501",
+    ]
+    # execvp replaces the Python process; signals and exit status flow naturally.
+    os.execvp("streamlit", args)
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="job-search",
+        description="Job Search Tool — scheduled scraping, scoring and notifications.",
+    )
+    sub = parser.add_subparsers(dest="command")
+    sub.add_parser(
+        "scheduler",
+        help="Run the continuous scheduled search loop (default).",
+    )
+    sub.add_parser(
+        "once",
+        help="Run a single search iteration and exit.",
+    )
+    sub.add_parser(
+        "dashboard",
+        help="Launch the Streamlit dashboard on port 8501.",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Dispatch to the requested subcommand (``scheduler`` is the default)."""
+    args = _build_parser().parse_args(argv)
+    command = args.command or "scheduler"
+
+    if command == "scheduler":
+        return _cmd_scheduler()
+    if command == "once":
+        return _cmd_once()
+    if command == "dashboard":
+        return _cmd_dashboard()
+
+    raise SystemExit(f"Unknown command: {command}")
 
 
 if __name__ == "__main__":

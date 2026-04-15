@@ -1,18 +1,19 @@
 name: job-search-tool
 
-# Two long-running services sharing a single /data volume.
+# Two long-running services sharing a single /data volume, built from the
+# same Docker image. They differ only by the subcommand they run:
 #
-#   scheduler  → slim core image, runs the continuous scheduled search loop
-#                (Telegram notifications included)
-#   dashboard  → dashboard image, serves the Streamlit UI on :8501
+#   scheduler  → `python main.py scheduler`  (default; continuous search loop)
+#   dashboard  → `python main.py dashboard`  (Streamlit UI on :8501)
 #
 # First run auto-scaffolds ./data/config/settings.yaml from the bundled
-# template — edit it and restart to apply.
+# template — edit it and restart the scheduler to apply.
 
 services:
   scheduler:
-    image: vincenzoimp/job-search-tool:latest-core
+    image: vincenzoimp/job-search-tool:latest
     restart: unless-stopped
+    command: ["python", "main.py", "scheduler"]
     env_file:
       - path: .env
         required: false
@@ -22,7 +23,7 @@ services:
   dashboard:
     image: vincenzoimp/job-search-tool:latest
     restart: unless-stopped
-    command: streamlit run dashboard.py --server.address=0.0.0.0 --server.port=8501
+    command: ["python", "main.py", "dashboard"]
     ports:
       - "${JOB_SEARCH_DASHBOARD_PORT:-8501}:8501"
     env_file:

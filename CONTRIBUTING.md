@@ -74,17 +74,19 @@ job-search-tool/
 
 ```bash
 # Continuous scheduler (default)
-cd scripts && uv run python main.py
+uv run python scripts/main.py
+# Same, explicit subcommand
+uv run python scripts/main.py scheduler
 # Single-shot run (cron / CI)
-cd scripts && uv run python main.py --once
-# Dashboard (separate process)
-uv run streamlit run scripts/dashboard.py
+uv run python scripts/main.py once
+# Streamlit dashboard on http://localhost:8501
+uv run python scripts/main.py dashboard
 
-# Published Docker Hub images
+# Published Docker Hub image
 docker compose pull
 docker compose up -d                              # starts scheduler + dashboard
 
-# Local build of the current checkout (rebuilds both variants)
+# Local build of the current checkout
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
 ```
 
