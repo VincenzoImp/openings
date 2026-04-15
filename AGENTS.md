@@ -119,7 +119,7 @@ job-search-tool/
 │   └── logs/search.log             # Rotating log
 │
 ├── Dockerfile                      # Multi-stage, single-target build, tini-init
-├── docker-compose.yml              # Two-service stack sharing ./data:/data
+├── docker-compose.yml              # Two-service stack sharing the `jobsearch-data` named volume
 ├── docker-compose.dev.yml          # Local-build override
 ├── .pre-commit-config.yaml         # Pre-commit hooks (ruff, etc.)
 ├── requirements.txt                # Production dependencies (compat mirror)
@@ -939,6 +939,13 @@ columns = [
 ---
 
 ## Changelog
+
+### v6.0.2 (2026-04-15)
+
+**Fix:**
+- **Docker-managed named volume** (`jobsearch-data`) replaces the host bind mount. Fixes a first-run permission error on hosts where `./data` was created as root while the container runs as `appuser` (UID 1000). The named volume inherits ownership from `/data` in the image, so the non-root container can write without any host-side `chown`.
+- Containers still run as `appuser` — no `gosu`, no root escalation, no init container.
+- Operational workflow documented in the README: edit `settings.yaml` via `docker compose cp`, back up with `docker run --rm -v jobsearch-data:/data ... tar czf …`.
 
 ### v6.0.1 (2026-04-15)
 

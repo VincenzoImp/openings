@@ -292,19 +292,24 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 You only need Docker. In an empty folder, drop this `docker-compose.yml`:
 
 ```yaml
+volumes:
+  jobsearch-data:
+
 services:
   scheduler:
     image: vincenzoimp/job-search-tool:latest
     restart: unless-stopped
     command: ["python", "main.py", "scheduler"]
-    volumes: ["./data:/data"]
+    volumes:
+      - jobsearch-data:/data
 
   dashboard:
     image: vincenzoimp/job-search-tool:latest
     restart: unless-stopped
     command: ["python", "main.py", "dashboard"]
     ports: ["8501:8501"]
-    volumes: ["./data:/data"]
+    volumes:
+      - jobsearch-data:/data
 ```
 
 Then:
@@ -313,7 +318,7 @@ Then:
 docker compose up -d
 ```
 
-That's it. On first run the container scaffolds `./data/config/settings.yaml` from the bundled template, creates the `./data/{db,chroma,results,logs}` tree, and starts the continuous scheduler alongside the dashboard. Edit `./data/config/settings.yaml` to configure your queries, scoring keywords, and (optionally) Telegram notifications, then `docker compose restart scheduler` to apply.
+That's it. On first run the container scaffolds `settings.yaml` from the bundled template inside the managed `jobsearch-data` volume, creates the `config/`, `db/`, `chroma/`, `results/`, `logs/` subtree, and starts the continuous scheduler alongside the dashboard.
 
 Open **http://localhost:8501** for the dashboard.
 
@@ -321,7 +326,40 @@ Open **http://localhost:8501** for the dashboard.
 
 - **scheduler** — runs the continuous search loop (`main.py scheduler`). `restart: unless-stopped` means it survives crashes, reboots, and rate-limit retries automatically.
 - **dashboard** — Streamlit UI on port `8501` (`main.py dashboard`). Reads the same SQLite database and vector store the scheduler writes to.
-- **One image, one volume, one tree** — both services pull `vincenzoimp/job-search-tool:latest` (so Docker downloads it once and shares layers). Everything persistent (`settings.yaml`, SQLite, ChromaDB vectors, CSV/Excel exports, logs) lives under `./data/`, so backup is `tar czf backup.tgz data/`.
+- **One image, one volume** — both services pull `vincenzoimp/job-search-tool:latest` (Docker downloads it once and shares layers). All persistent state (`settings.yaml`, SQLite, ChromaDB vectors, CSV/Excel exports, logs) lives inside the Docker-managed `jobsearch-data` volume.
+- **Non-root by default** — both containers run as UID 1000 (`appuser`). The named volume inherits ownership from the image at first mount, so you never need host-side `chown` or privileged init steps.
+
+### Configure the tool
+
+After the first `up`, open a shell against the running scheduler to inspect the scaffolded config, or pull it out with `docker compose cp`, edit locally, and copy it back:
+
+```bash
+# Copy the generated settings.yaml to your host for editing
+docker compose cp scheduler:/data/config/settings.yaml ./settings.yaml
+
+# Edit ./settings.yaml with your favourite editor
+# (set locations, queries, scoring, optional Telegram…)
+
+# Push it back into the volume and apply
+docker compose cp ./settings.yaml scheduler:/data/config/settings.yaml
+docker compose restart scheduler
+```
+
+You can also edit in place inside the container (`docker compose exec scheduler vi /data/config/settings.yaml`), or use the dashboard's own semantic search tab to explore results as the scheduler runs in the background.
+
+### Back up and restore
+
+The volume holds your entire job database and semantic index. Standard Docker volume backup pattern:
+
+```bash
+# Snapshot
+docker run --rm -v jobsearch-data:/data -v "$PWD:/backup" \
+  alpine tar czf /backup/jobsearch-data.tgz -C /data .
+
+# Restore
+docker run --rm -v jobsearch-data:/data -v "$PWD:/backup" \
+  alpine tar xzf /backup/jobsearch-data.tgz -C /data
+```
 
 ### The `main.py` CLI
 
@@ -496,13 +534,13 @@ notifications:
 ```yaml
 vector_search:
   enabled: true                 # Enable semantic search (default: true)
-  model_name: "all-MiniLM-L6-v2"  # Ignored: always uses ChromaDB's default ONNX embedder (~80 MB)
-  persist_dir: "data/chroma"   # ChromaDB storage
-  embed_on_save: true          # Auto-embed new jobs
-  default_results: 20          # Max semantic search results
-  backfill_on_startup: true    # Embed existing jobs at startup
-  batch_size: 100              # Embedding batch size
+  embed_on_save: true           # Auto-embed new jobs
+  default_results: 20           # Max semantic search results
+  backfill_on_startup: true     # Embed existing jobs at startup
+  batch_size: 100               # Embedding batch size
 ```
+
+The ONNX embedder (bundled `all-MiniLM-L6-v2`) and the persistence path (`{JOB_SEARCH_DATA_DIR}/chroma`) are fixed — use `JOB_SEARCH_DATA_DIR` to relocate the tree.
 
 ### Rate Limiting Prevention
 
@@ -639,31 +677,34 @@ uv run python scripts/main.py dashboard
 ### Bare `docker run` (no Compose)
 
 ```bash
+# Create the Docker-managed volume once
+docker volume create jobsearch-data
+
 # Scheduler (continuous)
 docker run -d --name job-search \
-  -v "$PWD/data:/data" \
+  -v jobsearch-data:/data \
   --restart unless-stopped \
   vincenzoimp/job-search-tool:latest
 
 # Dashboard (Streamlit UI on :8501)
 docker run -d --name job-search-dashboard \
-  -v "$PWD/data:/data" \
+  -v jobsearch-data:/data \
   -p 8501:8501 \
   --restart unless-stopped \
   vincenzoimp/job-search-tool:latest \
   python main.py dashboard
 ```
 
-Both containers share the same `./data` volume so the dashboard reads what the scheduler writes. On first run the container scaffolds `./data/config/settings.yaml` automatically.
+Both containers share the same `jobsearch-data` volume so the dashboard reads what the scheduler writes. On first run the container scaffolds `settings.yaml` automatically.
 
 ---
 
 ## Data Storage
 
-Everything persistent lives under a single root directory — `./data` when running from Compose, or `$JOB_SEARCH_DATA_DIR` (default `/data` inside Docker) otherwise:
+Everything persistent lives inside the Docker-managed `jobsearch-data` volume (or whatever bind mount / named volume you attach at `/data`):
 
 ```
-data/
+/data/
 ├── config/settings.yaml   # your configuration (auto-scaffolded on first run)
 ├── db/jobs.db             # primary SQLite store
 ├── chroma/                # ChromaDB vector store (semantic search)
@@ -671,11 +712,23 @@ data/
 └── logs/search.log        # rotating application log
 ```
 
-Back up with `tar czf backup.tgz data/`. Restore by extracting into the same folder.
+For local Python development `JOB_SEARCH_DATA_DIR` is unset so the repo root stands in for `/data` — all the subdirectories above materialise at the root of your checkout.
+
+### Back up and restore
+
+```bash
+# Snapshot the whole volume
+docker run --rm -v jobsearch-data:/data -v "$PWD:/backup" \
+  alpine tar czf /backup/jobsearch-data.tgz -C /data .
+
+# Restore from a snapshot
+docker run --rm -v jobsearch-data:/data -v "$PWD:/backup" \
+  alpine tar xzf /backup/jobsearch-data.tgz -C /data
+```
 
 ### Primary Storage: SQLite Database
 
-The SQLite database at `data/db/jobs.db` is the primary storage mechanism:
+The SQLite database (at `db/jobs.db` inside the volume) is the primary storage mechanism:
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -705,22 +758,22 @@ The blacklist uses the same internal identifier used for deduplication: `SHA256(
 
 ```bash
 # View statistics
-sqlite3 data/db/jobs.db "SELECT COUNT(*), AVG(relevance_score) FROM jobs"
+docker compose exec scheduler sqlite3 /data/db/jobs.db "SELECT COUNT(*), AVG(relevance_score) FROM jobs"
 
 # Today's new jobs
-sqlite3 data/db/jobs.db "SELECT title, company, relevance_score FROM jobs WHERE first_seen = date('now') ORDER BY relevance_score DESC"
+docker compose exec scheduler sqlite3 /data/db/jobs.db "SELECT title, company, relevance_score FROM jobs WHERE first_seen = date('now') ORDER BY relevance_score DESC"
 
 # Top unapplied jobs
-sqlite3 data/db/jobs.db "SELECT title, company, relevance_score FROM jobs WHERE applied = 0 ORDER BY relevance_score DESC LIMIT 10"
+docker compose exec scheduler sqlite3 /data/db/jobs.db "SELECT title, company, relevance_score FROM jobs WHERE applied = 0 ORDER BY relevance_score DESC LIMIT 10"
 
 # Mark job as applied
-sqlite3 data/db/jobs.db "UPDATE jobs SET applied = 1 WHERE job_id = 'your_job_id'"
+docker compose exec scheduler sqlite3 /data/db/jobs.db "UPDATE jobs SET applied = 1 WHERE job_id = 'your_job_id'"
 
 # Distribution by source
-sqlite3 data/db/jobs.db "SELECT site, COUNT(*) as count FROM jobs GROUP BY site ORDER BY count DESC"
+docker compose exec scheduler sqlite3 /data/db/jobs.db "SELECT site, COUNT(*) as count FROM jobs GROUP BY site ORDER BY count DESC"
 
 # Remote opportunities
-sqlite3 data/db/jobs.db "SELECT title, company FROM jobs WHERE is_remote = 1 ORDER BY relevance_score DESC LIMIT 20"
+docker compose exec scheduler sqlite3 /data/db/jobs.db "SELECT title, company FROM jobs WHERE is_remote = 1 ORDER BY relevance_score DESC LIMIT 20"
 ```
 
 ### Optional Exports
@@ -806,7 +859,7 @@ job-search-tool/
 ├── docker/
 │   └── entrypoint.sh              # First-run bootstrap + /data scaffolding
 ├── scripts/
-│   ├── main.py                    # Scheduler loop (default) / --once single-shot mode
+│   ├── main.py                    # CLI entry point with `scheduler` / `once` / `dashboard` subcommands
 │   ├── search_jobs.py             # Core search with parallel execution
 │   ├── scheduler.py               # APScheduler integration
 │   ├── notifier.py                # Telegram notifications
@@ -824,7 +877,7 @@ job-search-tool/
 ├── data/                           # Local dev state (gitignored): db/, chroma/, results/, logs/
 ├── .github/workflows/              # CI + publish-release + publish-main
 ├── Dockerfile                      # Multi-stage build, single image, non-root, tini-init
-├── docker-compose.yml              # 2 services, 1 image, 1 volume (./data:/data)
+├── docker-compose.yml              # 2 services, 1 image, 1 Docker-managed named volume
 ├── docker-compose.dev.yml          # Local-build override for developers
 ├── .pre-commit-config.yaml         # Ruff, trailing whitespace, etc.
 ├── pyproject.toml                  # Dependency metadata for uv

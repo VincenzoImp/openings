@@ -13,20 +13,16 @@ ENV/
 dist/
 build/
 
-# Results (keep directory structure, ignore contents)
+# v6 unified data tree (local runtime state)
+# Every persistent file lives under ./data/ when JOB_SEARCH_DATA_DIR is unset
+# (local dev) or when running the Compose stack with `./data:/data`.
+data/
+
+# Legacy dev-mode output dirs (kept for developers running from repo root)
 results/*.csv
 results/*.xlsx
 results/*.json
 !results/.gitkeep
-
-# Database (keep directory structure, ignore contents)
-data/*.db
-data/*.sqlite
-data/*.sqlite3
-data/chroma/
-!data/.gitkeep
-
-# Logs
 logs/
 *.log
 

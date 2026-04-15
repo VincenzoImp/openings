@@ -76,6 +76,9 @@ COPY --from=builder /usr/local/bin/job-search-entrypoint /usr/local/bin/job-sear
 
 RUN chmod +x /usr/local/bin/job-search-entrypoint
 
+# Run as a non-root user for defence-in-depth. /data is pre-created in the
+# layer above with appuser ownership so the matching named volume inherits
+# the same permissions on first mount.
 USER appuser
 WORKDIR /app/scripts
 

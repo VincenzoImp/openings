@@ -1,13 +1,24 @@
 name: job-search-tool
 
-# Two long-running services sharing a single /data volume, built from the
-# same Docker image. They differ only by the subcommand they run:
+# Two long-running services sharing a single Docker-managed named volume
+# backed by the /data subtree inside the image. Both services pull the same
+# image (Docker deduplicates the download) and differ only by the subcommand
+# they run:
 #
 #   scheduler  → `python main.py scheduler`  (default; continuous search loop)
 #   dashboard  → `python main.py dashboard`  (Streamlit UI on :8501)
 #
-# First run auto-scaffolds ./data/config/settings.yaml from the bundled
-# template — edit it and restart the scheduler to apply.
+# Both containers run as non-root (`appuser`, UID 1000). Using a named volume
+# instead of a bind mount means Docker inherits ownership from the image, so
+# the container can write to the volume without any host-side permission
+# tweaking.
+#
+# First run auto-scaffolds settings.yaml from the bundled template inside
+# the volume. To edit it afterwards, `docker compose cp` it out, edit
+# locally, copy it back, and restart the scheduler (see the README).
+
+volumes:
+  jobsearch-data:
 
 services:
   scheduler:
@@ -18,7 +29,7 @@ services:
       - path: .env
         required: false
     volumes:
-      - ./data:/data
+      - jobsearch-data:/data
 
   dashboard:
     image: vincenzoimp/job-search-tool:latest
@@ -30,4 +41,4 @@ services:
       - path: .env
         required: false
     volumes:
-      - ./data:/data
+      - jobsearch-data:/data

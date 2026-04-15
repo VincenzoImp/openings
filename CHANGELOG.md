@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.2] - 2026-04-15
+
+### Fixed
+
+- **First-run permission error on non-root containers**: the default `docker-compose.yml` now uses a Docker-managed named volume (`jobsearch-data`) instead of a `./data` host bind mount. On hosts where Docker creates `./data` as `root:root` (the common case when the Docker daemon itself runs as root — e.g. alpine-docker without userns-remap), the non-root container (`appuser`, UID 1000) would fail to write with `mkdir: cannot create directory '/data/config': Permission denied`. Named volumes inherit their ownership from the image, so the container writes to them without any host-side preparation.
+
+### Changed
+
+- **`docker-compose.yml`** switches from `./data:/data` bind mount to `jobsearch-data:/data` named volume. Both services still share the same volume, still run as `appuser`, still auto-scaffold `settings.yaml` on first boot.
+- **`docker-compose.dev.yml`** follows the same pattern for the local-build override.
+- **README Quick Start** updated: new compose snippet, `docker compose cp` workflow for editing `settings.yaml`, documented `docker run --rm -v jobsearch-data:/data alpine tar …` backup/restore recipe (the canonical Docker named-volume backup pattern).
+- Standalone `docker run` examples in the README now create and reuse a named volume (`docker volume create jobsearch-data`) instead of mounting host paths.
+- `.gitignore` excludes the whole `data/` directory tree so local dev state under the repo root never accidentally ends up in a commit.
+
+### Migration
+
+No user-facing migration: v6.0.1 never successfully ran on a host with a root-owned bind mount, so there is no persisted state to preserve. If you already have a `./data/config/settings.yaml` from local experimentation, copy its contents into the new volume after the first `docker compose up -d`:
+
+```bash
+docker compose up -d
+docker compose cp ./data/config/settings.yaml scheduler:/data/config/settings.yaml
+docker compose restart scheduler
+```
+
 ## [6.0.1] - 2026-04-15
 
 ### Changed
@@ -502,7 +526,8 @@ No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-
 - **Structured Logging**: File and console logs with rotation
 - **Docker Support**: Containerized environment for cross-platform compatibility
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.1...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.2...HEAD
+[6.0.2]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.1...v6.0.2
 [6.0.1]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.0...v6.0.1
 [6.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v5.0.1...v6.0.0
 [5.0.1]: https://github.com/VincenzoImp/job-search-tool/compare/v5.0.0...v5.0.1
