@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-04-15
+
+### Changed (BREAKING)
+
+- **Minimal two-service Compose stack**: `docker-compose.yml` collapses to two flat services — `scheduler` on `:latest-core` and `dashboard` on `:latest` — sharing a single `./data:/data` volume. YAML anchors, profiles, `init-config`, `jobsearch`, and `analyze` services are gone. `docker compose up -d` now starts the continuous scheduler and the dashboard together out of the box.
+- **Single `/data` volume**: every persistent file now lives under one mount point with a fixed layout — `/data/config/settings.yaml`, `/data/db/jobs.db`, `/data/chroma/`, `/data/results/`, `/data/logs/search.log`. Users go from four bind mounts (`config/`, `data/`, `results/`, `logs/`) to **one**. Override the root with `JOB_SEARCH_DATA_DIR`.
+- **First-run auto-bootstrap**: on startup, the container creates `/data/config/settings.yaml` from the bundled template if it is missing, scaffolds the `/data/{config,db,chroma,results,logs}` subtree, and logs a clear "edit me and restart" hint. The `init-config` service and `scripts/bootstrap_config.py` helper are removed — both obsolete.
+- **Scheduler is the default mode**: `python main.py` now starts the continuous APScheduler loop by default. Use `python main.py --once` for a one-off single-shot run (cron, CI). The `JOB_SEARCH_MODE=single|scheduled` env variable is gone.
+- **Fixed persistent paths**: `output.results_dir`, `output.data_dir`, `output.database_file`, `logging.file`, `vector_search.model_name`, and `vector_search.persist_dir` are removed from `settings.yaml`. They are silently accepted with a one-line warning to ease the transition. Use `JOB_SEARCH_DATA_DIR` to relocate the whole tree.
+- **Dockerfile runs under `tini`** for clean SIGTERM propagation, declares `VOLUME /data`, and exports `JOB_SEARCH_DATA_DIR=/data` as a default env.
+- **`.env.example` slimmed down**: dropped `JOB_SEARCH_IMAGE` / `JOB_SEARCH_CORE_IMAGE` / `JOB_SEARCH_DASHBOARD_IMAGE`, kept only the Telegram token, UID/GID, and dashboard port.
+- **`docker-compose.dev.yml` rewritten**: rebuilds both variants (`core` and `dashboard`) from the local checkout via `--build-arg VARIANT=...`.
+
+### Removed
+
+- `scripts/bootstrap_config.py` and its tests — the entrypoint does the bootstrap inline.
+- Compose services: `init-config`, `jobsearch`, `analyze`, all profile-gated services. Use `docker compose exec scheduler python analyze_jobs.py` for ad-hoc analysis.
+- `scripts/main.py::_resolve_scheduled_mode` and the `JOB_SEARCH_MODE` env switch.
+- `OutputConfig.results_dir` / `.data_dir` / `.database_file`, `LoggingConfig.file`, `VectorSearchConfig.model_name` / `.persist_dir`.
+- `get_vector_store(persist_dir, model_name=...)` signature — the `model_name` parameter is gone (it was already a no-op since v4.4.0).
+
+### Quick Start
+
+```yaml
+services:
+  scheduler:
+    image: vincenzoimp/job-search-tool:latest-core
+    restart: unless-stopped
+    volumes: ["./data:/data"]
+
+  dashboard:
+    image: vincenzoimp/job-search-tool:latest
+    restart: unless-stopped
+    ports: ["8501:8501"]
+    volumes: ["./data:/data"]
+```
+
+```bash
+docker compose up -d
+# edit ./data/config/settings.yaml, then:
+docker compose restart scheduler
+```
+
+Six lines of YAML, one volume, one command. Dashboard at http://localhost:8501.
+
 ## [5.0.1] - 2026-04-15
 
 ### Documentation
@@ -434,7 +479,8 @@ No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-
 - **Structured Logging**: File and console logs with rotation
 - **Docker Support**: Containerized environment for cross-platform compatibility
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v5.0.1...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.0...HEAD
+[6.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v5.0.1...v6.0.0
 [5.0.1]: https://github.com/VincenzoImp/job-search-tool/compare/v5.0.0...v5.0.1
 [5.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v4.4.0...v5.0.0
 [4.4.0]: https://github.com/VincenzoImp/job-search-tool/compare/v4.3.2...v4.4.0

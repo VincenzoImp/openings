@@ -133,12 +133,12 @@ def _fetch_statistics(db_path: str) -> dict[str, Any]:
 
 
 @st.cache_resource
-def _get_vector_store_cached(persist_dir: str, model_name: str) -> Any:
+def _get_vector_store_cached(persist_dir: str) -> Any:
     """Return a persistent JobVectorStore instance."""
     if not VECTOR_AVAILABLE:
         return None
     try:
-        return get_vector_store(Path(persist_dir), model_name=model_name)
+        return get_vector_store(Path(persist_dir))
     except Exception:
         return None
 
@@ -257,10 +257,7 @@ def _sync_vector_store_deletions(config: Config, db: JobDatabase) -> None:
     try:
         from vector_commands import sync_deletions
 
-        vs = _get_vector_store_cached(
-            str(config.chroma_path),
-            config.vector_search.model_name,
-        )
+        vs = _get_vector_store_cached(str(config.chroma_path))
         if vs is not None:
             sync_deletions(db, vs)
     except Exception:
@@ -487,9 +484,7 @@ def _apply_semantic_search(
     Jobs not in the vector search results are excluded so semantic search
     acts as a filter.
     """
-    vs = _get_vector_store_cached(
-        str(config.chroma_path), config.vector_search.model_name
-    )
+    vs = _get_vector_store_cached(str(config.chroma_path))
     if vs is None:
         return jobs
 
@@ -964,11 +959,7 @@ def main() -> None:
     vs_available: bool = (
         VECTOR_AVAILABLE
         and config.vector_search.enabled
-        and _get_vector_store_cached(
-            str(config.chroma_path),
-            config.vector_search.model_name,
-        )
-        is not None
+        and _get_vector_store_cached(str(config.chroma_path)) is not None
     )
 
     query: str = st.text_input(

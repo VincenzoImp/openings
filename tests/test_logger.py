@@ -357,7 +357,6 @@ class TestSetupLogging:
         config = Config(
             logging=LoggingConfig(
                 level="INFO",
-                file=str(temp_log_dir / "test.log"),
                 max_size_mb=1,
                 backup_count=3,
             )
@@ -375,7 +374,6 @@ class TestSetupLogging:
         config = Config(
             logging=LoggingConfig(
                 level="DEBUG",
-                file=str(temp_log_dir / "test.log"),
             )
         )
 
@@ -390,7 +388,6 @@ class TestSetupLogging:
         config = Config(
             logging=LoggingConfig(
                 level="WARNING",
-                file=str(temp_log_dir / "test.log"),
             )
         )
 
@@ -405,7 +402,6 @@ class TestSetupLogging:
         config = Config(
             logging=LoggingConfig(
                 level="INFO",
-                file=str(log_path),
             )
         )
 
@@ -419,7 +415,6 @@ class TestSetupLogging:
         config = Config(
             logging=LoggingConfig(
                 level="INFO",
-                file=str(temp_log_dir / "test.log"),
             )
         )
 
@@ -440,7 +435,6 @@ class TestSetupLogging:
         config = Config(
             logging=LoggingConfig(
                 level="INFO",
-                file=str(log_path),
             )
         )
 

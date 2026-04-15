@@ -67,8 +67,9 @@ def check_directories() -> bool:
 
         dirs_to_check = [
             config.results_path,
-            config.data_path,
-            config.log_path.parent,
+            config.database_path.parent,
+            config.chroma_path,
+            config.logs_dir,
         ]
 
         for dir_path in dirs_to_check:

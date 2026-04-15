@@ -289,169 +289,77 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 
 ## Quick Start
 
-### Prerequisites
+You only need Docker. In an empty folder, drop the following six-line `docker-compose.yml`:
 
-- Docker and Docker Compose (recommended), OR
-- Python 3.11 or higher
+```yaml
+services:
+  scheduler:
+    image: vincenzoimp/job-search-tool:latest-core
+    restart: unless-stopped
+    volumes: ["./data:/data"]
 
-### Option 1: Docker Hub Image (Recommended)
-
-```bash
-# Clone the repository
-git clone https://github.com/VincenzoImp/job-search-tool.git
-cd job-search-tool
-
-# Optional on Linux: align container writes with your host user
-export JOB_SEARCH_UID=$(id -u)
-export JOB_SEARCH_GID=$(id -g)
-
-# Start from the published Docker Hub image
-cp .env.example .env
-docker compose pull
-
-# Scaffold editable config/settings.yaml from the bundled template
-docker compose run --rm init-config
-
-# Edit configuration with your preferences
-# nano config/settings.yaml
-
-# Run the default stack: single-shot search + dashboard
-docker compose up
-
-# Or run continuously with scheduler instead of single-shot
-docker compose --profile scheduler up scheduler dashboard -d
-
-# Dashboard is available at http://localhost:8501
+  dashboard:
+    image: vincenzoimp/job-search-tool:latest
+    restart: unless-stopped
+    ports: ["8501:8501"]
+    volumes: ["./data:/data"]
 ```
 
-`docker compose up` starts both `jobsearch` (single-shot) and `dashboard` by default — no profile flags needed. The `jobsearch` and `scheduler` services force the expected runtime mode via `JOB_SEARCH_MODE`, so Compose behaves consistently even if `scheduler.enabled` differs inside `config/settings.yaml`.
+Then:
+
+```bash
+docker compose up -d
+```
+
+That's it. On first run the container scaffolds `./data/config/settings.yaml` from the bundled template, creates the `./data/{db,chroma,results,logs}` tree, and starts the scheduler continuously alongside the dashboard. Edit `./data/config/settings.yaml` to configure your queries, scoring keywords, and (optionally) Telegram notifications, then `docker compose restart scheduler` to apply.
+
+Open **http://localhost:8501** for the dashboard.
+
+### What you get
+
+- **scheduler** — runs the continuous search loop on the slim core image (no Streamlit bundled). `restart: unless-stopped` means it survives crashes, reboots, and rate-limit retries automatically.
+- **dashboard** — Streamlit UI on port `8501`, reads the same SQLite database and vector store the scheduler writes to.
+- **One volume, one tree** — everything persistent (`settings.yaml`, SQLite, ChromaDB vectors, CSV/Excel exports, logs) lives under `./data/` so backup is `tar czf backup.tgz data/`.
 
 ### Two Docker image variants
 
-The project publishes **two variants** of the Docker image from the same tag family:
+The project publishes two variants of the same build:
 
-| Variant | Tag example | Contents | Size |
-|---|---|---|---|
-| **Dashboard** (default) | `vincenzoimp/job-search-tool:latest` | Full stack, includes Streamlit UI | larger |
-| **Core** (slim) | `vincenzoimp/job-search-tool:latest-core` | No Streamlit (~200 MB smaller) | smaller |
+| Variant | Tag family | Contents |
+|---|---|---|
+| **Dashboard** (default) | `vincenzoimp/job-search-tool:latest` / `:vX.Y.Z` | Full stack, Streamlit UI bundled |
+| **Core** (slim) | `vincenzoimp/job-search-tool:latest-core` / `:vX.Y.Z-core` | No Streamlit (~200 MB smaller) |
 
-`docker-compose.yml` automatically wires headless services (`jobsearch`, `scheduler`, `analyze`, `init-config`) to the **core** image, and the `dashboard` service to the **dashboard** image. You get the weight savings for free without needing to think about it. Override either via `JOB_SEARCH_CORE_IMAGE` / `JOB_SEARCH_DASHBOARD_IMAGE` env vars.
+The compose file above wires the scheduler to `:latest-core` and the dashboard to `:latest`, so you get the weight savings automatically.
 
-To build locally, pick the variant via `--build-arg VARIANT=core|dashboard`:
+To build locally from source, pick the variant via `--build-arg VARIANT=core|dashboard`:
 
 ```bash
 docker build -t job-search-tool .                               # dashboard (default)
 docker build --build-arg VARIANT=core -t job-search-tool:core . # core (slim)
 ```
 
-### Compose Services
-
-- `init-config`: Creates `config/settings.yaml` and `config/settings.example.yaml` from the bundled image template (core image)
-- `jobsearch`: Runs a single search cycle and exits — **starts by default** (core image)
-- `dashboard`: Starts the Streamlit UI on port `8501` — **starts by default** (dashboard image)
-- `scheduler`: Keeps the application running with APScheduler (opt-in via `--profile scheduler`, core image)
-- `analyze`: Runs the analysis utilities against the existing database (opt-in via `--profile analyze`, core image)
-
-### Option 2: Standalone Docker Compose (No Clone)
-
-If you want the clean Compose workflow without cloning this repository, create an empty folder and add this minimal `docker-compose.yml`:
-
-```yaml
-name: job-search-tool
-
-x-job-search-base: &job-search-base
-  user: "${JOB_SEARCH_UID:-1000}:${JOB_SEARCH_GID:-1000}"
-  volumes:
-    - ./config:/app/config
-    - ./data:/app/data
-    - ./results:/app/results
-    - ./logs:/app/logs
-
-x-job-search-core: &job-search-core
-  <<: *job-search-base
-  image: vincenzoimp/job-search-tool:latest-core
-
-x-job-search-dashboard: &job-search-dashboard
-  <<: *job-search-base
-  image: vincenzoimp/job-search-tool:latest
-
-services:
-  init-config:
-    <<: *job-search-core
-    command: python bootstrap_config.py --write-settings
-    restart: "no"
-
-  jobsearch:
-    <<: *job-search-core
-    command: python main.py
-    environment:
-      JOB_SEARCH_MODE: single
-
-  scheduler:
-    <<: *job-search-core
-    command: python main.py
-    environment:
-      JOB_SEARCH_MODE: scheduled
-    profiles:
-      - scheduler
-
-  dashboard:
-    <<: *job-search-dashboard
-    command: streamlit run dashboard.py --server.address=0.0.0.0 --server.port=8501
-    ports:
-      - "8501:8501"
-```
-
-Then run:
+### Local Python (for development)
 
 ```bash
-mkdir -p config data results logs
-
-# Optional on Linux: align container writes with your host user
-export JOB_SEARCH_UID=$(id -u)
-export JOB_SEARCH_GID=$(id -g)
-
-docker compose pull
-docker compose run --rm init-config
-
-# Edit config/settings.yaml, then start the default stack (jobsearch + dashboard):
-docker compose up
-```
-
-Headless services run on the slim `:latest-core` image; the dashboard runs on the full `:latest` image with Streamlit bundled. This is the cleanest no-clone setup because you still get `init-config`, `jobsearch`, `scheduler`, and `dashboard` as named services instead of remembering long `docker run` commands.
-
-### Option 3: Local Python
-
-```bash
-# Clone and navigate
 git clone https://github.com/VincenzoImp/job-search-tool.git
 cd job-search-tool
-
-# Install uv if needed: https://docs.astral.sh/uv/getting-started/installation/
-
-# Create/sync the project environment from the lockfile
-uv sync --locked --no-install-project
-
-# Create configuration
+uv sync --locked                       # install all deps (including streamlit + dev tools)
 cp config/settings.example.yaml config/settings.yaml
-
-# Run the search
-cd scripts && uv run python main.py
-
-# Launch dashboard
+cd scripts && uv run python main.py    # runs continuously; add --once for a single iteration
+# Optional dashboard:
 uv run streamlit run dashboard.py
 ```
 
-### Option 4: Local Docker Build (Developer Workflow)
+In local development, `JOB_SEARCH_DATA_DIR` is unset and the project root is used as the root — `db/jobs.db`, `chroma/`, `results/`, `logs/search.log`, `config/settings.yaml` all live at the repo root.
+
+### Local Docker build (developer workflow)
 
 ```bash
-# Build the image from your local checkout instead of Docker Hub
-docker compose -f docker-compose.yml -f docker-compose.dev.yml build
-
-# Then use the same services as the Docker Hub workflow
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up jobsearch
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up dashboard
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
+
+This rebuilds both variants from the local checkout and runs the same two services.
 
 ---
 
@@ -663,7 +571,8 @@ parallel:
 
 4. **Test the Integration**
    ```bash
-   docker compose --profile scheduler up scheduler
+   docker compose restart scheduler
+   docker compose logs -f scheduler
    ```
 
 ### Notification Format
@@ -717,63 +626,63 @@ Deleting a job from the dashboard is persistent: the job is removed from the act
 
 ### Launch
 
-```bash
-# Docker Hub image
-docker compose up dashboard
-# Access at http://localhost:8501
+The dashboard is part of the default Compose stack — it's already running at **http://localhost:8501** after `docker compose up -d`. To stop or restart it individually:
 
-# Local Python
+```bash
+docker compose restart dashboard
+docker compose logs -f dashboard
+```
+
+For local Python development:
+
+```bash
 cd scripts && uv run streamlit run dashboard.py
 ```
 
-### Standalone Docker Compose Without Cloning
+### Bare `docker run` (no Compose)
 
-If you do not want to clone this repository, the cleanest Docker-only path is still Compose. Use the standalone `docker-compose.yml` example from the Quick Start section above, then run:
-
-```bash
-docker compose pull
-docker compose run --rm init-config
-docker compose up jobsearch
-docker compose up dashboard
-```
-
-### Direct Docker Hub Usage
-
-If you prefer `docker run` instead of Compose. For headless usage (no dashboard UI), prefer the slim `:latest-core` tag to save ~200 MB:
+If you want to run the scheduler without Compose:
 
 ```bash
-docker pull vincenzoimp/job-search-tool:latest-core
-
-mkdir -p config data results logs
-
-docker run --rm \
-  --user "$(id -u):$(id -g)" \
-  -v "$PWD/config:/app/config" \
-  -v "$PWD/data:/app/data" \
-  -v "$PWD/results:/app/results" \
-  -v "$PWD/logs:/app/logs" \
-  vincenzoimp/job-search-tool:latest-core \
-  python bootstrap_config.py --write-settings
-
-# Edit config/settings.yaml, then run the search
-docker run --rm \
-  --user "$(id -u):$(id -g)" \
-  -v "$PWD/config:/app/config" \
-  -v "$PWD/data:/app/data" \
-  -v "$PWD/results:/app/results" \
-  -v "$PWD/logs:/app/logs" \
+docker run -d --name job-search \
+  -v "$PWD/data:/data" \
+  --restart unless-stopped \
   vincenzoimp/job-search-tool:latest-core
 ```
 
-To run the Streamlit dashboard via `docker run`, swap `:latest-core` for `:latest` and add `-p 8501:8501 --entrypoint streamlit vincenzoimp/job-search-tool:latest run dashboard.py --server.address=0.0.0.0 --server.port=8501`.
+For the dashboard:
+
+```bash
+docker run -d --name job-search-dashboard \
+  -v "$PWD/data:/data" \
+  -p 8501:8501 \
+  --restart unless-stopped \
+  vincenzoimp/job-search-tool:latest \
+  streamlit run dashboard.py --server.address=0.0.0.0 --server.port=8501
+```
+
+Both containers share the same `./data` volume so the dashboard reads what the scheduler writes. On first run the container scaffolds `./data/config/settings.yaml` automatically.
 
 ---
 
 ## Data Storage
 
+Everything persistent lives under a single root directory — `./data` when running from Compose, or `$JOB_SEARCH_DATA_DIR` (default `/data` inside Docker) otherwise:
+
+```
+data/
+├── config/settings.yaml   # your configuration (auto-scaffolded on first run)
+├── db/jobs.db             # primary SQLite store
+├── chroma/                # ChromaDB vector store (semantic search)
+├── results/               # CSV/Excel exports
+└── logs/search.log        # rotating application log
+```
+
+Back up with `tar czf backup.tgz data/`. Restore by extracting into the same folder.
+
 ### Primary Storage: SQLite Database
 
-The SQLite database (`data/jobs.db`) is the primary storage mechanism:
+The SQLite database at `data/db/jobs.db` is the primary storage mechanism:
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -803,22 +712,22 @@ The blacklist uses the same internal identifier used for deduplication: `SHA256(
 
 ```bash
 # View statistics
-sqlite3 data/jobs.db "SELECT COUNT(*), AVG(relevance_score) FROM jobs"
+sqlite3 data/db/jobs.db "SELECT COUNT(*), AVG(relevance_score) FROM jobs"
 
 # Today's new jobs
-sqlite3 data/jobs.db "SELECT title, company, relevance_score FROM jobs WHERE first_seen = date('now') ORDER BY relevance_score DESC"
+sqlite3 data/db/jobs.db "SELECT title, company, relevance_score FROM jobs WHERE first_seen = date('now') ORDER BY relevance_score DESC"
 
 # Top unapplied jobs
-sqlite3 data/jobs.db "SELECT title, company, relevance_score FROM jobs WHERE applied = 0 ORDER BY relevance_score DESC LIMIT 10"
+sqlite3 data/db/jobs.db "SELECT title, company, relevance_score FROM jobs WHERE applied = 0 ORDER BY relevance_score DESC LIMIT 10"
 
 # Mark job as applied
-sqlite3 data/jobs.db "UPDATE jobs SET applied = 1 WHERE job_id = 'your_job_id'"
+sqlite3 data/db/jobs.db "UPDATE jobs SET applied = 1 WHERE job_id = 'your_job_id'"
 
 # Distribution by source
-sqlite3 data/jobs.db "SELECT site, COUNT(*) as count FROM jobs GROUP BY site ORDER BY count DESC"
+sqlite3 data/db/jobs.db "SELECT site, COUNT(*) as count FROM jobs GROUP BY site ORDER BY count DESC"
 
 # Remote opportunities
-sqlite3 data/jobs.db "SELECT title, company FROM jobs WHERE is_remote = 1 ORDER BY relevance_score DESC LIMIT 20"
+sqlite3 data/db/jobs.db "SELECT title, company FROM jobs WHERE is_remote = 1 ORDER BY relevance_score DESC LIMIT 20"
 ```
 
 ### Optional Exports
@@ -900,58 +809,33 @@ python3 --version
 ```
 job-search-tool/
 ├── config/
-│   ├── settings.yaml              # User configuration (gitignored)
-│   └── settings.example.yaml      # Documented template
+│   └── settings.example.yaml      # Documented template (copied into data/config/ on first run)
 ├── docker/
-│   └── entrypoint.sh              # Runtime bootstrap + Docker guidance
+│   └── entrypoint.sh              # First-run bootstrap + /data scaffolding
 ├── scripts/
-│   ├── main.py                    # Unified entry point
-│   ├── bootstrap_config.py        # Generate editable config for Docker users
+│   ├── main.py                    # Scheduler loop (default) / --once single-shot mode
 │   ├── search_jobs.py             # Core search with parallel execution
 │   ├── scheduler.py               # APScheduler integration
 │   ├── notifier.py                # Telegram notifications
 │   ├── dashboard.py               # Streamlit UI
 │   ├── database.py                # SQLite persistence (WAL mode)
-│   ├── config.py                  # Configuration loader + validation
+│   ├── config.py                  # Configuration loader + JOB_SEARCH_DATA_DIR resolver
 │   ├── logger.py                  # Structured logging
 │   ├── models.py                  # Type-safe dataclasses
-│   ├── scoring.py                 # Relevance scoring (extracted from search_jobs.py)
-│   ├── exporter.py                # CSV/Excel export
-│   ├── vector_store.py            # ChromaDB vector store
+│   ├── scoring.py                 # Relevance scoring engine
+│   ├── exporter.py                # CSV/Excel export with sanitization
+│   ├── vector_store.py            # ChromaDB vector store (ONNX embedder)
 │   ├── vector_commands.py         # Vector backfill/sync
 │   └── healthcheck.py             # Docker health checks
-├── tests/                          # 355+ pytest tests
-│   ├── conftest.py                # Shared fixtures
-│   ├── test_bootstrap_config.py   # Docker config bootstrap tests
-│   ├── test_main.py               # Entry point tests
-│   ├── test_config.py             # Configuration validation
-│   ├── test_database.py           # Database CRUD
-│   ├── test_notifier.py           # Notification tests
-│   ├── test_scheduler.py          # Scheduler tests
-│   ├── test_models.py             # Model tests
-│   ├── test_scoring.py            # Scoring tests
-│   ├── test_logger.py             # Logger tests
-│   ├── test_exporter.py           # Exporter tests
-│   ├── test_healthcheck.py        # Health check tests
-│   ├── test_report_generator.py   # Report generator tests
-│   ├── test_analyze_jobs.py       # Analysis tests
-│   ├── test_search_jobs.py        # Search engine tests
-│   └── test_vector_store.py       # Vector store tests
-├── .github/workflows/ci.yml       # CI pipeline
-├── .github/workflows/publish-main.yml
-├── .github/workflows/publish-release.yml
-├── results/                        # CSV/Excel output (gitignored)
-├── data/                           # SQLite database (gitignored)
-├── logs/                           # Log files (gitignored)
-├── Dockerfile                      # Multi-stage build with OCI metadata
-├── docker-compose.yml              # Docker Hub-first runtime stack
+├── tests/                          # 350+ pytest tests
+├── data/                           # Local dev state (gitignored): db/, chroma/, results/, logs/
+├── .github/workflows/              # CI + publish-release + publish-main
+├── Dockerfile                      # Multi-stage, variant-aware (core | dashboard)
+├── docker-compose.yml              # 2 services, 1 volume (./data:/data), ~20 lines
 ├── docker-compose.dev.yml          # Local-build override for developers
 ├── .pre-commit-config.yaml         # Ruff, trailing whitespace, etc.
 ├── pyproject.toml                  # Dependency metadata for uv
-├── uv.lock                         # Locked dependency resolution for CI/Docker
-├── requirements.txt                # Compatibility dependency mirror
-├── requirements-dev.txt            # Compatibility dev dependency mirror
-└── pytest.ini
+└── uv.lock                         # Locked dependency resolution for CI/Docker
 ```
 
 ### Docker Publishing

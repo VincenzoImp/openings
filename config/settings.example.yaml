@@ -938,15 +938,10 @@ logging:
   # ---------------------------------------------------------------------------
   level: "INFO"
 
-  # ---------------------------------------------------------------------------
-  # file (string, default: "logs/search.log")
-  # ---------------------------------------------------------------------------
-  # Path to the log file.
-  #
-  # The directory will be created automatically if it doesn't exist.
-  # Log rotation is handled automatically (see max_size_mb and backup_count).
-  # ---------------------------------------------------------------------------
-  file: "logs/search.log"
+  # The log file path is fixed at `{JOB_SEARCH_DATA_DIR}/logs/search.log` —
+  # override JOB_SEARCH_DATA_DIR (default `/data` inside Docker, repo root in
+  # local development) to move it. Rotation is controlled by max_size_mb and
+  # backup_count below.
 
   # ---------------------------------------------------------------------------
   # max_size_mb (integer, default: 10)
@@ -1065,55 +1060,20 @@ database:
 # =============================================================================
 #                                OUTPUT
 # =============================================================================
-# Configure where and how results are saved.
-# The SQLite database is always used (required for core functionality).
-# CSV and Excel files are optional exports for human review.
+# Persistent storage lives under JOB_SEARCH_DATA_DIR (default `/data` inside
+# Docker, repo root in local development) with a fixed layout:
+#
+#   {DATA_DIR}/config/settings.yaml   — this file
+#   {DATA_DIR}/db/jobs.db             — primary SQLite store
+#   {DATA_DIR}/chroma/                — vector store (ChromaDB)
+#   {DATA_DIR}/results/               — CSV/Excel exports (when enabled)
+#   {DATA_DIR}/logs/search.log        — application log
+#
+# Only the CSV/Excel toggles are tunable here; use `JOB_SEARCH_DATA_DIR` to
+# relocate the entire tree.
 # =============================================================================
 
 output:
-  # ---------------------------------------------------------------------------
-  # results_dir (string, default: "results")
-  # ---------------------------------------------------------------------------
-  # Directory for CSV and Excel output files.
-  #
-  # Files created (when enabled):
-  # - all_jobs_YYYYMMDD_HHMMSS.csv: All jobs from this search run
-  # - all_jobs_YYYYMMDD_HHMMSS.xlsx: Excel version with formatting
-  # - relevant_jobs_YYYYMMDD_HHMMSS.csv: Jobs above score threshold
-  # - relevant_jobs_YYYYMMDD_HHMMSS.xlsx: Excel with highlighting
-  #
-  # Directory is created automatically if it doesn't exist.
-  # ---------------------------------------------------------------------------
-  results_dir: "results"
-
-  # ---------------------------------------------------------------------------
-  # data_dir (string, default: "data")
-  # ---------------------------------------------------------------------------
-  # Directory for the SQLite database.
-  #
-  # The database is the primary data store for:
-  # - All jobs ever found
-  # - First seen / last seen dates
-  # - Applied status tracking
-  # - Deduplication across runs
-  #
-  # Directory is created automatically if it doesn't exist.
-  # ---------------------------------------------------------------------------
-  data_dir: "data"
-
-  # ---------------------------------------------------------------------------
-  # database_file (string, default: "jobs.db")
-  # ---------------------------------------------------------------------------
-  # SQLite database filename (within data_dir).
-  #
-  # The full path will be: {data_dir}/{database_file}
-  # Example: data/jobs.db
-  #
-  # The database schema is created automatically on first run.
-  # Migrations are applied automatically when new columns are added.
-  # ---------------------------------------------------------------------------
-  database_file: "jobs.db"
-
   # ---------------------------------------------------------------------------
   # save_csv (boolean, default: true)
   # ---------------------------------------------------------------------------
@@ -1494,14 +1454,11 @@ notifications:
 # sentence-transformers required — the model runs locally (~80 MB) via
 # onnxruntime, no external API needed.
 #
+# Storage path is fixed at `{JOB_SEARCH_DATA_DIR}/chroma`.
 # Query like "remote python backend distributed systems" to find matching jobs.
 
 vector_search:
   enabled: true
-  # Retained for backward compatibility but ignored: ChromaDB's default ONNX
-  # embedder is always used. A warning is logged if you set a different model.
-  model_name: "all-MiniLM-L6-v2"
-  persist_dir: "data/chroma"
   embed_on_save: true
   default_results: 20
   backfill_on_startup: true

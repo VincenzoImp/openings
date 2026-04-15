@@ -9,6 +9,10 @@
 # Build examples:
 #   docker build -t job-search-tool .                              # dashboard
 #   docker build --build-arg VARIANT=core -t job-search-tool:core .
+#
+# Runtime: everything persistent (config, database, vector store, results,
+# logs) lives under a single volume at /data. Mount it and that's it — no
+# other bind mounts are needed.
 
 ARG VARIANT=dashboard
 
@@ -32,12 +36,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends gcc \
 
 COPY pyproject.toml uv.lock ./
 COPY scripts/ ./scripts/
-COPY config/settings.example.yaml ./config/settings.example.yaml
 COPY config/settings.example.yaml /opt/job-search-tool/defaults/settings.example.yaml
 COPY docker/entrypoint.sh /usr/local/bin/job-search-entrypoint
 
 # =============================================================================
-# Variant builders — install deps into `.venv`, then prune.
+# Variant builders — install deps into .venv, then prune for size.
 # =============================================================================
 FROM builder-base AS builder-core
 
@@ -57,14 +60,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
             -o -type f \( -name '*.pyc' -o -name '*.pyo' -o -name '*.pyi' \) \
          \) -exec rm -rf {} +
 
-# =============================================================================
 # Variant selector — resolves `builder-${VARIANT}` via the global ARG.
-# =============================================================================
 FROM builder-${VARIANT} AS builder-final
 
 # =============================================================================
-# Runtime — single stage, variant-agnostic (differs only by what was installed
-# into /app/.venv in the builder stage).
+# Runtime — single stage, variant-agnostic.
 # =============================================================================
 FROM python:3.11.12-slim AS runtime
 
@@ -84,16 +84,19 @@ LABEL org.opencontainers.image.title="Job Search Tool" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.variant="${VARIANT}"
 
-RUN useradd -m -u 1000 -s /bin/bash appuser \
+# tini provides clean SIGTERM propagation to the Python process (it becomes PID 1).
+RUN apt-get update && apt-get install -y --no-install-recommends tini \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -u 1000 -s /bin/bash appuser \
     && install -d -o appuser -g appuser \
-        /app /app/results /app/data /app/data/chroma /app/logs \
+        /app \
+        /data /data/config /data/db /data/chroma /data/results /data/logs \
         /opt/job-search-tool/defaults
 
 WORKDIR /app
 
 COPY --from=builder-final --chown=appuser:appuser /app/.venv /app/.venv
 COPY --from=builder-final --chown=appuser:appuser /app/scripts /app/scripts
-COPY --from=builder-final --chown=appuser:appuser /app/config/settings.example.yaml /app/config/settings.example.yaml
 COPY --from=builder-final --chown=appuser:appuser /opt/job-search-tool/defaults/settings.example.yaml /opt/job-search-tool/defaults/settings.example.yaml
 COPY --from=builder-final /usr/local/bin/job-search-entrypoint /usr/local/bin/job-search-entrypoint
 
@@ -105,14 +108,18 @@ WORKDIR /app/scripts
 ENV PATH=/app/.venv/bin:$PATH
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
-ENV JOB_SEARCH_CONFIG=/app/config/settings.yaml
+# /data is the single root for all persistent state. Override with
+#   docker run -e JOB_SEARCH_DATA_DIR=/custom ... -v /host/path:/custom ...
+ENV JOB_SEARCH_DATA_DIR=/data
 ENV JOB_SEARCH_TEMPLATE_PATH=/opt/job-search-tool/defaults/settings.example.yaml
 # Timezone is configurable via logging.timezone in settings.yaml
 # or override with: docker run -e TZ=America/New_York ...
 ENV TZ=UTC
 
+VOLUME ["/data"]
+
 HEALTHCHECK --interval=5m --timeout=30s --start-period=60s --retries=3 \
     CMD python healthcheck.py
 
-ENTRYPOINT ["job-search-entrypoint"]
+ENTRYPOINT ["/usr/bin/tini", "--", "job-search-entrypoint"]
 CMD ["python", "main.py"]

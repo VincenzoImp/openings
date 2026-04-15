@@ -42,7 +42,8 @@ git remote add upstream https://github.com/VincenzoImp/job-search-tool.git
 # 4. Install uv if needed: https://docs.astral.sh/uv/getting-started/installation/
 
 # 5. Create/sync the project environment from the lockfile
-uv sync --locked --no-install-project
+#    (includes streamlit for the dashboard test suite)
+uv sync --locked
 
 # 6. Create configuration for local Python runs
 cp config/settings.example.yaml config/settings.yaml
@@ -72,22 +73,19 @@ job-search-tool/
 ### Running the Application
 
 ```bash
-# Single search
+# Continuous scheduler (default)
 cd scripts && uv run python main.py
+# Single-shot run (cron / CI)
+cd scripts && uv run python main.py --once
+# Dashboard (separate process)
+uv run streamlit run scripts/dashboard.py
 
-# With the published Docker Hub image
+# Published Docker Hub images
 docker compose pull
-docker compose run --rm init-config
-docker compose up jobsearch
+docker compose up -d                              # starts scheduler + dashboard
 
-# With a local Docker build of your current checkout
-docker compose -f docker-compose.yml -f docker-compose.dev.yml build
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up jobsearch
-
-# Dashboard (starts by default with `docker compose up`; run explicitly with)
-docker compose up dashboard
-# or, for local Python development:
-cd scripts && uv run streamlit run dashboard.py
+# Local build of the current checkout (rebuilds both variants)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
 ```
 
 ### Development Tools

@@ -17,7 +17,6 @@ from config import (
     _parse_scheduler_config,
     _parse_telegram_config,
     _parse_throttling_config,
-    VectorSearchConfig,
 )
 
 
@@ -276,28 +275,45 @@ class TestConfigPaths:
     """Tests for Config path properties."""
 
     def test_path_properties(self):
-        """Test that path properties return Path objects."""
+        """All path properties return concrete Path objects."""
         config = Config()
 
+        assert isinstance(config.data_dir, Path)
+        assert isinstance(config.config_dir, Path)
         assert isinstance(config.results_path, Path)
-        assert isinstance(config.data_path, Path)
         assert isinstance(config.database_path, Path)
         assert isinstance(config.chroma_path, Path)
+        assert isinstance(config.logs_dir, Path)
         assert isinstance(config.log_path, Path)
 
-    def test_database_path_composition(self):
-        """Test database_path is composed correctly."""
+    def test_fixed_layout_under_data_dir(self):
+        """Every persistent path must live under DATA_DIR with a fixed layout."""
         config = Config()
+        root = config.data_dir
 
-        assert config.database_path == config.data_path / config.output.database_file
+        assert config.config_dir == root / "config"
+        assert config.database_path == root / "db" / "jobs.db"
+        assert config.chroma_path == root / "chroma"
+        assert config.results_path == root / "results"
+        assert config.logs_dir == root / "logs"
+        assert config.log_path == root / "logs" / "search.log"
 
-    def test_chroma_path_uses_vector_persist_dir(self):
-        """Test chroma_path honors vector_search.persist_dir."""
-        config = Config(
-            vector_search=VectorSearchConfig(persist_dir="custom/chroma-store")
-        )
+    def test_data_dir_respects_environment(self, tmp_path, monkeypatch):
+        """JOB_SEARCH_DATA_DIR must relocate the whole tree."""
+        monkeypatch.setenv("JOB_SEARCH_DATA_DIR", str(tmp_path))
+        # config.DATA_DIR is resolved at import time, so re-import the module.
+        import importlib
 
-        assert config.chroma_path.as_posix().endswith("custom/chroma-store")
+        import config as config_module
+
+        importlib.reload(config_module)
+        try:
+            assert config_module.DATA_DIR == tmp_path.resolve()
+            cfg = config_module.Config()
+            assert cfg.database_path == tmp_path.resolve() / "db" / "jobs.db"
+        finally:
+            monkeypatch.delenv("JOB_SEARCH_DATA_DIR", raising=False)
+            importlib.reload(config_module)
 
 
 class TestConfigQueries:

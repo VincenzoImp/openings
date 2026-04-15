@@ -67,11 +67,13 @@ The Job Search Tool is an automated job aggregation platform built on the [JobSp
 ```
 job-search-tool/
 ├── config/
-│   ├── settings.yaml              # User configuration (gitignored)
-│   └── settings.example.yaml      # Template with documentation
+│   └── settings.example.yaml      # Bundled template (auto-scaffolded into data/config/ on first run)
+│
+├── docker/
+│   └── entrypoint.sh              # First-run bootstrap + /data scaffolding (tini-init)
 │
 ├── scripts/
-│   ├── main.py                    # Unified entry point
+│   ├── main.py                    # Scheduler loop (default) or --once single-shot
 │   ├── search_jobs.py             # Core search engine
 │   ├── scheduler.py               # APScheduler wrapper
 │   ├── notifier.py                # Notification channels
@@ -109,15 +111,19 @@ job-search-tool/
 │   └── workflows/
 │       └── ci.yml                 # CI pipeline (test, audit, Docker)
 │
-├── results/                        # CSV/Excel output (gitignored)
-├── data/                           # SQLite database (gitignored)
-├── logs/                           # Log files (gitignored)
+├── data/                           # Local state root (gitignored)
+│   ├── config/settings.yaml        # User configuration
+│   ├── db/jobs.db                  # SQLite store
+│   ├── chroma/                     # ChromaDB vector store
+│   ├── results/                    # CSV/Excel exports
+│   └── logs/search.log             # Rotating log
 │
-├── Dockerfile                      # Multi-stage, variant-aware build (core | dashboard), non-root user
-├── docker-compose.yml              # Service orchestration
+├── Dockerfile                      # Multi-stage, variant-aware build (core | dashboard), tini-init
+├── docker-compose.yml              # Two-service stack sharing ./data:/data
+├── docker-compose.dev.yml          # Local-build override (rebuilds both variants)
 ├── .pre-commit-config.yaml         # Pre-commit hooks (ruff, etc.)
-├── requirements.txt                # Production dependencies
-├── requirements-dev.txt            # Development dependencies
+├── requirements.txt                # Production dependencies (compat mirror)
+├── requirements-dev.txt            # Development dependencies (compat mirror)
 └── pytest.ini                      # Test configuration
 ```
 
@@ -647,23 +653,34 @@ database:
   cleanup_enabled: true
   cleanup_days: 30
 
-# Output options
+# Output toggles (persistent paths are fixed under JOB_SEARCH_DATA_DIR)
 output:
-  results_dir: "results"
-  data_dir: "data"
   save_csv: true
   save_excel: true
 
 # Vector search (semantic similarity)
 vector_search:
   enabled: true
-  model_name: "all-MiniLM-L6-v2"  # ignored; ChromaDB's default ONNX embedder is always used
-  persist_dir: "data/chroma"
   embed_on_save: true
   default_results: 20
   backfill_on_startup: true
   batch_size: 100
 ```
+
+**Fixed path layout under `JOB_SEARCH_DATA_DIR`** (default `/data` in Docker,
+repo root in local dev):
+
+```
+{DATA_DIR}/config/settings.yaml
+{DATA_DIR}/db/jobs.db
+{DATA_DIR}/chroma/
+{DATA_DIR}/results/
+{DATA_DIR}/logs/search.log
+```
+
+None of these paths are configurable through `settings.yaml`. Override the
+root directory via the `JOB_SEARCH_DATA_DIR` environment variable to relocate
+the whole tree.
 
 ### Dynamic Scoring
 
@@ -922,6 +939,19 @@ columns = [
 ---
 
 ## Changelog
+
+### v6.0.0 (2026-04-15)
+
+**Breaking (major UX simplification — "just run it"):**
+- `docker-compose.yml` collapses to **two flat services** (`scheduler` on `:latest-core`, `dashboard` on `:latest`) sharing a single `./data:/data` volume. Removed anchors, profiles, `init-config`, `jobsearch`, `analyze` services. `docker compose up -d` starts the full stack.
+- **Single `/data` volume** replaces the four-mount pattern. Fixed layout: `config/settings.yaml`, `db/jobs.db`, `chroma/`, `results/`, `logs/search.log`.
+- **First-run auto-bootstrap**: the container scaffolds `settings.yaml` from the bundled template on first start if missing, then prints a one-line "edit me" hint. `scripts/bootstrap_config.py` and `init-config` service removed.
+- **Scheduler is the default mode**: `python main.py` runs the APScheduler loop continuously. Use `python main.py --once` for single-shot CI/cron runs. `JOB_SEARCH_MODE` env var removed.
+- **Fixed persistent paths**: `output.results_dir` / `output.data_dir` / `output.database_file` / `logging.file` / `vector_search.model_name` / `vector_search.persist_dir` are removed from `settings.yaml`. Override the whole tree with `JOB_SEARCH_DATA_DIR`.
+- `config.Config` gains `data_dir`, `config_dir`, `logs_dir`, and a `log_path` that resolves against `DATA_DIR`. `data_path` is removed.
+- `get_vector_store(persist_dir, model_name=...)` becomes `get_vector_store(persist_dir)` — the `model_name` was a no-op since v4.4.0.
+- Dockerfile runs under `tini` for clean SIGTERM propagation, declares `VOLUME /data`, exports `JOB_SEARCH_DATA_DIR=/data`.
+- `.env.example` slimmed to Telegram token, UID/GID, dashboard port.
 
 ### v5.0.0 (2026-04-15)
 

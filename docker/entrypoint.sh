@@ -1,22 +1,39 @@
 #!/bin/sh
+#
+# First-run entrypoint for the job-search-tool container.
+#
+# On every start:
+#   - Ensures the /data subtree exists (config, db, chroma, results, logs).
+#   - On first run (no settings.yaml), scaffolds one from the bundled template
+#     and prints a friendly hint explaining what to edit.
+#   - Hands control over to the container command (scheduler, streamlit, ...).
+#
+# Override the root with JOB_SEARCH_DATA_DIR if you don't want /data.
+
 set -eu
 
-bootstrap_args="--quiet"
-if [ "${JOB_SEARCH_BOOTSTRAP_CONFIG:-0}" = "1" ]; then
-  bootstrap_args="$bootstrap_args --write-settings"
-fi
+: "${JOB_SEARCH_DATA_DIR:=/data}"
+: "${JOB_SEARCH_TEMPLATE_PATH:=/opt/job-search-tool/defaults/settings.example.yaml}"
+export JOB_SEARCH_DATA_DIR JOB_SEARCH_TEMPLATE_PATH
 
-if [ "$#" -ge 2 ] && [ "$1" = "python" ] && [ "$2" = "bootstrap_config.py" ]; then
-  export JOB_SEARCH_SUPPRESS_CONFIG_HINT=1
-fi
+SETTINGS="$JOB_SEARCH_DATA_DIR/config/settings.yaml"
 
-python bootstrap_config.py $bootstrap_args >/dev/null 2>&1 || true
+mkdir -p \
+  "$JOB_SEARCH_DATA_DIR/config" \
+  "$JOB_SEARCH_DATA_DIR/db" \
+  "$JOB_SEARCH_DATA_DIR/chroma" \
+  "$JOB_SEARCH_DATA_DIR/results" \
+  "$JOB_SEARCH_DATA_DIR/logs"
 
-settings_path="${JOB_SEARCH_CONFIG:-/app/config/settings.yaml}"
-if [ ! -f "$settings_path" ] && [ "${JOB_SEARCH_SUPPRESS_CONFIG_HINT:-0}" != "1" ]; then
-  echo "job-search-tool: no settings file found at $settings_path."
-  echo "job-search-tool: using built-in defaults until you create one."
-  echo "job-search-tool: run 'docker compose run --rm init-config' to scaffold a starter config."
+if [ ! -f "$SETTINGS" ]; then
+  if [ ! -f "$JOB_SEARCH_TEMPLATE_PATH" ]; then
+    echo "job-search-tool: settings template missing at $JOB_SEARCH_TEMPLATE_PATH" >&2
+    exit 1
+  fi
+  cp "$JOB_SEARCH_TEMPLATE_PATH" "$SETTINGS"
+  echo "job-search-tool: first run detected."
+  echo "job-search-tool: wrote default settings to $SETTINGS"
+  echo "job-search-tool: edit that file to configure queries, scoring, and (optionally) Telegram notifications, then restart the container."
 fi
 
 exec "$@"

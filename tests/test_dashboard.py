@@ -24,25 +24,22 @@ def _prepare_dashboard_app(
     monkeypatch,
     jobs: list[Job],
 ) -> tuple[AppTest, Path]:
-    """Create a dashboard AppTest wired to a temporary config and database."""
-    data_dir = tmp_path / "data"
-    results_dir = tmp_path / "results"
-    data_dir.mkdir()
-    results_dir.mkdir()
+    """Create a dashboard AppTest wired to a temporary ``JOB_SEARCH_DATA_DIR``."""
+    # In v6+ everything persistent lives under a single DATA_DIR root.
+    # Lay out the subtree the application expects and let it discover it via env.
+    (tmp_path / "config").mkdir()
+    db_dir = tmp_path / "db"
+    db_dir.mkdir()
 
-    config_path = tmp_path / "settings.yaml"
+    config_path = tmp_path / "config" / "settings.yaml"
     config_path.write_text(
         textwrap.dedent(
-            f"""
+            """
             search:
               sites: [indeed]
               locations: [Remote]
             queries:
               test: ["software engineer"]
-            output:
-              data_dir: "{data_dir}"
-              results_dir: "{results_dir}"
-              database_file: jobs.db
             notifications:
               enabled: false
             scheduler:
@@ -55,7 +52,7 @@ def _prepare_dashboard_app(
         encoding="utf-8",
     )
 
-    db = JobDatabase(data_dir / "jobs.db")
+    db = JobDatabase(db_dir / "jobs.db")
     for job in jobs:
         db.save_job(job)
     db.close()
@@ -63,7 +60,8 @@ def _prepare_dashboard_app(
     vector_store_stub = types.ModuleType("vector_store")
     vector_store_stub.get_vector_store = lambda *args, **kwargs: None
     monkeypatch.setitem(sys.modules, "vector_store", vector_store_stub)
-    monkeypatch.setenv("JOB_SEARCH_CONFIG", str(config_path))
+    monkeypatch.setenv("JOB_SEARCH_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("JOB_SEARCH_CONFIG", raising=False)
     sys.modules.pop("config", None)
     st.cache_data.clear()
     st.cache_resource.clear()
@@ -72,7 +70,7 @@ def _prepare_dashboard_app(
         str(Path(__file__).parent.parent / "scripts" / "dashboard.py"),
         default_timeout=10,
     )
-    return app, data_dir
+    return app, db_dir
 
 
 def test_dashboard_smoke_renders_and_escapes_html(monkeypatch, tmp_path: Path) -> None:

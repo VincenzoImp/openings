@@ -1,66 +1,32 @@
 name: job-search-tool
 
-# -----------------------------------------------------------------------------
-# Two images:
-#   - Core (slim, no Streamlit) → used by jobsearch / scheduler / analyze
-#   - Dashboard (full, with Streamlit) → used by the dashboard service
+# Two long-running services sharing a single /data volume.
 #
-# Override either via environment variables, e.g.
-#   JOB_SEARCH_CORE_IMAGE=vincenzoimp/job-search-tool:v4.5.0-core
-#   JOB_SEARCH_DASHBOARD_IMAGE=vincenzoimp/job-search-tool:v4.5.0
-# -----------------------------------------------------------------------------
-
-x-job-search-base: &job-search-base
-  user: "${JOB_SEARCH_UID:-1000}:${JOB_SEARCH_GID:-1000}"
-  env_file:
-    - path: .env
-      required: false
-  volumes:
-    - ./config:/app/config
-    - ./data:/app/data
-    - ./results:/app/results
-    - ./logs:/app/logs
-
-x-job-search-core: &job-search-core
-  <<: *job-search-base
-  image: ${JOB_SEARCH_CORE_IMAGE:-vincenzoimp/job-search-tool:latest-core}
-
-x-job-search-dashboard: &job-search-dashboard
-  <<: *job-search-base
-  image: ${JOB_SEARCH_DASHBOARD_IMAGE:-vincenzoimp/job-search-tool:latest}
+#   scheduler  → slim core image, runs the continuous scheduled search loop
+#                (Telegram notifications included)
+#   dashboard  → dashboard image, serves the Streamlit UI on :8501
+#
+# First run auto-scaffolds ./data/config/settings.yaml from the bundled
+# template — edit it and restart to apply.
 
 services:
-  init-config:
-    <<: *job-search-core
-    command: python bootstrap_config.py --write-settings
-    restart: "no"
-
-  jobsearch:
-    <<: *job-search-core
-    command: python main.py
-    environment:
-      JOB_SEARCH_MODE: single
-    restart: on-failure:3
-
   scheduler:
-    <<: *job-search-core
-    command: python main.py
-    environment:
-      JOB_SEARCH_MODE: scheduled
+    image: vincenzoimp/job-search-tool:latest-core
     restart: unless-stopped
-    profiles:
-      - scheduler
-
-  analyze:
-    <<: *job-search-core
-    command: python analyze_jobs.py
-    restart: on-failure:3
-    profiles:
-      - analyze
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./data:/data
 
   dashboard:
-    <<: *job-search-dashboard
-    command: streamlit run dashboard.py --server.address=0.0.0.0 --server.port=8501
+    image: vincenzoimp/job-search-tool:latest
     restart: unless-stopped
+    command: streamlit run dashboard.py --server.address=0.0.0.0 --server.port=8501
     ports:
       - "${JOB_SEARCH_DASHBOARD_PORT:-8501}:8501"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./data:/data

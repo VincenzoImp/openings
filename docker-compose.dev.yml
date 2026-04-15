@@ -1,20 +1,18 @@
-x-local-build: &local-build
-  build:
-    context: .
-  image: ${JOB_SEARCH_DEV_IMAGE:-job-search-tool:dev}
+# Override that rebuilds the two service images from the local checkout.
+# Use with:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 
 services:
-  init-config:
-    <<: *local-build
-
-  jobsearch:
-    <<: *local-build
-
   scheduler:
-    <<: *local-build
-
-  analyze:
-    <<: *local-build
+    build:
+      context: .
+      args:
+        VARIANT: core
+    image: ${JOB_SEARCH_DEV_CORE_IMAGE:-job-search-tool:dev-core}
 
   dashboard:
-    <<: *local-build
+    build:
+      context: .
+      args:
+        VARIANT: dashboard
+    image: ${JOB_SEARCH_DEV_DASHBOARD_IMAGE:-job-search-tool:dev}

@@ -19,9 +19,6 @@ from chromadb.utils.embedding_functions import (  # type: ignore[attr-defined]
     DefaultEmbeddingFunction,
 )
 
-# Model bundled with ChromaDB's DefaultEmbeddingFunction.
-_DEFAULT_MODEL = "all-MiniLM-L6-v2"
-
 if TYPE_CHECKING:
     import pandas as pd
 
@@ -60,19 +57,9 @@ class JobVectorStore:
         "job_url",
     )
 
-    def __init__(self, persist_dir: Path, model_name: str = _DEFAULT_MODEL) -> None:
+    def __init__(self, persist_dir: Path) -> None:
         self._persist_dir = Path(persist_dir)
         self._persist_dir.mkdir(parents=True, exist_ok=True)
-
-        if model_name and model_name != _DEFAULT_MODEL:
-            logger.warning(
-                "vector_search.model_name=%r is ignored: this build uses "
-                "ChromaDB's DefaultEmbeddingFunction (onnxruntime + %s). "
-                "Remove the setting or set it to %r to silence this warning.",
-                model_name,
-                _DEFAULT_MODEL,
-                _DEFAULT_MODEL,
-            )
 
         self._embedding_fn = DefaultEmbeddingFunction()
         self._client = chromadb.PersistentClient(path=str(self._persist_dir))
@@ -295,32 +282,23 @@ class JobVectorStore:
 # ------------------------------------------------------------------
 
 _vector_store: JobVectorStore | None = None
-_vector_store_key: tuple[str, str] | None = None
+_vector_store_key: str | None = None
 
 
-def get_vector_store(
-    persist_dir: Path,
-    model_name: str = _DEFAULT_MODEL,
-) -> JobVectorStore:
+def get_vector_store(persist_dir: Path) -> JobVectorStore:
     """Get or create the singleton :class:`JobVectorStore`.
 
     Args:
         persist_dir: Full path where the ChromaDB collection should live.
-        model_name: Retained for backward compatibility. Ignored — the
-            store always uses ChromaDB's ``DefaultEmbeddingFunction``
-            (onnxruntime + ``all-MiniLM-L6-v2``).
 
     Returns:
         The shared ``JobVectorStore`` instance.
     """
     global _vector_store, _vector_store_key
     resolved_path = Path(persist_dir).expanduser().resolve()
-    requested_key = (str(resolved_path), model_name)
+    key = str(resolved_path)
 
-    if _vector_store is None or _vector_store_key != requested_key:
-        _vector_store = JobVectorStore(
-            persist_dir=resolved_path,
-            model_name=model_name,
-        )
-        _vector_store_key = requested_key
+    if _vector_store is None or _vector_store_key != key:
+        _vector_store = JobVectorStore(persist_dir=resolved_path)
+        _vector_store_key = key
     return _vector_store

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -204,6 +203,7 @@ class TestRunJobSearch:
 class TestMain:
     """Tests for main() entry point."""
 
+    @patch("sys.argv", ["main.py", "--once"])
     @patch("main.get_config")
     @patch("main.setup_logging")
     @patch("main.get_database")
@@ -215,13 +215,13 @@ class TestMain:
         mock_setup_log,
         mock_get_config,
     ):
-        """Test single-shot mode returns 0 on success."""
+        """``--once`` runs a single iteration and exits 0 on success."""
         from main import main
 
         mock_config = MagicMock()
-        mock_config.scheduler.enabled = False
         mock_config.notifications.enabled = False
         mock_config.database.recalculate_scores_on_startup = False
+        mock_config.vector_search.enabled = False
         mock_get_config.return_value = mock_config
 
         mock_db = MagicMock()
@@ -236,7 +236,9 @@ class TestMain:
 
         assert result == 0
         mock_scheduler.run_once.assert_called_once()
+        mock_scheduler.start.assert_not_called()
 
+    @patch("sys.argv", ["main.py", "--once"])
     @patch("main.get_config")
     @patch("main.setup_logging")
     @patch("main.get_database")
@@ -248,13 +250,13 @@ class TestMain:
         mock_setup_log,
         mock_get_config,
     ):
-        """Test single-shot mode returns 1 on failure."""
+        """``--once`` returns 1 when the single run fails."""
         from main import main
 
         mock_config = MagicMock()
-        mock_config.scheduler.enabled = False
         mock_config.notifications.enabled = False
         mock_config.database.recalculate_scores_on_startup = False
+        mock_config.vector_search.enabled = False
         mock_get_config.return_value = mock_config
 
         mock_db = MagicMock()
@@ -269,6 +271,7 @@ class TestMain:
 
         assert result == 1
 
+    @patch("sys.argv", ["main.py", "--once"])
     @patch("main.get_config")
     @patch("main.setup_logging")
     @patch("main.get_database")
@@ -286,9 +289,9 @@ class TestMain:
         from main import main
 
         mock_config = MagicMock()
-        mock_config.scheduler.enabled = False
         mock_config.notifications.enabled = False
         mock_config.database.recalculate_scores_on_startup = True
+        mock_config.vector_search.enabled = False
         mock_get_config.return_value = mock_config
 
         mock_db = MagicMock()
@@ -303,6 +306,7 @@ class TestMain:
 
         mock_recalc.assert_called_once_with(mock_db, mock_config)
 
+    @patch("sys.argv", ["main.py", "--once"])
     @patch("main.get_config")
     @patch("main.setup_logging")
     @patch("main.get_database")
@@ -320,9 +324,9 @@ class TestMain:
         from main import main
 
         mock_config = MagicMock()
-        mock_config.scheduler.enabled = False
         mock_config.notifications.enabled = False
         mock_config.database.recalculate_scores_on_startup = True
+        mock_config.vector_search.enabled = False
         mock_get_config.return_value = mock_config
 
         mock_db = MagicMock()
@@ -337,27 +341,27 @@ class TestMain:
 
         mock_recalc.assert_not_called()
 
-    @patch.dict(os.environ, {"JOB_SEARCH_MODE": "scheduled"}, clear=False)
+    @patch("sys.argv", ["main.py"])
     @patch("main.get_config")
     @patch("main.setup_logging")
     @patch("main.get_database")
     @patch("main.create_scheduler")
-    def test_env_override_forces_scheduled_mode(
+    def test_default_is_scheduled_mode(
         self,
         mock_create_scheduler,
         mock_get_db,
         mock_setup_log,
         mock_get_config,
     ):
-        """Test JOB_SEARCH_MODE=scheduled overrides config for compose usage."""
+        """Without ``--once``, main() starts the continuous scheduler."""
         from main import main
 
         mock_config = MagicMock()
-        mock_config.scheduler.enabled = False
         mock_config.scheduler.interval_hours = 24
         mock_config.scheduler.run_on_startup = True
         mock_config.notifications.enabled = False
         mock_config.database.recalculate_scores_on_startup = False
+        mock_config.vector_search.enabled = False
         mock_get_config.return_value = mock_config
 
         mock_db = MagicMock()
@@ -372,38 +376,3 @@ class TestMain:
         assert result == 0
         mock_scheduler.start.assert_called_once()
         mock_scheduler.run_once.assert_not_called()
-
-    @patch.dict(os.environ, {"JOB_SEARCH_MODE": "single"}, clear=False)
-    @patch("main.get_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.create_scheduler")
-    def test_env_override_forces_single_shot_mode(
-        self,
-        mock_create_scheduler,
-        mock_get_db,
-        mock_setup_log,
-        mock_get_config,
-    ):
-        """Test JOB_SEARCH_MODE=single overrides config for compose usage."""
-        from main import main
-
-        mock_config = MagicMock()
-        mock_config.scheduler.enabled = True
-        mock_config.notifications.enabled = False
-        mock_config.database.recalculate_scores_on_startup = False
-        mock_get_config.return_value = mock_config
-
-        mock_db = MagicMock()
-        mock_db.get_statistics.return_value = {"total_jobs": 0}
-        mock_get_db.return_value = mock_db
-
-        mock_scheduler = MagicMock()
-        mock_scheduler.run_once.return_value = True
-        mock_create_scheduler.return_value = mock_scheduler
-
-        result = main()
-
-        assert result == 0
-        mock_scheduler.run_once.assert_called_once()
-        mock_scheduler.start.assert_not_called()

@@ -410,22 +410,16 @@ class TestGetVectorStore:
 
         assert store1 is store2
 
-    def test_recreates_singleton_when_config_changes(self, mock_client, tmp_path):
-        """Test singleton refreshes when path or model changes."""
+    def test_recreates_singleton_when_path_changes(self, mock_client, tmp_path):
+        """Test singleton refreshes when the persist_dir changes."""
         import vector_store as vs_module
 
         vs_module._vector_store = None
         vs_module._vector_store_key = None
 
         with patch.object(_mock_chromadb, "PersistentClient", return_value=mock_client):
-            store1 = vs_module.get_vector_store(
-                persist_dir=tmp_path / "chroma-a",
-                model_name="model-a",
-            )
-            store2 = vs_module.get_vector_store(
-                persist_dir=tmp_path / "chroma-b",
-                model_name="model-b",
-            )
+            store1 = vs_module.get_vector_store(persist_dir=tmp_path / "chroma-a")
+            store2 = vs_module.get_vector_store(persist_dir=tmp_path / "chroma-b")
 
         assert store1 is not store2
 

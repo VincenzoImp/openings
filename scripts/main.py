@@ -8,7 +8,6 @@ Integrates job search, database persistence, and notifications.
 
 from __future__ import annotations
 
-import os
 import sys
 import traceback
 from typing import TYPE_CHECKING
@@ -93,9 +92,7 @@ def run_job_search() -> bool:
                     from vector_store import get_vector_store
                     from vector_commands import sync_deletions
 
-                    vs = get_vector_store(
-                        config.chroma_path, config.vector_search.model_name
-                    )
+                    vs = get_vector_store(config.chroma_path)
                     sync_deletions(db, vs)
                 except Exception as e:
                     logger.warning(f"Vector store sync failed: {e}")
@@ -162,9 +159,7 @@ def run_job_search() -> bool:
                     ),
                     axis=1,
                 )
-                vs = get_vector_store(
-                    config.chroma_path, config.vector_search.model_name
-                )
+                vs = get_vector_store(config.chroma_path)
                 vs.add_jobs_from_dataframe(df_for_vs)
             except Exception as e:
                 logger.warning(f"Vector store embedding failed: {e}")
@@ -327,52 +322,24 @@ def _send_empty_notification(config: Config, db: JobDatabase) -> None:
         logger.error(f"Error sending empty notification: {e}")
 
 
-def _resolve_scheduled_mode(config: Config) -> bool:
-    """
-    Resolve execution mode from config, optionally overridden by environment.
-
-    Supported values:
-    - JOB_SEARCH_MODE=single
-    - JOB_SEARCH_MODE=scheduled
-    """
-    raw_mode = os.environ.get("JOB_SEARCH_MODE", "").strip().lower()
-    if not raw_mode:
-        return config.scheduler.enabled
-
-    logger = get_logger("main")
-
-    if raw_mode in {"single", "single-shot", "oneshot"}:
-        logger.info("Execution mode overridden by JOB_SEARCH_MODE=single")
-        return False
-
-    if raw_mode in {"scheduled", "scheduler"}:
-        logger.info("Execution mode overridden by JOB_SEARCH_MODE=scheduled")
-        return True
-
-    logger.warning(
-        "Ignoring invalid JOB_SEARCH_MODE=%r; expected 'single' or 'scheduled'",
-        raw_mode,
-    )
-    return config.scheduler.enabled
-
-
 def main() -> int:
-    """
-    Main entry point.
+    """Main entry point.
 
-    Determines execution mode (single-shot vs scheduled) based on configuration
-    and runs the appropriate workflow.
+    Starts the APScheduler loop and runs the search pipeline on the configured
+    interval. Single-shot execution is available via ``python main.py --once``
+    for ad-hoc runs and CI.
 
     Returns:
         Exit code (0 for success, 1 for failure).
     """
+    scheduled_mode = "--once" not in sys.argv
+
     # Initial config load
     config = get_config()
     logger = setup_logging(config)
-    scheduled_mode = _resolve_scheduled_mode(config)
 
     log_section(logger, "JOB SEARCH TOOL STARTING")
-    logger.info(f"Mode: {'Scheduled' if scheduled_mode else 'Single-shot'}")
+    logger.info(f"Mode: {'Scheduled' if scheduled_mode else 'Single-shot (--once)'}")
 
     if scheduled_mode:
         logger.info(f"Interval: {config.scheduler.interval_hours} hours")
@@ -401,7 +368,7 @@ def main() -> int:
             from vector_store import get_vector_store
             from vector_commands import backfill_embeddings
 
-            vs = get_vector_store(config.chroma_path, config.vector_search.model_name)
+            vs = get_vector_store(config.chroma_path)
             backfilled = backfill_embeddings(db, vs, config.vector_search.batch_size)
             if backfilled:
                 logger.info(f"Backfilled {backfilled} jobs into vector store")
