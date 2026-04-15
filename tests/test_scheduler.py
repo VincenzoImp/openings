@@ -35,7 +35,6 @@ class TestJobSearchSchedulerInit:
     def scheduler_config(self):
         """Create a SchedulerConfig for testing."""
         return SchedulerConfig(
-            enabled=True,
             interval_hours=12,
             run_on_startup=True,
             retry_on_failure=True,
@@ -86,12 +85,10 @@ class TestJobSearchSchedulerRunOnce:
 
     @pytest.fixture
     def scheduler_config(self):
-        """Create a disabled scheduler config for single-shot mode."""
-        return SchedulerConfig(enabled=False)
+        return SchedulerConfig()
 
     @pytest.fixture
     def config(self, scheduler_config):
-        """Create a Config with disabled scheduler."""
         return Config(scheduler=scheduler_config)
 
     def test_run_once_success(self, config):
@@ -149,9 +146,7 @@ class TestJobSearchSchedulerScheduledMode:
 
     @pytest.fixture
     def scheduler_config(self):
-        """Create an enabled scheduler config."""
         return SchedulerConfig(
-            enabled=True,
             interval_hours=1,
             run_on_startup=True,
             retry_on_failure=True,
@@ -221,17 +216,6 @@ class TestJobSearchSchedulerScheduledMode:
             # Should have called add_job
             mock_sched.add_job.assert_called_once()
 
-    def test_start_disabled_scheduler_runs_once(self):
-        """Test that start() runs once and exits when scheduler is disabled."""
-        config = Config(scheduler=SchedulerConfig(enabled=False))
-        mock_job = MagicMock(return_value=True)
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        # Should run once and return (not block)
-        scheduler.start()
-
-        mock_job.assert_called_once()
-
 
 # =============================================================================
 # TEST EXECUTE JOB
@@ -246,7 +230,6 @@ class TestJobSearchSchedulerExecuteJob:
         """Create a Config with retry enabled."""
         return Config(
             scheduler=SchedulerConfig(
-                enabled=True,
                 retry_on_failure=True,
                 retry_delay_minutes=5,
             )
@@ -299,7 +282,6 @@ class TestJobSearchSchedulerExecuteJob:
         """Test _execute_job doesn't retry when retry_on_failure is False."""
         config = Config(
             scheduler=SchedulerConfig(
-                enabled=True,
                 retry_on_failure=False,
             )
         )
@@ -334,7 +316,6 @@ class TestJobSearchSchedulerRetry:
         """Create a Config with retry settings."""
         return Config(
             scheduler=SchedulerConfig(
-                enabled=True,
                 retry_on_failure=True,
                 retry_delay_minutes=15,
             )
@@ -415,7 +396,7 @@ class TestJobSearchSchedulerStop:
     @pytest.fixture
     def config(self):
         """Create a Config for testing."""
-        return Config(scheduler=SchedulerConfig(enabled=True))
+        return Config(scheduler=SchedulerConfig())
 
     def test_stop_sets_running_false(self, config):
         """Test stop() sets _running to False."""
@@ -462,7 +443,7 @@ class TestJobSearchSchedulerProperties:
     @pytest.fixture
     def scheduler(self):
         """Create a scheduler instance for testing."""
-        config = Config(scheduler=SchedulerConfig(enabled=True))
+        config = Config(scheduler=SchedulerConfig())
         return JobSearchScheduler(config, lambda: True)
 
     def test_is_running_property(self, scheduler):
@@ -498,7 +479,7 @@ class TestJobSearchSchedulerSignals:
     @pytest.fixture
     def config(self):
         """Create a Config for testing."""
-        return Config(scheduler=SchedulerConfig(enabled=True))
+        return Config(scheduler=SchedulerConfig())
 
     def test_setup_signal_handlers(self, config):
         """Test _setup_signal_handlers sets up SIGINT and SIGTERM."""

@@ -184,15 +184,26 @@ class TestSchedulerConfigValidation:
         config = _parse_scheduler_config(
             {
                 "scheduler": {
-                    "enabled": True,
                     "interval_hours": 12,
                     "retry_delay_minutes": 15,
                 }
             }
         )
-        assert config.enabled is True
         assert config.interval_hours == 12
         assert config.retry_delay_minutes == 15
+
+    def test_legacy_enabled_key_warns_but_parses(self, caplog):
+        """Legacy scheduler.enabled is ignored with a deprecation warning."""
+        import logging
+
+        with caplog.at_level(logging.WARNING, logger="job_search.config"):
+            config = _parse_scheduler_config({"scheduler": {"enabled": True}})
+
+        assert config.interval_hours == 24
+        assert any(
+            "scheduler.enabled is ignored in v6+" in rec.message
+            for rec in caplog.records
+        )
 
     def test_interval_hours_positive(self):
         """Test interval_hours must be positive."""

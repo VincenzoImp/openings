@@ -220,7 +220,7 @@ def test_config(scoring_config):
         database=DatabaseConfig(cleanup_enabled=False),
         output=OutputConfig(save_csv=False, save_excel=False),  # Skip file I/O in tests
         profile=ProfileConfig(name="Test User"),
-        scheduler=SchedulerConfig(enabled=False),
+        scheduler=SchedulerConfig(),
         notifications=NotificationsConfig(enabled=False),
     )
 

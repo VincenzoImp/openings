@@ -68,8 +68,8 @@ class JobSearchScheduler:
         run_start = datetime.now()
 
         # Schedule next run immediately based on START time (not end time)
-        # This ensures consistent interval from start-to-start
-        if self._scheduler and self.config.scheduler.enabled and not is_retry:
+        # so the interval is start-to-start, not end-to-start.
+        if self._scheduler and not is_retry:
             self._schedule_next_run(run_start)
 
         run_label = "RETRY RUN" if is_retry else "SCHEDULED RUN"
@@ -112,7 +112,7 @@ class JobSearchScheduler:
         )
 
         # Log next scheduled run
-        if self._scheduler and self.config.scheduler.enabled and not is_retry:
+        if self._scheduler and not is_retry:
             jobs = self._scheduler.get_jobs()
             main_job = next((j for j in jobs if j.id == "main_job"), None)
             if main_job:
@@ -213,16 +213,12 @@ class JobSearchScheduler:
             return False
 
     def start(self) -> None:
-        """
-        Start the scheduler in continuous mode.
+        """Start the scheduler in continuous mode.
 
-        This method blocks until the scheduler is stopped.
+        Blocks until the scheduler is stopped via SIGINT/SIGTERM or
+        :meth:`stop`. The operating mode is chosen by the CLI subcommand in
+        ``main.py``; this method unconditionally runs the continuous loop.
         """
-        if not self.config.scheduler.enabled:
-            self.logger.info("Scheduler disabled, running once and exiting")
-            self.run_once()
-            return
-
         log_section(self.logger, "STARTING JOB SEARCH SCHEDULER")
         self.logger.info(f"Interval: {self.config.scheduler.interval_hours} hours")
         self.logger.info(f"Run on startup: {self.config.scheduler.run_on_startup}")

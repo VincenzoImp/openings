@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.3] - 2026-04-15
+
+### Fixed
+
+- **Scheduler never actually ran continuously** after v6.0.0: `JobSearchScheduler.start()` still consulted the legacy `config.scheduler.enabled` flag, and the bundled `settings.example.yaml` shipped with `scheduler.enabled: false` as the default. First-run containers happily scaffolded their settings, logged `"Scheduler disabled, running once and exiting"`, completed one search, and then died — losing the entire "unless-stopped continuous loop" promise of v6. The CLI subcommand (`python main.py scheduler`) now fully owns the mode selection and always runs the continuous loop.
+- **ChromaDB telemetry noise**: silenced the `Failed to send telemetry event … capture() takes 1 positional argument but 3 were given` errors from ChromaDB's bundled posthog client via `ANONYMIZED_TELEMETRY=False` and `CHROMA_TELEMETRY_IMPL=none` environment variables baked into the image.
+
+### Changed
+
+- **`SchedulerConfig.enabled` removed**: the continuous/single-shot choice is expressed by the CLI subcommand alone. `settings.yaml` keys with `scheduler.enabled` are now ignored with a one-line deprecation warning.
+- **`scripts/scheduler.py`**: `start()` unconditionally enters the continuous loop; the `_execute_job` retry-scheduling branches no longer double-check `config.scheduler.enabled` (they rely on the `self._scheduler` presence alone, which is already the canonical marker of continuous mode).
+- **`config/settings.example.yaml`**: scheduler section is rewritten to document that the mode is chosen by the CLI and no longer exposes `enabled`.
+- **Test suite**: `test_start_disabled_scheduler_runs_once` removed (the fallback it covered no longer exists); fixtures updated to construct `SchedulerConfig()` with defaults.
+
 ## [6.0.2] - 2026-04-15
 
 ### Fixed
@@ -526,7 +540,8 @@ No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-
 - **Structured Logging**: File and console logs with rotation
 - **Docker Support**: Containerized environment for cross-platform compatibility
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.2...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.3...HEAD
+[6.0.3]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.2...v6.0.3
 [6.0.2]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.1...v6.0.2
 [6.0.1]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.0...v6.0.1
 [6.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v5.0.1...v6.0.0

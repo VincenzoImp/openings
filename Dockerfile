@@ -92,6 +92,10 @@ ENV JOB_SEARCH_TEMPLATE_PATH=/opt/job-search-tool/defaults/settings.example.yaml
 # Timezone is configurable via logging.timezone in settings.yaml
 # or override with: docker run -e TZ=America/New_York ...
 ENV TZ=UTC
+# Silence ChromaDB telemetry pings (they also emit spurious "capture() takes
+# 1 positional argument but 3 were given" errors on recent posthog releases).
+ENV ANONYMIZED_TELEMETRY=False
+ENV CHROMA_TELEMETRY_IMPL=none
 
 VOLUME ["/data"]
 

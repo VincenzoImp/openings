@@ -1187,30 +1187,17 @@ profile:
 #                              SCHEDULER
 # =============================================================================
 # Automated scheduling settings for running periodic job searches.
-# When enabled, the tool runs continuously and searches at regular intervals.
+#
+# The operating mode (continuous scheduler vs single-shot) is chosen by the
+# CLI subcommand, not by config:
+#
+#   python main.py scheduler   → continuous loop, uses the settings below
+#   python main.py once        → single iteration, settings below are ignored
+#
+# The `scheduler.enabled` flag from v5 and older is no longer read.
 # =============================================================================
 
 scheduler:
-  # ---------------------------------------------------------------------------
-  # enabled (boolean, default: false)
-  # ---------------------------------------------------------------------------
-  # Enable scheduled (continuous) execution mode.
-  #
-  # Values:
-  # - false: Single-shot mode - run once and exit (default)
-  # - true: Scheduled mode - run continuously at intervals
-  #
-  # In scheduled mode:
-  # - Tool runs forever (until stopped)
-  # - Searches run every interval_hours
-  # - Notifications sent when new jobs found
-  # - Graceful shutdown on SIGINT/SIGTERM
-  #
-  # Docker usage:
-  # docker-compose --profile scheduler up scheduler
-  # ---------------------------------------------------------------------------
-  enabled: false
-
   # ---------------------------------------------------------------------------
   # interval_hours (integer, default: 24)
   # ---------------------------------------------------------------------------
