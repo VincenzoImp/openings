@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.4] - 2026-04-15
+
+### Changed
+
+- **Cleaner Compose defaults**: the committed `docker-compose.yml` now uses project name `jobsearch`, named containers `jobsearch-scheduler` / `jobsearch-dashboard`, and network `jobsearch`. `docker ps` and `docker compose logs -f <service>` read cleanly without the `-<n>` replica suffix.
+- **Network hardening baked into the default stack**:
+  - `networks.default.enable_ipv6: false` prevents the class of `[Errno 113] No route to host` errors seen on hosts with broken dual-stack routing (LXC, home routers with half-configured IPv6, cloud VMs without a default v6 route). Python's `getaddrinfo` only returns IPv4 results inside the stack.
+  - Explicit `dns: [1.1.1.1, 8.8.8.8]` on both services bypasses the embedded Docker DNS → host DNS chain that occasionally returns stale or unreachable upstream IPs.
+- **Safer first-run template** (`config/settings.example.yaml`): default `sites` narrowed to `[indeed, linkedin]` (Glassdoor is opt-in because its API rejects many common location formats with HTTP 400 / `location not parsed`); default `locations` changed to `["Remote"]` with `is_remote: true` so a brand-new container runs clean without region-specific parsing quirks.
+
+### Fixed
+
+- **JobSpy log noise deduplicated**: replaced the broken `logging.getLogger("jobspy").setLevel(CRITICAL)` (which targeted a non-existent lowercase logger name) with a proper `DedupeFilter` attached to both our application handlers and a root-logger handler. Third-party loggers like `JobSpy:Glassdoor` used to fire the same `Glassdoor: location not parsed` error 24+ times per run; now only the first occurrence is emitted per `(logger_name, level, message)` tuple. The filter is generic and will also collapse repeated noise from other chatty libraries.
+- **`job_search` logger no longer propagates**: application logs are now emitted only by our own handlers, preventing double-logging through the root handler we install for third-party capture.
+
+### Added
+
+- **README `Troubleshooting` section** rewritten with four actionable scenarios: rate limiting, Glassdoor `location not parsed`, `No route to host` / IPv6 diagnosis, and the local rebuild workflow. Includes a copy-pasteable `docker compose exec` diagnostic for network reachability.
+- **`DedupeFilter` unit tests**: six regression tests covering first-occurrence pass, duplicate suppression, distinct messages, independent logger tracking, prefix scoping, and global dedupe.
+
 ## [6.0.3] - 2026-04-15
 
 ### Fixed
@@ -540,7 +560,8 @@ No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-
 - **Structured Logging**: File and console logs with rotation
 - **Docker Support**: Containerized environment for cross-platform compatibility
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.3...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.4...HEAD
+[6.0.4]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.3...v6.0.4
 [6.0.3]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.2...v6.0.3
 [6.0.2]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.1...v6.0.2
 [6.0.1]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.0...v6.0.1

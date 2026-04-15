@@ -794,15 +794,16 @@ When enabled, files are saved to `results/` with timestamps:
 
 ## Troubleshooting
 
-### Rate Limiting (Empty Results, 429 Errors)
+### Rate Limiting (empty results, HTTP 429)
+
+Job boards aggressively rate-limit scraping traffic. Tune the throttling knobs in your `settings.yaml`:
 
 ```yaml
-# Adjust these settings in config/settings.yaml:
 throttling:
   enabled: true
   default_delay: 2.5          # Increase delay
   site_delays:
-    linkedin: 5.0             # LinkedIn needs more time
+    linkedin: 5.0             # LinkedIn is the most aggressive
 
 parallel:
   max_workers: 2              # Reduce concurrency
@@ -811,39 +812,70 @@ search:
   results_wanted: 20          # Reduce per-query results
 ```
 
-### Docker Issues
+### Glassdoor: "location not parsed" (HTTP 400)
 
-```bash
-# Refresh the published image
-docker compose pull
-docker compose up jobsearch
+Glassdoor's API is strict about location string format and rejects many perfectly valid-looking inputs (e.g. `"New York, NY"`, `"San Francisco, CA"`) with a cryptic 400. The default `settings.yaml` shipped with v6.0.4+ does **not** query Glassdoor for exactly this reason.
+
+If you want Glassdoor coverage, test your location manually first on glassdoor.com and verify that the format you use in `search.locations` resolves cleanly. When it does, re-enable it:
+
+```yaml
+search:
+  sites:
+    - "indeed"
+    - "linkedin"
+    - "glassdoor"    # add back once your location format works
 ```
 
+Duplicate `Glassdoor: location not parsed` errors inside a single run are automatically deduplicated in the logs — you'll see the first one and the rest are silently suppressed.
+
+### `[Errno 113] No route to host` on Indeed / Glassdoor / Cloudflare CDNs
+
+This happens when some Cloudflare anycast IPs are unreachable from your host — usually because IPv6 is half-configured (the container gets a v6 address but there's no functioning default v6 route) or because a firewall blackhole-drops certain ranges.
+
+The default `docker-compose.yml` already mitigates the two most common causes:
+- `networks.default.enable_ipv6: false` — the container stack never attempts IPv6 connectivity, so Python's `getaddrinfo` only returns v4 results.
+- `dns: [1.1.1.1, 8.8.8.8]` — explicit public resolvers bypass the embedded Docker DNS → host DNS chain, which is a frequent source of stale or broken lookups.
+
+If the error persists, run this diagnostic inside the container to see which Cloudflare IPs your host reaches:
+
 ```bash
-# Full local rebuild (developer workflow)
+docker compose exec scheduler python -c "
+import socket
+for host in ['apis.indeed.com', 'www.linkedin.com', 'www.glassdoor.com']:
+    try:
+        socket.create_connection((host, 443), 5).close()
+        print(f'{host} OK')
+    except Exception as e:
+        print(f'{host} FAIL ({type(e).__name__}: {e})')
+"
+```
+
+Persistent failures with `No route to host` point to a host-level networking problem (firewall, conntrack exhaustion, routing misconfiguration) that this tool cannot fix. Check `dmesg`, conntrack (`cat /proc/sys/net/netfilter/nf_conntrack_count`), and MTU.
+
+### Database locked
+
+The SQLite store runs with WAL mode and `busy_timeout=5000` to handle concurrent access, but SQLite still allows only one writer at a time. If something is holding the write lock:
+
+```bash
+docker compose restart scheduler    # clean restart releases any stale lock
+```
+
+### Local Docker rebuild
+
+When you change code or the `Dockerfile` and want to rebuild instead of pulling:
+
+```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml down
-docker system prune -f
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
 ```
 
-### Database Locked
-
-The database uses WAL mode and `busy_timeout=5000` to handle concurrent access, but SQLite still supports only one writer at a time:
-
-```bash
-# Stop any running processes
-docker compose down
-
-# Or wait for the current operation to complete
-```
-
-### Python Version
+### Python version (local development)
 
 JobSpy requires Python 3.11+:
 
 ```bash
 python3 --version
-# If below 3.11, use Docker instead
+# If below 3.11, either upgrade or use the Docker stack instead.
 ```
 
 ---

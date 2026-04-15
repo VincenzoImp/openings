@@ -940,6 +940,23 @@ columns = [
 
 ## Changelog
 
+### v6.0.4 (2026-04-15)
+
+**Polish release — cleaner defaults, network hardening, log dedupe.**
+
+- **`docker-compose.yml`**: project name `jobsearch`, containers `jobsearch-scheduler` / `jobsearch-dashboard`, network `jobsearch`. `networks.default.enable_ipv6: false` and explicit `dns: [1.1.1.1, 8.8.8.8]` mitigate common home-lab / cloud-VM networking edge cases (`[Errno 113] No route to host` from broken IPv6 routing, stale upstream DNS).
+- **Default template** (`settings.example.yaml`): `sites=[indeed, linkedin]`, `locations=["Remote"]`, `is_remote=true` so a fresh first-run container runs without triggering Glassdoor's `location not parsed` HTTP 400.
+- **`scripts/logger.py`**: new `DedupeFilter` class attached to both application handlers and a root-logger handler. Collapses repeated identical records from third-party loggers (e.g. `JobSpy:Glassdoor`'s 24× `location not parsed` spam per run) to a single emission per `(name, level, message)` tuple. `job_search` logger now has `propagate=False` so its records don't double-log through the root handler. Replaces the broken `logging.getLogger("jobspy")` suppression which targeted a non-existent lowercase logger name.
+- **README Troubleshooting** rewritten with four actionable scenarios (rate limiting, Glassdoor 400, `No route to host`, local rebuild) and a `docker compose exec` network diagnostic.
+- **Tests**: 6 new unit tests for `DedupeFilter`.
+
+### v6.0.3 (2026-04-15)
+
+**Fix:**
+- **`JobSearchScheduler.start()` now unconditionally enters the continuous loop**. Previously it still consulted the legacy `config.scheduler.enabled` flag, and the bundled template shipped with `enabled: false`, so v6.0.0–v6.0.2 containers would scaffold settings, run once, and exit.
+- **`SchedulerConfig.enabled` removed**; legacy keys in `settings.yaml` are accepted with a one-line deprecation warning.
+- **ChromaDB telemetry silenced** via `ANONYMIZED_TELEMETRY=False` and `CHROMA_TELEMETRY_IMPL=none` env vars baked into the image. Eliminates the `capture() takes 1 positional argument but 3 were given` errors.
+
 ### v6.0.2 (2026-04-15)
 
 **Fix:**

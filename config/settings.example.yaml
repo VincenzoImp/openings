@@ -116,12 +116,15 @@ search:
   # sites:
   #   - "indeed"
   #   - "linkedin"
-  #   - "glassdoor"
+  #   - "glassdoor"   # add after you've confirmed your location format works
   # ---------------------------------------------------------------------------
+  # Defaults: only the two most reliable sites. Glassdoor rejects many
+  # common "City, State" / "City, Country" formats with a cryptic HTTP 400
+  # "location not parsed" error — add it back after you've verified your
+  # location string works for it.
   sites:
     - "indeed"
     - "linkedin"
-    - "glassdoor"
 
   # ---------------------------------------------------------------------------
   # locations (list of strings, default: ["Remote"])
@@ -147,8 +150,11 @@ search:
   #   - "San Francisco, CA"
   #   - "London, UK"
   # ---------------------------------------------------------------------------
+  # Default: a single "Remote" entry so the first run works out of the box
+  # on any region without hitting location-parsing edge cases. Replace this
+  # with your real target(s) before running for real.
   locations:
-    - "New York, NY"
+    - "Remote"
 
   # ---------------------------------------------------------------------------
   # distance (integer, default: 50)
@@ -186,7 +192,8 @@ search:
   # Note: This is a strict filter. If set to true, non-remote jobs are excluded
   # even if they match all other criteria.
   # ---------------------------------------------------------------------------
-  is_remote: false
+  # Default true so it stays consistent with the "Remote" default above.
+  is_remote: true
 
   # ---------------------------------------------------------------------------
   # easy_apply (boolean or null, default: null)

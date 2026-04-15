@@ -1,21 +1,26 @@
-name: job-search-tool
+name: jobsearch
 
-# Two long-running services sharing a single Docker-managed named volume
-# backed by the /data subtree inside the image. Both services pull the same
-# image (Docker deduplicates the download) and differ only by the subcommand
-# they run:
+# Two long-running services sharing a single Docker-managed named volume.
+# Both pull the same image (Docker deduplicates the download) and differ only
+# by the subcommand they run:
 #
 #   scheduler  → `python main.py scheduler`  (default; continuous search loop)
 #   dashboard  → `python main.py dashboard`  (Streamlit UI on :8501)
 #
 # Both containers run as non-root (`appuser`, UID 1000). Using a named volume
 # instead of a bind mount means Docker inherits ownership from the image, so
-# the container can write to the volume without any host-side permission
-# tweaking.
+# the non-root container can write without any host-side permission tweaking.
 #
-# First run auto-scaffolds settings.yaml from the bundled template inside
-# the volume. To edit it afterwards, `docker compose cp` it out, edit
-# locally, copy it back, and restart the scheduler (see the README).
+# The network defaults below harden a few home-lab / cloud-VM edge cases:
+#   - IPv6 is disabled on the stack's bridge so Python's getaddrinfo never
+#     tries an unreachable IPv6 address when the host has broken v6 routing.
+#   - Explicit public resolvers bypass the embedded Docker DNS → host DNS
+#     chain, which occasionally returns stale or unreachable upstream IPs.
+
+networks:
+  default:
+    name: jobsearch
+    enable_ipv6: false
 
 volumes:
   jobsearch-data:
@@ -23,8 +28,12 @@ volumes:
 services:
   scheduler:
     image: vincenzoimp/job-search-tool:latest
+    container_name: jobsearch-scheduler
     restart: unless-stopped
     command: ["python", "main.py", "scheduler"]
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     env_file:
       - path: .env
         required: false
@@ -33,8 +42,12 @@ services:
 
   dashboard:
     image: vincenzoimp/job-search-tool:latest
+    container_name: jobsearch-dashboard
     restart: unless-stopped
     command: ["python", "main.py", "dashboard"]
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     ports:
       - "${JOB_SEARCH_DASHBOARD_PORT:-8501}:8501"
     env_file:

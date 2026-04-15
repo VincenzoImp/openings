@@ -23,6 +23,7 @@ from config import Config, LoggingConfig
 from logger import (
     ColoredFormatter,
     Colors,
+    DedupeFilter,
     PlainFormatter,
     ProgressLogger,
     get_logger,
@@ -450,3 +451,72 @@ class TestSetupLogging:
 
             assert old_file_handler not in logger.handlers
             assert old_file_handler.stream is None or old_file_handler.stream.closed
+
+
+# =============================================================================
+# TEST DEDUPE FILTER
+# =============================================================================
+
+
+def _make_record(name: str, msg: str, level: int = logging.ERROR) -> logging.LogRecord:
+    return logging.LogRecord(
+        name=name,
+        level=level,
+        pathname=__file__,
+        lineno=0,
+        msg=msg,
+        args=(),
+        exc_info=None,
+    )
+
+
+class TestDedupeFilter:
+    """Tests for DedupeFilter."""
+
+    def test_first_occurrence_passes(self):
+        """First record for a (name, level, msg) tuple always passes."""
+        f = DedupeFilter(name_prefix="JobSpy")
+        record = _make_record("JobSpy:Glassdoor", "location not parsed")
+        assert f.filter(record) is True
+
+    def test_duplicate_is_dropped(self):
+        """Second record with identical key is suppressed."""
+        f = DedupeFilter(name_prefix="JobSpy")
+        first = _make_record("JobSpy:Glassdoor", "location not parsed")
+        second = _make_record("JobSpy:Glassdoor", "location not parsed")
+        assert f.filter(first) is True
+        assert f.filter(second) is False
+
+    def test_distinct_messages_pass(self):
+        """Different messages from the same logger are kept independently."""
+        f = DedupeFilter(name_prefix="JobSpy")
+        a = _make_record("JobSpy:Glassdoor", "location not parsed")
+        b = _make_record("JobSpy:Glassdoor", "status code 429")
+        assert f.filter(a) is True
+        assert f.filter(b) is True
+
+    def test_distinct_loggers_are_independent(self):
+        """Records from different loggers are tracked separately."""
+        f = DedupeFilter(name_prefix="JobSpy")
+        a = _make_record("JobSpy:Glassdoor", "oops")
+        b = _make_record("JobSpy:Indeed", "oops")
+        assert f.filter(a) is True
+        assert f.filter(b) is True
+
+    def test_prefix_is_respected(self):
+        """Records outside the configured name prefix pass through unchanged."""
+        f = DedupeFilter(name_prefix="JobSpy")
+        a = _make_record("job_search.main", "hello")
+        b = _make_record(
+            "job_search.main", "hello"
+        )  # would be deduped if prefix was ""
+        assert f.filter(a) is True
+        assert f.filter(b) is True  # NOT deduped because name prefix doesn't match
+
+    def test_empty_prefix_dedupes_everything(self):
+        """An empty prefix applies dedupe globally."""
+        f = DedupeFilter(name_prefix="")
+        a = _make_record("any.logger", "hi")
+        b = _make_record("any.logger", "hi")
+        assert f.filter(a) is True
+        assert f.filter(b) is False

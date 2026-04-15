@@ -66,36 +66,77 @@ class PlainFormatter(logging.Formatter):
     pass
 
 
-def setup_logging(config: Config) -> logging.Logger:
+class DedupeFilter(logging.Filter):
+    """Collapse repeated identical records from noisy third-party loggers.
+
+    Emits the first record for each ``(logger_name, level, message)`` tuple
+    verbatim and drops subsequent duplicates for the remainder of the process.
+    Useful for third-party libraries (JobSpy, ChromaDB, ...) that spam the
+    same error for every item in a batch — we keep one sample instead of 24.
     """
-    Set up logging with console and file handlers.
+
+    def __init__(self, name_prefix: str = "") -> None:
+        super().__init__()
+        self._prefix = name_prefix
+        self._seen: set[tuple[str, int, str]] = set()
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if self._prefix and not record.name.startswith(self._prefix):
+            return True
+        key = (record.name, record.levelno, record.getMessage())
+        if key in self._seen:
+            return False
+        self._seen.add(key)
+        return True
+
+
+def setup_logging(config: Config) -> logging.Logger:
+    """Configure application-wide logging with console and file handlers.
+
+    The tool owns both its own ``job_search`` logger (with a compact coloured
+    format) and the root logger (where third-party libraries like JobSpy log
+    via ``logging.basicConfig``). Both routes share a ``DedupeFilter`` that
+    collapses repeated identical records from ``JobSpy:*`` per-site loggers —
+    typically the ``Glassdoor: location not parsed`` error that otherwise
+    fires 24 times per run.
 
     Args:
         config: Configuration object with logging settings.
 
     Returns:
-        Configured logger instance.
+        Configured ``job_search`` logger instance.
     """
-    # Create logger
-    logger = logging.getLogger("job_search")
-    logger.setLevel(getattr(logging, config.logging.level.upper(), logging.INFO))
+    level = getattr(logging, config.logging.level.upper(), logging.INFO)
 
-    # Remove and close existing handlers so repeated setup calls don't leak FDs.
-    for handler in list(logger.handlers):
-        logger.removeHandler(handler)
-        handler.close()
+    # Dedupe filter shared between all handlers so the same (name, level,
+    # message) tuple is suppressed everywhere after the first occurrence.
+    jobspy_dedupe = DedupeFilter(name_prefix="JobSpy")
 
-    # Console handler with colors
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.DEBUG)
     console_format = ColoredFormatter(
         fmt="%(asctime)s | %(levelname)s | %(message)s",
         datefmt="%H:%M:%S",
     )
+    file_format = PlainFormatter(
+        fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    # --- Our application logger (job_search) ------------------------------
+    logger = logging.getLogger("job_search")
+    logger.setLevel(level)
+    logger.propagate = False  # keep application logs off the root handlers
+
+    for handler in list(logger.handlers):
+        logger.removeHandler(handler)
+        handler.close()
+
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.DEBUG)
     console_handler.setFormatter(console_format)
+    console_handler.addFilter(jobspy_dedupe)
     logger.addHandler(console_handler)
 
-    # File handler with rotation (skip if directory is not writable)
+    # File handler with rotation (skip if the directory is not writable).
     log_path = config.log_path
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -106,11 +147,8 @@ def setup_logging(config: Config) -> logging.Logger:
             encoding="utf-8",
         )
         file_handler.setLevel(logging.DEBUG)
-        file_format = PlainFormatter(
-            fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
         file_handler.setFormatter(file_format)
+        file_handler.addFilter(jobspy_dedupe)
         logger.addHandler(file_handler)
     except PermissionError:
         logger.warning(
@@ -119,11 +157,42 @@ def setup_logging(config: Config) -> logging.Logger:
             log_path,
         )
 
-    # Suppress noisy third-party loggers
-    logging.getLogger("jobspy").setLevel(logging.CRITICAL)
+    # --- Root logger (third-party libraries) ------------------------------
+    # Install a root handler with the same dedupe filter so records from
+    # JobSpy / ChromaDB / ... that never touch our application logger are
+    # still deduped. Without this, JobSpy's ``logging.basicConfig`` call
+    # would attach an unfiltered StreamHandler at first import.
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.WARNING)
+    _purge_dedupe_filters(root_logger)
+    for handler in list(root_logger.handlers):
+        if isinstance(handler, logging.StreamHandler):
+            # Close stale handlers from previous setup_logging calls.
+            handler.close()
+            root_logger.removeHandler(handler)
+
+    root_console = logging.StreamHandler(sys.stdout)
+    root_console.setLevel(logging.WARNING)
+    root_console.setFormatter(file_format)
+    root_console.addFilter(jobspy_dedupe)
+    root_logger.addHandler(root_console)
+
+    # ChromaDB occasionally emits noisy WARNING-level telemetry failures —
+    # keep them at WARNING so anything at or above that level still flows.
     logging.getLogger("chromadb").setLevel(logging.WARNING)
 
     return logger
+
+
+def _purge_dedupe_filters(target: logging.Logger | logging.Handler) -> None:
+    """Remove previously attached ``DedupeFilter`` instances from ``target``.
+
+    Prevents filter accumulation when ``setup_logging`` is called multiple
+    times in the same process (tests, re-loads, config reloads).
+    """
+    for existing in list(target.filters):
+        if isinstance(existing, DedupeFilter):
+            target.removeFilter(existing)
 
 
 def get_logger(name: str | None = None) -> logging.Logger:

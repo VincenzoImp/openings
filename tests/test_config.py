@@ -196,8 +196,16 @@ class TestSchedulerConfigValidation:
         """Legacy scheduler.enabled is ignored with a deprecation warning."""
         import logging
 
-        with caplog.at_level(logging.WARNING, logger="job_search.config"):
+        # The ``job_search`` logger has ``propagate=False`` after
+        # ``setup_logging`` runs, so caplog's root-level handler never sees
+        # the warning. Attach caplog's handler directly to the child logger.
+        cfg_logger = logging.getLogger("job_search.config")
+        cfg_logger.setLevel(logging.WARNING)
+        cfg_logger.addHandler(caplog.handler)
+        try:
             config = _parse_scheduler_config({"scheduler": {"enabled": True}})
+        finally:
+            cfg_logger.removeHandler(caplog.handler)
 
         assert config.interval_hours == 24
         assert any(
