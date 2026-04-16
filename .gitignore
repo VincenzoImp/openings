@@ -3,33 +3,21 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
-env/
-venv/
 .venv/
-ENV/
 *.egg-info/
-.eggs/
 dist/
 build/
 
-# v6 unified data tree (local runtime state)
-# Every persistent file lives under ./data/ when JOB_SEARCH_DATA_DIR is unset
-# (local dev) or when running the Compose stack with `./data:/data`.
+# Runtime state (all persistent data lives under data/)
 data/
-
-# Legacy dev-mode output dirs (kept for developers running from repo root)
-results/*.csv
-results/*.xlsx
-results/*.json
-!results/.gitkeep
+results/
 logs/
 *.log
+chroma/
+db/
 
-# User configuration (personal settings)
+# User configuration
 config/settings.yaml
-config/local.yaml
-config/*.local.yaml
 
 # IDE
 .vscode/
@@ -41,25 +29,18 @@ config/*.local.yaml
 # OS
 .DS_Store
 Thumbs.db
-ehthumbs.db
 
 # Temporary files
 *.tmp
 *.bak
 tmp/
-temp/
-
-# Jupyter notebooks
-.ipynb_checkpoints/
-*.ipynb
+.tmp/
 
 # Testing
 .pytest_cache/
-.benchmarks/
 .coverage
 htmlcov/
-.tox/
-.nox/
+MagicMock/
 
 # Type checking and linting
 .mypy_cache/
@@ -69,10 +50,10 @@ htmlcov/
 .docker/
 docker-compose.override.yml
 
-# Environment files (may contain secrets)
+# Environment files
 .env
 .env.*
 !.env.example
 
-# Claude Code harness runtime state
+# Claude Code
 .claude/
