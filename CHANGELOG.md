@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.1.1] - 2026-04-16
+
+### Changed
+
+- **Shared service layer** (`scripts/job_service.py`): extracted DB/vector-store initialization, record serialization, job filtering, and sorting into a single module shared by the dashboard, REST API, and MCP server. All three frontends are now thin adapters over `job_service`, eliminating ~60 lines of duplicated logic and ensuring consistent behavior across surfaces.
+- **`api_server.py`** and **`mcp_server.py`** refactored to import all data operations from `job_service` instead of reimplementing them locally. Pydantic models and endpoint/tool definitions remain in the adapters.
+- **`dashboard.py`** now imports `record_to_dict` from `job_service` instead of maintaining its own copy.
+
+### Fixed
+
+- **MCP `_SETTINGS_DOCUMENTATION`**: `scoring.notify_threshold` default corrected from `0` to `20` (matched the actual `ScoringConfig` default).
+- **MCP vector store init**: failures are now logged with a warning instead of being silently swallowed (`except Exception: pass` → proper logging via `job_service.get_vs()`).
+- **API server version**: updated from hardcoded `"1.0.0"` to `"7.1.0"` to match the project version.
+- **SQLite cross-thread crash**: `check_same_thread=False` added to `sqlite3.connect()` in `database.py` — FastAPI runs sync endpoints in a threadpool, so the connection must be shareable across threads. WAL mode already provides concurrency safety.
+- **MCP server port**: `FastMCP` constructor now passes `host="0.0.0.0"` and `port=3001` explicitly. The default (`127.0.0.1:8000`) didn't match the `docker-compose.yml` mapping and wouldn't accept connections from outside the container.
+- **CI workflow**: removed stale `AGENTS.md` entry from `paths-ignore` (file was deleted in v7.0.1).
+- **README.md**: test count corrected from 375 to 373.
+
 ## [7.1.0] - 2026-04-16
 
 ### Added
@@ -387,7 +405,8 @@ No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-
 
 Entries prior to v4.3.1 have been archived. The git history on `main` plus the tagged commits are the authoritative source for anything older.
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v7.1.0...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v7.1.1...HEAD
+[7.1.1]: https://github.com/VincenzoImp/job-search-tool/compare/v7.1.0...v7.1.1
 [7.1.0]: https://github.com/VincenzoImp/job-search-tool/compare/v7.0.1...v7.1.0
 [7.0.1]: https://github.com/VincenzoImp/job-search-tool/compare/v7.0.0...v7.0.1
 [7.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.8...v7.0.0

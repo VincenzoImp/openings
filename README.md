@@ -55,7 +55,7 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 | **Retry Logic** | Exponential backoff with tenacity for transient failures |
 | **Dynamic Rescoring** | Automatic rescoring of existing jobs when criteria change |
 | **CI/CD Pipeline** | GitHub Actions with test matrix, security audit, Docker build |
-| **Comprehensive Testing** | 375 pytest tests covering all core functionality |
+| **Comprehensive Testing** | 373 pytest tests covering all core functionality |
 | **Vector Embeddings** | Local ONNX embeddings via ChromaDB's default function — no torch runtime |
 
 ---
@@ -1052,7 +1052,7 @@ job-search-tool/
 │   ├── api_server.py              # REST API adapter (FastAPI, port 8502)
 │   ├── mcp_server.py              # MCP server adapter for LLMs (SSE, port 3001)
 │   └── healthcheck.py             # Docker health checks
-├── tests/                          # 375 pytest tests
+├── tests/                          # 373 pytest tests
 ├── data/                           # Local dev state (gitignored): db/, chroma/, results/, logs/
 ├── .github/workflows/              # CI + publish-release
 ├── Dockerfile                      # Multi-stage build, single image, non-root, tini-init

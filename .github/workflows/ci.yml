@@ -7,7 +7,6 @@ on:
       - "README.md"
       - "CHANGELOG.md"
       - "CONTRIBUTING.md"
-      - "AGENTS.md"
       - "LICENSE"
   pull_request:
     branches: [main]
@@ -15,7 +14,6 @@ on:
       - "README.md"
       - "CHANGELOG.md"
       - "CONTRIBUTING.md"
-      - "AGENTS.md"
       - "LICENSE"
   workflow_dispatch:
 
