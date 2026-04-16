@@ -739,3 +739,314 @@ class TestRetentionMethods:
         assert blacklist_count == 1
         assert temp_db.get_all_jobs() == []
         assert temp_db.get_blacklisted_job_ids() == set()
+
+    def test_reset_all_deletes_applied_and_bookmarked(self, temp_db):
+        """reset_all is the ONLY path that bypasses bookmark/applied protection."""
+        bm = Job.from_dict(
+            {"title": "BM", "company": "C", "location": "NYC", "relevance_score": 1}
+        )
+        ap = Job.from_dict(
+            {"title": "AP", "company": "C", "location": "NYC", "relevance_score": 1}
+        )
+        temp_db.save_job(bm)
+        temp_db.save_job(ap)
+        temp_db.toggle_bookmark(bm.job_id)
+        temp_db.mark_as_applied(ap.job_id)
+
+        jobs_count, blacklist_count = temp_db.reset_all()
+
+        assert jobs_count == 2
+        assert blacklist_count == 0
+        assert temp_db.get_all_jobs() == []
+        assert not temp_db.job_exists(bm.job_id)
+        assert not temp_db.job_exists(ap.job_id)
+
+    def test_reset_all_empty_db(self, temp_db):
+        """reset_all on empty DB returns zeros."""
+        jobs_count, blacklist_count = temp_db.reset_all()
+        assert jobs_count == 0
+        assert blacklist_count == 0
+
+    def test_reconcile_only_score_threshold(self, temp_db):
+        """Reconcile with only save_threshold active (very old age, no blacklist)."""
+        low = Job.from_dict(
+            {"title": "Low", "company": "C", "location": "NYC", "relevance_score": 2}
+        )
+        high = Job.from_dict(
+            {"title": "High", "company": "C", "location": "NYC", "relevance_score": 50}
+        )
+        temp_db.save_job(low)
+        temp_db.save_job(high)
+
+        cfg = _make_config(
+            save_threshold=10,
+            max_age_days=9999,
+            purge_blacklist_after_days=9999,
+        )
+        report = temp_db.reconcile_with_config(cfg)
+
+        assert report.deleted_below_score == 1
+        assert report.deleted_stale == 0
+        assert report.purged_blacklist == 0
+        assert report.total_deleted == 1
+
+    def test_reconcile_only_age(self, temp_db):
+        """Reconcile with only stale-age active (score threshold=0)."""
+        old_job = Job.from_dict(
+            {"title": "Old", "company": "C", "location": "NYC", "relevance_score": 50}
+        )
+        fresh_job = Job.from_dict(
+            {"title": "Fresh", "company": "C", "location": "NYC", "relevance_score": 50}
+        )
+        temp_db.save_job(old_job)
+        temp_db.save_job(fresh_job)
+
+        # Make one job old
+        with temp_db._get_connection() as conn:
+            conn.execute(
+                "UPDATE jobs SET last_seen = date('now', '-120 days') WHERE job_id = ?",
+                (old_job.job_id,),
+            )
+            conn.commit()
+
+        cfg = _make_config(
+            save_threshold=0,
+            max_age_days=30,
+            purge_blacklist_after_days=9999,
+        )
+        report = temp_db.reconcile_with_config(cfg)
+
+        assert report.deleted_below_score == 0
+        assert report.deleted_stale == 1
+        assert report.purged_blacklist == 0
+        assert temp_db.job_exists(fresh_job.job_id)
+        assert not temp_db.job_exists(old_job.job_id)
+
+    def test_reconcile_all_three_active(self, temp_db):
+        """Reconcile with all three cleanup passes active."""
+        low = Job.from_dict(
+            {"title": "Low", "company": "C", "location": "NYC", "relevance_score": 1}
+        )
+        stale = Job.from_dict(
+            {"title": "Stale", "company": "C", "location": "NYC", "relevance_score": 50}
+        )
+        bl_job = Job.from_dict(
+            {"title": "Bl", "company": "C", "location": "NYC", "relevance_score": 30}
+        )
+        keeper = Job.from_dict(
+            {
+                "title": "Keeper",
+                "company": "C",
+                "location": "NYC",
+                "relevance_score": 50,
+            }
+        )
+        temp_db.save_job(low)
+        temp_db.save_job(stale)
+        temp_db.save_job(bl_job)
+        temp_db.save_job(keeper)
+
+        # Age one job
+        with temp_db._get_connection() as conn:
+            conn.execute(
+                "UPDATE jobs SET last_seen = date('now', '-120 days') WHERE job_id = ?",
+                (stale.job_id,),
+            )
+            conn.commit()
+
+        # Blacklist one with old timestamp
+        temp_db.blacklist_job(bl_job.job_id)
+        with temp_db._get_connection() as conn:
+            conn.execute(
+                "UPDATE deleted_jobs SET blacklisted_at = datetime('now', '-200 days') "
+                "WHERE job_id = ?",
+                (bl_job.job_id,),
+            )
+            conn.commit()
+
+        cfg = _make_config(
+            save_threshold=10,
+            max_age_days=30,
+            purge_blacklist_after_days=90,
+        )
+        report = temp_db.reconcile_with_config(cfg)
+
+        assert report.deleted_below_score == 1  # low
+        assert report.deleted_stale == 1  # stale
+        assert report.purged_blacklist == 1  # bl_job
+        assert report.total_deleted == 3
+        assert temp_db.job_exists(keeper.job_id)
+
+    def test_get_score_distribution_bin_size_10(self, temp_db):
+        """Test distribution with non-default bin size."""
+        for title, score in [("A", 5), ("B", 15), ("C", 25)]:
+            temp_db.save_job(
+                Job.from_dict(
+                    {
+                        "title": title,
+                        "company": "C",
+                        "location": "NYC",
+                        "relevance_score": score,
+                    }
+                )
+            )
+
+        bins = dict(temp_db.get_score_distribution(bin_size=10))
+
+        assert bins[0] == 1  # score 5
+        assert bins[10] == 1  # score 15
+        assert bins[20] == 1  # score 25
+
+    def test_get_score_distribution_invalid_bin_size(self, temp_db):
+        """bin_size <= 0 raises ValueError."""
+        import pytest
+
+        with pytest.raises(ValueError, match="bin_size must be positive"):
+            temp_db.get_score_distribution(bin_size=0)
+
+        with pytest.raises(ValueError, match="bin_size must be positive"):
+            temp_db.get_score_distribution(bin_size=-5)
+
+    def test_get_score_distribution_single_score(self, temp_db):
+        """All jobs at the same score produce a single bin."""
+        for i in range(3):
+            temp_db.save_job(
+                Job.from_dict(
+                    {
+                        "title": f"Job{i}",
+                        "company": "C",
+                        "location": "NYC",
+                        "relevance_score": 10,
+                    }
+                )
+            )
+
+        bins = temp_db.get_score_distribution(bin_size=5)
+        assert len(bins) == 1
+        assert bins[0] == (10, 3)
+
+    def test_count_jobs_below_score_accuracy(self, temp_db):
+        """Preview count must match actual delete."""
+        for title, score in [("A", 5), ("B", 15), ("C", 25)]:
+            temp_db.save_job(
+                Job.from_dict(
+                    {
+                        "title": title,
+                        "company": "C",
+                        "location": "NYC",
+                        "relevance_score": score,
+                    }
+                )
+            )
+
+        preview = temp_db.count_jobs_below_score(20)
+        actual = temp_db.delete_jobs_below_score(20)
+        assert preview == actual == 2
+
+    def test_count_stale_jobs_accuracy(self, temp_db):
+        """Preview count matches actual stale delete."""
+        j = Job.from_dict(
+            {"title": "Old", "company": "C", "location": "NYC", "relevance_score": 10}
+        )
+        temp_db.save_job(j)
+        with temp_db._get_connection() as conn:
+            conn.execute(
+                "UPDATE jobs SET last_seen = date('now', '-60 days') WHERE job_id = ?",
+                (j.job_id,),
+            )
+            conn.commit()
+
+        preview = temp_db.count_stale_jobs(30)
+        actual = temp_db.delete_stale_jobs(30)
+        assert preview == actual == 1
+
+    def test_count_blacklist_older_than_accuracy(self, temp_db):
+        """Preview count matches actual blacklist purge."""
+        j = Job.from_dict({"title": "Bl", "company": "C", "location": "NYC"})
+        temp_db.save_job(j)
+        temp_db.blacklist_job(j.job_id)
+        with temp_db._get_connection() as conn:
+            conn.execute(
+                "UPDATE deleted_jobs SET blacklisted_at = datetime('now', '-200 days') "
+                "WHERE job_id = ?",
+                (j.job_id,),
+            )
+            conn.commit()
+
+        preview = temp_db.count_blacklist_older_than(90)
+        actual = temp_db.purge_blacklist(older_than_days=90)
+        assert preview == actual == 1
+
+    def test_blacklist_jobs_large_batch(self, temp_db):
+        """Blacklist more than SQLITE_VAR_LIMIT (500) job IDs."""
+        job_ids = []
+        for i in range(600):
+            j = Job.from_dict({"title": f"J{i}", "company": "C", "location": "NYC"})
+            temp_db.save_job(j)
+            job_ids.append(j.job_id)
+
+        count = temp_db.blacklist_jobs(job_ids)
+
+        assert count == 600
+        assert temp_db.get_all_jobs() == []
+        assert len(temp_db.get_blacklisted_job_ids()) == 600
+
+    def test_delete_jobs_large_batch(self, temp_db):
+        """delete_jobs with more than SQLITE_VAR_LIMIT IDs."""
+        job_ids = []
+        for i in range(600):
+            j = Job.from_dict({"title": f"J{i}", "company": "C", "location": "NYC"})
+            temp_db.save_job(j)
+            job_ids.append(j.job_id)
+
+        count = temp_db.delete_jobs(job_ids)
+
+        assert count == 600
+        assert temp_db.get_all_jobs() == []
+
+    def test_delete_jobs_empty_list(self, temp_db):
+        """delete_jobs with empty list returns 0."""
+        assert temp_db.delete_jobs([]) == 0
+
+    def test_blacklist_jobs_empty_list(self, temp_db):
+        """blacklist_jobs with empty list returns 0."""
+        assert temp_db.blacklist_jobs([]) == 0
+
+    def test_get_top_jobs_empty_db(self, temp_db):
+        """get_top_jobs on empty DB returns empty list."""
+        assert temp_db.get_top_jobs() == []
+
+    def test_get_top_jobs_min_score_filters_all(self, temp_db):
+        """When min_score is above all scores, returns empty."""
+        j = Job.from_dict(
+            {"title": "Low", "company": "C", "location": "NYC", "relevance_score": 5}
+        )
+        temp_db.save_job(j)
+        assert temp_db.get_top_jobs(min_score=100) == []
+
+    def test_count_jobs_below_score_excludes_bookmarked(self, temp_db):
+        """count_jobs_below_score skips bookmarked jobs (matches delete behavior)."""
+        j = Job.from_dict(
+            {"title": "BM", "company": "C", "location": "NYC", "relevance_score": 1}
+        )
+        temp_db.save_job(j)
+        temp_db.toggle_bookmark(j.job_id)
+
+        assert temp_db.count_jobs_below_score(10) == 0
+
+    def test_count_stale_jobs_excludes_applied(self, temp_db):
+        """count_stale_jobs skips applied jobs."""
+        j = Job.from_dict(
+            {"title": "AP", "company": "C", "location": "NYC", "relevance_score": 10}
+        )
+        temp_db.save_job(j)
+        temp_db.mark_as_applied(j.job_id)
+
+        with temp_db._get_connection() as conn:
+            conn.execute(
+                "UPDATE jobs SET last_seen = date('now', '-120 days') WHERE job_id = ?",
+                (j.job_id,),
+            )
+            conn.commit()
+
+        assert temp_db.count_stale_jobs(30) == 0
