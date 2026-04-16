@@ -285,6 +285,7 @@ class JobDatabase:
             self._conn = sqlite3.connect(
                 self.db_path,
                 detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
+                check_same_thread=False,
             )
             self._conn.row_factory = sqlite3.Row
         try:

@@ -97,7 +97,7 @@ def _record_to_full(r: JobDBRecord) -> dict:
 # MCP Server
 # ---------------------------------------------------------------------------
 
-server = FastMCP("job-search-tool")
+server = FastMCP("job-search-tool", host="0.0.0.0", port=3001)
 
 
 # ---- DB read tools --------------------------------------------------------
