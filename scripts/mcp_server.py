@@ -11,13 +11,12 @@ Run: ``python mcp_server.py`` (SSE transport on port 3001).
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import asdict
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from mcp.server.fastmcp import FastMCP
 
+from config import DATA_DIR
 from database import JobDatabase
 from logger import get_logger
 from models import JobDBRecord
@@ -26,10 +25,9 @@ if TYPE_CHECKING:
     from vector_store import JobVectorStore
 
 # ---------------------------------------------------------------------------
-# Path helpers
+# Paths (derived from config.DATA_DIR — respects JOB_SEARCH_DATA_DIR env var)
 # ---------------------------------------------------------------------------
 
-DATA_DIR = Path(os.environ.get("JOB_SEARCH_DATA_DIR", "/data"))
 DB_PATH = DATA_DIR / "db" / "jobs.db"
 CHROMA_PATH = DATA_DIR / "chroma"
 

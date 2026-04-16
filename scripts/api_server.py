@@ -9,16 +9,15 @@ Run: ``python api_server.py`` (listens on port 8502).
 
 from __future__ import annotations
 
-import os
 from contextlib import asynccontextmanager
 from dataclasses import asdict
-from pathlib import Path
 from typing import TYPE_CHECKING, AsyncIterator
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from config import DATA_DIR
 from database import JobDatabase
 from logger import get_logger
 from models import JobDBRecord
@@ -27,10 +26,9 @@ if TYPE_CHECKING:
     from vector_store import JobVectorStore
 
 # ---------------------------------------------------------------------------
-# Path helpers
+# Paths (derived from config.DATA_DIR — respects JOB_SEARCH_DATA_DIR env var)
 # ---------------------------------------------------------------------------
 
-DATA_DIR = Path(os.environ.get("JOB_SEARCH_DATA_DIR", "/data"))
 DB_PATH = DATA_DIR / "db" / "jobs.db"
 CHROMA_PATH = DATA_DIR / "chroma"
 
@@ -117,13 +115,13 @@ def _record_to_response(record: JobDBRecord) -> JobResponse:
 
 
 def _semantic_to_response(sr: object) -> SemanticResultResponse:
-    meta = getattr(sr, "metadata", None) or {}
+    meta = sr.metadata or {}  # type: ignore[union-attr]
     return SemanticResultResponse(
-        job_id=getattr(sr, "job_id", ""),
+        job_id=sr.job_id,  # type: ignore[union-attr]
         title=meta.get("title"),
         company=meta.get("company"),
         location=meta.get("location"),
-        similarity=round(getattr(sr, "similarity", 0.0), 4),
+        similarity=round(sr.similarity, 4),  # type: ignore[union-attr]
         relevance_score=meta.get("relevance_score"),
         site=meta.get("site"),
         job_url=meta.get("job_url"),

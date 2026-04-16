@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -176,14 +176,12 @@ def test_search_similar_returns_results():
 
 
 def test_search_similar_no_vector_store():
-    import mcp_server
-
-    mcp_server._vs = None
     from mcp_server import search_similar
 
-    result = search_similar("test query")
-    data = json.loads(result)
-    assert "error" in data
+    with patch("mcp_server._get_vs", return_value=None):
+        result = search_similar("test query")
+        data = json.loads(result)
+        assert "error" in data
 
 
 # ---------------------------------------------------------------------------
