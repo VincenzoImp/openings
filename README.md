@@ -291,6 +291,8 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 | **Dashboard** | `dashboard.py` | Unified Job Search Hub with semantic search |
 | **Vector Store** | `vector_store.py` | ChromaDB semantic search |
 | **Vector Commands** | `vector_commands.py` | Embedding backfill and sync |
+| **REST API** | `api_server.py` | FastAPI CRUD server for programmatic access |
+| **MCP Server** | `mcp_server.py` | LLM tool server (DB access + config knowledge) |
 
 ---
 
@@ -754,6 +756,69 @@ Both containers share the same `jobsearch-data` volume (Docker creates it on fir
 
 ---
 
+## API & MCP Server
+
+Two optional services provide programmatic access to the job database.
+
+| Service | Purpose | Port |
+|---------|---------|------|
+| **REST API** (`api_server.py`) | CRUD wrapper over the job database for scripts, automations, and external tools. Auto-docs at `/docs`. | 8502 |
+| **MCP Server** (`mcp_server.py`) | Tool server for LLMs (Claude, etc.). Gives the model DB access and settings.yaml schema knowledge so it can act as a job search assistant. | 3001 |
+
+### Enable via Docker Compose
+
+Both services use Compose profiles and don't start by default:
+
+```bash
+# Start API only
+docker compose --profile api up -d
+
+# Start both API and MCP
+docker compose --profile api --profile mcp up -d
+
+# Default stack (scheduler + dashboard) is unaffected
+docker compose up -d
+```
+
+### REST API quick start
+
+```bash
+# List top jobs
+curl http://localhost:8502/jobs?limit=5&min_score=20
+
+# Get a single job
+curl http://localhost:8502/jobs/{job_id}
+
+# Semantic search
+curl "http://localhost:8502/jobs/search/semantic?q=python+backend&n_results=10"
+
+# Bookmark a job
+curl -X POST http://localhost:8502/jobs/{job_id}/bookmark
+
+# Full API docs
+open http://localhost:8502/docs
+```
+
+### MCP Server for Claude Code
+
+Add to your `.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "job-search-tool": {
+      "url": "http://localhost:3001/sse"
+    }
+  }
+}
+```
+
+Then ask Claude naturally: "Show me the top 10 jobs", "Bookmark that backend engineer role", "What does the scoring section in settings.yaml do?".
+
+The MCP server does NOT read your `settings.yaml` or profile -- it has a built-in `get_settings_documentation` tool that returns the full schema reference. You provide your context in the conversation.
+
+---
+
 ## Data Storage
 
 State lives in two places:
@@ -982,6 +1047,8 @@ job-search-tool/
 │   ├── exporter.py                # CSV/Excel export with sanitization
 │   ├── vector_store.py            # ChromaDB vector store (ONNX embedder)
 │   ├── vector_commands.py         # Vector backfill/sync
+│   ├── api_server.py              # REST API (FastAPI, port 8502)
+│   ├── mcp_server.py              # MCP server for LLMs (SSE, port 3001)
 │   └── healthcheck.py             # Docker health checks
 ├── tests/                          # 375 pytest tests
 ├── data/                           # Local dev state (gitignored): db/, chroma/, results/, logs/

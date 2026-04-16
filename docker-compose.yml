@@ -1,14 +1,20 @@
 name: jobsearch
 
-# Two long-running services sharing a single Docker-managed named volume
-# for all application state (database, vector store, results, logs). The
-# user-provided settings.yaml is bind-mounted as a read-only file so it can
-# be edited with any host-side editor.
+# Four services sharing a single Docker-managed named volume for all
+# application state (database, vector store, results, logs). The user-provided
+# settings.yaml is bind-mounted as a read-only file so it can be edited with
+# any host-side editor.
 #
 #   scheduler  → `python main.py scheduler`  (continuous search loop)
 #   dashboard  → `python main.py dashboard`  (Streamlit UI on :8501)
+#   api        → `python api_server.py`      (REST API on :8502, profile: api)
+#   mcp        → `python mcp_server.py`      (MCP server on :3001, profile: mcp)
 #
-# Both containers run as non-root (`appuser`, UID 1000) in every environment —
+# scheduler and dashboard always start. api and mcp are opt-in via
+# Docker Compose profiles:
+#   docker compose --profile api --profile mcp up -d
+#
+# All containers run as non-root (`appuser`, UID 1000) in every environment —
 # no host-side `chown`, no UID override, no privileged init. The named volume
 # inherits ownership from the image; settings.yaml is read-only so the
 # mismatch between host UID and container UID doesn't matter.
@@ -59,3 +65,40 @@ services:
     volumes:
       - jobsearch-data:/data
       - ./settings.yaml:/data/config/settings.yaml:ro
+
+  api:
+    image: vincenzoimp/job-search-tool:latest
+    container_name: jobsearch-api
+    restart: unless-stopped
+    command: ["python", "api_server.py"]
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    ports:
+      - "${JOB_SEARCH_API_PORT:-8502}:8502"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - jobsearch-data:/data
+      - ./settings.yaml:/data/config/settings.yaml:ro
+    profiles:
+      - api
+
+  mcp:
+    image: vincenzoimp/job-search-tool:latest
+    container_name: jobsearch-mcp
+    restart: unless-stopped
+    command: ["python", "mcp_server.py"]
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    ports:
+      - "${JOB_SEARCH_MCP_PORT:-3001}:3001"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - jobsearch-data:/data
+    profiles:
+      - mcp

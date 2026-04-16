@@ -219,10 +219,10 @@ tests/
 ├── test_logger.py       # Logger tests
 ├── test_exporter.py     # CSV/Excel export tests
 ├── test_healthcheck.py  # Health check tests
-├── test_report_generator.py  # Report generation tests
-├── test_analyze_jobs.py      # Analysis utility tests
 ├── test_search_jobs.py       # Search engine tests
-└── test_vector_store.py      # Vector store tests
+├── test_vector_store.py      # Vector store tests
+├── test_api_server.py        # REST API tests
+└── test_mcp_server.py        # MCP server tests
 ```
 
 ### Writing Tests

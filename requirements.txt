@@ -34,3 +34,10 @@ rapidfuzz>=3.0.0,<4.0.0
 # Uses ChromaDB's built-in ONNX embedder (DefaultEmbeddingFunction, bundling
 # all-MiniLM-L6-v2), so no torch / sentence-transformers / transformers needed.
 chromadb>=0.4.0,<1.0.0
+
+# REST API server
+fastapi>=0.115.0,<1.0.0
+uvicorn>=0.34.0,<1.0.0
+
+# MCP server for LLM tool integration
+mcp[cli]>=1.0.0,<2.0.0
