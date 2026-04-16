@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.1.0] - 2026-04-16
+
+### Added
+
+- **REST API server** (`scripts/api_server.py`, FastAPI on port 8502) — programmatic CRUD access to the job database for scripts, automations, and external tools. Endpoints: `GET /jobs` (paginated, filterable by score/site/company/bookmark/applied), `GET /jobs/{id}`, `GET /jobs/search/semantic` (ChromaDB vector search), `GET /stats`, `GET /distribution`, `POST /jobs/{id}/bookmark`, `POST /jobs/{id}/apply`, `DELETE /jobs/{id}`, `DELETE /jobs/below-score/{N}`, `GET /health`. Auto-generated OpenAPI docs at `/docs`.
+- **MCP server** (`scripts/mcp_server.py`, SSE transport on port 3001) — tools that let an LLM become a job search assistant. DB access tools: `list_jobs`, `get_job` (including full description for fit evaluation), `search_similar` (semantic search), `get_statistics`, `get_score_distribution`. Action tools: `bookmark_job`, `apply_job`, `delete_job`, `delete_jobs_below_score`. Knowledge tool: `get_settings_documentation` returns a comprehensive static reference (~3000 chars) of every `settings.yaml` section, field, type, default, and constraint — the MCP server does NOT read the user's actual settings file or profile; the user provides those in conversation and the LLM uses the tools + schema knowledge to advise.
+- **Docker Compose profiles** for the new services: `api` and `mcp`. The existing `scheduler` and `dashboard` always start; the new services are opt-in via `docker compose --profile api --profile mcp up -d`. No change to the default UX.
+- **Port override env vars**: `JOB_SEARCH_API_PORT` (default 8502) and `JOB_SEARCH_MCP_PORT` (default 3001), documented in `.env.example` alongside the existing `JOB_SEARCH_DASHBOARD_PORT`.
+- **38 new tests** (20 API, 18 MCP) covering happy paths, error paths (404, 503, missing vector store), and toggle operations.
+
+### Changed
+
+- **`docker-compose.yml`** top comment updated to document all four services and the Compose profiles opt-in pattern.
+- **`CONTRIBUTING.md`** test tree updated to reflect the current test suite (removed stale `test_report_generator.py` and `test_analyze_jobs.py`, added `test_api_server.py` and `test_mcp_server.py`).
+
+### Dependencies
+
+- `fastapi >= 0.115.0, < 1.0.0`
+- `uvicorn >= 0.34.0, < 1.0.0`
+- `mcp[cli] >= 1.0.0, < 2.0.0`
+
+### Architecture
+
+The tool now has four surfaces over a single data layer:
+
+| Service | Consumer | Protocol | Port | Profile |
+|---------|----------|----------|------|---------|
+| scheduler | (autonomous) | — | — | *(always on)* |
+| dashboard | Human (browser) | Streamlit | 8501 | *(always on)* |
+| api | Scripts, automations | REST/JSON | 8502 | `api` |
+| mcp | Claude, LLMs | MCP/SSE | 3001 | `mcp` |
+
+All four share the `jobsearch-data` Docker volume. SQLite WAL mode ensures concurrent readers don't block the scheduler's writes.
+
 ## [7.0.1] - 2026-04-16
 
 Housekeeping release. No functional changes: v7.0.0 introduced the new scoring/retention/dashboard surface, this release finishes the job by removing the dead code and stale documentation that didn't get caught in the main refactor pass.
@@ -353,7 +387,8 @@ No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-
 
 Entries prior to v4.3.1 have been archived. The git history on `main` plus the tagged commits are the authoritative source for anything older.
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v7.0.1...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v7.1.0...HEAD
+[7.1.0]: https://github.com/VincenzoImp/job-search-tool/compare/v7.0.1...v7.1.0
 [7.0.1]: https://github.com/VincenzoImp/job-search-tool/compare/v7.0.0...v7.0.1
 [7.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.8...v7.0.0
 [6.0.8]: https://github.com/VincenzoImp/job-search-tool/compare/v6.0.7...v6.0.8
