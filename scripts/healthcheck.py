@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Health check script for Docker container.
+"""Health check script for Docker container.
 
 Verifies that:
 1. Required Python modules can be imported
@@ -12,6 +11,8 @@ Exit codes:
 - 0: Healthy
 - 1: Unhealthy
 """
+
+from __future__ import annotations
 
 import sys
 
