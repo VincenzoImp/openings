@@ -291,8 +291,9 @@ Built on top of the [JobSpy](https://github.com/speedyapply/JobSpy) library, thi
 | **Dashboard** | `dashboard.py` | Unified Job Search Hub with semantic search |
 | **Vector Store** | `vector_store.py` | ChromaDB semantic search |
 | **Vector Commands** | `vector_commands.py` | Embedding backfill and sync |
-| **REST API** | `api_server.py` | FastAPI CRUD server for programmatic access |
-| **MCP Server** | `mcp_server.py` | LLM tool server (DB access + config knowledge) |
+| **Service Layer** | `job_service.py` | Shared DB/VS init, record serialization, filtering |
+| **REST API** | `api_server.py` | FastAPI adapter for programmatic access |
+| **MCP Server** | `mcp_server.py` | MCP adapter for LLMs (DB access + config knowledge) |
 
 ---
 
@@ -1047,8 +1048,9 @@ job-search-tool/
 │   ├── exporter.py                # CSV/Excel export with sanitization
 │   ├── vector_store.py            # ChromaDB vector store (ONNX embedder)
 │   ├── vector_commands.py         # Vector backfill/sync
-│   ├── api_server.py              # REST API (FastAPI, port 8502)
-│   ├── mcp_server.py              # MCP server for LLMs (SSE, port 3001)
+│   ├── job_service.py             # Shared service layer (DB/VS init, serialization, filtering)
+│   ├── api_server.py              # REST API adapter (FastAPI, port 8502)
+│   ├── mcp_server.py              # MCP server adapter for LLMs (SSE, port 3001)
 │   └── healthcheck.py             # Docker health checks
 ├── tests/                          # 375 pytest tests
 ├── data/                           # Local dev state (gitignored): db/, chroma/, results/, logs/

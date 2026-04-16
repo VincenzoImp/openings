@@ -71,20 +71,21 @@ def _seed_db(db_path):
 def client(db_path, _seed_db):
     """Create a FastAPI test client backed by the seeded DB."""
     import api_server
+    import job_service
 
-    # Create a fresh DB instance -- its connection will be opened inside
-    # the TestClient's worker thread on first use.
     db = JobDatabase(db_path)
-    db.close()  # close the connection opened in *this* thread
+    db.close()
+
+    # Patch the shared service singletons
+    job_service._db = db
+    job_service._vs = None
+    job_service._vs_attempted = True
 
     api_server.app.router.lifespan_context = _noop_lifespan
-    api_server._db = db
-    api_server._vs = None
     with TestClient(api_server.app, raise_server_exceptions=True) as c:
         yield c
     db.close()
-    api_server._db = None
-    api_server._vs = None
+    job_service.reset_singletons()
 
 
 @pytest.fixture()
@@ -134,7 +135,6 @@ def test_list_jobs_default(client):
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 3
-    # Default sort is by score descending
     assert data[0]["relevance_score"] >= data[1]["relevance_score"]
 
 
@@ -158,7 +158,6 @@ def test_list_jobs_min_score(client):
 
 
 def test_list_jobs_bookmarked_filter(client):
-    # First get a job and bookmark it
     resp = client.get("/jobs")
     job_id = resp.json()[0]["job_id"]
     client.post(f"/jobs/{job_id}/bookmark")
@@ -275,7 +274,6 @@ def test_delete_job(client):
     assert resp.status_code == 200
     assert resp.json()["deleted"] is True
 
-    # Verify it's gone
     resp = client.get(f"/jobs/{job_id}")
     assert resp.status_code == 404
 
@@ -298,13 +296,13 @@ def test_semantic_search_no_vector_store(client):
 
 
 def test_semantic_search_with_vector_store(client, mock_vector_store):
-    import api_server
+    import job_service
 
-    api_server._vs = mock_vector_store
+    job_service._vs = mock_vector_store
     resp = client.get("/jobs/search/semantic", params={"q": "machine learning"})
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 1
     assert data[0]["job_id"] == "abc123"
     assert "similarity" in data[0]
-    api_server._vs = None
+    job_service._vs = None

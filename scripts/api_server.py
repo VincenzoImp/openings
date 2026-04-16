@@ -1,6 +1,6 @@
 """REST API server for the Job Search Tool.
 
-Thin CRUD wrapper over JobDatabase and JobVectorStore. Designed for scripts,
+Thin FastAPI adapter over the shared job_service layer. Designed for scripts,
 automations, and external tools that need programmatic access to the job
 database.
 
@@ -10,27 +10,22 @@ Run: ``python api_server.py`` (listens on port 8502).
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from dataclasses import asdict
-from typing import TYPE_CHECKING, AsyncIterator
+from typing import AsyncIterator
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from config import DATA_DIR
-from database import JobDatabase
-from logger import get_logger
-from models import JobDBRecord
-
-if TYPE_CHECKING:
-    from vector_store import JobVectorStore
-
-# ---------------------------------------------------------------------------
-# Paths (derived from config.DATA_DIR — respects JOB_SEARCH_DATA_DIR env var)
-# ---------------------------------------------------------------------------
-
-DB_PATH = DATA_DIR / "db" / "jobs.db"
-CHROMA_PATH = DATA_DIR / "chroma"
+from job_service import (
+    close_db,
+    filter_jobs,
+    get_db,
+    get_vs,
+    logger,
+    record_to_dict,
+    sort_jobs_by_date,
+    sort_jobs_by_score,
+)
 
 # ---------------------------------------------------------------------------
 # Pydantic response models
@@ -94,65 +89,26 @@ class SemanticResultResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-logger = get_logger("api")
-
-_db: JobDatabase | None = None
-_vs: JobVectorStore | None = None
-
-
-def _record_to_response(record: JobDBRecord) -> JobResponse:
-    """Convert a frozen dataclass to the Pydantic response model."""
-    d = asdict(record)  # type: ignore[arg-type]
-    # Stringify dates for JSON serialisation
-    for key in ("date_posted", "first_seen", "last_seen"):
-        val = d.get(key)
-        if val is not None and hasattr(val, "isoformat"):
-            d[key] = val.isoformat()
-    return JobResponse(**d)
-
-
-def _semantic_to_response(sr: object) -> SemanticResultResponse:
-    meta = sr.metadata or {}  # type: ignore[union-attr]
-    return SemanticResultResponse(
-        job_id=sr.job_id,  # type: ignore[union-attr]
-        title=meta.get("title"),
-        company=meta.get("company"),
-        location=meta.get("location"),
-        similarity=round(sr.similarity, 4),  # type: ignore[union-attr]
-        relevance_score=meta.get("relevance_score"),
-        site=meta.get("site"),
-        job_url=meta.get("job_url"),
-    )
-
-
-# ---------------------------------------------------------------------------
 # Application
 # ---------------------------------------------------------------------------
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    global _db, _vs
-    logger.info("API server starting | DB: %s | Chroma: %s", DB_PATH, CHROMA_PATH)
-    _db = JobDatabase(DB_PATH)
-    try:
-        from vector_store import get_vector_store
-
-        _vs = get_vector_store(CHROMA_PATH)
-    except Exception as exc:
-        logger.warning("Vector store unavailable: %s", exc)
-        _vs = None
+    db = get_db()
+    vs = get_vs()
+    logger.info(
+        "API server ready | %d jobs | vector store %s",
+        db.get_job_count(),
+        "available" if vs else "unavailable",
+    )
     yield
-    if _db is not None:
-        _db.close()
+    close_db()
 
 
 app = FastAPI(
     title="Job Search Tool API",
-    version="1.0.0",
+    version="7.1.0",
     lifespan=lifespan,
 )
 
@@ -164,12 +120,6 @@ app.add_middleware(
 )
 
 
-def _get_db() -> JobDatabase:
-    if _db is None:
-        raise HTTPException(status_code=503, detail="Database not initialized")
-    return _db
-
-
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -177,8 +127,7 @@ def _get_db() -> JobDatabase:
 
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    db = _get_db()
-    return HealthResponse(status="ok", jobs_count=db.get_job_count())
+    return HealthResponse(status="ok", jobs_count=get_db().get_job_count())
 
 
 @app.get("/jobs", response_model=list[JobResponse])
@@ -193,42 +142,22 @@ def list_jobs(
     applied: bool | None = None,
     sort: str = Query("score", pattern="^(score|date)$"),
 ) -> list[JobResponse]:
-    db = _get_db()
-    all_jobs = db.get_all_jobs()
-
-    # Filter
-    filtered = all_jobs
-    if min_score is not None:
-        filtered = [j for j in filtered if j.relevance_score >= min_score]
-    if max_score is not None:
-        filtered = [j for j in filtered if j.relevance_score <= max_score]
-    if site is not None:
-        site_lower = site.lower()
-        filtered = [j for j in filtered if (j.site or "").lower() == site_lower]
-    if company is not None:
-        company_lower = company.lower()
-        filtered = [j for j in filtered if company_lower in (j.company or "").lower()]
-    if bookmarked is not None:
-        filtered = [j for j in filtered if j.bookmarked == bookmarked]
-    if applied is not None:
-        filtered = [j for j in filtered if j.applied == applied]
-
-    # Sort
+    filtered = filter_jobs(
+        get_db().get_all_jobs(),
+        min_score=min_score,
+        max_score=max_score,
+        site=site,
+        company=company,
+        bookmarked=bookmarked,
+        applied=applied,
+    )
     if sort == "score":
-        filtered.sort(key=lambda j: j.relevance_score, reverse=True)
+        sort_jobs_by_score(filtered)
     else:
-        filtered.sort(
-            key=lambda j: (
-                (j.date_posted or j.first_seen).isoformat()
-                if (j.date_posted or j.first_seen)
-                else ""
-            ),
-            reverse=True,
-        )
+        sort_jobs_by_date(filtered)
 
-    # Paginate
     page = filtered[offset : offset + limit]
-    return [_record_to_response(j) for j in page]
+    return [JobResponse(**record_to_dict(j)) for j in page]
 
 
 @app.get("/jobs/search/semantic", response_model=list[SemanticResultResponse])
@@ -238,72 +167,79 @@ def search_semantic(
     min_score: int | None = None,
     site: str | None = None,
 ) -> list[SemanticResultResponse]:
-    if _vs is None:
+    vs = get_vs()
+    if vs is None:
         raise HTTPException(status_code=503, detail="Vector store not available")
-    results = _vs.search(query=q, n_results=n_results, min_score=min_score, site=site)  # type: ignore[union-attr]
-    return [_semantic_to_response(r) for r in results]
+    results = vs.search(query=q, n_results=n_results, min_score=min_score, site=site)  # type: ignore[union-attr]
+    return [
+        SemanticResultResponse(
+            job_id=r.job_id,
+            title=r.metadata.get("title"),
+            company=r.metadata.get("company"),
+            location=r.metadata.get("location"),
+            similarity=round(r.similarity, 4),
+            relevance_score=r.metadata.get("relevance_score"),
+            site=r.metadata.get("site"),
+            job_url=r.metadata.get("job_url"),
+        )
+        for r in results
+    ]
 
 
 @app.get("/jobs/{job_id}", response_model=JobResponse)
 def get_job(job_id: str) -> JobResponse:
-    db = _get_db()
-    record = db.get_job_by_id(job_id)
+    record = get_db().get_job_by_id(job_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    return _record_to_response(record)
+    return JobResponse(**record_to_dict(record))
 
 
 @app.get("/stats", response_model=StatsResponse)
 def get_stats() -> StatsResponse:
-    db = _get_db()
-    stats = db.get_statistics()
-    return StatsResponse(**stats)
+    return StatsResponse(**get_db().get_statistics())
 
 
 @app.get("/distribution")
 def get_distribution(
     bin_size: int = Query(5, ge=1, le=100),
 ) -> list[list[int]]:
-    db = _get_db()
-    return [list(pair) for pair in db.get_score_distribution(bin_size)]
+    return [list(pair) for pair in get_db().get_score_distribution(bin_size)]
 
 
 @app.post("/jobs/{job_id}/bookmark", response_model=JobResponse)
 def toggle_bookmark(job_id: str) -> JobResponse:
-    db = _get_db()
+    db = get_db()
     try:
         db.toggle_bookmark(job_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Job not found")
     record = db.get_job_by_id(job_id)
-    assert record is not None
-    return _record_to_response(record)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return JobResponse(**record_to_dict(record))
 
 
 @app.post("/jobs/{job_id}/apply", response_model=JobResponse)
 def toggle_apply(job_id: str) -> JobResponse:
-    db = _get_db()
+    db = get_db()
     try:
         db.toggle_applied(job_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Job not found")
     record = db.get_job_by_id(job_id)
-    assert record is not None
-    return _record_to_response(record)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return JobResponse(**record_to_dict(record))
 
 
 @app.delete("/jobs/{job_id}", response_model=DeleteResponse)
 def delete_job(job_id: str) -> DeleteResponse:
-    db = _get_db()
-    deleted = db.blacklist_job(job_id)
-    return DeleteResponse(deleted=deleted)
+    return DeleteResponse(deleted=get_db().blacklist_job(job_id))
 
 
 @app.delete("/jobs/below-score/{score}", response_model=BulkDeleteResponse)
 def delete_below_score(score: int) -> BulkDeleteResponse:
-    db = _get_db()
-    count = db.delete_jobs_below_score(score)
-    return BulkDeleteResponse(deleted_count=count)
+    return BulkDeleteResponse(deleted_count=get_db().delete_jobs_below_score(score))
 
 
 # ---------------------------------------------------------------------------

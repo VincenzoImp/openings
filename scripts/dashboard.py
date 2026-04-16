@@ -37,7 +37,7 @@ from exporter import (  # noqa: E402
     dataframe_to_csv_bytes,
     export_dataframe,
 )
-from models import JobDBRecord  # noqa: E402
+from job_service import record_to_dict as _record_to_dict  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Optional vector search (graceful fallback when deps missing)
@@ -149,32 +149,6 @@ def _get_vector_store_cached(persist_dir: str) -> Any:
 # ═══════════════════════════════════════════════════════════════════════════
 # Helpers
 # ═══════════════════════════════════════════════════════════════════════════
-
-
-def _record_to_dict(r: JobDBRecord) -> dict[str, Any]:
-    """Convert a JobDBRecord to a plain dict for caching."""
-    return {
-        "job_id": r.job_id,
-        "title": r.title,
-        "company": r.company,
-        "location": r.location,
-        "job_url": r.job_url,
-        "site": r.site,
-        "job_type": r.job_type,
-        "is_remote": r.is_remote,
-        "job_level": r.job_level,
-        "description": r.description,
-        "date_posted": str(r.date_posted) if r.date_posted else None,
-        "min_amount": r.min_amount,
-        "max_amount": r.max_amount,
-        "currency": r.currency,
-        "company_url": r.company_url,
-        "first_seen": str(r.first_seen) if r.first_seen else None,
-        "last_seen": str(r.last_seen) if r.last_seen else None,
-        "relevance_score": r.relevance_score,
-        "applied": r.applied,
-        "bookmarked": r.bookmarked,
-    }
 
 
 def _escape_html_text(value: object) -> str:

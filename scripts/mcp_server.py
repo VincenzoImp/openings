@@ -11,85 +11,18 @@ Run: ``python mcp_server.py`` (SSE transport on port 3001).
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
-from typing import TYPE_CHECKING
 
 from mcp.server.fastmcp import FastMCP
 
-from config import DATA_DIR
-from database import JobDatabase
-from logger import get_logger
-from models import JobDBRecord
-
-if TYPE_CHECKING:
-    from vector_store import JobVectorStore
-
-# ---------------------------------------------------------------------------
-# Paths (derived from config.DATA_DIR — respects JOB_SEARCH_DATA_DIR env var)
-# ---------------------------------------------------------------------------
-
-DB_PATH = DATA_DIR / "db" / "jobs.db"
-CHROMA_PATH = DATA_DIR / "chroma"
-
-# ---------------------------------------------------------------------------
-# Singletons (initialised lazily on first tool call)
-# ---------------------------------------------------------------------------
-
-logger = get_logger("mcp")
-
-_db: JobDatabase | None = None
-_vs: JobVectorStore | None = None
-
-
-def _get_db() -> JobDatabase:
-    global _db
-    if _db is None:
-        _db = JobDatabase(DB_PATH)
-    return _db
-
-
-def _get_vs() -> JobVectorStore | None:
-    global _vs
-    if _vs is None:
-        try:
-            from vector_store import get_vector_store
-
-            _vs = get_vector_store(CHROMA_PATH)
-        except Exception:
-            pass
-    return _vs
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _record_to_summary(r: JobDBRecord) -> dict:
-    """Compact summary suitable for list views (no description)."""
-    return {
-        "job_id": r.job_id,
-        "title": r.title,
-        "company": r.company,
-        "location": r.location,
-        "relevance_score": r.relevance_score,
-        "site": r.site,
-        "bookmarked": r.bookmarked,
-        "applied": r.applied,
-        "first_seen": str(r.first_seen) if r.first_seen else None,
-        "job_url": r.job_url,
-    }
-
-
-def _record_to_full(r: JobDBRecord) -> dict:
-    """Full record including description."""
-    d = asdict(r)  # type: ignore[arg-type]
-    for key in ("date_posted", "first_seen", "last_seen"):
-        val = d.get(key)
-        if val is not None and hasattr(val, "isoformat"):
-            d[key] = val.isoformat()
-    return d
-
+from job_service import (
+    filter_jobs,
+    get_db,
+    get_vs,
+    logger,
+    record_to_dict,
+    record_to_summary,
+    sort_jobs_by_score,
+)
 
 # ---------------------------------------------------------------------------
 # MCP Server
@@ -115,24 +48,16 @@ def list_jobs(
     Returns compact summaries (no description). Use get_job() for full detail.
     Supports filtering by score range, site, bookmark, and applied status.
     """
-    db = _get_db()
-    jobs = db.get_all_jobs()
-
-    if min_score is not None:
-        jobs = [j for j in jobs if j.relevance_score >= min_score]
-    if max_score is not None:
-        jobs = [j for j in jobs if j.relevance_score <= max_score]
-    if site is not None:
-        site_lower = site.lower()
-        jobs = [j for j in jobs if (j.site or "").lower() == site_lower]
-    if bookmarked_only:
-        jobs = [j for j in jobs if j.bookmarked]
-    if applied_only:
-        jobs = [j for j in jobs if j.applied]
-
-    jobs.sort(key=lambda j: j.relevance_score, reverse=True)
-    page = jobs[:limit]
-    return json.dumps([_record_to_summary(j) for j in page])
+    filtered = filter_jobs(
+        get_db().get_all_jobs(),
+        min_score=min_score,
+        max_score=max_score,
+        site=site,
+        bookmarked=True if bookmarked_only else None,
+        applied=True if applied_only else None,
+    )
+    sort_jobs_by_score(filtered)
+    return json.dumps([record_to_summary(j) for j in filtered[:limit]])
 
 
 @server.tool()
@@ -142,11 +67,10 @@ def get_job(job_id: str) -> str:
     Use this to evaluate whether a specific job is a good fit for the user.
     Returns an error message if the job_id is not found.
     """
-    db = _get_db()
-    record = db.get_job_by_id(job_id)
+    record = get_db().get_job_by_id(job_id)
     if record is None:
         return json.dumps({"error": f"Job not found: {job_id}"})
-    return json.dumps(_record_to_full(record))
+    return json.dumps(record_to_dict(record))
 
 
 @server.tool()
@@ -156,7 +80,7 @@ def search_similar(query: str, n_results: int = 10) -> str:
     Uses ChromaDB vector embeddings to find jobs similar to the query.
     Returns job_id, title, company, similarity score, and relevance score.
     """
-    vs = _get_vs()
+    vs = get_vs()
     if vs is None:
         return json.dumps({"error": "Vector store not available"})
     results = vs.search(query=query, n_results=n_results)  # type: ignore[union-attr]
@@ -181,9 +105,7 @@ def get_statistics() -> str:
     Returns total jobs, jobs seen today, new today, applied count,
     blacklisted count, and average relevance score.
     """
-    db = _get_db()
-    stats = db.get_statistics()
-    return json.dumps(stats)
+    return json.dumps(get_db().get_statistics())
 
 
 @server.tool()
@@ -192,9 +114,7 @@ def get_score_distribution(bin_size: int = 5) -> str:
 
     Useful for understanding the spread of job scores and advising on threshold tuning.
     """
-    db = _get_db()
-    dist = db.get_score_distribution(bin_size)
-    return json.dumps(dist)
+    return json.dumps(get_db().get_score_distribution(bin_size))
 
 
 # ---- DB write tools -------------------------------------------------------
@@ -206,9 +126,8 @@ def bookmark_job(job_id: str) -> str:
 
     Returns confirmation with the new bookmark state.
     """
-    db = _get_db()
     try:
-        new_state = db.toggle_bookmark(job_id)
+        new_state = get_db().toggle_bookmark(job_id)
     except ValueError:
         return json.dumps({"error": f"Job not found: {job_id}"})
     return json.dumps({"job_id": job_id, "bookmarked": new_state})
@@ -220,9 +139,8 @@ def apply_job(job_id: str) -> str:
 
     Returns confirmation with the new applied state.
     """
-    db = _get_db()
     try:
-        new_state = db.toggle_applied(job_id)
+        new_state = get_db().toggle_applied(job_id)
     except ValueError:
         return json.dumps({"error": f"Job not found: {job_id}"})
     return json.dumps({"job_id": job_id, "applied": new_state})
@@ -235,9 +153,7 @@ def delete_job(job_id: str) -> str:
     The job is removed from the active table and its ID is stored in the
     blacklist. This is permanent unless the blacklist is purged.
     """
-    db = _get_db()
-    deleted = db.blacklist_job(job_id)
-    return json.dumps({"job_id": job_id, "deleted": deleted})
+    return json.dumps({"job_id": job_id, "deleted": get_db().blacklist_job(job_id)})
 
 
 @server.tool()
@@ -247,8 +163,7 @@ def delete_jobs_below_score(score: int) -> str:
     Bookmarked and applied jobs are always protected and will NOT be deleted.
     Returns the number of jobs removed.
     """
-    db = _get_db()
-    count = db.delete_jobs_below_score(score)
+    count = get_db().delete_jobs_below_score(score)
     return json.dumps({"score_threshold": score, "deleted_count": count})
 
 
@@ -288,7 +203,7 @@ Controls relevance scoring and the save/notify threshold split.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | save_threshold | int | 0 | Minimum score to persist a job to the DB |
-| notify_threshold | int | 0 | Minimum score to trigger notifications |
+| notify_threshold | int | 20 | Minimum score to trigger notifications |
 | weights | dict[str,int] | {} | Points per category. Can be negative for penalties |
 | keywords | dict[str,list[str]] | {} | Keywords per category. Case-insensitive matching |
 
@@ -411,5 +326,5 @@ def get_settings_documentation() -> str:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    logger.info("MCP server starting | DB: %s | Chroma: %s", DB_PATH, CHROMA_PATH)
+    logger.info("MCP server starting on port 3001")
     server.run(transport="sse")

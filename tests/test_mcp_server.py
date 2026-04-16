@@ -73,15 +73,15 @@ def mock_vs():
 
 
 @pytest.fixture(autouse=True)
-def patch_mcp_globals(temp_db, mock_vs):
-    """Patch the module-level singletons in mcp_server."""
-    import mcp_server
+def patch_service_globals(temp_db, mock_vs):
+    """Patch the shared job_service singletons used by mcp_server."""
+    import job_service
 
-    mcp_server._db = temp_db
-    mcp_server._vs = mock_vs
+    job_service._db = temp_db
+    job_service._vs = mock_vs
+    job_service._vs_attempted = True
     yield
-    mcp_server._db = None
-    mcp_server._vs = None
+    job_service.reset_singletons()
 
 
 # ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ def test_search_similar_returns_results():
 def test_search_similar_no_vector_store():
     from mcp_server import search_similar
 
-    with patch("mcp_server._get_vs", return_value=None):
+    with patch("mcp_server.get_vs", return_value=None):
         result = search_similar("test query")
         data = json.loads(result)
         assert "error" in data
