@@ -1,6 +1,6 @@
 [project]
 name = "job-search-tool"
-version = "7.1.1"
+version = "7.1.2"
 description = "Automated job search aggregation, scoring, notifications, and dashboard tooling."
 requires-python = ">=3.11"
 dependencies = [

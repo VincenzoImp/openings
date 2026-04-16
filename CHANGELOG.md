@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [7.1.2] - 2026-04-16
+
+### Added
+
+- **110 new tests** (373 → 483), bringing overall coverage from 82% to 87%:
+  - `test_job_service.py` (23 tests): direct unit tests for the shared service layer — DB/VS singleton lifecycle, record serialization, filtering, sorting.
+  - `test_integration.py` (9 tests): end-to-end pipeline tests with real databases (no mocking) — score→partition→save→reconcile cycle, bookmark/applied SQL protection, API and MCP full workflows, config-change simulation.
+  - `test_main.py` (+25 tests): `_prepare_runtime` rescore+reconcile ordering, `run_job_search` with real scoring against temp DBs, notification data construction, `_cmd_once`/`_cmd_scheduler` lifecycle.
+  - `test_database.py` (+19 tests): `reset_all` escape hatch, `reconcile_with_config` combinations, score distribution bins, preview count accuracy, batch blacklist operations.
+  - `test_dashboard.py` (+34 tests): pure helper coverage (`_escape_html_text`, `_score_badge_html`, `_format_salary`, `_short_num`, `_days_ago`, `_filtered_jobs_csv_bytes`).
+
+### Fixed
+
+- `healthcheck.py`: added missing `from __future__ import annotations` (consistency with all other modules).
+- `CLAUDE.md`: added `test_dashboard.py` to the test tree (was omitted).
+- API server version string aligned to 7.1.1 (was still 7.1.0).
+
+### Coverage
+
+| Module | Before | After |
+|--------|--------|-------|
+| `main.py` | 58% | 89% |
+| `job_service.py` | 75% | 99% |
+| `database.py` | 82% | 90% |
+| `dashboard.py` | 67% | 71% |
+| **Overall** | **82%** | **87%** |
+
 ## [7.1.1] - 2026-04-16
 
 ### Changed
@@ -405,7 +432,8 @@ No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-
 
 Entries prior to v4.3.1 have been archived. The git history on `main` plus the tagged commits are the authoritative source for anything older.
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v7.1.1...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v7.1.2...HEAD
+[7.1.2]: https://github.com/VincenzoImp/job-search-tool/compare/v7.1.1...v7.1.2
 [7.1.1]: https://github.com/VincenzoImp/job-search-tool/compare/v7.1.0...v7.1.1
 [7.1.0]: https://github.com/VincenzoImp/job-search-tool/compare/v7.0.1...v7.1.0
 [7.0.1]: https://github.com/VincenzoImp/job-search-tool/compare/v7.0.0...v7.0.1
