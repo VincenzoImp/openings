@@ -40,13 +40,11 @@ Current template defaults include `search.hours_old: 720`,
 |----------|---------|
 | `JOB_SEARCH_DATA_DIR` | root for database, ChromaDB, results, logs |
 | `JOB_SEARCH_TEMPLATE_PATH` | template path used for generated settings docs |
-| `JOB_SEARCH_DASHBOARD_BIND` | dashboard bind host in Compose |
-| `JOB_SEARCH_DASHBOARD_PORT` | dashboard host port |
-| `JOB_SEARCH_API_BIND` | API bind host in Compose |
-| `JOB_SEARCH_API_PORT` | API host port |
-| `JOB_SEARCH_API_TOKEN` | optional Bearer token for API operations |
-| `JOB_SEARCH_MCP_BIND` | MCP bind host in Compose |
-| `JOB_SEARCH_MCP_PORT` | MCP host port |
+| `JOB_SEARCH_WEB_BIND` | web bind host in Compose |
+| `JOB_SEARCH_WEB_PORT` | web host port |
+| `JOB_SEARCH_API_TOKEN` | optional Bearer token for API routes under `/api` |
+| `JOB_SEARCH_WEB_ALLOWED_HOSTS` | comma-separated MCP allowed hosts for LAN use |
+| `JOB_SEARCH_WEB_ALLOWED_ORIGINS` | comma-separated MCP allowed origins for LAN use |
 
 ## Thresholds
 

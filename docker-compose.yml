@@ -1,18 +1,12 @@
 name: jobsearch
 
-# Four services sharing a single Docker-managed named volume for all
+# Two runtime roles sharing a single Docker-managed named volume for all
 # application state (database, vector store, results, logs). The user-provided
 # settings.yaml is bind-mounted as a read-only file so it can be edited with
 # any host-side editor.
 #
-#   scheduler  → `job-search scheduler`  (continuous search loop)
-#   dashboard  → `job-search dashboard`  (Streamlit UI on :8501)
-#   api        → `job-search-api`        (REST API on :8502, profile: api)
-#   mcp        → `job-search-mcp`        (MCP server on :3001, profile: mcp)
-#
-# scheduler and dashboard always start. api and mcp are opt-in via
-# Docker Compose profiles:
-#   docker compose --profile api --profile mcp up -d
+#   scheduler  -> `job-search scheduler`  (continuous search loop)
+#   web        -> `job-search-web`        (React dashboard, REST API, MCP endpoint)
 #
 # All containers run as non-root (`appuser`, UID 1000) in every environment —
 # no host-side `chown`, no UID override, no privileged init. The named volume
@@ -49,57 +43,19 @@ services:
       - jobsearch-data:/data
       - ./settings.yaml:/data/config/settings.yaml:ro
 
-  dashboard:
+  web:
     image: vincenzoimp/job-search-tool:latest
-    container_name: jobsearch-dashboard
+    container_name: jobsearch-web
     restart: unless-stopped
-    command: ["job-search", "dashboard"]
+    command: ["job-search-web"]
     dns:
       - 1.1.1.1
       - 8.8.8.8
     ports:
-      - "${JOB_SEARCH_DASHBOARD_BIND:-127.0.0.1}:${JOB_SEARCH_DASHBOARD_PORT:-8501}:8501"
+      - "${JOB_SEARCH_WEB_BIND:-127.0.0.1}:${JOB_SEARCH_WEB_PORT:-8501}:8501"
     env_file:
       - path: .env
         required: false
     volumes:
       - jobsearch-data:/data
       - ./settings.yaml:/data/config/settings.yaml:ro
-
-  api:
-    image: vincenzoimp/job-search-tool:latest
-    container_name: jobsearch-api
-    restart: unless-stopped
-    command: ["job-search-api"]
-    dns:
-      - 1.1.1.1
-      - 8.8.8.8
-    ports:
-      - "${JOB_SEARCH_API_BIND:-127.0.0.1}:${JOB_SEARCH_API_PORT:-8502}:8502"
-    env_file:
-      - path: .env
-        required: false
-    volumes:
-      - jobsearch-data:/data
-      - ./settings.yaml:/data/config/settings.yaml:ro
-    profiles:
-      - api
-
-  mcp:
-    image: vincenzoimp/job-search-tool:latest
-    container_name: jobsearch-mcp
-    restart: unless-stopped
-    command: ["job-search-mcp"]
-    dns:
-      - 1.1.1.1
-      - 8.8.8.8
-    ports:
-      - "${JOB_SEARCH_MCP_BIND:-127.0.0.1}:${JOB_SEARCH_MCP_PORT:-3001}:3001"
-    env_file:
-      - path: .env
-        required: false
-    volumes:
-      - jobsearch-data:/data
-      - ./settings.yaml:/data/config/settings.yaml:ro
-    profiles:
-      - mcp

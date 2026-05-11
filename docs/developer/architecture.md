@@ -2,19 +2,21 @@
 
 Job Search Tool is a local-first, single-user automation system packaged under
 `src/job_search_tool`. Docker, local `uv run` commands, CI, and release images
-all execute the same installed entrypoints.
+all execute installed entrypoints.
 
 ## Runtime Surfaces
 
 | Surface | Module | Role |
 |---------|--------|------|
 | CLI scheduler | `job_search_tool.main` | scheduled or one-shot job collection |
-| Dashboard | `job_search_tool.dashboard` | human review and curation |
-| REST API | `job_search_tool.api_server` | programmatic local automation |
-| MCP | `job_search_tool.mcp_server` | LLM tool integration |
+| Web server | `job_search_tool.web.app` | React dashboard, REST API, MCP mount, health |
+| REST routes | `job_search_tool.web.api` | JSON automation under `/api` |
+| MCP tools | `job_search_tool.web.mcp` | streamable HTTP tools under `/mcp` |
+| Dashboard | `frontend/` | browser UI built into the Docker image |
 
-The dashboard, API, and MCP adapter share common behavior through
-`job_search_tool.job_service`.
+The scheduler remains a separate process from the web server. Dashboard, REST,
+and MCP behavior share the application layer in
+`job_search_tool.application.jobs`.
 
 ## Data Flow
 
@@ -26,6 +28,14 @@ The dashboard, API, and MCP adapter share common behavior through
 6. Save accepted rows to SQLite.
 7. Embed saved rows into ChromaDB when vector search is enabled.
 8. Notify about new rows above `notify_threshold`.
+
+## Web Flow
+
+1. `job-search-web` starts FastAPI on port 8501.
+2. `/` serves the built React dashboard.
+3. `/api/*` routes call `JobApplicationService`.
+4. `/mcp` mounts FastMCP streamable HTTP tools over the same service layer.
+5. `/health` reports process readiness and current job count.
 
 ## Persistence
 
@@ -44,10 +54,5 @@ root unless overridden.
 
 `config/settings.example.yaml` is the user-facing configuration reference. The
 same template is also packaged under `job_search_tool.defaults` so installed
-API and MCP entrypoints can generate settings documentation without depending
-on a source checkout. Tests assert both copies stay synchronized.
-
-## Current Documentation
-
-The deeper system audit lives in `docs/developer/current-system/`. It documents
-current behavior, known risks, and the problem model.
+MCP tools can generate settings documentation without depending on a source
+checkout. Tests assert both copies stay synchronized.

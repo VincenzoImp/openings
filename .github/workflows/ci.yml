@@ -152,74 +152,27 @@ jobs:
             -v "$PWD/config/settings.example.yaml:/data/config/settings.yaml:ro" \
             job-search-tool:test job-search-healthcheck
 
-      - name: Validate Compose profiles
+      - name: Validate Compose topology
         run: |
           cp config/settings.example.yaml settings.yaml
-          docker compose --profile api --profile mcp config
-          docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile api --profile mcp config
+          docker compose config
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml config
 
-      - name: Smoke dashboard container
+      - name: Smoke web container
         run: |
-          docker rm -f job-search-dashboard-smoke || true
+          docker rm -f job-search-web-smoke || true
           docker run --rm -d \
-            --name job-search-dashboard-smoke \
+            --name job-search-web-smoke \
             -p 18501:8501 \
             -v "$PWD/config/settings.example.yaml:/data/config/settings.yaml:ro" \
-            job-search-tool:test job-search dashboard
-          trap 'docker rm -f job-search-dashboard-smoke' EXIT
-          python - <<'PY'
-          import socket
-          import time
-
-          deadline = time.time() + 30
-          while True:
-              try:
-                  with socket.create_connection(("127.0.0.1", 18501), timeout=2):
-                      raise SystemExit(0)
-              except OSError:
-                  if time.time() >= deadline:
-                      raise
-                  time.sleep(1)
-          PY
-
-      - name: Smoke REST API container
-        run: |
-          docker rm -f job-search-api-smoke || true
-          docker run --rm -d \
-            --name job-search-api-smoke \
-            -p 18502:8502 \
-            -v "$PWD/config/settings.example.yaml:/data/config/settings.yaml:ro" \
-            job-search-tool:test job-search-api
-          trap 'docker rm -f job-search-api-smoke' EXIT
+            job-search-tool:test job-search-web
+          trap 'docker rm -f job-search-web-smoke' EXIT
           for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:18502/health; then
-              exit 0
+            if curl -fsS http://127.0.0.1:18501/health; then
+              break
             fi
             sleep 1
           done
-          docker logs job-search-api-smoke
-          exit 1
-
-      - name: Smoke MCP container
-        run: |
-          docker rm -f job-search-mcp-smoke || true
-          docker run --rm -d \
-            --name job-search-mcp-smoke \
-            -p 13001:3001 \
-            -v "$PWD/config/settings.example.yaml:/data/config/settings.yaml:ro" \
-            job-search-tool:test job-search-mcp
-          trap 'docker rm -f job-search-mcp-smoke' EXIT
-          python - <<'PY'
-          import socket
-          import time
-
-          deadline = time.time() + 30
-          while True:
-              try:
-                  with socket.create_connection(("127.0.0.1", 13001), timeout=2):
-                      raise SystemExit(0)
-              except OSError:
-                  if time.time() >= deadline:
-                      raise
-                  time.sleep(1)
-          PY
+          curl -fsS http://127.0.0.1:18501/api/jobs
+          curl -fsS http://127.0.0.1:18501/ >/tmp/job-search-index.html
+          grep -q '<div id="root"></div>' /tmp/job-search-index.html

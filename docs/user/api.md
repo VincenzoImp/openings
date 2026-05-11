@@ -1,26 +1,32 @@
 # REST API
 
-The REST API is a thin FastAPI adapter over the shared job service layer. It is
-intended for local scripts and trusted automations.
+The REST API is mounted under the unified web server at `/api`. It is intended
+for local scripts and trusted automations.
 
 ## Start
 
 Docker Compose:
 
 ```bash
-docker compose --profile api up -d
+docker compose up -d
 ```
 
 Local Python:
 
 ```bash
-uv run job-search-api
+uv run job-search-web
 ```
 
 Default base URL:
 
 ```text
-http://127.0.0.1:8502
+http://127.0.0.1:8501/api
+```
+
+OpenAPI docs:
+
+```text
+http://127.0.0.1:8501/docs
 ```
 
 ## Authentication
@@ -38,22 +44,23 @@ Authorization: Bearer change-me
 ```
 
 This is a local/LAN protection mechanism, not a substitute for a hardened public
-API gateway. Keep the API bound to `127.0.0.1` unless you explicitly need LAN
-access.
+API gateway. Keep the web server bound to `127.0.0.1` unless you explicitly need
+LAN access.
 
 ## Endpoints
 
 | Method | Path | Purpose |
 |--------|------|---------|
 | `GET` | `/health` | status and job count |
-| `GET` | `/jobs` | list jobs with filtering and pagination |
-| `GET` | `/jobs/{job_id}` | fetch one job |
-| `GET` | `/jobs/search/semantic` | semantic search over ChromaDB |
-| `GET` | `/stats` | summary statistics |
-| `GET` | `/distribution` | score distribution |
-| `POST` | `/jobs/{job_id}/bookmark` | toggle bookmark |
-| `POST` | `/jobs/{job_id}/apply` | toggle applied state |
-| `DELETE` | `/jobs/{job_id}` | blacklist and remove one job |
-| `DELETE` | `/jobs/below-score/{score}` | bulk delete below score |
+| `GET` | `/api/jobs` | list jobs with filtering and pagination |
+| `GET` | `/api/jobs/{job_id}` | fetch one job |
+| `GET` | `/api/jobs/search/semantic` | semantic search over ChromaDB |
+| `GET` | `/api/stats` | summary statistics |
+| `GET` | `/api/distribution` | score distribution |
+| `PUT` | `/api/jobs/{job_id}/bookmark` | set bookmark state |
+| `PUT` | `/api/jobs/{job_id}/applied` | set applied state |
+| `POST` | `/api/jobs/blacklist` | blacklist and remove jobs |
+| `GET` | `/api/cleanup/preview` | preview configured cleanup |
+| `POST` | `/api/cleanup/run` | run configured cleanup |
 
 OpenAPI metadata uses the project version from `pyproject.toml`.

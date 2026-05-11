@@ -15,14 +15,6 @@ services:
     <<: *local-build
     container_name: jobsearch-scheduler-dev
 
-  dashboard:
+  web:
     <<: *local-build
-    container_name: jobsearch-dashboard-dev
-
-  api:
-    <<: *local-build
-    container_name: jobsearch-api-dev
-
-  mcp:
-    <<: *local-build
-    container_name: jobsearch-mcp-dev
+    container_name: jobsearch-web-dev

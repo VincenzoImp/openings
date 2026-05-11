@@ -9,10 +9,8 @@ Integrates job search, database persistence, and notifications.
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 import traceback
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from job_search_tool.config import get_config, reload_config
@@ -419,20 +417,6 @@ def _cmd_once() -> int:
         return 1
 
 
-def _cmd_dashboard() -> int:
-    """Replace the current process with Streamlit serving the dashboard."""
-    dashboard_py = Path(__file__).parent / "dashboard.py"
-    args = [
-        "streamlit",
-        "run",
-        str(dashboard_py),
-        "--server.address=0.0.0.0",
-        "--server.port=8501",
-    ]
-    # execvp replaces the Python process; signals and exit status flow naturally.
-    os.execvp("streamlit", args)
-
-
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="job-search",
@@ -447,10 +431,6 @@ def _build_parser() -> argparse.ArgumentParser:
         "once",
         help="Run a single search iteration and exit.",
     )
-    sub.add_parser(
-        "dashboard",
-        help="Launch the Streamlit dashboard on port 8501.",
-    )
     return parser
 
 
@@ -463,8 +443,6 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_scheduler()
     if command == "once":
         return _cmd_once()
-    if command == "dashboard":
-        return _cmd_dashboard()
 
     raise SystemExit(f"Unknown command: {command}")
 

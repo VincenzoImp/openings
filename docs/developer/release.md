@@ -8,10 +8,13 @@ Run:
 
 ```bash
 uv run pytest
+npm --prefix frontend run typecheck
+npm --prefix frontend run test
+npm --prefix frontend run build
 uv run pre-commit run --all-files
 uv run mypy src/job_search_tool --ignore-missing-imports
 docker build -t job-search-tool:release .
-docker compose --profile api --profile mcp config
+docker compose config
 ```
 
 Also verify that `CHANGELOG.md`, `pyproject.toml`, and release docs agree on the

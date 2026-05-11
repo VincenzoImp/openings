@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import tempfile
-from contextlib import asynccontextmanager
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -346,17 +345,12 @@ def test_reconcile_idempotent(integration_env):
 # ---------------------------------------------------------------------------
 
 
-@asynccontextmanager
-async def _noop_lifespan(_app):
-    yield
-
-
 def test_api_full_workflow():
     """Seed real DB, exercise API endpoints through TestClient."""
     from fastapi.testclient import TestClient
 
-    from job_search_tool import api_server
     from job_search_tool import job_service
+    from job_search_tool.web.app import create_app
 
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
@@ -370,17 +364,16 @@ def test_api_full_workflow():
         job_service._vs = None
         job_service._vs_attempted = True
 
-        api_server.app.router.lifespan_context = _noop_lifespan
-        with TestClient(api_server.app, raise_server_exceptions=True) as client:
+        with TestClient(create_app(), raise_server_exceptions=True) as client:
             # Health
             resp = client.get("/health")
             assert resp.status_code == 200
             assert resp.json()["jobs_count"] == 5
 
             # List all jobs
-            resp = client.get("/jobs", params={"limit": 100})
+            resp = client.get("/api/jobs", params={"limit": 100})
             assert resp.status_code == 200
-            all_jobs = resp.json()
+            all_jobs = resp.json()["items"]
             assert len(all_jobs) == 5
 
             # Sorted by score descending
@@ -388,33 +381,35 @@ def test_api_full_workflow():
             assert scores == sorted(scores, reverse=True)
 
             # Filter by min_score
-            resp = client.get("/jobs", params={"min_score": 30})
+            resp = client.get("/api/jobs", params={"min_score": 30})
             assert resp.status_code == 200
-            filtered = resp.json()
+            filtered = resp.json()["items"]
             assert all(j["relevance_score"] >= 30 for j in filtered)
 
-            # Bookmark a job
+            # Bookmark a job explicitly
             job_id = all_jobs[0]["job_id"]
-            resp = client.post(f"/jobs/{job_id}/bookmark")
+            resp = client.put(f"/api/jobs/{job_id}/bookmark", json={"bookmarked": True})
             assert resp.status_code == 200
             assert resp.json()["bookmarked"] is True
 
-            # Delete below score -- should protect bookmarked
-            resp = client.delete("/jobs/below-score/15")
+            # Blacklist a different job explicitly
+            deleted_job_id = all_jobs[-1]["job_id"]
+            resp = client.post(
+                "/api/jobs/blacklist", json={"job_ids": [deleted_job_id]}
+            )
             assert resp.status_code == 200
-            deleted_count = resp.json()["deleted_count"]
-            assert deleted_count >= 1
+            assert resp.json()["affected_count"] == 1
 
             # Verify bookmarked job survived
-            resp = client.get(f"/jobs/{job_id}")
+            resp = client.get(f"/api/jobs/{job_id}")
             assert resp.status_code == 200
             assert resp.json()["bookmarked"] is True
 
             # Stats should be consistent
-            resp = client.get("/stats")
+            resp = client.get("/api/stats")
             assert resp.status_code == 200
             stats = resp.json()
-            assert stats["total_jobs"] == 5 - deleted_count
+            assert stats["total_jobs"] == 4
 
         db.close()
         job_service.reset_singletons()
@@ -440,12 +435,12 @@ def test_mcp_full_workflow():
         job_service._vs = None
         job_service._vs_attempted = True
 
-        from job_search_tool.mcp_server import (
-            bookmark_job,
-            delete_jobs_below_score,
+        from job_search_tool.web.mcp import (
+            blacklist_jobs,
             get_job,
             get_statistics,
             list_jobs,
+            set_bookmarked,
         )
 
         # list_jobs
@@ -463,17 +458,18 @@ def test_mcp_full_workflow():
         assert "description" in detail
         assert detail["job_id"] == job_id
 
-        # bookmark toggle
-        bm_result = json.loads(bookmark_job(job_id))
+        # explicit bookmark command
+        bm_result = json.loads(set_bookmarked(job_id, True))
         assert bm_result["bookmarked"] is True
 
         # get_statistics
         stats = json.loads(get_statistics())
         assert stats["total_jobs"] == 5
 
-        # delete below score -- protects bookmarked
-        del_result = json.loads(delete_jobs_below_score(15))
-        assert del_result["deleted_count"] >= 1
+        # blacklist a different job
+        deleted_job_id = result[-1]["job_id"]
+        del_result = json.loads(blacklist_jobs([deleted_job_id]))
+        assert del_result["affected_count"] == 1
 
         # Verify bookmarked survived
         detail_after = json.loads(get_job(job_id))
@@ -481,7 +477,7 @@ def test_mcp_full_workflow():
 
         # Stats consistent
         stats_after = json.loads(get_statistics())
-        assert stats_after["total_jobs"] == 5 - del_result["deleted_count"]
+        assert stats_after["total_jobs"] == 4
 
         db.close()
         job_service.reset_singletons()

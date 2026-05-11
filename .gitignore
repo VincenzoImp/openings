@@ -8,6 +8,12 @@ __pycache__/
 dist/
 build/
 
+# Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
+
 # Runtime state (all persistent data lives under data/)
 data/
 results/

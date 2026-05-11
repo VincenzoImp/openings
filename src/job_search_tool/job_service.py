@@ -1,8 +1,7 @@
-"""Shared service layer for the Job Search Tool server frontends.
+"""Shared service layer for Job Search Tool web surfaces.
 
 Provides DB/vector-store initialization, record serialization, and filtering
-logic used by the dashboard, REST API, and MCP server. Each frontend is a
-thin adapter that translates between this module and its framework.
+logic used by the React dashboard, REST API, and MCP tools.
 """
 
 from __future__ import annotations

@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.0.0] - 2026-05-11
+
+### Breaking Changes
+
+- The web runtime is now a single ASGI process. `job-search dashboard`,
+  `job-search-api`, and `job-search-mcp` have been removed. Use
+  `job-search-web`.
+- Docker Compose now has two services only: `scheduler` and `web`. API and MCP
+  are no longer separate Compose profiles.
+- REST routes moved under `http://127.0.0.1:8501/api`; MCP moved to
+  `http://127.0.0.1:8501/mcp`.
+- `JOB_SEARCH_DASHBOARD_*`, `JOB_SEARCH_API_BIND`, `JOB_SEARCH_API_PORT`,
+  `JOB_SEARCH_MCP_BIND`, and `JOB_SEARCH_MCP_PORT` have been removed. Use
+  `JOB_SEARCH_WEB_BIND` and `JOB_SEARCH_WEB_PORT`. `JOB_SEARCH_API_TOKEN`
+  remains supported for REST routes.
+- The runtime no longer depends on or ships Streamlit. The dashboard is a React
+  application built into the Docker image.
+
+### Added
+
+- React dashboard with job filtering, virtualized table rendering, detail
+  panel, explicit bookmark/apply actions, bulk blacklisting, CSV export,
+  analytics, and cleanup controls.
+- Unified FastAPI web server (`job-search-web`) serving the dashboard, REST API,
+  MCP streamable HTTP endpoint, and health check from one process.
+- Shared application command/query layer used by REST, MCP, and dashboard flows.
+- Documentation drift tests that fail when current docs advertise removed
+  runtime commands or environment variables.
+
+### Changed
+
+- Docker image builds frontend assets in a dedicated Node stage and serves the
+  built dashboard from the Python runtime image.
+- CI Docker smoke tests now validate the unified web server through `/health`,
+  `/api/jobs`, and `/`.
+- User and developer documentation now describes the two-process runtime:
+  scheduler plus unified web server.
+
+### Removed
+
+- Streamlit dashboard module and tests.
+- Standalone REST API and MCP entrypoints.
+- Obsolete current-system audit docs and internal release planning artifacts
+  from the shipped documentation tree.
+
 ## [8.0.0] - 2026-05-11
 
 ### Breaking Changes

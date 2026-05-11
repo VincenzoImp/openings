@@ -680,6 +680,92 @@ class JobDatabase:
 
         return records
 
+    def query_jobs(
+        self,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+        min_score: int | None = None,
+        max_score: int | None = None,
+        site: str | None = None,
+        company: str | None = None,
+        bookmarked: bool | None = None,
+        applied: bool | None = None,
+        remote: bool | None = None,
+        job_type: str | None = None,
+        text: str | None = None,
+        sort: str = "score",
+    ) -> tuple[list[JobDBRecord], int]:
+        """Query active jobs with SQL-backed filtering and pagination."""
+        limit = max(1, min(int(limit), 1000))
+        offset = max(0, int(offset))
+
+        where: list[str] = []
+        params: list[object] = []
+
+        if min_score is not None:
+            where.append("relevance_score >= ?")
+            params.append(min_score)
+        if max_score is not None:
+            where.append("relevance_score <= ?")
+            params.append(max_score)
+        if site:
+            where.append("LOWER(site) = LOWER(?)")
+            params.append(site)
+        if company:
+            where.append("LOWER(company) LIKE ?")
+            params.append(f"%{company.lower()}%")
+        if bookmarked is not None:
+            where.append("bookmarked = ?")
+            params.append(bool(bookmarked))
+        if applied is not None:
+            where.append("applied = ?")
+            params.append(bool(applied))
+        if remote is not None:
+            where.append("is_remote = ?")
+            params.append(bool(remote))
+        if job_type:
+            where.append("LOWER(job_type) = LOWER(?)")
+            params.append(job_type)
+        if text:
+            like = f"%{text.lower()}%"
+            where.append(
+                "("
+                "LOWER(title) LIKE ? OR "
+                "LOWER(company) LIKE ? OR "
+                "LOWER(location) LIKE ? OR "
+                "LOWER(COALESCE(description, '')) LIKE ?"
+                ")"
+            )
+            params.extend([like, like, like, like])
+
+        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+        order_sql = (
+            "ORDER BY COALESCE(date_posted, first_seen, last_seen) DESC, "
+            "relevance_score DESC"
+            if sort == "date"
+            else "ORDER BY relevance_score DESC, last_seen DESC"
+        )
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT COUNT(*) FROM jobs {where_sql}", params)
+            total = int(cursor.fetchone()[0])
+
+            cursor.execute(
+                f"""
+                SELECT {_JOB_COLUMNS}
+                FROM jobs
+                {where_sql}
+                {order_sql}
+                LIMIT ? OFFSET ?
+                """,
+                [*params, limit, offset],
+            )
+            records = [self._row_to_record(row) for row in cursor.fetchall()]
+
+        return records, total
+
     def get_top_jobs(self, limit: int = 10, min_score: int = 0) -> list[JobDBRecord]:
         """
         Get top jobs from database ordered by relevance score.
@@ -800,6 +886,20 @@ class JobDatabase:
             )
             conn.commit()
             return new_state
+
+    def set_applied(self, job_id: str, applied: bool) -> bool:
+        """Set applied status for a job idempotently."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT job_id FROM jobs WHERE job_id = ?", (job_id,))
+            if cursor.fetchone() is None:
+                return False
+            cursor.execute(
+                "UPDATE jobs SET applied = ? WHERE job_id = ?",
+                (applied, job_id),
+            )
+            conn.commit()
+            return True
 
     def delete_job(self, job_id: str) -> bool:
         """
@@ -931,6 +1031,20 @@ class JobDatabase:
             )
             conn.commit()
             return new_state
+
+    def set_bookmarked(self, job_id: str, bookmarked: bool) -> bool:
+        """Set bookmark status for a job idempotently."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT job_id FROM jobs WHERE job_id = ?", (job_id,))
+            if cursor.fetchone() is None:
+                return False
+            cursor.execute(
+                "UPDATE jobs SET bookmarked = ? WHERE job_id = ?",
+                (bookmarked, job_id),
+            )
+            conn.commit()
+            return True
 
     def get_job_by_id(self, job_id: str) -> JobDBRecord | None:
         """
@@ -1250,6 +1364,53 @@ class JobDatabase:
                 (f"-{days} days",),
             )
             return int(cursor.fetchone()[0])
+
+    def preview_reconcile_with_config(self, config: Config) -> ReconciliationReport:
+        """Preview reconciliation counts using the same deletion order as runtime.
+
+        The first pass deletes jobs below the save threshold. The stale-job
+        preview therefore excludes rows that would already be removed by the
+        score pass, so preview totals match actual execution totals.
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM jobs WHERE bookmarked = 1")
+            protected_bookmarked = int(cursor.fetchone()[0])
+            cursor.execute("SELECT COUNT(*) FROM jobs WHERE applied = 1")
+            protected_applied = int(cursor.fetchone()[0])
+
+            cursor.execute(
+                "SELECT COUNT(*) FROM jobs WHERE relevance_score < ? "
+                "AND bookmarked = 0 AND applied = 0",
+                (config.scoring.save_threshold,),
+            )
+            deleted_below_score = int(cursor.fetchone()[0])
+
+            cursor.execute(
+                "SELECT COUNT(*) FROM jobs WHERE relevance_score >= ? "
+                "AND last_seen < date('now', ?) "
+                "AND bookmarked = 0 AND applied = 0",
+                (
+                    config.scoring.save_threshold,
+                    f"-{config.database.retention.max_age_days} days",
+                ),
+            )
+            deleted_stale = int(cursor.fetchone()[0])
+
+            cursor.execute(
+                "SELECT COUNT(*) FROM deleted_jobs "
+                "WHERE blacklisted_at < datetime('now', ?)",
+                (f"-{config.database.retention.purge_blacklist_after_days} days",),
+            )
+            purged_blacklist = int(cursor.fetchone()[0])
+
+        return ReconciliationReport(
+            deleted_below_score=deleted_below_score,
+            deleted_stale=deleted_stale,
+            purged_blacklist=purged_blacklist,
+            protected_bookmarked=protected_bookmarked,
+            protected_applied=protected_applied,
+        )
 
     def reconcile_with_config(self, config: Config) -> ReconciliationReport:
         """Align the DB with the current settings.yaml retention rules.

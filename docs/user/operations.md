@@ -8,10 +8,10 @@ Run the container health check directly:
 docker compose exec scheduler job-search-healthcheck
 ```
 
-Check API health when the API profile is enabled:
+Check web health:
 
 ```bash
-curl http://127.0.0.1:8502/health
+curl http://127.0.0.1:8501/health
 ```
 
 ## Logs
@@ -20,9 +20,7 @@ Container logs:
 
 ```bash
 docker compose logs -f scheduler
-docker compose logs -f dashboard
-docker compose logs -f api
-docker compose logs -f mcp
+docker compose logs -f web
 ```
 
 Application logs are written to `/data/logs/search.log` inside the shared data
@@ -44,9 +42,10 @@ tooling.
 
 ## Concurrency
 
-The scheduler writes to SQLite. Dashboard, API, and MCP read from the same
-database and can mutate curation state. SQLite WAL mode and the application
-connection lock cover normal single-user local usage.
+The scheduler writes to SQLite. The web server reads from the same database and
+can mutate curation state through the dashboard, REST API, and MCP tools.
+SQLite WAL mode and the application connection lock cover normal single-user
+local usage.
 
 Do not run multiple independent scheduler/search instances against the same data
 directory at the same time.

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
+import pytest
 
 from job_search_tool.database import ReconciliationReport
 
@@ -377,20 +377,11 @@ class TestMain:
         mock_scheduler.run_once.assert_not_called()
 
     @patch("sys.argv", ["job_search_tool.main.py", "dashboard"])
-    @patch("job_search_tool.main.os.execvp")
-    def test_dashboard_subcommand_execs_streamlit(self, mock_execvp):
+    def test_dashboard_subcommand_is_removed(self):
         from job_search_tool.main import main
 
-        main()
-
-        mock_execvp.assert_called_once()
-        cmd, args = mock_execvp.call_args.args
-        assert cmd == "streamlit"
-        assert args[0] == "streamlit"
-        assert args[1] == "run"
-        dashboard_path = Path(args[2])
-        assert dashboard_path.name == "dashboard.py"
-        assert dashboard_path.is_file()
+        with pytest.raises(SystemExit):
+            main()
 
 
 # ════════════════════════════════════════════════════════════════════════════

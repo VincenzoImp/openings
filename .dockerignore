@@ -62,6 +62,12 @@ CONTRIBUTING.md
 .mypy_cache/
 .ruff_cache/
 
+# Frontend dependencies and local build output
+node_modules/
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
+
 # Environment files
 .env
 .env.*
