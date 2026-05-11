@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -64,6 +65,13 @@ def _seed_db(db_path: Path) -> None:
 @pytest.fixture()
 def client(db_path: Path, _seed_db: None):
     """Create a TestClient backed by the seeded DB singleton."""
+    with _client_for_db(db_path) as test_client:
+        yield test_client
+
+
+@contextmanager
+def _client_for_db(db_path: Path):
+    """Create a TestClient backed by an existing test DB path."""
     from job_search_tool import job_service
     from job_search_tool.web.app import create_app
 
@@ -143,6 +151,58 @@ def test_api_token_accepts_bearer_header(
     )
 
     assert response.status_code == 200
+
+
+def test_api_token_accepts_dashboard_header(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("JOB_SEARCH_API_TOKEN", "secret-token")
+
+    response = client.get(
+        "/api/jobs",
+        headers={"X-Job-Search-Token": "secret-token"},
+    )
+
+    assert response.status_code == 200
+
+
+def test_dashboard_auth_status_reports_token_requirement(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("JOB_SEARCH_API_TOKEN", "secret-token")
+
+    response = client.get("/api/dashboard/auth")
+
+    assert response.status_code == 200
+    assert response.json() == {"token_required": True}
+    assert "secret-token" not in response.text
+
+
+def test_cors_default_does_not_allow_arbitrary_origin(client: TestClient) -> None:
+    response = client.get(
+        "/api/jobs",
+        headers={"Origin": "http://evil.example"},
+    )
+
+    assert response.headers.get("access-control-allow-origin") is None
+
+
+def test_cors_allows_configured_origin(
+    db_path: Path,
+    _seed_db: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("JOB_SEARCH_WEB_ALLOWED_ORIGINS", "http://dashboard.example")
+
+    with _client_for_db(db_path) as test_client:
+        response = test_client.get(
+            "/api/jobs",
+            headers={"Origin": "http://dashboard.example"},
+        )
+
+    assert response.headers["access-control-allow-origin"] == "http://dashboard.example"
 
 
 def test_list_jobs_returns_paginated_result(client: TestClient) -> None:

@@ -1,6 +1,7 @@
 import type {
   CleanupResponse,
   CommandResponse,
+  DashboardAuthResponse,
   JobListParams,
   JobListResponse,
   JobRecord,
@@ -9,14 +10,63 @@ import type {
 } from "./types";
 
 const API_ROOT = "/api";
+const DASHBOARD_TOKEN_STORAGE_KEY = "job-search-tool.dashboard-token";
+
+function storage(): Storage | null {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function getDashboardToken(): string | null {
+  const token = storage()?.getItem(DASHBOARD_TOKEN_STORAGE_KEY)?.trim();
+  return token || null;
+}
+
+export function setDashboardToken(token: string | null): void {
+  const store = storage();
+  if (!store) {
+    return;
+  }
+
+  const normalized = token?.trim() ?? "";
+  if (normalized) {
+    store.setItem(DASHBOARD_TOKEN_STORAGE_KEY, normalized);
+  } else {
+    store.removeItem(DASHBOARD_TOKEN_STORAGE_KEY);
+  }
+}
+
+export function clearDashboardToken(): void {
+  setDashboardToken(null);
+}
+
+function requestHeaders(init?: RequestInit): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json"
+  };
+  const incoming = init?.headers;
+  if (incoming instanceof Headers) {
+    incoming.forEach((value, key) => {
+      headers[key] = value;
+    });
+  } else if (incoming) {
+    Object.assign(headers, incoming);
+  }
+
+  const token = getDashboardToken();
+  if (token) {
+    headers["X-Job-Search-Token"] = token;
+  }
+  return headers;
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_ROOT}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...init?.headers
-    },
-    ...init
+    ...init,
+    headers: requestHeaders(init)
   });
 
   if (!response.ok) {
@@ -25,6 +75,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return response.json() as Promise<T>;
+}
+
+export function getDashboardAuthStatus(): Promise<DashboardAuthResponse> {
+  return request<DashboardAuthResponse>("/dashboard/auth");
 }
 
 function query(params: JobListParams): string {

@@ -42,9 +42,9 @@ Current template defaults include `search.hours_old: 720`,
 | `JOB_SEARCH_TEMPLATE_PATH` | template path used for generated settings docs |
 | `JOB_SEARCH_WEB_BIND` | web bind host in Compose |
 | `JOB_SEARCH_WEB_PORT` | web host port |
-| `JOB_SEARCH_API_TOKEN` | optional Bearer token for API routes under `/api` |
+| `JOB_SEARCH_API_TOKEN` | optional token for API routes under `/api` and the dashboard token gate |
 | `JOB_SEARCH_WEB_ALLOWED_HOSTS` | comma-separated MCP allowed hosts for LAN use |
-| `JOB_SEARCH_WEB_ALLOWED_ORIGINS` | comma-separated MCP allowed origins for LAN use |
+| `JOB_SEARCH_WEB_ALLOWED_ORIGINS` | comma-separated MCP/CORS allowed origins for LAN use |
 
 ## Thresholds
 

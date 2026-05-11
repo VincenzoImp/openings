@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+import hmac
 import os
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -98,14 +99,40 @@ class SemanticResultResponse(BaseModel):
     job_url: str | None = None
 
 
-def require_api_token(authorization: str | None = Header(default=None)) -> None:
+class DashboardAuthResponse(BaseModel):
+    token_required: bool
+
+
+def _configured_api_token() -> str:
+    return os.environ.get("JOB_SEARCH_API_TOKEN", "").strip()
+
+
+def _token_matches(candidate: str | None, expected: str) -> bool:
+    if not candidate:
+        return False
+    return hmac.compare_digest(candidate, expected)
+
+
+def require_api_token(
+    authorization: str | None = Header(default=None),
+    x_job_search_token: str | None = Header(
+        default=None,
+        alias="X-Job-Search-Token",
+    ),
+) -> None:
     """Require a bearer token only when JOB_SEARCH_API_TOKEN is configured."""
-    token = os.environ.get("JOB_SEARCH_API_TOKEN", "").strip()
+    token = _configured_api_token()
     if not token:
         return
 
-    if authorization != f"Bearer {token}":
-        raise HTTPException(status_code=401, detail="Invalid or missing API token")
+    bearer_token = None
+    if authorization and authorization.startswith("Bearer "):
+        bearer_token = authorization.removeprefix("Bearer ").strip()
+
+    if _token_matches(bearer_token, token) or _token_matches(x_job_search_token, token):
+        return
+
+    raise HTTPException(status_code=401, detail="Invalid or missing API token")
 
 
 def _service() -> JobApplicationService:
@@ -120,7 +147,13 @@ def _cleanup_response(cleanup: CleanupPreview) -> CleanupResponse:
     return CleanupResponse(**asdict(cleanup), total_deleted=cleanup.total_deleted)
 
 
+public_router = APIRouter(prefix="/api")
 router = APIRouter(prefix="/api", dependencies=[Depends(require_api_token)])
+
+
+@public_router.get("/dashboard/auth", response_model=DashboardAuthResponse)
+def get_dashboard_auth() -> DashboardAuthResponse:
+    return DashboardAuthResponse(token_required=bool(_configured_api_token()))
 
 
 @router.get("/jobs", response_model=JobListResponse)

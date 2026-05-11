@@ -28,6 +28,10 @@ export interface JobListResponse {
   offset: number;
 }
 
+export interface DashboardAuthResponse {
+  token_required: boolean;
+}
+
 export interface JobListParams {
   limit?: number;
   offset?: number;

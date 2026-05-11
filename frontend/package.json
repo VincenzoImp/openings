@@ -11,12 +11,16 @@
     "quality": "npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
+    "@heroui/react": "^3.0.4",
+    "@heroui/styles": "^3.0.4",
+    "@tailwindcss/vite": "^4.3.0",
     "@tanstack/react-query": "^5.0.0",
     "@tanstack/react-table": "^8.0.0",
     "@tanstack/react-virtual": "^3.0.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^4.3.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.0.0",

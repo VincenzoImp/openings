@@ -52,8 +52,9 @@ To expose the web surface on a trusted LAN, create `.env`:
 JOB_SEARCH_WEB_BIND=0.0.0.0
 ```
 
-For API access outside the same machine, set `JOB_SEARCH_API_TOKEN` and send
-`Authorization: Bearer <token>`.
+For API or dashboard access outside the same machine, set `JOB_SEARCH_API_TOKEN`.
+Scripts can send `Authorization: Bearer <token>`. The dashboard will show a token
+gate and then send `X-Job-Search-Token` on browser API requests.
 
 For MCP access from another LAN device, also allow the host seen by the MCP
 client:
@@ -62,6 +63,10 @@ client:
 JOB_SEARCH_WEB_ALLOWED_HOSTS=192.168.1.10:8501
 JOB_SEARCH_WEB_ALLOWED_ORIGINS=http://192.168.1.10:8501
 ```
+
+`JOB_SEARCH_WEB_ALLOWED_ORIGINS` also controls browser CORS for API calls from a
+separate origin. It is not required when the built dashboard and API are served
+from the same web process.
 
 Do not expose the web port directly to untrusted networks.
 
@@ -72,7 +77,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Version 9.0.0 uses the current SQLite schema as the runtime baseline and does
+Since 9.0.0, the current SQLite schema is the runtime baseline and does
 not migrate prior database layouts. For a clean major-version start, reset the
 Docker-managed state volume before bringing services back up:
 

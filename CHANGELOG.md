@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.1.0] - 2026-05-11
+
+### Added
+
+- Dashboard token gate for local/LAN deployments that set `JOB_SEARCH_API_TOKEN`.
+- Public `/api/dashboard/auth` route so the frontend can detect whether a token is required without exposing the token.
+- Server-side pagination in the jobs dashboard, keeping large databases responsive.
+
+### Changed
+
+- Migrated dashboard styling to Tailwind CSS and HeroUI components, reducing custom UI code.
+- Dashboard mutations now refresh jobs, stats, score distribution, and cleanup preview together.
+- Dashboard job detail state now clears or syncs when filters, pagination, or refreshed data change.
+- Browser CORS now defaults to localhost origins and uses `JOB_SEARCH_WEB_ALLOWED_ORIGINS` for explicit LAN or remote frontend origins.
+
+### Fixed
+
+- The dashboard now works when REST API token authentication is enabled.
+- Open-job filtering now excludes both saved and applied jobs.
+- Virtualized job rows are explicitly anchored for stable browser layout.
+
 ## [9.0.0] - 2026-05-11
 
 ### Breaking Changes

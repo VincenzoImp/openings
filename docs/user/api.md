@@ -37,11 +37,20 @@ Authentication is disabled unless `JOB_SEARCH_API_TOKEN` is set.
 JOB_SEARCH_API_TOKEN=change-me
 ```
 
-Then send:
+Then send one of:
 
 ```text
 Authorization: Bearer change-me
+X-Job-Search-Token: change-me
 ```
+
+The React dashboard uses `X-Job-Search-Token` after the browser token gate is
+completed. The token is stored in browser local storage for that dashboard
+origin.
+
+Browser cross-origin access is restricted to localhost origins and any exact
+origins listed in `JOB_SEARCH_WEB_ALLOWED_ORIGINS`. Same-origin dashboard usage
+does not need CORS.
 
 This is a local/LAN protection mechanism, not a substitute for a hardened public
 API gateway. Keep the web server bound to `127.0.0.1` unless you explicitly need
@@ -52,6 +61,7 @@ LAN access.
 | Method | Path | Purpose |
 |--------|------|---------|
 | `GET` | `/health` | status and job count |
+| `GET` | `/api/dashboard/auth` | public dashboard auth capability check |
 | `GET` | `/api/jobs` | list jobs with filtering and pagination |
 | `GET` | `/api/jobs/{job_id}` | fetch one job |
 | `GET` | `/api/jobs/search/semantic` | semantic search over ChromaDB |

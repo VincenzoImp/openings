@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { RenderResult } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import type { JobListResponse, JobRecord } from "../../api/types";
@@ -66,16 +67,19 @@ const baseJobs: JobRecord[] = [
   }
 ];
 
-function response(items = baseJobs): JobListResponse {
+function response(
+  items = baseJobs,
+  overrides: Partial<Omit<JobListResponse, "items">> = {}
+): JobListResponse {
   return {
     items,
-    total: items.length,
-    limit: 50,
-    offset: 0
+    total: overrides.total ?? items.length,
+    limit: overrides.limit ?? 50,
+    offset: overrides.offset ?? 0
   };
 }
 
-function renderJobsPage() {
+function renderJobsPage(): RenderResult & { queryClient: QueryClient } {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -83,11 +87,12 @@ function renderJobsPage() {
     }
   });
 
-  return render(
+  const result = render(
     <QueryClientProvider client={queryClient}>
       <JobsPage />
     </QueryClientProvider>
   );
+  return { ...result, queryClient };
 }
 
 beforeEach(() => {
@@ -159,13 +164,70 @@ test("filter controls update the list query", async () => {
   });
 });
 
-test("bookmark action sends an explicit boolean", async () => {
+test("open status excludes saved and applied jobs", async () => {
   renderJobsPage();
+  await screen.findByText("Backend Engineer");
+
+  fireEvent.change(screen.getByLabelText("Status"), {
+    target: { value: "open" }
+  });
+
+  await waitFor(() => {
+    expect(listJobs).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        applied: false,
+        bookmarked: false
+      })
+    );
+  });
+});
+
+test("next page requests the next server offset", async () => {
+  vi.mocked(listJobs).mockResolvedValue(response(baseJobs, { limit: 100, total: 220 }));
+
+  renderJobsPage();
+  await screen.findByText("Backend Engineer");
+
+  fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+
+  await waitFor(() => {
+    expect(listJobs).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        limit: 100,
+        offset: 100
+      })
+    );
+  });
+});
+
+test("changing filters clears selected job ids", async () => {
+  renderJobsPage();
+  await screen.findByText("Backend Engineer");
+
+  fireEvent.click(screen.getByRole("checkbox", { name: "Select Backend Engineer" }));
+  expect(screen.getByRole("button", { name: "Blacklist selected" })).not.toBeDisabled();
+
+  fireEvent.change(screen.getByLabelText("Site"), {
+    target: { value: "linkedin" }
+  });
+
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: "Blacklist selected" })).toBeDisabled();
+  });
+});
+
+test("bookmark action sends an explicit boolean", async () => {
+  const { queryClient } = renderJobsPage();
+  const invalidate = vi.spyOn(queryClient, "invalidateQueries");
   await screen.findByText("Backend Engineer");
 
   fireEvent.click(screen.getByRole("button", { name: "Save Backend Engineer" }));
 
   await waitFor(() => expect(setBookmarked).toHaveBeenCalledWith("job-1", true));
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ["jobs"] });
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ["stats"] });
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ["distribution"] });
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ["cleanup-preview"] });
 });
 
 test("applied action sends an explicit boolean", async () => {
@@ -219,4 +281,20 @@ test("opening a row shows the detail panel", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Open Backend Engineer details" }));
 
   expect(screen.getByText("Build Python APIs and data pipelines.")).toBeInTheDocument();
+});
+
+test("changing filters clears the detail panel", async () => {
+  renderJobsPage();
+  await screen.findByText("Backend Engineer");
+
+  fireEvent.click(screen.getByRole("button", { name: "Open Backend Engineer details" }));
+  expect(screen.getByText("Build Python APIs and data pipelines.")).toBeInTheDocument();
+
+  fireEvent.change(screen.getByLabelText("Site"), {
+    target: { value: "linkedin" }
+  });
+
+  await waitFor(() => {
+    expect(screen.queryByText("Build Python APIs and data pipelines.")).not.toBeInTheDocument();
+  });
 });
