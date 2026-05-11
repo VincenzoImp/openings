@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 # Mock chromadb submodules before importing vector_store.
 _mock_chromadb = MagicMock()
@@ -29,7 +26,7 @@ sys.modules["chromadb.utils.embedding_functions"] = _mock_chromadb_utils_ef
 @pytest.fixture(autouse=True)
 def _reset_vector_store_singleton():
     """Reset the vector store singleton between tests."""
-    import vector_store as vs_module
+    import job_search_tool.vector_store as vs_module
 
     original = vs_module._vector_store
     original_key = getattr(vs_module, "_vector_store_key", None)
@@ -64,7 +61,7 @@ def mock_client(mock_collection):
 def vector_store(mock_client, mock_collection, tmp_path):
     """Create a JobVectorStore with mocked ChromaDB."""
     with patch.object(_mock_chromadb, "PersistentClient", return_value=mock_client):
-        from vector_store import JobVectorStore
+        from job_search_tool.vector_store import JobVectorStore
 
         store = JobVectorStore(persist_dir=tmp_path / "chroma")
     return store
@@ -124,7 +121,7 @@ class TestSemanticSearchResult:
     """Tests for the SemanticSearchResult dataclass."""
 
     def test_creation(self):
-        from vector_store import SemanticSearchResult
+        from job_search_tool.vector_store import SemanticSearchResult
 
         result = SemanticSearchResult(
             job_id="abc123",
@@ -138,7 +135,7 @@ class TestSemanticSearchResult:
         assert result.metadata == {"title": "Engineer"}
 
     def test_frozen(self):
-        from vector_store import SemanticSearchResult
+        from job_search_tool.vector_store import SemanticSearchResult
 
         result = SemanticSearchResult(
             job_id="abc123", distance=0.2, similarity=0.8, metadata={}
@@ -388,7 +385,7 @@ class TestGetVectorStore:
 
     def test_creates_instance(self, mock_client, tmp_path):
         """Test that get_vector_store creates a new instance."""
-        import vector_store as vs_module
+        import job_search_tool.vector_store as vs_module
 
         vs_module._vector_store = None
         vs_module._vector_store_key = None
@@ -401,7 +398,7 @@ class TestGetVectorStore:
 
     def test_returns_singleton(self, mock_client, tmp_path):
         """Test that get_vector_store returns the same instance."""
-        import vector_store as vs_module
+        import job_search_tool.vector_store as vs_module
 
         vs_module._vector_store = None
         vs_module._vector_store_key = None
@@ -414,7 +411,7 @@ class TestGetVectorStore:
 
     def test_recreates_singleton_when_path_changes(self, mock_client, tmp_path):
         """Test singleton refreshes when the persist_dir changes."""
-        import vector_store as vs_module
+        import job_search_tool.vector_store as vs_module
 
         vs_module._vector_store = None
         vs_module._vector_store_key = None
@@ -438,7 +435,7 @@ class TestBackfillEmbeddings:
         self, vector_store, mock_collection, mock_db_record
     ):
         """Test backfilling jobs that aren't yet embedded."""
-        from vector_commands import backfill_embeddings
+        from job_search_tool.vector_commands import backfill_embeddings
 
         mock_db = MagicMock()
         mock_db.get_all_jobs.return_value = [mock_db_record]
@@ -457,7 +454,7 @@ class TestBackfillEmbeddings:
         self, vector_store, mock_collection, mock_db_record
     ):
         """Test backfill when all jobs are already embedded."""
-        from vector_commands import backfill_embeddings
+        from job_search_tool.vector_commands import backfill_embeddings
 
         mock_db = MagicMock()
         mock_db.get_all_jobs.return_value = [mock_db_record]
@@ -472,7 +469,7 @@ class TestBackfillEmbeddings:
 
     def test_backfill_empty_database(self, vector_store, mock_collection):
         """Test backfill when database has no jobs."""
-        from vector_commands import backfill_embeddings
+        from job_search_tool.vector_commands import backfill_embeddings
 
         mock_db = MagicMock()
         mock_db.get_all_jobs.return_value = []
@@ -487,7 +484,7 @@ class TestSyncDeletions:
 
     def test_sync_removes_stale_entries(self, vector_store, mock_collection):
         """Test that stale embeddings are removed."""
-        from vector_commands import sync_deletions
+        from job_search_tool.vector_commands import sync_deletions
 
         mock_db = MagicMock()
         # DB only has "abc123"
@@ -508,7 +505,7 @@ class TestSyncDeletions:
 
     def test_sync_no_stale_entries(self, vector_store, mock_collection):
         """Test sync when everything is in sync."""
-        from vector_commands import sync_deletions
+        from job_search_tool.vector_commands import sync_deletions
 
         mock_db = MagicMock()
         mock_db_record = MagicMock()
@@ -524,7 +521,7 @@ class TestSyncDeletions:
 
     def test_sync_empty_vector_store(self, vector_store, mock_collection):
         """Test sync when vector store is empty."""
-        from vector_commands import sync_deletions
+        from job_search_tool.vector_commands import sync_deletions
 
         mock_db = MagicMock()
         mock_db.get_all_jobs.return_value = []

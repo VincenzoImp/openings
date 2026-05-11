@@ -14,7 +14,7 @@ import pandas as pd
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from logger import get_logger
+from job_search_tool.logger import get_logger
 
 # Score threshold for highlighting in Excel
 HIGH_SCORE_THRESHOLD = 30

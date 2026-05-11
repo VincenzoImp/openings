@@ -15,8 +15,8 @@ from dataclasses import dataclass
 import pandas as pd
 from rapidfuzz import fuzz
 
-from config import Config
-from logger import get_logger, log_section
+from job_search_tool.config import Config
+from job_search_tool.logger import get_logger, log_section
 
 
 def _normalize_text(text: str) -> str:

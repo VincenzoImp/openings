@@ -33,7 +33,6 @@ logs/
 
 # Documentation (not needed in container)
 README.md
-CLAUDE.md
 LICENSE
 
 # Temporary files
@@ -56,7 +55,6 @@ pytest.ini
 .github/
 
 # Development
-requirements-dev.txt
 .pre-commit-config.yaml
 CONTRIBUTING.md
 

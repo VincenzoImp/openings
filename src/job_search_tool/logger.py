@@ -12,7 +12,7 @@ from logging.handlers import RotatingFileHandler
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from config import Config
+    from job_search_tool.config import Config
 
 
 # ANSI color codes for console output

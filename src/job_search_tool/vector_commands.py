@@ -11,8 +11,8 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from database import JobDatabase
-    from vector_store import JobVectorStore
+    from job_search_tool.database import JobDatabase
+    from job_search_tool.vector_store import JobVectorStore
 
 logger = logging.getLogger("job_search.vector_commands")
 

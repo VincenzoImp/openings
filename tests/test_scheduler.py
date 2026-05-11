@@ -9,18 +9,13 @@ Tests for APScheduler integration including:
 """
 
 import signal
-import sys
 from datetime import datetime, timedelta
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Add scripts directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-
-from config import Config, SchedulerConfig
-from scheduler import JobSearchScheduler, create_scheduler
+from job_search_tool.config import Config, SchedulerConfig
+from job_search_tool.scheduler import JobSearchScheduler, create_scheduler
 
 
 # =============================================================================
@@ -164,7 +159,7 @@ class TestJobSearchSchedulerScheduledMode:
         scheduler = JobSearchScheduler(config, mock_job)
 
         # Mock BlockingScheduler to avoid blocking
-        with patch("scheduler.BlockingScheduler") as mock_blocking:
+        with patch("job_search_tool.scheduler.BlockingScheduler") as mock_blocking:
             mock_sched = MagicMock()
             mock_blocking.return_value = mock_sched
             # Make start() raise to exit immediately
@@ -185,7 +180,7 @@ class TestJobSearchSchedulerScheduledMode:
         mock_job = MagicMock(return_value=True)
         scheduler = JobSearchScheduler(config, mock_job)
 
-        with patch("scheduler.BlockingScheduler") as mock_blocking:
+        with patch("job_search_tool.scheduler.BlockingScheduler") as mock_blocking:
             mock_sched = MagicMock()
             mock_blocking.return_value = mock_sched
             mock_sched.start.side_effect = KeyboardInterrupt()
@@ -203,7 +198,7 @@ class TestJobSearchSchedulerScheduledMode:
         mock_job = MagicMock(return_value=True)
         scheduler = JobSearchScheduler(config, mock_job)
 
-        with patch("scheduler.BlockingScheduler") as mock_blocking:
+        with patch("job_search_tool.scheduler.BlockingScheduler") as mock_blocking:
             mock_sched = MagicMock()
             mock_blocking.return_value = mock_sched
             mock_sched.start.side_effect = KeyboardInterrupt()
@@ -251,7 +246,7 @@ class TestJobSearchSchedulerExecuteJob:
         scheduler = JobSearchScheduler(config, mock_job)
 
         # Set up mock scheduler
-        with patch("scheduler.BlockingScheduler") as mock_blocking:
+        with patch("job_search_tool.scheduler.BlockingScheduler") as mock_blocking:
             mock_sched = MagicMock()
             mock_blocking.return_value = mock_sched
             scheduler._scheduler = mock_sched
@@ -267,7 +262,7 @@ class TestJobSearchSchedulerExecuteJob:
         mock_job = MagicMock(side_effect=Exception("Error"))
         scheduler = JobSearchScheduler(config, mock_job)
 
-        with patch("scheduler.BlockingScheduler") as mock_blocking:
+        with patch("job_search_tool.scheduler.BlockingScheduler") as mock_blocking:
             mock_sched = MagicMock()
             mock_blocking.return_value = mock_sched
             scheduler._scheduler = mock_sched
@@ -288,7 +283,7 @@ class TestJobSearchSchedulerExecuteJob:
         mock_job = MagicMock(return_value=False)
         scheduler = JobSearchScheduler(config, mock_job)
 
-        with patch("scheduler.BlockingScheduler") as mock_blocking:
+        with patch("job_search_tool.scheduler.BlockingScheduler") as mock_blocking:
             mock_sched = MagicMock()
             mock_blocking.return_value = mock_sched
             scheduler._scheduler = mock_sched

@@ -3,14 +3,9 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-
-# Add scripts directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-
-from healthcheck import (
+from job_search_tool.healthcheck import (
     check_config,
     check_database,
     check_directories,
@@ -59,21 +54,23 @@ class TestCheckConfig:
         """Test check_config succeeds with valid config."""
         mock_config = MagicMock()
 
-        with patch("config.load_config", return_value=mock_config):
+        with patch("job_search_tool.config.load_config", return_value=mock_config):
             result = check_config()
 
             assert result is True
 
     def test_check_config_failure(self):
         """Test check_config fails when config loading raises."""
-        with patch("config.load_config", side_effect=Exception("Bad YAML")):
+        with patch(
+            "job_search_tool.config.load_config", side_effect=Exception("Bad YAML")
+        ):
             result = check_config()
 
             assert result is False
 
     def test_check_config_returns_none(self):
         """Test check_config fails when config is None."""
-        with patch("config.load_config", return_value=None):
+        with patch("job_search_tool.config.load_config", return_value=None):
             result = check_config()
 
             assert result is False
@@ -94,8 +91,8 @@ class TestCheckDatabase:
         mock_db.get_statistics.return_value = {"total_jobs": 5}
 
         with (
-            patch("config.get_config", return_value=mock_config),
-            patch("database.get_database", return_value=mock_db),
+            patch("job_search_tool.config.get_config", return_value=mock_config),
+            patch("job_search_tool.database.get_database", return_value=mock_db),
         ):
             result = check_database()
 
@@ -106,9 +103,10 @@ class TestCheckDatabase:
         mock_config = MagicMock()
 
         with (
-            patch("config.get_config", return_value=mock_config),
+            patch("job_search_tool.config.get_config", return_value=mock_config),
             patch(
-                "database.get_database", side_effect=Exception("DB connection failed")
+                "job_search_tool.database.get_database",
+                side_effect=Exception("DB connection failed"),
             ),
         ):
             result = check_database()
@@ -122,8 +120,8 @@ class TestCheckDatabase:
         mock_db.get_statistics.return_value = "not a dict"
 
         with (
-            patch("config.get_config", return_value=mock_config),
-            patch("database.get_database", return_value=mock_db),
+            patch("job_search_tool.config.get_config", return_value=mock_config),
+            patch("job_search_tool.database.get_database", return_value=mock_db),
         ):
             result = check_database()
 
@@ -143,15 +141,17 @@ class TestCheckDirectories:
         """Test check_directories succeeds when dirs exist and are writable."""
         mock_config = MagicMock()
         mock_config.results_path = tmp_path / "results"
-        mock_config.data_path = tmp_path / "data"
-        mock_config.log_path = tmp_path / "logs" / "search.log"
+        mock_config.database_path = tmp_path / "db" / "jobs.db"
+        mock_config.chroma_path = tmp_path / "chroma"
+        mock_config.logs_dir = tmp_path / "logs"
 
         # Create the directories
         mock_config.results_path.mkdir()
-        mock_config.data_path.mkdir()
-        mock_config.log_path.parent.mkdir()
+        mock_config.database_path.parent.mkdir()
+        mock_config.chroma_path.mkdir()
+        mock_config.logs_dir.mkdir()
 
-        with patch("config.get_config", return_value=mock_config):
+        with patch("job_search_tool.config.get_config", return_value=mock_config):
             result = check_directories()
 
             assert result is True
@@ -160,20 +160,24 @@ class TestCheckDirectories:
         """Test check_directories fails when a directory is missing."""
         mock_config = MagicMock()
         mock_config.results_path = tmp_path / "nonexistent"
-        mock_config.data_path = tmp_path / "data"
-        mock_config.log_path = tmp_path / "logs" / "search.log"
+        mock_config.database_path = tmp_path / "db" / "jobs.db"
+        mock_config.chroma_path = tmp_path / "chroma"
+        mock_config.logs_dir = tmp_path / "logs"
 
-        mock_config.data_path.mkdir()
-        mock_config.log_path.parent.mkdir()
+        mock_config.database_path.parent.mkdir()
+        mock_config.chroma_path.mkdir()
+        mock_config.logs_dir.mkdir()
 
-        with patch("config.get_config", return_value=mock_config):
+        with patch("job_search_tool.config.get_config", return_value=mock_config):
             result = check_directories()
 
             assert result is False
 
     def test_check_directories_exception(self):
         """Test check_directories handles exceptions."""
-        with patch("config.get_config", side_effect=Exception("Config error")):
+        with patch(
+            "job_search_tool.config.get_config", side_effect=Exception("Config error")
+        ):
             result = check_directories()
 
             assert result is False
@@ -190,10 +194,10 @@ class TestMain:
     def test_main_all_pass(self):
         """Test main returns 0 when all checks pass."""
         with (
-            patch("healthcheck.check_imports", return_value=True),
-            patch("healthcheck.check_config", return_value=True),
-            patch("healthcheck.check_database", return_value=True),
-            patch("healthcheck.check_directories", return_value=True),
+            patch("job_search_tool.healthcheck.check_imports", return_value=True),
+            patch("job_search_tool.healthcheck.check_config", return_value=True),
+            patch("job_search_tool.healthcheck.check_database", return_value=True),
+            patch("job_search_tool.healthcheck.check_directories", return_value=True),
         ):
             result = main()
 
@@ -202,10 +206,10 @@ class TestMain:
     def test_main_one_failure(self):
         """Test main returns 1 when any check fails."""
         with (
-            patch("healthcheck.check_imports", return_value=True),
-            patch("healthcheck.check_config", return_value=False),
-            patch("healthcheck.check_database", return_value=True),
-            patch("healthcheck.check_directories", return_value=True),
+            patch("job_search_tool.healthcheck.check_imports", return_value=True),
+            patch("job_search_tool.healthcheck.check_config", return_value=False),
+            patch("job_search_tool.healthcheck.check_database", return_value=True),
+            patch("job_search_tool.healthcheck.check_directories", return_value=True),
         ):
             result = main()
 
@@ -214,10 +218,10 @@ class TestMain:
     def test_main_all_fail(self):
         """Test main returns 1 when all checks fail."""
         with (
-            patch("healthcheck.check_imports", return_value=False),
-            patch("healthcheck.check_config", return_value=False),
-            patch("healthcheck.check_database", return_value=False),
-            patch("healthcheck.check_directories", return_value=False),
+            patch("job_search_tool.healthcheck.check_imports", return_value=False),
+            patch("job_search_tool.healthcheck.check_config", return_value=False),
+            patch("job_search_tool.healthcheck.check_database", return_value=False),
+            patch("job_search_tool.healthcheck.check_directories", return_value=False),
         ):
             result = main()
 
@@ -226,10 +230,13 @@ class TestMain:
     def test_main_handles_exceptions(self):
         """Test main handles exceptions from individual checks."""
         with (
-            patch("healthcheck.check_imports", side_effect=RuntimeError("Boom")),
-            patch("healthcheck.check_config", return_value=True),
-            patch("healthcheck.check_database", return_value=True),
-            patch("healthcheck.check_directories", return_value=True),
+            patch(
+                "job_search_tool.healthcheck.check_imports",
+                side_effect=RuntimeError("Boom"),
+            ),
+            patch("job_search_tool.healthcheck.check_config", return_value=True),
+            patch("job_search_tool.healthcheck.check_database", return_value=True),
+            patch("job_search_tool.healthcheck.check_directories", return_value=True),
         ):
             result = main()
 

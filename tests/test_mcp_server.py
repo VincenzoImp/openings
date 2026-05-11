@@ -13,8 +13,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from database import JobDatabase
-from models import Job
+from job_search_tool.database import JobDatabase
+from job_search_tool.models import Job
 
 
 # ---------------------------------------------------------------------------
@@ -54,7 +54,7 @@ def temp_db():
 @pytest.fixture()
 def mock_vs():
     """Create a mock vector store."""
-    from vector_store import SemanticSearchResult
+    from job_search_tool.vector_store import SemanticSearchResult
 
     vs = MagicMock()
     vs.search.return_value = [
@@ -75,7 +75,7 @@ def mock_vs():
 @pytest.fixture(autouse=True)
 def patch_service_globals(temp_db, mock_vs):
     """Patch the shared job_service singletons used by mcp_server."""
-    import job_service
+    from job_search_tool import job_service
 
     job_service._db = temp_db
     job_service._vs = mock_vs
@@ -90,7 +90,7 @@ def patch_service_globals(temp_db, mock_vs):
 
 
 def test_list_jobs_returns_valid_json():
-    from mcp_server import list_jobs
+    from job_search_tool.mcp_server import list_jobs
 
     result = list_jobs()
     data = json.loads(result)
@@ -99,7 +99,7 @@ def test_list_jobs_returns_valid_json():
 
 
 def test_list_jobs_respects_limit():
-    from mcp_server import list_jobs
+    from job_search_tool.mcp_server import list_jobs
 
     result = list_jobs(limit=1)
     data = json.loads(result)
@@ -107,7 +107,7 @@ def test_list_jobs_respects_limit():
 
 
 def test_list_jobs_min_score_filter():
-    from mcp_server import list_jobs
+    from job_search_tool.mcp_server import list_jobs
 
     result = list_jobs(min_score=30)
     data = json.loads(result)
@@ -115,7 +115,7 @@ def test_list_jobs_min_score_filter():
 
 
 def test_list_jobs_bookmarked_filter(temp_db):
-    from mcp_server import list_jobs
+    from job_search_tool.mcp_server import list_jobs
 
     result = list_jobs(bookmarked_only=True)
     data = json.loads(result)
@@ -123,7 +123,7 @@ def test_list_jobs_bookmarked_filter(temp_db):
 
 
 def test_list_jobs_summary_fields():
-    from mcp_server import list_jobs
+    from job_search_tool.mcp_server import list_jobs
 
     result = list_jobs()
     data = json.loads(result)
@@ -142,7 +142,7 @@ def test_list_jobs_summary_fields():
 
 
 def test_get_job_returns_full_detail(temp_db):
-    from mcp_server import get_job
+    from job_search_tool.mcp_server import get_job
 
     jobs = temp_db.get_all_jobs()
     result = get_job(jobs[0].job_id)
@@ -152,7 +152,7 @@ def test_get_job_returns_full_detail(temp_db):
 
 
 def test_get_job_not_found():
-    from mcp_server import get_job
+    from job_search_tool.mcp_server import get_job
 
     result = get_job("nonexistent_id")
     data = json.loads(result)
@@ -165,7 +165,7 @@ def test_get_job_not_found():
 
 
 def test_search_similar_returns_results():
-    from mcp_server import search_similar
+    from job_search_tool.mcp_server import search_similar
 
     result = search_similar("python backend")
     data = json.loads(result)
@@ -176,9 +176,9 @@ def test_search_similar_returns_results():
 
 
 def test_search_similar_no_vector_store():
-    from mcp_server import search_similar
+    from job_search_tool.mcp_server import search_similar
 
-    with patch("mcp_server.get_vs", return_value=None):
+    with patch("job_search_tool.mcp_server.get_vs", return_value=None):
         result = search_similar("test query")
         data = json.loads(result)
         assert "error" in data
@@ -190,7 +190,7 @@ def test_search_similar_no_vector_store():
 
 
 def test_get_statistics():
-    from mcp_server import get_statistics
+    from job_search_tool.mcp_server import get_statistics
 
     result = get_statistics()
     data = json.loads(result)
@@ -204,7 +204,7 @@ def test_get_statistics():
 
 
 def test_get_score_distribution():
-    from mcp_server import get_score_distribution
+    from job_search_tool.mcp_server import get_score_distribution
 
     result = get_score_distribution(bin_size=10)
     data = json.loads(result)
@@ -217,7 +217,7 @@ def test_get_score_distribution():
 
 
 def test_bookmark_job(temp_db):
-    from mcp_server import bookmark_job
+    from job_search_tool.mcp_server import bookmark_job
 
     jobs = temp_db.get_all_jobs()
     result = bookmark_job(jobs[0].job_id)
@@ -231,7 +231,7 @@ def test_bookmark_job(temp_db):
 
 
 def test_bookmark_job_not_found():
-    from mcp_server import bookmark_job
+    from job_search_tool.mcp_server import bookmark_job
 
     result = bookmark_job("nonexistent")
     data = json.loads(result)
@@ -239,7 +239,7 @@ def test_bookmark_job_not_found():
 
 
 def test_apply_job(temp_db):
-    from mcp_server import apply_job
+    from job_search_tool.mcp_server import apply_job
 
     jobs = temp_db.get_all_jobs()
     result = apply_job(jobs[0].job_id)
@@ -248,7 +248,7 @@ def test_apply_job(temp_db):
 
 
 def test_apply_job_not_found():
-    from mcp_server import apply_job
+    from job_search_tool.mcp_server import apply_job
 
     result = apply_job("nonexistent")
     data = json.loads(result)
@@ -261,7 +261,7 @@ def test_apply_job_not_found():
 
 
 def test_delete_job(temp_db):
-    from mcp_server import delete_job
+    from job_search_tool.mcp_server import delete_job
 
     jobs = temp_db.get_all_jobs()
     result = delete_job(jobs[0].job_id)
@@ -273,7 +273,7 @@ def test_delete_job(temp_db):
 
 
 def test_delete_jobs_below_score():
-    from mcp_server import delete_jobs_below_score
+    from job_search_tool.mcp_server import delete_jobs_below_score
 
     result = delete_jobs_below_score(25)
     data = json.loads(result)
@@ -287,7 +287,7 @@ def test_delete_jobs_below_score():
 
 
 def test_get_settings_documentation():
-    from mcp_server import get_settings_documentation
+    from job_search_tool.mcp_server import get_settings_documentation
 
     text = get_settings_documentation()
     assert isinstance(text, str)
@@ -306,3 +306,37 @@ def test_get_settings_documentation():
         "vector_search",
     ]:
         assert section in text.lower(), f"Section '{section}' missing from docs"
+    assert "hours_old: 720" in text
+    assert "country_indeed:" in text
+    assert "max_workers: 3" in text
+    assert "rate_limit_cooldown: 60.0" in text
+    assert "max_jobs_in_message: 20" in text
+
+
+# ---------------------------------------------------------------------------
+# Server transport
+# ---------------------------------------------------------------------------
+
+
+def test_run_mcp_server_uses_streamable_http_only(monkeypatch):
+    from job_search_tool import mcp_server
+
+    transports: list[str] = []
+    monkeypatch.setenv("JOB_SEARCH_MCP_TRANSPORT", "sse")
+    monkeypatch.setattr(
+        mcp_server.server,
+        "run",
+        lambda *, transport: transports.append(transport),
+    )
+
+    mcp_server.run_mcp_server()
+
+    assert transports == ["streamable-http"]
+
+
+def test_mcp_server_does_not_export_sse_compat_helpers():
+    from job_search_tool import mcp_server
+
+    assert not hasattr(mcp_server, "get_mcp_transport")
+    assert not hasattr(mcp_server, "create_dual_mcp_app")
+    assert not hasattr(mcp_server, "run_dual_mcp_server")

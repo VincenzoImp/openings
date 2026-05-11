@@ -8,6 +8,7 @@ and track application status.
 from __future__ import annotations
 
 import sqlite3
+import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -17,11 +18,11 @@ from typing import TYPE_CHECKING, Generator
 import pandas as pd
 
 if TYPE_CHECKING:
-    from config import Config
+    from job_search_tool.config import Config
 
-from logger import get_logger
-from models import Job, JobDBRecord, generate_job_id
-from scoring import calculate_relevance_score
+from job_search_tool.logger import get_logger
+from job_search_tool.models import Job, JobDBRecord, generate_job_id
+from job_search_tool.scoring import calculate_relevance_score
 
 _JOB_FIELD_NAMES = (
     "job_id",
@@ -129,28 +130,6 @@ class JobDatabase:
         ON deleted_jobs(blacklisted_at)
     """
 
-    CREATE_META_TABLE = """
-        CREATE TABLE IF NOT EXISTS app_meta (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-        )
-    """
-
-    # Migration: Add new columns to existing databases
-    MIGRATE_COLUMNS = [
-        "ALTER TABLE jobs ADD COLUMN site TEXT",
-        "ALTER TABLE jobs ADD COLUMN job_type TEXT",
-        "ALTER TABLE jobs ADD COLUMN is_remote BOOLEAN",
-        "ALTER TABLE jobs ADD COLUMN job_level TEXT",
-        "ALTER TABLE jobs ADD COLUMN description TEXT",
-        "ALTER TABLE jobs ADD COLUMN date_posted DATE",
-        "ALTER TABLE jobs ADD COLUMN min_amount REAL",
-        "ALTER TABLE jobs ADD COLUMN max_amount REAL",
-        "ALTER TABLE jobs ADD COLUMN currency TEXT",
-        "ALTER TABLE jobs ADD COLUMN company_url TEXT",
-        "ALTER TABLE jobs ADD COLUMN bookmarked BOOLEAN DEFAULT FALSE",
-    ]
-
     INSERT_OR_UPDATE = """
         INSERT INTO jobs (job_id, title, company, location, job_url,
                           site, job_type, is_remote, job_level, description,
@@ -203,11 +182,12 @@ class JobDatabase:
         """
         self.db_path = db_path
         self.logger = get_logger("database")
+        self._lock = threading.RLock()
         self._conn: sqlite3.Connection | None = None
         self._init_db()
 
     def _init_db(self) -> None:
-        """Initialize database schema and run migrations."""
+        """Initialize the current database schema."""
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
         with self._get_connection() as conn:
@@ -219,46 +199,24 @@ class JobDatabase:
             cursor.execute("PRAGMA busy_timeout=5000")
 
             cursor.execute(self.CREATE_TABLE)
+            cursor.execute(self.CREATE_DELETED_TABLE)
+            self._validate_current_schema(cursor)
+
             cursor.execute(self.CREATE_INDEX)
             cursor.execute(self.CREATE_SCORE_INDEX)
-            cursor.execute(self.CREATE_DELETED_TABLE)
             cursor.execute(self.CREATE_DELETED_INDEX)
-            cursor.execute(self.CREATE_META_TABLE)
-
-            # Run migrations for existing databases
-            for migration in self.MIGRATE_COLUMNS:
-                try:
-                    cursor.execute(migration)
-                except sqlite3.OperationalError as e:
-                    error_msg = str(e).lower()
-                    # Only ignore "duplicate column" errors
-                    if (
-                        "duplicate column" not in error_msg
-                        and "already exists" not in error_msg
-                    ):
-                        self.logger.error(f"Migration failed: {migration}")
-                        raise
-
-            if self._get_meta_value(cursor, "job_id_format") != "normalized_v2":
-                migrated_jobs, migrated_blacklist = self._migrate_job_ids(cursor)
-                self._set_meta_value(cursor, "job_id_format", "normalized_v2")
-                if migrated_jobs or migrated_blacklist:
-                    self.logger.info(
-                        "Normalized stored job IDs: %d active, %d blacklisted",
-                        migrated_jobs,
-                        migrated_blacklist,
-                    )
 
             conn.commit()
 
     def close(self) -> None:
         """Close the persistent database connection."""
-        if self._conn is not None:
-            try:
-                self._conn.close()
-            except sqlite3.Error:
-                pass
-            self._conn = None
+        with self._lock:
+            if self._conn is not None:
+                try:
+                    self._conn.close()
+                except sqlite3.Error:
+                    pass
+                self._conn = None
 
     def __enter__(self):
         return self
@@ -281,19 +239,20 @@ class JobDatabase:
         Yields:
             SQLite connection.
         """
-        if self._conn is None:
-            self._conn = sqlite3.connect(
-                self.db_path,
-                detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
-                check_same_thread=False,
-            )
-            self._conn.row_factory = sqlite3.Row
-        try:
-            yield self._conn
-        except sqlite3.Error:
-            # On error, close and discard the connection so next call gets a fresh one
-            self.close()
-            raise
+        with self._lock:
+            if self._conn is None:
+                self._conn = sqlite3.connect(
+                    self.db_path,
+                    detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
+                    check_same_thread=False,
+                )
+                self._conn.row_factory = sqlite3.Row
+            try:
+                yield self._conn
+            except sqlite3.Error:
+                # Discard the connection so next call gets a fresh one.
+                self.close()
+                raise
 
     def _batch_query_existing_ids(self, job_ids: list[str]) -> set[str]:
         """
@@ -326,182 +285,43 @@ class JobDatabase:
         return existing_ids
 
     @staticmethod
-    def _get_meta_value(cursor: sqlite3.Cursor, key: str) -> str | None:
-        """Return a value from the app metadata table."""
-        cursor.execute("SELECT value FROM app_meta WHERE key = ?", (key,))
-        row = cursor.fetchone()
-        return row[0] if row is not None else None
-
-    @staticmethod
-    def _set_meta_value(cursor: sqlite3.Cursor, key: str, value: str) -> None:
-        """Store a value in the app metadata table."""
-        cursor.execute(
-            """
-            INSERT INTO app_meta (key, value)
-            VALUES (?, ?)
-            ON CONFLICT(key) DO UPDATE SET value = excluded.value
-            """,
-            (key, value),
-        )
-
-    @staticmethod
-    def _is_missing_value(value: object) -> bool:
-        """Return True for empty/whitespace-only values."""
-        return value is None or (isinstance(value, str) and not value.strip())
+    def _table_columns(cursor: sqlite3.Cursor, table_name: str) -> set[str]:
+        """Return column names for a table."""
+        table_info_queries = {
+            "jobs": "PRAGMA table_info(jobs)",
+            "deleted_jobs": "PRAGMA table_info(deleted_jobs)",
+        }
+        cursor.execute(table_info_queries[table_name])
+        return {str(row[1]) for row in cursor.fetchall()}
 
     @classmethod
-    def _merge_job_record(
+    def _validate_table_columns(
         cls,
-        base: dict[str, object],
-        candidate: dict[str, object],
+        cursor: sqlite3.Cursor,
+        table_name: str,
+        required_columns: tuple[str, ...],
     ) -> None:
-        """Merge duplicate normalized job rows into a single record."""
-        for field in (
-            "title",
-            "company",
-            "location",
-            "job_url",
-            "site",
-            "job_type",
-            "is_remote",
-            "job_level",
-            "date_posted",
-            "min_amount",
-            "max_amount",
-            "currency",
-            "company_url",
-        ):
-            if cls._is_missing_value(base.get(field)) and not cls._is_missing_value(
-                candidate.get(field)
-            ):
-                base[field] = candidate[field]
-
-        candidate_description = candidate.get("description")
-        base_description = base.get("description")
-        if not cls._is_missing_value(candidate_description) and (
-            cls._is_missing_value(base_description)
-            or len(str(candidate_description)) > len(str(base_description))
-        ):
-            base["description"] = candidate_description
-
-        first_seen_values = [
-            str(value)
-            for value in (base.get("first_seen"), candidate.get("first_seen"))
-            if value is not None
+        actual_columns = cls._table_columns(cursor, table_name)
+        missing_columns = [
+            column for column in required_columns if column not in actual_columns
         ]
-        if first_seen_values:
-            base["first_seen"] = min(first_seen_values)
-
-        last_seen_values = [
-            str(value)
-            for value in (base.get("last_seen"), candidate.get("last_seen"))
-            if value is not None
-        ]
-        if last_seen_values:
-            base["last_seen"] = max(last_seen_values)
-
-        base["relevance_score"] = max(
-            int(str(base.get("relevance_score") or 0)),
-            int(str(candidate.get("relevance_score") or 0)),
-        )
-        base["applied"] = bool(base.get("applied")) or bool(candidate.get("applied"))
-        base["bookmarked"] = bool(base.get("bookmarked")) or bool(
-            candidate.get("bookmarked")
-        )
+        if missing_columns:
+            missing = ", ".join(missing_columns)
+            raise RuntimeError(
+                "Database does not match the current database schema: "
+                f"table '{table_name}' is missing required columns: {missing}. "
+                "Start with a fresh database or restore a current-format backup."
+            )
 
     @classmethod
-    def _merge_deleted_job_record(
-        cls,
-        base: dict[str, object],
-        candidate: dict[str, object],
-    ) -> None:
-        """Merge duplicate normalized blacklist rows."""
-        for field in ("title", "company", "location"):
-            if cls._is_missing_value(base.get(field)) and not cls._is_missing_value(
-                candidate.get(field)
-            ):
-                base[field] = candidate[field]
-
-        timestamps = [
-            str(value)
-            for value in (base.get("blacklisted_at"), candidate.get("blacklisted_at"))
-            if value is not None
-        ]
-        if timestamps:
-            base["blacklisted_at"] = min(timestamps)
-
-    def _migrate_job_ids(self, cursor: sqlite3.Cursor) -> tuple[int, int]:
-        """Normalize historical job IDs and merge duplicates created by formatting."""
-        migrated_jobs = 0
-        migrated_blacklist = 0
-
-        cursor.execute(f"SELECT {_JOB_COLUMNS} FROM jobs")
-        job_rows = cursor.fetchall()
-        merged_jobs: dict[str, dict[str, object]] = {}
-        for row in job_rows:
-            record = {field: row[field] for field in _JOB_FIELD_NAMES}
-            canonical_job_id = generate_job_id(
-                str(record["title"] or ""),
-                str(record["company"] or ""),
-                str(record["location"] or ""),
-            )
-            if canonical_job_id != record["job_id"]:
-                migrated_jobs += 1
-            record["job_id"] = canonical_job_id
-
-            existing = merged_jobs.get(canonical_job_id)
-            if existing is None:
-                merged_jobs[canonical_job_id] = record
-            else:
-                self._merge_job_record(existing, record)
-
-        if migrated_jobs or len(merged_jobs) != len(job_rows):
-            cursor.execute("DELETE FROM jobs")
-            cursor.executemany(
-                f"""
-                INSERT INTO jobs ({_JOB_COLUMNS})
-                VALUES ({",".join("?" for _ in _JOB_FIELD_NAMES)})
-                """,
-                [
-                    tuple(record[field] for field in _JOB_FIELD_NAMES)
-                    for record in merged_jobs.values()
-                ],
-            )
-
-        cursor.execute(f"SELECT {_DELETED_JOB_COLUMNS} FROM deleted_jobs")
-        deleted_rows = cursor.fetchall()
-        merged_deleted_jobs: dict[str, dict[str, object]] = {}
-        for row in deleted_rows:
-            record = {field: row[field] for field in _DELETED_JOB_FIELD_NAMES}
-            canonical_job_id = generate_job_id(
-                str(record["title"] or ""),
-                str(record["company"] or ""),
-                str(record["location"] or ""),
-            )
-            if canonical_job_id != record["job_id"]:
-                migrated_blacklist += 1
-            record["job_id"] = canonical_job_id
-
-            existing = merged_deleted_jobs.get(canonical_job_id)
-            if existing is None:
-                merged_deleted_jobs[canonical_job_id] = record
-            else:
-                self._merge_deleted_job_record(existing, record)
-
-        if migrated_blacklist or len(merged_deleted_jobs) != len(deleted_rows):
-            cursor.execute("DELETE FROM deleted_jobs")
-            cursor.executemany(
-                f"""
-                INSERT INTO deleted_jobs ({_DELETED_JOB_COLUMNS})
-                VALUES ({",".join("?" for _ in _DELETED_JOB_FIELD_NAMES)})
-                """,
-                [
-                    tuple(record[field] for field in _DELETED_JOB_FIELD_NAMES)
-                    for record in merged_deleted_jobs.values()
-                ],
-            )
-
-        return migrated_jobs, migrated_blacklist
+    def _validate_current_schema(cls, cursor: sqlite3.Cursor) -> None:
+        """Verify that existing tables match the current runtime schema."""
+        cls._validate_table_columns(cursor, "jobs", _JOB_FIELD_NAMES)
+        cls._validate_table_columns(
+            cursor,
+            "deleted_jobs",
+            _DELETED_JOB_FIELD_NAMES,
+        )
 
     def _batch_query_blacklisted_ids(self, job_ids: list[str]) -> set[str]:
         """
@@ -1272,35 +1092,27 @@ class JobDatabase:
         Returns:
             JobDBRecord instance.
         """
-
-        # Helper to safely get column value (handles missing columns in old DBs)
-        def get_col(name: str, default=None):
-            try:
-                return row[name]
-            except (IndexError, KeyError):
-                return default
-
         return JobDBRecord(
             job_id=row["job_id"],
             title=row["title"],
             company=row["company"],
             location=row["location"],
-            job_url=get_col("job_url"),
-            site=get_col("site"),
-            job_type=get_col("job_type"),
-            is_remote=get_col("is_remote"),
-            job_level=get_col("job_level"),
-            description=get_col("description"),
-            date_posted=get_col("date_posted"),
-            min_amount=get_col("min_amount"),
-            max_amount=get_col("max_amount"),
-            currency=get_col("currency"),
-            company_url=get_col("company_url"),
+            job_url=row["job_url"],
+            site=row["site"],
+            job_type=row["job_type"],
+            is_remote=row["is_remote"],
+            job_level=row["job_level"],
+            description=row["description"],
+            date_posted=row["date_posted"],
+            min_amount=row["min_amount"],
+            max_amount=row["max_amount"],
+            currency=row["currency"],
+            company_url=row["company_url"],
             first_seen=row["first_seen"],
             last_seen=row["last_seen"],
             relevance_score=row["relevance_score"],
             applied=bool(row["applied"]),
-            bookmarked=bool(get_col("bookmarked", False)),
+            bookmarked=bool(row["bookmarked"]),
         )
 
     def update_scores_batch(self, updates: list[tuple[str, int]]) -> int:

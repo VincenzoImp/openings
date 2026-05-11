@@ -7,19 +7,14 @@ Tests for Telegram notification functionality including:
 - NotificationManager coordination
 """
 
-import sys
 from datetime import datetime
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# Add scripts directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-
-from config import Config, NotificationsConfig, TelegramConfig
-from models import JobDBRecord
-from notifier import (
+from job_search_tool.config import Config, NotificationsConfig, TelegramConfig
+from job_search_tool.models import JobDBRecord
+from job_search_tool.notifier import (
     NotificationData,
     NotificationManager,
     TelegramNotifier,
@@ -364,7 +359,7 @@ class TestTelegramNotifierSend:
     @pytest.mark.asyncio
     async def test_send_notification_success(self, notifier, sample_notification_data):
         """Test successful notification sending."""
-        with patch("notifier.Bot") as mock_bot_class:
+        with patch("job_search_tool.notifier.Bot") as mock_bot_class:
             mock_bot = AsyncMock()
             mock_bot.send_message = AsyncMock(return_value=MagicMock())
             mock_bot_class.return_value = mock_bot
@@ -380,7 +375,7 @@ class TestTelegramNotifierSend:
         self, notifier, sample_notification_data
     ):
         """Test handling of Telegram API errors."""
-        with patch("notifier.Bot") as mock_bot_class:
+        with patch("job_search_tool.notifier.Bot") as mock_bot_class:
             mock_bot = AsyncMock()
             mock_bot.send_message = AsyncMock(side_effect=Exception("API Error"))
             mock_bot_class.return_value = mock_bot
@@ -392,7 +387,7 @@ class TestTelegramNotifierSend:
 
     def test_reconcile_notification_formatting(self):
         """ReconcileNotificationData → Telegram-safe MarkdownV2 text."""
-        from database import ReconciliationReport
+        from job_search_tool.database import ReconciliationReport
 
         report = ReconciliationReport(
             deleted_below_score=4,
@@ -417,7 +412,7 @@ class TestTelegramNotifierSend:
         telegram_config.send_summary = False
         notifier = TelegramNotifier(telegram_config)
 
-        with patch("notifier.Bot") as mock_bot_class:
+        with patch("job_search_tool.notifier.Bot") as mock_bot_class:
             mock_bot = AsyncMock()
             mock_bot.send_message = AsyncMock(return_value=MagicMock())
             mock_bot_class.return_value = mock_bot
@@ -450,7 +445,7 @@ class TestTelegramNotifierSend:
             total_jobs_in_db=0,
         )
 
-        with patch("notifier.Bot") as mock_bot_class:
+        with patch("job_search_tool.notifier.Bot") as mock_bot_class:
             mock_bot = AsyncMock()
             mock_bot.send_message = AsyncMock(return_value=MagicMock())
             mock_bot_class.return_value = mock_bot
@@ -491,8 +486,8 @@ class TestTelegramNotifierSend:
         )
 
         with (
-            patch("notifier.TelegramError", Exception),
-            patch("notifier.Bot") as mock_bot_class,
+            patch("job_search_tool.notifier.TelegramError", Exception),
+            patch("job_search_tool.notifier.Bot") as mock_bot_class,
         ):
             mock_bot = AsyncMock()
             mock_bot.send_message = AsyncMock(
@@ -640,7 +635,7 @@ class TestTelegramNotifierChunking:
             total_jobs_in_db=100,
         )
 
-        with patch("notifier.Bot") as mock_bot_class:
+        with patch("job_search_tool.notifier.Bot") as mock_bot_class:
             mock_bot = AsyncMock()
             mock_bot.send_message = AsyncMock(return_value=MagicMock())
             mock_bot_class.return_value = mock_bot

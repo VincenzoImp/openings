@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from logger import get_logger
+from job_search_tool.logger import get_logger
 
 try:
     from telegram import Bot
@@ -29,8 +29,8 @@ POSITION_EMOJIS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️�
 MAX_EMOJI_POSITIONS = 10
 
 if TYPE_CHECKING:
-    from config import Config, TelegramConfig
-    from models import JobDBRecord
+    from job_search_tool.config import Config, TelegramConfig
+    from job_search_tool.models import JobDBRecord
 
 
 @dataclass
@@ -291,23 +291,6 @@ class TelegramNotifier(BaseNotifier):
             lines.append("")
 
         return "\n".join(lines)
-
-    def _build_summary_message(self, data: NotificationData) -> str:
-        """
-        Build the summary notification message (legacy single-message format).
-
-        This is kept for backward compatibility but send_notification now uses
-        chunked messages for large job lists.
-
-        Args:
-            data: Notification data.
-
-        Returns:
-            Formatted message string.
-        """
-        jobs_to_send = list(data.new_jobs)[: self.config.max_jobs_in_message]
-        total_top_overall = len(data.top_jobs_overall) if data.top_jobs_overall else 0
-        return self._build_header_message(data, len(jobs_to_send), total_top_overall)
 
     async def send_notification(self, data: NotificationData) -> bool:
         """

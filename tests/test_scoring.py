@@ -1,16 +1,10 @@
 """Tests for scoring functionality in scoring module."""
 
-import sys
-from pathlib import Path
-
 import pandas as pd
 import pytest
 
-# Add scripts directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-
-from config import Config, ScoringConfig
-from scoring import (
+from job_search_tool.config import Config, ScoringConfig
+from job_search_tool.scoring import (
     calculate_relevance_score,
     fuzzy_post_filter,
     partition_by_thresholds,
@@ -313,7 +307,7 @@ class TestFuzzyPostFilter:
     @pytest.fixture
     def config_with_filter(self):
         """Create config with post-filter enabled."""
-        from config import Config, PostFilterConfig
+        from job_search_tool.config import Config, PostFilterConfig
 
         return Config(
             post_filter=PostFilterConfig(
@@ -327,7 +321,7 @@ class TestFuzzyPostFilter:
     @pytest.fixture
     def config_without_filter(self):
         """Create config with post-filter disabled."""
-        from config import Config, PostFilterConfig
+        from job_search_tool.config import Config, PostFilterConfig
 
         return Config(post_filter=PostFilterConfig(enabled=False))
 
@@ -454,7 +448,7 @@ class TestFuzzyPostFilter:
 class TestScoreAndPartition:
     @pytest.fixture
     def config(self):
-        from config import Config, ScoringConfig
+        from job_search_tool.config import Config, ScoringConfig
 
         return Config(
             scoring=ScoringConfig(

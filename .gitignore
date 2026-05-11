@@ -17,6 +17,7 @@ chroma/
 db/
 
 # User configuration
+settings.yaml
 config/settings.yaml
 
 # IDE
@@ -39,6 +40,7 @@ tmp/
 # Testing
 .pytest_cache/
 .coverage
+coverage.xml
 htmlcov/
 MagicMock/
 
@@ -55,5 +57,5 @@ docker-compose.override.yml
 .env.*
 !.env.example
 
-# Claude Code
+# Local agent settings
 .claude/

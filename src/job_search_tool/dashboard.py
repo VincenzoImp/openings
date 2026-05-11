@@ -8,7 +8,6 @@ analytics, and database management for the Job Search Tool.
 from __future__ import annotations
 
 import html
-import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -26,24 +25,19 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ---------------------------------------------------------------------------
-# Path setup
-# ---------------------------------------------------------------------------
-sys.path.insert(0, str(Path(__file__).parent))
-
-from config import Config, load_config  # noqa: E402
-from database import JobDatabase  # noqa: E402
-from exporter import (  # noqa: E402
+from job_search_tool.config import Config, load_config  # noqa: E402
+from job_search_tool.database import JobDatabase  # noqa: E402
+from job_search_tool.exporter import (  # noqa: E402
     dataframe_to_csv_bytes,
     export_dataframe,
 )
-from job_service import record_to_dict as _record_to_dict  # noqa: E402
+from job_search_tool.job_service import record_to_dict as _record_to_dict  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Optional vector search (graceful fallback when deps missing)
 # ---------------------------------------------------------------------------
 try:
-    from vector_store import get_vector_store  # noqa: E402
+    from job_search_tool.vector_store import get_vector_store
 
     VECTOR_AVAILABLE: bool = True
 except Exception:
@@ -232,7 +226,7 @@ def _sync_vector_store_deletions(config: Config, db: JobDatabase) -> None:
         return
 
     try:
-        from vector_commands import sync_deletions
+        from job_search_tool.vector_commands import sync_deletions
 
         vs = _get_vector_store_cached(str(config.chroma_path))
         if vs is not None:
@@ -995,14 +989,14 @@ def main() -> None:
     db_path = config.database_path
     if not db_path.exists():
         st.warning("No database found. Run a job search first to populate data.")
-        st.code("python scripts/main.py", language="bash")
+        st.code("job-search once", language="bash")
         return
 
     # ---- Fetch jobs ----
     all_jobs = _fetch_all_jobs(str(db_path))
     if not all_jobs:
         st.info("The database is empty. Run a job search to populate it.")
-        st.code("python scripts/main.py", language="bash")
+        st.code("job-search once", language="bash")
         return
 
     # ── Header ──────────────────────────────────────────────────────────

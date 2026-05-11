@@ -1,19 +1,19 @@
 """Tests for database module."""
 
-import hashlib
 import sqlite3
-import sys
 from datetime import date
-from pathlib import Path
 
 import pandas as pd
+import pytest
 
-# Add scripts directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-
-from config import Config, DatabaseConfig, RetentionConfig, ScoringConfig
-from database import ReconciliationReport
-from models import Job
+from job_search_tool.config import (
+    Config,
+    DatabaseConfig,
+    RetentionConfig,
+    ScoringConfig,
+)
+from job_search_tool.database import ReconciliationReport
+from job_search_tool.models import Job
 
 
 class TestJobDatabase:
@@ -22,6 +22,63 @@ class TestJobDatabase:
     def test_database_creation(self, temp_db):
         """Test database and tables are created."""
         assert temp_db.db_path.exists()
+
+    def test_database_creation_uses_current_schema_only(self, temp_db_path):
+        """Test database initialization creates only the current runtime schema."""
+        from job_search_tool.database import JobDatabase
+
+        db = JobDatabase(temp_db_path)
+        db.close()
+
+        with sqlite3.connect(temp_db_path) as conn:
+            tables = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                )
+            }
+            job_columns = [
+                row[1] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()
+            ]
+            deleted_job_columns = [
+                row[1]
+                for row in conn.execute("PRAGMA table_info(deleted_jobs)").fetchall()
+            ]
+
+        assert tables == {"jobs", "deleted_jobs"}
+        assert job_columns == [
+            "job_id",
+            "title",
+            "company",
+            "location",
+            "job_url",
+            "site",
+            "job_type",
+            "is_remote",
+            "job_level",
+            "description",
+            "date_posted",
+            "min_amount",
+            "max_amount",
+            "currency",
+            "company_url",
+            "first_seen",
+            "last_seen",
+            "relevance_score",
+            "applied",
+            "bookmarked",
+        ]
+        assert deleted_job_columns == [
+            "job_id",
+            "title",
+            "company",
+            "location",
+            "blacklisted_at",
+        ]
+
+    def test_database_connection_access_is_lock_guarded(self, temp_db):
+        """Test persistent connection access is guarded by an instance lock."""
+        assert hasattr(temp_db, "_lock")
 
     def test_save_new_job(self, temp_db, sample_job):
         """Test saving a new job returns True."""
@@ -313,7 +370,7 @@ class TestJobDatabase:
 
     def test_get_top_jobs(self, temp_db):
         """Test get_top_jobs returns jobs sorted by score."""
-        from models import Job
+        from job_search_tool.models import Job
 
         # Create jobs with different scores
         jobs = [
@@ -355,7 +412,7 @@ class TestJobDatabase:
 
     def test_get_top_jobs_with_min_score(self, temp_db):
         """Test get_top_jobs respects min_score filter."""
-        from models import Job
+        from job_search_tool.models import Job
 
         # Create jobs with different scores
         jobs = [
@@ -396,7 +453,7 @@ class TestJobDatabase:
 
     def test_get_job_count(self, temp_db):
         """Test get_job_count returns correct count."""
-        from models import Job
+        from job_search_tool.models import Job
 
         # Empty database
         assert temp_db.get_job_count() == 0
@@ -412,92 +469,31 @@ class TestJobDatabase:
 
         assert temp_db.get_job_count() == 5
 
-    def test_database_migrates_legacy_job_ids(self, temp_db_path):
-        """Test old hash IDs are normalized on first open without losing records."""
-        from database import JobDatabase
-        from models import generate_job_id
-
-        def legacy_job_id(title: str, company: str, location: str) -> str:
-            raw = f"{title}|{company}|{location}".lower()
-            return hashlib.sha256(raw.encode("utf-8")).hexdigest()
-
-        active_title = "  Senior   Engineer  "
-        active_company = "Acme"
-        active_location = "Remote"
-        blacklisted_title = "Legacy\u00a0Role"
+    def test_database_rejects_non_current_jobs_schema(self, temp_db_path):
+        """Test non-current database schemas fail instead of being migrated."""
+        from job_search_tool.database import JobDatabase
 
         with sqlite3.connect(temp_db_path) as conn:
-            conn.execute(JobDatabase.CREATE_TABLE)
+            conn.execute(
+                """
+                CREATE TABLE jobs (
+                    job_id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    company TEXT NOT NULL,
+                    location TEXT NOT NULL,
+                    job_url TEXT,
+                    first_seen DATE NOT NULL,
+                    last_seen DATE NOT NULL,
+                    relevance_score INTEGER DEFAULT 0,
+                    applied BOOLEAN DEFAULT FALSE
+                )
+                """
+            )
             conn.execute(JobDatabase.CREATE_DELETED_TABLE)
-            conn.execute(
-                """
-                INSERT INTO jobs (
-                    job_id, title, company, location, job_url,
-                    site, job_type, is_remote, job_level, description,
-                    date_posted, min_amount, max_amount, currency, company_url,
-                    first_seen, last_seen, relevance_score, applied, bookmarked
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    legacy_job_id(active_title, active_company, active_location),
-                    active_title,
-                    active_company,
-                    active_location,
-                    None,
-                    "linkedin",
-                    "fulltime",
-                    True,
-                    "senior",
-                    "desc",
-                    "2024-01-15",
-                    None,
-                    None,
-                    "USD",
-                    None,
-                    "2024-01-15",
-                    "2024-01-16",
-                    25,
-                    False,
-                    True,
-                ),
-            )
-            conn.execute(
-                """
-                INSERT INTO deleted_jobs (
-                    job_id, title, company, location, blacklisted_at
-                )
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (
-                    legacy_job_id(blacklisted_title, active_company, active_location),
-                    blacklisted_title,
-                    active_company,
-                    active_location,
-                    "2024-01-17T12:00:00",
-                ),
-            )
             conn.commit()
 
-        db = JobDatabase(temp_db_path)
-        active_job_id = generate_job_id(
-            "Senior Engineer",
-            active_company,
-            active_location,
-        )
-        blacklisted_job_id = generate_job_id(
-            "Legacy Role",
-            active_company,
-            active_location,
-        )
-
-        jobs = db.get_all_jobs()
-
-        assert len(jobs) == 1
-        assert jobs[0].job_id == active_job_id
-        assert db.job_exists(active_job_id) is True
-        assert db.is_job_blacklisted(blacklisted_job_id) is True
-        db.close()
+        with pytest.raises(RuntimeError, match="current database schema"):
+            JobDatabase(temp_db_path)
 
 
 def _make_config(

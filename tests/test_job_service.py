@@ -7,7 +7,7 @@ from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
-from models import JobDBRecord
+from job_search_tool.models import JobDBRecord
 
 
 # ---------------------------------------------------------------------------
@@ -37,21 +37,21 @@ def _make_record(**overrides: object) -> JobDBRecord:
 
 
 def test_get_db_creates_instance():
-    import job_service
+    from job_search_tool import job_service
 
     job_service.reset_singletons()
     with tempfile.TemporaryDirectory() as tmpdir:
         with patch.object(job_service, "DB_PATH", Path(tmpdir) / "test.db"):
             db = job_service.get_db()
             assert db is not None
-            from database import JobDatabase
+            from job_search_tool.database import JobDatabase
 
             assert isinstance(db, JobDatabase)
             job_service.reset_singletons()
 
 
 def test_get_db_returns_same_instance():
-    import job_service
+    from job_search_tool import job_service
 
     job_service.reset_singletons()
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -63,7 +63,7 @@ def test_get_db_returns_same_instance():
 
 
 def test_close_db_closes_and_resets():
-    import job_service
+    from job_search_tool import job_service
 
     job_service.reset_singletons()
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -75,7 +75,7 @@ def test_close_db_closes_and_resets():
 
 
 def test_reset_singletons_clears_all():
-    import job_service
+    from job_search_tool import job_service
 
     job_service._db = object()  # type: ignore[assignment]
     job_service._vs = object()  # type: ignore[assignment]
@@ -92,7 +92,7 @@ def test_reset_singletons_clears_all():
 
 
 def test_get_vs_returns_none_when_unavailable(caplog):
-    import job_service
+    from job_search_tool import job_service
 
     job_service.reset_singletons()
     with patch.object(
@@ -100,7 +100,7 @@ def test_get_vs_returns_none_when_unavailable(caplog):
         "get_vs",
         wraps=job_service.get_vs,
     ):
-        with patch.dict("sys.modules", {"vector_store": None}):
+        with patch.dict("sys.modules", {"job_search_tool.vector_store": None}):
             # Force re-import failure by resetting and patching the import
             job_service._vs = None
             job_service._vs_attempted = False
@@ -108,7 +108,7 @@ def test_get_vs_returns_none_when_unavailable(caplog):
                 "builtins.__import__",
                 side_effect=lambda name, *a, **kw: (
                     (_ for _ in ()).throw(ImportError("no chromadb"))
-                    if name == "vector_store"
+                    if name == "job_search_tool.vector_store"
                     else __import__(name, *a, **kw)
                 ),
             ):
@@ -118,7 +118,7 @@ def test_get_vs_returns_none_when_unavailable(caplog):
 
 
 def test_get_vs_attempts_only_once():
-    import job_service
+    from job_search_tool import job_service
 
     job_service.reset_singletons()
     call_count = 0
@@ -128,7 +128,7 @@ def test_get_vs_attempts_only_once():
 
     def counting_import(name, *args, **kwargs):
         nonlocal call_count
-        if name == "vector_store":
+        if name == "job_search_tool.vector_store":
             call_count += 1
             raise ImportError("no chromadb")
         return original_import(name, *args, **kwargs)
@@ -148,7 +148,7 @@ def test_get_vs_attempts_only_once():
 
 
 def test_record_to_dict_all_fields():
-    from job_service import record_to_dict
+    from job_search_tool.job_service import record_to_dict
 
     r = _make_record(
         job_url="https://example.com",
@@ -175,7 +175,7 @@ def test_record_to_dict_all_fields():
 
 
 def test_record_to_dict_serializes_dates():
-    from job_service import record_to_dict
+    from job_search_tool.job_service import record_to_dict
 
     r = _make_record(date_posted=date(2026, 3, 15))
     d = record_to_dict(r)
@@ -185,7 +185,7 @@ def test_record_to_dict_serializes_dates():
 
 
 def test_record_to_dict_handles_none_dates():
-    from job_service import record_to_dict
+    from job_search_tool.job_service import record_to_dict
 
     r = _make_record(date_posted=None)
     d = record_to_dict(r)
@@ -193,7 +193,7 @@ def test_record_to_dict_handles_none_dates():
 
 
 def test_record_to_summary_excludes_description():
-    from job_service import record_to_summary
+    from job_search_tool.job_service import record_to_summary
 
     r = _make_record(description="A long description here")
     s = record_to_summary(r)
@@ -201,7 +201,7 @@ def test_record_to_summary_excludes_description():
 
 
 def test_record_to_summary_includes_core_fields():
-    from job_service import record_to_summary
+    from job_search_tool.job_service import record_to_summary
 
     r = _make_record(site="indeed", job_url="https://example.com/job")
     s = record_to_summary(r)
@@ -217,7 +217,7 @@ def test_record_to_summary_includes_core_fields():
 
 
 def test_record_to_summary_serializes_first_seen():
-    from job_service import record_to_summary
+    from job_search_tool.job_service import record_to_summary
 
     r = _make_record()
     s = record_to_summary(r)
@@ -271,7 +271,7 @@ def _make_job_list() -> list[JobDBRecord]:
 
 
 def test_filter_jobs_no_filters_returns_all():
-    from job_service import filter_jobs
+    from job_search_tool.job_service import filter_jobs
 
     jobs = _make_job_list()
     result = filter_jobs(jobs)
@@ -279,7 +279,7 @@ def test_filter_jobs_no_filters_returns_all():
 
 
 def test_filter_jobs_by_min_score():
-    from job_service import filter_jobs
+    from job_search_tool.job_service import filter_jobs
 
     jobs = _make_job_list()
     result = filter_jobs(jobs, min_score=25)
@@ -288,7 +288,7 @@ def test_filter_jobs_by_min_score():
 
 
 def test_filter_jobs_by_max_score():
-    from job_service import filter_jobs
+    from job_search_tool.job_service import filter_jobs
 
     jobs = _make_job_list()
     result = filter_jobs(jobs, max_score=25)
@@ -297,7 +297,7 @@ def test_filter_jobs_by_max_score():
 
 
 def test_filter_jobs_by_site_case_insensitive():
-    from job_service import filter_jobs
+    from job_search_tool.job_service import filter_jobs
 
     jobs = _make_job_list()
     result = filter_jobs(jobs, site="LinkedIn")
@@ -306,7 +306,7 @@ def test_filter_jobs_by_site_case_insensitive():
 
 
 def test_filter_jobs_by_company_substring():
-    from job_service import filter_jobs
+    from job_search_tool.job_service import filter_jobs
 
     jobs = _make_job_list()
     result = filter_jobs(jobs, company="Tech")
@@ -315,7 +315,7 @@ def test_filter_jobs_by_company_substring():
 
 
 def test_filter_jobs_by_bookmarked():
-    from job_service import filter_jobs
+    from job_search_tool.job_service import filter_jobs
 
     jobs = _make_job_list()
     result = filter_jobs(jobs, bookmarked=True)
@@ -324,7 +324,7 @@ def test_filter_jobs_by_bookmarked():
 
 
 def test_filter_jobs_by_applied():
-    from job_service import filter_jobs
+    from job_search_tool.job_service import filter_jobs
 
     jobs = _make_job_list()
     result = filter_jobs(jobs, applied=True)
@@ -333,7 +333,7 @@ def test_filter_jobs_by_applied():
 
 
 def test_filter_jobs_combined():
-    from job_service import filter_jobs
+    from job_search_tool.job_service import filter_jobs
 
     jobs = _make_job_list()
     result = filter_jobs(jobs, min_score=15, site="linkedin")
@@ -347,7 +347,7 @@ def test_filter_jobs_combined():
 
 
 def test_sort_jobs_by_score_descending():
-    from job_service import sort_jobs_by_score
+    from job_search_tool.job_service import sort_jobs_by_score
 
     jobs = _make_job_list()
     sorted_jobs = sort_jobs_by_score(jobs)
@@ -356,7 +356,7 @@ def test_sort_jobs_by_score_descending():
 
 
 def test_sort_jobs_by_date_descending():
-    from job_service import sort_jobs_by_date
+    from job_search_tool.job_service import sort_jobs_by_date
 
     jobs = [
         _make_record(
@@ -375,7 +375,7 @@ def test_sort_jobs_by_date_descending():
 
 
 def test_sort_jobs_by_date_handles_none():
-    from job_service import sort_jobs_by_date
+    from job_search_tool.job_service import sort_jobs_by_date
 
     jobs = [
         _make_record(job_id="a", date_posted=None, first_seen=date(2026, 2, 1)),

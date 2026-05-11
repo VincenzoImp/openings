@@ -14,9 +14,9 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.date import DateTrigger
 
 if TYPE_CHECKING:
-    from config import Config
+    from job_search_tool.config import Config
 
-from logger import get_logger, log_section
+from job_search_tool.logger import get_logger, log_section
 
 
 class JobSearchScheduler:

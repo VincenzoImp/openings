@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
 import pytest
 
-# Add scripts directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-
-from config import Config, SearchConfig, ThrottlingConfig
-from search_jobs import ThrottledExecutor, print_banner, print_top_jobs, search_jobs
+from job_search_tool.config import Config, SearchConfig, ThrottlingConfig
+from job_search_tool.search_jobs import (
+    ThrottledExecutor,
+    print_banner,
+    print_top_jobs,
+    search_jobs,
+)
 
 
 # =============================================================================
@@ -74,7 +74,7 @@ class TestThrottledExecutor:
         """Test throttled_search bypasses throttling when disabled."""
         executor = ThrottledExecutor(config_without_throttling)
 
-        with patch("search_jobs.search_single_query") as mock_search:
+        with patch("job_search_tool.search_jobs.search_single_query") as mock_search:
             mock_search.return_value = ("query", "loc", pd.DataFrame(), None)
 
             executor.throttled_search("query", "loc", config_without_throttling)
@@ -86,8 +86,8 @@ class TestThrottledExecutor:
         executor = ThrottledExecutor(config_with_throttling)
 
         with (
-            patch("search_jobs.search_single_query") as mock_search,
-            patch("search_jobs.time.sleep"),
+            patch("job_search_tool.search_jobs.search_single_query") as mock_search,
+            patch("job_search_tool.search_jobs.time.sleep"),
         ):
             mock_search.return_value = ("query", "loc", pd.DataFrame(), None)
 
@@ -121,7 +121,7 @@ class TestSearchSingleQuery:
 
     def test_successful_search(self, config):
         """Test successful search returns DataFrame."""
-        from search_jobs import search_single_query
+        from job_search_tool.search_jobs import search_single_query
 
         mock_df = pd.DataFrame(
             [
@@ -135,8 +135,12 @@ class TestSearchSingleQuery:
         )
 
         with (
-            patch("search_jobs.scrape_jobs", return_value=mock_df) as mock_scrape,
-            patch("search_jobs.fuzzy_post_filter", return_value=mock_df),
+            patch(
+                "job_search_tool.search_jobs.scrape_jobs", return_value=mock_df
+            ) as mock_scrape,
+            patch(
+                "job_search_tool.search_jobs.fuzzy_post_filter", return_value=mock_df
+            ),
         ):
             query, loc, result_df, error = search_single_query(
                 "developer", "NYC", config
@@ -151,7 +155,7 @@ class TestSearchSingleQuery:
 
     def test_search_respects_multiple_job_types(self, config):
         """Test search issues one JobSpy request per configured job type."""
-        from search_jobs import search_single_query
+        from job_search_tool.search_jobs import search_single_query
 
         config.search.job_types = ["fulltime", "contract"]
         fulltime_df = pd.DataFrame(
@@ -177,11 +181,11 @@ class TestSearchSingleQuery:
 
         with (
             patch(
-                "search_jobs.scrape_jobs",
+                "job_search_tool.search_jobs.scrape_jobs",
                 side_effect=[fulltime_df, contract_df],
             ) as mock_scrape,
             patch(
-                "search_jobs.fuzzy_post_filter",
+                "job_search_tool.search_jobs.fuzzy_post_filter",
                 side_effect=lambda df, *_args: df,
             ),
         ):
@@ -199,9 +203,11 @@ class TestSearchSingleQuery:
 
     def test_search_returns_none(self, config):
         """Test search with no results returns None."""
-        from search_jobs import search_single_query
+        from job_search_tool.search_jobs import search_single_query
 
-        with patch("search_jobs.scrape_jobs", return_value=pd.DataFrame()):
+        with patch(
+            "job_search_tool.search_jobs.scrape_jobs", return_value=pd.DataFrame()
+        ):
             query, loc, result_df, error = search_single_query(
                 "developer", "NYC", config
             )
@@ -211,9 +217,12 @@ class TestSearchSingleQuery:
 
     def test_search_exception(self, config):
         """Test search handles exceptions gracefully."""
-        from search_jobs import search_single_query
+        from job_search_tool.search_jobs import search_single_query
 
-        with patch("search_jobs.scrape_jobs", side_effect=ValueError("Bad data")):
+        with patch(
+            "job_search_tool.search_jobs.scrape_jobs",
+            side_effect=ValueError("Bad data"),
+        ):
             query, loc, result_df, error = search_single_query(
                 "developer", "NYC", config
             )
@@ -224,10 +233,11 @@ class TestSearchSingleQuery:
 
     def test_search_connection_error(self, config):
         """Test search handles connection errors."""
-        from search_jobs import search_single_query
+        from job_search_tool.search_jobs import search_single_query
 
         with patch(
-            "search_jobs.scrape_jobs", side_effect=ConnectionError("No network")
+            "job_search_tool.search_jobs.scrape_jobs",
+            side_effect=ConnectionError("No network"),
         ):
             query, loc, result_df, error = search_single_query(
                 "developer", "NYC", config
@@ -249,7 +259,7 @@ class TestSearchJobs:
     @pytest.fixture
     def config(self):
         """Create a test config with queries."""
-        from config import ParallelConfig, PostFilterConfig, RetryConfig
+        from job_search_tool.config import ParallelConfig, PostFilterConfig, RetryConfig
 
         return Config(
             search=SearchConfig(
@@ -278,8 +288,10 @@ class TestSearchJobs:
         )
 
         with (
-            patch("search_jobs.scrape_jobs", return_value=mock_df),
-            patch("search_jobs.fuzzy_post_filter", return_value=mock_df),
+            patch("job_search_tool.search_jobs.scrape_jobs", return_value=mock_df),
+            patch(
+                "job_search_tool.search_jobs.fuzzy_post_filter", return_value=mock_df
+            ),
         ):
             result_df, summary = search_jobs(config)
 
@@ -289,7 +301,9 @@ class TestSearchJobs:
 
     def test_search_jobs_no_results(self, config):
         """Test search_jobs with no results."""
-        with patch("search_jobs.scrape_jobs", return_value=pd.DataFrame()):
+        with patch(
+            "job_search_tool.search_jobs.scrape_jobs", return_value=pd.DataFrame()
+        ):
             result_df, summary = search_jobs(config)
 
             assert result_df is None
@@ -312,8 +326,10 @@ class TestSearchJobs:
         config.search.locations = ["NYC"]
 
         with (
-            patch("search_jobs.scrape_jobs", return_value=mock_df),
-            patch("search_jobs.fuzzy_post_filter", return_value=mock_df),
+            patch("job_search_tool.search_jobs.scrape_jobs", return_value=mock_df),
+            patch(
+                "job_search_tool.search_jobs.fuzzy_post_filter", return_value=mock_df
+            ),
         ):
             result_df, summary = search_jobs(config)
 
@@ -324,7 +340,7 @@ class TestSearchJobs:
     def test_search_jobs_handles_failures(self, config):
         """Test search_jobs tracks failed queries."""
         with patch(
-            "search_jobs.scrape_jobs",
+            "job_search_tool.search_jobs.scrape_jobs",
             side_effect=RuntimeError("Unexpected error"),
         ):
             result_df, summary = search_jobs(config)
@@ -349,7 +365,7 @@ class TestPrintBanner:
 
     def test_print_banner_with_custom_profile(self):
         """Test print_banner with custom profile."""
-        from config import ProfileConfig
+        from job_search_tool.config import ProfileConfig
 
         config = Config(
             profile=ProfileConfig(
@@ -365,7 +381,7 @@ class TestPrintBanner:
 
     def test_print_banner_truncates_long_values(self):
         """Test print_banner handles very long profile values."""
-        from config import ProfileConfig
+        from job_search_tool.config import ProfileConfig
 
         config = Config(
             profile=ProfileConfig(

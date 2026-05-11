@@ -1,15 +1,12 @@
 """Tests for config module."""
 
-import sys
 from pathlib import Path
 
 import pytest
 
-# Add scripts directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-
-from config import (
+from job_search_tool.config import (
     Config,
+    _parse_database_config,
     _parse_parallel_config,
     _parse_logging_config,
     _parse_post_filter_config,
@@ -18,6 +15,7 @@ from config import (
     _parse_scoring_config,
     _parse_telegram_config,
     _parse_throttling_config,
+    _parse_vector_search_config,
 )
 
 
@@ -193,36 +191,10 @@ class TestSchedulerConfigValidation:
         assert config.interval_hours == 12
         assert config.retry_delay_minutes == 15
 
-    def test_legacy_enabled_key_is_accepted_and_recorded(self):
-        """Legacy scheduler.enabled parses and leaves a marker in ``_LEGACY_WARNED``."""
-        import config as config_module
-
-        # Resolve the parser from ``config_module`` rather than the file-level
-        # import, so another test performing ``importlib.reload(config)``
-        # can't leave us holding a stale function reference pointing at a
-        # different ``_LEGACY_WARNED`` set.
-        parse = config_module._parse_scheduler_config
-
-        config_module._LEGACY_WARNED.clear()
-        cfg = parse({"scheduler": {"enabled": True}})
-
-        assert cfg.interval_hours == 24
-        assert "scheduler_enabled" in config_module._LEGACY_WARNED
-
-    def test_legacy_enabled_key_is_one_shot(self):
-        """The one-shot guard keeps ``_LEGACY_WARNED`` idempotent across parses."""
-        import config as config_module
-
-        parse = config_module._parse_scheduler_config
-        config_module._LEGACY_WARNED.clear()
-
-        # Simulates startup + two scheduler iterations each triggering
-        # reload_config() — three parses, one marker.
-        parse({"scheduler": {"enabled": True}})
-        parse({"scheduler": {"enabled": True}})
-        parse({"scheduler": {"enabled": True}})
-
-        assert config_module._LEGACY_WARNED == {"scheduler_enabled"}
+    def test_legacy_enabled_key_is_rejected(self):
+        """Old scheduler.enabled configs should fail fast instead of being ignored."""
+        with pytest.raises(ValueError, match="scheduler.enabled"):
+            _parse_scheduler_config({"scheduler": {"enabled": True}})
 
     def test_interval_hours_positive(self):
         """Test interval_hours must be positive."""
@@ -327,7 +299,7 @@ class TestConfigPaths:
         # config.DATA_DIR is resolved at import time, so re-import the module.
         import importlib
 
-        import config as config_module
+        import job_search_tool.config as config_module
 
         importlib.reload(config_module)
         try:
@@ -347,14 +319,13 @@ class TestScoringConfigValidation:
         assert cfg.save_threshold == 0
         assert cfg.notify_threshold == 20
 
-    def test_unknown_threshold_key_is_ignored(self):
-        """Unknown keys like the old 'threshold' must be silently ignored."""
-        cfg = _parse_scoring_config({"scoring": {"threshold": 15}})
-        assert cfg.save_threshold == 0
-        assert cfg.notify_threshold == 20
+    def test_legacy_threshold_key_is_rejected(self):
+        """Old scoring.threshold configs should fail fast instead of being ignored."""
+        with pytest.raises(ValueError, match="scoring.threshold"):
+            _parse_scoring_config({"scoring": {"threshold": 15}})
 
     def test_notify_must_be_ge_save(self, tmp_path, monkeypatch):
-        import config as config_module
+        import job_search_tool.config as config_module
 
         yaml_file = tmp_path / "settings.yaml"
         yaml_file.write_text(
@@ -363,6 +334,28 @@ class TestScoringConfigValidation:
         monkeypatch.setattr(config_module, "CONFIG_FILE", yaml_file)
 
         with pytest.raises(ValueError, match="notify_threshold"):
+            config_module.load_config()
+
+    def test_load_config_rejects_unknown_top_level_key(self, tmp_path, monkeypatch):
+        import job_search_tool.config as config_module
+
+        yaml_file = tmp_path / "settings.yaml"
+        yaml_file.write_text("old_section:\n  enabled: true\n", encoding="utf-8")
+        monkeypatch.setattr(config_module, "CONFIG_FILE", yaml_file)
+
+        with pytest.raises(
+            ValueError, match="Unsupported configuration key: old_section"
+        ):
+            config_module.load_config()
+
+    def test_load_config_rejects_non_mapping_root(self, tmp_path, monkeypatch):
+        import job_search_tool.config as config_module
+
+        yaml_file = tmp_path / "settings.yaml"
+        yaml_file.write_text("- search\n- scoring\n", encoding="utf-8")
+        monkeypatch.setattr(config_module, "CONFIG_FILE", yaml_file)
+
+        with pytest.raises(ValueError, match="settings must be a mapping"):
             config_module.load_config()
 
 
@@ -374,16 +367,21 @@ class TestDatabaseRetentionConfig:
         assert cfg.database.retention.max_age_days == 30
         assert cfg.database.retention.purge_blacklist_after_days == 90
 
-    def test_unknown_database_keys_are_ignored(self):
-        """Old cleanup_* keys must be silently ignored, not translated."""
-        import config as config_module
+    def test_legacy_database_cleanup_keys_are_rejected(self):
+        """Old cleanup_* database configs should fail fast instead of being ignored."""
+        with pytest.raises(ValueError, match="database.cleanup_enabled"):
+            _parse_database_config({"database": {"cleanup_enabled": True}})
 
-        cfg = config_module._parse_database_config(
-            {"database": {"cleanup_enabled": True, "cleanup_days": 10}}
-        )
-        # Defaults unchanged — legacy keys have no effect whatsoever.
-        assert cfg.retention.max_age_days == 30
-        assert cfg.retention.purge_blacklist_after_days == 90
+
+class TestVectorSearchConfigValidation:
+    """Tests for vector search config parsing."""
+
+    def test_legacy_vector_storage_keys_are_rejected(self):
+        """Old vector_search storage/model keys should fail fast."""
+        with pytest.raises(ValueError, match="vector_search.model_name"):
+            _parse_vector_search_config(
+                {"vector_search": {"model_name": "all-MiniLM-L6-v2"}}
+            )
 
 
 class TestConfigQueries:

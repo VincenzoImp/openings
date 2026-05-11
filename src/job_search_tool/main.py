@@ -15,27 +15,27 @@ import traceback
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from config import get_config, reload_config
-from database import get_database, recalculate_all_scores
-from logger import get_logger, log_section, setup_logging
-from models import generate_job_id
-from notifier import (
+from job_search_tool.config import get_config, reload_config
+from job_search_tool.database import get_database, recalculate_all_scores
+from job_search_tool.logger import get_logger, log_section, setup_logging
+from job_search_tool.models import generate_job_id
+from job_search_tool.notifier import (
     NotificationManager,
     create_notification_data,
     create_reconcile_notification_data,
 )
-from scheduler import create_scheduler
-from scoring import partition_by_thresholds, score_jobs
-from search_jobs import (
+from job_search_tool.scheduler import create_scheduler
+from job_search_tool.scoring import partition_by_thresholds, score_jobs
+from job_search_tool.search_jobs import (
     print_banner,
     print_top_jobs,
     search_jobs,
 )
 
 if TYPE_CHECKING:
-    from config import Config
-    from database import JobDatabase
-    from models import JobDBRecord
+    from job_search_tool.config import Config
+    from job_search_tool.database import JobDatabase
+    from job_search_tool.models import JobDBRecord
 
 
 def _extract_job_ids_from_dataframe(jobs_df) -> list[str]:
@@ -109,7 +109,7 @@ def run_job_search() -> bool:
 
         if config.vector_search.enabled and config.vector_search.embed_on_save:
             try:
-                from vector_store import get_vector_store
+                from job_search_tool.vector_store import get_vector_store
 
                 df_for_vs = to_save.copy()
                 df_for_vs["job_id"] = df_for_vs.apply(
@@ -355,8 +355,11 @@ def _prepare_runtime(*, scheduled: bool) -> tuple[Config, JobDatabase]:
 
     if config.vector_search.enabled:
         try:
-            from vector_store import get_vector_store
-            from vector_commands import backfill_embeddings, sync_deletions
+            from job_search_tool.vector_store import get_vector_store
+            from job_search_tool.vector_commands import (
+                backfill_embeddings,
+                sync_deletions,
+            )
 
             vs = get_vector_store(config.chroma_path)
             if report.total_deleted > 0:

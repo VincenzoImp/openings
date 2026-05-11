@@ -7,6 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [8.0.0] - 2026-05-11
+
+### Breaking Changes
+
+- Docker images no longer ship root-level command wrappers for `python main.py`,
+  `python api_server.py`, `python mcp_server.py`, or `python healthcheck.py`.
+  Use the installed entrypoints: `job-search`, `job-search-api`,
+  `job-search-mcp`, and `job-search-healthcheck`.
+- MCP now exposes streamable HTTP only at `/mcp`. The SSE and dual-transport
+  compatibility modes, plus `JOB_SEARCH_MCP_TRANSPORT`, have been removed.
+- Unsupported settings keys now fail startup instead of being accepted or
+  ignored. Remove old keys such as `scheduler.enabled`, `scoring.threshold`,
+  `database.cleanup_enabled`, `database.cleanup_days`,
+  `vector_search.model_name`, and `vector_search.persist_dir`.
+- SQLite startup no longer migrates older database layouts or historical job ID
+  formats. Version 8.0.0 uses the current schema as the baseline; replace
+  non-current `jobs.db` files with a fresh database or a current-format backup.
+
+### Added
+
+- Optional REST API Bearer token via `JOB_SEARCH_API_TOKEN`.
+- Generated settings reference helper used by MCP documentation, sourced from
+  `config/settings.example.yaml`.
+- Docker Compose validation tests covering service settings mounts, localhost
+  port bindings, and dev-profile coverage.
+- Canonical documentation tree under `docs/user/` and `docs/developer/`.
+- Installable package entrypoints: `job-search`, `job-search-api`,
+  `job-search-mcp`, and `job-search-healthcheck`.
+- Packaged default settings template used by installed MCP/API helpers.
+
+### Changed
+
+- **MCP server transport**: runtime exposes streamable HTTP at `/mcp` on port
+  3001.
+- Configuration parsing is now strict and rejects unsupported keys to prevent
+  stale settings drift.
+- Docker Compose now binds dashboard, API, and MCP to `127.0.0.1` by default,
+  with explicit `*_BIND=0.0.0.0` LAN opt-in.
+- MCP Docker service now mounts the same `settings.yaml` as the scheduler,
+  dashboard, and API.
+- API version metadata now comes from project metadata instead of a hardcoded
+  string.
+- Runtime modules moved from the historical `scripts/` layout into the
+  installable `src/job_search_tool` package.
+- Docker and CI now execute installed entrypoints instead of source-file paths.
+- README is now a concise landing page instead of duplicated developer
+  reference material.
+
+### Fixed
+
+- MCP settings documentation no longer drifts from current configuration
+  defaults.
+- SQLite persistent connection access is serialized with a re-entrant lock for
+  normal multi-surface local usage.
+- Development Compose override now covers scheduler, dashboard, API, and MCP.
+- `job-search dashboard` now execs the packaged `dashboard.py` file instead of
+  a non-existent `job_search_tool.dashboard.py` path.
+
+### Removed
+
+- Root-level agent instruction files (`CLAUDE.md`, `AGENTS.md`) and internal
+  planning artifacts under `docs/superpowers/`; public docs now live under
+  `docs/user/` and `docs/developer/`.
+- `requirements.txt` and `requirements-dev.txt`; `pyproject.toml` plus
+  `uv.lock` are the dependency source of truth.
+- The package-refactor roadmap, because the refactor is part of this release.
+- Docker image compatibility wrappers under `docker/compat/`.
+- MCP SSE/dual transport runtime code and environment configuration.
+- Legacy config warning/cache code for settings keys that no longer exist.
+- SQLite schema and job ID migration code, including the internal `app_meta`
+  migration table.
+
 ## [7.1.2] - 2026-04-16
 
 ### Added
@@ -38,7 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Shared service layer** (`scripts/job_service.py`): extracted DB/vector-store initialization, record serialization, job filtering, and sorting into a single module shared by the dashboard, REST API, and MCP server. All three frontends are now thin adapters over `job_service`, eliminating ~60 lines of duplicated logic and ensuring consistent behavior across surfaces.
+- **Shared service layer** (`src/job_search_tool/job_service.py`): extracted DB/vector-store initialization, record serialization, job filtering, and sorting into a single module shared by the dashboard, REST API, and MCP server. All three frontends are now thin adapters over `job_service`, eliminating ~60 lines of duplicated logic and ensuring consistent behavior across surfaces.
 - **`api_server.py`** and **`mcp_server.py`** refactored to import all data operations from `job_service` instead of reimplementing them locally. Pydantic models and endpoint/tool definitions remain in the adapters.
 - **`dashboard.py`** now imports `record_to_dict` from `job_service` instead of maintaining its own copy.
 
@@ -56,8 +128,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **REST API server** (`scripts/api_server.py`, FastAPI on port 8502) — programmatic CRUD access to the job database for scripts, automations, and external tools. Endpoints: `GET /jobs` (paginated, filterable by score/site/company/bookmark/applied), `GET /jobs/{id}`, `GET /jobs/search/semantic` (ChromaDB vector search), `GET /stats`, `GET /distribution`, `POST /jobs/{id}/bookmark`, `POST /jobs/{id}/apply`, `DELETE /jobs/{id}`, `DELETE /jobs/below-score/{N}`, `GET /health`. Auto-generated OpenAPI docs at `/docs`.
-- **MCP server** (`scripts/mcp_server.py`, SSE transport on port 3001) — tools that let an LLM become a job search assistant. DB access tools: `list_jobs`, `get_job` (including full description for fit evaluation), `search_similar` (semantic search), `get_statistics`, `get_score_distribution`. Action tools: `bookmark_job`, `apply_job`, `delete_job`, `delete_jobs_below_score`. Knowledge tool: `get_settings_documentation` returns a comprehensive static reference (~3000 chars) of every `settings.yaml` section, field, type, default, and constraint — the MCP server does NOT read the user's actual settings file or profile; the user provides those in conversation and the LLM uses the tools + schema knowledge to advise.
+- **REST API server** (`src/job_search_tool/api_server.py`, FastAPI on port 8502) — programmatic CRUD access to the job database for scripts, automations, and external tools. Endpoints: `GET /jobs` (paginated, filterable by score/site/company/bookmark/applied), `GET /jobs/{id}`, `GET /jobs/search/semantic` (ChromaDB vector search), `GET /stats`, `GET /distribution`, `POST /jobs/{id}/bookmark`, `POST /jobs/{id}/apply`, `DELETE /jobs/{id}`, `DELETE /jobs/below-score/{N}`, `GET /health`. Auto-generated OpenAPI docs at `/docs`.
+- **MCP server** (`src/job_search_tool/mcp_server.py`, SSE transport on port 3001) — tools that let an LLM become a job search assistant. DB access tools: `list_jobs`, `get_job` (including full description for fit evaluation), `search_similar` (semantic search), `get_statistics`, `get_score_distribution`. Action tools: `bookmark_job`, `apply_job`, `delete_job`, `delete_jobs_below_score`. Knowledge tool: `get_settings_documentation` returns a comprehensive static reference (~3000 chars) of every `settings.yaml` section, field, type, default, and constraint — the MCP server does NOT read the user's actual settings file or profile; the user provides those in conversation and the LLM uses the tools + schema knowledge to advise.
 - **Docker Compose profiles** for the new services: `api` and `mcp`. The existing `scheduler` and `dashboard` always start; the new services are opt-in via `docker compose --profile api --profile mcp up -d`. No change to the default UX.
 - **Port override env vars**: `JOB_SEARCH_API_PORT` (default 8502) and `JOB_SEARCH_MCP_PORT` (default 3001), documented in `.env.example` alongside the existing `JOB_SEARCH_DASHBOARD_PORT`.
 - **38 new tests** (20 API, 18 MCP) covering happy paths, error paths (404, 503, missing vector store), and toggle operations.
@@ -94,11 +166,11 @@ Housekeeping release. No functional changes: v7.0.0 introduced the new scoring/r
 
 ### Removed
 
-- **`scripts/report_generator.py`** and its test — dead code, only self-imported. Its Excel formatting helpers were already duplicated in `scripts/exporter.py`.
-- **`scripts/analyze_jobs.py`** and its test — standalone CLI utility (ran via `python analyze_jobs.py` or `docker compose exec scheduler python analyze_jobs.py`) whose entire feature set is now covered by the dashboard's Database tab introduced in v7.0.0: company/location/keyword statistics are shown interactively, the score distribution is a live histogram, and filtering by company is a click on the main tab. Keeping a second implementation of the same thing on the CLI was just maintenance debt.
+- **`src/job_search_tool/report_generator.py`** and its test — dead code, only self-imported. Its Excel formatting helpers were already duplicated in `src/job_search_tool/exporter.py`.
+- **`src/job_search_tool/analyze_jobs.py`** and its test — standalone CLI utility (ran via `python analyze_jobs.py` or `docker compose exec scheduler python analyze_jobs.py`) whose entire feature set is now covered by the dashboard's Database tab introduced in v7.0.0: company/location/keyword statistics are shown interactively, the score distribution is a live histogram, and filtering by company is a click on the main tab. Keeping a second implementation of the same thing on the CLI was just maintenance debt.
 - **`AGENTS.md`** — stale duplicate of `CLAUDE.md` that still described the pre-v7 pipeline (`cleanup_old_jobs` per-iteration, `filter_relevant_jobs`, `save_results`, single `scoring.threshold`). It wasn't updated during the v7 refactor and had drifted ~15 documentation blocks away from reality. `CLAUDE.md` is now the single source of truth for developer documentation; if another agent tool needs its own file later, it can be recreated from `CLAUDE.md`.
 - **`.github/workflows/publish-main.yml`** — manual-only (`workflow_dispatch`) Docker publish workflow that had never been triggered. `publish-release.yml` handles real releases (every `v*` tag, multi-arch, SBOM, provenance, semver tag tree); `publish-main.yml` was leftover pre-release infrastructure whose only effect on Docker Hub would have been a confusing `main` tag.
-- **`SearchResult` dataclass** in `scripts/models.py` — unused since before v7 and not to be confused with `vector_store.SemanticSearchResult` which is live.
+- **`SearchResult` dataclass** in `src/job_search_tool/models.py` — unused since before v7 and not to be confused with `vector_store.SemanticSearchResult` which is live.
 - **`mock_logger` fixture** in `tests/conftest.py` — defined at the top-level conftest but with zero consumers; `test_logger.py` has its own locally-scoped fixture of the same name.
 - **`results/.gitkeep`** and **`data/.gitkeep`** — both directories are gitignored and created lazily at runtime (the `results/` directory is only created the first time a user triggers an export from the dashboard's Database tab).
 
@@ -111,8 +183,8 @@ Housekeeping release. No functional changes: v7.0.0 introduced the new scoring/r
 ### Test plan
 
 - `pytest`: 335 passed, 0 failed. The delta from v7.0.0 (375 tests) is exactly the sum of the deleted `test_report_generator.py` (15) + `test_analyze_jobs.py` (17) + 8 parameterized variants that lived inside them.
-- `ruff check scripts/ tests/` clean.
-- `ruff format scripts/ tests/` — no files reformatted.
+- `ruff check src/job_search_tool tests/` clean.
+- `ruff format src/job_search_tool tests/` — no files reformatted.
 - CI green on PR #8 before and after the release bump commit.
 
 ## [7.0.0] - 2026-04-15
@@ -125,15 +197,15 @@ This is a major release. The scoring pipeline, the database retention model, and
 - **`database.retention`** block with `max_age_days` (default `30`) and `purge_blacklist_after_days` (default `90`). Applied at every boot by the new `reconcile_with_config` pass — no `cleanup_enabled` flag, no opt-in: if you don't want retention, raise the limits.
 - **Reconciliation at boot** — after `recalculate_all_scores`, the tool now runs `db.reconcile_with_config(config)` which drops jobs below `save_threshold`, drops stale jobs, purges the blacklist, and syncs the vector store. Idempotent: running it twice in a row is a no-op. If anything was removed, a summary is pushed to Telegram (`🧹 Startup cleanup: X jobs removed`).
 - **SQL-level protection invariant** — every DELETE query (except the explicit `reset_all` escape hatch) includes `AND bookmarked = 0 AND applied = 0`. Bookmarked and applied jobs are structurally immune to automatic cleanup, both at boot and from the dashboard's smart-cleanup controls. Not configurable.
-- **Database retention primitives** in `scripts/database.py`: `delete_jobs_below_score`, `delete_stale_jobs` (renamed from `cleanup_old_jobs`/`delete_jobs_older_than`), `purge_blacklist`, `get_score_distribution`, `count_jobs_below_score`, `count_stale_jobs`, `count_blacklist_older_than`, `reconcile_with_config`, `reset_all`. Dedicated SQL index on `relevance_score` so score-based cleanups stay O(log n).
+- **Database retention primitives** in `src/job_search_tool/database.py`: `delete_jobs_below_score`, `delete_stale_jobs` (renamed from `cleanup_old_jobs`/`delete_jobs_older_than`), `purge_blacklist`, `get_score_distribution`, `count_jobs_below_score`, `count_stale_jobs`, `count_blacklist_older_than`, `reconcile_with_config`, `reset_all`. Dedicated SQL index on `relevance_score` so score-based cleanups stay O(log n).
 - **New Database tab in the Streamlit dashboard** — a full management surface with five sections:
   - **Health**: total jobs, bookmarked, applied, blacklisted, average score, DB size on disk.
   - **Score distribution**: dynamic histogram from `get_score_distribution`, with vertical reference lines drawn at both `save_threshold` and `notify_threshold`.
   - **Smart cleanup**: four cards with live preview counts before confirmation — *Delete below score N* (default = current `save_threshold`), *Delete stale older than N days*, *Purge blacklist older than N days*, and **Apply `settings.yaml` retention now** which calls `reconcile_with_config` against the live config and shows the `ReconciliationReport` in the UI.
   - **Export**: on-demand CSV/Excel of the currently filtered view.
   - **Danger zone**: Full reset with text-confirmed `DELETE` that truncates the `jobs` table, the `deleted_jobs` blacklist, and the ChromaDB collection in one shot (the only path that bypasses the bookmarked/applied invariant).
-- **`ReconcileNotificationData`** + `format_reconcile_message` + `NotificationManager.send_reconcile_sync` in `scripts/notifier.py` for the startup cleanup summary.
-- **`Partitions`** dataclass in `scripts/scoring.py` — the new `partition_by_thresholds(scored, config)` returns a `Partitions(scored, to_save, to_notify)` so the main flow reads as score → partition → save → embed → notify without any threshold arithmetic at the call site.
+- **`ReconcileNotificationData`** + `format_reconcile_message` + `NotificationManager.send_reconcile_sync` in `src/job_search_tool/notifier.py` for the startup cleanup summary.
+- **`Partitions`** dataclass in `src/job_search_tool/scoring.py` — the new `partition_by_thresholds(scored, config)` returns a `Partitions(scored, to_save, to_notify)` so the main flow reads as score → partition → save → embed → notify without any threshold arithmetic at the call site.
 
 ### Changed (BREAKING)
 
@@ -148,8 +220,8 @@ This is a major release. The scoring pipeline, the database retention model, and
 
 ### Removed
 
-- `OutputConfig` dataclass and the entire `scripts/exporter.save_results` code path. `scripts/exporter.py` is reduced to a single `export_dataframe(df, output_dir, basename, fmt)` helper used only by the dashboard.
-- Dead `main()` function in `scripts/search_jobs.py` (it duplicated the pipeline; there was only one real entry point).
+- `OutputConfig` dataclass and the entire `scripts/exporter.save_results` code path. `src/job_search_tool/exporter.py` is reduced to a single `export_dataframe(df, output_dir, basename, fmt)` helper used only by the dashboard.
+- Dead `main()` function in `src/job_search_tool/search_jobs.py` (it duplicated the pipeline; there was only one real entry point).
 - Automatic `all_jobs_*.csv` and `relevant_jobs_*.csv` files from the results folder on every scheduled run.
 
 ### Migration
@@ -253,14 +325,14 @@ Four explicit steps, zero magic. If you forget step 3 the containers fail loudly
 
 ### Fixed
 
-- **ChromaDB telemetry errors are actually silenced now**: v6.0.3 tried to disable them via the `ANONYMIZED_TELEMETRY=False` env var but the posthog client bundled with our ChromaDB pin ignores that variable and still fires `Failed to send telemetry event … capture() takes 1 positional argument but 3 were given` on every client call. `scripts/vector_store.py` now passes `Settings(anonymized_telemetry=False)` directly to `chromadb.PersistentClient`, which the library honours end-to-end.
-- **JobSpy log dedupe actually deduplicates**: v6.0.4 installed the right `DedupeFilter` on the root logger, but JobSpy attaches its *own* StreamHandler to each per-site logger (`JobSpy:Indeed`, `JobSpy:Glassdoor`, ...) at import time, bypassing the root filter entirely. `scripts/logger.py` now strips those handlers during `setup_logging` and forces `propagate=True` so every JobSpy record flows through the root handler where the dedupe filter lives. Third-party noise is now collapsed per `(name, level, message)` tuple in practice, not just in theory.
-- **Legacy-key deprecation warnings are one-shot**: `scheduler.enabled is ignored in v6+` used to fire twice per scheduler iteration (once during startup `load_config()`, once during `reload_config()` inside `run_job_search()`). They're now tracked in a per-process `_LEGACY_WARNED` set in `scripts/config.py` and emitted exactly once regardless of how many times the parser runs. Applies to `output.*`, `scheduler.enabled`, and `vector_search.{model_name,persist_dir}` legacy keys alike.
+- **ChromaDB telemetry errors are actually silenced now**: v6.0.3 tried to disable them via the `ANONYMIZED_TELEMETRY=False` env var but the posthog client bundled with our ChromaDB pin ignores that variable and still fires `Failed to send telemetry event … capture() takes 1 positional argument but 3 were given` on every client call. `src/job_search_tool/vector_store.py` now passes `Settings(anonymized_telemetry=False)` directly to `chromadb.PersistentClient`, which the library honours end-to-end.
+- **JobSpy log dedupe actually deduplicates**: v6.0.4 installed the right `DedupeFilter` on the root logger, but JobSpy attaches its *own* StreamHandler to each per-site logger (`JobSpy:Indeed`, `JobSpy:Glassdoor`, ...) at import time, bypassing the root filter entirely. `src/job_search_tool/logger.py` now strips those handlers during `setup_logging` and forces `propagate=True` so every JobSpy record flows through the root handler where the dedupe filter lives. Third-party noise is now collapsed per `(name, level, message)` tuple in practice, not just in theory.
+- **Legacy-key deprecation warnings are one-shot**: `scheduler.enabled is ignored in v6+` used to fire twice per scheduler iteration (once during startup `load_config()`, once during `reload_config()` inside `run_job_search()`). They're now tracked in a per-process `_LEGACY_WARNED` set in `src/job_search_tool/config.py` and emitted exactly once regardless of how many times the parser runs. Applies to `output.*`, `scheduler.enabled`, and `vector_search.{model_name,persist_dir}` legacy keys alike.
 
 ### Changed
 
-- **`scripts/logger.py`**: new `_reroute_jobspy_loggers()` helper invoked by `setup_logging`. Pre-configures the nine known JobSpy per-site loggers (strip handlers, `propagate=True`, level `WARNING`) so they inherit the root handler's `DedupeFilter` and the uniform log format.
-- **`scripts/config.py`**: new `_warn_legacy_once(section, message)` helper backed by a module-level set. Replaces the three ad-hoc `logger.warning(...)` call sites with a single one-shot implementation. Autouse pytest fixture in `conftest.py` snapshots and restores the set between tests so cross-test state leakage can't re-trigger warnings.
+- **`src/job_search_tool/logger.py`**: new `_reroute_jobspy_loggers()` helper invoked by `setup_logging`. Pre-configures the nine known JobSpy per-site loggers (strip handlers, `propagate=True`, level `WARNING`) so they inherit the root handler's `DedupeFilter` and the uniform log format.
+- **`src/job_search_tool/config.py`**: new `_warn_legacy_once(section, message)` helper backed by a module-level set. Replaces the three ad-hoc `logger.warning(...)` call sites with a single one-shot implementation. Autouse pytest fixture in `conftest.py` snapshots and restores the set between tests so cross-test state leakage can't re-trigger warnings.
 
 ### Added
 
@@ -297,7 +369,7 @@ Four explicit steps, zero magic. If you forget step 3 the containers fail loudly
 ### Changed
 
 - **`SchedulerConfig.enabled` removed**: the continuous/single-shot choice is expressed by the CLI subcommand alone. `settings.yaml` keys with `scheduler.enabled` are now ignored with a one-line deprecation warning.
-- **`scripts/scheduler.py`**: `start()` unconditionally enters the continuous loop; the `_execute_job` retry-scheduling branches no longer double-check `config.scheduler.enabled` (they rely on the `self._scheduler` presence alone, which is already the canonical marker of continuous mode).
+- **`src/job_search_tool/scheduler.py`**: `start()` unconditionally enters the continuous loop; the `_execute_job` retry-scheduling branches no longer double-check `config.scheduler.enabled` (they rely on the `self._scheduler` presence alone, which is already the canonical marker of continuous mode).
 - **`config/settings.example.yaml`**: scheduler section is rewritten to document that the mode is chosen by the CLI and no longer exposes `enabled`.
 - **Test suite**: `test_start_disabled_scheduler_runs_once` removed (the fallback it covered no longer exists); fixtures updated to construct `SchedulerConfig()` with defaults.
 
@@ -320,7 +392,7 @@ Four explicit steps, zero magic. If you forget step 3 the containers fail loudly
 ### Changed
 
 - **Single Docker image**: the dashboard/core variant split from v5.0.0 is removed. One image tree, one tag family (`:latest`, `:vX.Y.Z`, `:vX.Y`, `:vX`, `:sha-<commit>`). Both Compose services pull the same image — Docker downloads it once and shares layers — and differ only by the command they run.
-- **Unified CLI subcommands**: `scripts/main.py` now accepts subcommands:
+- **Unified CLI subcommands**: `src/job_search_tool/main.py` now accepts subcommands:
   - `python main.py` / `python main.py scheduler` — continuous scheduler loop (default)
   - `python main.py once` — single-shot run (for cron / CI)
   - `python main.py dashboard` — `exec`-replaces the process with Streamlit on port 8501
@@ -344,7 +416,7 @@ Four explicit steps, zero magic. If you forget step 3 the containers fail loudly
 
 - **Minimal two-service Compose stack**: `docker-compose.yml` collapses to two flat services — `scheduler` on `:latest-core` and `dashboard` on `:latest` — sharing a single `./data:/data` volume. YAML anchors, profiles, `init-config`, `jobsearch`, and `analyze` services are gone. `docker compose up -d` now starts the continuous scheduler and the dashboard together out of the box.
 - **Single `/data` volume**: every persistent file now lives under one mount point with a fixed layout — `/data/config/settings.yaml`, `/data/db/jobs.db`, `/data/chroma/`, `/data/results/`, `/data/logs/search.log`. Users go from four bind mounts (`config/`, `data/`, `results/`, `logs/`) to **one**. Override the root with `JOB_SEARCH_DATA_DIR`.
-- **First-run auto-bootstrap**: on startup, the container creates `/data/config/settings.yaml` from the bundled template if it is missing, scaffolds the `/data/{config,db,chroma,results,logs}` subtree, and logs a clear "edit me and restart" hint. The `init-config` service and `scripts/bootstrap_config.py` helper are removed — both obsolete.
+- **First-run auto-bootstrap**: on startup, the container creates `/data/config/settings.yaml` from the bundled template if it is missing, scaffolds the `/data/{config,db,chroma,results,logs}` subtree, and logs a clear "edit me and restart" hint. The `init-config` service and `src/job_search_tool/bootstrap_config.py` helper are removed — both obsolete.
 - **Scheduler is the default mode**: `python main.py` now starts the continuous APScheduler loop by default. Use `python main.py --once` for a one-off single-shot run (cron, CI). The `JOB_SEARCH_MODE=single|scheduled` env variable is gone.
 - **Fixed persistent paths**: `output.results_dir`, `output.data_dir`, `output.database_file`, `logging.file`, `vector_search.model_name`, and `vector_search.persist_dir` are removed from `settings.yaml`. They are silently accepted with a one-line warning to ease the transition. Use `JOB_SEARCH_DATA_DIR` to relocate the whole tree.
 - **Dockerfile runs under `tini`** for clean SIGTERM propagation, declares `VOLUME /data`, and exports `JOB_SEARCH_DATA_DIR=/data` as a default env.
@@ -353,7 +425,7 @@ Four explicit steps, zero magic. If you forget step 3 the containers fail loudly
 
 ### Removed
 
-- `scripts/bootstrap_config.py` and its tests — the entrypoint does the bootstrap inline.
+- `src/job_search_tool/bootstrap_config.py` and its tests — the entrypoint does the bootstrap inline.
 - Compose services: `init-config`, `jobsearch`, `analyze`, all profile-gated services. Use `docker compose exec scheduler python analyze_jobs.py` for ad-hoc analysis.
 - `scripts/main.py::_resolve_scheduled_mode` and the `JOB_SEARCH_MODE` env switch.
 - `OutputConfig.results_dir` / `.data_dir` / `.database_file`, `LoggingConfig.file`, `VectorSearchConfig.model_name` / `.persist_dir`.
@@ -369,7 +441,7 @@ Four explicit steps, zero magic. If you forget step 3 the containers fail loudly
   - `.env.example`: replaces `JOB_SEARCH_IMAGE` with `JOB_SEARCH_CORE_IMAGE` and `JOB_SEARCH_DASHBOARD_IMAGE`.
   - `config/settings.example.yaml`: `vector_search` block now documents that `model_name` is ignored and describes the ONNX embedder.
   - `CLAUDE.md` / `AGENTS.md`: tech stack table, project tree comment on `Dockerfile`, internal changelog (v4.4.0 + v5.0.0 entries added), "Last Updated" date refreshed. `AGENTS.md` is now tracked alongside `CLAUDE.md`.
-  - `scripts/dashboard.py`: "semantic search unavailable" hint no longer mentions the removed `sentence-transformers` package.
+  - `src/job_search_tool/dashboard.py`: "semantic search unavailable" hint no longer mentions the removed `sentence-transformers` package.
 
 No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-for-byte equivalent aside from the `VERSION` build label.
 
@@ -432,7 +504,8 @@ No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-
 
 Entries prior to v4.3.1 have been archived. The git history on `main` plus the tagged commits are the authoritative source for anything older.
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v7.1.2...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v8.0.0...HEAD
+[8.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v7.1.2...v8.0.0
 [7.1.2]: https://github.com/VincenzoImp/job-search-tool/compare/v7.1.1...v7.1.2
 [7.1.1]: https://github.com/VincenzoImp/job-search-tool/compare/v7.1.0...v7.1.1
 [7.1.0]: https://github.com/VincenzoImp/job-search-tool/compare/v7.0.1...v7.1.0

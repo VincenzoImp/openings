@@ -1,6 +1,6 @@
 [project]
 name = "job-search-tool"
-version = "7.1.2"
+version = "8.0.0"
 description = "Automated job search aggregation, scoring, notifications, and dashboard tooling."
 requires-python = ">=3.11"
 dependencies = [
@@ -19,6 +19,19 @@ dependencies = [
     "mcp[cli]>=1.0.0,<2.0.0",
 ]
 
+[project.scripts]
+job-search = "job_search_tool.main:main"
+job-search-api = "job_search_tool.api_server:main"
+job-search-mcp = "job_search_tool.mcp_server:run_mcp_server"
+job-search-healthcheck = "job_search_tool.healthcheck:main"
+
+[build-system]
+requires = ["hatchling>=1.26.0,<2.0.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/job_search_tool"]
+
 [dependency-groups]
 dev = [
     "pytest>=7.4.0,<8.0.0",
@@ -34,4 +47,9 @@ dev = [
 ]
 
 [tool.uv]
+constraint-dependencies = [
+    # Security floors for transitive runtime dependencies audited in CI.
+    "gitpython>=3.1.50",
+    "python-multipart>=0.0.27",
+]
 default-groups = ["dev"]

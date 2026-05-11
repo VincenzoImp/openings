@@ -34,7 +34,7 @@ def check_imports() -> bool:
 def check_config() -> bool:
     """Verify configuration can be loaded."""
     try:
-        from config import load_config
+        from job_search_tool.config import load_config
 
         config = load_config()
         return config is not None
@@ -46,8 +46,8 @@ def check_config() -> bool:
 def check_database() -> bool:
     """Verify database connection works."""
     try:
-        from config import get_config
-        from database import get_database
+        from job_search_tool.config import get_config
+        from job_search_tool.database import get_database
 
         config = get_config()
         db = get_database(config)
@@ -62,7 +62,7 @@ def check_database() -> bool:
 def check_directories() -> bool:
     """Verify required directories exist and are writable."""
     try:
-        from config import get_config
+        from job_search_tool.config import get_config
 
         config = get_config()
 

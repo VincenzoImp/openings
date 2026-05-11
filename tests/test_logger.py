@@ -9,18 +9,14 @@ Tests for logging functionality including:
 """
 
 import logging
-import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Add scripts directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-
-from config import Config, LoggingConfig
-from logger import (
+from job_search_tool.config import Config, LoggingConfig
+from job_search_tool.logger import (
     ColoredFormatter,
     Colors,
     DedupeFilter,
@@ -557,7 +553,7 @@ class TestRerouteJobSpyLoggers:
         """End-to-end: setup_logging + duplicate JobSpy emission → 1 output line."""
         import io
 
-        from config import Config, LoggingConfig
+        from job_search_tool.config import Config, LoggingConfig
 
         config = Config(logging=LoggingConfig(level="DEBUG"))
         buffer = io.StringIO()

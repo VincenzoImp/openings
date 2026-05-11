@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
-from database import ReconciliationReport
+from job_search_tool.database import ReconciliationReport
 
 
 def _make_empty_report() -> ReconciliationReport:
@@ -30,14 +31,14 @@ def _make_runtime_config_mock() -> MagicMock:
 class TestRunJobSearch:
     """Tests for run_job_search function."""
 
-    @patch("main.reload_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.print_banner")
-    @patch("main.search_jobs")
-    @patch("main.score_jobs")
-    @patch("main.partition_by_thresholds")
-    @patch("main.print_top_jobs")
+    @patch("job_search_tool.main.reload_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.print_banner")
+    @patch("job_search_tool.main.search_jobs")
+    @patch("job_search_tool.main.score_jobs")
+    @patch("job_search_tool.main.partition_by_thresholds")
+    @patch("job_search_tool.main.print_top_jobs")
     def test_successful_search(
         self,
         mock_print_top,
@@ -49,8 +50,8 @@ class TestRunJobSearch:
         mock_setup_log,
         mock_reload,
     ):
-        from main import run_job_search
-        from scoring import Partitions
+        from job_search_tool.main import run_job_search
+        from job_search_tool.scoring import Partitions
 
         mock_config = _make_runtime_config_mock()
         mock_reload.return_value = mock_config
@@ -80,11 +81,11 @@ class TestRunJobSearch:
         mock_search.assert_called_once_with(mock_config)
         mock_db.save_jobs_from_dataframe.assert_called_once()
 
-    @patch("main.reload_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.print_banner")
-    @patch("main.search_jobs")
+    @patch("job_search_tool.main.reload_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.print_banner")
+    @patch("job_search_tool.main.search_jobs")
     def test_no_results(
         self,
         mock_search,
@@ -93,7 +94,7 @@ class TestRunJobSearch:
         mock_setup_log,
         mock_reload,
     ):
-        from main import run_job_search
+        from job_search_tool.main import run_job_search
 
         mock_config = _make_runtime_config_mock()
         mock_reload.return_value = mock_config
@@ -106,11 +107,11 @@ class TestRunJobSearch:
 
         assert run_job_search() is True
 
-    @patch("main.reload_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.print_banner")
-    @patch("main.search_jobs")
+    @patch("job_search_tool.main.reload_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.print_banner")
+    @patch("job_search_tool.main.search_jobs")
     def test_exception_returns_false(
         self,
         mock_search,
@@ -119,7 +120,7 @@ class TestRunJobSearch:
         mock_setup_log,
         mock_reload,
     ):
-        from main import run_job_search
+        from job_search_tool.main import run_job_search
 
         mock_config = _make_runtime_config_mock()
         mock_reload.return_value = mock_config
@@ -132,15 +133,15 @@ class TestRunJobSearch:
 
         assert run_job_search() is False
 
-    @patch("main.reload_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.print_banner")
-    @patch("main.search_jobs")
-    @patch("main.score_jobs")
-    @patch("main.partition_by_thresholds")
-    @patch("main.print_top_jobs")
-    @patch("main._send_notifications")
+    @patch("job_search_tool.main.reload_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.print_banner")
+    @patch("job_search_tool.main.search_jobs")
+    @patch("job_search_tool.main.score_jobs")
+    @patch("job_search_tool.main.partition_by_thresholds")
+    @patch("job_search_tool.main.print_top_jobs")
+    @patch("job_search_tool.main._send_notifications")
     def test_notifications_only_include_current_run_new_jobs(
         self,
         mock_send_notifications,
@@ -153,9 +154,9 @@ class TestRunJobSearch:
         mock_setup_log,
         mock_reload,
     ):
-        from main import run_job_search
-        from models import JobDBRecord, generate_job_id
-        from scoring import Partitions
+        from job_search_tool.main import run_job_search
+        from job_search_tool.models import JobDBRecord, generate_job_id
+        from job_search_tool.scoring import Partitions
 
         mock_config = _make_runtime_config_mock()
         mock_config.notifications.enabled = True
@@ -217,12 +218,12 @@ class TestRunJobSearch:
 class TestMain:
     """Tests for main() entry point."""
 
-    @patch("sys.argv", ["main.py", "once"])
-    @patch("main.get_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.recalculate_all_scores")
-    @patch("main.create_scheduler")
+    @patch("sys.argv", ["job_search_tool.main.py", "once"])
+    @patch("job_search_tool.main.get_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.recalculate_all_scores")
+    @patch("job_search_tool.main.create_scheduler")
     def test_single_shot_success(
         self,
         mock_create_scheduler,
@@ -231,7 +232,7 @@ class TestMain:
         mock_setup_log,
         mock_get_config,
     ):
-        from main import main
+        from job_search_tool.main import main
 
         mock_config = _make_runtime_config_mock()
         mock_get_config.return_value = mock_config
@@ -249,12 +250,12 @@ class TestMain:
         mock_scheduler.run_once.assert_called_once()
         mock_scheduler.start.assert_not_called()
 
-    @patch("sys.argv", ["main.py", "once"])
-    @patch("main.get_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.recalculate_all_scores")
-    @patch("main.create_scheduler")
+    @patch("sys.argv", ["job_search_tool.main.py", "once"])
+    @patch("job_search_tool.main.get_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.recalculate_all_scores")
+    @patch("job_search_tool.main.create_scheduler")
     def test_single_shot_failure(
         self,
         mock_create_scheduler,
@@ -263,7 +264,7 @@ class TestMain:
         mock_setup_log,
         mock_get_config,
     ):
-        from main import main
+        from job_search_tool.main import main
 
         mock_config = _make_runtime_config_mock()
         mock_get_config.return_value = mock_config
@@ -279,12 +280,12 @@ class TestMain:
 
         assert main() == 1
 
-    @patch("sys.argv", ["main.py", "once"])
-    @patch("main.get_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.recalculate_all_scores")
-    @patch("main.create_scheduler")
+    @patch("sys.argv", ["job_search_tool.main.py", "once"])
+    @patch("job_search_tool.main.get_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.recalculate_all_scores")
+    @patch("job_search_tool.main.create_scheduler")
     def test_score_recalculation_always_runs_when_db_nonempty(
         self,
         mock_create_scheduler,
@@ -293,7 +294,7 @@ class TestMain:
         mock_setup_log,
         mock_get_config,
     ):
-        from main import main
+        from job_search_tool.main import main
 
         mock_config = _make_runtime_config_mock()
         mock_get_config.return_value = mock_config
@@ -312,12 +313,12 @@ class TestMain:
         mock_recalc.assert_called_once_with(mock_db, mock_config)
         mock_db.reconcile_with_config.assert_called_once_with(mock_config)
 
-    @patch("sys.argv", ["main.py", "once"])
-    @patch("main.get_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.recalculate_all_scores")
-    @patch("main.create_scheduler")
+    @patch("sys.argv", ["job_search_tool.main.py", "once"])
+    @patch("job_search_tool.main.get_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.recalculate_all_scores")
+    @patch("job_search_tool.main.create_scheduler")
     def test_skip_recalculation_empty_db(
         self,
         mock_create_scheduler,
@@ -326,7 +327,7 @@ class TestMain:
         mock_setup_log,
         mock_get_config,
     ):
-        from main import main
+        from job_search_tool.main import main
 
         mock_config = _make_runtime_config_mock()
         mock_get_config.return_value = mock_config
@@ -344,11 +345,11 @@ class TestMain:
 
         mock_recalc.assert_not_called()
 
-    @patch("sys.argv", ["main.py"])
-    @patch("main.get_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.create_scheduler")
+    @patch("sys.argv", ["job_search_tool.main.py"])
+    @patch("job_search_tool.main.get_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.create_scheduler")
     def test_default_is_scheduled_mode(
         self,
         mock_create_scheduler,
@@ -356,7 +357,7 @@ class TestMain:
         mock_setup_log,
         mock_get_config,
     ):
-        from main import main
+        from job_search_tool.main import main
 
         mock_config = _make_runtime_config_mock()
         mock_get_config.return_value = mock_config
@@ -375,10 +376,10 @@ class TestMain:
         mock_scheduler.start.assert_called_once()
         mock_scheduler.run_once.assert_not_called()
 
-    @patch("sys.argv", ["main.py", "dashboard"])
-    @patch("main.os.execvp")
+    @patch("sys.argv", ["job_search_tool.main.py", "dashboard"])
+    @patch("job_search_tool.main.os.execvp")
     def test_dashboard_subcommand_execs_streamlit(self, mock_execvp):
-        from main import main
+        from job_search_tool.main import main
 
         main()
 
@@ -387,7 +388,9 @@ class TestMain:
         assert cmd == "streamlit"
         assert args[0] == "streamlit"
         assert args[1] == "run"
-        assert args[2].endswith("dashboard.py")
+        dashboard_path = Path(args[2])
+        assert dashboard_path.name == "dashboard.py"
+        assert dashboard_path.is_file()
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -398,10 +401,10 @@ class TestMain:
 class TestPrepareRuntime:
     """Tests for _prepare_runtime startup logic."""
 
-    @patch("main.get_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.recalculate_all_scores")
+    @patch("job_search_tool.main.get_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.recalculate_all_scores")
     def test_calls_recalc_and_reconcile_scheduled(
         self,
         mock_recalc,
@@ -409,7 +412,7 @@ class TestPrepareRuntime:
         mock_setup_log,
         mock_get_config,
     ):
-        from main import _prepare_runtime
+        from job_search_tool.main import _prepare_runtime
 
         mock_config = _make_runtime_config_mock()
         mock_get_config.return_value = mock_config
@@ -426,10 +429,10 @@ class TestPrepareRuntime:
         assert config is mock_config
         assert db is mock_db
 
-    @patch("main.get_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.recalculate_all_scores")
+    @patch("job_search_tool.main.get_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.recalculate_all_scores")
     def test_skips_recalc_on_empty_db(
         self,
         mock_recalc,
@@ -437,7 +440,7 @@ class TestPrepareRuntime:
         mock_setup_log,
         mock_get_config,
     ):
-        from main import _prepare_runtime
+        from job_search_tool.main import _prepare_runtime
 
         mock_config = _make_runtime_config_mock()
         mock_get_config.return_value = mock_config
@@ -452,12 +455,12 @@ class TestPrepareRuntime:
         mock_recalc.assert_not_called()
         mock_db.reconcile_with_config.assert_called_once()
 
-    @patch("main.NotificationManager")
-    @patch("main.create_reconcile_notification_data")
-    @patch("main.get_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.recalculate_all_scores")
+    @patch("job_search_tool.main.NotificationManager")
+    @patch("job_search_tool.main.create_reconcile_notification_data")
+    @patch("job_search_tool.main.get_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.recalculate_all_scores")
     def test_sends_reconcile_notification_when_deletions(
         self,
         mock_recalc,
@@ -467,7 +470,7 @@ class TestPrepareRuntime:
         mock_create_data,
         mock_manager_cls,
     ):
-        from main import _prepare_runtime
+        from job_search_tool.main import _prepare_runtime
 
         mock_config = _make_runtime_config_mock()
         mock_config.notifications.enabled = True
@@ -488,10 +491,10 @@ class TestPrepareRuntime:
         mock_create_data.assert_called_once_with(report)
         mock_mgr.send_reconcile_sync.assert_called_once()
 
-    @patch("main.get_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.recalculate_all_scores")
+    @patch("job_search_tool.main.get_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.recalculate_all_scores")
     def test_no_reconcile_notification_when_zero_deletions(
         self,
         mock_recalc,
@@ -499,7 +502,7 @@ class TestPrepareRuntime:
         mock_setup_log,
         mock_get_config,
     ):
-        from main import _prepare_runtime
+        from job_search_tool.main import _prepare_runtime
 
         mock_config = _make_runtime_config_mock()
         mock_config.notifications.enabled = True
@@ -513,10 +516,10 @@ class TestPrepareRuntime:
         _prepare_runtime(scheduled=False)
         # No NotificationManager should be created
 
-    @patch("main.get_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.recalculate_all_scores")
+    @patch("job_search_tool.main.get_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.recalculate_all_scores")
     def test_vector_sync_on_deletions(
         self,
         mock_recalc,
@@ -524,7 +527,7 @@ class TestPrepareRuntime:
         mock_setup_log,
         mock_get_config,
     ):
-        from main import _prepare_runtime
+        from job_search_tool.main import _prepare_runtime
 
         mock_config = _make_runtime_config_mock()
         mock_config.vector_search.enabled = True
@@ -539,9 +542,11 @@ class TestPrepareRuntime:
         mock_get_db.return_value = mock_db
 
         with (
-            patch("vector_store.get_vector_store"),
-            patch("vector_commands.sync_deletions") as mock_sync,
-            patch("vector_commands.backfill_embeddings") as mock_backfill,
+            patch("job_search_tool.vector_store.get_vector_store"),
+            patch("job_search_tool.vector_commands.sync_deletions") as mock_sync,
+            patch(
+                "job_search_tool.vector_commands.backfill_embeddings"
+            ) as mock_backfill,
         ):
             mock_backfill.return_value = 3
             _prepare_runtime(scheduled=False)
@@ -553,12 +558,12 @@ class TestPrepareRuntime:
 class TestRunJobSearchIntegration:
     """Tests where scoring and partitioning run for real against a temp DB."""
 
-    @patch("main.reload_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.print_banner")
-    @patch("main.search_jobs")
-    @patch("main.print_top_jobs")
+    @patch("job_search_tool.main.reload_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.print_banner")
+    @patch("job_search_tool.main.search_jobs")
+    @patch("job_search_tool.main.print_top_jobs")
     def test_jobs_above_save_threshold_are_saved(
         self,
         mock_print_top,
@@ -570,8 +575,8 @@ class TestRunJobSearchIntegration:
         temp_db,
     ):
         """Mock search_jobs but let score_jobs and partition run for real."""
-        from config import Config, ScoringConfig
-        from main import run_job_search
+        from job_search_tool.config import Config, ScoringConfig
+        from job_search_tool.main import run_job_search
 
         config = Config(
             scoring=ScoringConfig(
@@ -617,13 +622,13 @@ class TestRunJobSearchIntegration:
         assert "Python Dev" in titles
         assert "Chef" not in titles  # Score 0 < save_threshold 10
 
-    @patch("main.reload_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.print_banner")
-    @patch("main.search_jobs")
-    @patch("main.print_top_jobs")
-    @patch("main._send_notifications")
+    @patch("job_search_tool.main.reload_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.print_banner")
+    @patch("job_search_tool.main.search_jobs")
+    @patch("job_search_tool.main.print_top_jobs")
+    @patch("job_search_tool.main._send_notifications")
     def test_notifications_only_for_notify_threshold(
         self,
         mock_send_notif,
@@ -636,8 +641,8 @@ class TestRunJobSearchIntegration:
         temp_db,
     ):
         """Jobs between save and notify threshold should save but not notify."""
-        from config import Config, ScoringConfig
-        from main import run_job_search
+        from job_search_tool.config import Config, ScoringConfig
+        from job_search_tool.main import run_job_search
 
         config = Config(
             scoring=ScoringConfig(
@@ -676,12 +681,12 @@ class TestRunJobSearchIntegration:
         # But no notifications because score 20 < notify_threshold 30
         mock_send_notif.assert_not_called()
 
-    @patch("main.reload_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.print_banner")
-    @patch("main.search_jobs")
-    @patch("main.print_top_jobs")
+    @patch("job_search_tool.main.reload_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.print_banner")
+    @patch("job_search_tool.main.search_jobs")
+    @patch("job_search_tool.main.print_top_jobs")
     def test_blacklisted_jobs_excluded(
         self,
         mock_print_top,
@@ -692,9 +697,9 @@ class TestRunJobSearchIntegration:
         mock_reload,
         temp_db,
     ):
-        from config import Config, ScoringConfig
-        from main import run_job_search
-        from models import Job
+        from job_search_tool.config import Config, ScoringConfig
+        from job_search_tool.main import run_job_search
+        from job_search_tool.models import Job
 
         config = Config(
             scoring=ScoringConfig(
@@ -733,11 +738,11 @@ class TestRunJobSearchIntegration:
 
         assert len(temp_db.get_all_jobs()) == 0
 
-    @patch("main.reload_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.print_banner")
-    @patch("main.search_jobs")
+    @patch("job_search_tool.main.reload_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.print_banner")
+    @patch("job_search_tool.main.search_jobs")
     def test_empty_search_results(
         self,
         mock_search,
@@ -746,7 +751,7 @@ class TestRunJobSearchIntegration:
         mock_setup_log,
         mock_reload,
     ):
-        from main import run_job_search
+        from job_search_tool.main import run_job_search
 
         mock_config = _make_runtime_config_mock()
         mock_reload.return_value = mock_config
@@ -759,11 +764,11 @@ class TestRunJobSearchIntegration:
 
         assert run_job_search() is True
 
-    @patch("main.reload_config")
-    @patch("main.setup_logging")
-    @patch("main.get_database")
-    @patch("main.print_banner")
-    @patch("main.search_jobs")
+    @patch("job_search_tool.main.reload_config")
+    @patch("job_search_tool.main.setup_logging")
+    @patch("job_search_tool.main.get_database")
+    @patch("job_search_tool.main.print_banner")
+    @patch("job_search_tool.main.search_jobs")
     def test_empty_dataframe_search_results(
         self,
         mock_search,
@@ -772,7 +777,7 @@ class TestRunJobSearchIntegration:
         mock_setup_log,
         mock_reload,
     ):
-        from main import run_job_search
+        from job_search_tool.main import run_job_search
 
         mock_config = _make_runtime_config_mock()
         mock_reload.return_value = mock_config
@@ -789,9 +794,9 @@ class TestRunJobSearchIntegration:
 class TestSendNotifications:
     """Tests for _send_notifications helper."""
 
-    @patch("main.NotificationManager")
+    @patch("job_search_tool.main.NotificationManager")
     def test_disabled_notifications(self, mock_manager_cls):
-        from main import _send_notifications
+        from job_search_tool.main import _send_notifications
 
         mock_config = _make_runtime_config_mock()
         mock_config.notifications.enabled = False
@@ -799,9 +804,9 @@ class TestSendNotifications:
         _send_notifications(mock_config, MagicMock(), [], 0, 0)
         mock_manager_cls.assert_not_called()
 
-    @patch("main.NotificationManager")
+    @patch("job_search_tool.main.NotificationManager")
     def test_no_configured_notifiers(self, mock_manager_cls):
-        from main import _send_notifications
+        from job_search_tool.main import _send_notifications
 
         mock_config = _make_runtime_config_mock()
         mock_config.notifications.enabled = True
@@ -814,11 +819,11 @@ class TestSendNotifications:
         _send_notifications(mock_config, MagicMock(), [], 0, 0)
         mock_mgr.send_all_sync.assert_not_called()
 
-    @patch("main.create_notification_data")
-    @patch("main.NotificationManager")
+    @patch("job_search_tool.main.create_notification_data")
+    @patch("job_search_tool.main.NotificationManager")
     def test_sends_with_new_jobs(self, mock_manager_cls, mock_create_data):
-        from main import _send_notifications
-        from models import JobDBRecord
+        from job_search_tool.main import _send_notifications
+        from job_search_tool.models import JobDBRecord
 
         mock_config = _make_runtime_config_mock()
         mock_config.notifications.enabled = True
@@ -847,11 +852,11 @@ class TestSendNotifications:
         mock_create_data.assert_called_once()
         mock_mgr.send_all_sync.assert_called_once()
 
-    @patch("main.create_notification_data")
-    @patch("main.NotificationManager")
+    @patch("job_search_tool.main.create_notification_data")
+    @patch("job_search_tool.main.NotificationManager")
     def test_includes_top_overall(self, mock_manager_cls, mock_create_data):
-        from main import _send_notifications
-        from models import JobDBRecord
+        from job_search_tool.main import _send_notifications
+        from job_search_tool.models import JobDBRecord
 
         mock_config = _make_runtime_config_mock()
         mock_config.notifications.enabled = True
@@ -901,9 +906,9 @@ class TestSendNotifications:
 class TestSendEmptyNotification:
     """Tests for _send_empty_notification."""
 
-    @patch("main.NotificationManager")
+    @patch("job_search_tool.main.NotificationManager")
     def test_disabled_notifications(self, mock_manager_cls):
-        from main import _send_empty_notification
+        from job_search_tool.main import _send_empty_notification
 
         mock_config = _make_runtime_config_mock()
         mock_config.notifications.enabled = False
@@ -911,10 +916,10 @@ class TestSendEmptyNotification:
         _send_empty_notification(mock_config, MagicMock())
         mock_manager_cls.assert_not_called()
 
-    @patch("main.create_notification_data")
-    @patch("main.NotificationManager")
+    @patch("job_search_tool.main.create_notification_data")
+    @patch("job_search_tool.main.NotificationManager")
     def test_sends_empty_with_top_overall(self, mock_manager_cls, mock_create_data):
-        from main import _send_empty_notification
+        from job_search_tool.main import _send_empty_notification
 
         mock_config = _make_runtime_config_mock()
         mock_config.notifications.enabled = True
@@ -944,10 +949,10 @@ class TestSendEmptyNotification:
 class TestCmdOnce:
     """Tests for _cmd_once."""
 
-    @patch("main._prepare_runtime")
-    @patch("main.create_scheduler")
+    @patch("job_search_tool.main._prepare_runtime")
+    @patch("job_search_tool.main.create_scheduler")
     def test_calls_prepare_and_run_once(self, mock_create_sched, mock_prepare):
-        from main import _cmd_once
+        from job_search_tool.main import _cmd_once
 
         mock_config = _make_runtime_config_mock()
         mock_prepare.return_value = (mock_config, MagicMock())
@@ -962,10 +967,10 @@ class TestCmdOnce:
         mock_prepare.assert_called_once_with(scheduled=False)
         mock_sched.run_once.assert_called_once()
 
-    @patch("main._prepare_runtime")
-    @patch("main.create_scheduler")
+    @patch("job_search_tool.main._prepare_runtime")
+    @patch("job_search_tool.main.create_scheduler")
     def test_returns_1_on_failure(self, mock_create_sched, mock_prepare):
-        from main import _cmd_once
+        from job_search_tool.main import _cmd_once
 
         mock_config = _make_runtime_config_mock()
         mock_prepare.return_value = (mock_config, MagicMock())
@@ -976,10 +981,10 @@ class TestCmdOnce:
 
         assert _cmd_once() == 1
 
-    @patch("main._prepare_runtime")
-    @patch("main.create_scheduler")
+    @patch("job_search_tool.main._prepare_runtime")
+    @patch("job_search_tool.main.create_scheduler")
     def test_keyboard_interrupt(self, mock_create_sched, mock_prepare):
-        from main import _cmd_once
+        from job_search_tool.main import _cmd_once
 
         mock_config = _make_runtime_config_mock()
         mock_prepare.return_value = (mock_config, MagicMock())
@@ -994,10 +999,10 @@ class TestCmdOnce:
 class TestCmdScheduler:
     """Tests for _cmd_scheduler."""
 
-    @patch("main._prepare_runtime")
-    @patch("main.create_scheduler")
+    @patch("job_search_tool.main._prepare_runtime")
+    @patch("job_search_tool.main.create_scheduler")
     def test_normal_start(self, mock_create_sched, mock_prepare):
-        from main import _cmd_scheduler
+        from job_search_tool.main import _cmd_scheduler
 
         mock_config = _make_runtime_config_mock()
         mock_prepare.return_value = (mock_config, MagicMock())
@@ -1011,10 +1016,10 @@ class TestCmdScheduler:
         mock_prepare.assert_called_once_with(scheduled=True)
         mock_sched.start.assert_called_once()
 
-    @patch("main._prepare_runtime")
-    @patch("main.create_scheduler")
+    @patch("job_search_tool.main._prepare_runtime")
+    @patch("job_search_tool.main.create_scheduler")
     def test_keyboard_interrupt(self, mock_create_sched, mock_prepare):
-        from main import _cmd_scheduler
+        from job_search_tool.main import _cmd_scheduler
 
         mock_config = _make_runtime_config_mock()
         mock_prepare.return_value = (mock_config, MagicMock())
@@ -1025,10 +1030,10 @@ class TestCmdScheduler:
 
         assert _cmd_scheduler() == 0
 
-    @patch("main._prepare_runtime")
-    @patch("main.create_scheduler")
+    @patch("job_search_tool.main._prepare_runtime")
+    @patch("job_search_tool.main.create_scheduler")
     def test_fatal_error(self, mock_create_sched, mock_prepare):
-        from main import _cmd_scheduler
+        from job_search_tool.main import _cmd_scheduler
 
         mock_config = _make_runtime_config_mock()
         mock_prepare.return_value = (mock_config, MagicMock())

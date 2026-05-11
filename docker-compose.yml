@@ -5,10 +5,10 @@ name: jobsearch
 # settings.yaml is bind-mounted as a read-only file so it can be edited with
 # any host-side editor.
 #
-#   scheduler  → `python main.py scheduler`  (continuous search loop)
-#   dashboard  → `python main.py dashboard`  (Streamlit UI on :8501)
-#   api        → `python api_server.py`      (REST API on :8502, profile: api)
-#   mcp        → `python mcp_server.py`      (MCP server on :3001, profile: mcp)
+#   scheduler  → `job-search scheduler`  (continuous search loop)
+#   dashboard  → `job-search dashboard`  (Streamlit UI on :8501)
+#   api        → `job-search-api`        (REST API on :8502, profile: api)
+#   mcp        → `job-search-mcp`        (MCP server on :3001, profile: mcp)
 #
 # scheduler and dashboard always start. api and mcp are opt-in via
 # Docker Compose profiles:
@@ -38,7 +38,7 @@ services:
     image: vincenzoimp/job-search-tool:latest
     container_name: jobsearch-scheduler
     restart: unless-stopped
-    command: ["python", "main.py", "scheduler"]
+    command: ["job-search", "scheduler"]
     dns:
       - 1.1.1.1
       - 8.8.8.8
@@ -53,12 +53,12 @@ services:
     image: vincenzoimp/job-search-tool:latest
     container_name: jobsearch-dashboard
     restart: unless-stopped
-    command: ["python", "main.py", "dashboard"]
+    command: ["job-search", "dashboard"]
     dns:
       - 1.1.1.1
       - 8.8.8.8
     ports:
-      - "${JOB_SEARCH_DASHBOARD_PORT:-8501}:8501"
+      - "${JOB_SEARCH_DASHBOARD_BIND:-127.0.0.1}:${JOB_SEARCH_DASHBOARD_PORT:-8501}:8501"
     env_file:
       - path: .env
         required: false
@@ -70,12 +70,12 @@ services:
     image: vincenzoimp/job-search-tool:latest
     container_name: jobsearch-api
     restart: unless-stopped
-    command: ["python", "api_server.py"]
+    command: ["job-search-api"]
     dns:
       - 1.1.1.1
       - 8.8.8.8
     ports:
-      - "${JOB_SEARCH_API_PORT:-8502}:8502"
+      - "${JOB_SEARCH_API_BIND:-127.0.0.1}:${JOB_SEARCH_API_PORT:-8502}:8502"
     env_file:
       - path: .env
         required: false
@@ -89,16 +89,17 @@ services:
     image: vincenzoimp/job-search-tool:latest
     container_name: jobsearch-mcp
     restart: unless-stopped
-    command: ["python", "mcp_server.py"]
+    command: ["job-search-mcp"]
     dns:
       - 1.1.1.1
       - 8.8.8.8
     ports:
-      - "${JOB_SEARCH_MCP_PORT:-3001}:3001"
+      - "${JOB_SEARCH_MCP_BIND:-127.0.0.1}:${JOB_SEARCH_MCP_PORT:-3001}:3001"
     env_file:
       - path: .env
         required: false
     volumes:
       - jobsearch-data:/data
+      - ./settings.yaml:/data/config/settings.yaml:ro
     profiles:
       - mcp

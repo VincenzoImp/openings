@@ -1136,10 +1136,10 @@ profile:
 # The operating mode (continuous scheduler vs single-shot) is chosen by the
 # CLI subcommand, not by config:
 #
-#   python main.py scheduler   → continuous loop, uses the settings below
-#   python main.py once        → single iteration, settings below are ignored
+#   job-search scheduler   → continuous loop, uses the settings below
+#   job-search once        → single iteration, settings below are ignored
 #
-# The `scheduler.enabled` flag from v5 and older is no longer read.
+# Unsupported keys are rejected at startup so configuration drift is visible.
 # =============================================================================
 
 scheduler:

@@ -16,15 +16,15 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from config import (
+from job_search_tool.config import (
     Config,
     DatabaseConfig,
     RetentionConfig,
     ScoringConfig,
 )
-from database import JobDatabase, recalculate_all_scores
-from models import Job
-from scoring import Partitions, partition_by_thresholds, score_jobs
+from job_search_tool.database import JobDatabase, recalculate_all_scores
+from job_search_tool.models import Job
+from job_search_tool.scoring import Partitions, partition_by_thresholds, score_jobs
 
 
 # ---------------------------------------------------------------------------
@@ -355,8 +355,8 @@ def test_api_full_workflow():
     """Seed real DB, exercise API endpoints through TestClient."""
     from fastapi.testclient import TestClient
 
-    import api_server
-    import job_service
+    from job_search_tool import api_server
+    from job_search_tool import job_service
 
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
@@ -427,7 +427,7 @@ def test_api_full_workflow():
 
 def test_mcp_full_workflow():
     """Seed real DB, call MCP tool functions directly."""
-    import job_service
+    from job_search_tool import job_service
 
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"
@@ -440,7 +440,7 @@ def test_mcp_full_workflow():
         job_service._vs = None
         job_service._vs_attempted = True
 
-        from mcp_server import (
+        from job_search_tool.mcp_server import (
             bookmark_job,
             delete_jobs_below_score,
             get_job,

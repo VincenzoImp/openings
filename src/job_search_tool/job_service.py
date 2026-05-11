@@ -10,13 +10,13 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import TYPE_CHECKING
 
-from config import DATA_DIR
-from database import JobDatabase
-from logger import get_logger
-from models import JobDBRecord
+from job_search_tool.config import DATA_DIR
+from job_search_tool.database import JobDatabase
+from job_search_tool.logger import get_logger
+from job_search_tool.models import JobDBRecord
 
 if TYPE_CHECKING:
-    from vector_store import JobVectorStore
+    from job_search_tool.vector_store import JobVectorStore
 
 # ---------------------------------------------------------------------------
 # Paths (derived from config.DATA_DIR — respects JOB_SEARCH_DATA_DIR env var)
@@ -50,7 +50,7 @@ def get_vs() -> JobVectorStore | None:
     if not _vs_attempted:
         _vs_attempted = True
         try:
-            from vector_store import get_vector_store
+            from job_search_tool.vector_store import get_vector_store
 
             _vs = get_vector_store(CHROMA_PATH)
         except Exception as exc:

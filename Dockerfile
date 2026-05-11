@@ -2,9 +2,9 @@
 
 # Job Search Tool — Docker container
 #
-# Single image containing the scheduler, the Streamlit dashboard, and every
-# runtime dependency. The same image runs both Compose services; the two
-# differ only by their command (scheduler loop vs Streamlit UI).
+# Single image containing the scheduler, Streamlit dashboard, REST API, MCP
+# server, and every runtime dependency. Compose services differ only by their
+# command.
 #
 # Everything persistent (config, database, vector store, results, logs) lives
 # under a single volume at /data. Mount it and that's it.
@@ -28,12 +28,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends gcc \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml uv.lock ./
-COPY scripts/ ./scripts/
+COPY src/ ./src/
 COPY config/settings.example.yaml /opt/job-search-tool/defaults/settings.example.yaml
 COPY docker/entrypoint.sh /usr/local/bin/job-search-entrypoint
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev --no-install-project \
+    uv sync --locked --no-dev \
     && find /app/.venv -depth \
          \( -type d \( -name __pycache__ -o -name tests -o -name test \) \
             -o -type f \( -name '*.pyc' -o -name '*.pyo' -o -name '*.pyi' \) \
@@ -70,7 +70,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends tini \
 WORKDIR /app
 
 COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
-COPY --from=builder --chown=appuser:appuser /app/scripts /app/scripts
+COPY --from=builder --chown=appuser:appuser /app/src /app/src
 COPY --from=builder --chown=appuser:appuser /opt/job-search-tool/defaults/settings.example.yaml /opt/job-search-tool/defaults/settings.example.yaml
 COPY --from=builder /usr/local/bin/job-search-entrypoint /usr/local/bin/job-search-entrypoint
 
@@ -80,7 +80,7 @@ RUN chmod +x /usr/local/bin/job-search-entrypoint
 # layer above with appuser ownership so the matching named volume inherits
 # the same permissions on first mount.
 USER appuser
-WORKDIR /app/scripts
+WORKDIR /app
 
 ENV PATH=/app/.venv/bin:$PATH
 ENV PYTHONUNBUFFERED=1
@@ -100,7 +100,7 @@ ENV CHROMA_TELEMETRY_IMPL=none
 VOLUME ["/data"]
 
 HEALTHCHECK --interval=5m --timeout=30s --start-period=60s --retries=3 \
-    CMD python healthcheck.py
+    CMD job-search-healthcheck
 
 ENTRYPOINT ["/usr/bin/tini", "--", "job-search-entrypoint"]
-CMD ["python", "main.py"]
+CMD ["job-search", "scheduler"]

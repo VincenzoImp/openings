@@ -47,13 +47,13 @@ jobs:
           cache-suffix: quality
 
       - name: Sync dependencies
-        run: uv sync --locked --no-install-project
+        run: uv sync --locked
 
       - name: Run pre-commit hooks
         run: uv run pre-commit run --all-files
 
       - name: Type check with mypy
-        run: uv run mypy scripts/ --ignore-missing-imports
+        run: uv run mypy src/job_search_tool --ignore-missing-imports
 
   test:
     runs-on: ubuntu-latest
@@ -81,11 +81,11 @@ jobs:
           cache-suffix: py${{ matrix.python-version }}-ci
 
       - name: Sync dependencies
-        run: uv sync --locked --no-install-project
+        run: uv sync --locked
 
       - name: Run tests with coverage
         if: matrix.python-version == '3.11'
-        run: uv run pytest --cov=scripts --cov-report=xml --cov-fail-under=60
+        run: uv run pytest --cov=job_search_tool --cov-report=xml --cov-fail-under=60
 
       - name: Run tests
         if: matrix.python-version != '3.11'
@@ -150,4 +150,76 @@ jobs:
         run: |
           docker run --rm \
             -v "$PWD/config/settings.example.yaml:/data/config/settings.yaml:ro" \
-            job-search-tool:test python healthcheck.py
+            job-search-tool:test job-search-healthcheck
+
+      - name: Validate Compose profiles
+        run: |
+          cp config/settings.example.yaml settings.yaml
+          docker compose --profile api --profile mcp config
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile api --profile mcp config
+
+      - name: Smoke dashboard container
+        run: |
+          docker rm -f job-search-dashboard-smoke || true
+          docker run --rm -d \
+            --name job-search-dashboard-smoke \
+            -p 18501:8501 \
+            -v "$PWD/config/settings.example.yaml:/data/config/settings.yaml:ro" \
+            job-search-tool:test job-search dashboard
+          trap 'docker rm -f job-search-dashboard-smoke' EXIT
+          python - <<'PY'
+          import socket
+          import time
+
+          deadline = time.time() + 30
+          while True:
+              try:
+                  with socket.create_connection(("127.0.0.1", 18501), timeout=2):
+                      raise SystemExit(0)
+              except OSError:
+                  if time.time() >= deadline:
+                      raise
+                  time.sleep(1)
+          PY
+
+      - name: Smoke REST API container
+        run: |
+          docker rm -f job-search-api-smoke || true
+          docker run --rm -d \
+            --name job-search-api-smoke \
+            -p 18502:8502 \
+            -v "$PWD/config/settings.example.yaml:/data/config/settings.yaml:ro" \
+            job-search-tool:test job-search-api
+          trap 'docker rm -f job-search-api-smoke' EXIT
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:18502/health; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs job-search-api-smoke
+          exit 1
+
+      - name: Smoke MCP container
+        run: |
+          docker rm -f job-search-mcp-smoke || true
+          docker run --rm -d \
+            --name job-search-mcp-smoke \
+            -p 13001:3001 \
+            -v "$PWD/config/settings.example.yaml:/data/config/settings.yaml:ro" \
+            job-search-tool:test job-search-mcp
+          trap 'docker rm -f job-search-mcp-smoke' EXIT
+          python - <<'PY'
+          import socket
+          import time
+
+          deadline = time.time() + 30
+          while True:
+              try:
+                  with socket.create_connection(("127.0.0.1", 13001), timeout=2):
+                      raise SystemExit(0)
+              except OSError:
+                  if time.time() >= deadline:
+                      raise
+                  time.sleep(1)
+          PY

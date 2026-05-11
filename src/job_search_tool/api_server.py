@@ -4,19 +4,20 @@ Thin FastAPI adapter over the shared job_service layer. Designed for scripts,
 automations, and external tools that need programmatic access to the job
 database.
 
-Run: ``python api_server.py`` (listens on port 8502).
+Run: ``job-search-api`` (listens on port 8502).
 """
 
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import os
 from typing import AsyncIterator
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from job_service import (
+from job_search_tool.job_service import (
     close_db,
     filter_jobs,
     get_db,
@@ -26,6 +27,7 @@ from job_service import (
     sort_jobs_by_date,
     sort_jobs_by_score,
 )
+from job_search_tool.project_meta import get_project_version
 
 # ---------------------------------------------------------------------------
 # Pydantic response models
@@ -106,10 +108,21 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     close_db()
 
 
+def require_api_token(authorization: str | None = Header(default=None)) -> None:
+    """Require a bearer token only when JOB_SEARCH_API_TOKEN is configured."""
+    token = os.environ.get("JOB_SEARCH_API_TOKEN", "").strip()
+    if not token:
+        return
+
+    if authorization != f"Bearer {token}":
+        raise HTTPException(status_code=401, detail="Invalid or missing API token")
+
+
 app = FastAPI(
     title="Job Search Tool API",
-    version="7.1.2",
+    version=get_project_version(),
     lifespan=lifespan,
+    dependencies=[Depends(require_api_token)],
 )
 
 app.add_middleware(
@@ -246,7 +259,13 @@ def delete_below_score(score: int) -> BulkDeleteResponse:
 # Entrypoint
 # ---------------------------------------------------------------------------
 
-if __name__ == "__main__":
+
+def main() -> None:
+    """Run the REST API server."""
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8502)
+
+
+if __name__ == "__main__":
+    main()

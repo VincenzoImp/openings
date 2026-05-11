@@ -10,8 +10,8 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from database import JobDatabase
-from models import Job
+from job_search_tool.database import JobDatabase
+from job_search_tool.models import Job
 
 
 @asynccontextmanager
@@ -70,8 +70,8 @@ def _seed_db(db_path):
 @pytest.fixture()
 def client(db_path, _seed_db):
     """Create a FastAPI test client backed by the seeded DB."""
-    import api_server
-    import job_service
+    from job_search_tool import api_server
+    from job_search_tool import job_service
 
     db = JobDatabase(db_path)
     db.close()
@@ -91,7 +91,7 @@ def client(db_path, _seed_db):
 @pytest.fixture()
 def mock_vector_store():
     """Create a mock vector store returning canned results."""
-    from vector_store import SemanticSearchResult
+    from job_search_tool.vector_store import SemanticSearchResult
 
     vs = MagicMock()
     vs.search.return_value = [
@@ -123,6 +123,31 @@ def test_health(client):
     data = resp.json()
     assert data["status"] == "ok"
     assert data["jobs_count"] == 3
+
+
+def test_openapi_version_matches_project_metadata(client):
+    from job_search_tool.project_meta import get_project_version
+
+    resp = client.get("/openapi.json")
+
+    assert resp.status_code == 200
+    assert resp.json()["info"]["version"] == get_project_version()
+
+
+def test_api_token_rejects_missing_header(client, monkeypatch):
+    monkeypatch.setenv("JOB_SEARCH_API_TOKEN", "secret-token")
+
+    resp = client.get("/jobs")
+
+    assert resp.status_code == 401
+
+
+def test_api_token_accepts_bearer_header(client, monkeypatch):
+    monkeypatch.setenv("JOB_SEARCH_API_TOKEN", "secret-token")
+
+    resp = client.get("/jobs", headers={"Authorization": "Bearer secret-token"})
+
+    assert resp.status_code == 200
 
 
 # ---------------------------------------------------------------------------
@@ -296,7 +321,7 @@ def test_semantic_search_no_vector_store(client):
 
 
 def test_semantic_search_with_vector_store(client, mock_vector_store):
-    import job_service
+    from job_search_tool import job_service
 
     job_service._vs = mock_vector_store
     resp = client.get("/jobs/search/semantic", params={"q": "machine learning"})

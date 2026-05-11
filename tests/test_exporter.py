@@ -2,17 +2,13 @@
 
 from __future__ import annotations
 
-import sys
 from io import BytesIO
-from pathlib import Path
 
 import pandas as pd
 import pytest
 from openpyxl import load_workbook
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-
-from exporter import (
+from job_search_tool.exporter import (
     _sanitize_dataframe_for_excel,
     _sanitize_excel_value,
     dataframe_to_csv_bytes,
