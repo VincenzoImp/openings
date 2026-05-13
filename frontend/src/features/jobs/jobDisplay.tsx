@@ -34,6 +34,19 @@ export function statusChip(job: JobRecord) {
   );
 }
 
+export function ScoreBadge({ score }: { score: number }) {
+  return (
+    <Chip
+      className="w-9 min-w-9 justify-center px-0 font-semibold tabular-nums"
+      color={scoreColor(score)}
+      size="sm"
+      variant="soft"
+    >
+      {score}
+    </Chip>
+  );
+}
+
 export function salaryLabel(job: JobRecord) {
   if (job.min_amount === null && job.max_amount === null) {
     return "unknown";
