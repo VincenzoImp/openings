@@ -6,7 +6,11 @@ export interface JobFilterValues {
   company: string;
   datePostedFrom: string;
   datePostedTo: string;
+  firstSeenFrom: string;
+  firstSeenTo: string;
   jobType: string;
+  lastSeenFrom: string;
+  lastSeenTo: string;
   location: string;
   maxSalary: string;
   maxScore: string;
@@ -23,7 +27,11 @@ export const DEFAULT_JOB_FILTERS: JobFilterValues = {
   company: "",
   datePostedFrom: "",
   datePostedTo: "",
+  firstSeenFrom: "",
+  firstSeenTo: "",
   jobType: "",
+  lastSeenFrom: "",
+  lastSeenTo: "",
   location: "",
   maxSalary: "",
   maxScore: "",
@@ -63,7 +71,11 @@ export function buildJobListParams(
     company: filters.company || undefined,
     date_posted_from: filters.datePostedFrom || undefined,
     date_posted_to: filters.datePostedTo || undefined,
+    first_seen_from: filters.firstSeenFrom || undefined,
+    first_seen_to: filters.firstSeenTo || undefined,
     job_types: filters.jobType ? [filters.jobType] : undefined,
+    last_seen_from: filters.lastSeenFrom || undefined,
+    last_seen_to: filters.lastSeenTo || undefined,
     limit: pageSize,
     location: filters.location || undefined,
     max_salary: numericFilter(filters.maxSalary),

@@ -1,4 +1,4 @@
-import { Chip } from "@heroui/react";
+import { Button, Card, CardContent, Chip, Input } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
@@ -7,11 +7,14 @@ import {
   deleteJobs,
   exportJobs,
   getFacets,
+  searchSimilarJobs,
   setApplied,
   setBookmarked
 } from "../../api/client";
-import type { JobRecord } from "../../api/types";
+import type { ExportFormat, JobRecord, SemanticJobResult } from "../../api/types";
+import { AlertBanner } from "../../components/AlertBanner";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { PageHeader } from "../../components/PageHeader";
 import { JobActionsBar } from "./JobActionsBar";
 import { JobDetailPanel } from "./JobDetailPanel";
 import { JobFiltersPanel } from "./JobFiltersPanel";
@@ -25,10 +28,10 @@ import {
 import { jobsQuery } from "./jobQueries";
 
 type PendingCommand =
-  | { action: "blacklist"; jobIds: string[] }
-  | { action: "delete"; jobIds: string[] };
+  | { action: "blacklist"; jobIds: string[]; jobTitle?: string }
+  | { action: "delete"; jobIds: string[]; jobTitle?: string };
 
-const PAGE_SIZE = 100;
+const DEFAULT_PAGE_SIZE = 100;
 
 function saveBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -42,12 +45,16 @@ function saveBlob(blob: Blob, filename: string) {
 export function JobsPage() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<JobFilterValues>(DEFAULT_JOB_FILTERS);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectedJob, setSelectedJob] = useState<JobRecord | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [mutationMessage, setMutationMessage] = useState<string | null>(null);
   const [pendingCommand, setPendingCommand] = useState<PendingCommand | null>(null);
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("csv");
+  const [semanticQuery, setSemanticQuery] = useState("");
+  const [semanticResults, setSemanticResults] = useState<SemanticJobResult[]>([]);
 
   const filterKey = useMemo(() => jobFilterKey(filters), [filters]);
 
@@ -62,7 +69,7 @@ export function JobsPage() {
     setSelectedJob(null);
   }, [page]);
 
-  const params = useMemo(() => buildJobListParams(filters, page, PAGE_SIZE), [filters, page]);
+  const params = useMemo(() => buildJobListParams(filters, page, pageSize), [filters, page, pageSize]);
 
   const { data, isLoading, isError } = useQuery(jobsQuery(params));
   const facets = useQuery({
@@ -77,11 +84,11 @@ export function JobsPage() {
       return;
     }
 
-    const lastPage = Math.max(0, Math.ceil(data.total / PAGE_SIZE) - 1);
+    const lastPage = Math.max(0, Math.ceil(data.total / pageSize) - 1);
     if (page > lastPage) {
       setPage(lastPage);
     }
-  }, [data?.total, page]);
+  }, [data?.total, page, pageSize]);
 
   useEffect(() => {
     setSelectedJob((current) => {
@@ -92,7 +99,7 @@ export function JobsPage() {
     });
   }, [jobs]);
 
-  const pageCount = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
   const canGoBack = page > 0;
   const canGoForward = page + 1 < pageCount;
 
@@ -196,8 +203,8 @@ export function JobsPage() {
     mutationFn: (payload: { jobIds?: string[] }) =>
       exportJobs(
         payload.jobIds?.length
-          ? { format: "csv", job_ids: payload.jobIds }
-          : { filters: params, format: "csv" }
+          ? { format: exportFormat, job_ids: payload.jobIds }
+          : { filters: params, format: exportFormat }
       ),
     onError: mutationFailure,
     onMutate: () => {
@@ -205,8 +212,20 @@ export function JobsPage() {
       setMutationMessage(null);
     },
     onSuccess: (blob) => {
-      saveBlob(blob, "jobs.csv");
+      saveBlob(blob, `jobs.${exportFormat}`);
       commandSuccess("Export generated.");
+    }
+  });
+  const semanticMutation = useMutation({
+    mutationFn: searchSimilarJobs,
+    onError: mutationFailure,
+    onMutate: () => {
+      setMutationError(null);
+      setMutationMessage(null);
+    },
+    onSuccess: (results) => {
+      setSemanticResults(results);
+      commandSuccess("Semantic search completed.");
     }
   });
 
@@ -235,6 +254,30 @@ export function JobsPage() {
     setMutationMessage(null);
   };
 
+  const updatePageSize = (nextPageSize: number) => {
+    setPageSize(nextPageSize);
+    setPage(0);
+    setSelectedIds(new Set());
+    setSelectedJob(null);
+  };
+
+  const requestCommand = (action: PendingCommand["action"], jobIds: string[], jobTitle?: string) => {
+    setPendingCommand({ action, jobIds, jobTitle });
+  };
+
+  const runSemanticSearch = () => {
+    const q = semanticQuery.trim();
+    if (!q) {
+      return;
+    }
+    semanticMutation.mutate({
+      min_score: filters.minScore ? Number(filters.minScore) : undefined,
+      n_results: 10,
+      q,
+      site: filters.site || undefined
+    });
+  };
+
   const confirmPendingCommand = () => {
     if (!pendingCommand) {
       return;
@@ -248,30 +291,28 @@ export function JobsPage() {
 
   const pendingTitle =
     pendingCommand?.action === "blacklist"
-      ? "Blacklist selected jobs?"
-      : "Delete selected jobs permanently?";
+      ? pendingCommand.jobTitle
+        ? `Blacklist ${pendingCommand.jobTitle}?`
+        : "Blacklist selected jobs?"
+      : pendingCommand?.jobTitle
+        ? `Delete ${pendingCommand.jobTitle} permanently?`
+        : "Delete selected jobs permanently?";
   const pendingDescription =
     pendingCommand?.action === "blacklist"
       ? "Blacklisting removes these active jobs and blocks matching jobs from being imported again."
       : "Permanent delete removes these active jobs without adding them to the blacklist. They can be rediscovered in a future search.";
 
   return (
-    <section className="mx-auto grid max-w-[1500px] gap-4" aria-label="Jobs">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold text-zinc-950">Jobs</h2>
-          <p className="mt-1 text-sm text-zinc-500">
-            {data?.total ?? 0} active records, {selectedIds.size} selected
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {(facets.data?.sites ?? []).slice(0, 4).map((facet) => (
-            <Chip key={String(facet.value)} color="default" size="sm" variant="soft">
-              {String(facet.value)} {facet.count}
-            </Chip>
-          ))}
-        </div>
-      </div>
+    <section className="mx-auto grid min-w-0 max-w-[1500px] gap-4" aria-label="Jobs">
+      <PageHeader
+        chips={(facets.data?.sites ?? []).slice(0, 4).map((facet) => (
+          <Chip key={String(facet.value)} color="default" size="sm" variant="soft">
+            {String(facet.value)} {facet.count}
+          </Chip>
+        ))}
+        description={`${data?.total ?? 0} active records, ${selectedIds.size} selected`}
+        title="Jobs"
+      />
 
       <JobFiltersPanel
         facets={facets.data}
@@ -284,9 +325,58 @@ export function JobsPage() {
         visibleJobs={jobs}
       />
 
+      <Card className="w-full min-w-0 border border-zinc-200 bg-white shadow-sm" variant="default">
+        <CardContent className="grid min-w-0 gap-3 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <label className="grid min-w-0 gap-1.5 text-sm font-medium text-zinc-700">
+            <span>Semantic search</span>
+            <Input
+              aria-label="Semantic search"
+              fullWidth
+              onChange={(event) => setSemanticQuery(event.target.value)}
+              placeholder="Find jobs similar to a role, stack, or responsibility"
+              value={semanticQuery}
+              variant="secondary"
+            />
+          </label>
+          <Button
+            className="w-full sm:w-auto"
+            isDisabled={!semanticQuery.trim() || semanticMutation.isPending}
+            onPress={runSemanticSearch}
+            variant="primary"
+          >
+            Search similar jobs
+          </Button>
+          {semanticResults.length > 0 ? (
+            <div className="grid gap-2 md:col-span-2">
+              {semanticResults.slice(0, 5).map((result) => (
+                <button
+                  className="grid gap-1 rounded-md border border-zinc-200 px-3 py-2 text-left text-sm hover:bg-zinc-50"
+                  key={result.job_id}
+                  onClick={() => {
+                    const match = jobs.find((job) => job.job_id === result.job_id);
+                    if (match) {
+                      setSelectedJob(match);
+                    }
+                  }}
+                  type="button"
+                >
+                  <span className="font-semibold text-zinc-950">{result.title ?? result.job_id}</span>
+                  <span className="text-xs text-zinc-500">
+                    {Math.round(result.similarity * 100)}% match
+                    {result.company ? ` / ${result.company}` : ""}
+                    {result.site ? ` / ${result.site}` : ""}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
       <JobActionsBar
         canGoBack={canGoBack}
         canGoForward={canGoForward}
+        exportFormat={exportFormat}
         isAppliedPending={bulkAppliedMutation.isPending}
         isBlacklistPending={blacklistMutation.isPending}
         isBookmarkPending={bulkBookmarkMutation.isPending}
@@ -294,39 +384,42 @@ export function JobsPage() {
         isExportPending={exportMutation.isPending}
         isLoading={isLoading}
         jobsCount={jobs.length}
-        onBlacklistSelected={() => setPendingCommand({ action: "blacklist", jobIds: [...selectedIds] })}
-        onDeleteSelected={() => setPendingCommand({ action: "delete", jobIds: [...selectedIds] })}
+        onBlacklistSelected={() => requestCommand("blacklist", [...selectedIds])}
+        onDeleteSelected={() => requestCommand("delete", [...selectedIds])}
         onExportFiltered={() => exportMutation.mutate({})}
+        onExportFormatChange={setExportFormat}
         onExportSelected={() => exportMutation.mutate({ jobIds: [...selectedIds] })}
         onMarkAppliedSelected={() => bulkAppliedMutation.mutate({ jobIds: [...selectedIds], value: true })}
         onMarkNotAppliedSelected={() => bulkAppliedMutation.mutate({ jobIds: [...selectedIds], value: false })}
         onNextPage={() => setPage((value) => value + 1)}
+        onPageSizeChange={updatePageSize}
         onPreviousPage={() => setPage((value) => value - 1)}
         onSaveSelected={() => bulkBookmarkMutation.mutate({ jobIds: [...selectedIds], value: true })}
         onUnsaveSelected={() => bulkBookmarkMutation.mutate({ jobIds: [...selectedIds], value: false })}
         page={page}
         pageCount={pageCount}
+        pageSize={pageSize}
         selectedCount={selectedIds.size}
       />
 
       {mutationError ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
-          {mutationError}
-        </div>
+        <AlertBanner kind="danger">{mutationError}</AlertBanner>
       ) : null}
       {mutationMessage ? (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">
-          {mutationMessage}
-        </div>
+        <AlertBanner kind="success">{mutationMessage}</AlertBanner>
       ) : null}
 
       <div className={selectedJob ? "grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]" : "grid gap-4"}>
         <JobTable
           isAppliedPending={appliedMutation.isPending}
+          isBlacklistPending={blacklistMutation.isPending}
           isBookmarkPending={bookmarkMutation.isPending}
+          isDeletePending={deleteMutation.isPending}
           isError={isError}
           isLoading={isLoading}
           jobs={jobs}
+          onBlacklistJob={(job) => requestCommand("blacklist", [job.job_id], job.title)}
+          onDeleteJob={(job) => requestCommand("delete", [job.job_id], job.title)}
           onSelectJob={setSelectedJob}
           onToggleApplied={(job) => appliedMutation.mutate(job)}
           onToggleBookmarked={(job) => bookmarkMutation.mutate(job)}
@@ -340,8 +433,9 @@ export function JobsPage() {
             isBlacklistPending={blacklistMutation.isPending}
             isBookmarkPending={bookmarkMutation.isPending}
             job={selectedJob}
-            onBlacklist={(job) => setPendingCommand({ action: "blacklist", jobIds: [job.job_id] })}
+            onBlacklist={(job) => requestCommand("blacklist", [job.job_id], job.title)}
             onClose={() => setSelectedJob(null)}
+            onDelete={(job) => requestCommand("delete", [job.job_id], job.title)}
             onToggleApplied={(job) => appliedMutation.mutate(job)}
             onToggleBookmarked={(job) => bookmarkMutation.mutate(job)}
           />

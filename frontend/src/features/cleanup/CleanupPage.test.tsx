@@ -83,6 +83,9 @@ test("renders cleanup preview counts", async () => {
   expect(await screen.findByText("8")).toBeInTheDocument();
   expect(screen.getByText("Below score")).toBeInTheDocument();
   expect(screen.getByText("Blacklist purge")).toBeInTheDocument();
+  expect(screen.getByText("Score threshold")).toBeInTheDocument();
+  expect(screen.getByText("Stale days")).toBeInTheDocument();
+  expect(screen.getByText("Blacklist age")).toBeInTheDocument();
 });
 
 test("runs configured and manual cleanup commands", async () => {
@@ -91,6 +94,9 @@ test("runs configured and manual cleanup commands", async () => {
 
   fireEvent.click(screen.getByLabelText("Confirm cleanup"));
   fireEvent.click(screen.getByRole("button", { name: "Run configured cleanup" }));
+  expect(runCleanup).not.toHaveBeenCalled();
+  expect(screen.getByRole("heading", { name: "Run configured cleanup?" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm configured cleanup" }));
   await waitFor(() => expect(runCleanup).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(screen.getByRole("button", { name: "Delete below score" })).not.toBeDisabled());
 

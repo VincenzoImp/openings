@@ -322,13 +322,30 @@ def test_semantic_search_with_vector_store(
 
     job_service._vs = mock_vector_store
 
-    response = client.get("/api/jobs/search/semantic", params={"q": "machine learning"})
+    response = client.get(
+        "/api/jobs/search/semantic",
+        params={
+            "q": "machine learning",
+            "n_results": 12,
+            "min_score": 30,
+            "site": "linkedin",
+        },
+    )
 
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
     assert data[0]["job_id"] == "abc123"
     assert data[0]["similarity"] == 0.85
+    assert data[0]["location"] == "Remote"
+    assert data[0]["site"] == "linkedin"
+    assert data[0]["job_url"] == "https://example.com/ml"
+    mock_vector_store.search.assert_called_once_with(
+        query="machine learning",
+        n_results=12,
+        min_score=30,
+        site="linkedin",
+    )
 
 
 def test_put_bookmark_is_explicit_and_idempotent(client: TestClient) -> None:

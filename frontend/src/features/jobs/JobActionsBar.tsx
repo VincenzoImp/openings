@@ -1,9 +1,12 @@
 import { Button } from "@heroui/react";
 import { Bookmark, Check, Download, Trash2, X } from "lucide-react";
 
+import type { ExportFormat } from "../../api/types";
+
 interface JobActionsBarProps {
   canGoBack: boolean;
   canGoForward: boolean;
+  exportFormat: ExportFormat;
   isAppliedPending: boolean;
   isBlacklistPending: boolean;
   isBookmarkPending: boolean;
@@ -14,21 +17,25 @@ interface JobActionsBarProps {
   onBlacklistSelected: () => void;
   onDeleteSelected: () => void;
   onExportFiltered: () => void;
+  onExportFormatChange: (format: ExportFormat) => void;
   onExportSelected: () => void;
   onMarkAppliedSelected: () => void;
   onMarkNotAppliedSelected: () => void;
   onNextPage: () => void;
   onPreviousPage: () => void;
+  onPageSizeChange: (pageSize: number) => void;
   onSaveSelected: () => void;
   onUnsaveSelected: () => void;
   page: number;
   pageCount: number;
+  pageSize: number;
   selectedCount: number;
 }
 
 export function JobActionsBar({
   canGoBack,
   canGoForward,
+  exportFormat,
   isAppliedPending,
   isBlacklistPending,
   isBookmarkPending,
@@ -39,23 +46,38 @@ export function JobActionsBar({
   onBlacklistSelected,
   onDeleteSelected,
   onExportFiltered,
+  onExportFormatChange,
   onExportSelected,
   onMarkAppliedSelected,
   onMarkNotAppliedSelected,
   onNextPage,
+  onPageSizeChange,
   onPreviousPage,
   onSaveSelected,
   onUnsaveSelected,
   page,
   pageCount,
+  pageSize,
   selectedCount
 }: JobActionsBarProps) {
   const hasSelection = selectedCount > 0;
 
   return (
-    <div className="grid gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
+    <div className="grid w-full min-w-0 gap-3">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap gap-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+            <span>Export</span>
+            <select
+              aria-label="Export format"
+              className="h-9 min-w-0 rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 shadow-sm outline-none focus:border-zinc-950 focus:ring-2 focus:ring-zinc-100"
+              onChange={(event) => onExportFormatChange(event.target.value as ExportFormat)}
+              value={exportFormat}
+            >
+              <option value="csv">CSV</option>
+              <option value="json">JSON</option>
+            </select>
+          </label>
           <Button isDisabled={isExportPending || jobsCount === 0} onPress={onExportFiltered} variant="outline">
             <Download aria-hidden="true" size={16} />
             Export filtered
@@ -85,7 +107,7 @@ export function JobActionsBar({
             Mark not applied
           </Button>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex min-w-0 flex-wrap gap-2">
           <Button
             isDisabled={!hasSelection || isBlacklistPending}
             onPress={onBlacklistSelected}
@@ -104,7 +126,21 @@ export function JobActionsBar({
           </Button>
         </div>
       </div>
-      <div className="flex items-center gap-2 text-sm text-zinc-600" aria-label="Pagination">
+      <div className="flex flex-wrap items-center gap-2 text-sm text-zinc-600" aria-label="Pagination">
+        <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+          <span>Rows</span>
+          <select
+            aria-label="Page size"
+            className="h-9 min-w-0 rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 shadow-sm outline-none focus:border-zinc-950 focus:ring-2 focus:ring-zinc-100"
+            onChange={(event) => onPageSizeChange(Number(event.target.value))}
+            value={pageSize}
+          >
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={200}>200</option>
+          </select>
+        </label>
         <Button isDisabled={!canGoBack || isLoading} onPress={onPreviousPage} variant="outline">
           Previous page
         </Button>

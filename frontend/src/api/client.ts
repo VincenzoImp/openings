@@ -9,6 +9,7 @@ import type {
   JobListParams,
   JobListResponse,
   JobRecord,
+  SemanticJobResult,
   ScoreDistribution,
   StatsResponse
 } from "./types";
@@ -141,6 +142,22 @@ export function getFacets(): Promise<FacetsResponse> {
 
 export function getJob(jobId: string): Promise<JobRecord> {
   return request<JobRecord>(`/jobs/${encodeURIComponent(jobId)}`);
+}
+
+export function searchSimilarJobs(params: {
+  q: string;
+  n_results?: number;
+  min_score?: number;
+  site?: string;
+}): Promise<SemanticJobResult[]> {
+  return request<SemanticJobResult[]>(
+    `/jobs/search/semantic${query({
+      q: params.q,
+      n_results: params.n_results,
+      min_score: params.min_score,
+      site: params.site
+    })}`
+  );
 }
 
 export function setBookmarked(

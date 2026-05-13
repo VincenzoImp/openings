@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import { getDistribution, getFacets, getStats } from "../../api/client";
 import type { FacetItem } from "../../api/types";
+import { AlertBanner } from "../../components/AlertBanner";
+import { PageHeader } from "../../components/PageHeader";
 
 function scoreLabel(binStart: number) {
   return `${binStart}-${binStart + 4}`;
@@ -29,16 +31,19 @@ export function AnalyticsPage() {
 
   return (
     <section className="mx-auto grid max-w-[1500px] gap-4" aria-label="Analytics">
-      {hasError ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
-          Unable to load analytics data.
-        </div>
-      ) : null}
+      <PageHeader
+        description="Score, source, and pipeline health across the job database"
+        title="Analytics"
+      />
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      {hasError ? <AlertBanner kind="danger">Unable to load analytics data.</AlertBanner> : null}
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
         <Metric label="Total jobs" value={stats.data?.total_jobs ?? 0} />
         <Metric label="Seen today" value={stats.data?.seen_today ?? 0} />
+        <Metric label="New today" value={stats.data?.new_today ?? 0} />
         <Metric label="Applied" value={stats.data?.applied ?? 0} />
+        <Metric label="Blacklisted" value={stats.data?.blacklisted ?? 0} />
         <Metric label="Average score" value={stats.data?.avg_relevance_score ?? 0} />
       </div>
 

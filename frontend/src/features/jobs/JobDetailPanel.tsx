@@ -11,6 +11,7 @@ interface JobDetailPanelProps {
   job: JobRecord;
   onBlacklist: (job: JobRecord) => void;
   onClose: () => void;
+  onDelete: (job: JobRecord) => void;
   onToggleApplied: (job: JobRecord) => void;
   onToggleBookmarked: (job: JobRecord) => void;
 }
@@ -22,6 +23,7 @@ export function JobDetailPanel({
   job,
   onBlacklist,
   onClose,
+  onDelete,
   onToggleApplied,
   onToggleBookmarked
 }: JobDetailPanelProps) {
@@ -62,6 +64,10 @@ export function JobDetailPanel({
           <Button isDisabled={isBlacklistPending} onPress={() => onBlacklist(job)} variant="danger">
             <Trash2 aria-hidden="true" size={16} />
             Blacklist
+          </Button>
+          <Button onPress={() => onDelete(job)} variant="danger">
+            <X aria-hidden="true" size={16} />
+            Delete job
           </Button>
         </div>
         <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">

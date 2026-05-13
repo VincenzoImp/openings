@@ -49,8 +49,11 @@ beforeEach(() => {
 test("renders analytics stats and score distribution", async () => {
   renderAnalyticsPage();
 
+  expect(await screen.findByRole("heading", { name: "Analytics" })).toBeInTheDocument();
   expect(await screen.findByText("42")).toBeInTheDocument();
   expect(screen.getByText("32.5")).toBeInTheDocument();
+  expect(screen.getByText("New today")).toBeInTheDocument();
+  expect(screen.getByText("Blacklisted")).toBeInTheDocument();
   expect(screen.getByText("40-44")).toBeInTheDocument();
   expect(screen.getAllByText("5").length).toBeGreaterThan(0);
   expect(await screen.findByText("Acme Corp")).toBeInTheDocument();

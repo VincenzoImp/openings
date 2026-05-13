@@ -1,5 +1,5 @@
-import { Button, Card, CardContent } from "@heroui/react";
-import { AlertTriangle } from "lucide-react";
+import { AlertDialog, Button } from "@heroui/react";
+import { useEffect } from "react";
 
 export interface ConfirmDialogProps {
   confirmLabel: string;
@@ -20,37 +20,53 @@ export function ConfirmDialog({
   onConfirm,
   title
 }: ConfirmDialogProps) {
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isPending) {
+        onCancel();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isPending, onCancel]);
+
   if (!isOpen) {
     return null;
   }
 
   return (
-    <div
-      aria-modal="true"
-      className="fixed inset-0 z-50 grid place-items-center bg-zinc-950/40 p-4"
-      role="dialog"
+    <AlertDialog
+      isOpen={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          onCancel();
+        }
+      }}
     >
-      <Card className="w-full max-w-md border border-red-200 shadow-xl" variant="default">
-        <CardContent className="grid gap-5 p-5">
-          <div className="flex items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-md bg-red-50 text-red-700">
-              <AlertTriangle aria-hidden="true" size={20} />
-            </span>
-            <div>
-              <h2 className="text-lg font-semibold text-zinc-950">{title}</h2>
-              <p className="mt-1 text-sm leading-6 text-zinc-600">{description}</p>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button isDisabled={isPending} onPress={onCancel} variant="outline">
-              Cancel
-            </Button>
-            <Button isDisabled={isPending} onPress={onConfirm} variant="danger">
-              {confirmLabel}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+      <AlertDialog.Trigger className="sr-only" aria-hidden="true" />
+      <AlertDialog.Backdrop isDismissable isKeyboardDismissDisabled={false} variant="blur">
+        <AlertDialog.Container placement="center" size="md">
+          <AlertDialog.Dialog>
+            <AlertDialog.Header>
+              <AlertDialog.Icon status="danger" />
+              <AlertDialog.Heading>{title}</AlertDialog.Heading>
+            </AlertDialog.Header>
+            <AlertDialog.Body>{description}</AlertDialog.Body>
+            <AlertDialog.Footer>
+              <Button isDisabled={isPending} onPress={onCancel} variant="outline">
+                Cancel
+              </Button>
+              <Button autoFocus isDisabled={isPending} onPress={onConfirm} variant="danger">
+                {confirmLabel}
+              </Button>
+            </AlertDialog.Footer>
+          </AlertDialog.Dialog>
+        </AlertDialog.Container>
+      </AlertDialog.Backdrop>
+    </AlertDialog>
   );
 }

@@ -27,6 +27,7 @@ vi.mock("./features/cleanup/CleanupPage", () => ({
 }));
 
 beforeEach(() => {
+  window.history.pushState(null, "", "/");
   vi.mocked(getDashboardAuthStatus).mockResolvedValue({ token_required: false });
   vi.mocked(getDashboardToken).mockReturnValue(null);
   vi.mocked(setDashboardToken).mockReturnValue(undefined);
@@ -52,12 +53,23 @@ test("navigates between console workspaces", async () => {
 
   fireEvent.click(screen.getByRole("button", { name: "Blacklist" }));
   expect(screen.getByText("Blacklist view")).toBeInTheDocument();
+  expect(window.location.search).toBe("?view=blacklist");
 
   fireEvent.click(screen.getByRole("button", { name: "Cleanup" }));
   expect(screen.getByText("Cleanup view")).toBeInTheDocument();
+  expect(window.location.search).toBe("?view=cleanup");
 
   fireEvent.click(screen.getByRole("button", { name: "Analytics" }));
   expect(screen.getByText("Analytics view")).toBeInTheDocument();
+  expect(window.location.search).toBe("?view=analytics");
+});
+
+test("opens the workspace requested by the URL", async () => {
+  window.history.pushState(null, "", "/?view=analytics");
+
+  render(<App />);
+
+  expect(await screen.findByText("Analytics view")).toBeInTheDocument();
 });
 
 test("shows a token gate when the API requires dashboard authentication", async () => {

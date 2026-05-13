@@ -1,10 +1,12 @@
 import { Button, Card, CardContent, CardHeader, Chip, Input } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RotateCcw, Search, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { listBlacklistedJobs, purgeBlacklist, unblacklistJobs } from "../../api/client";
+import { AlertBanner } from "../../components/AlertBanner";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { PageHeader } from "../../components/PageHeader";
 
 function optionalPositiveInteger(value: string): number | undefined | null {
   if (!value.trim()) {
@@ -20,16 +22,23 @@ function optionalPositiveInteger(value: string): number | undefined | null {
 export function BlacklistPage() {
   const queryClient = useQueryClient();
   const [text, setText] = useState("");
+  const [company, setCompany] = useState("");
+  const [location, setLocation] = useState("");
   const [olderThanDays, setOlderThanDays] = useState("");
+  const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmPurge, setConfirmPurge] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const limit = 100;
   const params = useMemo(
     () => ({
-      limit: 100,
+      company: company || undefined,
+      limit,
+      location: location || undefined,
+      offset: page * limit,
       text: text || undefined
     }),
-    [text]
+    [company, limit, location, page, text]
   );
   const blacklist = useQuery({
     queryKey: ["blacklist", params],
@@ -37,6 +46,15 @@ export function BlacklistPage() {
     staleTime: 15_000
   });
   const rows = blacklist.data?.items ?? [];
+  const pageCount = Math.max(1, Math.ceil((blacklist.data?.total ?? 0) / limit));
+  const canGoBack = page > 0;
+  const canGoForward = page + 1 < pageCount;
+
+  useEffect(() => {
+    setPage(0);
+    setSelectedIds(new Set());
+  }, [company, location, text]);
+
   const invalidate = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ["blacklist"] }),
@@ -77,58 +95,83 @@ export function BlacklistPage() {
 
   return (
     <section className="mx-auto grid max-w-[1500px] gap-4" aria-label="Blacklist">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold text-zinc-950">Blacklist</h2>
-          <p className="mt-1 text-sm text-zinc-500">
-            {blacklist.data?.total ?? 0} blocked job fingerprints
-          </p>
-        </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <Input
-            aria-label="Search blacklist"
-            onChange={(event) => setText(event.target.value)}
-            placeholder="Search title, company, location"
-            value={text}
-            variant="secondary"
-          />
-          <Input
-            aria-label="Blacklist age days"
-            min="1"
-            onChange={(event) => setOlderThanDays(event.target.value)}
-            placeholder="Age days"
-            type="number"
-            value={olderThanDays}
-            variant="secondary"
-          />
-          <Button
-            isDisabled={selectedIds.size === 0 || unblacklistMutation.isPending}
-            onPress={() => unblacklistMutation.mutate([...selectedIds])}
-            variant="outline"
-          >
-            <RotateCcw aria-hidden="true" size={16} />
-            Unblacklist selected
-          </Button>
-          <Button
-            isDisabled={purgeMutation.isPending || purgeAge === null}
-            onPress={() => setConfirmPurge(true)}
-            variant="danger"
-          >
-            <Trash2 aria-hidden="true" size={16} />
-            {olderThanDays ? "Purge aged blacklist" : "Purge all"}
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        actions={
+          <>
+            <Button
+              isDisabled={selectedIds.size === 0 || unblacklistMutation.isPending}
+              onPress={() => unblacklistMutation.mutate([...selectedIds])}
+              variant="outline"
+            >
+              <RotateCcw aria-hidden="true" size={16} />
+              Unblacklist selected
+            </Button>
+            <Button
+              isDisabled={purgeMutation.isPending || purgeAge === null}
+              onPress={() => setConfirmPurge(true)}
+              variant="danger"
+            >
+              <Trash2 aria-hidden="true" size={16} />
+              {olderThanDays ? "Purge aged blacklist" : "Purge all"}
+            </Button>
+          </>
+        }
+        description={`${blacklist.data?.total ?? 0} blocked job fingerprints`}
+        title="Blacklist"
+      />
+
+      <Card className="border border-zinc-200 bg-white shadow-sm" variant="default">
+        <CardContent className="grid gap-3 p-4 lg:grid-cols-[minmax(220px,1fr)_180px_180px_160px] lg:items-end">
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
+            <span>Search</span>
+            <Input
+              aria-label="Search blacklist"
+              onChange={(event) => setText(event.target.value)}
+              placeholder="Search title, company, location"
+              value={text}
+              variant="secondary"
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
+            <span>Company</span>
+            <Input
+              aria-label="Blacklist company"
+              onChange={(event) => setCompany(event.target.value)}
+              placeholder="Company"
+              value={company}
+              variant="secondary"
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
+            <span>Location</span>
+            <Input
+              aria-label="Blacklist location"
+              onChange={(event) => setLocation(event.target.value)}
+              placeholder="Location"
+              value={location}
+              variant="secondary"
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
+            <span>Age days</span>
+            <Input
+              aria-label="Blacklist age days"
+              min="1"
+              onChange={(event) => setOlderThanDays(event.target.value)}
+              placeholder="Age days"
+              type="number"
+              value={olderThanDays}
+              variant="secondary"
+            />
+          </label>
+        </CardContent>
+      </Card>
 
       {mutationError ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
-          {mutationError}
-        </div>
+        <AlertBanner kind="danger">{mutationError}</AlertBanner>
       ) : null}
       {blacklist.isError ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
-          Unable to load blacklist entries.
-        </div>
+        <AlertBanner kind="danger">Unable to load blacklist entries.</AlertBanner>
       ) : null}
 
       <Card className="border border-zinc-200 shadow-sm" variant="default">
@@ -142,43 +185,66 @@ export function BlacklistPage() {
           </Chip>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <div className="min-w-[760px]">
-              <div className="grid grid-cols-[44px_minmax(240px,2fr)_minmax(160px,1fr)_180px_180px] border-y border-zinc-200 bg-zinc-100 px-4 py-3 text-xs font-bold uppercase text-zinc-500">
-                <span />
-                <span>Role</span>
-                <span>Company</span>
-                <span>Location</span>
-                <span>Blacklisted</span>
-              </div>
-              {blacklist.isLoading ? (
-                <div className="px-4 py-5 text-sm text-zinc-500">Loading blacklist</div>
-              ) : null}
-              {rows.map((job) => (
-                <div
-                  className="grid min-h-14 grid-cols-[44px_minmax(240px,2fr)_minmax(160px,1fr)_180px_180px] items-center border-b border-zinc-100 px-4 py-2 text-sm"
-                  key={job.job_id}
-                >
-                  <input
-                    aria-label={`Select ${job.title}`}
-                    checked={selectedIds.has(job.job_id)}
-                    className="size-4 accent-zinc-950"
-                    onChange={() => toggleSelected(job.job_id)}
-                    type="checkbox"
-                  />
-                  <span className="font-semibold text-zinc-950">{job.title}</span>
-                  <span className="truncate text-zinc-700">{job.company}</span>
-                  <span className="truncate text-zinc-600">{job.location}</span>
-                  <span className="text-zinc-500">{job.blacklisted_at}</span>
-                </div>
-              ))}
-              {!blacklist.isLoading && rows.length === 0 ? (
-                <div className="px-4 py-8 text-sm text-zinc-500">No blacklist entries</div>
-              ) : null}
-            </div>
+          <div className="hidden grid-cols-[44px_minmax(240px,2fr)_minmax(160px,1fr)_180px_180px] border-y border-zinc-200 bg-zinc-100 px-4 py-3 text-xs font-bold uppercase text-zinc-500 md:grid">
+            <span />
+            <span>Role</span>
+            <span>Company</span>
+            <span>Location</span>
+            <span>Blacklisted</span>
           </div>
+          {blacklist.isLoading ? (
+            <div className="px-4 py-5 text-sm text-zinc-500">Loading blacklist</div>
+          ) : null}
+          {rows.map((job) => (
+            <div
+              className="grid min-h-20 grid-cols-[32px_minmax(0,1fr)] items-start gap-2 border-b border-zinc-100 px-4 py-3 text-sm md:min-h-14 md:grid-cols-[44px_minmax(240px,2fr)_minmax(160px,1fr)_180px_180px] md:items-center md:gap-0 md:py-2"
+              key={job.job_id}
+            >
+              <input
+                aria-label={`Select ${job.title}`}
+                checked={selectedIds.has(job.job_id)}
+                className="size-4 accent-zinc-950"
+                onChange={() => toggleSelected(job.job_id)}
+                type="checkbox"
+              />
+              <span className="grid gap-1 font-semibold text-zinc-950">
+                {job.title}
+                <small className="font-normal text-zinc-500 md:hidden">
+                  {job.company} / {job.location} / {job.blacklisted_at}
+                </small>
+              </span>
+              <span className="hidden truncate text-zinc-700 md:inline">{job.company}</span>
+              <span className="hidden truncate text-zinc-600 md:inline">{job.location}</span>
+              <span className="hidden text-zinc-500 md:inline">{job.blacklisted_at}</span>
+            </div>
+          ))}
+          {!blacklist.isLoading && rows.length === 0 ? (
+            <div className="px-4 py-8 text-sm text-zinc-500">No blacklist entries</div>
+          ) : null}
         </CardContent>
       </Card>
+      <div
+        className="flex flex-wrap items-center gap-2 text-sm text-zinc-600"
+        aria-label="Blacklist pagination"
+      >
+        <Button
+          isDisabled={!canGoBack || blacklist.isLoading}
+          onPress={() => setPage((value) => value - 1)}
+          variant="outline"
+        >
+          Previous blacklist page
+        </Button>
+        <span className="min-w-24 text-center">
+          Page {page + 1} of {pageCount}
+        </span>
+        <Button
+          isDisabled={!canGoForward || blacklist.isLoading}
+          onPress={() => setPage((value) => value + 1)}
+          variant="outline"
+        >
+          Next blacklist page
+        </Button>
+      </div>
       <ConfirmDialog
         confirmLabel="Confirm purge blacklist"
         description={
