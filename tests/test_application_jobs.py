@@ -140,6 +140,26 @@ def test_list_jobs_sorts_by_date(seeded_db: JobDatabase) -> None:
     ]
 
 
+def test_list_jobs_supports_console_filters(seeded_db: JobDatabase) -> None:
+    from job_search_tool.application.jobs import JobApplicationService
+    from job_search_tool.application.models import JobListQuery
+
+    service = JobApplicationService(seeded_db)
+
+    result = service.list_jobs(
+        JobListQuery(
+            sites=["indeed"],
+            location="san",
+            job_types=["fulltime"],
+            date_posted_from=date(2026, 5, 1),
+            sort="title",
+        )
+    )
+
+    assert result.total == 1
+    assert [job.title for job in result.jobs] == ["Data Scientist"]
+
+
 def test_set_bookmarked_is_idempotent(seeded_db: JobDatabase) -> None:
     from job_search_tool.application.jobs import JobApplicationService
 
@@ -154,6 +174,22 @@ def test_set_bookmarked_is_idempotent(seeded_db: JobDatabase) -> None:
     assert first.bookmarked is True
     assert second.bookmarked is True
     assert seeded_db.get_job_by_id(job.job_id).bookmarked is True  # type: ignore[union-attr]
+
+
+def test_set_bookmarked_updates_multiple_jobs(seeded_db: JobDatabase) -> None:
+    from job_search_tool.application.jobs import JobApplicationService
+
+    service = JobApplicationService(seeded_db)
+    jobs = service.list_jobs().jobs[:2]
+    job_ids = [jobs[0].job_id, jobs[1].job_id, jobs[0].job_id]
+
+    result = service.set_bookmarked(job_ids, True)
+
+    assert result.success is True
+    assert result.affected_count == 2
+    assert result.job_ids == [jobs[0].job_id, jobs[1].job_id]
+    assert result.bookmarked is True
+    assert all(seeded_db.get_job_by_id(job.job_id).bookmarked for job in jobs)  # type: ignore[union-attr]
 
 
 def test_set_applied_is_idempotent(seeded_db: JobDatabase) -> None:
@@ -172,6 +208,21 @@ def test_set_applied_is_idempotent(seeded_db: JobDatabase) -> None:
     assert seeded_db.get_job_by_id(job.job_id).applied is True  # type: ignore[union-attr]
 
 
+def test_set_applied_updates_multiple_jobs(seeded_db: JobDatabase) -> None:
+    from job_search_tool.application.jobs import JobApplicationService
+
+    service = JobApplicationService(seeded_db)
+    jobs = service.list_jobs().jobs[:2]
+
+    result = service.set_applied([job.job_id for job in jobs], True)
+
+    assert result.success is True
+    assert result.affected_count == 2
+    assert result.job_ids == [job.job_id for job in jobs]
+    assert result.applied is True
+    assert all(seeded_db.get_job_by_id(job.job_id).applied for job in jobs)  # type: ignore[union-attr]
+
+
 def test_blacklist_jobs_reports_removed_count(seeded_db: JobDatabase) -> None:
     from job_search_tool.application.jobs import JobApplicationService
 
@@ -184,6 +235,87 @@ def test_blacklist_jobs_reports_removed_count(seeded_db: JobDatabase) -> None:
     assert result.affected_count == 1
     assert seeded_db.get_job_by_id(job.job_id) is None
     assert seeded_db.is_job_blacklisted(job.job_id) is True
+
+
+def test_blacklist_unblacklist_and_delete_use_command_envelopes(
+    seeded_db: JobDatabase,
+) -> None:
+    from job_search_tool.application.jobs import JobApplicationService
+
+    service = JobApplicationService(seeded_db)
+    jobs = service.list_jobs().jobs
+    blacklist_id = jobs[0].job_id
+    delete_id = jobs[1].job_id
+
+    blacklisted = service.blacklist_jobs([blacklist_id, blacklist_id])
+    unblacklisted = service.unblacklist_jobs([blacklist_id])
+    deleted = service.delete_jobs([delete_id])
+
+    assert blacklisted.success is True
+    assert blacklisted.affected_count == 1
+    assert blacklisted.job_ids == [blacklist_id]
+    assert unblacklisted.success is True
+    assert unblacklisted.affected_count == 1
+    assert unblacklisted.job_ids == [blacklist_id]
+    assert deleted.success is True
+    assert deleted.affected_count == 1
+    assert deleted.job_ids == [delete_id]
+    assert seeded_db.is_job_blacklisted(blacklist_id) is False
+    assert seeded_db.get_job_by_id(blacklist_id) is None
+    assert seeded_db.is_job_blacklisted(delete_id) is False
+    assert seeded_db.get_job_by_id(delete_id) is None
+
+
+def test_blacklist_query_and_facets(seeded_db: JobDatabase) -> None:
+    from job_search_tool.application.jobs import JobApplicationService
+    from job_search_tool.application.models import BlacklistListQuery
+
+    service = JobApplicationService(seeded_db)
+    job = next(job for job in service.list_jobs().jobs if job.title == "Data Scientist")
+    service.blacklist_jobs([job.job_id])
+
+    blacklist = service.list_blacklisted_jobs(BlacklistListQuery(text="data"))
+    facets = service.get_facets()
+
+    assert blacklist.total == 1
+    assert blacklist.items[0].job_id == job.job_id
+    assert blacklist.limit == 100
+    assert facets["sites"] == [
+        {"value": "indeed", "count": 1},
+        {"value": "linkedin", "count": 1},
+    ]
+    assert facets["remote"] == [
+        {"value": False, "count": 1},
+        {"value": True, "count": 1},
+    ]
+
+
+def test_manual_cleanup_commands(seeded_db: JobDatabase) -> None:
+    from job_search_tool.application.jobs import JobApplicationService
+
+    service = JobApplicationService(seeded_db)
+    stale = service.delete_stale_jobs(30)
+    below_score = service.delete_jobs_below_score(35)
+
+    assert stale.success is True
+    assert stale.affected_count == 1
+    assert below_score.success is False
+    assert below_score.affected_count == 0
+
+
+def test_export_jobs_selected_as_json(seeded_db: JobDatabase) -> None:
+    from job_search_tool.application.jobs import JobApplicationService
+
+    service = JobApplicationService(seeded_db)
+    selected = service.list_jobs().jobs[:2]
+
+    exported = service.export_jobs(job_ids=[job.job_id for job in selected], fmt="json")
+
+    assert exported.media_type == "application/json"
+    assert exported.filename == "jobs.json"
+    assert exported.row_count == 2
+    assert b"Backend Engineer" in exported.content
+    assert b"Data Scientist" in exported.content
 
 
 def test_cleanup_preview_matches_cleanup_execution(seeded_db: JobDatabase) -> None:

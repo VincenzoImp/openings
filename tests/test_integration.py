@@ -445,21 +445,23 @@ def test_mcp_full_workflow():
 
         # list_jobs
         result = json.loads(list_jobs())
-        assert len(result) == 5
+        assert result["total"] == 5
+        items = result["items"]
+        assert len(items) == 5
         # Should be sorted by score descending
-        scores = [j["relevance_score"] for j in result]
+        scores = [j["relevance_score"] for j in items]
         assert scores == sorted(scores, reverse=True)
         # No description in summaries
-        assert all("description" not in j for j in result)
+        assert all("description" not in j for j in items)
 
         # get_job with full detail
-        job_id = result[0]["job_id"]
+        job_id = items[0]["job_id"]
         detail = json.loads(get_job(job_id))
         assert "description" in detail
         assert detail["job_id"] == job_id
 
         # explicit bookmark command
-        bm_result = json.loads(set_bookmarked(job_id, True))
+        bm_result = json.loads(set_bookmarked([job_id], True))
         assert bm_result["bookmarked"] is True
 
         # get_statistics
@@ -467,7 +469,7 @@ def test_mcp_full_workflow():
         assert stats["total_jobs"] == 5
 
         # blacklist a different job
-        deleted_job_id = result[-1]["job_id"]
+        deleted_job_id = items[-1]["job_id"]
         del_result = json.loads(blacklist_jobs([deleted_job_id]))
         assert del_result["affected_count"] == 1
 

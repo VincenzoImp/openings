@@ -6,10 +6,11 @@ import { AnalyticsPage } from "./AnalyticsPage";
 
 vi.mock("../../api/client", () => ({
   getDistribution: vi.fn(),
+  getFacets: vi.fn(),
   getStats: vi.fn()
 }));
 
-import { getDistribution, getStats } from "../../api/client";
+import { getDistribution, getFacets, getStats } from "../../api/client";
 
 function renderAnalyticsPage() {
   const queryClient = new QueryClient({
@@ -36,6 +37,13 @@ beforeEach(() => {
     [20, 7],
     [40, 5]
   ]);
+  vi.mocked(getFacets).mockResolvedValue({
+    companies: [{ count: 5, value: "Acme Corp" }],
+    job_types: [{ count: 6, value: "fulltime" }],
+    locations: [{ count: 7, value: "Remote" }],
+    remote: [{ count: 8, value: true }],
+    sites: [{ count: 9, value: "indeed" }]
+  });
 });
 
 test("renders analytics stats and score distribution", async () => {
@@ -44,5 +52,7 @@ test("renders analytics stats and score distribution", async () => {
   expect(await screen.findByText("42")).toBeInTheDocument();
   expect(screen.getByText("32.5")).toBeInTheDocument();
   expect(screen.getByText("40-44")).toBeInTheDocument();
-  expect(screen.getByText("5")).toBeInTheDocument();
+  expect(screen.getAllByText("5").length).toBeGreaterThan(0);
+  expect(await screen.findByText("Acme Corp")).toBeInTheDocument();
+  expect(screen.getByText("fulltime")).toBeInTheDocument();
 });

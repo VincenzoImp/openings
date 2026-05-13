@@ -254,3 +254,14 @@ class JobDBRecord:
             company_url=company_url,
             relevance_score=job.relevance_score,
         )
+
+
+@dataclass(frozen=True)
+class BlacklistedJobRecord:
+    """Database record for a job hidden from future search imports."""
+
+    job_id: str
+    title: str
+    company: str
+    location: str
+    blacklisted_at: str

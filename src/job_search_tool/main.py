@@ -294,8 +294,8 @@ def _send_empty_notification(config: Config, db: JobDatabase) -> None:
         notification_data = create_notification_data(
             new_jobs=[],
             updated_count=0,
-            total_found=stats.get("seen_today", 0),
-            avg_score=stats.get("avg_relevance_score", 0),
+            total_found=int(stats.get("seen_today", 0)),
+            avg_score=float(stats.get("avg_relevance_score", 0)),
             top_jobs_overall=top_jobs_overall,
             total_jobs_in_db=total_jobs_in_db,
             notify_threshold=config.scoring.notify_threshold,

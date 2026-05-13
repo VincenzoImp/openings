@@ -1,15 +1,29 @@
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Button, Card, CardContent, Input } from "@heroui/react";
-import { BarChart3, BriefcaseBusiness, Database } from "lucide-react";
+import { BarChart3, Bookmark, BriefcaseBusiness, CheckCircle2, ShieldX, Wrench } from "lucide-react";
 import { useState } from "react";
 
 import { getDashboardAuthStatus, getDashboardToken, setDashboardToken } from "./api/client";
 import { AnalyticsPage } from "./features/analytics/AnalyticsPage";
-import { DatabasePage } from "./features/database/DatabasePage";
+import { BlacklistPage } from "./features/blacklist/BlacklistPage";
+import { CleanupPage } from "./features/cleanup/CleanupPage";
 import { JobsPage } from "./features/jobs/JobsPage";
 import "./styles.css";
 
-type View = "jobs" | "analytics" | "database";
+type View = "jobs" | "saved" | "applied" | "blacklist" | "cleanup" | "analytics";
+
+const NAV_ITEMS: {
+  icon: typeof BriefcaseBusiness;
+  label: string;
+  view: View;
+}[] = [
+  { icon: BriefcaseBusiness, label: "Jobs", view: "jobs" },
+  { icon: Bookmark, label: "Saved", view: "saved" },
+  { icon: CheckCircle2, label: "Applied", view: "applied" },
+  { icon: ShieldX, label: "Blacklist", view: "blacklist" },
+  { icon: Wrench, label: "Cleanup", view: "cleanup" },
+  { icon: BarChart3, label: "Analytics", view: "analytics" }
+];
 
 export default function App() {
   const [queryClient] = useState(
@@ -126,46 +140,34 @@ function DashboardShell({ onClearToken }: { onClearToken?: () => void }) {
   const [view, setView] = useState<View>("jobs");
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950 md:grid md:grid-cols-[260px_minmax(0,1fr)]">
-      <aside className="border-b border-slate-200 bg-white p-4 md:min-h-screen md:border-b-0 md:border-r">
+    <div className="min-h-screen bg-zinc-50 text-zinc-950 md:grid md:grid-cols-[248px_minmax(0,1fr)]">
+      <aside className="border-b border-zinc-200 bg-white p-4 md:min-h-screen md:border-b-0 md:border-r">
         <div className="flex min-h-14 items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-lg bg-emerald-700 text-sm font-bold text-white">
-            JS
+          <span className="grid size-10 place-items-center rounded-md bg-zinc-950 text-sm font-bold text-white">
+            JT
           </span>
           <div>
             <h1 className="text-lg font-semibold leading-tight">Job Search</h1>
-            <p className="text-xs text-slate-500">Pipeline Console</p>
+            <p className="text-xs text-zinc-500">Operations Console</p>
           </div>
         </div>
 
         <nav className="mt-6 grid gap-2 sm:grid-cols-3 md:grid-cols-1" aria-label="Primary">
-          <Button
-            className="justify-start"
-            fullWidth
-            onPress={() => setView("jobs")}
-            variant={view === "jobs" ? "secondary" : "ghost"}
-          >
-            <BriefcaseBusiness aria-hidden="true" size={18} />
-            Jobs
-          </Button>
-          <Button
-            className="justify-start"
-            fullWidth
-            onPress={() => setView("analytics")}
-            variant={view === "analytics" ? "secondary" : "ghost"}
-          >
-            <BarChart3 aria-hidden="true" size={18} />
-            Analytics
-          </Button>
-          <Button
-            className="justify-start"
-            fullWidth
-            onPress={() => setView("database")}
-            variant={view === "database" ? "secondary" : "ghost"}
-          >
-            <Database aria-hidden="true" size={18} />
-            Database
-          </Button>
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Button
+                className="justify-start"
+                fullWidth
+                key={item.view}
+                onPress={() => setView(item.view)}
+                variant={view === item.view ? "secondary" : "ghost"}
+              >
+                <Icon aria-hidden="true" size={18} />
+                {item.label}
+              </Button>
+            );
+          })}
         </nav>
 
         {onClearToken ? (
@@ -176,9 +178,12 @@ function DashboardShell({ onClearToken }: { onClearToken?: () => void }) {
       </aside>
 
       <main className="min-w-0 p-4 md:p-6">
-        {view === "jobs" ? <JobsPage /> : null}
+        {view === "jobs" ? <JobsPage preset="all" /> : null}
+        {view === "saved" ? <JobsPage preset="saved" /> : null}
+        {view === "applied" ? <JobsPage preset="applied" /> : null}
+        {view === "blacklist" ? <BlacklistPage /> : null}
+        {view === "cleanup" ? <CleanupPage /> : null}
         {view === "analytics" ? <AnalyticsPage /> : null}
-        {view === "database" ? <DatabasePage /> : null}
       </main>
     </div>
   );

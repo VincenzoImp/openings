@@ -38,22 +38,70 @@ export interface JobListParams {
   min_score?: number;
   max_score?: number;
   site?: string;
+  sites?: string[];
   company?: string;
+  location?: string;
+  locations?: string[];
   bookmarked?: boolean;
   applied?: boolean;
   remote?: boolean;
   job_type?: string;
+  job_types?: string[];
+  min_salary?: number;
+  max_salary?: number;
+  date_posted_from?: string;
+  date_posted_to?: string;
+  first_seen_from?: string;
+  first_seen_to?: string;
+  last_seen_from?: string;
+  last_seen_to?: string;
   text?: string;
-  sort?: "score" | "date";
+  sort?: "score" | "date" | "company" | "title" | "salary";
 }
 
 export interface CommandResponse {
   success: boolean;
   affected_count: number;
-  job_id: string | null;
+  job_ids: string[];
   bookmarked: boolean | null;
   applied: boolean | null;
   message: string | null;
+}
+
+export interface FacetItem {
+  value: string | boolean;
+  count: number;
+}
+
+export interface FacetsResponse {
+  sites: FacetItem[];
+  companies: FacetItem[];
+  locations: FacetItem[];
+  job_types: FacetItem[];
+  remote: FacetItem[];
+}
+
+export interface BlacklistedJobRecord {
+  job_id: string;
+  title: string;
+  company: string;
+  location: string;
+  blacklisted_at: string;
+}
+
+export interface BlacklistListParams {
+  limit?: number;
+  offset?: number;
+  text?: string;
+  company?: string;
+  location?: string;
+}
+
+export interface BlacklistListResponse {
+  items: BlacklistedJobRecord[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 export interface StatsResponse {
@@ -75,3 +123,5 @@ export interface CleanupResponse {
 }
 
 export type ScoreDistribution = [number, number][];
+
+export type ExportFormat = "csv" | "json";

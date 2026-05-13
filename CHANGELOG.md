@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.0.0] - 2026-05-13
+
+### Breaking Changes
+
+- MCP `list_jobs` now returns a paginated object with `items`, `total`, `limit`, and `offset` instead of a bare list, matching the REST/dashboard contract.
+- MCP `set_bookmarked` and `set_applied` now take `job_ids` lists so single and bulk state changes use one command shape.
+
+### Added
+
+- Server-backed dashboard filters for location, company, multi-site, job type, salary bounds, posted-date bounds, and sort by score, date, company, title, or salary.
+- First-class permanent delete, blacklist, unblacklist, facets, manual cleanup, and export capabilities in the shared application service.
+- REST endpoints for facets, bulk bookmark/apply/delete, blacklist list/remove/purge, filtered or selected job export, and manual cleanup commands.
+- MCP tools for blacklist management, facets, permanent delete, manual cleanup, and export, aligned with REST command names.
+- Dashboard workspaces for Jobs, Saved, Applied, Blacklist, Cleanup, and Analytics.
+- Blacklist dashboard with search, selection, unblacklist, and purge workflows.
+- Cleanup dashboard with configured cleanup preview plus explicit manual delete-below-score, delete-stale, and purge-aged-blacklist commands.
+- Docker smoke script that builds the image, starts the unified web server with seeded jobs, and verifies REST, dashboard serving, export, and MCP initialize/list-tools/call-tools.
+
+### Changed
+
+- Rebuilt the job triage dashboard around a denser operations-console layout with advanced filters, bulk actions, export selected/export filtered, and a richer job inspector.
+- Dashboard API client now serializes array filters as repeated query parameters and uses the new bulk REST endpoints.
+- Analytics now includes facet summaries for sources, companies, locations, and job types.
+- Active-job delete and blacklist are clearly separated across dashboard, REST, MCP, and application service behavior.
+
+### Removed
+
+- The old dashboard `Database` view was replaced by the dedicated `Cleanup` workspace.
+
 ## [9.1.0] - 2026-05-11
 
 ### Added

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tempfile
 from contextlib import contextmanager
+from datetime import date
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -36,6 +37,9 @@ def _seed_db(db_path: Path) -> None:
             job_url="https://example.com/backend",
             job_type="fulltime",
             is_remote=True,
+            date_posted=date(2026, 5, 1),
+            min_amount=90000,
+            max_amount=130000,
         ),
         Job(
             title="Frontend Developer",
@@ -45,6 +49,9 @@ def _seed_db(db_path: Path) -> None:
             job_url="https://example.com/frontend",
             job_type="contract",
             is_remote=False,
+            date_posted=date(2026, 5, 3),
+            min_amount=70000,
+            max_amount=90000,
         ),
         Job(
             title="Data Scientist",
@@ -54,6 +61,9 @@ def _seed_db(db_path: Path) -> None:
             job_url="https://example.com/data",
             job_type="fulltime",
             is_remote=False,
+            date_posted=date(2026, 5, 5),
+            min_amount=100000,
+            max_amount=160000,
         ),
     ]
     db.save_job(jobs[0], site="linkedin")
@@ -229,6 +239,41 @@ def test_list_jobs_filters(client: TestClient) -> None:
     assert data["items"][0]["title"] == "Data Scientist"
 
 
+def test_list_jobs_console_filters_and_sort(client: TestClient) -> None:
+    response = client.get(
+        "/api/jobs",
+        params=[
+            ("sites", "indeed"),
+            ("sites", "linkedin"),
+            ("job_types", "fulltime"),
+            ("location", "san"),
+            ("min_salary", "120000"),
+            ("date_posted_from", "2026-05-01"),
+            ("sort", "title"),
+        ],
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["title"] == "Data Scientist"
+
+
+def test_get_job_facets(client: TestClient) -> None:
+    response = client.get("/api/jobs/facets")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["sites"] == [
+        {"value": "indeed", "count": 2},
+        {"value": "linkedin", "count": 1},
+    ]
+    assert data["job_types"] == [
+        {"value": "fulltime", "count": 2},
+        {"value": "contract", "count": 1},
+    ]
+
+
 def test_get_job_found(client: TestClient) -> None:
     list_response = client.get("/api/jobs")
     job_id = list_response.json()["items"][0]["job_id"]
@@ -298,6 +343,25 @@ def test_put_bookmark_is_explicit_and_idempotent(client: TestClient) -> None:
     assert second.json()["bookmarked"] is True
 
 
+def test_bulk_bookmark_command(client: TestClient) -> None:
+    job_ids = [
+        item["job_id"]
+        for item in client.get("/api/jobs", params={"limit": 2}).json()["items"]
+    ]
+
+    response = client.post(
+        "/api/jobs/bookmark",
+        json={"job_ids": [*job_ids, job_ids[0]], "bookmarked": True},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["affected_count"] == 2
+    assert data["job_ids"] == job_ids
+    assert data["bookmarked"] is True
+
+
 def test_put_applied_is_explicit_and_idempotent(client: TestClient) -> None:
     job_id = client.get("/api/jobs").json()["items"][0]["job_id"]
 
@@ -310,6 +374,25 @@ def test_put_applied_is_explicit_and_idempotent(client: TestClient) -> None:
     assert second.json()["applied"] is True
 
 
+def test_bulk_applied_command(client: TestClient) -> None:
+    job_ids = [
+        item["job_id"]
+        for item in client.get("/api/jobs", params={"limit": 2}).json()["items"]
+    ]
+
+    response = client.post(
+        "/api/jobs/applied",
+        json={"job_ids": job_ids, "applied": True},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["affected_count"] == 2
+    assert data["job_ids"] == job_ids
+    assert data["applied"] is True
+
+
 def test_blacklist_jobs(client: TestClient) -> None:
     job_id = client.get("/api/jobs").json()["items"][0]["job_id"]
 
@@ -318,6 +401,85 @@ def test_blacklist_jobs(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json()["affected_count"] == 1
     assert client.get(f"/api/jobs/{job_id}").status_code == 404
+
+
+def test_delete_jobs_is_not_blacklist(client: TestClient) -> None:
+    job_id = client.get("/api/jobs").json()["items"][0]["job_id"]
+
+    response = client.post("/api/jobs/delete", json={"job_ids": [job_id]})
+
+    assert response.status_code == 200
+    assert response.json()["affected_count"] == 1
+    assert client.get(f"/api/jobs/{job_id}").status_code == 404
+    assert client.get("/api/blacklist").json()["total"] == 0
+
+
+def test_blacklist_list_remove_and_purge(client: TestClient) -> None:
+    jobs = client.get("/api/jobs").json()["items"]
+    first_id = jobs[0]["job_id"]
+    second_id = jobs[1]["job_id"]
+
+    create = client.post("/api/blacklist", json={"job_ids": [first_id]})
+    listed = client.get("/api/blacklist", params={"text": jobs[0]["company"]})
+    removed = client.post("/api/blacklist/remove", json={"job_ids": [first_id]})
+    client.post("/api/blacklist", json={"job_ids": [second_id]})
+    purged = client.post("/api/blacklist/purge", json={})
+
+    assert create.status_code == 200
+    assert create.json()["affected_count"] == 1
+    assert listed.status_code == 200
+    assert listed.json()["total"] == 1
+    assert listed.json()["items"][0]["job_id"] == first_id
+    assert removed.status_code == 200
+    assert removed.json()["affected_count"] == 1
+    assert purged.status_code == 200
+    assert purged.json()["affected_count"] == 1
+    assert client.get("/api/blacklist").json()["total"] == 0
+
+
+def test_export_selected_jobs_as_json(client: TestClient) -> None:
+    job_ids = [
+        item["job_id"]
+        for item in client.get("/api/jobs", params={"limit": 2}).json()["items"]
+    ]
+
+    response = client.post(
+        "/api/export/jobs",
+        json={"job_ids": job_ids, "format": "json"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+    assert "attachment" in response.headers["content-disposition"]
+    data = response.json()
+    assert len(data) == 2
+    assert {item["job_id"] for item in data} == set(job_ids)
+
+
+def test_export_filtered_jobs_as_csv(client: TestClient) -> None:
+    response = client.get(
+        "/api/export/jobs",
+        params={"format": "csv", "site": "indeed", "sort": "title"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert "Data Scientist" in response.text
+    assert "Frontend Developer" in response.text
+    assert "Backend Engineer" not in response.text
+
+
+def test_manual_cleanup_routes(client: TestClient) -> None:
+    stale = client.post("/api/cleanup/delete-stale", json={"days": 0})
+    below_score = client.post("/api/cleanup/delete-below-score", json={"score": 35})
+    purge = client.post("/api/cleanup/purge-blacklist", json={})
+
+    assert stale.status_code == 200
+    assert below_score.status_code == 200
+    assert purge.status_code == 200
+    assert "affected_count" in stale.json()
+    assert "affected_count" in below_score.json()
+    assert "affected_count" in purge.json()
 
 
 def test_cleanup_preview(client: TestClient) -> None:

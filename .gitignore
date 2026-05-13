@@ -65,3 +65,4 @@ docker-compose.override.yml
 
 # Local agent settings
 .claude/
+.superpowers/

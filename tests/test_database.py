@@ -19,6 +19,80 @@ from job_search_tool.models import Job
 class TestJobDatabase:
     """Tests for JobDatabase class."""
 
+    def _save_console_jobs(self, temp_db) -> dict[str, Job]:
+        raw_jobs = {
+            "backend": (
+                "linkedin",
+                {
+                    "title": "Backend Python Engineer",
+                    "company": "Acme Labs",
+                    "location": "Rome, Italy",
+                    "description": "Python APIs and data pipelines",
+                    "job_type": "fulltime",
+                    "is_remote": True,
+                    "date_posted": "2024-05-10",
+                    "min_amount": 90000,
+                    "max_amount": 130000,
+                    "currency": "EUR",
+                    "relevance_score": 90,
+                },
+            ),
+            "platform": (
+                "indeed",
+                {
+                    "title": "Data Platform Lead",
+                    "company": "BetaWorks",
+                    "location": "Milan, Italy",
+                    "description": "Own the platform roadmap",
+                    "job_type": "contract",
+                    "is_remote": False,
+                    "date_posted": "2024-03-01",
+                    "min_amount": 70000,
+                    "max_amount": 90000,
+                    "currency": "EUR",
+                    "relevance_score": 80,
+                },
+            ),
+            "frontend": (
+                "glassdoor",
+                {
+                    "title": "Frontend Engineer",
+                    "company": "Cygnus",
+                    "location": "Berlin, Germany",
+                    "description": "React interfaces",
+                    "job_type": "fulltime",
+                    "is_remote": True,
+                    "date_posted": "2023-12-20",
+                    "min_amount": 60000,
+                    "max_amount": 85000,
+                    "currency": "EUR",
+                    "relevance_score": 70,
+                },
+            ),
+            "analyst": (
+                "linkedin",
+                {
+                    "title": "Product Analyst",
+                    "company": "Delta",
+                    "location": "Rome, Italy",
+                    "description": "Product metrics and experiments",
+                    "job_type": "parttime",
+                    "is_remote": False,
+                    "date_posted": "2024-07-15",
+                    "min_amount": 45000,
+                    "max_amount": 55000,
+                    "currency": "EUR",
+                    "relevance_score": 60,
+                },
+            ),
+        }
+        jobs: dict[str, Job] = {}
+        for key, (site, data) in raw_jobs.items():
+            job = Job.from_dict(data)
+            temp_db.save_job(job, site=site)
+            jobs[key] = job
+        return jobs
+
     def test_database_creation(self, temp_db):
         """Test database and tables are created."""
         assert temp_db.db_path.exists()
@@ -201,6 +275,122 @@ class TestJobDatabase:
         jobs = temp_db.get_jobs_by_ids([second_job.job_id, first_job.job_id])
 
         assert [job.title for job in jobs] == ["Second", "First"]
+
+    def test_query_jobs_filters_by_location_salary_and_date_bounds(self, temp_db):
+        """Dashboard filters combine location, salary, and posted-date bounds."""
+        self._save_console_jobs(temp_db)
+
+        records, total = temp_db.query_jobs(
+            location="rome",
+            min_salary=80000,
+            date_posted_from="2024-01-01",
+            date_posted_to="2024-12-31",
+        )
+
+        assert total == 1
+        assert [record.title for record in records] == ["Backend Python Engineer"]
+
+    def test_query_jobs_filters_by_multiple_sites_and_job_types(self, temp_db):
+        """Multi-select source and job-type filters are SQL-backed."""
+        self._save_console_jobs(temp_db)
+
+        records, total = temp_db.query_jobs(
+            sites=["indeed", "glassdoor"],
+            job_types=["fulltime", "contract"],
+            sort="company",
+        )
+
+        assert total == 2
+        assert [record.company for record in records] == ["BetaWorks", "Cygnus"]
+
+    def test_query_jobs_sorts_by_title_company_and_salary(self, temp_db):
+        """Console sort keys expose deterministic title/company/salary ordering."""
+        self._save_console_jobs(temp_db)
+
+        by_title, _ = temp_db.query_jobs(sort="title")
+        by_company, _ = temp_db.query_jobs(sort="company")
+        by_salary, _ = temp_db.query_jobs(sort="salary")
+
+        assert [record.title for record in by_title] == [
+            "Backend Python Engineer",
+            "Data Platform Lead",
+            "Frontend Engineer",
+            "Product Analyst",
+        ]
+        assert [record.company for record in by_company] == [
+            "Acme Labs",
+            "BetaWorks",
+            "Cygnus",
+            "Delta",
+        ]
+        assert by_salary[0].title == "Backend Python Engineer"
+
+    def test_delete_jobs_does_not_blacklist_and_allows_rediscovery(
+        self, temp_db, sample_job
+    ):
+        """Permanent delete removes the active row without blocking future saves."""
+        temp_db.save_job(sample_job)
+
+        assert temp_db.delete_jobs([sample_job.job_id]) == 1
+
+        assert temp_db.job_exists(sample_job.job_id) is False
+        assert temp_db.is_job_blacklisted(sample_job.job_id) is False
+        assert temp_db.save_job(sample_job) is True
+        assert temp_db.job_exists(sample_job.job_id) is True
+
+    def test_list_blacklisted_jobs_returns_filtered_paginated_rows(self, temp_db):
+        """Blacklist management can list and search blocked jobs."""
+        jobs = self._save_console_jobs(temp_db)
+        temp_db.blacklist_jobs([jobs["backend"].job_id, jobs["platform"].job_id])
+
+        records, total = temp_db.list_blacklisted_jobs(limit=1, text="acme")
+
+        assert total == 1
+        assert len(records) == 1
+        assert records[0].job_id == jobs["backend"].job_id
+        assert records[0].title == "Backend Python Engineer"
+        assert records[0].company == "Acme Labs"
+        assert records[0].location == "Rome, Italy"
+        assert records[0].blacklisted_at
+
+    def test_unblacklist_jobs_removes_block_without_restoring_active_job(
+        self, temp_db, sample_job
+    ):
+        """Unblacklist permits rediscovery but does not recreate deleted rows."""
+        temp_db.save_job(sample_job)
+        temp_db.blacklist_job(sample_job.job_id)
+
+        assert temp_db.unblacklist_jobs([sample_job.job_id]) == 1
+
+        assert temp_db.is_job_blacklisted(sample_job.job_id) is False
+        assert temp_db.job_exists(sample_job.job_id) is False
+        assert temp_db.save_job(sample_job) is True
+        assert temp_db.job_exists(sample_job.job_id) is True
+
+    def test_get_facets_returns_dashboard_filter_counts(self, temp_db):
+        """Facets summarize active jobs only for dashboard filters."""
+        jobs = self._save_console_jobs(temp_db)
+        temp_db.blacklist_job(jobs["frontend"].job_id)
+
+        facets = temp_db.get_facets()
+
+        assert facets["sites"] == [
+            {"value": "linkedin", "count": 2},
+            {"value": "indeed", "count": 1},
+        ]
+        assert facets["locations"] == [
+            {"value": "Rome, Italy", "count": 2},
+            {"value": "Milan, Italy", "count": 1},
+        ]
+        assert facets["job_types"] == [
+            {"value": "contract", "count": 1},
+            {"value": "fulltime", "count": 1},
+            {"value": "parttime", "count": 1},
+        ]
+        assert facets["remote"] == [
+            {"value": False, "count": 2},
+            {"value": True, "count": 1},
+        ]
 
     def test_mark_as_applied(self, temp_db, sample_job):
         """Test mark_as_applied updates job status."""

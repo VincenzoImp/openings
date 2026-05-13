@@ -14,10 +14,18 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { blacklistJobs, setApplied, setBookmarked } from "../../api/client";
-import type { JobRecord } from "../../api/types";
+import {
+  blacklistJobs,
+  deleteJobs,
+  exportJobs,
+  getFacets,
+  setApplied,
+  setBookmarked
+} from "../../api/client";
+import type { JobListParams, JobRecord } from "../../api/types";
 import { jobsQuery } from "./jobQueries";
 
+type JobsPagePreset = "all" | "saved" | "applied";
 type StatusFilter = "all" | "bookmarked" | "applied" | "open";
 
 const PAGE_SIZE = 100;
@@ -66,44 +74,52 @@ function statusChip(job: JobRecord) {
   );
 }
 
-function csvCell(value: string | number | boolean | null) {
-  return `"${String(value ?? "").replaceAll("\"", "\"\"")}"`;
+function salaryLabel(job: JobRecord) {
+  if (job.min_amount === null && job.max_amount === null) {
+    return "unknown";
+  }
+  const currency = job.currency ?? "";
+  const min = job.min_amount !== null ? `${currency} ${job.min_amount.toLocaleString()}` : "";
+  const max = job.max_amount !== null ? `${currency} ${job.max_amount.toLocaleString()}` : "";
+  return [min, max].filter(Boolean).join(" - ");
 }
 
-function exportJobsCsv(jobs: JobRecord[]) {
-  const columns = ["title", "company", "location", "site", "relevance_score", "applied", "bookmarked"];
-  const lines = [
-    columns.join(","),
-    ...jobs.map((job) =>
-      [
-        job.title,
-        job.company,
-        job.location,
-        job.site,
-        job.relevance_score,
-        job.applied,
-        job.bookmarked
-      ]
-        .map(csvCell)
-        .join(",")
-    )
-  ];
-  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+function Meta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
+      <span className="text-xs font-bold uppercase text-slate-500">{label}</span>
+      <span className="truncate text-slate-800">{value}</span>
+    </div>
+  );
+}
+
+function saveBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "jobs.csv";
+  link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
 }
 
-export function JobsPage() {
+export function JobsPage({ preset = "all" }: { preset?: JobsPagePreset }) {
   const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [text, setText] = useState("");
   const [minScore, setMinScore] = useState("");
+  const [maxScore, setMaxScore] = useState("");
   const [site, setSite] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("all");
+  const [company, setCompany] = useState("");
+  const [location, setLocation] = useState("");
+  const [jobType, setJobType] = useState("");
+  const [minSalary, setMinSalary] = useState("");
+  const [maxSalary, setMaxSalary] = useState("");
+  const [datePostedFrom, setDatePostedFrom] = useState("");
+  const [datePostedTo, setDatePostedTo] = useState("");
+  const [sort, setSort] = useState<JobListParams["sort"]>("score");
+  const [status, setStatus] = useState<StatusFilter>(
+    preset === "saved" ? "bookmarked" : preset === "applied" ? "applied" : "all"
+  );
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -111,9 +127,46 @@ export function JobsPage() {
   const [mutationError, setMutationError] = useState<string | null>(null);
 
   const filterKey = useMemo(
-    () => JSON.stringify({ minScore, remoteOnly, site, status, text }),
-    [minScore, remoteOnly, site, status, text]
+    () =>
+      JSON.stringify({
+        company,
+        datePostedFrom,
+        datePostedTo,
+        jobType,
+        location,
+        maxSalary,
+        maxScore,
+        minSalary,
+        minScore,
+        preset,
+        remoteOnly,
+        site,
+        sort,
+        status,
+        text
+      }),
+    [
+      company,
+      datePostedFrom,
+      datePostedTo,
+      jobType,
+      location,
+      maxSalary,
+      maxScore,
+      minSalary,
+      minScore,
+      preset,
+      remoteOnly,
+      site,
+      sort,
+      status,
+      text
+    ]
   );
+
+  useEffect(() => {
+    setStatus(preset === "saved" ? "bookmarked" : preset === "applied" ? "applied" : "all");
+  }, [preset]);
 
   useEffect(() => {
     setPage(0);
@@ -126,22 +179,51 @@ export function JobsPage() {
     setSelectedJob(null);
   }, [page]);
 
-  const params = useMemo(
+  const params = useMemo<JobListParams>(
     () => ({
       applied: status === "applied" ? true : status === "open" ? false : undefined,
       bookmarked: status === "bookmarked" ? true : status === "open" ? false : undefined,
+      company: company || undefined,
+      date_posted_from: datePostedFrom || undefined,
+      date_posted_to: datePostedTo || undefined,
+      job_types: jobType ? [jobType] : undefined,
       limit: PAGE_SIZE,
+      location: location || undefined,
+      max_salary: maxSalary ? Number(maxSalary) : undefined,
+      max_score: maxScore ? Number(maxScore) : undefined,
+      min_salary: minSalary ? Number(minSalary) : undefined,
       min_score: minScore ? Number(minScore) : undefined,
       offset: page * PAGE_SIZE,
       remote: remoteOnly ? true : undefined,
-      site: site || undefined,
-      sort: "score" as const,
+      sites: site ? [site] : undefined,
+      sort,
       text: text || undefined
     }),
-    [minScore, page, remoteOnly, site, status, text]
+    [
+      company,
+      datePostedFrom,
+      datePostedTo,
+      jobType,
+      location,
+      maxSalary,
+      maxScore,
+      minSalary,
+      minScore,
+      page,
+      remoteOnly,
+      site,
+      sort,
+      status,
+      text
+    ]
   );
 
   const { data, isLoading, isError } = useQuery(jobsQuery(params));
+  const facets = useQuery({
+    queryKey: ["job-facets"],
+    queryFn: getFacets,
+    staleTime: 60_000
+  });
   const jobs = data?.items ?? [];
 
   useEffect(() => {
@@ -190,19 +272,21 @@ export function JobsPage() {
       queryClient.invalidateQueries({ queryKey: ["jobs"] }),
       queryClient.invalidateQueries({ queryKey: ["stats"] }),
       queryClient.invalidateQueries({ queryKey: ["distribution"] }),
-      queryClient.invalidateQueries({ queryKey: ["cleanup-preview"] })
+      queryClient.invalidateQueries({ queryKey: ["cleanup-preview"] }),
+      queryClient.invalidateQueries({ queryKey: ["blacklist"] }),
+      queryClient.invalidateQueries({ queryKey: ["job-facets"] })
     ]);
   const mutationFailure = (error: Error) => {
     setMutationError(error.message || "Dashboard command failed");
   };
   const bookmarkMutation = useMutation({
-    mutationFn: (job: JobRecord) => setBookmarked(job.job_id, !job.bookmarked),
+    mutationFn: (job: JobRecord) => setBookmarked([job.job_id], !job.bookmarked),
     onError: mutationFailure,
     onMutate: () => setMutationError(null),
     onSuccess: invalidateDashboardData
   });
   const appliedMutation = useMutation({
-    mutationFn: (job: JobRecord) => setApplied(job.job_id, !job.applied),
+    mutationFn: (job: JobRecord) => setApplied([job.job_id], !job.applied),
     onError: mutationFailure,
     onMutate: () => setMutationError(null),
     onSuccess: invalidateDashboardData
@@ -215,6 +299,39 @@ export function JobsPage() {
       setSelectedIds(new Set());
       return invalidateDashboardData();
     }
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (jobIds: string[]) => deleteJobs(jobIds),
+    onError: mutationFailure,
+    onMutate: () => setMutationError(null),
+    onSuccess: () => {
+      setSelectedIds(new Set());
+      return invalidateDashboardData();
+    }
+  });
+  const bulkBookmarkMutation = useMutation({
+    mutationFn: ({ jobIds, value }: { jobIds: string[]; value: boolean }) =>
+      setBookmarked(jobIds, value),
+    onError: mutationFailure,
+    onMutate: () => setMutationError(null),
+    onSuccess: invalidateDashboardData
+  });
+  const bulkAppliedMutation = useMutation({
+    mutationFn: ({ jobIds, value }: { jobIds: string[]; value: boolean }) => setApplied(jobIds, value),
+    onError: mutationFailure,
+    onMutate: () => setMutationError(null),
+    onSuccess: invalidateDashboardData
+  });
+  const exportMutation = useMutation({
+    mutationFn: (payload: { jobIds?: string[] }) =>
+      exportJobs(
+        payload.jobIds?.length
+          ? { format: "csv", job_ids: payload.jobIds }
+          : { filters: params, format: "csv" }
+      ),
+    onError: mutationFailure,
+    onMutate: () => setMutationError(null),
+    onSuccess: (blob) => saveBlob(blob, "jobs.csv")
   });
 
   const toggleSelected = (jobId: string) => {
@@ -231,14 +348,33 @@ export function JobsPage() {
 
   return (
     <section className="mx-auto grid max-w-[1500px] gap-4" aria-label="Jobs">
-      <Card className="border border-slate-200 shadow-sm" variant="default">
-        <div className="flex flex-wrap items-end gap-3 p-4">
-          <label className="grid min-w-72 flex-1 gap-1 text-sm font-medium text-slate-700">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold text-zinc-950">
+            {preset === "saved" ? "Saved jobs" : preset === "applied" ? "Applied jobs" : "Jobs"}
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            {data?.total ?? 0} active records, {selectedIds.size} selected
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {(facets.data?.sites ?? []).slice(0, 4).map((facet) => (
+            <Chip key={String(facet.value)} color="default" size="sm" variant="soft">
+              {String(facet.value)} {facet.count}
+            </Chip>
+          ))}
+        </div>
+      </div>
+
+      <Card className="border border-zinc-200 shadow-sm" variant="default">
+        <div className="grid gap-3 p-4">
+          <div className="grid gap-3 lg:grid-cols-[minmax(240px,2fr)_repeat(4,minmax(120px,1fr))]">
+            <label className="grid gap-1 text-sm font-medium text-zinc-700">
             <span>Search</span>
             <div className="relative">
               <Search
                 aria-hidden="true"
-                className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-400"
+                  className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-zinc-400"
                 size={16}
               />
               <Input
@@ -252,8 +388,59 @@ export function JobsPage() {
               />
             </div>
           </label>
-          <label className="grid min-w-36 gap-1 text-sm font-medium text-slate-700">
-            <span>Minimum score</span>
+            <label className="grid gap-1 text-sm font-medium text-zinc-700">
+              <span>Company</span>
+              <Input
+                aria-label="Company"
+                onChange={(event) => setCompany(event.target.value)}
+                value={company}
+                variant="secondary"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-medium text-zinc-700">
+              <span>Location</span>
+              <Input
+                aria-label="Location"
+                onChange={(event) => setLocation(event.target.value)}
+                value={location}
+                variant="secondary"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-medium text-zinc-700">
+              <span>Site</span>
+              <Input
+                aria-label="Site"
+                list="job-sites"
+                onChange={(event) => setSite(event.target.value)}
+                value={site}
+                variant="secondary"
+              />
+              <datalist id="job-sites">
+                {(facets.data?.sites ?? []).map((facet) => (
+                  <option key={String(facet.value)} value={String(facet.value)} />
+                ))}
+              </datalist>
+            </label>
+            <label className="grid gap-1 text-sm font-medium text-zinc-700">
+              <span>Job type</span>
+              <Input
+                aria-label="Job type"
+                list="job-types"
+                onChange={(event) => setJobType(event.target.value)}
+                value={jobType}
+                variant="secondary"
+              />
+              <datalist id="job-types">
+                {(facets.data?.job_types ?? []).map((facet) => (
+                  <option key={String(facet.value)} value={String(facet.value)} />
+                ))}
+              </datalist>
+            </label>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-8">
+            <label className="grid gap-1 text-sm font-medium text-zinc-700">
+              <span>Min score</span>
             <Input
               aria-label="Minimum score"
               max="100"
@@ -264,20 +451,65 @@ export function JobsPage() {
               variant="secondary"
             />
           </label>
-          <label className="grid min-w-36 gap-1 text-sm font-medium text-slate-700">
-            <span>Site</span>
+            <label className="grid gap-1 text-sm font-medium text-zinc-700">
+              <span>Max score</span>
             <Input
-              aria-label="Site"
-              onChange={(event) => setSite(event.target.value)}
-              value={site}
+                aria-label="Maximum score"
+                max="100"
+                min="0"
+                onChange={(event) => setMaxScore(event.target.value)}
+                type="number"
+                value={maxScore}
               variant="secondary"
             />
           </label>
-          <label className="grid min-w-36 gap-1 text-sm font-medium text-slate-700">
+            <label className="grid gap-1 text-sm font-medium text-zinc-700">
+              <span>Min salary</span>
+              <Input
+                aria-label="Minimum salary"
+                min="0"
+                onChange={(event) => setMinSalary(event.target.value)}
+                type="number"
+                value={minSalary}
+                variant="secondary"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-medium text-zinc-700">
+              <span>Max salary</span>
+              <Input
+                aria-label="Maximum salary"
+                min="0"
+                onChange={(event) => setMaxSalary(event.target.value)}
+                type="number"
+                value={maxSalary}
+                variant="secondary"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-medium text-zinc-700">
+              <span>Posted from</span>
+              <Input
+                aria-label="Date posted from"
+                onChange={(event) => setDatePostedFrom(event.target.value)}
+                type="date"
+                value={datePostedFrom}
+                variant="secondary"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-medium text-zinc-700">
+              <span>Posted to</span>
+              <Input
+                aria-label="Date posted to"
+                onChange={(event) => setDatePostedTo(event.target.value)}
+                type="date"
+                value={datePostedTo}
+                variant="secondary"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-medium text-zinc-700">
             <span>Status</span>
             <select
               aria-label="Status"
-              className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 shadow-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 shadow-sm outline-none focus:border-zinc-950 focus:ring-2 focus:ring-zinc-100"
               onChange={(event) => setStatus(event.target.value as StatusFilter)}
               value={status}
             >
@@ -287,26 +519,83 @@ export function JobsPage() {
               <option value="applied">Applied</option>
             </select>
           </label>
-          <label className="flex h-10 items-center gap-2 text-sm font-semibold text-slate-700">
+            <label className="grid gap-1 text-sm font-medium text-zinc-700">
+              <span>Sort</span>
+              <select
+                aria-label="Sort"
+                className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 shadow-sm outline-none focus:border-zinc-950 focus:ring-2 focus:ring-zinc-100"
+                onChange={(event) => setSort(event.target.value as JobListParams["sort"])}
+                value={sort}
+              >
+                <option value="score">Score</option>
+                <option value="date">Date</option>
+                <option value="company">Company</option>
+                <option value="title">Title</option>
+                <option value="salary">Salary</option>
+              </select>
+            </label>
+          </div>
+          <label className="flex h-10 items-center gap-2 text-sm font-semibold text-zinc-700">
             <input
               checked={remoteOnly}
-              className="size-4 accent-emerald-700"
+              className="size-4 accent-zinc-950"
               onChange={(event) => setRemoteOnly(event.target.checked)}
               type="checkbox"
             />
             Remote
           </label>
-          <Chip color="default" size="sm" variant="soft">
-            {data?.total ?? 0} jobs
-          </Chip>
         </div>
       </Card>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
-          <Button isDisabled={jobs.length === 0} onPress={() => exportJobsCsv(jobs)} variant="outline">
+          <Button
+            isDisabled={exportMutation.isPending || jobs.length === 0}
+            onPress={() => exportMutation.mutate({})}
+            variant="outline"
+          >
             <Download aria-hidden="true" size={16} />
-            Export CSV
+            Export filtered
+          </Button>
+          <Button
+            isDisabled={selectedIds.size === 0 || exportMutation.isPending}
+            onPress={() => exportMutation.mutate({ jobIds: [...selectedIds] })}
+            variant="outline"
+          >
+            <Download aria-hidden="true" size={16} />
+            Export selected
+          </Button>
+          <Button
+            isDisabled={selectedIds.size === 0 || bulkBookmarkMutation.isPending}
+            onPress={() => bulkBookmarkMutation.mutate({ jobIds: [...selectedIds], value: true })}
+            variant="outline"
+          >
+            <Bookmark aria-hidden="true" size={16} />
+            Save selected
+          </Button>
+          <Button
+            isDisabled={selectedIds.size === 0 || bulkBookmarkMutation.isPending}
+            onPress={() => bulkBookmarkMutation.mutate({ jobIds: [...selectedIds], value: false })}
+            variant="outline"
+          >
+            <Bookmark aria-hidden="true" size={16} />
+            Unsave selected
+          </Button>
+          <Button
+            isDisabled={selectedIds.size === 0 || bulkAppliedMutation.isPending}
+            onPress={() => bulkAppliedMutation.mutate({ jobIds: [...selectedIds], value: true })}
+            variant="outline"
+          >
+            <Check aria-hidden="true" size={16} />
+            Mark applied
+          </Button>
+          <Button
+            isDisabled={selectedIds.size === 0 || bulkAppliedMutation.isPending}
+            onPress={() => bulkAppliedMutation.mutate({ jobIds: [...selectedIds], value: false })}
+            variant="outline"
+          >
+            <Check aria-hidden="true" size={16} />
+            Mark not applied
           </Button>
           <Button
             isDisabled={selectedIds.size === 0 || blacklistMutation.isPending}
@@ -316,8 +605,16 @@ export function JobsPage() {
             <Trash2 aria-hidden="true" size={16} />
             Blacklist selected
           </Button>
+          <Button
+            isDisabled={selectedIds.size === 0 || deleteMutation.isPending}
+            onPress={() => deleteMutation.mutate([...selectedIds])}
+            variant="danger"
+          >
+            <X aria-hidden="true" size={16} />
+            Delete selected
+          </Button>
         </div>
-        <div className="flex items-center gap-2 text-sm text-slate-600" aria-label="Pagination">
+        <div className="flex items-center gap-2 text-sm text-zinc-600" aria-label="Pagination">
           <Button isDisabled={!canGoBack || isLoading} onPress={() => setPage((value) => value - 1)} variant="outline">
             Previous page
           </Button>
@@ -461,6 +758,40 @@ export function JobsPage() {
                 </Chip>
                 <span>{selectedJob.location}</span>
                 <span>{selectedJob.site ?? "unknown"}</span>
+              </div>
+              <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                <Meta label="Salary" value={salaryLabel(selectedJob)} />
+                <Meta label="Type" value={selectedJob.job_type ?? "unknown"} />
+                <Meta label="Remote" value={selectedJob.is_remote ? "Yes" : "No"} />
+                <Meta label="Date posted" value={selectedJob.date_posted ?? "unknown"} />
+                <Meta label="First seen" value={selectedJob.first_seen ?? "unknown"} />
+                <Meta label="Last seen" value={selectedJob.last_seen ?? "unknown"} />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  isDisabled={bookmarkMutation.isPending}
+                  onPress={() => bookmarkMutation.mutate(selectedJob)}
+                  variant="outline"
+                >
+                  <Bookmark aria-hidden="true" size={16} />
+                  {selectedJob.bookmarked ? "Unsave" : "Save"}
+                </Button>
+                <Button
+                  isDisabled={appliedMutation.isPending}
+                  onPress={() => appliedMutation.mutate(selectedJob)}
+                  variant="outline"
+                >
+                  <Check aria-hidden="true" size={16} />
+                  {selectedJob.applied ? "Mark not applied" : "Mark applied"}
+                </Button>
+                <Button
+                  isDisabled={blacklistMutation.isPending}
+                  onPress={() => blacklistMutation.mutate([selectedJob.job_id])}
+                  variant="danger"
+                >
+                  <Trash2 aria-hidden="true" size={16} />
+                  Blacklist
+                </Button>
               </div>
               <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">
                 {selectedJob.description ?? "No description available."}

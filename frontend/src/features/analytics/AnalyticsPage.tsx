@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, Chip } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 
-import { getDistribution, getStats } from "../../api/client";
+import { getDistribution, getFacets, getStats } from "../../api/client";
+import type { FacetItem } from "../../api/types";
 
 function scoreLabel(binStart: number) {
   return `${binStart}-${binStart + 4}`;
@@ -17,6 +18,11 @@ export function AnalyticsPage() {
     queryKey: ["distribution"],
     queryFn: getDistribution,
     staleTime: 30_000
+  });
+  const facets = useQuery({
+    queryKey: ["job-facets"],
+    queryFn: getFacets,
+    staleTime: 60_000
   });
   const maxCount = Math.max(...(distribution.data?.map(([, count]) => count) ?? [1]));
 
@@ -51,6 +57,13 @@ export function AnalyticsPage() {
           ))}
         </CardContent>
       </Card>
+
+      <div className="grid gap-4 xl:grid-cols-4">
+        <FacetSummary title="Sources" items={facets.data?.sites ?? []} />
+        <FacetSummary title="Companies" items={facets.data?.companies ?? []} />
+        <FacetSummary title="Locations" items={facets.data?.locations ?? []} />
+        <FacetSummary title="Job types" items={facets.data?.job_types ?? []} />
+      </div>
     </section>
   );
 }
@@ -61,6 +74,33 @@ function Metric({ label, value }: { label: string; value: number }) {
       <CardContent className="grid min-h-24 gap-2 p-4">
         <span className="text-xs font-bold uppercase text-slate-500">{label}</span>
         <strong className="text-3xl font-semibold leading-none text-slate-950">{value}</strong>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FacetSummary({ title, items }: { title: string; items: FacetItem[] }) {
+  const max = Math.max(...items.map((item) => item.count), 1);
+  return (
+    <Card className="border border-slate-200 shadow-sm" variant="default">
+      <CardHeader className="p-4">
+        <h3 className="text-base font-semibold text-slate-950">{title}</h3>
+      </CardHeader>
+      <CardContent className="grid gap-3 p-4 pt-0">
+        {items.slice(0, 6).map((item) => (
+          <div className="grid gap-1" key={String(item.value)}>
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="truncate text-slate-700">{String(item.value)}</span>
+              <strong className="text-slate-950">{item.count}</strong>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-zinc-900"
+                style={{ width: `${Math.max(8, (item.count / max) * 100)}%` }}
+              />
+            </div>
+          </div>
+        ))}
       </CardContent>
     </Card>
   );

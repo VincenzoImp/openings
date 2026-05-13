@@ -21,7 +21,12 @@ if TYPE_CHECKING:
     from job_search_tool.config import Config
 
 from job_search_tool.logger import get_logger
-from job_search_tool.models import Job, JobDBRecord, generate_job_id
+from job_search_tool.models import (
+    BlacklistedJobRecord,
+    Job,
+    JobDBRecord,
+    generate_job_id,
+)
 from job_search_tool.scoring import calculate_relevance_score
 
 _JOB_FIELD_NAMES = (
@@ -365,6 +370,24 @@ class JobDatabase:
         )
         return df_with_ids
 
+    @staticmethod
+    def _date_filter_value(value: date | datetime | str | None) -> str | None:
+        """Return an ISO-ish date string suitable for SQLite date comparisons."""
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value.date().isoformat()
+        if isinstance(value, date):
+            return value.isoformat()
+        return str(value)
+
+    @staticmethod
+    def _unique_non_empty(values: list[str] | tuple[str, ...] | None) -> list[str]:
+        """Return deduplicated, truthy string values while preserving order."""
+        if not values:
+            return []
+        return list(dict.fromkeys(value for value in values if value))
+
     def job_exists(self, job_id: str) -> bool:
         """
         Check if job exists in database.
@@ -688,11 +711,23 @@ class JobDatabase:
         min_score: int | None = None,
         max_score: int | None = None,
         site: str | None = None,
+        sites: list[str] | None = None,
         company: str | None = None,
+        location: str | None = None,
+        locations: list[str] | None = None,
         bookmarked: bool | None = None,
         applied: bool | None = None,
         remote: bool | None = None,
         job_type: str | None = None,
+        job_types: list[str] | None = None,
+        min_salary: float | None = None,
+        max_salary: float | None = None,
+        date_posted_from: date | datetime | str | None = None,
+        date_posted_to: date | datetime | str | None = None,
+        first_seen_from: date | datetime | str | None = None,
+        first_seen_to: date | datetime | str | None = None,
+        last_seen_from: date | datetime | str | None = None,
+        last_seen_to: date | datetime | str | None = None,
         text: str | None = None,
         sort: str = "score",
     ) -> tuple[list[JobDBRecord], int]:
@@ -709,12 +744,24 @@ class JobDatabase:
         if max_score is not None:
             where.append("relevance_score <= ?")
             params.append(max_score)
-        if site:
-            where.append("LOWER(site) = LOWER(?)")
-            params.append(site)
+        site_values = self._unique_non_empty([site] if site else []) + (
+            self._unique_non_empty(sites)
+        )
+        if site_values:
+            placeholders = ",".join("?" * len(site_values))
+            where.append(f"LOWER(site) IN ({placeholders})")
+            params.extend(value.lower() for value in site_values)
         if company:
             where.append("LOWER(company) LIKE ?")
             params.append(f"%{company.lower()}%")
+        if location:
+            where.append("LOWER(location) LIKE ?")
+            params.append(f"%{location.lower()}%")
+        location_values = self._unique_non_empty(locations)
+        if location_values:
+            placeholders = ",".join("?" * len(location_values))
+            where.append(f"LOWER(location) IN ({placeholders})")
+            params.extend(value.lower() for value in location_values)
         if bookmarked is not None:
             where.append("bookmarked = ?")
             params.append(bool(bookmarked))
@@ -724,9 +771,32 @@ class JobDatabase:
         if remote is not None:
             where.append("is_remote = ?")
             params.append(bool(remote))
-        if job_type:
-            where.append("LOWER(job_type) = LOWER(?)")
-            params.append(job_type)
+        job_type_values = self._unique_non_empty([job_type] if job_type else []) + (
+            self._unique_non_empty(job_types)
+        )
+        if job_type_values:
+            placeholders = ",".join("?" * len(job_type_values))
+            where.append(f"LOWER(job_type) IN ({placeholders})")
+            params.extend(value.lower() for value in job_type_values)
+        if min_salary is not None:
+            where.append("COALESCE(max_amount, min_amount) >= ?")
+            params.append(min_salary)
+        if max_salary is not None:
+            where.append("COALESCE(min_amount, max_amount) <= ?")
+            params.append(max_salary)
+        for column, start, end in (
+            ("date_posted", date_posted_from, date_posted_to),
+            ("first_seen", first_seen_from, first_seen_to),
+            ("last_seen", last_seen_from, last_seen_to),
+        ):
+            start_value = self._date_filter_value(start)
+            end_value = self._date_filter_value(end)
+            if start_value is not None:
+                where.append(f"date({column}) >= date(?)")
+                params.append(start_value)
+            if end_value is not None:
+                where.append(f"date({column}) <= date(?)")
+                params.append(end_value)
         if text:
             like = f"%{text.lower()}%"
             where.append(
@@ -740,12 +810,19 @@ class JobDatabase:
             params.extend([like, like, like, like])
 
         where_sql = f"WHERE {' AND '.join(where)}" if where else ""
-        order_sql = (
-            "ORDER BY COALESCE(date_posted, first_seen, last_seen) DESC, "
-            "relevance_score DESC"
-            if sort == "date"
-            else "ORDER BY relevance_score DESC, last_seen DESC"
-        )
+        order_sql = {
+            "company": "ORDER BY LOWER(company) ASC, relevance_score DESC, last_seen DESC",
+            "date": (
+                "ORDER BY COALESCE(date_posted, first_seen, last_seen) DESC, "
+                "relevance_score DESC"
+            ),
+            "salary": (
+                "ORDER BY COALESCE(max_amount, min_amount, 0) DESC, "
+                "COALESCE(min_amount, max_amount, 0) DESC, relevance_score DESC"
+            ),
+            "score": "ORDER BY relevance_score DESC, last_seen DESC",
+            "title": "ORDER BY LOWER(title) ASC, relevance_score DESC, last_seen DESC",
+        }.get(sort, "ORDER BY relevance_score DESC, last_seen DESC")
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -765,6 +842,119 @@ class JobDatabase:
             records = [self._row_to_record(row) for row in cursor.fetchall()]
 
         return records, total
+
+    def list_blacklisted_jobs(
+        self,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+        text: str | None = None,
+        company: str | None = None,
+        location: str | None = None,
+    ) -> tuple[list[BlacklistedJobRecord], int]:
+        """Return blacklisted jobs with SQL-backed search and pagination."""
+        limit = max(1, min(int(limit), 1000))
+        offset = max(0, int(offset))
+
+        where: list[str] = []
+        params: list[object] = []
+
+        if text:
+            like = f"%{text.lower()}%"
+            where.append(
+                "("
+                "LOWER(job_id) LIKE ? OR "
+                "LOWER(title) LIKE ? OR "
+                "LOWER(company) LIKE ? OR "
+                "LOWER(location) LIKE ?"
+                ")"
+            )
+            params.extend([like, like, like, like])
+        if company:
+            where.append("LOWER(company) LIKE ?")
+            params.append(f"%{company.lower()}%")
+        if location:
+            where.append("LOWER(location) LIKE ?")
+            params.append(f"%{location.lower()}%")
+
+        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT COUNT(*) FROM deleted_jobs {where_sql}", params)
+            total = int(cursor.fetchone()[0])
+            cursor.execute(
+                f"""
+                SELECT {_DELETED_JOB_COLUMNS}
+                FROM deleted_jobs
+                {where_sql}
+                ORDER BY blacklisted_at DESC, LOWER(title) ASC
+                LIMIT ? OFFSET ?
+                """,
+                [*params, limit, offset],
+            )
+            records = [
+                BlacklistedJobRecord(
+                    job_id=row["job_id"],
+                    title=row["title"],
+                    company=row["company"],
+                    location=row["location"],
+                    blacklisted_at=row["blacklisted_at"],
+                )
+                for row in cursor.fetchall()
+            ]
+
+        return records, total
+
+    def get_facets(self) -> dict[str, list[dict[str, object]]]:
+        """Return value/count summaries for dashboard filter controls."""
+
+        def facet_counts(
+            cursor: sqlite3.Cursor,
+            column: str,
+            *,
+            limit: int = 50,
+        ) -> list[dict[str, object]]:
+            cursor.execute(
+                f"""
+                SELECT {column} AS value, COUNT(*) AS count
+                FROM jobs
+                WHERE {column} IS NOT NULL
+                  AND TRIM(CAST({column} AS TEXT)) != ''
+                GROUP BY {column}
+                ORDER BY count DESC, LOWER(CAST({column} AS TEXT)) ASC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+            return [
+                {"value": row["value"], "count": int(row["count"])}
+                for row in cursor.fetchall()
+            ]
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT is_remote AS value, COUNT(*) AS count
+                FROM jobs
+                WHERE is_remote IS NOT NULL
+                GROUP BY is_remote
+                ORDER BY count DESC, is_remote ASC
+                """
+            )
+            remote: list[dict[str, object]] = [
+                {"value": bool(row["value"]), "count": int(row["count"])}
+                for row in cursor.fetchall()
+            ]
+
+            return {
+                "sites": facet_counts(cursor, "site"),
+                "companies": facet_counts(cursor, "company"),
+                "locations": facet_counts(cursor, "location"),
+                "job_types": facet_counts(cursor, "job_type"),
+                "remote": remote,
+            }
 
     def get_top_jobs(self, limit: int = 10, min_score: int = 0) -> list[JobDBRecord]:
         """
@@ -959,6 +1149,38 @@ class JobDatabase:
 
         return total_deleted
 
+    def unblacklist_jobs(self, job_ids: list[str]) -> int:
+        """
+        Remove job IDs from the blacklist without restoring active job rows.
+
+        Args:
+            job_ids: List of job IDs to unblock for future imports.
+
+        Returns:
+            Number of blacklist rows removed.
+        """
+        if not job_ids:
+            return 0
+
+        total_removed = 0
+        unique_job_ids = list(dict.fromkeys(job_ids))
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            for i in range(0, len(unique_job_ids), self.SQLITE_VAR_LIMIT):
+                chunk = unique_job_ids[i : i + self.SQLITE_VAR_LIMIT]
+                placeholders = ",".join("?" * len(chunk))
+                cursor.execute(
+                    f"DELETE FROM deleted_jobs WHERE job_id IN ({placeholders})",
+                    chunk,
+                )
+                total_removed += cursor.rowcount
+
+            conn.commit()
+
+        return total_removed
+
     def blacklist_jobs(self, job_ids: list[str]) -> int:
         """
         Blacklist multiple jobs and remove them from the active job table.
@@ -1108,7 +1330,7 @@ class JobDatabase:
             if job_id in records_by_id
         ]
 
-    def get_statistics(self) -> dict[str, int]:
+    def get_statistics(self) -> dict[str, int | float]:
         """
         Get database statistics.
 
