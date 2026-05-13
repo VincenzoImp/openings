@@ -1,4 +1,4 @@
-import { Button, Card, Chip, Tooltip } from "@heroui/react";
+import { Button, Card, Tooltip } from "@heroui/react";
 import { createColumnHelper, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Bookmark, Check, PanelRightOpen } from "lucide-react";
@@ -6,10 +6,10 @@ import type { ReactNode } from "react";
 import { useRef } from "react";
 
 import type { JobRecord } from "../../api/types";
-import { scoreColor, statusChip } from "./jobDisplay";
+import { ScoreBadge, statusChip } from "./jobDisplay";
 
 const JOB_GRID_CLASS =
-  "grid grid-cols-[32px_56px_minmax(0,1fr)] items-center gap-2 px-3 md:grid-cols-[36px_72px_minmax(220px,2fr)_minmax(160px,1fr)_110px_110px_160px] md:gap-3 md:px-4";
+  "grid grid-cols-[32px_44px_minmax(0,1fr)] items-center gap-2 px-3 md:grid-cols-[36px_52px_minmax(220px,2fr)_minmax(160px,1fr)_110px_110px_160px] md:gap-3 md:px-4";
 
 const columnHelper = createColumnHelper<JobRecord>();
 const columns = [
@@ -129,9 +129,9 @@ export function JobTable({
                       type="checkbox"
                     />
                   </label>
-                  <Chip color={scoreColor(job.relevance_score)} role="cell" size="sm" variant="soft">
-                    {job.relevance_score}
-                  </Chip>
+                  <span role="cell">
+                    <ScoreBadge score={job.relevance_score} />
+                  </span>
                   <span role="cell">
                     <button
                       aria-label={`View ${job.title} details`}

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Consolidated Jobs, Saved, and Applied into one Jobs workspace with status filtering instead of three duplicated dashboard pages.
 - Split the Jobs dashboard into focused filter, action bar, table, detail, display, and query-mapping modules.
 - Improved the Jobs table desktop and mobile layouts, including mobile row actions without page-level horizontal overflow.
+- Refined the Jobs filter panel into a compact primary bar with grouped advanced filters and shorter score badges.
 
 ### Fixed
 

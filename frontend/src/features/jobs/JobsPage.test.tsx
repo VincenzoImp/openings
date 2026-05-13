@@ -170,6 +170,7 @@ test("filter controls update the list query", async () => {
   fireEvent.change(screen.getByLabelText("Search jobs"), {
     target: { value: "backend" }
   });
+  fireEvent.click(screen.getByRole("button", { name: /More filters/ }));
   fireEvent.change(screen.getByLabelText("Minimum score"), {
     target: { value: "35" }
   });
@@ -182,9 +183,7 @@ test("filter controls update the list query", async () => {
   fireEvent.change(screen.getByLabelText("Job type"), {
     target: { value: "fulltime" }
   });
-  fireEvent.change(screen.getByLabelText("Status"), {
-    target: { value: "bookmarked" }
-  });
+  fireEvent.click(screen.getByRole("button", { name: "Saved" }));
   fireEvent.change(screen.getByLabelText("Sort"), {
     target: { value: "salary" }
   });
@@ -208,9 +207,7 @@ test("open status excludes saved and applied jobs", async () => {
   renderJobsPage();
   await screen.findByText("Backend Engineer");
 
-  fireEvent.change(screen.getByLabelText("Status"), {
-    target: { value: "open" }
-  });
+  fireEvent.click(screen.getByRole("button", { name: "Open" }));
 
   await waitFor(() => {
     expect(listJobs).toHaveBeenLastCalledWith(
@@ -247,6 +244,7 @@ test("changing filters clears selected job ids", async () => {
   fireEvent.click(screen.getByRole("checkbox", { name: "Select Backend Engineer" }));
   expect(screen.getByRole("button", { name: "Blacklist selected" })).not.toBeDisabled();
 
+  fireEvent.click(screen.getByRole("button", { name: /More filters/ }));
   fireEvent.change(screen.getByLabelText("Site"), {
     target: { value: "linkedin" }
   });
@@ -319,14 +317,12 @@ test("reset filters returns the job query to the default console state", async (
   fireEvent.change(screen.getByLabelText("Search jobs"), {
     target: { value: "backend" }
   });
-  fireEvent.change(screen.getByLabelText("Status"), {
-    target: { value: "bookmarked" }
-  });
+  fireEvent.click(screen.getByRole("button", { name: "Saved" }));
   fireEvent.click(screen.getByRole("button", { name: "Reset filters" }));
 
   await waitFor(() => {
     expect(screen.getByLabelText("Search jobs")).toHaveValue("");
-    expect(screen.getByLabelText("Status")).toHaveValue("all");
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
   });
   expect(listJobs).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -379,6 +375,7 @@ test("changing filters clears the detail panel", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Open Backend Engineer details" }));
   expect(screen.getByText("Build Python APIs and data pipelines.")).toBeInTheDocument();
 
+  fireEvent.click(screen.getByRole("button", { name: /More filters/ }));
   fireEvent.change(screen.getByLabelText("Site"), {
     target: { value: "linkedin" }
   });

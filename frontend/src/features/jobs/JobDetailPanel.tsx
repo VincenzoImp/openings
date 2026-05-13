@@ -1,8 +1,8 @@
-import { Button, Card, Chip } from "@heroui/react";
+import { Button, Card } from "@heroui/react";
 import { Bookmark, Check, ExternalLink, Trash2, X } from "lucide-react";
 
 import type { JobRecord } from "../../api/types";
-import { Meta, salaryLabel, scoreColor } from "./jobDisplay";
+import { Meta, salaryLabel, ScoreBadge } from "./jobDisplay";
 
 interface JobDetailPanelProps {
   isAppliedPending: boolean;
@@ -38,9 +38,7 @@ export function JobDetailPanel({
           </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-          <Chip color={scoreColor(job.relevance_score)} size="sm" variant="soft">
-            {job.relevance_score}
-          </Chip>
+          <ScoreBadge score={job.relevance_score} />
           <span>{job.location}</span>
           <span>{job.site ?? "unknown"}</span>
         </div>
