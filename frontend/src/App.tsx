@@ -4,6 +4,7 @@ import { BarChart3, BriefcaseBusiness, ShieldX, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { getDashboardAuthStatus, getDashboardToken, setDashboardToken } from "./api/client";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { AnalyticsPage } from "./features/analytics/AnalyticsPage";
 import { BlacklistPage } from "./features/blacklist/BlacklistPage";
 import { CleanupPage } from "./features/cleanup/CleanupPage";
@@ -22,6 +23,11 @@ const NAV_ITEMS: {
   { icon: Wrench, label: "Cleanup", view: "cleanup" },
   { icon: BarChart3, label: "Analytics", view: "analytics" }
 ];
+
+function viewFromSearch(): View {
+  const value = new URLSearchParams(globalThis.location.search).get("view");
+  return NAV_ITEMS.some((item) => item.view === value) ? (value as View) : "jobs";
+}
 
 export default function App() {
   const [queryClient] = useState(
@@ -142,7 +148,25 @@ function TokenGate({ onSubmit }: { onSubmit: (token: string) => void }) {
 }
 
 function DashboardShell({ onClearToken }: { onClearToken?: () => void }) {
-  const [view, setView] = useState<View>("jobs");
+  const [view, setView] = useState<View>(() => viewFromSearch());
+
+  useEffect(() => {
+    const handlePopState = () => setView(viewFromSearch());
+    globalThis.addEventListener("popstate", handlePopState);
+    return () => globalThis.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const navigate = (nextView: View) => {
+    setView(nextView);
+    const params = new URLSearchParams(globalThis.location.search);
+    if (nextView === "jobs") {
+      params.delete("view");
+    } else {
+      params.set("view", nextView);
+    }
+    const nextSearch = params.toString();
+    globalThis.history.pushState(null, "", `${globalThis.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`);
+  };
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-950 md:grid md:grid-cols-[248px_minmax(0,1fr)]">
@@ -165,7 +189,7 @@ function DashboardShell({ onClearToken }: { onClearToken?: () => void }) {
                 className="justify-start"
                 fullWidth
                 key={item.view}
-                onPress={() => setView(item.view)}
+                onPress={() => navigate(item.view)}
                 variant={view === item.view ? "secondary" : "ghost"}
               >
                 <Icon aria-hidden="true" size={18} />
@@ -183,10 +207,12 @@ function DashboardShell({ onClearToken }: { onClearToken?: () => void }) {
       </aside>
 
       <main className="min-w-0 p-4 md:p-6">
-        {view === "jobs" ? <JobsPage /> : null}
-        {view === "blacklist" ? <BlacklistPage /> : null}
-        {view === "cleanup" ? <CleanupPage /> : null}
-        {view === "analytics" ? <AnalyticsPage /> : null}
+        <ErrorBoundary>
+          {view === "jobs" ? <JobsPage /> : null}
+          {view === "blacklist" ? <BlacklistPage /> : null}
+          {view === "cleanup" ? <CleanupPage /> : null}
+          {view === "analytics" ? <AnalyticsPage /> : null}
+        </ErrorBoundary>
       </main>
     </div>
   );

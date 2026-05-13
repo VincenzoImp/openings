@@ -91,6 +91,9 @@ test("runs configured and manual cleanup commands", async () => {
 
   fireEvent.click(screen.getByLabelText("Confirm cleanup"));
   fireEvent.click(screen.getByRole("button", { name: "Run configured cleanup" }));
+  expect(runCleanup).not.toHaveBeenCalled();
+  expect(screen.getByRole("heading", { name: "Run configured cleanup?" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm configured cleanup" }));
   await waitFor(() => expect(runCleanup).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(screen.getByRole("button", { name: "Delete below score" })).not.toBeDisabled());
 
