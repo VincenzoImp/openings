@@ -25,9 +25,16 @@ export function AnalyticsPage() {
     staleTime: 60_000
   });
   const maxCount = Math.max(...(distribution.data?.map(([, count]) => count) ?? [1]));
+  const hasError = stats.isError || distribution.isError || facets.isError;
 
   return (
     <section className="mx-auto grid max-w-[1500px] gap-4" aria-label="Analytics">
+      {hasError ? (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+          Unable to load analytics data.
+        </div>
+      ) : null}
+
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Metric label="Total jobs" value={stats.data?.total_jobs ?? 0} />
         <Metric label="Seen today" value={stats.data?.seen_today ?? 0} />

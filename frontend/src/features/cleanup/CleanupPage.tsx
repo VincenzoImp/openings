@@ -10,6 +10,23 @@ import {
   purgeCleanupBlacklist,
   runCleanup
 } from "../../api/client";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
+
+type PendingCleanup =
+  | { action: "below-score"; value: number }
+  | { action: "stale"; value: number }
+  | { action: "blacklist"; value: number };
+
+function positiveInteger(value: string, min = 1): number | null {
+  if (!value.trim()) {
+    return null;
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < min) {
+    return null;
+  }
+  return parsed;
+}
 
 export function CleanupPage() {
   const queryClient = useQueryClient();
@@ -17,6 +34,8 @@ export function CleanupPage() {
   const [score, setScore] = useState("25");
   const [days, setDays] = useState("30");
   const [blacklistDays, setBlacklistDays] = useState("90");
+  const [pendingCleanup, setPendingCleanup] = useState<PendingCleanup | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
   const cleanup = useQuery({
     queryKey: ["cleanup-preview"],
     queryFn: previewCleanup,
@@ -32,24 +51,79 @@ export function CleanupPage() {
     ]);
   const runCleanupMutation = useMutation({
     mutationFn: runCleanup,
+    onError: (error: Error) => setMutationError(error.message || "Cleanup failed"),
     onSuccess: () => {
+      setMutationError(null);
       setConfirmed(false);
       return invalidate();
     }
   });
   const belowScoreMutation = useMutation({
     mutationFn: deleteJobsBelowScore,
-    onSuccess: invalidate
+    onError: (error: Error) => setMutationError(error.message || "Cleanup failed"),
+    onSuccess: () => {
+      setMutationError(null);
+      setPendingCleanup(null);
+      return invalidate();
+    }
   });
   const staleMutation = useMutation({
     mutationFn: deleteStaleJobs,
-    onSuccess: invalidate
+    onError: (error: Error) => setMutationError(error.message || "Cleanup failed"),
+    onSuccess: () => {
+      setMutationError(null);
+      setPendingCleanup(null);
+      return invalidate();
+    }
   });
   const blacklistMutation = useMutation({
     mutationFn: purgeCleanupBlacklist,
-    onSuccess: invalidate
+    onError: (error: Error) => setMutationError(error.message || "Cleanup failed"),
+    onSuccess: () => {
+      setMutationError(null);
+      setPendingCleanup(null);
+      return invalidate();
+    }
   });
   const preview = cleanup.data;
+  const scoreValue = positiveInteger(score, 0);
+  const daysValue = positiveInteger(days);
+  const blacklistDaysValue = positiveInteger(blacklistDays);
+  const cleanupPending =
+    runCleanupMutation.isPending ||
+    belowScoreMutation.isPending ||
+    staleMutation.isPending ||
+    blacklistMutation.isPending;
+  const pendingTitle =
+    pendingCleanup?.action === "below-score"
+      ? "Delete jobs below score?"
+      : pendingCleanup?.action === "stale"
+        ? "Delete stale jobs?"
+        : "Purge aged blacklist entries?";
+  const pendingDescription =
+    pendingCleanup?.action === "below-score"
+      ? `This permanently deletes active jobs with relevance score below ${pendingCleanup.value}. Saved and applied jobs remain protected by the cleanup rules.`
+      : pendingCleanup?.action === "stale"
+        ? `This permanently deletes active jobs that have not been seen for at least ${pendingCleanup.value} days.`
+        : `This removes blacklist entries older than ${pendingCleanup?.value ?? 0} days. It does not restore active jobs.`;
+  const pendingConfirmLabel =
+    pendingCleanup?.action === "below-score"
+      ? "Confirm delete below score"
+      : pendingCleanup?.action === "stale"
+        ? "Confirm delete stale jobs"
+        : "Confirm purge blacklist";
+  const confirmPendingCleanup = () => {
+    if (!pendingCleanup) {
+      return;
+    }
+    if (pendingCleanup.action === "below-score") {
+      belowScoreMutation.mutate(pendingCleanup.value);
+    } else if (pendingCleanup.action === "stale") {
+      staleMutation.mutate(pendingCleanup.value);
+    } else {
+      blacklistMutation.mutate(pendingCleanup.value);
+    }
+  };
 
   return (
     <section className="mx-auto grid max-w-[1500px] gap-4" aria-label="Cleanup">
@@ -95,6 +169,17 @@ export function CleanupPage() {
         />
       </div>
 
+      {mutationError ? (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+          {mutationError}
+        </div>
+      ) : null}
+      {cleanup.isError ? (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+          Unable to load cleanup preview.
+        </div>
+      ) : null}
+
       <Card className="border border-zinc-200 shadow-sm" variant="default">
         <CardHeader className="flex items-center gap-2 p-4">
           <ShieldCheck aria-hidden="true" className="text-zinc-500" size={18} />
@@ -111,8 +196,12 @@ export function CleanupPage() {
               variant="secondary"
             />
             <Button
-              isDisabled={belowScoreMutation.isPending}
-              onPress={() => belowScoreMutation.mutate(Number(score))}
+              isDisabled={scoreValue === null || cleanupPending}
+              onPress={() => {
+                if (scoreValue !== null) {
+                  setPendingCleanup({ action: "below-score", value: scoreValue });
+                }
+              }}
               variant="danger"
             >
               <Trash2 aria-hidden="true" size={16} />
@@ -129,8 +218,12 @@ export function CleanupPage() {
               variant="secondary"
             />
             <Button
-              isDisabled={staleMutation.isPending}
-              onPress={() => staleMutation.mutate(Number(days))}
+              isDisabled={daysValue === null || cleanupPending}
+              onPress={() => {
+                if (daysValue !== null) {
+                  setPendingCleanup({ action: "stale", value: daysValue });
+                }
+              }}
               variant="danger"
             >
               <Trash2 aria-hidden="true" size={16} />
@@ -147,8 +240,12 @@ export function CleanupPage() {
               variant="secondary"
             />
             <Button
-              isDisabled={blacklistMutation.isPending}
-              onPress={() => blacklistMutation.mutate(Number(blacklistDays))}
+              isDisabled={blacklistDaysValue === null || cleanupPending}
+              onPress={() => {
+                if (blacklistDaysValue !== null) {
+                  setPendingCleanup({ action: "blacklist", value: blacklistDaysValue });
+                }
+              }}
               variant="danger"
             >
               <Trash2 aria-hidden="true" size={16} />
@@ -157,6 +254,15 @@ export function CleanupPage() {
           </div>
         </CardContent>
       </Card>
+      <ConfirmDialog
+        confirmLabel={pendingConfirmLabel}
+        description={pendingDescription}
+        isOpen={pendingCleanup !== null}
+        isPending={cleanupPending}
+        onCancel={() => setPendingCleanup(null)}
+        onConfirm={confirmPendingCleanup}
+        title={pendingTitle}
+      />
     </section>
   );
 }

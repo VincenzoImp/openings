@@ -47,6 +47,15 @@ export function clearDashboardToken(): void {
   setDashboardToken(null);
 }
 
+function handleRejectedAuth(response: Response): void {
+  if (response.status !== 401 && response.status !== 403) {
+    return;
+  }
+
+  clearDashboardToken();
+  globalThis.dispatchEvent(new Event("job-search-tool.dashboard-token-invalid"));
+}
+
 function requestHeaders(init?: RequestInit): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json"
@@ -74,6 +83,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
+    handleRejectedAuth(response);
     const message = await response.text();
     throw new Error(message || `Request failed with ${response.status}`);
   }
@@ -88,6 +98,7 @@ async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
   });
 
   if (!response.ok) {
+    handleRejectedAuth(response);
     const message = await response.text();
     throw new Error(message || `Request failed with ${response.status}`);
   }

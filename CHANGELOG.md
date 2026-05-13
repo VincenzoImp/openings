@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Consolidated Jobs, Saved, and Applied into one Jobs workspace with status filtering instead of three duplicated dashboard pages.
+- Split the Jobs dashboard into focused filter, action bar, table, detail, display, and query-mapping modules.
+- Improved the Jobs table desktop and mobile layouts, including mobile row actions without page-level horizontal overflow.
+
+### Fixed
+
+- Dashboard now clears stale stored API tokens after REST 401/403 responses and returns to the token gate.
+- Destructive dashboard commands now require confirmation before deleting, blacklisting, or purging records.
+- Cleanup and blacklist numeric inputs now reject invalid manual command values instead of sending `NaN`-style requests.
+- Dashboard error states are now visible for jobs, blacklist, cleanup, and analytics query or mutation failures.
+
 ## [10.0.0] - 2026-05-13
 
 ### Breaking Changes

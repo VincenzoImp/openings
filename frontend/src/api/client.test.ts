@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import {
   blacklistJobs,
+  clearDashboardToken,
   deleteJobs,
   deleteJobsBelowScore,
   exportJobs,
@@ -59,6 +60,21 @@ test("includes the saved dashboard token on API requests", async () => {
   expect(init?.headers).toMatchObject({
     "X-Job-Search-Token": "secret-token"
   });
+});
+
+test("clears a stale dashboard token when the API rejects it", async () => {
+  setDashboardToken("stale-token");
+  vi.mocked(fetch).mockResolvedValueOnce({
+    ok: false,
+    status: 401,
+    json: vi.fn(),
+    text: vi.fn().mockResolvedValue("Unauthorized")
+  } as unknown as Response);
+
+  await expect(listJobs()).rejects.toThrow("Unauthorized");
+
+  expect(localStorage.removeItem).toHaveBeenCalledWith("job-search-tool.dashboard-token");
+  expect(clearDashboardToken()).toBeUndefined();
 });
 
 test("fetches dashboard auth status from the public API route", async () => {

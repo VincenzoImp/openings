@@ -11,7 +11,7 @@ vi.mock("./api/client", () => ({
 }));
 
 vi.mock("./features/jobs/JobsPage", () => ({
-  JobsPage: ({ preset }: { preset?: string }) => <div>{preset ?? "all"} jobs view</div>
+  JobsPage: () => <div>jobs view</div>
 }));
 
 vi.mock("./features/analytics/AnalyticsPage", () => ({
@@ -38,8 +38,8 @@ test("renders the dashboard shell", async () => {
   expect(await screen.findByRole("heading", { name: "Job Search" })).toBeInTheDocument();
   expect(await screen.findByRole("navigation")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Jobs" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Saved" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Applied" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Saved" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Applied" })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Blacklist" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Cleanup" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Analytics" })).toBeInTheDocument();
@@ -48,13 +48,7 @@ test("renders the dashboard shell", async () => {
 test("navigates between console workspaces", async () => {
   render(<App />);
 
-  expect(await screen.findByText("all jobs view")).toBeInTheDocument();
-
-  fireEvent.click(screen.getByRole("button", { name: "Saved" }));
-  expect(screen.getByText("saved jobs view")).toBeInTheDocument();
-
-  fireEvent.click(screen.getByRole("button", { name: "Applied" }));
-  expect(screen.getByText("applied jobs view")).toBeInTheDocument();
+  expect(await screen.findByText("jobs view")).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: "Blacklist" }));
   expect(screen.getByText("Blacklist view")).toBeInTheDocument();

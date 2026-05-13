@@ -84,5 +84,8 @@ test("unblacklists selected entries and can purge the blacklist", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Purge all" }));
 
   await waitFor(() => expect(unblacklistJobs).toHaveBeenCalledWith(["job-1"]));
-  expect(purgeBlacklist).toHaveBeenCalledWith(undefined);
+  expect(screen.getByRole("heading", { name: "Purge blacklist entries?" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm purge blacklist" }));
+
+  await waitFor(() => expect(purgeBlacklist).toHaveBeenCalledWith(undefined));
 });

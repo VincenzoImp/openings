@@ -286,6 +286,11 @@ test("selected blacklist action sends selected job ids", async () => {
   fireEvent.click(screen.getByRole("checkbox", { name: "Select Backend Engineer" }));
   fireEvent.click(screen.getByRole("button", { name: "Blacklist selected" }));
 
+  expect(blacklistJobs).not.toHaveBeenCalled();
+  expect(screen.getByRole("heading", { name: "Blacklist selected jobs?" })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Confirm blacklist" }));
+
   await waitFor(() => expect(blacklistJobs).toHaveBeenCalledWith(["job-1"]));
 });
 
@@ -298,13 +303,38 @@ test("bulk actions can save apply export delete and blacklist selected jobs", as
   fireEvent.click(screen.getByRole("button", { name: "Mark applied" }));
   fireEvent.click(screen.getByRole("button", { name: "Export selected" }));
   fireEvent.click(screen.getByRole("button", { name: "Delete selected" }));
-  fireEvent.click(screen.getByRole("button", { name: "Blacklist selected" }));
+  expect(screen.getByRole("heading", { name: "Delete selected jobs permanently?" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
 
   await waitFor(() => expect(setBookmarked).toHaveBeenCalledWith(["job-1"], true));
   expect(setApplied).toHaveBeenCalledWith(["job-1"], true);
   expect(exportJobs).toHaveBeenCalledWith({ format: "csv", job_ids: ["job-1"] });
   expect(deleteJobs).toHaveBeenCalledWith(["job-1"]);
-  expect(blacklistJobs).toHaveBeenCalledWith(["job-1"]);
+});
+
+test("reset filters returns the job query to the default console state", async () => {
+  renderJobsPage();
+  await screen.findByText("Backend Engineer");
+
+  fireEvent.change(screen.getByLabelText("Search jobs"), {
+    target: { value: "backend" }
+  });
+  fireEvent.change(screen.getByLabelText("Status"), {
+    target: { value: "bookmarked" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Reset filters" }));
+
+  await waitFor(() => {
+    expect(screen.getByLabelText("Search jobs")).toHaveValue("");
+    expect(screen.getByLabelText("Status")).toHaveValue("all");
+  });
+  expect(listJobs).toHaveBeenCalledWith(
+    expect.objectContaining({
+      limit: 100,
+      offset: 0,
+      sort: "score"
+    })
+  );
 });
 
 test("exports the current rows as CSV", async () => {

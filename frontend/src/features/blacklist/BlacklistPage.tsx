@@ -4,12 +4,26 @@ import { RotateCcw, Search, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { listBlacklistedJobs, purgeBlacklist, unblacklistJobs } from "../../api/client";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
+
+function optionalPositiveInteger(value: string): number | undefined | null {
+  if (!value.trim()) {
+    return undefined;
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return null;
+  }
+  return parsed;
+}
 
 export function BlacklistPage() {
   const queryClient = useQueryClient();
   const [text, setText] = useState("");
   const [olderThanDays, setOlderThanDays] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmPurge, setConfirmPurge] = useState(false);
+  const [mutationError, setMutationError] = useState<string | null>(null);
   const params = useMemo(
     () => ({
       limit: 100,
@@ -31,15 +45,23 @@ export function BlacklistPage() {
     ]);
   const unblacklistMutation = useMutation({
     mutationFn: (jobIds: string[]) => unblacklistJobs(jobIds),
+    onError: (error: Error) => setMutationError(error.message || "Blacklist command failed"),
     onSuccess: () => {
+      setMutationError(null);
       setSelectedIds(new Set());
       return invalidate();
     }
   });
   const purgeMutation = useMutation({
     mutationFn: (days?: number) => purgeBlacklist(days),
-    onSuccess: invalidate
+    onError: (error: Error) => setMutationError(error.message || "Blacklist command failed"),
+    onSuccess: () => {
+      setMutationError(null);
+      setConfirmPurge(false);
+      return invalidate();
+    }
   });
+  const purgeAge = optionalPositiveInteger(olderThanDays);
 
   const toggleSelected = (jobId: string) => {
     setSelectedIds((current) => {
@@ -88,8 +110,8 @@ export function BlacklistPage() {
             Unblacklist selected
           </Button>
           <Button
-            isDisabled={purgeMutation.isPending}
-            onPress={() => purgeMutation.mutate(olderThanDays ? Number(olderThanDays) : undefined)}
+            isDisabled={purgeMutation.isPending || purgeAge === null}
+            onPress={() => setConfirmPurge(true)}
             variant="danger"
           >
             <Trash2 aria-hidden="true" size={16} />
@@ -97,6 +119,17 @@ export function BlacklistPage() {
           </Button>
         </div>
       </div>
+
+      {mutationError ? (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+          {mutationError}
+        </div>
+      ) : null}
+      {blacklist.isError ? (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+          Unable to load blacklist entries.
+        </div>
+      ) : null}
 
       <Card className="border border-zinc-200 shadow-sm" variant="default">
         <CardHeader className="flex items-center justify-between gap-3 p-4">
@@ -146,6 +179,19 @@ export function BlacklistPage() {
           </div>
         </CardContent>
       </Card>
+      <ConfirmDialog
+        confirmLabel="Confirm purge blacklist"
+        description={
+          purgeAge === undefined
+            ? "This removes every blacklist entry. Previously blocked jobs may be imported again if future searches find them."
+            : `This removes blacklist entries older than ${purgeAge} days. It does not restore active job rows.`
+        }
+        isOpen={confirmPurge}
+        isPending={purgeMutation.isPending}
+        onCancel={() => setConfirmPurge(false)}
+        onConfirm={() => purgeMutation.mutate(purgeAge ?? undefined)}
+        title="Purge blacklist entries?"
+      />
     </section>
   );
 }
