@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Button, Card, CardContent, Input } from "@heroui/react";
-import { BarChart3, Bookmark, BriefcaseBusiness, CheckCircle2, ShieldX, Wrench } from "lucide-react";
-import { useState } from "react";
+import { BarChart3, BriefcaseBusiness, ShieldX, Wrench } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { getDashboardAuthStatus, getDashboardToken, setDashboardToken } from "./api/client";
 import { AnalyticsPage } from "./features/analytics/AnalyticsPage";
@@ -10,7 +10,7 @@ import { CleanupPage } from "./features/cleanup/CleanupPage";
 import { JobsPage } from "./features/jobs/JobsPage";
 import "./styles.css";
 
-type View = "jobs" | "saved" | "applied" | "blacklist" | "cleanup" | "analytics";
+type View = "jobs" | "blacklist" | "cleanup" | "analytics";
 
 const NAV_ITEMS: {
   icon: typeof BriefcaseBusiness;
@@ -18,8 +18,6 @@ const NAV_ITEMS: {
   view: View;
 }[] = [
   { icon: BriefcaseBusiness, label: "Jobs", view: "jobs" },
-  { icon: Bookmark, label: "Saved", view: "saved" },
-  { icon: CheckCircle2, label: "Applied", view: "applied" },
   { icon: ShieldX, label: "Blacklist", view: "blacklist" },
   { icon: Wrench, label: "Cleanup", view: "cleanup" },
   { icon: BarChart3, label: "Analytics", view: "analytics" }
@@ -49,6 +47,13 @@ function DashboardApp() {
     staleTime: 60_000
   });
   const [token, setToken] = useState(() => getDashboardToken());
+
+  useEffect(() => {
+    const handleInvalidToken = () => setToken(null);
+    globalThis.addEventListener("job-search-tool.dashboard-token-invalid", handleInvalidToken);
+    return () =>
+      globalThis.removeEventListener("job-search-tool.dashboard-token-invalid", handleInvalidToken);
+  }, []);
 
   if (auth.isLoading) {
     return <StatusScreen>Loading dashboard</StatusScreen>;
@@ -152,7 +157,7 @@ function DashboardShell({ onClearToken }: { onClearToken?: () => void }) {
           </div>
         </div>
 
-        <nav className="mt-6 grid gap-2 sm:grid-cols-3 md:grid-cols-1" aria-label="Primary">
+        <nav className="mt-6 grid gap-2 sm:grid-cols-4 md:grid-cols-1" aria-label="Primary">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             return (
@@ -178,9 +183,7 @@ function DashboardShell({ onClearToken }: { onClearToken?: () => void }) {
       </aside>
 
       <main className="min-w-0 p-4 md:p-6">
-        {view === "jobs" ? <JobsPage preset="all" /> : null}
-        {view === "saved" ? <JobsPage preset="saved" /> : null}
-        {view === "applied" ? <JobsPage preset="applied" /> : null}
+        {view === "jobs" ? <JobsPage /> : null}
         {view === "blacklist" ? <BlacklistPage /> : null}
         {view === "cleanup" ? <CleanupPage /> : null}
         {view === "analytics" ? <AnalyticsPage /> : null}
