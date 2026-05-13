@@ -6,6 +6,7 @@ from datetime import date
 import json
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -137,6 +138,57 @@ def test_list_jobs_supports_console_filters() -> None:
     assert data["items"][0]["title"] == "Frontend Developer"
 
 
+def test_search_similar_supports_console_filters() -> None:
+    from job_search_tool import job_service
+    from job_search_tool.vector_store import SemanticSearchResult
+    from job_search_tool.web.mcp import search_similar
+
+    job_service._vs = MagicMock()
+    job_service._vs.search.return_value = [
+        SemanticSearchResult(
+            job_id="semantic-1",
+            distance=0.12,
+            similarity=0.88,
+            metadata={
+                "title": "ML Engineer",
+                "company": "AI Corp",
+                "location": "Remote",
+                "relevance_score": 44,
+                "site": "linkedin",
+                "job_url": "https://example.com/ml",
+            },
+        )
+    ]
+
+    data = json.loads(
+        search_similar(
+            "machine learning",
+            n_results=5,
+            min_score=30,
+            site="linkedin",
+        )
+    )
+
+    assert data == [
+        {
+            "job_id": "semantic-1",
+            "title": "ML Engineer",
+            "company": "AI Corp",
+            "location": "Remote",
+            "similarity": 0.88,
+            "relevance_score": 44,
+            "site": "linkedin",
+            "job_url": "https://example.com/ml",
+        }
+    ]
+    job_service._vs.search.assert_called_once_with(
+        query="machine learning",
+        n_results=5,
+        min_score=30,
+        site="linkedin",
+    )
+
+
 def test_set_bookmarked_is_explicit_and_idempotent(temp_db: JobDatabase) -> None:
     from job_search_tool.web.mcp import set_bookmarked
 
@@ -227,6 +279,24 @@ def test_facets_export_and_manual_cleanup_tools() -> None:
     assert exported[0]["title"] == "Frontend Developer"
     assert below_score["affected_count"] == 1
     assert "affected_count" in purge
+
+
+def test_export_jobs_supports_console_filters() -> None:
+    from job_search_tool.web.mcp import export_jobs
+
+    exported = json.loads(
+        export_jobs(
+            format="json",
+            sites=["indeed"],
+            job_types=["contract"],
+            min_salary=80000,
+            date_posted_from="2026-05-01",
+            sort="title",
+        )
+    )
+
+    assert len(exported) == 1
+    assert exported[0]["title"] == "Frontend Developer"
 
 
 def test_cleanup_tools_return_counts() -> None:

@@ -190,21 +190,34 @@ def list_blacklisted_jobs(
     )
 
 
-def search_similar(query: str, n_results: int = 10) -> str:
+def search_similar(
+    query: str,
+    n_results: int = 10,
+    min_score: int | None = None,
+    site: str | None = None,
+) -> str:
     """Search semantically similar jobs using the vector store when available."""
     vs = get_vs()
     if vs is None:
         return _json({"error": "Vector store not available"})
 
-    results = vs.search(query=query, n_results=n_results)
+    results = vs.search(
+        query=query,
+        n_results=n_results,
+        min_score=min_score,
+        site=site,
+    )
     return _json(
         [
             {
                 "job_id": result.job_id,
                 "title": result.metadata.get("title"),
                 "company": result.metadata.get("company"),
+                "location": result.metadata.get("location"),
                 "similarity": round(result.similarity, 4),
                 "relevance_score": result.metadata.get("relevance_score"),
+                "site": result.metadata.get("site"),
+                "job_url": result.metadata.get("job_url"),
             }
             for result in results
         ]
@@ -269,7 +282,28 @@ def purge_blacklist(older_than_days: int | None = None) -> str:
 def export_jobs(
     format: str = "csv",
     job_ids: list[str] | None = None,
+    limit: int = 1000,
+    offset: int = 0,
+    min_score: int | None = None,
+    max_score: int | None = None,
     site: str | None = None,
+    sites: list[str] | None = None,
+    company: str | None = None,
+    location: str | None = None,
+    locations: list[str] | None = None,
+    bookmarked: bool | None = None,
+    applied: bool | None = None,
+    remote: bool | None = None,
+    job_type: str | None = None,
+    job_types: list[str] | None = None,
+    min_salary: float | None = None,
+    max_salary: float | None = None,
+    date_posted_from: str | None = None,
+    date_posted_to: str | None = None,
+    first_seen_from: str | None = None,
+    first_seen_to: str | None = None,
+    last_seen_from: str | None = None,
+    last_seen_to: str | None = None,
     text: str | None = None,
     sort: str = "score",
 ) -> str:
@@ -278,7 +312,32 @@ def export_jobs(
         job_ids=job_ids,
         query=None
         if job_ids is not None
-        else JobListQuery(site=site, text=text, sort=_sort_value(sort)),
+        else JobListQuery(
+            limit=limit,
+            offset=offset,
+            min_score=min_score,
+            max_score=max_score,
+            site=site,
+            sites=sites,
+            company=company,
+            location=location,
+            locations=locations,
+            bookmarked=bookmarked,
+            applied=applied,
+            remote=remote,
+            job_type=job_type,
+            job_types=job_types,
+            min_salary=min_salary,
+            max_salary=max_salary,
+            date_posted_from=date_posted_from,
+            date_posted_to=date_posted_to,
+            first_seen_from=first_seen_from,
+            first_seen_to=first_seen_to,
+            last_seen_from=last_seen_from,
+            last_seen_to=last_seen_to,
+            text=text,
+            sort=_sort_value(sort),
+        ),
         fmt=_export_format(format),
     )
     if format == "json":
