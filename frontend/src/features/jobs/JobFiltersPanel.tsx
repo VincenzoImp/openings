@@ -49,12 +49,12 @@ export function JobFiltersPanel({
   const [showAdvanced, setShowAdvanced] = useState(activeAdvancedCount > 0);
 
   return (
-    <Card className="border border-zinc-200 bg-white shadow-sm" variant="default">
-      <div className="grid gap-4 p-4">
-        <div className="grid gap-3 xl:grid-cols-[minmax(320px,1fr)_auto_180px_auto] xl:items-end">
-          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
+    <Card className="w-full min-w-0 border border-zinc-200 bg-white shadow-sm" variant="default">
+      <div className="grid min-w-0 gap-4 p-4">
+        <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(320px,1fr)_auto_180px_auto] xl:items-end">
+          <label className="grid min-w-0 gap-1.5 text-sm font-medium text-zinc-700">
             <span>Search</span>
-            <div className="relative">
+            <div className="relative min-w-0">
               <Search
                 aria-hidden="true"
                 className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-zinc-400"
@@ -72,9 +72,9 @@ export function JobFiltersPanel({
             </div>
           </label>
 
-          <div className="grid gap-1.5">
+          <div className="grid min-w-0 gap-1.5">
             <span className="text-sm font-medium text-zinc-700">Status</span>
-            <div aria-label="Status" className="flex flex-wrap gap-1.5" role="group">
+            <div aria-label="Status" className="flex min-w-0 flex-wrap gap-1.5" role="group">
               <StatusButton
                 isSelected={filters.status === "all"}
                 label="All"
@@ -98,11 +98,11 @@ export function JobFiltersPanel({
             </div>
           </div>
 
-          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
+          <label className="grid min-w-0 gap-1.5 text-sm font-medium text-zinc-700">
             <span>Sort</span>
             <select
               aria-label="Sort"
-              className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 shadow-sm outline-none focus:border-zinc-950 focus:ring-2 focus:ring-zinc-100"
+              className="h-10 w-full min-w-0 rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 shadow-sm outline-none focus:border-zinc-950 focus:ring-2 focus:ring-zinc-100"
               onChange={(event) => onChange({ sort: event.target.value as JobFilterValues["sort"] })}
               value={filters.sort}
             >
@@ -125,7 +125,7 @@ export function JobFiltersPanel({
           </label>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-3">
           <Button onPress={() => setShowAdvanced((value) => !value)} variant="outline">
             <SlidersHorizontal aria-hidden="true" size={16} />
             More filters
@@ -141,7 +141,7 @@ export function JobFiltersPanel({
             />
           </Button>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex min-w-0 flex-wrap gap-2">
             <Button onPress={onReset} variant="outline">
               <RotateCcw aria-hidden="true" size={16} />
               Reset filters
@@ -156,10 +156,10 @@ export function JobFiltersPanel({
         </div>
 
         {showAdvanced ? (
-          <div className="grid gap-4 border-t border-zinc-100 pt-4 xl:grid-cols-[1.05fr_1fr_1.15fr]">
-            <fieldset className="grid gap-3">
+          <div className="grid min-w-0 gap-4 border-t border-zinc-100 pt-4 xl:grid-cols-[1.05fr_1fr_1.15fr]">
+            <fieldset className="grid min-w-0 gap-3">
               <legend className="mb-1 text-xs font-bold uppercase text-zinc-500">Source</legend>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2">
                 <TextFilter
                   label="Company"
                   name="Company"
@@ -199,9 +199,9 @@ export function JobFiltersPanel({
               </datalist>
             </fieldset>
 
-            <fieldset className="grid gap-3">
+            <fieldset className="grid min-w-0 gap-3">
               <legend className="mb-1 text-xs font-bold uppercase text-zinc-500">Score and salary</legend>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2">
                 <NumberFilter
                   label="Min score"
                   max="100"
@@ -235,9 +235,9 @@ export function JobFiltersPanel({
               </div>
             </fieldset>
 
-            <fieldset className="grid gap-3">
+            <fieldset className="grid min-w-0 gap-3">
               <legend className="mb-1 text-xs font-bold uppercase text-zinc-500">Dates</legend>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2">
                 <DateFilter
                   label="Posted from"
                   name="Date posted from"
@@ -318,10 +318,11 @@ function TextFilter({
   value: string;
 }) {
   return (
-    <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
+    <label className="grid min-w-0 gap-1.5 text-sm font-medium text-zinc-700">
       <span>{label}</span>
       <Input
         aria-label={name}
+        fullWidth
         list={datalistId}
         onChange={(event) => onChange(event.target.value)}
         value={value}
@@ -347,10 +348,11 @@ function NumberFilter({
   value: string;
 }) {
   return (
-    <label className="grid gap-1 text-sm font-medium text-zinc-700">
+    <label className="grid min-w-0 gap-1 text-sm font-medium text-zinc-700">
       <span>{label}</span>
       <Input
         aria-label={name}
+        fullWidth
         max={max}
         min={min}
         onChange={(event) => onChange(event.target.value)}
@@ -374,10 +376,11 @@ function DateFilter({
   value: string;
 }) {
   return (
-    <label className="grid gap-1 text-sm font-medium text-zinc-700">
+    <label className="grid min-w-0 gap-1 text-sm font-medium text-zinc-700">
       <span>{label}</span>
       <Input
         aria-label={name}
+        fullWidth
         onChange={(event) => onChange(event.target.value)}
         type="date"
         value={value}

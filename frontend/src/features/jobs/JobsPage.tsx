@@ -303,7 +303,7 @@ export function JobsPage() {
       : "Permanent delete removes these active jobs without adding them to the blacklist. They can be rediscovered in a future search.";
 
   return (
-    <section className="mx-auto grid max-w-[1500px] gap-4" aria-label="Jobs">
+    <section className="mx-auto grid min-w-0 max-w-[1500px] gap-4" aria-label="Jobs">
       <PageHeader
         chips={(facets.data?.sites ?? []).slice(0, 4).map((facet) => (
           <Chip key={String(facet.value)} color="default" size="sm" variant="soft">
@@ -325,12 +325,13 @@ export function JobsPage() {
         visibleJobs={jobs}
       />
 
-      <Card className="border border-zinc-200 bg-white shadow-sm" variant="default">
-        <CardContent className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
+      <Card className="w-full min-w-0 border border-zinc-200 bg-white shadow-sm" variant="default">
+        <CardContent className="grid min-w-0 gap-3 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <label className="grid min-w-0 gap-1.5 text-sm font-medium text-zinc-700">
             <span>Semantic search</span>
             <Input
               aria-label="Semantic search"
+              fullWidth
               onChange={(event) => setSemanticQuery(event.target.value)}
               placeholder="Find jobs similar to a role, stack, or responsibility"
               value={semanticQuery}
@@ -338,6 +339,7 @@ export function JobsPage() {
             />
           </label>
           <Button
+            className="w-full sm:w-auto"
             isDisabled={!semanticQuery.trim() || semanticMutation.isPending}
             onPress={runSemanticSearch}
             variant="primary"

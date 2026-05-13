@@ -104,6 +104,15 @@ function renderJobsPage(): RenderResult & { queryClient: QueryClient } {
 }
 
 beforeEach(() => {
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    value: vi.fn(() => "blob:jobs")
+  });
+  Object.defineProperty(URL, "revokeObjectURL", {
+    configurable: true,
+    value: vi.fn()
+  });
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
   vi.mocked(listJobs).mockResolvedValue(response());
   vi.mocked(getFacets).mockResolvedValue({
     companies: [{ count: 1, value: "Acme Corp" }],
@@ -167,6 +176,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 test("renders rows from the jobs API", async () => {

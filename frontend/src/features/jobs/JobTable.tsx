@@ -74,8 +74,8 @@ export function JobTable({
     : rows.map((row, index) => ({ item: null, row, fallbackIndex: index }));
 
   return (
-    <Card className="overflow-hidden border border-slate-200 shadow-sm" variant="default">
-      <div aria-colcount={7} aria-rowcount={jobs.length} className="overflow-x-auto" role="table">
+    <Card className="w-full min-w-0 overflow-hidden border border-slate-200 shadow-sm" variant="default">
+      <div aria-colcount={7} aria-rowcount={jobs.length} className="min-w-0 overflow-x-auto" role="table">
         <div
           className={`${JOB_GRID_CLASS} border-b border-slate-200 bg-slate-100 py-3 text-xs font-bold uppercase text-slate-500 md:min-w-[980px]`}
           role="row"
@@ -103,7 +103,7 @@ export function JobTable({
           <div className="px-4 py-8 text-sm text-slate-500">No jobs match the current filters</div>
         ) : null}
 
-        <div className="max-h-[min(62vh,720px)] overflow-auto" ref={scrollRef}>
+        <div className="min-w-0 max-h-[min(62vh,720px)] overflow-auto" ref={scrollRef}>
           <div
             className="relative md:min-w-[980px]"
             style={{ height: virtualItems.length ? rowVirtualizer.getTotalSize() : "auto" }}
@@ -140,16 +140,16 @@ export function JobTable({
                   <span role="cell">
                     <ScoreBadge score={job.relevance_score} />
                   </span>
-                  <span role="cell">
+                  <span className="min-w-0" role="cell">
                     <button
                       aria-label={`View ${job.title} details`}
-                      className="grid gap-0.5 text-left"
+                      className="grid min-w-0 gap-0.5 text-left"
                       onClick={() => onSelectJob(job)}
                       type="button"
                     >
-                      <span className="font-semibold text-slate-950">{job.title}</span>
-                      <small className="text-xs text-slate-500">{job.company}</small>
-                      <small className="text-xs text-slate-500 md:hidden">
+                      <span className="truncate font-semibold text-slate-950">{job.title}</span>
+                      <small className="truncate text-xs text-slate-500">{job.company}</small>
+                      <small className="truncate text-xs text-slate-500 md:hidden">
                         {job.location} / {job.site ?? "unknown"} /{" "}
                         {job.applied ? "Applied" : job.bookmarked ? "Saved" : "Open"}
                       </small>

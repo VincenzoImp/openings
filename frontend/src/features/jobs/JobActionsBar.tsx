@@ -63,14 +63,14 @@ export function JobActionsBar({
   const hasSelection = selectedCount > 0;
 
   return (
-    <div className="grid gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
+    <div className="grid w-full min-w-0 gap-3">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap gap-2">
           <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
             <span>Export</span>
             <select
               aria-label="Export format"
-              className="h-9 rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 shadow-sm outline-none focus:border-zinc-950 focus:ring-2 focus:ring-zinc-100"
+              className="h-9 min-w-0 rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 shadow-sm outline-none focus:border-zinc-950 focus:ring-2 focus:ring-zinc-100"
               onChange={(event) => onExportFormatChange(event.target.value as ExportFormat)}
               value={exportFormat}
             >
@@ -107,7 +107,7 @@ export function JobActionsBar({
             Mark not applied
           </Button>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex min-w-0 flex-wrap gap-2">
           <Button
             isDisabled={!hasSelection || isBlacklistPending}
             onPress={onBlacklistSelected}
@@ -126,12 +126,12 @@ export function JobActionsBar({
           </Button>
         </div>
       </div>
-      <div className="flex items-center gap-2 text-sm text-zinc-600" aria-label="Pagination">
+      <div className="flex flex-wrap items-center gap-2 text-sm text-zinc-600" aria-label="Pagination">
         <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
           <span>Rows</span>
           <select
             aria-label="Page size"
-            className="h-9 rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 shadow-sm outline-none focus:border-zinc-950 focus:ring-2 focus:ring-zinc-100"
+            className="h-9 min-w-0 rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 shadow-sm outline-none focus:border-zinc-950 focus:ring-2 focus:ring-zinc-100"
             onChange={(event) => onPageSizeChange(Number(event.target.value))}
             value={pageSize}
           >
