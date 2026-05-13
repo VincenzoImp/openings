@@ -7,12 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+No changes yet.
+
+## [10.1.0] - 2026-05-13
+
+### Added
+
+- URL-backed dashboard navigation with shared page headers, visible alert banners, and an error boundary around each workspace.
+- Jobs workspace controls for page size, CSV/JSON export format, posted/first-seen/last-seen date ranges, semantic search, row-level blacklist, row-level permanent delete, and detail-panel deletion.
+- Blacklist workspace filters for text, company, location, blacklist age, and server-side pagination.
+- Analytics metrics for new jobs today and blacklisted jobs.
+- MCP `search_similar` support for `min_score` and `site`, returning the same location/site/job URL metadata exposed by REST.
+- MCP `export_jobs` support for the same filtered query surface used by the dashboard and REST export endpoint.
+
 ### Changed
 
 - Consolidated Jobs, Saved, and Applied into one Jobs workspace with status filtering instead of three duplicated dashboard pages.
 - Split the Jobs dashboard into focused filter, action bar, table, detail, display, and query-mapping modules.
 - Improved the Jobs table desktop and mobile layouts, including mobile row actions without page-level horizontal overflow.
 - Refined the Jobs filter panel into a compact primary bar with grouped advanced filters and shorter score badges.
+- Blacklist, Cleanup, and Analytics now use the same header, alert, confirmation, and command feedback patterns as the Jobs workspace.
 
 ### Fixed
 
@@ -20,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Destructive dashboard commands now require confirmation before deleting, blacklisting, or purging records.
 - Cleanup and blacklist numeric inputs now reject invalid manual command values instead of sending `NaN`-style requests.
 - Dashboard error states are now visible for jobs, blacklist, cleanup, and analytics query or mutation failures.
+- Dashboard no longer overflows horizontally on 390px mobile viewports.
+- Dashboard export tests no longer emit jsdom navigation warnings.
 
 ## [10.0.0] - 2026-05-13
 
@@ -613,7 +629,11 @@ No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-
 
 Entries prior to v4.3.1 have been archived. The git history on `main` plus the tagged commits are the authoritative source for anything older.
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v8.0.0...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v10.1.0...HEAD
+[10.1.0]: https://github.com/VincenzoImp/job-search-tool/compare/v10.0.0...v10.1.0
+[10.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v9.1.0...v10.0.0
+[9.1.0]: https://github.com/VincenzoImp/job-search-tool/compare/v9.0.0...v9.1.0
+[9.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v8.0.0...v9.0.0
 [8.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v7.1.2...v8.0.0
 [7.1.2]: https://github.com/VincenzoImp/job-search-tool/compare/v7.1.1...v7.1.2
 [7.1.1]: https://github.com/VincenzoImp/job-search-tool/compare/v7.1.0...v7.1.1
