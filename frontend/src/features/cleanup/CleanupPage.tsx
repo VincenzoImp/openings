@@ -214,14 +214,17 @@ export function CleanupPage() {
         </CardHeader>
         <CardContent className="grid gap-3 p-4 pt-0 lg:grid-cols-3">
           <div className="grid gap-2 rounded-md border border-zinc-200 p-3">
-            <Input
-              aria-label="Score threshold"
-              min="0"
-              onChange={(event) => setScore(event.target.value)}
-              type="number"
-              value={score}
-              variant="secondary"
-            />
+            <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
+              <span>Score threshold</span>
+              <Input
+                aria-label="Score threshold"
+                min="0"
+                onChange={(event) => setScore(event.target.value)}
+                type="number"
+                value={score}
+                variant="secondary"
+              />
+            </label>
             <Button
               isDisabled={scoreValue === null || cleanupPending}
               onPress={() => {
@@ -236,14 +239,17 @@ export function CleanupPage() {
             </Button>
           </div>
           <div className="grid gap-2 rounded-md border border-zinc-200 p-3">
-            <Input
-              aria-label="Stale days"
-              min="1"
-              onChange={(event) => setDays(event.target.value)}
-              type="number"
-              value={days}
-              variant="secondary"
-            />
+            <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
+              <span>Stale days</span>
+              <Input
+                aria-label="Stale days"
+                min="1"
+                onChange={(event) => setDays(event.target.value)}
+                type="number"
+                value={days}
+                variant="secondary"
+              />
+            </label>
             <Button
               isDisabled={daysValue === null || cleanupPending}
               onPress={() => {
@@ -258,14 +264,17 @@ export function CleanupPage() {
             </Button>
           </div>
           <div className="grid gap-2 rounded-md border border-zinc-200 p-3">
-            <Input
-              aria-label="Blacklist age days"
-              min="1"
-              onChange={(event) => setBlacklistDays(event.target.value)}
-              type="number"
-              value={blacklistDays}
-              variant="secondary"
-            />
+            <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
+              <span>Blacklist age</span>
+              <Input
+                aria-label="Blacklist age days"
+                min="1"
+                onChange={(event) => setBlacklistDays(event.target.value)}
+                type="number"
+                value={blacklistDays}
+                variant="secondary"
+              />
+            </label>
             <Button
               isDisabled={blacklistDaysValue === null || cleanupPending}
               onPress={() => {

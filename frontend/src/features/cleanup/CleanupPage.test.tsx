@@ -83,6 +83,9 @@ test("renders cleanup preview counts", async () => {
   expect(await screen.findByText("8")).toBeInTheDocument();
   expect(screen.getByText("Below score")).toBeInTheDocument();
   expect(screen.getByText("Blacklist purge")).toBeInTheDocument();
+  expect(screen.getByText("Score threshold")).toBeInTheDocument();
+  expect(screen.getByText("Stale days")).toBeInTheDocument();
+  expect(screen.getByText("Blacklist age")).toBeInTheDocument();
 });
 
 test("runs configured and manual cleanup commands", async () => {
