@@ -125,3 +125,14 @@ export interface CleanupResponse {
 export type ScoreDistribution = [number, number][];
 
 export type ExportFormat = "csv" | "json";
+
+export interface SemanticJobResult {
+  job_id: string;
+  title: string | null;
+  company: string | null;
+  location: string | null;
+  similarity: number;
+  relevance_score: number | null;
+  site: string | null;
+  job_url: string | null;
+}

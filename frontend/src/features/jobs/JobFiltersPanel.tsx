@@ -38,7 +38,11 @@ export function JobFiltersPanel({
         filters.minSalary,
         filters.maxSalary,
         filters.datePostedFrom,
-        filters.datePostedTo
+        filters.datePostedTo,
+        filters.firstSeenFrom,
+        filters.firstSeenTo,
+        filters.lastSeenFrom,
+        filters.lastSeenTo
       ].filter(Boolean).length,
     [filters]
   );
@@ -152,7 +156,7 @@ export function JobFiltersPanel({
         </div>
 
         {showAdvanced ? (
-          <div className="grid gap-4 border-t border-zinc-100 pt-4 xl:grid-cols-[1.15fr_1fr_0.85fr]">
+          <div className="grid gap-4 border-t border-zinc-100 pt-4 xl:grid-cols-[1.05fr_1fr_1.15fr]">
             <fieldset className="grid gap-3">
               <legend className="mb-1 text-xs font-bold uppercase text-zinc-500">Source</legend>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -232,27 +236,45 @@ export function JobFiltersPanel({
             </fieldset>
 
             <fieldset className="grid gap-3">
-              <legend className="mb-1 text-xs font-bold uppercase text-zinc-500">Posted date</legend>
-              <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
-                <span>From</span>
-                <Input
-                  aria-label="Date posted from"
-                  onChange={(event) => onChange({ datePostedFrom: event.target.value })}
-                  type="date"
+              <legend className="mb-1 text-xs font-bold uppercase text-zinc-500">Dates</legend>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <DateFilter
+                  label="Posted from"
+                  name="Date posted from"
+                  onChange={(value) => onChange({ datePostedFrom: value })}
                   value={filters.datePostedFrom}
-                  variant="secondary"
                 />
-              </label>
-              <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
-                <span>To</span>
-                <Input
-                  aria-label="Date posted to"
-                  onChange={(event) => onChange({ datePostedTo: event.target.value })}
-                  type="date"
+                <DateFilter
+                  label="Posted to"
+                  name="Date posted to"
+                  onChange={(value) => onChange({ datePostedTo: value })}
                   value={filters.datePostedTo}
-                  variant="secondary"
                 />
-              </label>
+                <DateFilter
+                  label="First seen from"
+                  name="First seen from"
+                  onChange={(value) => onChange({ firstSeenFrom: value })}
+                  value={filters.firstSeenFrom}
+                />
+                <DateFilter
+                  label="First seen to"
+                  name="First seen to"
+                  onChange={(value) => onChange({ firstSeenTo: value })}
+                  value={filters.firstSeenTo}
+                />
+                <DateFilter
+                  label="Last seen from"
+                  name="Last seen from"
+                  onChange={(value) => onChange({ lastSeenFrom: value })}
+                  value={filters.lastSeenFrom}
+                />
+                <DateFilter
+                  label="Last seen to"
+                  name="Last seen to"
+                  onChange={(value) => onChange({ lastSeenTo: value })}
+                  value={filters.lastSeenTo}
+                />
+              </div>
             </fieldset>
           </div>
         ) : null}
@@ -333,6 +355,31 @@ function NumberFilter({
         min={min}
         onChange={(event) => onChange(event.target.value)}
         type="number"
+        value={value}
+        variant="secondary"
+      />
+    </label>
+  );
+}
+
+function DateFilter({
+  label,
+  name,
+  onChange,
+  value
+}: {
+  label: string;
+  name: string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  return (
+    <label className="grid gap-1 text-sm font-medium text-zinc-700">
+      <span>{label}</span>
+      <Input
+        aria-label={name}
+        onChange={(event) => onChange(event.target.value)}
+        type="date"
         value={value}
         variant="secondary"
       />

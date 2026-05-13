@@ -11,6 +11,7 @@ import {
   listBlacklistedJobs,
   listJobs,
   purgeBlacklist,
+  searchSimilarJobs,
   setApplied,
   setBookmarked,
   setDashboardToken,
@@ -161,6 +162,7 @@ test("covers facets blacklist cleanup and export endpoints", async () => {
 
   await getFacets();
   await listBlacklistedJobs({ text: "acme" });
+  await searchSimilarJobs({ min_score: 35, n_results: 12, q: "backend platform", site: "linkedin" });
   await unblacklistJobs(["job-1"]);
   await purgeBlacklist(30);
   await deleteJobsBelowScore(20);
@@ -177,21 +179,26 @@ test("covers facets blacklist cleanup and export endpoints", async () => {
   expect(fetch).toHaveBeenNthCalledWith(2, "/api/blacklist?text=acme", expect.any(Object));
   expect(fetch).toHaveBeenNthCalledWith(
     3,
+    "/api/jobs/search/semantic?q=backend+platform&n_results=12&min_score=35&site=linkedin",
+    expect.any(Object)
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    4,
     "/api/blacklist/remove",
     expect.objectContaining({ body: JSON.stringify({ job_ids: ["job-1"] }) })
   );
   expect(fetch).toHaveBeenNthCalledWith(
-    4,
+    5,
     "/api/blacklist/purge",
     expect.objectContaining({ body: JSON.stringify({ older_than_days: 30 }) })
   );
   expect(fetch).toHaveBeenNthCalledWith(
-    5,
+    6,
     "/api/cleanup/delete-below-score",
     expect.objectContaining({ body: JSON.stringify({ score: 20 }) })
   );
   expect(fetch).toHaveBeenNthCalledWith(
-    6,
+    7,
     "/api/export/jobs",
     expect.objectContaining({
       body: JSON.stringify({ job_ids: ["job-1"], format: "csv" }),

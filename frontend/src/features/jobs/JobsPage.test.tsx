@@ -12,6 +12,7 @@ vi.mock("../../api/client", () => ({
   exportJobs: vi.fn(),
   getFacets: vi.fn(),
   listJobs: vi.fn(),
+  searchSimilarJobs: vi.fn(),
   setApplied: vi.fn(),
   setBookmarked: vi.fn()
 }));
@@ -22,6 +23,7 @@ import {
   exportJobs,
   getFacets,
   listJobs,
+  searchSimilarJobs,
   setApplied,
   setBookmarked
 } from "../../api/client";
@@ -149,6 +151,18 @@ beforeEach(() => {
     message: null
   });
   vi.mocked(exportJobs).mockResolvedValue(new Blob(["id,title"]));
+  vi.mocked(searchSimilarJobs).mockResolvedValue([
+    {
+      company: "Acme Corp",
+      job_id: "job-1",
+      job_url: "https://example.com/backend",
+      location: "Remote",
+      relevance_score: 44,
+      similarity: 0.91,
+      site: "linkedin",
+      title: "Backend Engineer"
+    }
+  ]);
 });
 
 afterEach(() => {
@@ -183,6 +197,12 @@ test("filter controls update the list query", async () => {
   fireEvent.change(screen.getByLabelText("Job type"), {
     target: { value: "fulltime" }
   });
+  fireEvent.change(screen.getByLabelText("First seen from"), {
+    target: { value: "2026-05-01" }
+  });
+  fireEvent.change(screen.getByLabelText("Last seen to"), {
+    target: { value: "2026-05-09" }
+  });
   fireEvent.click(screen.getByRole("button", { name: "Saved" }));
   fireEvent.change(screen.getByLabelText("Sort"), {
     target: { value: "salary" }
@@ -192,12 +212,32 @@ test("filter controls update the list query", async () => {
     expect(listJobs).toHaveBeenLastCalledWith(
       expect.objectContaining({
         bookmarked: true,
+        first_seen_from: "2026-05-01",
         job_types: ["fulltime"],
+        last_seen_to: "2026-05-09",
         location: "remote",
         min_score: 35,
         sites: ["linkedin"],
         sort: "salary",
         text: "backend"
+      })
+    );
+  });
+});
+
+test("page size is sent to the jobs API", async () => {
+  renderJobsPage();
+  await screen.findByText("Backend Engineer");
+
+  fireEvent.change(screen.getByLabelText("Page size"), {
+    target: { value: "50" }
+  });
+
+  await waitFor(() => {
+    expect(listJobs).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        limit: 50,
+        offset: 0
       })
     );
   });
@@ -310,6 +350,21 @@ test("bulk actions can save apply export delete and blacklist selected jobs", as
   expect(deleteJobs).toHaveBeenCalledWith(["job-1"]);
 });
 
+test("row actions can blacklist and delete one job", async () => {
+  renderJobsPage();
+  await screen.findByText("Backend Engineer");
+
+  fireEvent.click(screen.getByRole("button", { name: "Blacklist Backend Engineer" }));
+  expect(screen.getByRole("heading", { name: "Blacklist Backend Engineer?" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm blacklist" }));
+  await waitFor(() => expect(blacklistJobs).toHaveBeenCalledWith(["job-1"]));
+
+  fireEvent.click(screen.getByRole("button", { name: "Delete Backend Engineer" }));
+  expect(screen.getByRole("heading", { name: "Delete Backend Engineer permanently?" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+  await waitFor(() => expect(deleteJobs).toHaveBeenCalledWith(["job-1"]));
+});
+
 test("reset filters returns the job query to the default console state", async () => {
   renderJobsPage();
   await screen.findByText("Backend Engineer");
@@ -359,6 +414,52 @@ test("exports the current rows as CSV", async () => {
   expect(revokeObjectUrl).toHaveBeenCalledWith("blob:jobs");
 });
 
+test("exports filtered jobs as JSON when selected", async () => {
+  const createObjectUrl = vi.fn(() => "blob:jobs");
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    value: createObjectUrl
+  });
+  Object.defineProperty(URL, "revokeObjectURL", {
+    configurable: true,
+    value: vi.fn()
+  });
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+
+  renderJobsPage();
+  await screen.findByText("Backend Engineer");
+
+  fireEvent.change(screen.getByLabelText("Export format"), {
+    target: { value: "json" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Export filtered" }));
+
+  await waitFor(() => expect(exportJobs).toHaveBeenCalledWith(expect.objectContaining({ format: "json" })));
+});
+
+test("semantic search returns matching jobs without replacing the main list", async () => {
+  renderJobsPage();
+  await screen.findByText("Backend Engineer");
+
+  fireEvent.change(screen.getByLabelText("Semantic search"), {
+    target: { value: "python backend platform" }
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Search similar jobs" }));
+
+  await waitFor(() =>
+    expect(searchSimilarJobs).toHaveBeenCalledWith(
+      {
+        min_score: undefined,
+        n_results: 10,
+        q: "python backend platform",
+        site: undefined
+      },
+      expect.any(Object)
+    )
+  );
+  expect(await screen.findByText(/91% match/)).toBeInTheDocument();
+});
+
 test("opening a row shows the detail panel", async () => {
   renderJobsPage();
   await screen.findByText("Backend Engineer");
@@ -366,6 +467,18 @@ test("opening a row shows the detail panel", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Open Backend Engineer details" }));
 
   expect(screen.getByText("Build Python APIs and data pipelines.")).toBeInTheDocument();
+});
+
+test("detail panel can permanently delete the open job", async () => {
+  renderJobsPage();
+  await screen.findByText("Backend Engineer");
+
+  fireEvent.click(screen.getByRole("button", { name: "Open Backend Engineer details" }));
+  fireEvent.click(screen.getByRole("button", { name: "Delete job" }));
+  expect(screen.getByRole("heading", { name: "Delete Backend Engineer permanently?" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+
+  await waitFor(() => expect(deleteJobs).toHaveBeenCalledWith(["job-1"]));
 });
 
 test("changing filters clears the detail panel", async () => {
