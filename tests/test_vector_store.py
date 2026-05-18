@@ -309,6 +309,38 @@ class TestJobVectorStore:
         assert results[0].similarity == 1.0  # clamped from 1.5
         assert results[1].similarity == 0.0  # clamped from -1.0
 
+    def test_search_handles_missing_metadata(self, vector_store, mock_collection):
+        """Test stale or partially-corrupt Chroma rows do not crash search."""
+        mock_collection.count.return_value = 5
+        mock_collection.query.return_value = {
+            "ids": [["id1", "id2"]],
+            "distances": [[0.2, 0.5]],
+            "metadatas": [[None, {"title": "Engineer"}]],
+        }
+
+        results = vector_store.search("engineer")
+
+        assert len(results) == 2
+        assert results[0].job_id == "id1"
+        assert results[0].metadata == {}
+        assert results[1].metadata == {"title": "Engineer"}
+
+    def test_search_keeps_results_when_metadata_list_is_absent(
+        self, vector_store, mock_collection
+    ):
+        """Test Chroma rows are not dropped when metadata is unavailable."""
+        mock_collection.count.return_value = 5
+        mock_collection.query.return_value = {
+            "ids": [["id1", "id2"]],
+            "distances": [[0.2, 0.5]],
+            "metadatas": [[]],
+        }
+
+        results = vector_store.search("engineer")
+
+        assert [result.job_id for result in results] == ["id1", "id2"]
+        assert [result.metadata for result in results] == [{}, {}]
+
     def test_delete_jobs(self, vector_store, mock_collection):
         """Test deleting jobs from the vector store."""
         mock_collection.get.return_value = {"ids": ["abc123"]}

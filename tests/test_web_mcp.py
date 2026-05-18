@@ -143,10 +143,11 @@ def test_search_similar_supports_console_filters() -> None:
     from job_search_tool.vector_store import SemanticSearchResult
     from job_search_tool.web.mcp import search_similar
 
+    active_job_id = job_service.get_db().get_all_jobs()[0].job_id
     job_service._vs = MagicMock()
     job_service._vs.search.return_value = [
         SemanticSearchResult(
-            job_id="semantic-1",
+            job_id=active_job_id,
             distance=0.12,
             similarity=0.88,
             metadata={
@@ -171,7 +172,7 @@ def test_search_similar_supports_console_filters() -> None:
 
     assert data == [
         {
-            "job_id": "semantic-1",
+            "job_id": active_job_id,
             "title": "ML Engineer",
             "company": "AI Corp",
             "location": "Remote",

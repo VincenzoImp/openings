@@ -11,7 +11,10 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 
-from job_search_tool.application.jobs import JobApplicationService
+from job_search_tool.application.jobs import (
+    JobApplicationService,
+    VectorStoreUnavailableError,
+)
 from job_search_tool.application.models import (
     BlacklistListQuery,
     CleanupPreview,
@@ -39,7 +42,7 @@ DEFAULT_MCP_ALLOWED_ORIGINS = [
 
 
 def _service() -> JobApplicationService:
-    return JobApplicationService(get_db())
+    return JobApplicationService(get_db(), vector_store_factory=get_vs)
 
 
 def _json(data: object) -> str:
@@ -197,27 +200,26 @@ def search_similar(
     site: str | None = None,
 ) -> str:
     """Search semantically similar jobs using the vector store when available."""
-    vs = get_vs()
-    if vs is None:
+    try:
+        results = _service().search_similar(
+            query=query,
+            n_results=n_results,
+            min_score=min_score,
+            site=site,
+        )
+    except VectorStoreUnavailableError:
         return _json({"error": "Vector store not available"})
-
-    results = vs.search(
-        query=query,
-        n_results=n_results,
-        min_score=min_score,
-        site=site,
-    )
     return _json(
         [
             {
                 "job_id": result.job_id,
-                "title": result.metadata.get("title"),
-                "company": result.metadata.get("company"),
-                "location": result.metadata.get("location"),
+                "title": result.title,
+                "company": result.company,
+                "location": result.location,
                 "similarity": round(result.similarity, 4),
-                "relevance_score": result.metadata.get("relevance_score"),
-                "site": result.metadata.get("site"),
-                "job_url": result.metadata.get("job_url"),
+                "relevance_score": result.relevance_score,
+                "site": result.site,
+                "job_url": result.job_url,
             }
             for result in results
         ]

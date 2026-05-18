@@ -6,6 +6,8 @@ from dataclasses import asdict
 import csv
 import json
 from io import StringIO
+import logging
+from typing import Any, Callable, Protocol, Sequence, cast
 
 from job_search_tool.application.models import (
     BlacklistListQuery,
@@ -17,9 +19,36 @@ from job_search_tool.application.models import (
     JobExportResult,
     JobListQuery,
     JobListResult,
+    SemanticJobResult,
 )
 from job_search_tool.database import JobDatabase
 from job_search_tool.models import JobDBRecord
+
+logger = logging.getLogger("job_search.application.jobs")
+
+
+class VectorSearchResult(Protocol):
+    job_id: str
+    similarity: float
+    metadata: dict[str, Any]
+
+
+class VectorStore(Protocol):
+    def delete_jobs(self, job_ids: list[str]) -> None: ...
+
+    def get_embedded_ids(self) -> set[str]: ...
+
+    def search(
+        self,
+        query: str,
+        n_results: int = 20,
+        min_score: int | None = None,
+        site: str | None = None,
+    ) -> Sequence[VectorSearchResult]: ...
+
+
+class VectorStoreUnavailableError(RuntimeError):
+    """Raised when semantic search is requested without a vector store."""
 
 
 class JobApplicationService:
@@ -29,8 +58,13 @@ class JobApplicationService:
     concerns so every surface uses the same behavior.
     """
 
-    def __init__(self, db: JobDatabase) -> None:
+    def __init__(
+        self,
+        db: JobDatabase,
+        vector_store_factory: Callable[[], object | None] | None = None,
+    ) -> None:
         self.db = db
+        self._vector_store_factory = vector_store_factory
 
     @staticmethod
     def _normalize_job_ids(job_ids: str | list[str]) -> list[str]:
@@ -73,6 +107,43 @@ class JobApplicationService:
             if hasattr(value, "isoformat"):
                 row[key] = value.isoformat()
         return row
+
+    def _get_vector_store(self) -> VectorStore | None:
+        if self._vector_store_factory is None:
+            return None
+        try:
+            vector_store = self._vector_store_factory()
+            return cast(VectorStore | None, vector_store)
+        except Exception as exc:
+            logger.warning("Vector store unavailable: %s", exc)
+            return None
+
+    def _delete_vector_jobs(self, job_ids: list[str]) -> None:
+        if not job_ids:
+            return
+        vector_store = self._get_vector_store()
+        if vector_store is None:
+            return
+        try:
+            vector_store.delete_jobs(job_ids)
+        except Exception as exc:
+            logger.warning("Failed to delete vector embeddings: %s", exc)
+
+    def _sync_stale_vector_jobs(self) -> None:
+        vector_store = self._get_vector_store()
+        if vector_store is None:
+            return
+        try:
+            active_ids = {job.job_id for job in self.db.get_all_jobs()}
+            stale_ids = sorted(
+                job_id
+                for job_id in vector_store.get_embedded_ids()
+                if job_id not in active_ids
+            )
+            if stale_ids:
+                vector_store.delete_jobs(stale_ids)
+        except Exception as exc:
+            logger.warning("Failed to sync stale vector embeddings: %s", exc)
 
     def list_jobs(self, query: JobListQuery | None = None) -> JobListResult:
         """Return a filtered, sorted, paginated job list."""
@@ -146,6 +217,56 @@ class JobApplicationService:
         """Return dashboard filter facets."""
         return self.db.get_facets()
 
+    def search_similar(
+        self,
+        query: str,
+        n_results: int = 20,
+        min_score: int | None = None,
+        site: str | None = None,
+    ) -> list[SemanticJobResult]:
+        """Return semantic results that still exist in the active job database."""
+        vector_store = self._get_vector_store()
+        if vector_store is None:
+            raise VectorStoreUnavailableError("Vector store not available")
+
+        vector_results = vector_store.search(
+            query=query,
+            n_results=n_results,
+            min_score=min_score,
+            site=site,
+        )
+        records_by_id = {
+            record.job_id: record
+            for record in self.db.get_jobs_by_ids(
+                [result.job_id for result in vector_results]
+            )
+        }
+        stale_ids: list[str] = []
+        semantic_results: list[SemanticJobResult] = []
+
+        for result in vector_results:
+            record = records_by_id.get(result.job_id)
+            if record is None:
+                stale_ids.append(result.job_id)
+                continue
+            metadata = result.metadata or {}
+            semantic_results.append(
+                SemanticJobResult(
+                    job_id=result.job_id,
+                    title=metadata.get("title") or record.title,
+                    company=metadata.get("company") or record.company,
+                    location=metadata.get("location") or record.location,
+                    similarity=result.similarity,
+                    relevance_score=metadata.get("relevance_score")
+                    or record.relevance_score,
+                    site=metadata.get("site") or record.site,
+                    job_url=metadata.get("job_url") or record.job_url,
+                )
+            )
+
+        self._delete_vector_jobs(stale_ids)
+        return semantic_results
+
     def set_bookmarked(
         self,
         job_ids: str | list[str],
@@ -187,6 +308,7 @@ class JobApplicationService:
             job_id for job_id in requested_ids if self.db.get_job_by_id(job_id)
         ]
         self.db.blacklist_jobs(affected_ids)
+        self._delete_vector_jobs(affected_ids)
         return self._command_result(
             affected_ids,
             total_requested=len(requested_ids),
@@ -210,6 +332,7 @@ class JobApplicationService:
             job_id for job_id in requested_ids if self.db.get_job_by_id(job_id)
         ]
         self.db.delete_jobs(affected_ids)
+        self._delete_vector_jobs(affected_ids)
         return self._command_result(
             affected_ids,
             total_requested=len(requested_ids),
@@ -218,11 +341,15 @@ class JobApplicationService:
     def delete_jobs_below_score(self, score: int) -> JobCommandResult:
         """Delete unprotected active jobs below a relevance score."""
         count = self.db.delete_jobs_below_score(score)
+        if count > 0:
+            self._sync_stale_vector_jobs()
         return JobCommandResult(success=count > 0, affected_count=count)
 
     def delete_stale_jobs(self, days: int) -> JobCommandResult:
         """Delete unprotected active jobs older than a last-seen threshold."""
         count = self.db.delete_stale_jobs(days)
+        if count > 0:
+            self._sync_stale_vector_jobs()
         return JobCommandResult(success=count > 0, affected_count=count)
 
     def purge_blacklist(self, older_than_days: int | None = None) -> JobCommandResult:
@@ -284,6 +411,8 @@ class JobApplicationService:
     def run_cleanup(self, config) -> CleanupResult:
         """Run cleanup and return the resulting counts."""
         report = self.db.reconcile_with_config(config)
+        if report.deleted_below_score > 0 or report.deleted_stale > 0:
+            self._sync_stale_vector_jobs()
         return CleanupResult(
             deleted_below_score=report.deleted_below_score,
             deleted_stale=report.deleted_stale,

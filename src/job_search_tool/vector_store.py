@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from itertools import zip_longest
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -233,18 +234,22 @@ class JobVectorStore:
         metadatas = results.get("metadatas") or []
         ids = results.get("ids") or []
         if ids and ids[0]:
-            for job_id, distance, metadata in zip(
+            for job_id, distance, metadata in zip_longest(
                 ids[0],
                 distances[0] if distances else [],
                 metadatas[0] if metadatas else [],
+                fillvalue=None,
             ):
+                if job_id is None or distance is None:
+                    continue
                 similarity = max(0.0, min(1.0, 1.0 - distance))
+                result_metadata = dict(metadata) if metadata else {}
                 search_results.append(
                     SemanticSearchResult(
                         job_id=job_id,
                         distance=distance,
                         similarity=similarity,
-                        metadata=dict(metadata),
+                        metadata=result_metadata,
                     )
                 )
 

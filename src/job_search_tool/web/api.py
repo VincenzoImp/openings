@@ -10,7 +10,10 @@ from typing import cast
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
-from job_search_tool.application.jobs import JobApplicationService
+from job_search_tool.application.jobs import (
+    JobApplicationService,
+    VectorStoreUnavailableError,
+)
 from job_search_tool.application.models import (
     BlacklistListQuery,
     CleanupPreview,
@@ -184,7 +187,7 @@ def require_api_token(
 
 
 def _service() -> JobApplicationService:
-    return JobApplicationService(get_db())
+    return JobApplicationService(get_db(), vector_store_factory=get_vs)
 
 
 def _command_response(result: JobCommandResult) -> JobCommandResponse:
@@ -328,21 +331,25 @@ def search_semantic(
     min_score: int | None = None,
     site: str | None = None,
 ) -> list[SemanticResultResponse]:
-    vs = get_vs()
-    if vs is None:
+    try:
+        results = _service().search_similar(
+            query=q,
+            n_results=n_results,
+            min_score=min_score,
+            site=site,
+        )
+    except VectorStoreUnavailableError:
         raise HTTPException(status_code=503, detail="Vector store not available")
-
-    results = vs.search(query=q, n_results=n_results, min_score=min_score, site=site)
     return [
         SemanticResultResponse(
             job_id=result.job_id,
-            title=result.metadata.get("title"),
-            company=result.metadata.get("company"),
-            location=result.metadata.get("location"),
+            title=result.title,
+            company=result.company,
+            location=result.location,
             similarity=round(result.similarity, 4),
-            relevance_score=result.metadata.get("relevance_score"),
-            site=result.metadata.get("site"),
-            job_url=result.metadata.get("job_url"),
+            relevance_score=result.relevance_score,
+            site=result.site,
+            job_url=result.job_url,
         )
         for result in results
     ]

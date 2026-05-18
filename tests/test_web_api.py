@@ -319,7 +319,24 @@ def test_semantic_search_with_vector_store(
     mock_vector_store,
 ) -> None:
     from job_search_tool import job_service
+    from job_search_tool.vector_store import SemanticSearchResult
 
+    active_job_id = client.get("/api/jobs").json()["items"][0]["job_id"]
+    mock_vector_store.search.return_value = [
+        SemanticSearchResult(
+            job_id=active_job_id,
+            distance=0.15,
+            similarity=0.85,
+            metadata={
+                "title": "ML Engineer",
+                "company": "AI Corp",
+                "location": "Remote",
+                "relevance_score": 35,
+                "site": "linkedin",
+                "job_url": "https://example.com/ml",
+            },
+        )
+    ]
     job_service._vs = mock_vector_store
 
     response = client.get(
@@ -335,7 +352,7 @@ def test_semantic_search_with_vector_store(
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
-    assert data[0]["job_id"] == "abc123"
+    assert data[0]["job_id"] == active_job_id
     assert data[0]["similarity"] == 0.85
     assert data[0]["location"] == "Remote"
     assert data[0]["site"] == "linkedin"
