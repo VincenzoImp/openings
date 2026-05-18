@@ -8,7 +8,7 @@ import tomllib
 
 
 PROJECT_NAME = "job-search-tool"
-FALLBACK_VERSION = "10.1.2"
+FALLBACK_VERSION = "10.1.3"
 ROOT_DIR = Path(__file__).resolve().parents[2]
 
 

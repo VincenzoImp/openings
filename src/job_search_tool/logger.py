@@ -222,8 +222,8 @@ def setup_logging(config: Config) -> logging.Logger:
     # installed so they inherit the DedupeFilter and uniform format.
     _reroute_jobspy_loggers()
 
-    # ChromaDB occasionally emits noisy WARNING-level telemetry failures —
-    # keep them at WARNING so anything at or above that level still flows.
+    # Keep third-party ChromaDB logs visible at warning/error level. Product
+    # telemetry itself is disabled in the vector-store client configuration.
     logging.getLogger("chromadb").setLevel(logging.WARNING)
 
     return logger

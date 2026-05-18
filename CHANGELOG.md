@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 No changes yet.
 
+## [10.1.3] - 2026-05-18
+
+### Fixed
+
+- Replaced ChromaDB's product telemetry implementation with a local no-op adapter so disabled telemetry no longer constructs PostHog or emits `capture() takes 1 positional argument but 3 were given` log noise.
+- Updated Docker telemetry defaults to point ChromaDB at the same no-op adapter used by the application.
+
 ## [10.1.2] - 2026-05-18
 
 ### Fixed
@@ -642,7 +649,8 @@ No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-
 
 Entries prior to v4.3.1 have been archived. The git history on `main` plus the tagged commits are the authoritative source for anything older.
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v10.1.2...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v10.1.3...HEAD
+[10.1.3]: https://github.com/VincenzoImp/job-search-tool/compare/v10.1.2...v10.1.3
 [10.1.2]: https://github.com/VincenzoImp/job-search-tool/compare/v10.1.1...v10.1.2
 [10.1.1]: https://github.com/VincenzoImp/job-search-tool/compare/v10.1.0...v10.1.1
 [10.1.0]: https://github.com/VincenzoImp/job-search-tool/compare/v10.0.0...v10.1.0

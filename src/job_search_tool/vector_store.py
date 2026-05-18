@@ -25,6 +25,9 @@ if TYPE_CHECKING:
     import pandas as pd
 
 logger = logging.getLogger("job_search.vector_store")
+NOOP_PRODUCT_TELEMETRY_IMPL = (
+    "job_search_tool.chroma_telemetry.NoOpProductTelemetryClient"
+)
 
 
 @dataclass(frozen=True)
@@ -64,14 +67,16 @@ class JobVectorStore:
         self._persist_dir.mkdir(parents=True, exist_ok=True)
 
         self._embedding_fn = DefaultEmbeddingFunction()
-        # Disable ChromaDB telemetry at the Settings level. The
-        # ANONYMIZED_TELEMETRY env var is not honoured by every bundled
-        # posthog version (it still fires noisy 'capture() takes 1 positional
-        # argument but 3 were given' errors); passing Settings explicitly is
-        # the contract that the ChromaDB client honours end-to-end.
+        # Use a product-telemetry no-op. ChromaDB 0.6.x still builds its
+        # PostHog client when only anonymized_telemetry=False is set, which can
+        # emit noisy runtime errors with newer posthog versions.
         self._client = chromadb.PersistentClient(
             path=str(self._persist_dir),
-            settings=Settings(anonymized_telemetry=False),
+            settings=Settings(
+                anonymized_telemetry=False,
+                chroma_product_telemetry_impl=NOOP_PRODUCT_TELEMETRY_IMPL,
+                chroma_telemetry_impl=NOOP_PRODUCT_TELEMETRY_IMPL,
+            ),
         )
         self._collection = self._client.get_or_create_collection(
             name=self.COLLECTION_NAME,
