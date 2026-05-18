@@ -156,6 +156,25 @@ class TestJobVectorStore:
         """Test that the vector store initializes with ChromaDB."""
         mock_client.get_or_create_collection.assert_called_once()
 
+    def test_initialization_uses_noop_product_telemetry(self, mock_client, tmp_path):
+        """Test ChromaDB product telemetry is disabled at the implementation layer."""
+        from job_search_tool.vector_store import JobVectorStore
+
+        _mock_chromadb_config.Settings.reset_mock()
+
+        with patch.object(_mock_chromadb, "PersistentClient", return_value=mock_client):
+            JobVectorStore(persist_dir=tmp_path / "chroma")
+
+        _mock_chromadb_config.Settings.assert_called_once_with(
+            anonymized_telemetry=False,
+            chroma_product_telemetry_impl=(
+                "job_search_tool.chroma_telemetry.NoOpProductTelemetryClient"
+            ),
+            chroma_telemetry_impl=(
+                "job_search_tool.chroma_telemetry.NoOpProductTelemetryClient"
+            ),
+        )
+
     def test_add_jobs_valid(self, vector_store, mock_collection, sample_jobs):
         """Test adding jobs with valid data."""
         count = vector_store.add_jobs(sample_jobs)

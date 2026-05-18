@@ -109,7 +109,8 @@ ENV TZ=UTC
 # Silence ChromaDB telemetry pings (they also emit spurious "capture() takes
 # 1 positional argument but 3 were given" errors on recent posthog releases).
 ENV ANONYMIZED_TELEMETRY=False
-ENV CHROMA_TELEMETRY_IMPL=none
+ENV CHROMA_PRODUCT_TELEMETRY_IMPL=job_search_tool.chroma_telemetry.NoOpProductTelemetryClient
+ENV CHROMA_TELEMETRY_IMPL=job_search_tool.chroma_telemetry.NoOpProductTelemetryClient
 
 VOLUME ["/data"]
 
