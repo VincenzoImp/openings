@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+No changes yet.
+
+## [10.1.1] - 2026-05-18
+
 ### Fixed
 
 - Updated GitHub Actions Docker and artifact actions to Node 24-ready major versions, removing the Node.js 20 deprecation warning path before GitHub's forced runtime switch.
@@ -631,7 +635,8 @@ No functional or Docker-image changes — the v5.0.0 and v5.0.1 images are byte-
 
 Entries prior to v4.3.1 have been archived. The git history on `main` plus the tagged commits are the authoritative source for anything older.
 
-[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v10.1.0...HEAD
+[Unreleased]: https://github.com/VincenzoImp/job-search-tool/compare/v10.1.1...HEAD
+[10.1.1]: https://github.com/VincenzoImp/job-search-tool/compare/v10.1.0...v10.1.1
 [10.1.0]: https://github.com/VincenzoImp/job-search-tool/compare/v10.0.0...v10.1.0
 [10.0.0]: https://github.com/VincenzoImp/job-search-tool/compare/v9.1.0...v10.0.0
 [9.1.0]: https://github.com/VincenzoImp/job-search-tool/compare/v9.0.0...v9.1.0
