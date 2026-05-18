@@ -266,6 +266,92 @@ def test_blacklist_unblacklist_and_delete_use_command_envelopes(
     assert seeded_db.get_job_by_id(delete_id) is None
 
 
+def test_delete_and_blacklist_remove_vector_embeddings(
+    seeded_db: JobDatabase,
+) -> None:
+    from unittest.mock import MagicMock
+
+    from job_search_tool.application.jobs import JobApplicationService
+
+    vector_store = MagicMock()
+    service = JobApplicationService(
+        seeded_db, vector_store_factory=lambda: vector_store
+    )
+    jobs = service.list_jobs().jobs
+    delete_id = jobs[0].job_id
+    blacklist_id = jobs[1].job_id
+
+    service.delete_jobs([delete_id])
+    service.blacklist_jobs([blacklist_id])
+
+    vector_store.delete_jobs.assert_any_call([delete_id])
+    vector_store.delete_jobs.assert_any_call([blacklist_id])
+
+
+def test_cleanup_deletions_remove_stale_vector_embeddings(
+    seeded_db: JobDatabase,
+) -> None:
+    from unittest.mock import MagicMock
+
+    from job_search_tool.application.jobs import JobApplicationService
+
+    vector_store = MagicMock()
+    vector_store.get_embedded_ids.return_value = {
+        job.job_id for job in seeded_db.get_all_jobs()
+    }
+    stale_vector_id = next(
+        job.job_id
+        for job in seeded_db.get_all_jobs()
+        if job.title == "Frontend Developer"
+    )
+    service = JobApplicationService(
+        seeded_db, vector_store_factory=lambda: vector_store
+    )
+
+    result = service.delete_stale_jobs(30)
+
+    assert result.affected_count == 1
+    vector_store.delete_jobs.assert_called_once_with([stale_vector_id])
+
+
+def test_search_similar_filters_stale_vector_rows_and_uses_db_metadata(
+    seeded_db: JobDatabase,
+) -> None:
+    from unittest.mock import MagicMock
+
+    from job_search_tool.application.jobs import JobApplicationService
+    from job_search_tool.vector_store import SemanticSearchResult
+
+    active_job = seeded_db.get_all_jobs()[0]
+    stale_id = "deleted-job"
+    vector_store = MagicMock()
+    vector_store.search.return_value = [
+        SemanticSearchResult(
+            job_id=stale_id,
+            distance=0.1,
+            similarity=0.9,
+            metadata={"title": "Deleted"},
+        ),
+        SemanticSearchResult(
+            job_id=active_job.job_id,
+            distance=0.2,
+            similarity=0.8,
+            metadata={},
+        ),
+    ]
+
+    service = JobApplicationService(
+        seeded_db, vector_store_factory=lambda: vector_store
+    )
+    results = service.search_similar("python", n_results=2)
+
+    assert [result.job_id for result in results] == [active_job.job_id]
+    assert results[0].title == active_job.title
+    assert results[0].company == active_job.company
+    assert results[0].similarity == 0.8
+    vector_store.delete_jobs.assert_called_once_with([stale_id])
+
+
 def test_blacklist_query_and_facets(seeded_db: JobDatabase) -> None:
     from job_search_tool.application.jobs import JobApplicationService
     from job_search_tool.application.models import BlacklistListQuery

@@ -96,6 +96,20 @@ class JobExportResult:
 
 
 @dataclass(frozen=True)
+class SemanticJobResult:
+    """Semantic search result enriched with active database job metadata."""
+
+    job_id: str
+    title: str | None
+    company: str | None
+    location: str | None
+    similarity: float
+    relevance_score: int | None
+    site: str | None
+    job_url: str | None
+
+
+@dataclass(frozen=True)
 class CleanupPreview:
     """Counts for cleanup actions before or after execution."""
 
