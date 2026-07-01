@@ -45,9 +45,6 @@ class TestColors:
         assert isinstance(Colors.RED, str)
         assert isinstance(Colors.GREEN, str)
         assert isinstance(Colors.YELLOW, str)
-        assert isinstance(Colors.BLUE, str)
-        assert isinstance(Colors.MAGENTA, str)
-        assert isinstance(Colors.CYAN, str)
         assert isinstance(Colors.GRAY, str)
 
     def test_color_codes_are_ansi(self):

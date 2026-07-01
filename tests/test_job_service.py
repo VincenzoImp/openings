@@ -95,6 +95,17 @@ def test_get_vs_returns_none_when_unavailable(caplog):
     from job_search_tool import job_service
 
     job_service.reset_singletons()
+    original_import = (
+        __builtins__.__import__ if hasattr(__builtins__, "__import__") else __import__
+    )  # type: ignore[union-attr]
+
+    def failing_import(name, *args, **kwargs):
+        if name == "job_search_tool.vector_store":
+            raise ImportError("no chromadb")
+        # Delegate to the ORIGINAL import, not the patched one, so any
+        # incidental import inside this block doesn't recurse forever.
+        return original_import(name, *args, **kwargs)
+
     with patch.object(
         job_service,
         "get_vs",
@@ -104,14 +115,7 @@ def test_get_vs_returns_none_when_unavailable(caplog):
             # Force re-import failure by resetting and patching the import
             job_service._vs = None
             job_service._vs_attempted = False
-            with patch(
-                "builtins.__import__",
-                side_effect=lambda name, *a, **kw: (
-                    (_ for _ in ()).throw(ImportError("no chromadb"))
-                    if name == "job_search_tool.vector_store"
-                    else __import__(name, *a, **kw)
-                ),
-            ):
+            with patch("builtins.__import__", side_effect=failing_import):
                 result = job_service.get_vs()
             assert result is None
     job_service.reset_singletons()
