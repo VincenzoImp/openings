@@ -427,6 +427,57 @@ class TestJobVectorStore:
 
 
 # =============================================================================
+# ReadOnlyVectorStore TESTS
+# =============================================================================
+
+
+class TestReadOnlyVectorStore:
+    """Tests for the ReadOnlyVectorStore wrapper.
+
+    The web process must never mutate the on-disk Chroma index directly —
+    only the scheduler process (the sole owner/writer) does that. This
+    wrapper enforces the boundary: it exposes reads and hides writes so a
+    caller can't accidentally reintroduce cross-process writes to Chroma.
+    """
+
+    def test_search_delegates_to_wrapped_store(self, vector_store, mock_collection):
+        from job_search_tool.vector_store import ReadOnlyVectorStore
+
+        mock_collection.count.return_value = 5
+        mock_collection.query.return_value = {
+            "ids": [["abc123"]],
+            "distances": [[0.2]],
+            "metadatas": [[{"title": "Eng"}]],
+        }
+
+        readonly = ReadOnlyVectorStore(vector_store)
+        results = readonly.search("engineer")
+
+        assert len(results) == 1
+        assert results[0].job_id == "abc123"
+
+    def test_count_delegates_to_wrapped_store(self, vector_store, mock_collection):
+        from job_search_tool.vector_store import ReadOnlyVectorStore
+
+        mock_collection.count.return_value = 42
+
+        readonly = ReadOnlyVectorStore(vector_store)
+
+        assert readonly.count() == 42
+
+    def test_does_not_expose_mutating_methods(self, vector_store):
+        from job_search_tool.vector_store import ReadOnlyVectorStore
+
+        readonly = ReadOnlyVectorStore(vector_store)
+
+        assert not hasattr(readonly, "delete_jobs")
+        assert not hasattr(readonly, "add_jobs")
+        assert not hasattr(readonly, "add_jobs_from_dataframe")
+        assert not hasattr(readonly, "reset")
+        assert not hasattr(readonly, "get_embedded_ids")
+
+
+# =============================================================================
 # get_vector_store SINGLETON TESTS
 # =============================================================================
 

@@ -34,9 +34,12 @@ class VectorSearchResult(Protocol):
 
 
 class VectorStore(Protocol):
-    def delete_jobs(self, job_ids: list[str]) -> None: ...
+    """Read-only surface the web process is allowed to use.
 
-    def get_embedded_ids(self) -> set[str]: ...
+    Only the scheduler process may mutate Chroma's on-disk index — see
+    ``vector_store.ReadOnlyVectorStore`` for why concurrent multi-process
+    writes corrupt it. This service must never call a mutating method here.
+    """
 
     def search(
         self,
@@ -118,33 +121,6 @@ class JobApplicationService:
             logger.warning("Vector store unavailable: %s", exc)
             return None
 
-    def _delete_vector_jobs(self, job_ids: list[str]) -> None:
-        if not job_ids:
-            return
-        vector_store = self._get_vector_store()
-        if vector_store is None:
-            return
-        try:
-            vector_store.delete_jobs(job_ids)
-        except Exception as exc:
-            logger.warning("Failed to delete vector embeddings: %s", exc)
-
-    def _sync_stale_vector_jobs(self) -> None:
-        vector_store = self._get_vector_store()
-        if vector_store is None:
-            return
-        try:
-            active_ids = {job.job_id for job in self.db.get_all_jobs()}
-            stale_ids = sorted(
-                job_id
-                for job_id in vector_store.get_embedded_ids()
-                if job_id not in active_ids
-            )
-            if stale_ids:
-                vector_store.delete_jobs(stale_ids)
-        except Exception as exc:
-            logger.warning("Failed to sync stale vector embeddings: %s", exc)
-
     def list_jobs(self, query: JobListQuery | None = None) -> JobListResult:
         """Return a filtered, sorted, paginated job list."""
         query = query or JobListQuery()
@@ -224,7 +200,13 @@ class JobApplicationService:
         min_score: int | None = None,
         site: str | None = None,
     ) -> list[SemanticJobResult]:
-        """Return semantic results that still exist in the active job database."""
+        """Return semantic results that still exist in the active job database.
+
+        Stale hits (jobs Chroma still has embedded but that are no longer in
+        the SQL DB) are filtered out of the results here, but not deleted
+        from Chroma — only the scheduler process may write to Chroma; it
+        prunes the same stale entries on its own periodic sync.
+        """
         vector_store = self._get_vector_store()
         if vector_store is None:
             raise VectorStoreUnavailableError("Vector store not available")
@@ -241,13 +223,11 @@ class JobApplicationService:
                 [result.job_id for result in vector_results]
             )
         }
-        stale_ids: list[str] = []
         semantic_results: list[SemanticJobResult] = []
 
         for result in vector_results:
             record = records_by_id.get(result.job_id)
             if record is None:
-                stale_ids.append(result.job_id)
                 continue
             metadata = result.metadata or {}
             semantic_results.append(
@@ -264,7 +244,6 @@ class JobApplicationService:
                 )
             )
 
-        self._delete_vector_jobs(stale_ids)
         return semantic_results
 
     def set_bookmarked(
@@ -308,7 +287,6 @@ class JobApplicationService:
             job_id for job_id in requested_ids if self.db.get_job_by_id(job_id)
         ]
         self.db.blacklist_jobs(affected_ids)
-        self._delete_vector_jobs(affected_ids)
         return self._command_result(
             affected_ids,
             total_requested=len(requested_ids),
@@ -332,24 +310,27 @@ class JobApplicationService:
             job_id for job_id in requested_ids if self.db.get_job_by_id(job_id)
         ]
         self.db.delete_jobs(affected_ids)
-        self._delete_vector_jobs(affected_ids)
         return self._command_result(
             affected_ids,
             total_requested=len(requested_ids),
         )
 
     def delete_jobs_below_score(self, score: int) -> JobCommandResult:
-        """Delete unprotected active jobs below a relevance score."""
+        """Delete unprotected active jobs below a relevance score.
+
+        Chroma embeddings for these jobs are pruned by the scheduler's own
+        periodic sync, not from here — see ``search_similar``.
+        """
         count = self.db.delete_jobs_below_score(score)
-        if count > 0:
-            self._sync_stale_vector_jobs()
         return JobCommandResult(success=count > 0, affected_count=count)
 
     def delete_stale_jobs(self, days: int) -> JobCommandResult:
-        """Delete unprotected active jobs older than a last-seen threshold."""
+        """Delete unprotected active jobs older than a last-seen threshold.
+
+        Chroma embeddings for these jobs are pruned by the scheduler's own
+        periodic sync, not from here — see ``search_similar``.
+        """
         count = self.db.delete_stale_jobs(days)
-        if count > 0:
-            self._sync_stale_vector_jobs()
         return JobCommandResult(success=count > 0, affected_count=count)
 
     def purge_blacklist(self, older_than_days: int | None = None) -> JobCommandResult:
@@ -409,10 +390,13 @@ class JobApplicationService:
         )
 
     def run_cleanup(self, config) -> CleanupResult:
-        """Run cleanup and return the resulting counts."""
+        """Run cleanup and return the resulting counts.
+
+        Chroma embeddings for jobs deleted here are pruned by the
+        scheduler's own periodic sync, not from here — see
+        ``search_similar``.
+        """
         report = self.db.reconcile_with_config(config)
-        if report.deleted_below_score > 0 or report.deleted_stale > 0:
-            self._sync_stale_vector_jobs()
         return CleanupResult(
             deleted_below_score=report.deleted_below_score,
             deleted_stale=report.deleted_stale,

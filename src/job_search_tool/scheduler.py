@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Callable
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.date import DateTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 if TYPE_CHECKING:
     from job_search_tool.config import Config
@@ -27,7 +28,14 @@ class JobSearchScheduler:
     Handles graceful shutdown and retry logic.
     """
 
-    def __init__(self, config: Config, job_function: Callable[[], bool]):
+    def __init__(
+        self,
+        config: Config,
+        job_function: Callable[[], bool],
+        *,
+        vector_sync_function: Callable[[], None] | None = None,
+        vector_sync_interval_minutes: int | None = None,
+    ):
         """
         Initialize the scheduler.
 
@@ -35,9 +43,19 @@ class JobSearchScheduler:
             config: Configuration object.
             job_function: Function to execute for each search.
                          Should return True on success, False on failure.
+            vector_sync_function: Optional callable that prunes stale Chroma
+                embeddings. Run on its own interval alongside the main job
+                because the scheduler process is the sole writer to Chroma's
+                on-disk index — the web process only reads it, so deletions
+                made from the dashboard are pruned here instead.
+            vector_sync_interval_minutes: Interval, in minutes, between
+                ``vector_sync_function`` runs. Ignored if
+                ``vector_sync_function`` is None.
         """
         self.config = config
         self.job_function = job_function
+        self.vector_sync_function = vector_sync_function
+        self.vector_sync_interval_minutes = vector_sync_interval_minutes
         self.logger = get_logger("scheduler")
         self._scheduler: BlockingScheduler | None = None
         self._running = False
@@ -230,6 +248,19 @@ class JobSearchScheduler:
         # Initialize scheduler
         self._scheduler = BlockingScheduler()
 
+        if self.vector_sync_function is not None:
+            interval_minutes = self.vector_sync_interval_minutes or 30
+            self._scheduler.add_job(
+                self.vector_sync_function,
+                trigger=IntervalTrigger(minutes=interval_minutes),
+                id="vector_sync_job",
+                name="Vector Store Sync",
+                max_instances=1,
+            )
+            self.logger.info(
+                f"Vector store sync scheduled every {interval_minutes} minutes"
+            )
+
         # Run immediately on startup if configured, otherwise schedule first run
         if self.config.scheduler.run_on_startup:
             self.logger.info("Executing initial run on startup...")
@@ -284,7 +315,11 @@ class JobSearchScheduler:
 
 
 def create_scheduler(
-    config: Config, job_function: Callable[[], bool]
+    config: Config,
+    job_function: Callable[[], bool],
+    *,
+    vector_sync_function: Callable[[], None] | None = None,
+    vector_sync_interval_minutes: int | None = None,
 ) -> JobSearchScheduler:
     """
     Factory function to create a JobSearchScheduler.
@@ -292,8 +327,17 @@ def create_scheduler(
     Args:
         config: Configuration object.
         job_function: Function to execute for each search.
+        vector_sync_function: Optional periodic Chroma stale-embedding
+            cleanup callable (see ``JobSearchScheduler.__init__``).
+        vector_sync_interval_minutes: Interval, in minutes, between
+            ``vector_sync_function`` runs.
 
     Returns:
         Configured JobSearchScheduler instance.
     """
-    return JobSearchScheduler(config, job_function)
+    return JobSearchScheduler(
+        config,
+        job_function,
+        vector_sync_function=vector_sync_function,
+        vector_sync_interval_minutes=vector_sync_interval_minutes,
+    )

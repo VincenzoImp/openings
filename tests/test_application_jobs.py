@@ -266,14 +266,47 @@ def test_blacklist_unblacklist_and_delete_use_command_envelopes(
     assert seeded_db.get_job_by_id(delete_id) is None
 
 
-def test_delete_and_blacklist_remove_vector_embeddings(
+class _ReadOnlyFakeVectorStore:
+    """Test double mirroring ``ReadOnlyVectorStore``'s read-only surface.
+
+    The web process only ever gets a read-only view (see
+    ``job_service.get_vs``) because ChromaDB's local ``PersistentClient``
+    is not safe for concurrent multi-process writes — the scheduler process
+    is the sole writer. ``delete_jobs``/``get_embedded_ids`` are implemented
+    here (rather than left absent) purely to *record* whether application
+    code still tries to call them — application code swallows
+    ``Exception`` around vector-store calls, so an absent-attribute
+    ``AttributeError`` would be silently caught and prove nothing.
+    """
+
+    def __init__(self, search_results: list | None = None) -> None:
+        self.search_results = search_results or []
+        self.delete_jobs_called = False
+        self.get_embedded_ids_called = False
+
+    def search(self, query, n_results=20, min_score=None, site=None):
+        return self.search_results
+
+    def delete_jobs(self, job_ids: list[str]) -> None:
+        self.delete_jobs_called = True
+
+    def get_embedded_ids(self) -> set[str]:
+        self.get_embedded_ids_called = True
+        return set()
+
+
+def test_delete_and_blacklist_never_write_to_vector_store(
     seeded_db: JobDatabase,
 ) -> None:
-    from unittest.mock import MagicMock
+    """Web-triggered deletes only touch the SQL DB, never Chroma directly.
 
+    Only the scheduler process may mutate the on-disk Chroma index (see
+    ``vector_store.ReadOnlyVectorStore``); writing from two processes at
+    once corrupts the HNSW index and crashes with a native segfault.
+    """
     from job_search_tool.application.jobs import JobApplicationService
 
-    vector_store = MagicMock()
+    vector_store = _ReadOnlyFakeVectorStore()
     service = JobApplicationService(
         seeded_db, vector_store_factory=lambda: vector_store
     )
@@ -281,29 +314,23 @@ def test_delete_and_blacklist_remove_vector_embeddings(
     delete_id = jobs[0].job_id
     blacklist_id = jobs[1].job_id
 
-    service.delete_jobs([delete_id])
-    service.blacklist_jobs([blacklist_id])
+    delete_result = service.delete_jobs([delete_id])
+    blacklist_result = service.blacklist_jobs([blacklist_id])
 
-    vector_store.delete_jobs.assert_any_call([delete_id])
-    vector_store.delete_jobs.assert_any_call([blacklist_id])
+    assert delete_result.affected_count == 1
+    assert blacklist_result.affected_count == 1
+    assert seeded_db.get_job_by_id(delete_id) is None
+    assert seeded_db.is_job_blacklisted(blacklist_id) is True
+    assert vector_store.delete_jobs_called is False
 
 
-def test_cleanup_deletions_remove_stale_vector_embeddings(
+def test_cleanup_deletions_do_not_write_to_vector_store(
     seeded_db: JobDatabase,
 ) -> None:
-    from unittest.mock import MagicMock
-
+    """Stale-job cleanup only touches the SQL DB, never Chroma directly."""
     from job_search_tool.application.jobs import JobApplicationService
 
-    vector_store = MagicMock()
-    vector_store.get_embedded_ids.return_value = {
-        job.job_id for job in seeded_db.get_all_jobs()
-    }
-    stale_vector_id = next(
-        job.job_id
-        for job in seeded_db.get_all_jobs()
-        if job.title == "Frontend Developer"
-    )
+    vector_store = _ReadOnlyFakeVectorStore()
     service = JobApplicationService(
         seeded_db, vector_store_factory=lambda: vector_store
     )
@@ -311,34 +338,35 @@ def test_cleanup_deletions_remove_stale_vector_embeddings(
     result = service.delete_stale_jobs(30)
 
     assert result.affected_count == 1
-    vector_store.delete_jobs.assert_called_once_with([stale_vector_id])
+    assert vector_store.delete_jobs_called is False
+    assert vector_store.get_embedded_ids_called is False
 
 
 def test_search_similar_filters_stale_vector_rows_and_uses_db_metadata(
     seeded_db: JobDatabase,
 ) -> None:
-    from unittest.mock import MagicMock
-
+    """Stale semantic hits are filtered from results without touching Chroma."""
     from job_search_tool.application.jobs import JobApplicationService
     from job_search_tool.vector_store import SemanticSearchResult
 
     active_job = seeded_db.get_all_jobs()[0]
     stale_id = "deleted-job"
-    vector_store = MagicMock()
-    vector_store.search.return_value = [
-        SemanticSearchResult(
-            job_id=stale_id,
-            distance=0.1,
-            similarity=0.9,
-            metadata={"title": "Deleted"},
-        ),
-        SemanticSearchResult(
-            job_id=active_job.job_id,
-            distance=0.2,
-            similarity=0.8,
-            metadata={},
-        ),
-    ]
+    vector_store = _ReadOnlyFakeVectorStore(
+        search_results=[
+            SemanticSearchResult(
+                job_id=stale_id,
+                distance=0.1,
+                similarity=0.9,
+                metadata={"title": "Deleted"},
+            ),
+            SemanticSearchResult(
+                job_id=active_job.job_id,
+                distance=0.2,
+                similarity=0.8,
+                metadata={},
+            ),
+        ]
+    )
 
     service = JobApplicationService(
         seeded_db, vector_store_factory=lambda: vector_store
@@ -349,7 +377,7 @@ def test_search_similar_filters_stale_vector_rows_and_uses_db_metadata(
     assert results[0].title == active_job.title
     assert results[0].company == active_job.company
     assert results[0].similarity == 0.8
-    vector_store.delete_jobs.assert_called_once_with([stale_id])
+    assert vector_store.delete_jobs_called is False
 
 
 def test_blacklist_query_and_facets(seeded_db: JobDatabase) -> None:

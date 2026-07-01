@@ -15,7 +15,7 @@ from job_search_tool.logger import get_logger
 from job_search_tool.models import JobDBRecord
 
 if TYPE_CHECKING:
-    from job_search_tool.vector_store import JobVectorStore
+    from job_search_tool.vector_store import ReadOnlyVectorStore
 
 # ---------------------------------------------------------------------------
 # Paths (derived from config.DATA_DIR — respects JOB_SEARCH_DATA_DIR env var)
@@ -31,7 +31,7 @@ logger = get_logger("service")
 # ---------------------------------------------------------------------------
 
 _db: JobDatabase | None = None
-_vs: JobVectorStore | None = None
+_vs: ReadOnlyVectorStore | None = None
 _vs_attempted: bool = False
 
 
@@ -43,15 +43,23 @@ def get_db() -> JobDatabase:
     return _db
 
 
-def get_vs() -> JobVectorStore | None:
-    """Return the shared JobVectorStore singleton, or None if unavailable."""
+def get_vs() -> ReadOnlyVectorStore | None:
+    """Return a read-only view of the vector store, or None if unavailable.
+
+    Only the scheduler process may write to Chroma's on-disk index (its
+    local ``PersistentClient`` isn't safe for concurrent multi-process
+    writes); the web process — this module — only ever reads it.
+    """
     global _vs, _vs_attempted
     if not _vs_attempted:
         _vs_attempted = True
         try:
-            from job_search_tool.vector_store import get_vector_store
+            from job_search_tool.vector_store import (
+                ReadOnlyVectorStore,
+                get_vector_store,
+            )
 
-            _vs = get_vector_store(CHROMA_PATH)
+            _vs = ReadOnlyVectorStore(get_vector_store(CHROMA_PATH))
         except Exception as exc:
             logger.warning("Vector store unavailable: %s", exc)
             _vs = None

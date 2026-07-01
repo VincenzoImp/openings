@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import sys
 import traceback
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from job_search_tool.config import get_config, reload_config
 from job_search_tool.database import get_database, recalculate_all_scores
@@ -382,11 +382,42 @@ def _prepare_runtime(*, scheduled: bool) -> tuple[Config, JobDatabase]:
     return config, db
 
 
+def _make_vector_sync_function(
+    config: Config, db: JobDatabase
+) -> Callable[[], None] | None:
+    """Build the scheduler's periodic Chroma stale-embedding cleanup callback.
+
+    The scheduler process is the sole writer to Chroma's on-disk index — its
+    local ``PersistentClient`` isn't safe for concurrent multi-process
+    writes, which is what corrupted the HNSW index and crashed the
+    scheduler with a native segfault. Deletions made from the web dashboard
+    only touch the SQL DB (see ``application/jobs.py``); this callback is
+    how the corresponding Chroma embeddings eventually get pruned.
+    """
+    if not config.vector_search.enabled:
+        return None
+
+    from job_search_tool.vector_store import get_vector_store
+    from job_search_tool.vector_commands import sync_deletions
+
+    vs = get_vector_store(config.chroma_path)
+
+    def vector_sync_function() -> None:
+        sync_deletions(db, vs)
+
+    return vector_sync_function
+
+
 def _cmd_scheduler() -> int:
     """Run the continuous APScheduler loop."""
     logger = get_logger("main")
-    config, _db = _prepare_runtime(scheduled=True)
-    scheduler = create_scheduler(config, run_job_search)
+    config, db = _prepare_runtime(scheduled=True)
+    scheduler = create_scheduler(
+        config,
+        run_job_search,
+        vector_sync_function=_make_vector_sync_function(config, db),
+        vector_sync_interval_minutes=config.vector_search.sync_interval_minutes,
+    )
 
     try:
         scheduler.start()

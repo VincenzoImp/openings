@@ -334,6 +334,12 @@ class VectorSearchConfig:
     default_results: int = 20
     backfill_on_startup: bool = True
     batch_size: int = 100
+    # Cadence for the scheduler's periodic stale-embedding cleanup. The
+    # scheduler process is the sole writer to the on-disk Chroma index (the
+    # web process only reads it — see docs/architecture notes on vector
+    # store ownership), so deletions made from the dashboard are cleaned up
+    # here rather than immediately from the web process.
+    sync_interval_minutes: int = 30
 
 
 @dataclass
@@ -924,6 +930,7 @@ def _parse_vector_search_config(data: dict[str, Any]) -> VectorSearchConfig:
             "default_results",
             "backfill_on_startup",
             "batch_size",
+            "sync_interval_minutes",
         },
     )
 
@@ -935,12 +942,17 @@ def _parse_vector_search_config(data: dict[str, Any]) -> VectorSearchConfig:
         vector_data.get("batch_size", 100), "batch_size", 100
     )
 
+    sync_interval_minutes = _validate_positive_int(
+        vector_data.get("sync_interval_minutes", 30), "sync_interval_minutes", 30
+    )
+
     return VectorSearchConfig(
         enabled=vector_data.get("enabled", True),
         embed_on_save=vector_data.get("embed_on_save", True),
         default_results=default_results,
         backfill_on_startup=vector_data.get("backfill_on_startup", True),
         batch_size=batch_size,
+        sync_interval_minutes=sync_interval_minutes,
     )
 
 

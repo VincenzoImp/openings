@@ -142,6 +142,27 @@ def test_get_vs_attempts_only_once():
     job_service.reset_singletons()
 
 
+def test_get_vs_returns_read_only_wrapper():
+    """The web process must get a read-only view, never the raw writable store.
+
+    ChromaDB's local PersistentClient corrupts its on-disk HNSW index under
+    concurrent multi-process writes; the scheduler process is the sole
+    writer, so the web process (this module) may only read.
+    """
+    from job_search_tool import job_service
+    from job_search_tool.vector_store import JobVectorStore, ReadOnlyVectorStore
+
+    job_service.reset_singletons()
+    fake_store = object.__new__(JobVectorStore)
+    with patch(
+        "job_search_tool.vector_store.get_vector_store", return_value=fake_store
+    ):
+        result = job_service.get_vs()
+
+    assert isinstance(result, ReadOnlyVectorStore)
+    job_service.reset_singletons()
+
+
 # ---------------------------------------------------------------------------
 # Record serialization
 # ---------------------------------------------------------------------------

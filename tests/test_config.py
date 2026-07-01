@@ -383,6 +383,25 @@ class TestVectorSearchConfigValidation:
                 {"vector_search": {"model_name": "all-MiniLM-L6-v2"}}
             )
 
+    def test_sync_interval_minutes_default(self):
+        """Default sync_interval_minutes is 30 when unset."""
+        config = _parse_vector_search_config({})
+        assert config.sync_interval_minutes == 30
+
+    def test_sync_interval_minutes_custom(self):
+        """A configured sync_interval_minutes value is honored."""
+        config = _parse_vector_search_config(
+            {"vector_search": {"sync_interval_minutes": 10}}
+        )
+        assert config.sync_interval_minutes == 10
+
+    def test_sync_interval_minutes_rejects_non_positive(self):
+        """sync_interval_minutes must be at least 1."""
+        with pytest.raises(ValueError, match="sync_interval_minutes"):
+            _parse_vector_search_config(
+                {"vector_search": {"sync_interval_minutes": 0}}
+            )
+
 
 class TestConfigQueries:
     """Tests for Config query methods."""
