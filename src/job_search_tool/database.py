@@ -29,6 +29,22 @@ from job_search_tool.models import (
 )
 from job_search_tool.scoring import calculate_relevance_score
 
+
+# Python 3.12 deprecated sqlite3's built-in date/datetime adapters and
+# converters. Register explicit ones (matching the former defaults —
+# ISO 8601 text) so the DATE columns keep round-tripping to datetime.date
+# without emitting DeprecationWarnings on 3.12+.
+def _register_sqlite_date_handlers() -> None:
+    sqlite3.register_adapter(date, lambda value: value.isoformat())
+    sqlite3.register_adapter(datetime, lambda value: value.isoformat())
+    sqlite3.register_converter("date", lambda raw: date.fromisoformat(raw.decode()))
+    sqlite3.register_converter(
+        "timestamp", lambda raw: datetime.fromisoformat(raw.decode())
+    )
+
+
+_register_sqlite_date_handlers()
+
 _JOB_FIELD_NAMES = (
     "job_id",
     "title",
