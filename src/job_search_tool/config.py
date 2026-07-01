@@ -15,6 +15,7 @@ import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
 
@@ -704,11 +705,19 @@ def _parse_logging_config(data: dict[str, Any]) -> LoggingConfig:
     if backup_count < 0:
         raise ValueError(f"backup_count cannot be negative, got {backup_count}")
 
+    timezone = logging_data.get("timezone", "UTC")
+    try:
+        ZoneInfo(timezone)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise ValueError(
+            f"logging.timezone must be a valid IANA timezone, got {timezone!r}"
+        ) from exc
+
     return LoggingConfig(
         level=logging_data.get("level", "INFO"),
         max_size_mb=max_size_mb,
         backup_count=backup_count,
-        timezone=logging_data.get("timezone", "UTC"),
+        timezone=timezone,
     )
 
 

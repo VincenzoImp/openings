@@ -174,6 +174,16 @@ class TestLoggingConfigValidation:
         with pytest.raises(ValueError, match="backup_count cannot be negative"):
             _parse_logging_config({"logging": {"backup_count": -1}})
 
+    def test_invalid_timezone_is_rejected(self):
+        """An unknown IANA timezone must fail fast instead of being ignored."""
+        with pytest.raises(ValueError, match="timezone"):
+            _parse_logging_config({"logging": {"timezone": "Not/ARealZone"}})
+
+    def test_valid_timezone_is_accepted(self):
+        """A real IANA timezone is accepted."""
+        config = _parse_logging_config({"logging": {"timezone": "Europe/Zurich"}})
+        assert config.timezone == "Europe/Zurich"
+
 
 class TestSchedulerConfigValidation:
     """Tests for scheduler config validation."""

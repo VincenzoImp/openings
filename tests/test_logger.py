@@ -451,6 +451,57 @@ class TestSetupLogging:
 
 
 # =============================================================================
+# TEST TIMEZONE CONVERTER
+# =============================================================================
+
+
+class TestTimezoneConverter:
+    """Tests for the logging.timezone setting actually shaping timestamps.
+
+    The setting is documented as controlling the timezone of log timestamps;
+    previously it was parsed but never applied (a silent no-op).
+    """
+
+    def test_utc_matches_gmtime(self):
+        import time
+
+        from job_search_tool.logger import _timezone_converter
+
+        ts = 1700000000.0
+        assert _timezone_converter("UTC")(ts)[:6] == time.gmtime(ts)[:6]
+
+    def test_named_zone_offsets_from_utc(self):
+        from job_search_tool.logger import _timezone_converter
+
+        ts = 1700000000.0
+        utc = _timezone_converter("UTC")(ts)
+        # Kiritimati is UTC+14 — no realistic host/CI tz coincides with it.
+        far = _timezone_converter("Pacific/Kiritimati")(ts)
+        assert far[3] != utc[3]
+
+    def test_invalid_zone_falls_back_to_localtime(self):
+        import time
+
+        from job_search_tool.logger import _timezone_converter
+
+        assert _timezone_converter("Not/ARealZone") is time.localtime
+
+    def test_setup_logging_applies_configured_timezone(self, tmp_path):
+        from job_search_tool.logger import _timezone_converter
+
+        config = Config(logging=LoggingConfig(timezone="Pacific/Kiritimati"))
+        ts = 1700000000.0
+        expected = _timezone_converter("Pacific/Kiritimati")(ts)
+
+        with patch.object(Config, "log_path", tmp_path / "test.log"):
+            logger = setup_logging(config)
+
+            for handler in logger.handlers:
+                assert handler.formatter is not None
+                assert handler.formatter.converter(ts)[:6] == expected[:6]
+
+
+# =============================================================================
 # TEST DEDUPE FILTER
 # =============================================================================
 
