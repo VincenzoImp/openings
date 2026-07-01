@@ -5,9 +5,8 @@ Job Search Tool - Automated Job Aggregation.
 Aggregates job listings from multiple job boards using JobSpy.
 Features parallel execution, throttling, retry logic, and configurable scoring.
 
-Scoring, filtering, and export functionality are in separate modules:
+Scoring and filtering functionality lives in a separate module:
 - scoring.py: Relevance scoring, fuzzy matching, filtering
-- exporter.py: CSV/Excel export
 """
 
 from __future__ import annotations

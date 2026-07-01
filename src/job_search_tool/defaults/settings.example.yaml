@@ -1049,13 +1049,12 @@ database:
 #   {DATA_DIR}/config/settings.yaml   — this file
 #   {DATA_DIR}/db/jobs.db             — primary SQLite store
 #   {DATA_DIR}/chroma/                — vector store (ChromaDB)
-#   {DATA_DIR}/results/               — CSV/Excel exports (created on demand)
 #   {DATA_DIR}/logs/search.log        — application log
 #
 # None of these paths are configurable here — use JOB_SEARCH_DATA_DIR to
 # relocate the entire tree. There is no longer an `output:` section: CSV
-# and Excel exports are triggered on-demand from the dashboard's Database
-# tab; the search pipeline itself never writes spreadsheets.
+# and JSON exports are streamed on-demand from the dashboard's Database tab
+# straight to the browser; nothing is ever written to disk.
 # =============================================================================
 
 

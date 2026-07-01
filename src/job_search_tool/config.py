@@ -413,11 +413,6 @@ class Config:
         return DATA_DIR / "config"
 
     @property
-    def results_path(self) -> Path:
-        """Directory where CSV/Excel exports are written."""
-        return DATA_DIR / "results"
-
-    @property
     def database_path(self) -> Path:
         """Absolute path to the SQLite database file."""
         return DATA_DIR / "db" / "jobs.db"

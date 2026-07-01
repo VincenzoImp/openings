@@ -275,7 +275,6 @@ class TestConfigPaths:
 
         assert isinstance(config.data_dir, Path)
         assert isinstance(config.config_dir, Path)
-        assert isinstance(config.results_path, Path)
         assert isinstance(config.database_path, Path)
         assert isinstance(config.chroma_path, Path)
         assert isinstance(config.logs_dir, Path)
@@ -289,7 +288,6 @@ class TestConfigPaths:
         assert config.config_dir == root / "config"
         assert config.database_path == root / "db" / "jobs.db"
         assert config.chroma_path == root / "chroma"
-        assert config.results_path == root / "results"
         assert config.logs_dir == root / "logs"
         assert config.log_path == root / "logs" / "search.log"
 
