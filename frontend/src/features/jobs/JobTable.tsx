@@ -41,7 +41,7 @@ export function JobTable({
   onToggleApplied,
   onToggleBookmarked,
   onToggleSelected,
-  selectedIds
+  selectedIds,
 }: JobTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const rowHeight = globalThis.innerWidth < 768 ? 124 : 58;
@@ -49,7 +49,7 @@ export function JobTable({
     count: jobs.length,
     estimateSize: () => rowHeight,
     getScrollElement: () => scrollRef.current,
-    overscan: 8
+    overscan: 8,
   });
   const virtualItems = rowVirtualizer.getVirtualItems();
   const visibleRows = virtualItems.length
@@ -57,8 +57,16 @@ export function JobTable({
     : jobs.map((job, index) => ({ item: null, job, fallbackIndex: index }));
 
   return (
-    <Card className="w-full min-w-0 overflow-hidden border border-slate-200 shadow-sm" variant="default">
-      <div aria-colcount={7} aria-rowcount={jobs.length} className="min-w-0 overflow-x-auto" role="table">
+    <Card
+      className="w-full min-w-0 overflow-hidden border border-slate-200 shadow-sm"
+      variant="default"
+    >
+      <div
+        aria-colcount={7}
+        aria-rowcount={jobs.length}
+        className="min-w-0 overflow-x-auto"
+        role="table"
+      >
         <div
           className={`${JOB_GRID_CLASS} border-b border-slate-200 bg-slate-100 py-3 text-xs font-bold uppercase text-slate-500 md:min-w-[980px]`}
           role="row"
@@ -105,7 +113,7 @@ export function JobTable({
                           left: 0,
                           position: "absolute",
                           top: 0,
-                          transform: `translateY(${top}px)`
+                          transform: `translateY(${top}px)`,
                         }
                       : undefined
                   }

@@ -9,7 +9,7 @@ vi.mock("../../api/client", () => ({
   deleteStaleJobs: vi.fn(),
   previewCleanup: vi.fn(),
   purgeCleanupBlacklist: vi.fn(),
-  runCleanup: vi.fn()
+  runCleanup: vi.fn(),
 }));
 
 import {
@@ -17,20 +17,20 @@ import {
   deleteStaleJobs,
   previewCleanup,
   purgeCleanupBlacklist,
-  runCleanup
+  runCleanup,
 } from "../../api/client";
 
 function renderCleanupPage() {
   const queryClient = new QueryClient({
     defaultOptions: {
       mutations: { retry: false },
-      queries: { retry: false }
-    }
+      queries: { retry: false },
+    },
   });
   render(
     <QueryClientProvider client={queryClient}>
       <CleanupPage />
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -41,7 +41,7 @@ beforeEach(() => {
     protected_applied: 4,
     protected_bookmarked: 3,
     purged_blacklist: 5,
-    total_deleted: 8
+    total_deleted: 8,
   });
   vi.mocked(runCleanup).mockResolvedValue({
     deleted_below_score: 2,
@@ -49,7 +49,7 @@ beforeEach(() => {
     protected_applied: 4,
     protected_bookmarked: 3,
     purged_blacklist: 5,
-    total_deleted: 8
+    total_deleted: 8,
   });
   vi.mocked(deleteJobsBelowScore).mockResolvedValue({
     affected_count: 2,
@@ -57,7 +57,7 @@ beforeEach(() => {
     bookmarked: null,
     job_ids: [],
     message: null,
-    success: true
+    success: true,
   });
   vi.mocked(deleteStaleJobs).mockResolvedValue({
     affected_count: 1,
@@ -65,7 +65,7 @@ beforeEach(() => {
     bookmarked: null,
     job_ids: [],
     message: null,
-    success: true
+    success: true,
   });
   vi.mocked(purgeCleanupBlacklist).mockResolvedValue({
     affected_count: 5,
@@ -73,7 +73,7 @@ beforeEach(() => {
     bookmarked: null,
     job_ids: [],
     message: null,
-    success: true
+    success: true,
   });
 });
 
@@ -98,35 +98,45 @@ test("runs configured and manual cleanup commands", async () => {
   expect(screen.getByRole("heading", { name: "Run configured cleanup?" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Confirm configured cleanup" }));
   await waitFor(() => expect(runCleanup).toHaveBeenCalledTimes(1));
-  await waitFor(() => expect(screen.getByRole("button", { name: "Delete below score" })).not.toBeDisabled());
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Delete below score" })).not.toBeDisabled(),
+  );
 
   fireEvent.change(screen.getByLabelText("Score threshold"), {
-    target: { value: "30" }
+    target: { value: "30" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Delete below score" }));
   expect(screen.getByRole("heading", { name: "Delete jobs below score?" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Confirm delete below score" }));
   await waitFor(() =>
-    expect(screen.queryByRole("heading", { name: "Delete jobs below score?" })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole("heading", { name: "Delete jobs below score?" }),
+    ).not.toBeInTheDocument(),
   );
-  await waitFor(() => expect(screen.getByRole("button", { name: "Delete stale jobs" })).not.toBeDisabled());
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Delete stale jobs" })).not.toBeDisabled(),
+  );
 
   fireEvent.change(screen.getByLabelText("Stale days"), {
-    target: { value: "45" }
+    target: { value: "45" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Delete stale jobs" }));
   expect(screen.getByRole("heading", { name: "Delete stale jobs?" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Confirm delete stale jobs" }));
   await waitFor(() =>
-    expect(screen.queryByRole("heading", { name: "Delete stale jobs?" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("heading", { name: "Delete stale jobs?" })).not.toBeInTheDocument(),
   );
-  await waitFor(() => expect(screen.getByRole("button", { name: "Purge aged blacklist" })).not.toBeDisabled());
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Purge aged blacklist" })).not.toBeDisabled(),
+  );
 
   fireEvent.change(screen.getByLabelText("Blacklist age days"), {
-    target: { value: "90" }
+    target: { value: "90" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Purge aged blacklist" }));
-  expect(screen.getByRole("heading", { name: "Purge aged blacklist entries?" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "Purge aged blacklist entries?" }),
+  ).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Confirm purge blacklist" }));
 
   expect(vi.mocked(deleteJobsBelowScore).mock.calls[0][0]).toBe(30);
@@ -140,13 +150,13 @@ test("disables manual cleanup commands when numeric input is invalid", async () 
   await screen.findByText("8");
 
   fireEvent.change(screen.getByLabelText("Score threshold"), {
-    target: { value: "" }
+    target: { value: "" },
   });
   fireEvent.change(screen.getByLabelText("Stale days"), {
-    target: { value: "0" }
+    target: { value: "0" },
   });
   fireEvent.change(screen.getByLabelText("Blacklist age days"), {
-    target: { value: "-3" }
+    target: { value: "-3" },
   });
 
   expect(screen.getByRole("button", { name: "Delete below score" })).toBeDisabled();

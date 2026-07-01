@@ -9,7 +9,7 @@ import {
   getFacets,
   searchSimilarJobs,
   setApplied,
-  setBookmarked
+  setBookmarked,
 } from "../../api/client";
 import type { ExportFormat, JobRecord, SemanticJobResult } from "../../api/types";
 import { AlertBanner } from "../../components/AlertBanner";
@@ -23,7 +23,7 @@ import {
   buildJobListParams,
   DEFAULT_JOB_FILTERS,
   jobFilterKey,
-  type JobFilterValues
+  type JobFilterValues,
 } from "./jobFilters";
 import { jobsQuery } from "./jobQueries";
 
@@ -69,13 +69,16 @@ export function JobsPage() {
     setSelectedJob(null);
   }, [page]);
 
-  const params = useMemo(() => buildJobListParams(filters, page, pageSize), [filters, page, pageSize]);
+  const params = useMemo(
+    () => buildJobListParams(filters, page, pageSize),
+    [filters, page, pageSize],
+  );
 
   const { data, isLoading, isError } = useQuery(jobsQuery(params));
   const facets = useQuery({
     queryKey: ["job-facets"],
     queryFn: getFacets,
-    staleTime: 60_000
+    staleTime: 60_000,
   });
   const jobs = data?.items ?? [];
 
@@ -110,7 +113,7 @@ export function JobsPage() {
       queryClient.invalidateQueries({ queryKey: ["distribution"] }),
       queryClient.invalidateQueries({ queryKey: ["cleanup-preview"] }),
       queryClient.invalidateQueries({ queryKey: ["blacklist"] }),
-      queryClient.invalidateQueries({ queryKey: ["job-facets"] })
+      queryClient.invalidateQueries({ queryKey: ["job-facets"] }),
     ]);
   const mutationFailure = (error: Error) => {
     setMutationMessage(null);
@@ -130,7 +133,7 @@ export function JobsPage() {
     onSuccess: () => {
       commandSuccess("Job state updated.");
       return invalidateDashboardData();
-    }
+    },
   });
   const appliedMutation = useMutation({
     mutationFn: (job: JobRecord) => setApplied([job.job_id], !job.applied),
@@ -142,7 +145,7 @@ export function JobsPage() {
     onSuccess: () => {
       commandSuccess("Job state updated.");
       return invalidateDashboardData();
-    }
+    },
   });
   const blacklistMutation = useMutation({
     mutationFn: (jobIds: string[]) => blacklistJobs(jobIds),
@@ -157,7 +160,7 @@ export function JobsPage() {
       setSelectedIds(new Set());
       setSelectedJob(null);
       return invalidateDashboardData();
-    }
+    },
   });
   const deleteMutation = useMutation({
     mutationFn: (jobIds: string[]) => deleteJobs(jobIds),
@@ -172,7 +175,7 @@ export function JobsPage() {
       setSelectedIds(new Set());
       setSelectedJob(null);
       return invalidateDashboardData();
-    }
+    },
   });
   const bulkBookmarkMutation = useMutation({
     mutationFn: ({ jobIds, value }: { jobIds: string[]; value: boolean }) =>
@@ -185,10 +188,11 @@ export function JobsPage() {
     onSuccess: () => {
       commandSuccess("Selected jobs were updated.");
       return invalidateDashboardData();
-    }
+    },
   });
   const bulkAppliedMutation = useMutation({
-    mutationFn: ({ jobIds, value }: { jobIds: string[]; value: boolean }) => setApplied(jobIds, value),
+    mutationFn: ({ jobIds, value }: { jobIds: string[]; value: boolean }) =>
+      setApplied(jobIds, value),
     onError: mutationFailure,
     onMutate: () => {
       setMutationError(null);
@@ -197,14 +201,14 @@ export function JobsPage() {
     onSuccess: () => {
       commandSuccess("Selected jobs were updated.");
       return invalidateDashboardData();
-    }
+    },
   });
   const exportMutation = useMutation({
     mutationFn: (payload: { jobIds?: string[] }) =>
       exportJobs(
         payload.jobIds?.length
           ? { format: exportFormat, job_ids: payload.jobIds }
-          : { filters: params, format: exportFormat }
+          : { filters: params, format: exportFormat },
       ),
     onError: mutationFailure,
     onMutate: () => {
@@ -214,7 +218,7 @@ export function JobsPage() {
     onSuccess: (blob) => {
       saveBlob(blob, `jobs.${exportFormat}`);
       commandSuccess("Export generated.");
-    }
+    },
   });
   const semanticMutation = useMutation({
     mutationFn: searchSimilarJobs,
@@ -226,7 +230,7 @@ export function JobsPage() {
     onSuccess: (results) => {
       setSemanticResults(results);
       commandSuccess("Semantic search completed.");
-    }
+    },
   });
 
   const toggleSelected = (jobId: string) => {
@@ -261,7 +265,11 @@ export function JobsPage() {
     setSelectedJob(null);
   };
 
-  const requestCommand = (action: PendingCommand["action"], jobIds: string[], jobTitle?: string) => {
+  const requestCommand = (
+    action: PendingCommand["action"],
+    jobIds: string[],
+    jobTitle?: string,
+  ) => {
     setPendingCommand({ action, jobIds, jobTitle });
   };
 
@@ -274,7 +282,7 @@ export function JobsPage() {
       min_score: filters.minScore ? Number(filters.minScore) : undefined,
       n_results: 10,
       q,
-      site: filters.site || undefined
+      site: filters.site || undefined,
     });
   };
 
@@ -360,7 +368,9 @@ export function JobsPage() {
                   }}
                   type="button"
                 >
-                  <span className="font-semibold text-zinc-950">{result.title ?? result.job_id}</span>
+                  <span className="font-semibold text-zinc-950">
+                    {result.title ?? result.job_id}
+                  </span>
                   <span className="text-xs text-zinc-500">
                     {Math.round(result.similarity * 100)}% match
                     {result.company ? ` / ${result.company}` : ""}
@@ -389,25 +399,29 @@ export function JobsPage() {
         onExportFiltered={() => exportMutation.mutate({})}
         onExportFormatChange={setExportFormat}
         onExportSelected={() => exportMutation.mutate({ jobIds: [...selectedIds] })}
-        onMarkAppliedSelected={() => bulkAppliedMutation.mutate({ jobIds: [...selectedIds], value: true })}
-        onMarkNotAppliedSelected={() => bulkAppliedMutation.mutate({ jobIds: [...selectedIds], value: false })}
+        onMarkAppliedSelected={() =>
+          bulkAppliedMutation.mutate({ jobIds: [...selectedIds], value: true })
+        }
+        onMarkNotAppliedSelected={() =>
+          bulkAppliedMutation.mutate({ jobIds: [...selectedIds], value: false })
+        }
         onNextPage={() => setPage((value) => value + 1)}
         onPageSizeChange={updatePageSize}
         onPreviousPage={() => setPage((value) => value - 1)}
-        onSaveSelected={() => bulkBookmarkMutation.mutate({ jobIds: [...selectedIds], value: true })}
-        onUnsaveSelected={() => bulkBookmarkMutation.mutate({ jobIds: [...selectedIds], value: false })}
+        onSaveSelected={() =>
+          bulkBookmarkMutation.mutate({ jobIds: [...selectedIds], value: true })
+        }
+        onUnsaveSelected={() =>
+          bulkBookmarkMutation.mutate({ jobIds: [...selectedIds], value: false })
+        }
         page={page}
         pageCount={pageCount}
         pageSize={pageSize}
         selectedCount={selectedIds.size}
       />
 
-      {mutationError ? (
-        <AlertBanner kind="danger">{mutationError}</AlertBanner>
-      ) : null}
-      {mutationMessage ? (
-        <AlertBanner kind="success">{mutationMessage}</AlertBanner>
-      ) : null}
+      {mutationError ? <AlertBanner kind="danger">{mutationError}</AlertBanner> : null}
+      {mutationMessage ? <AlertBanner kind="success">{mutationMessage}</AlertBanner> : null}
 
       <div className={selectedJob ? "grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]" : "grid gap-4"}>
         <JobTable
@@ -442,7 +456,9 @@ export function JobsPage() {
         ) : null}
       </div>
       <ConfirmDialog
-        confirmLabel={pendingCommand?.action === "blacklist" ? "Confirm blacklist" : "Confirm delete"}
+        confirmLabel={
+          pendingCommand?.action === "blacklist" ? "Confirm blacklist" : "Confirm delete"
+        }
         description={pendingDescription}
         isOpen={pendingCommand !== null}
         isPending={blacklistMutation.isPending || deleteMutation.isPending}

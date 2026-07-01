@@ -41,7 +41,7 @@ export const DEFAULT_JOB_FILTERS: JobFilterValues = {
   site: "",
   sort: "score",
   status: "all",
-  text: ""
+  text: "",
 };
 
 export function jobFilterKey(filters: JobFilterValues): string {
@@ -62,7 +62,7 @@ function numericFilter(value: string, min = 0, max?: number): number | undefined
 export function buildJobListParams(
   filters: JobFilterValues,
   page: number,
-  pageSize: number
+  pageSize: number,
 ): JobListParams {
   return {
     applied: filters.status === "applied" ? true : filters.status === "open" ? false : undefined,
@@ -86,6 +86,6 @@ export function buildJobListParams(
     remote: filters.remoteOnly ? true : undefined,
     sites: filters.site ? [filters.site] : undefined,
     sort: filters.sort,
-    text: filters.text || undefined
+    text: filters.text || undefined,
   };
 }

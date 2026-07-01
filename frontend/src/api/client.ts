@@ -11,7 +11,7 @@ import type {
   JobRecord,
   SemanticJobResult,
   ScoreDistribution,
-  StatsResponse
+  StatsResponse,
 } from "./types";
 
 const API_ROOT = "/api";
@@ -59,7 +59,7 @@ function handleRejectedAuth(response: Response): void {
 
 function requestHeaders(init?: RequestInit): Record<string, string> {
   const headers: Record<string, string> = {
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
   };
   const incoming = init?.headers;
   if (incoming instanceof Headers) {
@@ -80,7 +80,7 @@ function requestHeaders(init?: RequestInit): Record<string, string> {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_ROOT}${path}`, {
     ...init,
-    headers: requestHeaders(init)
+    headers: requestHeaders(init),
   });
 
   if (!response.ok) {
@@ -95,7 +95,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
   const response = await fetch(`${API_ROOT}${path}`, {
     ...init,
-    headers: requestHeaders(init)
+    headers: requestHeaders(init),
   });
 
   if (!response.ok) {
@@ -155,47 +155,44 @@ export function searchSimilarJobs(params: {
       q: params.q,
       n_results: params.n_results,
       min_score: params.min_score,
-      site: params.site
-    })}`
+      site: params.site,
+    })}`,
   );
 }
 
 export function setBookmarked(
   jobIds: string[] | string,
-  bookmarked: boolean
+  bookmarked: boolean,
 ): Promise<CommandResponse> {
   return request<CommandResponse>("/jobs/bookmark", {
     method: "POST",
-    body: JSON.stringify({ job_ids: jobIdsPayload(jobIds), bookmarked })
+    body: JSON.stringify({ job_ids: jobIdsPayload(jobIds), bookmarked }),
   });
 }
 
-export function setApplied(
-  jobIds: string[] | string,
-  applied: boolean
-): Promise<CommandResponse> {
+export function setApplied(jobIds: string[] | string, applied: boolean): Promise<CommandResponse> {
   return request<CommandResponse>("/jobs/applied", {
     method: "POST",
-    body: JSON.stringify({ job_ids: jobIdsPayload(jobIds), applied })
+    body: JSON.stringify({ job_ids: jobIdsPayload(jobIds), applied }),
   });
 }
 
 export function blacklistJobs(jobIds: string[]): Promise<CommandResponse> {
   return request<CommandResponse>("/blacklist", {
     method: "POST",
-    body: JSON.stringify({ job_ids: jobIds })
+    body: JSON.stringify({ job_ids: jobIds }),
   });
 }
 
 export function deleteJobs(jobIds: string[]): Promise<CommandResponse> {
   return request<CommandResponse>("/jobs/delete", {
     method: "POST",
-    body: JSON.stringify({ job_ids: jobIds })
+    body: JSON.stringify({ job_ids: jobIds }),
   });
 }
 
 export function listBlacklistedJobs(
-  params: BlacklistListParams = {}
+  params: BlacklistListParams = {},
 ): Promise<BlacklistListResponse> {
   return request<BlacklistListResponse>(`/blacklist${query(params)}`);
 }
@@ -203,14 +200,14 @@ export function listBlacklistedJobs(
 export function unblacklistJobs(jobIds: string[]): Promise<CommandResponse> {
   return request<CommandResponse>("/blacklist/remove", {
     method: "POST",
-    body: JSON.stringify({ job_ids: jobIds })
+    body: JSON.stringify({ job_ids: jobIds }),
   });
 }
 
 export function purgeBlacklist(olderThanDays?: number): Promise<CommandResponse> {
   return request<CommandResponse>("/blacklist/purge", {
     method: "POST",
-    body: JSON.stringify({ older_than_days: olderThanDays ?? null })
+    body: JSON.stringify({ older_than_days: olderThanDays ?? null }),
   });
 }
 
@@ -233,21 +230,21 @@ export function runCleanup(): Promise<CleanupResponse> {
 export function deleteJobsBelowScore(score: number): Promise<CommandResponse> {
   return request<CommandResponse>("/cleanup/delete-below-score", {
     method: "POST",
-    body: JSON.stringify({ score })
+    body: JSON.stringify({ score }),
   });
 }
 
 export function deleteStaleJobs(days: number): Promise<CommandResponse> {
   return request<CommandResponse>("/cleanup/delete-stale", {
     method: "POST",
-    body: JSON.stringify({ days })
+    body: JSON.stringify({ days }),
   });
 }
 
 export function purgeCleanupBlacklist(olderThanDays?: number): Promise<CommandResponse> {
   return request<CommandResponse>("/cleanup/purge-blacklist", {
     method: "POST",
-    body: JSON.stringify({ older_than_days: olderThanDays ?? null })
+    body: JSON.stringify({ older_than_days: olderThanDays ?? null }),
   });
 }
 
@@ -259,11 +256,11 @@ export function exportJobs(payload: {
   if (payload.job_ids) {
     return requestBlob("/export/jobs", {
       method: "POST",
-      body: JSON.stringify({ job_ids: payload.job_ids, format: payload.format })
+      body: JSON.stringify({ job_ids: payload.job_ids, format: payload.format }),
     });
   }
 
   return requestBlob(
-    `/export/jobs${query({ ...(payload.filters ?? {}), format: payload.format })}`
+    `/export/jobs${query({ ...(payload.filters ?? {}), format: payload.format })}`,
   );
 }

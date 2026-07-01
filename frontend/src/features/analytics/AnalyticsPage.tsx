@@ -15,17 +15,17 @@ export function AnalyticsPage() {
   const stats = useQuery({
     queryKey: ["stats"],
     queryFn: getStats,
-    staleTime: 30_000
+    staleTime: 30_000,
   });
   const distribution = useQuery({
     queryKey: ["distribution"],
     queryFn: getDistribution,
-    staleTime: 30_000
+    staleTime: 30_000,
   });
   const facets = useQuery({
     queryKey: ["job-facets"],
     queryFn: getFacets,
-    staleTime: 60_000
+    staleTime: 60_000,
   });
   const maxCount = Math.max(...(distribution.data?.map(([, count]) => count) ?? []), 1);
   const hasError = stats.isError || distribution.isError || facets.isError;
@@ -57,7 +57,10 @@ export function AnalyticsPage() {
         </CardHeader>
         <CardContent className="grid gap-3 p-4 pt-0">
           {distribution.data?.map(([binStart, count]) => (
-            <div className="grid grid-cols-[72px_minmax(0,1fr)_40px] items-center gap-3" key={binStart}>
+            <div
+              className="grid grid-cols-[72px_minmax(0,1fr)_40px] items-center gap-3"
+              key={binStart}
+            >
               <span className="text-sm text-slate-600">{scoreLabel(binStart)}</span>
               <div className="h-3 overflow-hidden rounded-full bg-slate-100">
                 <div

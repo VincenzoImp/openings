@@ -7,23 +7,23 @@ import { getDashboardAuthStatus, getDashboardToken, setDashboardToken } from "./
 vi.mock("./api/client", () => ({
   getDashboardAuthStatus: vi.fn(),
   getDashboardToken: vi.fn(),
-  setDashboardToken: vi.fn()
+  setDashboardToken: vi.fn(),
 }));
 
 vi.mock("./features/jobs/JobsPage", () => ({
-  JobsPage: () => <div>jobs view</div>
+  JobsPage: () => <div>jobs view</div>,
 }));
 
 vi.mock("./features/analytics/AnalyticsPage", () => ({
-  AnalyticsPage: () => <div>Analytics view</div>
+  AnalyticsPage: () => <div>Analytics view</div>,
 }));
 
 vi.mock("./features/blacklist/BlacklistPage", () => ({
-  BlacklistPage: () => <div>Blacklist view</div>
+  BlacklistPage: () => <div>Blacklist view</div>,
 }));
 
 vi.mock("./features/cleanup/CleanupPage", () => ({
-  CleanupPage: () => <div>Cleanup view</div>
+  CleanupPage: () => <div>Cleanup view</div>,
 }));
 
 beforeEach(() => {

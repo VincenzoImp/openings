@@ -58,7 +58,7 @@ export function JobActionsBar({
   page,
   pageCount,
   pageSize,
-  selectedCount
+  selectedCount,
 }: JobActionsBarProps) {
   const hasSelection = selectedCount > 0;
 
@@ -78,23 +78,43 @@ export function JobActionsBar({
               <option value="json">JSON</option>
             </select>
           </label>
-          <Button isDisabled={isExportPending || jobsCount === 0} onPress={onExportFiltered} variant="outline">
+          <Button
+            isDisabled={isExportPending || jobsCount === 0}
+            onPress={onExportFiltered}
+            variant="outline"
+          >
             <Download aria-hidden="true" size={16} />
             Export filtered
           </Button>
-          <Button isDisabled={!hasSelection || isExportPending} onPress={onExportSelected} variant="outline">
+          <Button
+            isDisabled={!hasSelection || isExportPending}
+            onPress={onExportSelected}
+            variant="outline"
+          >
             <Download aria-hidden="true" size={16} />
             Export selected
           </Button>
-          <Button isDisabled={!hasSelection || isBookmarkPending} onPress={onSaveSelected} variant="outline">
+          <Button
+            isDisabled={!hasSelection || isBookmarkPending}
+            onPress={onSaveSelected}
+            variant="outline"
+          >
             <Bookmark aria-hidden="true" size={16} />
             Save selected
           </Button>
-          <Button isDisabled={!hasSelection || isBookmarkPending} onPress={onUnsaveSelected} variant="outline">
+          <Button
+            isDisabled={!hasSelection || isBookmarkPending}
+            onPress={onUnsaveSelected}
+            variant="outline"
+          >
             <Bookmark aria-hidden="true" size={16} />
             Unsave selected
           </Button>
-          <Button isDisabled={!hasSelection || isAppliedPending} onPress={onMarkAppliedSelected} variant="outline">
+          <Button
+            isDisabled={!hasSelection || isAppliedPending}
+            onPress={onMarkAppliedSelected}
+            variant="outline"
+          >
             <Check aria-hidden="true" size={16} />
             Mark applied
           </Button>
@@ -126,7 +146,10 @@ export function JobActionsBar({
           </Button>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-sm text-zinc-600" aria-label="Pagination">
+      <div
+        className="flex flex-wrap items-center gap-2 text-sm text-zinc-600"
+        aria-label="Pagination"
+      >
         <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
           <span>Rows</span>
           <select

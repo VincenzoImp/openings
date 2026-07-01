@@ -25,10 +25,14 @@ export function JobDetailPanel({
   onClose,
   onDelete,
   onToggleApplied,
-  onToggleBookmarked
+  onToggleBookmarked,
 }: JobDetailPanelProps) {
   return (
-    <Card aria-label="Job detail" className="self-start border border-slate-200 shadow-sm" variant="default">
+    <Card
+      aria-label="Job detail"
+      className="self-start border border-slate-200 shadow-sm"
+      variant="default"
+    >
       <div className="grid gap-4 p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -53,11 +57,19 @@ export function JobDetailPanel({
           <Meta label="Last seen" value={job.last_seen ?? "unknown"} />
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button isDisabled={isBookmarkPending} onPress={() => onToggleBookmarked(job)} variant="outline">
+          <Button
+            isDisabled={isBookmarkPending}
+            onPress={() => onToggleBookmarked(job)}
+            variant="outline"
+          >
             <Bookmark aria-hidden="true" size={16} />
             {job.bookmarked ? "Unsave" : "Save"}
           </Button>
-          <Button isDisabled={isAppliedPending} onPress={() => onToggleApplied(job)} variant="outline">
+          <Button
+            isDisabled={isAppliedPending}
+            onPress={() => onToggleApplied(job)}
+            variant="outline"
+          >
             <Check aria-hidden="true" size={16} />
             {job.applied ? "Mark not applied" : "Mark applied"}
           </Button>

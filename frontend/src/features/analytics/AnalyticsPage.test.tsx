@@ -7,19 +7,19 @@ import { AnalyticsPage } from "./AnalyticsPage";
 vi.mock("../../api/client", () => ({
   getDistribution: vi.fn(),
   getFacets: vi.fn(),
-  getStats: vi.fn()
+  getStats: vi.fn(),
 }));
 
 import { getDistribution, getFacets, getStats } from "../../api/client";
 
 function renderAnalyticsPage() {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } }
+    defaultOptions: { queries: { retry: false } },
   });
   render(
     <QueryClientProvider client={queryClient}>
       <AnalyticsPage />
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -30,19 +30,19 @@ beforeEach(() => {
     blacklisted: 4,
     new_today: 3,
     seen_today: 8,
-    total_jobs: 42
+    total_jobs: 42,
   });
   vi.mocked(getDistribution).mockResolvedValue([
     [0, 2],
     [20, 7],
-    [40, 5]
+    [40, 5],
   ]);
   vi.mocked(getFacets).mockResolvedValue({
     companies: [{ count: 5, value: "Acme Corp" }],
     job_types: [{ count: 6, value: "fulltime" }],
     locations: [{ count: 7, value: "Remote" }],
     remote: [{ count: 8, value: true }],
-    sites: [{ count: 9, value: "indeed" }]
+    sites: [{ count: 9, value: "indeed" }],
   });
 });
 

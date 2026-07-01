@@ -15,7 +15,7 @@ import {
   setApplied,
   setBookmarked,
   setDashboardToken,
-  unblacklistJobs
+  unblacklistJobs,
 } from "./client";
 
 function jsonResponse(body: unknown): Response {
@@ -23,7 +23,7 @@ function jsonResponse(body: unknown): Response {
     ok: true,
     status: 200,
     json: vi.fn().mockResolvedValue(body),
-    text: vi.fn().mockResolvedValue(JSON.stringify(body))
+    text: vi.fn().mockResolvedValue(JSON.stringify(body)),
   } as unknown as Response;
 }
 
@@ -33,7 +33,7 @@ beforeEach(() => {
     clear: vi.fn(() => storage.clear()),
     getItem: vi.fn((key: string) => storage.get(key) ?? null),
     removeItem: vi.fn((key: string) => storage.delete(key)),
-    setItem: vi.fn((key: string, value: string) => storage.set(key, value))
+    setItem: vi.fn((key: string, value: string) => storage.set(key, value)),
   });
   vi.stubGlobal(
     "fetch",
@@ -42,9 +42,9 @@ beforeEach(() => {
         items: [],
         limit: 20,
         offset: 0,
-        total: 0
-      })
-    )
+        total: 0,
+      }),
+    ),
   );
 });
 
@@ -59,7 +59,7 @@ test("includes the saved dashboard token on API requests", async () => {
 
   const [, init] = vi.mocked(fetch).mock.calls[0];
   expect(init?.headers).toMatchObject({
-    "X-Job-Search-Token": "secret-token"
+    "X-Job-Search-Token": "secret-token",
   });
 });
 
@@ -69,7 +69,7 @@ test("clears a stale dashboard token when the API rejects it", async () => {
     ok: false,
     status: 401,
     json: vi.fn(),
-    text: vi.fn().mockResolvedValue("Unauthorized")
+    text: vi.fn().mockResolvedValue("Unauthorized"),
   } as unknown as Response);
 
   await expect(listJobs()).rejects.toThrow("Unauthorized");
@@ -86,9 +86,9 @@ test("fetches dashboard auth status from the public API route", async () => {
     "/api/dashboard/auth",
     expect.objectContaining({
       headers: expect.objectContaining({
-        "Content-Type": "application/json"
-      })
-    })
+        "Content-Type": "application/json",
+      }),
+    }),
   );
 });
 
@@ -98,12 +98,12 @@ test("serializes array query parameters for server-backed filters", async () => 
     job_types: ["fulltime"],
     location: "remote",
     min_salary: 120000,
-    sort: "salary"
+    sort: "salary",
   });
 
   expect(fetch).toHaveBeenCalledWith(
     "/api/jobs?sites=indeed&sites=linkedin&job_types=fulltime&location=remote&min_salary=120000&sort=salary",
-    expect.any(Object)
+    expect.any(Object),
   );
 });
 
@@ -121,32 +121,32 @@ test("sends bulk command request bodies with the dashboard token", async () => {
     expect.objectContaining({
       body: JSON.stringify({ job_ids: ["job-1", "job-2"], bookmarked: true }),
       headers: expect.objectContaining({ "X-Job-Search-Token": "secret-token" }),
-      method: "POST"
-    })
+      method: "POST",
+    }),
   );
   expect(fetch).toHaveBeenNthCalledWith(
     2,
     "/api/jobs/applied",
     expect.objectContaining({
       body: JSON.stringify({ job_ids: ["job-1"], applied: false }),
-      method: "POST"
-    })
+      method: "POST",
+    }),
   );
   expect(fetch).toHaveBeenNthCalledWith(
     3,
     "/api/blacklist",
     expect.objectContaining({
       body: JSON.stringify({ job_ids: ["job-3"] }),
-      method: "POST"
-    })
+      method: "POST",
+    }),
   );
   expect(fetch).toHaveBeenNthCalledWith(
     4,
     "/api/jobs/delete",
     expect.objectContaining({
       body: JSON.stringify({ job_ids: ["job-4"] }),
-      method: "POST"
-    })
+      method: "POST",
+    }),
   );
 });
 
@@ -156,13 +156,18 @@ test("covers facets blacklist cleanup and export endpoints", async () => {
       items: [],
       limit: 100,
       offset: 0,
-      total: 0
-    })
+      total: 0,
+    }),
   );
 
   await getFacets();
   await listBlacklistedJobs({ text: "acme" });
-  await searchSimilarJobs({ min_score: 35, n_results: 12, q: "backend platform", site: "linkedin" });
+  await searchSimilarJobs({
+    min_score: 35,
+    n_results: 12,
+    q: "backend platform",
+    site: "linkedin",
+  });
   await unblacklistJobs(["job-1"]);
   await purgeBlacklist(30);
   await deleteJobsBelowScore(20);
@@ -171,7 +176,7 @@ test("covers facets blacklist cleanup and export endpoints", async () => {
     blob: vi.fn().mockResolvedValue(new Blob(["id,title"])),
     ok: true,
     status: 200,
-    text: vi.fn().mockResolvedValue("")
+    text: vi.fn().mockResolvedValue(""),
   } as unknown as Response);
   await exportJobs({ format: "csv", job_ids: ["job-1"] });
 
@@ -180,29 +185,29 @@ test("covers facets blacklist cleanup and export endpoints", async () => {
   expect(fetch).toHaveBeenNthCalledWith(
     3,
     "/api/jobs/search/semantic?q=backend+platform&n_results=12&min_score=35&site=linkedin",
-    expect.any(Object)
+    expect.any(Object),
   );
   expect(fetch).toHaveBeenNthCalledWith(
     4,
     "/api/blacklist/remove",
-    expect.objectContaining({ body: JSON.stringify({ job_ids: ["job-1"] }) })
+    expect.objectContaining({ body: JSON.stringify({ job_ids: ["job-1"] }) }),
   );
   expect(fetch).toHaveBeenNthCalledWith(
     5,
     "/api/blacklist/purge",
-    expect.objectContaining({ body: JSON.stringify({ older_than_days: 30 }) })
+    expect.objectContaining({ body: JSON.stringify({ older_than_days: 30 }) }),
   );
   expect(fetch).toHaveBeenNthCalledWith(
     6,
     "/api/cleanup/delete-below-score",
-    expect.objectContaining({ body: JSON.stringify({ score: 20 }) })
+    expect.objectContaining({ body: JSON.stringify({ score: 20 }) }),
   );
   expect(fetch).toHaveBeenNthCalledWith(
     7,
     "/api/export/jobs",
     expect.objectContaining({
       body: JSON.stringify({ job_ids: ["job-1"], format: "csv" }),
-      method: "POST"
-    })
+      method: "POST",
+    }),
   );
 });

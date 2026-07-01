@@ -7,5 +7,5 @@ export const jobsQuery = (params: JobListParams) =>
   queryOptions({
     queryKey: ["jobs", params],
     queryFn: () => listJobs(params),
-    staleTime: 30_000
+    staleTime: 30_000,
   });
