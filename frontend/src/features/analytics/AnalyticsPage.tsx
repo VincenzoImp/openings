@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getDistribution, getFacets, getStats } from "../../api/client";
 import type { FacetItem } from "../../api/types";
 import { AlertBanner } from "../../components/AlertBanner";
+import { Metric } from "../../components/Metric";
 import { PageHeader } from "../../components/PageHeader";
 
 function scoreLabel(binStart: number) {
@@ -26,7 +27,7 @@ export function AnalyticsPage() {
     queryFn: getFacets,
     staleTime: 60_000
   });
-  const maxCount = Math.max(...(distribution.data?.map(([, count]) => count) ?? [1]));
+  const maxCount = Math.max(...(distribution.data?.map(([, count]) => count) ?? []), 1);
   const hasError = stats.isError || distribution.isError || facets.isError;
 
   return (
@@ -77,17 +78,6 @@ export function AnalyticsPage() {
         <FacetSummary title="Job types" items={facets.data?.job_types ?? []} />
       </div>
     </section>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <Card className="border border-slate-200 shadow-sm" variant="default">
-      <CardContent className="grid min-h-24 gap-2 p-4">
-        <span className="text-xs font-bold uppercase text-slate-500">{label}</span>
-        <strong className="text-3xl font-semibold leading-none text-slate-950">{value}</strong>
-      </CardContent>
-    </Card>
   );
 }
 

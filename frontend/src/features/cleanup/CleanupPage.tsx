@@ -12,6 +12,7 @@ import {
 } from "../../api/client";
 import { AlertBanner } from "../../components/AlertBanner";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { Metric } from "../../components/Metric";
 
 type PendingCleanup =
   | { action: "configured"; value: null }
@@ -303,13 +304,3 @@ export function CleanupPage() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <Card className="border border-zinc-200 bg-white shadow-sm" variant="default">
-      <CardContent className="grid min-h-24 gap-2 p-4">
-        <span className="text-xs font-bold uppercase text-zinc-500">{label}</span>
-        <strong className="text-3xl font-semibold leading-none text-zinc-950">{value}</strong>
-      </CardContent>
-    </Card>
-  );
-}
