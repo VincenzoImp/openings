@@ -398,9 +398,7 @@ class TestVectorSearchConfigValidation:
     def test_sync_interval_minutes_rejects_non_positive(self):
         """sync_interval_minutes must be at least 1."""
         with pytest.raises(ValueError, match="sync_interval_minutes"):
-            _parse_vector_search_config(
-                {"vector_search": {"sync_interval_minutes": 0}}
-            )
+            _parse_vector_search_config({"vector_search": {"sync_interval_minutes": 0}})
 
 
 class TestConfigQueries:
