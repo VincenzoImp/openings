@@ -21,7 +21,7 @@ const NAV_ITEMS: {
   { icon: BriefcaseBusiness, label: "Jobs", view: "jobs" },
   { icon: ShieldX, label: "Blacklist", view: "blacklist" },
   { icon: Wrench, label: "Cleanup", view: "cleanup" },
-  { icon: BarChart3, label: "Analytics", view: "analytics" }
+  { icon: BarChart3, label: "Analytics", view: "analytics" },
 ];
 
 function viewFromSearch(): View {
@@ -34,9 +34,9 @@ export default function App() {
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { retry: false }
-        }
-      })
+          queries: { retry: false },
+        },
+      }),
   );
 
   return (
@@ -50,7 +50,7 @@ function DashboardApp() {
   const auth = useQuery({
     queryKey: ["dashboard-auth"],
     queryFn: getDashboardAuthStatus,
-    staleTime: 60_000
+    staleTime: 60_000,
   });
   const [token, setToken] = useState(() => getDashboardToken());
 
@@ -165,7 +165,11 @@ function DashboardShell({ onClearToken }: { onClearToken?: () => void }) {
       params.set("view", nextView);
     }
     const nextSearch = params.toString();
-    globalThis.history.pushState(null, "", `${globalThis.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`);
+    globalThis.history.pushState(
+      null,
+      "",
+      `${globalThis.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`,
+    );
   };
 
   return (

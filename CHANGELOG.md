@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 No changes yet.
 
+## [10.2.0] - 2026-07-02
+
+### Fixed
+
+- Stopped the web process from writing directly to the Chroma vector store. ChromaDB's local `PersistentClient` is not safe for concurrent multi-process writes; the `web` and `scheduler` containers sharing one on-disk Chroma index corrupted its HNSW capacity bookkeeping and crashed the scheduler with a native segfault (`Index with capacity N and N current entries cannot add 1 records`). The scheduler process is now the sole writer — it prunes stale embeddings on a new periodic job (`vector_search.sync_interval_minutes`, default 30) instead of the web process deleting them inline.
+- Raised security floors for 6 vulnerable transitive dependencies (cryptography, idna, pydantic-settings, pyjwt, python-multipart, starlette) so `pip-audit` reports no known vulnerabilities.
+- `logging.timezone` now actually shapes log timestamps (it was parsed and documented but silently ignored), and an invalid timezone is rejected at config load.
+- The Docker healthcheck no longer requires an obsolete `results/` directory that nothing creates, so a fresh volume no longer reports unhealthy.
+
+### Removed
+
+- Deleted the dead `exporter.py` module (and its `openpyxl` dependency); the live export path streams CSV/JSON to the browser in-memory.
+
+### Changed
+
+- The frontend is now linted (ESLint), formatted (Prettier), and exercised in CI — the vitest suite, typecheck, and build run on every push and PR instead of only inside a PR-only Docker build.
+- Cleared all `npm audit` advisories and dropped the unused `@tanstack/react-table` dependency.
+- CI runs with least-privilege `permissions: contents: read`, and the Docker build/smoke job now runs on push to `main` as well as PRs.
+- Deprecation warnings are surfaced as test failures, and mypy/ruff configuration is single-sourced in `pyproject.toml`.
+
 ## [10.1.3] - 2026-05-18
 
 ### Fixed

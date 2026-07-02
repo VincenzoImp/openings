@@ -14,10 +14,12 @@ test("cancels the confirm dialog with Escape", () => {
       onCancel={onCancel}
       onConfirm={vi.fn()}
       title="Delete selected jobs permanently?"
-    />
+    />,
   );
 
-  expect(screen.getByRole("alertdialog", { name: "Delete selected jobs permanently?" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("alertdialog", { name: "Delete selected jobs permanently?" }),
+  ).toBeInTheDocument();
 
   fireEvent.keyDown(document, { key: "Escape" });
 

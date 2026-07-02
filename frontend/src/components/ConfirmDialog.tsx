@@ -18,7 +18,7 @@ export function ConfirmDialog({
   isPending = false,
   onCancel,
   onConfirm,
-  title
+  title,
 }: ConfirmDialogProps) {
   useEffect(() => {
     if (!isOpen) {

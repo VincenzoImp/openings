@@ -140,13 +140,11 @@ class TestCheckDirectories:
     def test_check_directories_success(self, tmp_path):
         """Test check_directories succeeds when dirs exist and are writable."""
         mock_config = MagicMock()
-        mock_config.results_path = tmp_path / "results"
         mock_config.database_path = tmp_path / "db" / "jobs.db"
         mock_config.chroma_path = tmp_path / "chroma"
         mock_config.logs_dir = tmp_path / "logs"
 
         # Create the directories
-        mock_config.results_path.mkdir()
         mock_config.database_path.parent.mkdir()
         mock_config.chroma_path.mkdir()
         mock_config.logs_dir.mkdir()
@@ -157,9 +155,28 @@ class TestCheckDirectories:
             assert result is True
 
     def test_check_directories_missing(self, tmp_path):
-        """Test check_directories fails when a directory is missing."""
+        """Test check_directories fails when a required directory is missing."""
         mock_config = MagicMock()
-        mock_config.results_path = tmp_path / "nonexistent"
+        mock_config.database_path = tmp_path / "db" / "jobs.db"
+        mock_config.chroma_path = tmp_path / "nonexistent"
+        mock_config.logs_dir = tmp_path / "logs"
+
+        mock_config.database_path.parent.mkdir()
+        mock_config.logs_dir.mkdir()
+
+        with patch("job_search_tool.config.get_config", return_value=mock_config):
+            result = check_directories()
+
+            assert result is False
+
+    def test_check_directories_does_not_require_results_dir(self, tmp_path):
+        """The obsolete results/ dir is never created, so it must not be required.
+
+        load_config only creates db/chroma/logs; requiring results/ made the
+        Docker healthcheck report unhealthy on a fresh volume.
+        """
+        mock_config = MagicMock()
+        mock_config.results_path = tmp_path / "results"  # real path, never created
         mock_config.database_path = tmp_path / "db" / "jobs.db"
         mock_config.chroma_path = tmp_path / "chroma"
         mock_config.logs_dir = tmp_path / "logs"
@@ -171,7 +188,7 @@ class TestCheckDirectories:
         with patch("job_search_tool.config.get_config", return_value=mock_config):
             result = check_directories()
 
-            assert result is False
+            assert result is True
 
     def test_check_directories_exception(self):
         """Test check_directories handles exceptions."""

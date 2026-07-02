@@ -38,7 +38,7 @@ Current template defaults include `search.hours_old: 720`,
 
 | Variable | Purpose |
 |----------|---------|
-| `JOB_SEARCH_DATA_DIR` | root for database, ChromaDB, results, logs |
+| `JOB_SEARCH_DATA_DIR` | root for database, ChromaDB, logs |
 | `JOB_SEARCH_TEMPLATE_PATH` | template path used for generated settings docs |
 | `JOB_SEARCH_WEB_BIND` | web bind host in Compose |
 | `JOB_SEARCH_WEB_PORT` | web host port |
@@ -64,7 +64,6 @@ Inside Docker, persistent state lives under `/data`:
 /data/config/settings.yaml
 /data/db/jobs.db
 /data/chroma/
-/data/results/
 /data/logs/search.log
 ```
 

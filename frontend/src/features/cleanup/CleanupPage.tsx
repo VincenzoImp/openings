@@ -8,10 +8,11 @@ import {
   deleteStaleJobs,
   previewCleanup,
   purgeCleanupBlacklist,
-  runCleanup
+  runCleanup,
 } from "../../api/client";
 import { AlertBanner } from "../../components/AlertBanner";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { Metric } from "../../components/Metric";
 
 type PendingCleanup =
   | { action: "configured"; value: null }
@@ -42,7 +43,7 @@ export function CleanupPage() {
   const cleanup = useQuery({
     queryKey: ["cleanup-preview"],
     queryFn: previewCleanup,
-    staleTime: 15_000
+    staleTime: 15_000,
   });
   const invalidate = () =>
     Promise.all([
@@ -50,7 +51,7 @@ export function CleanupPage() {
       queryClient.invalidateQueries({ queryKey: ["jobs"] }),
       queryClient.invalidateQueries({ queryKey: ["stats"] }),
       queryClient.invalidateQueries({ queryKey: ["distribution"] }),
-      queryClient.invalidateQueries({ queryKey: ["blacklist"] })
+      queryClient.invalidateQueries({ queryKey: ["blacklist"] }),
     ]);
   const runCleanupMutation = useMutation({
     mutationFn: runCleanup,
@@ -64,7 +65,7 @@ export function CleanupPage() {
       setConfirmed(false);
       setPendingCleanup(null);
       return invalidate();
-    }
+    },
   });
   const belowScoreMutation = useMutation({
     mutationFn: deleteJobsBelowScore,
@@ -77,7 +78,7 @@ export function CleanupPage() {
       setMutationMessage("Jobs below the score threshold were deleted.");
       setPendingCleanup(null);
       return invalidate();
-    }
+    },
   });
   const staleMutation = useMutation({
     mutationFn: deleteStaleJobs,
@@ -90,7 +91,7 @@ export function CleanupPage() {
       setMutationMessage("Stale jobs were deleted.");
       setPendingCleanup(null);
       return invalidate();
-    }
+    },
   });
   const blacklistMutation = useMutation({
     mutationFn: purgeCleanupBlacklist,
@@ -103,7 +104,7 @@ export function CleanupPage() {
       setMutationMessage("Aged blacklist entries were purged.");
       setPendingCleanup(null);
       return invalidate();
-    }
+    },
   });
   const preview = cleanup.data;
   const scoreValue = positiveInteger(score, 0);
@@ -118,26 +119,26 @@ export function CleanupPage() {
     pendingCleanup?.action === "configured"
       ? "Run configured cleanup?"
       : pendingCleanup?.action === "below-score"
-      ? "Delete jobs below score?"
-      : pendingCleanup?.action === "stale"
-        ? "Delete stale jobs?"
-        : "Purge aged blacklist entries?";
+        ? "Delete jobs below score?"
+        : pendingCleanup?.action === "stale"
+          ? "Delete stale jobs?"
+          : "Purge aged blacklist entries?";
   const pendingDescription =
     pendingCleanup?.action === "configured"
       ? "This runs the configured cleanup sequence using settings.yaml retention and scoring rules. Saved and applied jobs remain protected."
       : pendingCleanup?.action === "below-score"
-      ? `This permanently deletes active jobs with relevance score below ${pendingCleanup.value}. Saved and applied jobs remain protected by the cleanup rules.`
-      : pendingCleanup?.action === "stale"
-        ? `This permanently deletes active jobs that have not been seen for at least ${pendingCleanup.value} days.`
-        : `This removes blacklist entries older than ${pendingCleanup?.value ?? 0} days. It does not restore active jobs.`;
+        ? `This permanently deletes active jobs with relevance score below ${pendingCleanup.value}. Saved and applied jobs remain protected by the cleanup rules.`
+        : pendingCleanup?.action === "stale"
+          ? `This permanently deletes active jobs that have not been seen for at least ${pendingCleanup.value} days.`
+          : `This removes blacklist entries older than ${pendingCleanup?.value ?? 0} days. It does not restore active jobs.`;
   const pendingConfirmLabel =
     pendingCleanup?.action === "configured"
       ? "Confirm configured cleanup"
       : pendingCleanup?.action === "below-score"
-      ? "Confirm delete below score"
-      : pendingCleanup?.action === "stale"
-        ? "Confirm delete stale jobs"
-        : "Confirm purge blacklist";
+        ? "Confirm delete below score"
+        : pendingCleanup?.action === "stale"
+          ? "Confirm delete stale jobs"
+          : "Confirm purge blacklist";
   const confirmPendingCleanup = () => {
     if (!pendingCleanup) {
       return;
@@ -197,12 +198,8 @@ export function CleanupPage() {
         />
       </div>
 
-      {mutationError ? (
-        <AlertBanner kind="danger">{mutationError}</AlertBanner>
-      ) : null}
-      {mutationMessage ? (
-        <AlertBanner kind="success">{mutationMessage}</AlertBanner>
-      ) : null}
+      {mutationError ? <AlertBanner kind="danger">{mutationError}</AlertBanner> : null}
+      {mutationMessage ? <AlertBanner kind="success">{mutationMessage}</AlertBanner> : null}
       {cleanup.isError ? (
         <AlertBanner kind="danger">Unable to load cleanup preview.</AlertBanner>
       ) : null}
@@ -300,16 +297,5 @@ export function CleanupPage() {
         title={pendingTitle}
       />
     </section>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <Card className="border border-zinc-200 bg-white shadow-sm" variant="default">
-      <CardContent className="grid min-h-24 gap-2 p-4">
-        <span className="text-xs font-bold uppercase text-zinc-500">{label}</span>
-        <strong className="text-3xl font-semibold leading-none text-zinc-950">{value}</strong>
-      </CardContent>
-    </Card>
   );
 }

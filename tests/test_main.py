@@ -1023,6 +1023,86 @@ class TestCmdScheduler:
 
     @patch("job_search_tool.main._prepare_runtime")
     @patch("job_search_tool.main.create_scheduler")
+    def test_wires_vector_sync_when_enabled(self, mock_create_sched, mock_prepare):
+        """The scheduler (sole Chroma writer) gets a periodic sync callback.
+
+        The web process can't be trusted to mutate Chroma's on-disk index
+        (concurrent multi-process writes corrupt it), so the scheduler
+        process must periodically prune stale embeddings itself.
+        """
+        from job_search_tool.main import _cmd_scheduler
+
+        mock_config = _make_runtime_config_mock()
+        mock_config.vector_search.enabled = True
+        mock_config.vector_search.sync_interval_minutes = 15
+        mock_db = MagicMock()
+        mock_prepare.return_value = (mock_config, mock_db)
+
+        mock_sched = MagicMock()
+        mock_create_sched.return_value = mock_sched
+
+        with patch("job_search_tool.vector_store.get_vector_store") as mock_get_vs:
+            mock_get_vs.return_value = MagicMock()
+            result = _cmd_scheduler()
+
+        assert result == 0
+        call_kwargs = mock_create_sched.call_args.kwargs
+        assert call_kwargs["vector_sync_function"] is not None
+        assert call_kwargs["vector_sync_interval_minutes"] == 15
+
+    @patch("job_search_tool.main._prepare_runtime")
+    @patch("job_search_tool.main.create_scheduler")
+    def test_skips_vector_sync_when_disabled(self, mock_create_sched, mock_prepare):
+        from job_search_tool.main import _cmd_scheduler
+
+        mock_config = _make_runtime_config_mock()
+        mock_config.vector_search.enabled = False
+        mock_prepare.return_value = (mock_config, MagicMock())
+
+        mock_sched = MagicMock()
+        mock_create_sched.return_value = mock_sched
+
+        result = _cmd_scheduler()
+
+        assert result == 0
+        call_kwargs = mock_create_sched.call_args.kwargs
+        assert call_kwargs["vector_sync_function"] is None
+
+    @patch("job_search_tool.main._prepare_runtime")
+    @patch("job_search_tool.main.create_scheduler")
+    def test_vector_sync_function_calls_sync_deletions(
+        self, mock_create_sched, mock_prepare
+    ):
+        """The registered callback prunes stale embeddings via sync_deletions."""
+        from job_search_tool.main import _cmd_scheduler
+
+        mock_config = _make_runtime_config_mock()
+        mock_config.vector_search.enabled = True
+        mock_config.vector_search.sync_interval_minutes = 30
+        mock_db = MagicMock()
+        mock_prepare.return_value = (mock_config, mock_db)
+
+        mock_sched = MagicMock()
+        mock_create_sched.return_value = mock_sched
+
+        mock_vs = MagicMock()
+        with (
+            patch(
+                "job_search_tool.vector_store.get_vector_store",
+                return_value=mock_vs,
+            ),
+            patch("job_search_tool.vector_commands.sync_deletions") as mock_sync,
+        ):
+            _cmd_scheduler()
+            vector_sync_function = mock_create_sched.call_args.kwargs[
+                "vector_sync_function"
+            ]
+            vector_sync_function()
+
+        mock_sync.assert_called_once_with(mock_db, mock_vs)
+
+    @patch("job_search_tool.main._prepare_runtime")
+    @patch("job_search_tool.main.create_scheduler")
     def test_fatal_error(self, mock_create_sched, mock_prepare):
         from job_search_tool.main import _cmd_scheduler
 

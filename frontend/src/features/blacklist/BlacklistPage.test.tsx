@@ -7,7 +7,7 @@ import { BlacklistPage } from "./BlacklistPage";
 vi.mock("../../api/client", () => ({
   listBlacklistedJobs: vi.fn(),
   purgeBlacklist: vi.fn(),
-  unblacklistJobs: vi.fn()
+  unblacklistJobs: vi.fn(),
 }));
 
 import { listBlacklistedJobs, purgeBlacklist, unblacklistJobs } from "../../api/client";
@@ -16,13 +16,13 @@ function renderBlacklistPage() {
   const queryClient = new QueryClient({
     defaultOptions: {
       mutations: { retry: false },
-      queries: { retry: false }
-    }
+      queries: { retry: false },
+    },
   });
   render(
     <QueryClientProvider client={queryClient}>
       <BlacklistPage />
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -34,12 +34,12 @@ beforeEach(() => {
         company: "Acme Corp",
         job_id: "job-1",
         location: "Remote",
-        title: "Backend Engineer"
-      }
+        title: "Backend Engineer",
+      },
     ],
     limit: 100,
     offset: 0,
-    total: 1
+    total: 1,
   });
   vi.mocked(unblacklistJobs).mockResolvedValue({
     affected_count: 1,
@@ -47,7 +47,7 @@ beforeEach(() => {
     bookmarked: null,
     job_ids: ["job-1"],
     message: null,
-    success: true
+    success: true,
   });
   vi.mocked(purgeBlacklist).mockResolvedValue({
     affected_count: 1,
@@ -55,7 +55,7 @@ beforeEach(() => {
     bookmarked: null,
     job_ids: [],
     message: null,
-    success: true
+    success: true,
   });
 });
 
@@ -65,25 +65,23 @@ test("lists and filters blacklist entries", async () => {
   expect(await screen.findByText("Backend Engineer")).toBeInTheDocument();
 
   fireEvent.change(screen.getByLabelText("Search blacklist"), {
-    target: { value: "acme" }
+    target: { value: "acme" },
   });
 
   await waitFor(() => {
-    expect(listBlacklistedJobs).toHaveBeenLastCalledWith(
-      expect.objectContaining({ text: "acme" })
-    );
+    expect(listBlacklistedJobs).toHaveBeenLastCalledWith(expect.objectContaining({ text: "acme" }));
   });
 
   fireEvent.change(screen.getByLabelText("Blacklist company"), {
-    target: { value: "Acme Corp" }
+    target: { value: "Acme Corp" },
   });
   fireEvent.change(screen.getByLabelText("Blacklist location"), {
-    target: { value: "Remote" }
+    target: { value: "Remote" },
   });
 
   await waitFor(() => {
     expect(listBlacklistedJobs).toHaveBeenLastCalledWith(
-      expect.objectContaining({ company: "Acme Corp", location: "Remote", text: "acme" })
+      expect.objectContaining({ company: "Acme Corp", location: "Remote", text: "acme" }),
     );
   });
 });
@@ -96,12 +94,12 @@ test("blacklist pagination requests the next server page", async () => {
         company: "Acme Corp",
         job_id: "job-1",
         location: "Remote",
-        title: "Backend Engineer"
-      }
+        title: "Backend Engineer",
+      },
     ],
     limit: 100,
     offset: 0,
-    total: 220
+    total: 220,
   });
 
   renderBlacklistPage();
@@ -111,7 +109,7 @@ test("blacklist pagination requests the next server page", async () => {
 
   await waitFor(() => {
     expect(listBlacklistedJobs).toHaveBeenLastCalledWith(
-      expect.objectContaining({ limit: 100, offset: 100 })
+      expect.objectContaining({ limit: 100, offset: 100 }),
     );
   });
 });

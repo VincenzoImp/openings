@@ -14,7 +14,7 @@ vi.mock("../../api/client", () => ({
   listJobs: vi.fn(),
   searchSimilarJobs: vi.fn(),
   setApplied: vi.fn(),
-  setBookmarked: vi.fn()
+  setBookmarked: vi.fn(),
 }));
 
 import {
@@ -25,7 +25,7 @@ import {
   listJobs,
   searchSimilarJobs,
   setApplied,
-  setBookmarked
+  setBookmarked,
 } from "../../api/client";
 
 const baseJobs: JobRecord[] = [
@@ -49,7 +49,7 @@ const baseJobs: JobRecord[] = [
     last_seen: "2026-05-02T10:00:00",
     relevance_score: 44,
     applied: false,
-    bookmarked: false
+    bookmarked: false,
   },
   {
     job_id: "job-2",
@@ -71,19 +71,19 @@ const baseJobs: JobRecord[] = [
     last_seen: "2026-05-02T11:00:00",
     relevance_score: 31,
     applied: false,
-    bookmarked: true
-  }
+    bookmarked: true,
+  },
 ];
 
 function response(
   items = baseJobs,
-  overrides: Partial<Omit<JobListResponse, "items">> = {}
+  overrides: Partial<Omit<JobListResponse, "items">> = {},
 ): JobListResponse {
   return {
     items,
     total: overrides.total ?? items.length,
     limit: overrides.limit ?? 50,
-    offset: overrides.offset ?? 0
+    offset: overrides.offset ?? 0,
   };
 }
 
@@ -91,14 +91,14 @@ function renderJobsPage(): RenderResult & { queryClient: QueryClient } {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
-      mutations: { retry: false }
-    }
+      mutations: { retry: false },
+    },
   });
 
   const result = render(
     <QueryClientProvider client={queryClient}>
       <JobsPage />
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
   return { ...result, queryClient };
 }
@@ -106,11 +106,11 @@ function renderJobsPage(): RenderResult & { queryClient: QueryClient } {
 beforeEach(() => {
   Object.defineProperty(URL, "createObjectURL", {
     configurable: true,
-    value: vi.fn(() => "blob:jobs")
+    value: vi.fn(() => "blob:jobs"),
   });
   Object.defineProperty(URL, "revokeObjectURL", {
     configurable: true,
-    value: vi.fn()
+    value: vi.fn(),
   });
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
   vi.mocked(listJobs).mockResolvedValue(response());
@@ -120,12 +120,12 @@ beforeEach(() => {
     locations: [{ count: 1, value: "Remote" }],
     remote: [
       { count: 1, value: true },
-      { count: 1, value: false }
+      { count: 1, value: false },
     ],
     sites: [
       { count: 1, value: "linkedin" },
-      { count: 1, value: "indeed" }
-    ]
+      { count: 1, value: "indeed" },
+    ],
   });
   vi.mocked(setBookmarked).mockResolvedValue({
     success: true,
@@ -133,7 +133,7 @@ beforeEach(() => {
     job_ids: ["job-1"],
     bookmarked: true,
     applied: null,
-    message: null
+    message: null,
   });
   vi.mocked(setApplied).mockResolvedValue({
     success: true,
@@ -141,7 +141,7 @@ beforeEach(() => {
     job_ids: ["job-1"],
     bookmarked: null,
     applied: true,
-    message: null
+    message: null,
   });
   vi.mocked(blacklistJobs).mockResolvedValue({
     success: true,
@@ -149,7 +149,7 @@ beforeEach(() => {
     job_ids: ["job-1"],
     bookmarked: null,
     applied: null,
-    message: null
+    message: null,
   });
   vi.mocked(deleteJobs).mockResolvedValue({
     success: true,
@@ -157,7 +157,7 @@ beforeEach(() => {
     job_ids: ["job-1"],
     bookmarked: null,
     applied: null,
-    message: null
+    message: null,
   });
   vi.mocked(exportJobs).mockResolvedValue(new Blob(["id,title"]));
   vi.mocked(searchSimilarJobs).mockResolvedValue([
@@ -169,8 +169,8 @@ beforeEach(() => {
       relevance_score: 44,
       similarity: 0.91,
       site: "linkedin",
-      title: "Backend Engineer"
-    }
+      title: "Backend Engineer",
+    },
   ]);
 });
 
@@ -192,30 +192,30 @@ test("filter controls update the list query", async () => {
   await screen.findByText("Backend Engineer");
 
   fireEvent.change(screen.getByLabelText("Search jobs"), {
-    target: { value: "backend" }
+    target: { value: "backend" },
   });
   fireEvent.click(screen.getByRole("button", { name: /More filters/ }));
   fireEvent.change(screen.getByLabelText("Minimum score"), {
-    target: { value: "35" }
+    target: { value: "35" },
   });
   fireEvent.change(screen.getByLabelText("Site"), {
-    target: { value: "linkedin" }
+    target: { value: "linkedin" },
   });
   fireEvent.change(screen.getByLabelText("Location"), {
-    target: { value: "remote" }
+    target: { value: "remote" },
   });
   fireEvent.change(screen.getByLabelText("Job type"), {
-    target: { value: "fulltime" }
+    target: { value: "fulltime" },
   });
   fireEvent.change(screen.getByLabelText("First seen from"), {
-    target: { value: "2026-05-01" }
+    target: { value: "2026-05-01" },
   });
   fireEvent.change(screen.getByLabelText("Last seen to"), {
-    target: { value: "2026-05-09" }
+    target: { value: "2026-05-09" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Saved" }));
   fireEvent.change(screen.getByLabelText("Sort"), {
-    target: { value: "salary" }
+    target: { value: "salary" },
   });
 
   await waitFor(() => {
@@ -229,8 +229,8 @@ test("filter controls update the list query", async () => {
         min_score: 35,
         sites: ["linkedin"],
         sort: "salary",
-        text: "backend"
-      })
+        text: "backend",
+      }),
     );
   });
 });
@@ -240,15 +240,15 @@ test("page size is sent to the jobs API", async () => {
   await screen.findByText("Backend Engineer");
 
   fireEvent.change(screen.getByLabelText("Page size"), {
-    target: { value: "50" }
+    target: { value: "50" },
   });
 
   await waitFor(() => {
     expect(listJobs).toHaveBeenLastCalledWith(
       expect.objectContaining({
         limit: 50,
-        offset: 0
-      })
+        offset: 0,
+      }),
     );
   });
 });
@@ -263,8 +263,8 @@ test("open status excludes saved and applied jobs", async () => {
     expect(listJobs).toHaveBeenLastCalledWith(
       expect.objectContaining({
         applied: false,
-        bookmarked: false
-      })
+        bookmarked: false,
+      }),
     );
   });
 });
@@ -281,8 +281,8 @@ test("next page requests the next server offset", async () => {
     expect(listJobs).toHaveBeenLastCalledWith(
       expect.objectContaining({
         limit: 100,
-        offset: 100
-      })
+        offset: 100,
+      }),
     );
   });
 });
@@ -296,7 +296,7 @@ test("changing filters clears selected job ids", async () => {
 
   fireEvent.click(screen.getByRole("button", { name: /More filters/ }));
   fireEvent.change(screen.getByLabelText("Site"), {
-    target: { value: "linkedin" }
+    target: { value: "linkedin" },
   });
 
   await waitFor(() => {
@@ -351,7 +351,9 @@ test("bulk actions can save apply export delete and blacklist selected jobs", as
   fireEvent.click(screen.getByRole("button", { name: "Mark applied" }));
   fireEvent.click(screen.getByRole("button", { name: "Export selected" }));
   fireEvent.click(screen.getByRole("button", { name: "Delete selected" }));
-  expect(screen.getByRole("heading", { name: "Delete selected jobs permanently?" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "Delete selected jobs permanently?" }),
+  ).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
 
   await waitFor(() => expect(setBookmarked).toHaveBeenCalledWith(["job-1"], true));
@@ -370,7 +372,9 @@ test("row actions can blacklist and delete one job", async () => {
   await waitFor(() => expect(blacklistJobs).toHaveBeenCalledWith(["job-1"]));
 
   fireEvent.click(screen.getByRole("button", { name: "Delete Backend Engineer" }));
-  expect(screen.getByRole("heading", { name: "Delete Backend Engineer permanently?" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "Delete Backend Engineer permanently?" }),
+  ).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
   await waitFor(() => expect(deleteJobs).toHaveBeenCalledWith(["job-1"]));
 });
@@ -380,7 +384,7 @@ test("reset filters returns the job query to the default console state", async (
   await screen.findByText("Backend Engineer");
 
   fireEvent.change(screen.getByLabelText("Search jobs"), {
-    target: { value: "backend" }
+    target: { value: "backend" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Saved" }));
   fireEvent.click(screen.getByRole("button", { name: "Reset filters" }));
@@ -393,24 +397,22 @@ test("reset filters returns the job query to the default console state", async (
     expect.objectContaining({
       limit: 100,
       offset: 0,
-      sort: "score"
-    })
+      sort: "score",
+    }),
   );
 });
 
 test("exports the current rows as CSV", async () => {
   const createObjectUrl = vi.fn(() => "blob:jobs");
   const revokeObjectUrl = vi.fn();
-  const click = vi
-    .spyOn(HTMLAnchorElement.prototype, "click")
-    .mockImplementation(() => undefined);
+  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
   Object.defineProperty(URL, "createObjectURL", {
     configurable: true,
-    value: createObjectUrl
+    value: createObjectUrl,
   });
   Object.defineProperty(URL, "revokeObjectURL", {
     configurable: true,
-    value: revokeObjectUrl
+    value: revokeObjectUrl,
   });
 
   renderJobsPage();
@@ -418,7 +420,9 @@ test("exports the current rows as CSV", async () => {
 
   fireEvent.click(screen.getByRole("button", { name: "Export filtered" }));
 
-  await waitFor(() => expect(exportJobs).toHaveBeenCalledWith(expect.objectContaining({ format: "csv" })));
+  await waitFor(() =>
+    expect(exportJobs).toHaveBeenCalledWith(expect.objectContaining({ format: "csv" })),
+  );
   expect(createObjectUrl).toHaveBeenCalledTimes(1);
   expect(click).toHaveBeenCalledTimes(1);
   expect(revokeObjectUrl).toHaveBeenCalledWith("blob:jobs");
@@ -428,11 +432,11 @@ test("exports filtered jobs as JSON when selected", async () => {
   const createObjectUrl = vi.fn(() => "blob:jobs");
   Object.defineProperty(URL, "createObjectURL", {
     configurable: true,
-    value: createObjectUrl
+    value: createObjectUrl,
   });
   Object.defineProperty(URL, "revokeObjectURL", {
     configurable: true,
-    value: vi.fn()
+    value: vi.fn(),
   });
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
 
@@ -440,11 +444,13 @@ test("exports filtered jobs as JSON when selected", async () => {
   await screen.findByText("Backend Engineer");
 
   fireEvent.change(screen.getByLabelText("Export format"), {
-    target: { value: "json" }
+    target: { value: "json" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Export filtered" }));
 
-  await waitFor(() => expect(exportJobs).toHaveBeenCalledWith(expect.objectContaining({ format: "json" })));
+  await waitFor(() =>
+    expect(exportJobs).toHaveBeenCalledWith(expect.objectContaining({ format: "json" })),
+  );
 });
 
 test("semantic search returns matching jobs without replacing the main list", async () => {
@@ -452,7 +458,7 @@ test("semantic search returns matching jobs without replacing the main list", as
   await screen.findByText("Backend Engineer");
 
   fireEvent.change(screen.getByLabelText("Semantic search"), {
-    target: { value: "python backend platform" }
+    target: { value: "python backend platform" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Search similar jobs" }));
 
@@ -462,10 +468,10 @@ test("semantic search returns matching jobs without replacing the main list", as
         min_score: undefined,
         n_results: 10,
         q: "python backend platform",
-        site: undefined
+        site: undefined,
       },
-      expect.any(Object)
-    )
+      expect.any(Object),
+    ),
   );
   expect(await screen.findByText(/91% match/)).toBeInTheDocument();
 });
@@ -485,7 +491,9 @@ test("detail panel can permanently delete the open job", async () => {
 
   fireEvent.click(screen.getByRole("button", { name: "Open Backend Engineer details" }));
   fireEvent.click(screen.getByRole("button", { name: "Delete job" }));
-  expect(screen.getByRole("heading", { name: "Delete Backend Engineer permanently?" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "Delete Backend Engineer permanently?" }),
+  ).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
 
   await waitFor(() => expect(deleteJobs).toHaveBeenCalledWith(["job-1"]));
@@ -500,7 +508,7 @@ test("changing filters clears the detail panel", async () => {
 
   fireEvent.click(screen.getByRole("button", { name: /More filters/ }));
   fireEvent.change(screen.getByLabelText("Site"), {
-    target: { value: "linkedin" }
+    target: { value: "linkedin" },
   });
 
   await waitFor(() => {

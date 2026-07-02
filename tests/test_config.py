@@ -174,6 +174,16 @@ class TestLoggingConfigValidation:
         with pytest.raises(ValueError, match="backup_count cannot be negative"):
             _parse_logging_config({"logging": {"backup_count": -1}})
 
+    def test_invalid_timezone_is_rejected(self):
+        """An unknown IANA timezone must fail fast instead of being ignored."""
+        with pytest.raises(ValueError, match="timezone"):
+            _parse_logging_config({"logging": {"timezone": "Not/ARealZone"}})
+
+    def test_valid_timezone_is_accepted(self):
+        """A real IANA timezone is accepted."""
+        config = _parse_logging_config({"logging": {"timezone": "Europe/Zurich"}})
+        assert config.timezone == "Europe/Zurich"
+
 
 class TestSchedulerConfigValidation:
     """Tests for scheduler config validation."""
@@ -275,7 +285,6 @@ class TestConfigPaths:
 
         assert isinstance(config.data_dir, Path)
         assert isinstance(config.config_dir, Path)
-        assert isinstance(config.results_path, Path)
         assert isinstance(config.database_path, Path)
         assert isinstance(config.chroma_path, Path)
         assert isinstance(config.logs_dir, Path)
@@ -289,7 +298,6 @@ class TestConfigPaths:
         assert config.config_dir == root / "config"
         assert config.database_path == root / "db" / "jobs.db"
         assert config.chroma_path == root / "chroma"
-        assert config.results_path == root / "results"
         assert config.logs_dir == root / "logs"
         assert config.log_path == root / "logs" / "search.log"
 
@@ -382,6 +390,23 @@ class TestVectorSearchConfigValidation:
             _parse_vector_search_config(
                 {"vector_search": {"model_name": "all-MiniLM-L6-v2"}}
             )
+
+    def test_sync_interval_minutes_default(self):
+        """Default sync_interval_minutes is 30 when unset."""
+        config = _parse_vector_search_config({})
+        assert config.sync_interval_minutes == 30
+
+    def test_sync_interval_minutes_custom(self):
+        """A configured sync_interval_minutes value is honored."""
+        config = _parse_vector_search_config(
+            {"vector_search": {"sync_interval_minutes": 10}}
+        )
+        assert config.sync_interval_minutes == 10
+
+    def test_sync_interval_minutes_rejects_non_positive(self):
+        """sync_interval_minutes must be at least 1."""
+        with pytest.raises(ValueError, match="sync_interval_minutes"):
+            _parse_vector_search_config({"vector_search": {"sync_interval_minutes": 0}})
 
 
 class TestConfigQueries:

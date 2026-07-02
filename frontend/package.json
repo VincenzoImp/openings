@@ -7,15 +7,17 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest run",
-    "quality": "npm run typecheck && npm run test && npm run build"
+    "quality": "npm run lint && npm run format:check && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
     "@heroui/react": "^3.0.4",
     "@heroui/styles": "^3.0.4",
     "@tailwindcss/vite": "^4.3.0",
     "@tanstack/react-query": "^5.0.0",
-    "@tanstack/react-table": "^8.0.0",
     "@tanstack/react-virtual": "^3.0.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
@@ -23,14 +25,22 @@
     "tailwindcss": "^4.3.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@testing-library/jest-dom": "^6.0.0",
     "@testing-library/react": "^16.0.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^17.7.0",
     "jsdom": "^27.0.0",
+    "prettier": "^3.9.4",
     "typescript": "^5.0.0",
+    "typescript-eslint": "^8.62.1",
     "vite": "^7.0.0",
     "vitest": "^4.0.0"
   }

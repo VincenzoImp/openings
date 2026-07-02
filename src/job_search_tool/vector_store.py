@@ -296,6 +296,39 @@ class JobVectorStore:
         logger.info("Vector store reset")
 
 
+class ReadOnlyVectorStore:
+    """Read-only view over a :class:`JobVectorStore`.
+
+    ChromaDB's local ``PersistentClient`` is not safe for concurrent
+    multi-process writes to the same on-disk index (see the ``scheduler``
+    and ``web`` containers, which share one Chroma directory over a Docker
+    volume) — two processes mutating the HNSW index at once corrupts its
+    capacity bookkeeping and crashes the writer with a native segfault.
+    Only the scheduler process may call the mutating methods on
+    :class:`JobVectorStore`; the web process gets this wrapper instead, so
+    a future call site can't reintroduce a cross-process write by accident.
+    """
+
+    def __init__(self, vector_store: JobVectorStore) -> None:
+        self._vector_store = vector_store
+
+    def search(
+        self,
+        query: str,
+        n_results: int = 20,
+        min_score: int | None = None,
+        site: str | None = None,
+    ) -> list[SemanticSearchResult]:
+        """Search for jobs semantically similar to *query*."""
+        return self._vector_store.search(
+            query, n_results=n_results, min_score=min_score, site=site
+        )
+
+    def count(self) -> int:
+        """Number of jobs in the vector store."""
+        return self._vector_store.count()
+
+
 # ------------------------------------------------------------------
 # Singleton accessor
 # ------------------------------------------------------------------

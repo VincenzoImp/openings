@@ -1,5 +1,4 @@
 import { Button, Card, Tooltip } from "@heroui/react";
-import { createColumnHelper, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Ban, Bookmark, Check, PanelRightOpen, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -10,16 +9,6 @@ import { ScoreBadge, statusChip } from "./jobDisplay";
 
 const JOB_GRID_CLASS =
   "grid grid-cols-[32px_44px_minmax(0,1fr)] items-center gap-2 px-3 md:grid-cols-[36px_52px_minmax(220px,2fr)_minmax(160px,1fr)_100px_100px_220px] md:gap-3 md:px-4";
-
-const columnHelper = createColumnHelper<JobRecord>();
-const columns = [
-  columnHelper.accessor("relevance_score", { header: "Score" }),
-  columnHelper.accessor("title", { header: "Role" }),
-  columnHelper.accessor("company", { header: "Company" }),
-  columnHelper.accessor("site", { header: "Site" }),
-  columnHelper.display({ id: "status", header: "Status" }),
-  columnHelper.display({ id: "actions", header: "Actions" })
-];
 
 interface JobTableProps {
   isAppliedPending: boolean;
@@ -52,30 +41,32 @@ export function JobTable({
   onToggleApplied,
   onToggleBookmarked,
   onToggleSelected,
-  selectedIds
+  selectedIds,
 }: JobTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const table = useReactTable({
-    columns,
-    data: jobs,
-    getCoreRowModel: getCoreRowModel()
-  });
-  const rows = table.getRowModel().rows;
   const rowHeight = globalThis.innerWidth < 768 ? 124 : 58;
   const rowVirtualizer = useVirtualizer({
-    count: rows.length,
+    count: jobs.length,
     estimateSize: () => rowHeight,
     getScrollElement: () => scrollRef.current,
-    overscan: 8
+    overscan: 8,
   });
   const virtualItems = rowVirtualizer.getVirtualItems();
   const visibleRows = virtualItems.length
-    ? virtualItems.map((item) => ({ fallbackIndex: item.index, item, row: rows[item.index] }))
-    : rows.map((row, index) => ({ item: null, row, fallbackIndex: index }));
+    ? virtualItems.map((item) => ({ fallbackIndex: item.index, item, job: jobs[item.index] }))
+    : jobs.map((job, index) => ({ item: null, job, fallbackIndex: index }));
 
   return (
-    <Card className="w-full min-w-0 overflow-hidden border border-slate-200 shadow-sm" variant="default">
-      <div aria-colcount={7} aria-rowcount={jobs.length} className="min-w-0 overflow-x-auto" role="table">
+    <Card
+      className="w-full min-w-0 overflow-hidden border border-slate-200 shadow-sm"
+      variant="default"
+    >
+      <div
+        aria-colcount={7}
+        aria-rowcount={jobs.length}
+        className="min-w-0 overflow-x-auto"
+        role="table"
+      >
         <div
           className={`${JOB_GRID_CLASS} border-b border-slate-200 bg-slate-100 py-3 text-xs font-bold uppercase text-slate-500 md:min-w-[980px]`}
           role="row"
@@ -108,8 +99,7 @@ export function JobTable({
             className="relative md:min-w-[980px]"
             style={{ height: virtualItems.length ? rowVirtualizer.getTotalSize() : "auto" }}
           >
-            {visibleRows.map(({ item, row, fallbackIndex }) => {
-              const job = row.original;
+            {visibleRows.map(({ item, job, fallbackIndex }) => {
               const top = item?.start ?? fallbackIndex * rowHeight;
               return (
                 <div
@@ -123,7 +113,7 @@ export function JobTable({
                           left: 0,
                           position: "absolute",
                           top: 0,
-                          transform: `translateY(${top}px)`
+                          transform: `translateY(${top}px)`,
                         }
                       : undefined
                   }

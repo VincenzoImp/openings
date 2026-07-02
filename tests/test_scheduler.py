@@ -69,6 +69,22 @@ class TestJobSearchSchedulerInit:
         assert isinstance(scheduler, JobSearchScheduler)
         assert scheduler.config == config
 
+    def test_create_scheduler_factory_passes_through_vector_sync(
+        self, config, mock_job_function
+    ):
+        """Test create_scheduler forwards vector-sync kwargs."""
+        mock_sync = MagicMock()
+
+        scheduler = create_scheduler(
+            config,
+            mock_job_function,
+            vector_sync_function=mock_sync,
+            vector_sync_interval_minutes=45,
+        )
+
+        assert scheduler.vector_sync_function is mock_sync
+        assert scheduler.vector_sync_interval_minutes == 45
+
 
 # =============================================================================
 # TEST SINGLE-SHOT MODE
@@ -210,6 +226,77 @@ class TestJobSearchSchedulerScheduledMode:
 
             # Should have called add_job
             mock_sched.add_job.assert_called_once()
+
+
+# =============================================================================
+# TEST VECTOR STORE SYNC JOB
+# =============================================================================
+
+
+class TestJobSearchSchedulerVectorSync:
+    """Tests for the periodic vector-store sync job.
+
+    The scheduler process is the sole writer to Chroma's on-disk index (the
+    web process only reads it — concurrent multi-process writes corrupt the
+    HNSW index and crash with a native segfault). This periodic job is how
+    deletions made from the dashboard eventually get pruned from Chroma
+    without the web process touching it directly.
+    """
+
+    @pytest.fixture
+    def config(self):
+        return Config(scheduler=SchedulerConfig(run_on_startup=False))
+
+    def test_start_registers_vector_sync_job_when_configured(self, config):
+        mock_job = MagicMock(return_value=True)
+        mock_sync = MagicMock()
+        scheduler = JobSearchScheduler(
+            config,
+            mock_job,
+            vector_sync_function=mock_sync,
+            vector_sync_interval_minutes=15,
+        )
+
+        with patch("job_search_tool.scheduler.BlockingScheduler") as mock_blocking:
+            mock_sched = MagicMock()
+            mock_blocking.return_value = mock_sched
+            mock_sched.start.side_effect = KeyboardInterrupt()
+
+            try:
+                scheduler.start()
+            except SystemExit:
+                pass
+
+            sync_calls = [
+                call
+                for call in mock_sched.add_job.call_args_list
+                if call.kwargs.get("id") == "vector_sync_job"
+            ]
+            assert len(sync_calls) == 1
+            call = sync_calls[0]
+            assert call.args[0] is mock_sync
+            assert call.kwargs["trigger"].interval == timedelta(minutes=15)
+
+    def test_start_skips_vector_sync_job_when_not_configured(self, config):
+        mock_job = MagicMock(return_value=True)
+        scheduler = JobSearchScheduler(config, mock_job)
+
+        with patch("job_search_tool.scheduler.BlockingScheduler") as mock_blocking:
+            mock_sched = MagicMock()
+            mock_blocking.return_value = mock_sched
+            mock_sched.start.side_effect = KeyboardInterrupt()
+
+            try:
+                scheduler.start()
+            except SystemExit:
+                pass
+
+            sync_calls = [
+                call
+                for call in mock_sched.add_job.call_args_list
+                if call.kwargs.get("id") == "vector_sync_job"
+            ]
+            assert sync_calls == []
 
 
 # =============================================================================

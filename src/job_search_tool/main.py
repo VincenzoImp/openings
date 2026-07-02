@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import sys
 import traceback
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from job_search_tool.config import get_config, reload_config
 from job_search_tool.database import get_database, recalculate_all_scores
@@ -181,6 +181,42 @@ def _job_id_in_frame(df, job_id: str) -> bool:
     return False
 
 
+def _configured_notification_manager(config: Config) -> NotificationManager | None:
+    """Return a ready ``NotificationManager``, or None when notifications are off.
+
+    Centralizes the enabled/configured guard shared by both notification
+    paths. Returns None (without constructing a manager) when notifications
+    are disabled, and None when enabled but no channel is configured.
+    """
+    logger = get_logger("notifications")
+
+    if not config.notifications.enabled:
+        logger.debug("Notifications disabled")
+        return None
+
+    manager = NotificationManager(config)
+    if not manager.has_configured_notifiers():
+        logger.debug("No notification channels configured")
+        return None
+
+    return manager
+
+
+def _fetch_top_overall(config: Config, db: JobDatabase) -> tuple[list, int]:
+    """Return the ``(top_jobs_overall, total_jobs_in_db)`` pair for a digest.
+
+    Both are empty/zero unless ``telegram.include_top_overall`` is set.
+    """
+    telegram_config = config.notifications.telegram
+    if not telegram_config.include_top_overall:
+        return [], 0
+    top_jobs_overall = db.get_top_jobs(
+        limit=telegram_config.max_top_overall,
+        min_score=config.scoring.notify_threshold,
+    )
+    return top_jobs_overall, db.get_job_count()
+
+
 def _send_notifications(
     config: Config,
     db: JobDatabase,
@@ -200,40 +236,23 @@ def _send_notifications(
     """
     logger = get_logger("notifications")
 
-    if not config.notifications.enabled:
-        logger.debug("Notifications disabled")
-        return
-
-    notification_manager = NotificationManager(config)
-
-    if not notification_manager.has_configured_notifiers():
-        logger.debug("No notification channels configured")
+    notification_manager = _configured_notification_manager(config)
+    if notification_manager is None:
         return
 
     log_section(logger, "SENDING NOTIFICATIONS")
 
     try:
-        # Get top jobs overall from database (for notifications)
-        top_jobs_overall = []
-        total_jobs_in_db = 0
-        telegram_config = config.notifications.telegram
-        if telegram_config.include_top_overall:
-            top_jobs_overall = db.get_top_jobs(
-                limit=telegram_config.max_top_overall,
-                min_score=config.scoring.notify_threshold,
-            )
-            total_jobs_in_db = db.get_job_count()
+        top_jobs_overall, total_jobs_in_db = _fetch_top_overall(config, db)
 
         if not new_jobs and not top_jobs_overall:
             logger.info("No new jobs or top jobs to notify about")
             return
 
-        # Calculate average score
         avg_score = (
             sum(j.relevance_score for j in new_jobs) / len(new_jobs) if new_jobs else 0
         )
 
-        # Create notification data
         notification_data = create_notification_data(
             new_jobs=new_jobs,
             updated_count=updated_count,
@@ -244,7 +263,6 @@ def _send_notifications(
             notify_threshold=config.scoring.notify_threshold,
         )
 
-        # Send notifications
         results = notification_manager.send_all_sync(notification_data)
 
         for channel, success in results.items():
@@ -267,30 +285,14 @@ def _send_empty_notification(config: Config, db: JobDatabase) -> None:
     """
     logger = get_logger("notifications")
 
-    if not config.notifications.enabled:
-        return
-
-    notification_manager = NotificationManager(config)
-
-    if not notification_manager.has_configured_notifiers():
+    notification_manager = _configured_notification_manager(config)
+    if notification_manager is None:
         return
 
     try:
-        # Get database stats for context
         stats = db.get_statistics()
+        top_jobs_overall, total_jobs_in_db = _fetch_top_overall(config, db)
 
-        # Get top jobs overall even when no new jobs found
-        top_jobs_overall = []
-        total_jobs_in_db = 0
-        telegram_config = config.notifications.telegram
-        if telegram_config.include_top_overall:
-            top_jobs_overall = db.get_top_jobs(
-                limit=telegram_config.max_top_overall,
-                min_score=config.scoring.notify_threshold,
-            )
-            total_jobs_in_db = db.get_job_count()
-
-        # Create notification data
         notification_data = create_notification_data(
             new_jobs=[],
             updated_count=0,
@@ -301,7 +303,6 @@ def _send_empty_notification(config: Config, db: JobDatabase) -> None:
             notify_threshold=config.scoring.notify_threshold,
         )
 
-        # Send notifications
         results = notification_manager.send_all_sync(notification_data)
 
         for channel, success in results.items():
@@ -382,11 +383,42 @@ def _prepare_runtime(*, scheduled: bool) -> tuple[Config, JobDatabase]:
     return config, db
 
 
+def _make_vector_sync_function(
+    config: Config, db: JobDatabase
+) -> Callable[[], None] | None:
+    """Build the scheduler's periodic Chroma stale-embedding cleanup callback.
+
+    The scheduler process is the sole writer to Chroma's on-disk index — its
+    local ``PersistentClient`` isn't safe for concurrent multi-process
+    writes, which is what corrupted the HNSW index and crashed the
+    scheduler with a native segfault. Deletions made from the web dashboard
+    only touch the SQL DB (see ``application/jobs.py``); this callback is
+    how the corresponding Chroma embeddings eventually get pruned.
+    """
+    if not config.vector_search.enabled:
+        return None
+
+    from job_search_tool.vector_store import get_vector_store
+    from job_search_tool.vector_commands import sync_deletions
+
+    vs = get_vector_store(config.chroma_path)
+
+    def vector_sync_function() -> None:
+        sync_deletions(db, vs)
+
+    return vector_sync_function
+
+
 def _cmd_scheduler() -> int:
     """Run the continuous APScheduler loop."""
     logger = get_logger("main")
-    config, _db = _prepare_runtime(scheduled=True)
-    scheduler = create_scheduler(config, run_job_search)
+    config, db = _prepare_runtime(scheduled=True)
+    scheduler = create_scheduler(
+        config,
+        run_job_search,
+        vector_sync_function=_make_vector_sync_function(config, db),
+        vector_sync_interval_minutes=config.vector_search.sync_interval_minutes,
+    )
 
     try:
         scheduler.start()

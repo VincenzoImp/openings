@@ -15,6 +15,7 @@ import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
 
@@ -334,6 +335,12 @@ class VectorSearchConfig:
     default_results: int = 20
     backfill_on_startup: bool = True
     batch_size: int = 100
+    # Cadence for the scheduler's periodic stale-embedding cleanup. The
+    # scheduler process is the sole writer to the on-disk Chroma index (the
+    # web process only reads it — see docs/architecture notes on vector
+    # store ownership), so deletions made from the dashboard are cleaned up
+    # here rather than immediately from the web process.
+    sync_interval_minutes: int = 30
 
 
 @dataclass
@@ -405,11 +412,6 @@ class Config:
     def config_dir(self) -> Path:
         """Directory holding ``settings.yaml``."""
         return DATA_DIR / "config"
-
-    @property
-    def results_path(self) -> Path:
-        """Directory where CSV/Excel exports are written."""
-        return DATA_DIR / "results"
 
     @property
     def database_path(self) -> Path:
@@ -703,11 +705,19 @@ def _parse_logging_config(data: dict[str, Any]) -> LoggingConfig:
     if backup_count < 0:
         raise ValueError(f"backup_count cannot be negative, got {backup_count}")
 
+    timezone = logging_data.get("timezone", "UTC")
+    try:
+        ZoneInfo(timezone)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise ValueError(
+            f"logging.timezone must be a valid IANA timezone, got {timezone!r}"
+        ) from exc
+
     return LoggingConfig(
         level=logging_data.get("level", "INFO"),
         max_size_mb=max_size_mb,
         backup_count=backup_count,
-        timezone=logging_data.get("timezone", "UTC"),
+        timezone=timezone,
     )
 
 
@@ -924,6 +934,7 @@ def _parse_vector_search_config(data: dict[str, Any]) -> VectorSearchConfig:
             "default_results",
             "backfill_on_startup",
             "batch_size",
+            "sync_interval_minutes",
         },
     )
 
@@ -935,12 +946,17 @@ def _parse_vector_search_config(data: dict[str, Any]) -> VectorSearchConfig:
         vector_data.get("batch_size", 100), "batch_size", 100
     )
 
+    sync_interval_minutes = _validate_positive_int(
+        vector_data.get("sync_interval_minutes", 30), "sync_interval_minutes", 30
+    )
+
     return VectorSearchConfig(
         enabled=vector_data.get("enabled", True),
         embed_on_save=vector_data.get("embed_on_save", True),
         default_results=default_results,
         backfill_on_startup=vector_data.get("backfill_on_startup", True),
         batch_size=batch_size,
+        sync_interval_minutes=sync_interval_minutes,
     )
 
 

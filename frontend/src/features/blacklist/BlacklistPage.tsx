@@ -36,14 +36,14 @@ export function BlacklistPage() {
       limit,
       location: location || undefined,
       offset: page * limit,
-      text: text || undefined
+      text: text || undefined,
     }),
-    [company, limit, location, page, text]
+    [company, limit, location, page, text],
   );
   const blacklist = useQuery({
     queryKey: ["blacklist", params],
     queryFn: () => listBlacklistedJobs(params),
-    staleTime: 15_000
+    staleTime: 15_000,
   });
   const rows = blacklist.data?.items ?? [];
   const pageCount = Math.max(1, Math.ceil((blacklist.data?.total ?? 0) / limit));
@@ -59,7 +59,7 @@ export function BlacklistPage() {
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ["blacklist"] }),
       queryClient.invalidateQueries({ queryKey: ["jobs"] }),
-      queryClient.invalidateQueries({ queryKey: ["stats"] })
+      queryClient.invalidateQueries({ queryKey: ["stats"] }),
     ]);
   const unblacklistMutation = useMutation({
     mutationFn: (jobIds: string[]) => unblacklistJobs(jobIds),
@@ -68,7 +68,7 @@ export function BlacklistPage() {
       setMutationError(null);
       setSelectedIds(new Set());
       return invalidate();
-    }
+    },
   });
   const purgeMutation = useMutation({
     mutationFn: (days?: number) => purgeBlacklist(days),
@@ -77,7 +77,7 @@ export function BlacklistPage() {
       setMutationError(null);
       setConfirmPurge(false);
       return invalidate();
-    }
+    },
   });
   const purgeAge = optionalPositiveInteger(olderThanDays);
 
@@ -167,9 +167,7 @@ export function BlacklistPage() {
         </CardContent>
       </Card>
 
-      {mutationError ? (
-        <AlertBanner kind="danger">{mutationError}</AlertBanner>
-      ) : null}
+      {mutationError ? <AlertBanner kind="danger">{mutationError}</AlertBanner> : null}
       {blacklist.isError ? (
         <AlertBanner kind="danger">Unable to load blacklist entries.</AlertBanner>
       ) : null}

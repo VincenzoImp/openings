@@ -44,7 +44,6 @@ and MCP behavior share the application layer in
 - `config/settings.yaml`
 - `db/jobs.db`
 - `chroma/`
-- `results/`
 - `logs/search.log`
 
 Docker defaults this root to `/data`. Local development defaults to the repo

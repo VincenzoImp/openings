@@ -66,3 +66,5 @@ docker-compose.override.yml
 # Local agent settings
 .claude/
 .superpowers/
+# Internal planning/spec artifacts — keep them out of the published docs/ tree
+docs/superpowers/

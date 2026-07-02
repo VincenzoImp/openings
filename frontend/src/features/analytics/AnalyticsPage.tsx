@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getDistribution, getFacets, getStats } from "../../api/client";
 import type { FacetItem } from "../../api/types";
 import { AlertBanner } from "../../components/AlertBanner";
+import { Metric } from "../../components/Metric";
 import { PageHeader } from "../../components/PageHeader";
 
 function scoreLabel(binStart: number) {
@@ -14,19 +15,19 @@ export function AnalyticsPage() {
   const stats = useQuery({
     queryKey: ["stats"],
     queryFn: getStats,
-    staleTime: 30_000
+    staleTime: 30_000,
   });
   const distribution = useQuery({
     queryKey: ["distribution"],
     queryFn: getDistribution,
-    staleTime: 30_000
+    staleTime: 30_000,
   });
   const facets = useQuery({
     queryKey: ["job-facets"],
     queryFn: getFacets,
-    staleTime: 60_000
+    staleTime: 60_000,
   });
-  const maxCount = Math.max(...(distribution.data?.map(([, count]) => count) ?? [1]));
+  const maxCount = Math.max(...(distribution.data?.map(([, count]) => count) ?? []), 1);
   const hasError = stats.isError || distribution.isError || facets.isError;
 
   return (
@@ -56,7 +57,10 @@ export function AnalyticsPage() {
         </CardHeader>
         <CardContent className="grid gap-3 p-4 pt-0">
           {distribution.data?.map(([binStart, count]) => (
-            <div className="grid grid-cols-[72px_minmax(0,1fr)_40px] items-center gap-3" key={binStart}>
+            <div
+              className="grid grid-cols-[72px_minmax(0,1fr)_40px] items-center gap-3"
+              key={binStart}
+            >
               <span className="text-sm text-slate-600">{scoreLabel(binStart)}</span>
               <div className="h-3 overflow-hidden rounded-full bg-slate-100">
                 <div
@@ -77,17 +81,6 @@ export function AnalyticsPage() {
         <FacetSummary title="Job types" items={facets.data?.job_types ?? []} />
       </div>
     </section>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <Card className="border border-slate-200 shadow-sm" variant="default">
-      <CardContent className="grid min-h-24 gap-2 p-4">
-        <span className="text-xs font-bold uppercase text-slate-500">{label}</span>
-        <strong className="text-3xl font-semibold leading-none text-slate-950">{value}</strong>
-      </CardContent>
-    </Card>
   );
 }
 

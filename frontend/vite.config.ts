@@ -7,12 +7,12 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": "http://127.0.0.1:8501",
-      "/mcp": "http://127.0.0.1:8501"
-    }
+      "/mcp": "http://127.0.0.1:8501",
+    },
   },
   test: {
     environment: "jsdom",
     globals: true,
-    setupFiles: "./src/test/setup.ts"
-  }
+    setupFiles: "./src/test/setup.ts",
+  },
 });

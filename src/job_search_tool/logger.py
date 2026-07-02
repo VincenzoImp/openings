@@ -8,11 +8,35 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
+from datetime import datetime
 from logging.handlers import RotatingFileHandler
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 if TYPE_CHECKING:
     from job_search_tool.config import Config
+
+
+def _timezone_converter(tz_name: str) -> Callable[[float | None], time.struct_time]:
+    """Build a ``logging.Formatter.converter`` for the given IANA timezone.
+
+    ``logging.Formatter`` renders ``%(asctime)s`` by passing the record's
+    epoch timestamp through ``converter`` (``time.localtime`` by default). We
+    swap in a converter that resolves the timestamp in ``tz_name`` so the
+    documented ``logging.timezone`` setting actually shapes log timestamps.
+    Falls back to ``time.localtime`` for an unknown zone (defensive — the
+    config layer already validates the value at load time).
+    """
+    try:
+        tz = ZoneInfo(tz_name)
+    except (ZoneInfoNotFoundError, ValueError):
+        return time.localtime
+
+    def convert(timestamp: float | None) -> time.struct_time:
+        return datetime.fromtimestamp(timestamp or 0.0, tz).timetuple()
+
+    return convert
 
 
 # ANSI color codes for console output
@@ -24,9 +48,6 @@ class Colors:
     RED = "\033[91m"
     GREEN = "\033[92m"
     YELLOW = "\033[93m"
-    BLUE = "\033[94m"
-    MAGENTA = "\033[95m"
-    CYAN = "\033[96m"
     GRAY = "\033[90m"
 
 
@@ -150,14 +171,19 @@ def setup_logging(config: Config) -> logging.Logger:
     # message) tuple is suppressed everywhere after the first occurrence.
     jobspy_dedupe = DedupeFilter(name_prefix="JobSpy")
 
+    # Render all timestamps in the configured timezone (default UTC).
+    tz_converter = _timezone_converter(config.logging.timezone)
+
     console_format = ColoredFormatter(
         fmt="%(asctime)s | %(levelname)s | %(message)s",
         datefmt="%H:%M:%S",
     )
+    console_format.converter = tz_converter
     file_format = PlainFormatter(
         fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+    file_format.converter = tz_converter
 
     # --- Our application logger (job_search) ------------------------------
     logger = logging.getLogger("job_search")

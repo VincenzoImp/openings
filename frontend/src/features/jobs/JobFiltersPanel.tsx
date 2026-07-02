@@ -24,7 +24,7 @@ export function JobFiltersPanel({
   onReset,
   onSelectVisible,
   selectedCount,
-  visibleJobs
+  visibleJobs,
 }: JobFiltersPanelProps) {
   const activeAdvancedCount = useMemo(
     () =>
@@ -42,9 +42,9 @@ export function JobFiltersPanel({
         filters.firstSeenFrom,
         filters.firstSeenTo,
         filters.lastSeenFrom,
-        filters.lastSeenTo
+        filters.lastSeenTo,
       ].filter(Boolean).length,
-    [filters]
+    [filters],
   );
   const [showAdvanced, setShowAdvanced] = useState(activeAdvancedCount > 0);
 
@@ -103,7 +103,9 @@ export function JobFiltersPanel({
             <select
               aria-label="Sort"
               className="h-10 w-full min-w-0 rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 shadow-sm outline-none focus:border-zinc-950 focus:ring-2 focus:ring-zinc-100"
-              onChange={(event) => onChange({ sort: event.target.value as JobFilterValues["sort"] })}
+              onChange={(event) =>
+                onChange({ sort: event.target.value as JobFilterValues["sort"] })
+              }
               value={filters.sort}
             >
               <option value="score">Score</option>
@@ -146,7 +148,11 @@ export function JobFiltersPanel({
               <RotateCcw aria-hidden="true" size={16} />
               Reset filters
             </Button>
-            <Button isDisabled={visibleJobs.length === 0} onPress={onSelectVisible} variant="outline">
+            <Button
+              isDisabled={visibleJobs.length === 0}
+              onPress={onSelectVisible}
+              variant="outline"
+            >
               Select visible
             </Button>
             <Button isDisabled={selectedCount === 0} onPress={onClearSelection} variant="outline">
@@ -200,7 +206,9 @@ export function JobFiltersPanel({
             </fieldset>
 
             <fieldset className="grid min-w-0 gap-3">
-              <legend className="mb-1 text-xs font-bold uppercase text-zinc-500">Score and salary</legend>
+              <legend className="mb-1 text-xs font-bold uppercase text-zinc-500">
+                Score and salary
+              </legend>
               <div className="grid min-w-0 gap-3 sm:grid-cols-2">
                 <NumberFilter
                   label="Min score"
@@ -286,7 +294,7 @@ export function JobFiltersPanel({
 function StatusButton({
   isSelected,
   label,
-  onPress
+  onPress,
 }: {
   isSelected: boolean;
   label: string;
@@ -309,7 +317,7 @@ function TextFilter({
   label,
   name,
   onChange,
-  value
+  value,
 }: {
   datalistId?: string;
   label: string;
@@ -338,7 +346,7 @@ function NumberFilter({
   min,
   name,
   onChange,
-  value
+  value,
 }: {
   label: string;
   max?: string;
@@ -368,7 +376,7 @@ function DateFilter({
   label,
   name,
   onChange,
-  value
+  value,
 }: {
   label: string;
   name: string;
