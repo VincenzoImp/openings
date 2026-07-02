@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+No changes yet.
+
+## [10.2.0] - 2026-07-02
+
 ### Fixed
 
 - Stopped the web process from writing directly to the Chroma vector store. ChromaDB's local `PersistentClient` is not safe for concurrent multi-process writes; the `web` and `scheduler` containers sharing one on-disk Chroma index corrupted its HNSW capacity bookkeeping and crashed the scheduler with a native segfault (`Index with capacity N and N current entries cannot add 1 records`). The scheduler process is now the sole writer — it prunes stale embeddings on a new periodic job (`vector_search.sync_interval_minutes`, default 30) instead of the web process deleting them inline.
