@@ -46,6 +46,7 @@ dev = [
 ]
 
 [tool.uv]
+override-dependencies = ["markdownify>=0.14.1"]
 constraint-dependencies = [
     # Security floors for transitive runtime dependencies audited in CI.
     # Each floor is the minimum version that clears a pip-audit finding for a
