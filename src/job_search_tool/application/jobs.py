@@ -345,15 +345,27 @@ class JobApplicationService:
         job_ids: list[str] | None = None,
         fmt: JobExportFormat = "csv",
     ) -> JobExportResult:
-        """Serialize selected or filtered jobs for download/export surfaces."""
+        """Serialize selected or filtered jobs for download/export surfaces.
+
+        The caller's ``limit`` and ``offset`` are honoured, so an export can be
+        paged like any other listing. A ``limit`` of zero or less means "every
+        row matching the filter" and is resolved against the reported total
+        rather than a fixed ceiling.
+        """
         if job_ids is not None:
             records = self.db.get_jobs_by_ids(self._normalize_job_ids(job_ids))
+            total = len(records)
         else:
-            export_query = query or JobListQuery(limit=1000)
-            export_query = JobListQuery(
-                **{**asdict(export_query), "limit": 1000, "offset": 0}
-            )
-            records = self.list_jobs(export_query).jobs
+            export_query = query or JobListQuery()
+            if export_query.limit <= 0:
+                matching = self.list_jobs(
+                    JobListQuery(**{**asdict(export_query), "limit": 1, "offset": 0})
+                ).total
+                export_query = JobListQuery(
+                    **{**asdict(export_query), "limit": max(matching, 1), "offset": 0}
+                )
+            listed = self.list_jobs(export_query)
+            records, total = listed.jobs, listed.total
 
         rows = [self._record_to_export_row(record) for record in records]
         if fmt == "json":
@@ -362,6 +374,7 @@ class JobApplicationService:
                 media_type="application/json",
                 filename="jobs.json",
                 row_count=len(rows),
+                total=total,
             )
         if fmt != "csv":
             raise ValueError(f"Unsupported export format: {fmt}")
@@ -376,6 +389,7 @@ class JobApplicationService:
             media_type="text/csv",
             filename="jobs.csv",
             row_count=len(rows),
+            total=total,
         )
 
     def preview_cleanup(self, config) -> CleanupPreview:

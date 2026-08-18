@@ -300,6 +300,35 @@ def test_export_jobs_supports_console_filters() -> None:
     assert exported[0]["title"] == "Frontend Developer"
 
 
+def test_export_jobs_pages_with_limit_and_offset() -> None:
+    """The MCP surface advertises limit and offset, so they must page."""
+    from job_search_tool.web.mcp import export_jobs
+
+    first = json.loads(export_jobs(format="json", limit=1, offset=0))
+    second = json.loads(export_jobs(format="json", limit=1, offset=1))
+
+    assert [row["title"] for row in first] == ["Backend Engineer"]
+    assert [row["title"] for row in second] == ["Frontend Developer"]
+
+
+def test_export_jobs_csv_payload_reports_total() -> None:
+    """A caller must be able to tell a first page from a complete export."""
+    from job_search_tool.web.mcp import export_jobs
+
+    payload = json.loads(export_jobs(format="csv", limit=1, offset=0))
+
+    assert payload["row_count"] == 1
+    assert payload["total"] == 2
+
+
+def test_export_jobs_unbounded_limit_exports_every_match() -> None:
+    from job_search_tool.web.mcp import export_jobs
+
+    exported = json.loads(export_jobs(format="json", limit=0))
+
+    assert len(exported) == 2
+
+
 def test_cleanup_tools_return_counts() -> None:
     from job_search_tool.web.mcp import preview_cleanup, run_cleanup
 

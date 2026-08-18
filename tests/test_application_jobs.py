@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
 
+from job_search_tool.application.models import JobListQuery
 from job_search_tool.config import (
     Config,
     DatabaseConfig,
@@ -430,6 +432,61 @@ def test_export_jobs_selected_as_json(seeded_db: JobDatabase) -> None:
     assert exported.row_count == 2
     assert b"Backend Engineer" in exported.content
     assert b"Data Scientist" in exported.content
+
+
+def test_export_jobs_honours_limit_and_offset(seeded_db: JobDatabase) -> None:
+    """A caller that asks for one page must not receive the whole set."""
+    from job_search_tool.application.jobs import JobApplicationService
+
+    service = JobApplicationService(seeded_db)
+
+    exported = service.export_jobs(query=JobListQuery(limit=1, offset=1), fmt="json")
+
+    assert exported.row_count == 1
+    assert json.loads(exported.content)[0]["title"] == "Data Scientist"
+
+
+def test_export_jobs_pages_cover_the_set_without_overlap(
+    seeded_db: JobDatabase,
+) -> None:
+    """Walking offsets must yield every row exactly once."""
+    from job_search_tool.application.jobs import JobApplicationService
+
+    service = JobApplicationService(seeded_db)
+
+    titles = []
+    for offset in range(0, 3):
+        page = service.export_jobs(
+            query=JobListQuery(limit=1, offset=offset), fmt="json"
+        )
+        titles.extend(row["title"] for row in json.loads(page.content))
+
+    assert titles == ["Backend Engineer", "Data Scientist", "Frontend Developer"]
+
+
+def test_export_jobs_with_unbounded_limit_returns_whole_filtered_set(
+    seeded_db: JobDatabase,
+) -> None:
+    """limit=0 means 'export everything that matches', not 'export nothing'."""
+    from job_search_tool.application.jobs import JobApplicationService
+
+    service = JobApplicationService(seeded_db)
+
+    exported = service.export_jobs(query=JobListQuery(limit=0), fmt="json")
+
+    assert exported.row_count == 3
+
+
+def test_export_jobs_reports_total_of_the_filtered_set(seeded_db: JobDatabase) -> None:
+    """A truncated export must be detectable: row_count alone cannot show it."""
+    from job_search_tool.application.jobs import JobApplicationService
+
+    service = JobApplicationService(seeded_db)
+
+    exported = service.export_jobs(query=JobListQuery(limit=1), fmt="json")
+
+    assert exported.row_count == 1
+    assert exported.total == 3
 
 
 def test_cleanup_preview_matches_cleanup_execution(seeded_db: JobDatabase) -> None:

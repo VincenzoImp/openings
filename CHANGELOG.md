@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 No changes yet.
 
+## [10.3.0] - 2026-08-18
+
+### Fixed
+
+- `export_jobs` no longer discards the caller's `limit` and `offset`. The application service overwrote both with a hard-coded `limit=1000, offset=0` on every filtered export, so all three surfaces (MCP tool, `GET /api/export/jobs`, and the service itself) advertised pagination parameters that did nothing: paging through a 2,256-job set returned the same first 1,000 rows twelve times, and any export of a set larger than 1,000 was silently truncated with no indication that rows were missing. Callers that relied on the old behaviour of always receiving the first 1,000 rows now receive the page they actually asked for.
+
+### Added
+
+- `limit=0` on an export means "every row matching the filter", resolved against the set's real total instead of a fixed ceiling, so a full export no longer has to guess a large enough limit.
+- Exports report the filtered set's `total` next to `row_count`: in the MCP CSV payload, in `JobExportResult`, and as the `X-Job-Search-Export-Total` response header. A truncated first page is now detectable by the caller rather than indistinguishable from a complete export.
+
+### Changed
+
+- `GET /api/export/jobs` no longer caps `limit` at 1000, since the cap silently bounded what an export could return.
+
 ## [10.2.0] - 2026-07-02
 
 ### Fixed

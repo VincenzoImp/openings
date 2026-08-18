@@ -309,7 +309,13 @@ def export_jobs(
     text: str | None = None,
     sort: str = "score",
 ) -> str:
-    """Export selected or filtered jobs."""
+    """Export selected or filtered jobs.
+
+    ``limit`` and ``offset`` page the export the same way they page
+    ``list_jobs``; pass ``limit=0`` to export every row matching the filter.
+    The CSV payload reports ``total`` alongside ``row_count`` so a caller can
+    tell a complete export from a first page.
+    """
     exported = _service().export_jobs(
         job_ids=job_ids,
         query=None
@@ -350,6 +356,7 @@ def export_jobs(
             "media_type": exported.media_type,
             "filename": exported.filename,
             "row_count": exported.row_count,
+            "total": exported.total,
         }
     )
 
