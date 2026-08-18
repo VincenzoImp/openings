@@ -23,6 +23,7 @@ No changes yet.
 ### Changed
 
 - `GET /api/export/jobs` no longer caps `limit` at 1000, since the cap silently bounded what an export could return.
+- Raised the `cryptography` security floor to 50.0.0 for PYSEC-2026-3552, which was published after the previous release and broke the CI audit.
 
 ## [10.2.0] - 2026-07-02
 

@@ -50,7 +50,7 @@ constraint-dependencies = [
     # Security floors for transitive runtime dependencies audited in CI.
     # Each floor is the minimum version that clears a pip-audit finding for a
     # package we only pull in indirectly (mostly via mcp/fastapi).
-    "cryptography>=48.0.1",       # GHSA-537c-gmf6-5ccf (via mcp -> pyjwt[crypto])
+    "cryptography>=50.0.0",       # PYSEC-2026-3552 (via mcp -> pyjwt[crypto])
     "gitpython>=3.1.50",
     "idna>=3.15",                 # PYSEC-2026-215 (via anyio/httpx/requests)
     "pydantic-settings>=2.14.2",  # GHSA-4xgf-cpjx-pc3j (via mcp)
