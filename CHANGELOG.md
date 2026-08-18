@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 No changes yet.
 
+## [10.3.1] - 2026-08-18
+
+### Fixed
+
+- An unbounded export (`limit=0`, added in 10.3.0) stopped at the first page for any set larger than the query cap. `query_jobs` caps a single page at 1000 rows so no one request can materialize an unbounded result set, and the export resolved its limit against that capped query: asking for all 2,256 matching jobs returned 1,000 and reported `total: 2256`, which was correct but easy to read as a complete export. The export now pages internally until it has covered the reported total.
+
+### Changed
+
+- The per-query row cap is now the named constant `JobDatabase.MAX_QUERY_LIMIT` instead of a literal repeated at two call sites, so the export paging and the cap cannot drift apart.
+
 ## [10.3.0] - 2026-08-18
 
 ### Fixed

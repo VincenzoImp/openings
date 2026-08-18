@@ -477,6 +477,40 @@ def test_export_jobs_with_unbounded_limit_returns_whole_filtered_set(
     assert exported.row_count == 3
 
 
+def test_export_jobs_unbounded_limit_pages_past_the_query_cap(
+    tmp_path: Path,
+) -> None:
+    """A set larger than MAX_QUERY_LIMIT must export whole, not one page.
+
+    ``query_jobs`` caps a single page, so an unbounded export has to page or it
+    returns the first page and looks complete.
+    """
+    from job_search_tool.application.jobs import JobApplicationService
+
+    db = JobDatabase(tmp_path / "big.db")
+    over_cap = JobDatabase.MAX_QUERY_LIMIT + 5
+    for index in range(over_cap):
+        db.save_job(
+            Job(
+                title=f"Engineer {index}",
+                company="Acme Corp",
+                location="Remote",
+                relevance_score=index,
+                job_url=f"https://example.com/job-{index}",
+            ),
+            site="linkedin",
+        )
+
+    exported = JobApplicationService(db).export_jobs(
+        query=JobListQuery(limit=0), fmt="json"
+    )
+
+    assert exported.total == over_cap
+    assert exported.row_count == over_cap
+    assert len({row["job_id"] for row in json.loads(exported.content)}) == over_cap
+    db.close()
+
+
 def test_export_jobs_reports_total_of_the_filtered_set(seeded_db: JobDatabase) -> None:
     """A truncated export must be detectable: row_count alone cannot show it."""
     from job_search_tool.application.jobs import JobApplicationService

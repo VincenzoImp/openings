@@ -338,6 +338,31 @@ class JobApplicationService:
         count = self.db.purge_blacklist(older_than_days)
         return JobCommandResult(success=count > 0, affected_count=count)
 
+    def _export_every_match(self, query: JobListQuery) -> tuple[list[JobDBRecord], int]:
+        """Collect every row matching ``query``, paging past the query cap.
+
+        ``query_jobs`` caps a single page at ``MAX_QUERY_LIMIT`` so no one
+        request can materialize an unbounded result set. An export of a set
+        larger than that cap therefore has to page, or it silently returns the
+        first page and looks complete.
+        """
+        page_size = self.db.MAX_QUERY_LIMIT
+        records: list[JobDBRecord] = []
+        total = 0
+        while True:
+            listed = self.list_jobs(
+                JobListQuery(
+                    **{**asdict(query), "limit": page_size, "offset": len(records)}
+                )
+            )
+            total = listed.total
+            if not listed.jobs:
+                break
+            records.extend(listed.jobs)
+            if len(records) >= total:
+                break
+        return records, total
+
     def export_jobs(
         self,
         *,
@@ -358,14 +383,10 @@ class JobApplicationService:
         else:
             export_query = query or JobListQuery()
             if export_query.limit <= 0:
-                matching = self.list_jobs(
-                    JobListQuery(**{**asdict(export_query), "limit": 1, "offset": 0})
-                ).total
-                export_query = JobListQuery(
-                    **{**asdict(export_query), "limit": max(matching, 1), "offset": 0}
-                )
-            listed = self.list_jobs(export_query)
-            records, total = listed.jobs, listed.total
+                records, total = self._export_every_match(export_query)
+            else:
+                listed = self.list_jobs(export_query)
+                records, total = listed.jobs, listed.total
 
         rows = [self._record_to_export_row(record) for record in records]
         if fmt == "json":
