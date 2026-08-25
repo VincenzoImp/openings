@@ -249,6 +249,11 @@ class JobDatabase:
     # We use a conservative chunk size to stay well under this limit
     SQLITE_VAR_LIMIT = 500
 
+    # Largest page a single query may return, so one request cannot be made to
+    # materialize an unbounded result set. Callers that need the whole set page
+    # through it — see JobApplicationService.export_jobs.
+    MAX_QUERY_LIMIT = 1000
+
     @contextmanager
     def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
         """
@@ -748,7 +753,7 @@ class JobDatabase:
         sort: str = "score",
     ) -> tuple[list[JobDBRecord], int]:
         """Query active jobs with SQL-backed filtering and pagination."""
-        limit = max(1, min(int(limit), 1000))
+        limit = max(1, min(int(limit), self.MAX_QUERY_LIMIT))
         offset = max(0, int(offset))
 
         where: list[str] = []
@@ -869,7 +874,7 @@ class JobDatabase:
         location: str | None = None,
     ) -> tuple[list[BlacklistedJobRecord], int]:
         """Return blacklisted jobs with SQL-backed search and pagination."""
-        limit = max(1, min(int(limit), 1000))
+        limit = max(1, min(int(limit), self.MAX_QUERY_LIMIT))
         offset = max(0, int(offset))
 
         where: list[str] = []

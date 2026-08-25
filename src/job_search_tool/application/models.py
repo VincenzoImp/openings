@@ -93,6 +93,12 @@ class JobExportResult:
     media_type: str
     filename: str
     row_count: int
+    total: int = 0
+    """Rows matching the filter, so a truncated export is detectable.
+
+    ``row_count`` alone cannot distinguish "the filter matched 1000 jobs" from
+    "the filter matched 5000 and this page holds the first 1000".
+    """
 
 
 @dataclass(frozen=True)

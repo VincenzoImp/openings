@@ -218,6 +218,7 @@ def _export_response(exported) -> Response:
         headers={
             "Content-Disposition": f'attachment; filename="{exported.filename}"',
             "X-Job-Search-Export-Count": str(exported.row_count),
+            "X-Job-Search-Export-Total": str(exported.total),
         },
     )
 
@@ -437,7 +438,7 @@ def purge_blacklist(payload: BlacklistPurgeRequest) -> JobCommandResponse:
 
 @router.get("/export/jobs")
 def export_jobs(
-    limit: int = Query(1000, ge=1, le=1000),
+    limit: int = Query(1000, ge=0),
     offset: int = Query(0, ge=0),
     min_score: int | None = None,
     max_score: int | None = None,
