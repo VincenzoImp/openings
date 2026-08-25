@@ -149,7 +149,20 @@ jobs:
           uv export --frozen --no-dev --no-emit-project --output-file .tmp/requirements-audit.txt
 
       - name: Security audit
-        run: uvx --python 3.11 --from 'pip-audit==2.9.0' pip-audit --ignore-vuln CVE-2025-46656 -r .tmp/requirements-audit.txt  # markdownify pinned by python-jobspy<0.14.0
+        # Ignored vulnerabilities:
+        # - CVE-2025-46656: markdownify pinned by python-jobspy<0.14.0
+        # - GHSA-2wm9-hf6c-p5cr, GHSA-36p7-vc44-83pf, GHSA-xph7-9rjv-w5fr:
+        #   chromadb has no patched release (every version up to 1.5.9 is
+        #   affected) and all three require the HTTP server with RBAC auth,
+        #   while this project only uses an embedded PersistentClient.
+        #   Drop these once upstream ships a fix.
+        run: |
+          uvx --python 3.11 --from 'pip-audit==2.9.0' pip-audit \
+            --ignore-vuln CVE-2025-46656 \
+            --ignore-vuln GHSA-2wm9-hf6c-p5cr \
+            --ignore-vuln GHSA-36p7-vc44-83pf \
+            --ignore-vuln GHSA-xph7-9rjv-w5fr \
+            -r .tmp/requirements-audit.txt
 
   docker:
     # Runs on PRs and on push to main so a direct push (skipping a PR) still
