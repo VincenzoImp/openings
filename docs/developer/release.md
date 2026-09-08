@@ -7,20 +7,22 @@ Images are published from Git tags.
 ```bash
 uv run pre-commit run --all-files
 uv run mypy src/openings
-uv run pytest --cov=openings --cov-fail-under=60
+uv run pytest --cov=openings --cov-fail-under=80
 npm --prefix frontend run quality
+npm --prefix frontend run test:e2e
 docker compose config
 sh docker/smoke.sh
 ```
 
-Check that `pyproject.toml`, `CHANGELOG.md` and the docs agree on the version.
-Move the `Unreleased` notes under the new heading with the date.
+Check that `pyproject.toml`, `frontend/package.json`, `CHANGELOG.md` and the
+docs agree on the version. Move the `Unreleased` notes under the new heading
+with the date.
 
 ## Tag
 
 ```bash
-git tag -a v1.2.0 -m "Openings 1.2.0"
-git push origin v1.2.0
+git tag -a v0.2.0 -m "Openings 0.2.0"
+git push origin v0.2.0
 ```
 
 ## Publish

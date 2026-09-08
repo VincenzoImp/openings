@@ -14,9 +14,9 @@ Both share the named volume `openings-data` mounted at `/data`:
 
 ```text
 /data/config/settings.yaml   bind-mounted from ./settings.yaml, read-only
-/data/db/openings.db         the database
+/data/db/openings.db         the database, embeddings included
 /data/attachments/<job_id>/  uploaded files
-/data/chroma/                the vector index (optional)
+/data/models/                the sentence model, downloaded once
 /data/logs/openings.log      application log
 ```
 
@@ -29,7 +29,9 @@ docker compose logs -f scheduler
 ```
 
 The container refuses to start without `settings.yaml`; there is no default
-configuration. Edit the file and `docker compose restart` to apply changes.
+configuration. Edit the file and the running processes pick it up: the
+scheduler at its next collection, the web process as soon as the file
+changes.
 
 ## Environment
 
