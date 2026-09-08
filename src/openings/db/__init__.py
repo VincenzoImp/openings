@@ -12,7 +12,14 @@ from pathlib import Path
 from openings.db.base import MAX_QUERY_LIMIT, SQLITE_VAR_LIMIT, Store
 from openings.db.embeddings import EmbeddingsMixin
 from openings.db.events import EventsMixin
-from openings.db.jobs import JOB_SORTS, SORT_DIRECTIONS, JobQuery, JobsMixin, MergeResult, UpsertResult
+from openings.db.jobs import (
+    JOB_SORTS,
+    SORT_DIRECTIONS,
+    JobQuery,
+    JobsMixin,
+    MergeResult,
+    UpsertResult,
+)
 from openings.db.material import MaterialMixin
 from openings.db.retention import ReconciliationReport, RetentionMixin
 from openings.db.runs import RunsMixin

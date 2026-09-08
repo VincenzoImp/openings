@@ -212,7 +212,7 @@ jobs:
         run: |
           # --no-deps: the export is fully pinned and uv's dependency overrides
           # (numpy, markdownify) are not something pip can re-resolve.
-          uvx --python 3.12 --from 'pip-audit==2.9.0' pip-audit --no-deps -r .tmp/requirements-audit.txt
+          uvx --python 3.12 --from 'pip-audit==2.9.0' pip-audit --no-deps --disable-pip -r .tmp/requirements-audit.txt
 
   docker:
     # Runs on PRs and on push to main so a direct push (skipping a PR) still

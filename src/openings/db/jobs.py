@@ -168,8 +168,7 @@ class JobsMixin(PostingsMixin, Store):
                 job_ids.append(row["job_id"])
         for chunk in chunks(job_ids):
             rows = conn.execute(
-                "SELECT job_id, source FROM postings "
-                f"WHERE job_id IN ({placeholders(len(chunk))})",
+                f"SELECT job_id, source FROM postings WHERE job_id IN ({placeholders(len(chunk))})",
                 list(chunk),
             ).fetchall()
             sources: dict[str, set[str]] = {}
@@ -216,9 +215,7 @@ class JobsMixin(PostingsMixin, Store):
                 if target is None:
                     target = job_id_for(key, job.identity)
 
-                row = conn.execute(
-                    "SELECT status FROM jobs WHERE job_id = ?", (target,)
-                ).fetchone()
+                row = conn.execute("SELECT status FROM jobs WHERE job_id = ?", (target,)).fetchone()
                 if row is not None and row["status"] == _BLACKLISTED:
                     result.skipped_blacklisted += 1
                     continue
