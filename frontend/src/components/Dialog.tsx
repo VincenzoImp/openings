@@ -1,8 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
 
+import { useHotkeys } from "../app/hotkeys";
 import { Button } from "./Button";
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export function Dialog({
   open,
@@ -20,25 +24,48 @@ export function Dialog({
   wide?: boolean;
 }) {
   const panel = useRef<HTMLDivElement>(null);
+  const restoreTo = useRef<HTMLElement | null>(null);
+  const titleId = useId();
+
+  useHotkeys("dialog", [{ key: "Escape", run: onClose }], open);
 
   useEffect(() => {
     if (!open) {
       return;
     }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        onClose();
+    restoreTo.current = document.activeElement as HTMLElement | null;
+    const node = panel.current;
+    const preferred = node?.querySelector<HTMLElement>("[autofocus]");
+    const first = preferred ?? node?.querySelector<HTMLElement>(FOCUSABLE);
+    first?.focus();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== "Tab" || !node) {
+        return;
+      }
+      const focusable = Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE));
+      if (focusable.length === 0) {
+        return;
+      }
+      const start = focusable[0];
+      const end = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === start) {
+        event.preventDefault();
+        end.focus();
+      } else if (!event.shiftKey && document.activeElement === end) {
+        event.preventDefault();
+        start.focus();
       }
     };
-    // Capture phase so the dialog wins over view-level shortcuts.
-    window.addEventListener("keydown", onKeyDown, true);
-    const focusable = panel.current?.querySelector<HTMLElement>(
-      "input, textarea, select, button, [tabindex]",
-    );
-    focusable?.focus();
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [open, onClose]);
+    window.addEventListener("keydown", trap);
+    return () => {
+      window.removeEventListener("keydown", trap);
+      document.body.style.overflow = previousOverflow;
+      restoreTo.current?.focus?.();
+    };
+  }, [open]);
 
   if (!open) {
     return null;
@@ -46,8 +73,8 @@ export function Dialog({
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-start justify-center bg-slate-900/40 p-4 pt-16"
-      onMouseDown={(event) => {
+      className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 p-0 sm:items-start sm:p-4 sm:pt-16"
+      onClick={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
         }
@@ -57,62 +84,27 @@ export function Dialog({
         ref={panel}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
-        className={`w-full ${wide ? "max-w-3xl" : "max-w-lg"} rounded-lg bg-white shadow-xl`}
+        aria-labelledby={titleId}
+        className={`flex max-h-[calc(100dvh-1rem)] w-full flex-col rounded-t-lg border border-edge bg-surface shadow-panel sm:max-h-[calc(100dvh-5rem)] sm:rounded-lg ${wide ? "sm:max-w-3xl" : "sm:max-w-lg"}`}
+        style={{ overscrollBehavior: "contain" }}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <h2 className="text-base font-semibold">{title}</h2>
+        <div className="flex items-center justify-between gap-3 border-b border-edge px-4 py-3">
+          <h2 id={titleId} className="truncate text-base font-semibold text-fg">
+            {title}
+          </h2>
           <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
-            <X size={16} />
+            <X size={16} aria-hidden="true" />
           </Button>
         </div>
-        <div className="px-4 py-3">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3" tabIndex={0}>
+          {children}
+        </div>
         {footer ? (
-          <div className="flex justify-end gap-2 border-t border-slate-200 px-4 py-3">{footer}</div>
+          <div className="flex flex-wrap justify-end gap-2 border-t border-edge px-4 py-3">
+            {footer}
+          </div>
         ) : null}
       </div>
     </div>
-  );
-}
-
-export function ConfirmDialog({
-  open,
-  title,
-  message,
-  confirmLabel = "Confirm",
-  danger = false,
-  onConfirm,
-  onClose,
-}: {
-  open: boolean;
-  title: string;
-  message: ReactNode;
-  confirmLabel?: string;
-  danger?: boolean;
-  onConfirm: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <Dialog
-      open={open}
-      title={title}
-      onClose={onClose}
-      footer={
-        <>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button
-            variant={danger ? "danger" : "primary"}
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
-          >
-            {confirmLabel}
-          </Button>
-        </>
-      }
-    >
-      <div className="text-sm text-slate-700">{message}</div>
-    </Dialog>
   );
 }

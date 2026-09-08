@@ -1,575 +1,94 @@
-"""Tests for scheduler module.
-
-Tests for APScheduler integration including:
-- Scheduler initialization and configuration
-- Single-shot mode execution
-- Scheduled mode execution
-- Retry logic on failure
-- Signal handling
-"""
-
-import signal
-from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
-
-import pytest
-
-from openings.config import Config, SchedulerConfig
-from openings.scheduler import JobSearchScheduler, create_scheduler
-
-
-# =============================================================================
-# TEST SCHEDULER INITIALIZATION
-# =============================================================================
-
-
-class TestJobSearchSchedulerInit:
-    """Tests for JobSearchScheduler initialization."""
-
-    @pytest.fixture
-    def scheduler_config(self):
-        """Create a SchedulerConfig for testing."""
-        return SchedulerConfig(
-            interval_hours=12,
-            run_on_startup=True,
-            retry_on_failure=True,
-            retry_delay_minutes=15,
-        )
-
-    @pytest.fixture
-    def config(self, scheduler_config):
-        """Create a Config with scheduler settings."""
-        return Config(scheduler=scheduler_config)
-
-    @pytest.fixture
-    def mock_job_function(self):
-        """Create a mock job function."""
-        return MagicMock(return_value=True)
-
-    def test_init_stores_config(self, config, mock_job_function):
-        """Test that config is stored on initialization."""
-        scheduler = JobSearchScheduler(config, mock_job_function)
-
-        assert scheduler.config == config
-        assert scheduler.job_function == mock_job_function
-
-    def test_init_defaults(self, config, mock_job_function):
-        """Test initial state of scheduler."""
-        scheduler = JobSearchScheduler(config, mock_job_function)
-
-        assert scheduler.is_running is False
-        assert scheduler.last_run_success is False
-        assert scheduler.run_count == 0
-        assert scheduler._scheduler is None
-
-    def test_create_scheduler_factory(self, config, mock_job_function):
-        """Test create_scheduler factory function."""
-        scheduler = create_scheduler(config, mock_job_function)
-
-        assert isinstance(scheduler, JobSearchScheduler)
-        assert scheduler.config == config
-
-    def test_create_scheduler_factory_passes_through_vector_sync(self, config, mock_job_function):
-        """Test create_scheduler forwards vector-sync kwargs."""
-        mock_sync = MagicMock()
-
-        scheduler = create_scheduler(
-            config,
-            mock_job_function,
-            vector_sync_function=mock_sync,
-            vector_sync_interval_minutes=45,
-        )
-
-        assert scheduler.vector_sync_function is mock_sync
-        assert scheduler.vector_sync_interval_minutes == 45
-
-
-# =============================================================================
-# TEST SINGLE-SHOT MODE
-# =============================================================================
-
-
-class TestJobSearchSchedulerRunOnce:
-    """Tests for single-shot (run_once) execution."""
-
-    @pytest.fixture
-    def scheduler_config(self):
-        return SchedulerConfig()
-
-    @pytest.fixture
-    def config(self, scheduler_config):
-        return Config(scheduler=scheduler_config)
-
-    def test_run_once_success(self, config):
-        """Test run_once returns True on successful job."""
-        mock_job = MagicMock(return_value=True)
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        result = scheduler.run_once()
-
-        assert result is True
-        assert scheduler.last_run_success is True
-        assert scheduler.run_count == 1
-        mock_job.assert_called_once()
-
-    def test_run_once_failure(self, config):
-        """Test run_once returns False when job returns False."""
-        mock_job = MagicMock(return_value=False)
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        result = scheduler.run_once()
-
-        assert result is False
-        assert scheduler.last_run_success is False
-        assert scheduler.run_count == 1
-
-    def test_run_once_exception(self, config):
-        """Test run_once handles exceptions gracefully."""
-        mock_job = MagicMock(side_effect=Exception("Job failed"))
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        result = scheduler.run_once()
-
-        assert result is False
-        assert scheduler.run_count == 1
-
-    def test_run_once_increments_run_count(self, config):
-        """Test that run_once increments run count each time."""
-        mock_job = MagicMock(return_value=True)
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        scheduler.run_once()
-        scheduler.run_once()
-        scheduler.run_once()
-
-        assert scheduler.run_count == 3
-
-
-# =============================================================================
-# TEST SCHEDULED MODE
-# =============================================================================
-
-
-class TestJobSearchSchedulerScheduledMode:
-    """Tests for scheduled (continuous) mode execution."""
-
-    @pytest.fixture
-    def scheduler_config(self):
-        return SchedulerConfig(
-            interval_hours=1,
-            run_on_startup=True,
-            retry_on_failure=True,
-            retry_delay_minutes=5,
-        )
-
-    @pytest.fixture
-    def config(self, scheduler_config):
-        """Create a Config with enabled scheduler."""
-        return Config(scheduler=scheduler_config)
-
-    def test_start_runs_on_startup(self, config):
-        """Test that start() runs job immediately when run_on_startup is True."""
-        mock_job = MagicMock(return_value=True)
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        # Mock BlockingScheduler to avoid blocking
-        with patch("openings.scheduler.BlockingScheduler") as mock_blocking:
-            mock_sched = MagicMock()
-            mock_blocking.return_value = mock_sched
-            # Make start() raise to exit immediately
-            mock_sched.start.side_effect = KeyboardInterrupt()
-
-            try:
-                scheduler.start()
-            except SystemExit:
-                pass
-
-            # Job should have been called once (on startup)
-            mock_job.assert_called_once()
-
-    def test_start_skips_startup_run_when_disabled(self, scheduler_config):
-        """Test that start() skips initial run when run_on_startup is False."""
-        scheduler_config.run_on_startup = False
-        config = Config(scheduler=scheduler_config)
-        mock_job = MagicMock(return_value=True)
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        with patch("openings.scheduler.BlockingScheduler") as mock_blocking:
-            mock_sched = MagicMock()
-            mock_blocking.return_value = mock_sched
-            mock_sched.start.side_effect = KeyboardInterrupt()
-
-            try:
-                scheduler.start()
-            except SystemExit:
-                pass
-
-            # Job should NOT have been called
-            mock_job.assert_not_called()
-
-    def test_start_adds_interval_job(self, config):
-        """Test that start() adds an interval job to the scheduler."""
-        mock_job = MagicMock(return_value=True)
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        with patch("openings.scheduler.BlockingScheduler") as mock_blocking:
-            mock_sched = MagicMock()
-            mock_blocking.return_value = mock_sched
-            mock_sched.start.side_effect = KeyboardInterrupt()
-
-            try:
-                scheduler.start()
-            except SystemExit:
-                pass
-
-            # Should have called add_job
-            mock_sched.add_job.assert_called_once()
-
-
-# =============================================================================
-# TEST VECTOR STORE SYNC JOB
-# =============================================================================
-
-
-class TestJobSearchSchedulerVectorSync:
-    """Tests for the periodic vector-store sync job.
-
-    The scheduler process is the sole writer to Chroma's on-disk index (the
-    web process only reads it — concurrent multi-process writes corrupt the
-    HNSW index and crash with a native segfault). This periodic job is how
-    deletions made from the dashboard eventually get pruned from Chroma
-    without the web process touching it directly.
-    """
-
-    @pytest.fixture
-    def config(self):
-        return Config(scheduler=SchedulerConfig(run_on_startup=False))
-
-    def test_start_registers_vector_sync_job_when_configured(self, config):
-        mock_job = MagicMock(return_value=True)
-        mock_sync = MagicMock()
-        scheduler = JobSearchScheduler(
-            config,
-            mock_job,
-            vector_sync_function=mock_sync,
-            vector_sync_interval_minutes=15,
-        )
-
-        with patch("openings.scheduler.BlockingScheduler") as mock_blocking:
-            mock_sched = MagicMock()
-            mock_blocking.return_value = mock_sched
-            mock_sched.start.side_effect = KeyboardInterrupt()
-
-            try:
-                scheduler.start()
-            except SystemExit:
-                pass
-
-            sync_calls = [
-                call
-                for call in mock_sched.add_job.call_args_list
-                if call.kwargs.get("id") == "vector_sync_job"
-            ]
-            assert len(sync_calls) == 1
-            call = sync_calls[0]
-            assert call.args[0] is mock_sync
-            assert call.kwargs["trigger"].interval == timedelta(minutes=15)
-
-    def test_start_skips_vector_sync_job_when_not_configured(self, config):
-        mock_job = MagicMock(return_value=True)
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        with patch("openings.scheduler.BlockingScheduler") as mock_blocking:
-            mock_sched = MagicMock()
-            mock_blocking.return_value = mock_sched
-            mock_sched.start.side_effect = KeyboardInterrupt()
-
-            try:
-                scheduler.start()
-            except SystemExit:
-                pass
-
-            sync_calls = [
-                call
-                for call in mock_sched.add_job.call_args_list
-                if call.kwargs.get("id") == "vector_sync_job"
-            ]
-            assert sync_calls == []
-
-
-# =============================================================================
-# TEST EXECUTE JOB
-# =============================================================================
-
-
-class TestJobSearchSchedulerExecuteJob:
-    """Tests for _execute_job method."""
-
-    @pytest.fixture
-    def config(self):
-        """Create a Config with retry enabled."""
-        return Config(
-            scheduler=SchedulerConfig(
-                retry_on_failure=True,
-                retry_delay_minutes=5,
-            )
-        )
-
-    def test_execute_job_success(self, config):
-        """Test _execute_job on successful run."""
-        mock_job = MagicMock(return_value=True)
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        scheduler._execute_job()
-
-        assert scheduler.last_run_success is True
-        assert scheduler.run_count == 1
-
-    def test_execute_job_failure_with_retry(self, config):
-        """Test _execute_job schedules retry on failure."""
-        mock_job = MagicMock(return_value=False)
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        # Set up mock scheduler
-        with patch("openings.scheduler.BlockingScheduler") as mock_blocking:
-            mock_sched = MagicMock()
-            mock_blocking.return_value = mock_sched
-            scheduler._scheduler = mock_sched
-
-            scheduler._execute_job()
-
-            assert scheduler.last_run_success is False
-            # Should have scheduled a retry
-            mock_sched.add_job.assert_called()
-
-    def test_execute_job_exception_with_retry(self, config):
-        """Test _execute_job schedules retry on exception."""
-        mock_job = MagicMock(side_effect=Exception("Error"))
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        with patch("openings.scheduler.BlockingScheduler") as mock_blocking:
-            mock_sched = MagicMock()
-            mock_blocking.return_value = mock_sched
-            scheduler._scheduler = mock_sched
-
-            scheduler._execute_job()
-
-            assert scheduler.last_run_success is False
-            # Should have scheduled a retry
-            mock_sched.add_job.assert_called()
-
-    def test_execute_job_no_retry_when_disabled(self):
-        """Test _execute_job doesn't retry when retry_on_failure is False."""
-        config = Config(
-            scheduler=SchedulerConfig(
-                retry_on_failure=False,
-            )
-        )
-        mock_job = MagicMock(return_value=False)
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        with patch("openings.scheduler.BlockingScheduler") as mock_blocking:
-            mock_sched = MagicMock()
-            mock_blocking.return_value = mock_sched
-            scheduler._scheduler = mock_sched
-
-            scheduler._execute_job()
-
-            # Should have scheduled the next run (main_job) but NOT a retry
-            calls = mock_sched.add_job.call_args_list
-            retry_calls = [c for c in calls if c.kwargs.get("id") == "retry_job"]
-            assert len(retry_calls) == 0, (
-                "Should not schedule a retry when retry_on_failure is False"
-            )
-
-
-# =============================================================================
-# TEST SCHEDULE RETRY
-# =============================================================================
-
-
-class TestJobSearchSchedulerRetry:
-    """Tests for retry scheduling functionality."""
-
-    @pytest.fixture
-    def config(self):
-        """Create a Config with retry settings."""
-        return Config(
-            scheduler=SchedulerConfig(
-                retry_on_failure=True,
-                retry_delay_minutes=15,
-            )
-        )
-
-    def test_schedule_retry_adds_job(self, config):
-        """Test _schedule_retry adds a retry job."""
-        mock_job = MagicMock()
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        mock_sched = MagicMock()
-        scheduler._scheduler = mock_sched
-
-        scheduler._schedule_retry()
-
-        mock_sched.add_job.assert_called_once()
-        call_kwargs = mock_sched.add_job.call_args
-        assert call_kwargs.kwargs.get("trigger") == "date"
-        assert call_kwargs.kwargs.get("id") == "retry_job"
-        assert call_kwargs.kwargs.get("kwargs") == {"is_retry": True}
-        assert call_kwargs.kwargs.get("replace_existing") is True
-
-    def test_schedule_retry_uses_configured_delay(self, config):
-        """Test retry uses configured delay."""
-        mock_job = MagicMock()
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        mock_sched = MagicMock()
-        scheduler._scheduler = mock_sched
-
-        before = datetime.now()
-        scheduler._schedule_retry()
-        after = datetime.now()
-
-        # Get the run_date from the call
-        call_kwargs = mock_sched.add_job.call_args
-        run_date = call_kwargs.kwargs.get("run_date")
-
-        # Should be approximately 15 minutes from now
-        expected_min = before + timedelta(minutes=15)
-        expected_max = after + timedelta(minutes=15) + timedelta(seconds=1)
-
-        assert expected_min <= run_date <= expected_max
-
-    def test_schedule_retry_no_scheduler(self, config):
-        """Test _schedule_retry handles no scheduler gracefully."""
-        mock_job = MagicMock()
-        scheduler = JobSearchScheduler(config, mock_job)
-        scheduler._scheduler = None
-
-        # Should not raise
-        scheduler._schedule_retry()
-
-    def test_retry_run_does_not_reschedule_main_job(self, config):
-        """Test retries do not shift the regular main-job cadence."""
-        mock_job = MagicMock(return_value=True)
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        mock_sched = MagicMock()
-        scheduler._scheduler = mock_sched
-
-        scheduler._execute_job(is_retry=True)
-
-        scheduled_ids = [call.kwargs.get("id") for call in mock_sched.add_job.call_args_list]
-        assert "main_job" not in scheduled_ids
-
-
-# =============================================================================
-# TEST STOP
-# =============================================================================
-
-
-class TestJobSearchSchedulerStop:
-    """Tests for scheduler stop functionality."""
-
-    @pytest.fixture
-    def config(self):
-        """Create a Config for testing."""
-        return Config(scheduler=SchedulerConfig())
-
-    def test_stop_sets_running_false(self, config):
-        """Test stop() sets _running to False."""
-        mock_job = MagicMock()
-        scheduler = JobSearchScheduler(config, mock_job)
-        scheduler._running = True
-
-        scheduler.stop()
-
-        assert scheduler.is_running is False
-
-    def test_stop_shuts_down_scheduler(self, config):
-        """Test stop() shuts down the APScheduler."""
-        mock_job = MagicMock()
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        mock_sched = MagicMock()
-        mock_sched.running = True
-        scheduler._scheduler = mock_sched
-
-        scheduler.stop()
-
-        mock_sched.shutdown.assert_called_once_with(wait=False)
-        assert scheduler._scheduler is None
-
-    def test_stop_no_scheduler(self, config):
-        """Test stop() handles no scheduler gracefully."""
-        mock_job = MagicMock()
-        scheduler = JobSearchScheduler(config, mock_job)
-        scheduler._scheduler = None
-
-        # Should not raise
-        scheduler.stop()
-
-
-# =============================================================================
-# TEST PROPERTIES
-# =============================================================================
-
-
-class TestJobSearchSchedulerProperties:
-    """Tests for scheduler property accessors."""
-
-    @pytest.fixture
-    def scheduler(self):
-        """Create a scheduler instance for testing."""
-        config = Config(scheduler=SchedulerConfig())
-        return JobSearchScheduler(config, lambda: True)
-
-    def test_is_running_property(self, scheduler):
-        """Test is_running property."""
-        assert scheduler.is_running is False
-
-        scheduler._running = True
-        assert scheduler.is_running is True
-
-    def test_last_run_success_property(self, scheduler):
-        """Test last_run_success property."""
-        assert scheduler.last_run_success is False
-
-        scheduler._last_run_success = True
-        assert scheduler.last_run_success is True
-
-    def test_run_count_property(self, scheduler):
-        """Test run_count property."""
-        assert scheduler.run_count == 0
-
-        scheduler._run_count = 5
-        assert scheduler.run_count == 5
-
-
-# =============================================================================
-# TEST SIGNAL HANDLERS
-# =============================================================================
-
-
-class TestJobSearchSchedulerSignals:
-    """Tests for signal handler setup."""
-
-    @pytest.fixture
-    def config(self):
-        """Create a Config for testing."""
-        return Config(scheduler=SchedulerConfig())
-
-    def test_setup_signal_handlers(self, config):
-        """Test _setup_signal_handlers sets up SIGINT and SIGTERM."""
-        mock_job = MagicMock()
-        scheduler = JobSearchScheduler(config, mock_job)
-
-        with patch("signal.signal") as mock_signal:
-            scheduler._setup_signal_handlers()
-
-            # Should set up SIGINT and SIGTERM handlers
-            calls = mock_signal.call_args_list
-            signals_set = [c[0][0] for c in calls]
-
-            assert signal.SIGINT in signals_set
-            assert signal.SIGTERM in signals_set
+import threading
+import time
+from datetime import timedelta
+from unittest.mock import MagicMock
+
+from openings.models import utcnow
+from openings.scheduler import MAIN_JOB, RETRY_JOB, Scheduler, request_run, run_requested
+
+
+def test_run_once_returns_the_job_result(config):
+    scheduler = Scheduler(config, lambda: True)
+    assert scheduler.run_once() is True
+    assert scheduler.run_count == 1 and scheduler.last_run_success is True
+    failing = Scheduler(config, MagicMock(side_effect=RuntimeError("boom")))
+    assert failing.run_once() is False
+
+
+def test_execute_job_schedules_next_run_from_start_and_retries_on_failure(config):
+    config.scheduler.interval_hours = 1
+    config.scheduler.retry_delay_minutes = 5
+    scheduler = Scheduler(config, lambda: False)
+    scheduler._scheduler = MagicMock()
+    scheduler._scheduler.get_job.return_value = None
+    scheduler._execute_job()
+    ids = [call.kwargs["id"] for call in scheduler._scheduler.add_job.call_args_list]
+    assert ids == [MAIN_JOB, RETRY_JOB]
+    main_call = scheduler._scheduler.add_job.call_args_list[0]
+    next_run = main_call.kwargs["trigger"].run_date
+    assert timedelta(minutes=59) < next_run - utcnow() <= timedelta(hours=1)
+
+
+def test_manual_run_does_not_reschedule_the_interval(config):
+    scheduler = Scheduler(config, lambda: True)
+    scheduler._scheduler = MagicMock()
+    scheduler._scheduler.get_job.return_value = None
+    scheduler._execute_job(manual=True)
+    assert scheduler._scheduler.add_job.call_count == 0
+
+
+def test_retry_stops_at_max_retries(config):
+    config.scheduler.max_retries = 2
+    scheduler = Scheduler(config, lambda: False)
+    scheduler._scheduler = MagicMock()
+    scheduler._scheduler.get_job.return_value = None
+    scheduler._execute_job()
+    scheduler._execute_job(is_retry=True)
+    ids = [call.kwargs["id"] for call in scheduler._scheduler.add_job.call_args_list]
+    assert ids.count(RETRY_JOB) == 1
+
+
+def test_long_run_skips_missed_slots(config):
+    config.scheduler.interval_hours = 1
+    scheduler = Scheduler(config, lambda: True)
+    scheduler._scheduler = MagicMock()
+    scheduler._schedule_next_run(utcnow() - timedelta(hours=2, minutes=30))
+    run_date = scheduler._scheduler.add_job.call_args.kwargs["trigger"].run_date
+    assert run_date > utcnow()
+
+
+def test_run_now_flag(config):
+    path = config.run_now_path
+    assert run_requested(path) is False
+    request_run(path)
+    assert run_requested(path) is True
+    scheduler = Scheduler(config, lambda: True)
+    scheduler._scheduler = MagicMock()
+    scheduler._scheduler.get_job.return_value = None
+    scheduler._poll_run_now()
+    assert run_requested(path) is False and scheduler.run_count == 1
+    scheduler._poll_run_now()
+    assert scheduler.run_count == 1
+
+
+def test_start_runs_on_startup_and_stops(config):
+    """A real BlockingScheduler in a thread: the startup run fires, then stop() returns."""
+    config.scheduler.run_on_startup = True
+    ran = threading.Event()
+
+    def job() -> bool:
+        ran.set()
+        return True
+
+    scheduler = Scheduler(config, job)
+    thread = threading.Thread(target=scheduler.start, daemon=True)
+    thread.start()
+    assert ran.wait(5)
+    deadline = time.time() + 5
+    while scheduler._scheduler is None or not scheduler._scheduler.running:
+        if time.time() > deadline:
+            break
+        time.sleep(0.05)
+    scheduler.stop()
+    thread.join(timeout=5)
+    assert not thread.is_alive()

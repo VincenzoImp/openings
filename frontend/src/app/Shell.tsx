@@ -1,18 +1,29 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Building2, HelpCircle, Inbox, Kanban, PlayCircle, Plus, Settings } from "lucide-react";
+import {
+  Building2,
+  HelpCircle,
+  Inbox,
+  Kanban,
+  Moon,
+  PlayCircle,
+  Plus,
+  Settings,
+  Sun,
+} from "lucide-react";
 
-import { TOKEN_INVALID_EVENT, api, getToken } from "../api/client";
 import { Button } from "../components/Button";
 import { Kbd } from "../components/Kbd";
 import { AddJobDialog } from "../features/shared/AddJobDialog";
-import { keys, useStats } from "../features/shared/queries";
+import { useStats } from "../features/shared/queries";
+import { useFinePointer } from "../features/shared/useMediaQuery";
 import { HelpDialog } from "./HelpDialog";
 import { useHotkeys } from "./hotkeys";
 import { VIEWS, navigate } from "./router";
 import type { View } from "./router";
+import { useTheme } from "./theme";
 import { TokenDialog } from "./TokenDialog";
+import { useAuthGate } from "./useAuthGate";
 
 const ICONS: Record<View, typeof Inbox> = {
   inbox: Inbox,
@@ -22,62 +33,136 @@ const ICONS: Record<View, typeof Inbox> = {
   system: Settings,
 };
 
+function ThemeButton() {
+  const theme = useTheme();
+  const next = theme.resolved === "dark" ? "light" : "dark";
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      aria-label={`Switch to ${next} theme`}
+      title={`Theme: ${theme.preference}`}
+      onClick={() => theme.setPreference(next)}
+    >
+      {theme.resolved === "dark" ? (
+        <Sun size={16} aria-hidden="true" />
+      ) : (
+        <Moon size={16} aria-hidden="true" />
+      )}
+    </Button>
+  );
+}
+
 export function Shell({ view, children }: { view: View; children: ReactNode }) {
   const [help, setHelp] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [tokenPrompt, setTokenPrompt] = useState(false);
-  const [tokenDismissed, setTokenDismissed] = useState(false);
-  const auth = useQuery({ queryKey: keys.auth, queryFn: api.dashboardAuth });
+  const gate = useAuthGate();
   const stats = useStats();
-  const tokenMissing = Boolean(auth.data?.token_required) && !getToken() && !tokenDismissed;
-
-  useEffect(() => {
-    const onInvalid = () => setTokenPrompt(true);
-    window.addEventListener(TOKEN_INVALID_EVENT, onInvalid);
-    return () => window.removeEventListener(TOKEN_INVALID_EVENT, onInvalid);
-  }, []);
-
-  useHotkeys({
-    ...Object.fromEntries(
-      VIEWS.map((entry) => [entry.key, () => navigate({ view: entry.id, jobId: null })]),
-    ),
-    "?": () => setHelp((open) => !open),
-    n: () => setAdding(true),
-  });
-
+  const finePointer = useFinePointer();
   const counts = stats.data?.by_status;
 
+  useHotkeys("global", [
+    ...VIEWS.map((entry) => ({
+      key: entry.key,
+      run: () => navigate({ view: entry.id, jobId: null, params: null }),
+    })),
+    {
+      key: "1",
+      run: () => navigate({ view: "inbox", jobId: null, params: null }),
+      description: "Inbox, Pipeline, Companies, Runs, System",
+      group: "Everywhere",
+      label: "1 … 5",
+    },
+    {
+      key: "n",
+      run: () => setAdding(true),
+      description: "Add a posting by hand",
+      group: "Everywhere",
+    },
+    {
+      key: "?",
+      run: () => setHelp((open) => !open),
+      description: "Keyboard shortcuts",
+      group: "Everywhere",
+    },
+  ]);
+
+  const countFor = (id: View): number | undefined => {
+    if (!counts) {
+      return undefined;
+    }
+    if (id === "inbox") {
+      return counts.new;
+    }
+    if (id === "pipeline") {
+      return (["shortlisted", "applied", "interviewing", "offer"] as const).reduce(
+        (sum, status) => sum + (counts[status] ?? 0),
+        0,
+      );
+    }
+    return undefined;
+  };
+
+  const go = (id: View) => navigate({ view: id, jobId: null, params: null });
+
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="flex w-full shrink-0 flex-col border-b border-slate-200 bg-white md:h-screen md:w-56 md:border-b-0 md:border-r">
-        <div className="flex items-center justify-between px-4 py-3">
-          <a href="?view=inbox" className="text-base font-semibold tracking-tight">
-            Openings
-          </a>
+    <div className="flex min-h-dvh flex-col md:flex-row">
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-edge bg-surface px-3 py-2 md:hidden">
+        <a
+          href="?view=inbox"
+          onClick={(event) => {
+            event.preventDefault();
+            go("inbox");
+          }}
+          className="text-base font-semibold tracking-tight"
+        >
+          Openings
+        </a>
+        <div className="flex items-center gap-1">
           <Button
             size="sm"
             variant="ghost"
-            aria-label="Keyboard shortcuts"
-            onClick={() => setHelp(true)}
+            aria-label="Add posting"
+            onClick={() => setAdding(true)}
           >
-            <HelpCircle size={16} />
+            <Plus size={16} aria-hidden="true" />
+          </Button>
+          <ThemeButton />
+          <Button size="sm" variant="ghost" aria-label="Help" onClick={() => setHelp(true)}>
+            <HelpCircle size={16} aria-hidden="true" />
           </Button>
         </div>
-        <nav
-          className="flex gap-1 overflow-x-auto px-2 pb-2 md:flex-col md:pb-0"
-          aria-label="Views"
-        >
+      </header>
+
+      <aside className="hidden w-56 shrink-0 flex-col border-r border-edge bg-surface md:sticky md:top-0 md:flex md:h-dvh">
+        <div className="flex items-center justify-between px-4 py-3">
+          <a
+            href="?view=inbox"
+            onClick={(event) => {
+              event.preventDefault();
+              go("inbox");
+            }}
+            className="text-base font-semibold tracking-tight"
+          >
+            Openings
+          </a>
+          <div className="flex items-center">
+            <ThemeButton />
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label="Keyboard shortcuts"
+              onClick={() => setHelp(true)}
+            >
+              <HelpCircle size={16} aria-hidden="true" />
+            </Button>
+          </div>
+        </div>
+        <nav className="flex flex-col gap-1 px-2" aria-label="Views">
           {VIEWS.map((entry) => {
             const Icon = ICONS[entry.id];
             const active = entry.id === view;
-            const count =
-              entry.id === "inbox"
-                ? counts?.new
-                : entry.id === "pipeline" && counts
-                  ? Object.entries(counts)
-                      .filter(([status]) => status !== "new")
-                      .reduce((sum, [, value]) => sum + value, 0)
-                  : undefined;
+            const count = countFor(entry.id);
             return (
               <a
                 key={entry.id}
@@ -85,49 +170,77 @@ export function Shell({ view, children }: { view: View; children: ReactNode }) {
                 aria-current={active ? "page" : undefined}
                 onClick={(event) => {
                   event.preventDefault();
-                  navigate({ view: entry.id, jobId: null });
+                  go(entry.id);
                 }}
                 className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm ${
-                  active ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
+                  active ? "bg-fg text-bg" : "text-fg-muted hover:bg-surface-2 hover:text-fg"
                 }`}
               >
-                <Icon size={16} />
+                <Icon size={16} aria-hidden="true" />
                 <span className="flex-1">{entry.label}</span>
                 {count !== undefined ? (
-                  <span
-                    className={`text-xs tabular-nums ${active ? "text-slate-300" : "text-slate-500"}`}
-                  >
+                  <span className={`tabular text-xs ${active ? "opacity-70" : "text-fg-faint"}`}>
                     {count}
                   </span>
                 ) : null}
-                <span className="hidden md:inline">
-                  <Kbd>{entry.key}</Kbd>
-                </span>
+                {finePointer ? (
+                  <span aria-hidden="true">
+                    <Kbd>{entry.key}</Kbd>
+                  </span>
+                ) : null}
               </a>
             );
           })}
         </nav>
-        <div className="mt-auto hidden px-3 py-3 md:block">
+        <div className="mt-auto px-3 py-3">
           <Button
             variant="primary"
             className="w-full justify-center"
             onClick={() => setAdding(true)}
           >
-            <Plus size={14} /> Add posting
+            <Plus size={14} aria-hidden="true" /> Add posting
           </Button>
         </div>
       </aside>
-      <main className="min-w-0 flex-1 p-4 md:overflow-y-auto md:p-6">{children}</main>
+
+      <main className="min-w-0 flex-1 p-4 pb-[calc(4rem+env(safe-area-inset-bottom))] md:overflow-y-auto md:p-6 md:pb-6">
+        {children}
+      </main>
+
+      <nav
+        className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-edge bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
+        aria-label="Views"
+      >
+        {VIEWS.map((entry) => {
+          const Icon = ICONS[entry.id];
+          const active = entry.id === view;
+          const count = countFor(entry.id);
+          return (
+            <a
+              key={entry.id}
+              href={`?view=${entry.id}`}
+              aria-current={active ? "page" : undefined}
+              onClick={(event) => {
+                event.preventDefault();
+                go(entry.id);
+              }}
+              className={`relative flex flex-col items-center gap-0.5 py-2 text-[11px] ${active ? "text-fg" : "text-fg-muted"}`}
+            >
+              <Icon size={18} aria-hidden="true" />
+              <span>{entry.label}</span>
+              {count ? (
+                <span className="tabular absolute right-2 top-1 rounded-full bg-accent px-1 text-[10px] font-medium text-on-accent">
+                  {count}
+                </span>
+              ) : null}
+            </a>
+          );
+        })}
+      </nav>
 
       <HelpDialog open={help} onClose={() => setHelp(false)} />
       <AddJobDialog open={adding} onClose={() => setAdding(false)} />
-      <TokenDialog
-        open={tokenPrompt || tokenMissing}
-        onClose={() => {
-          setTokenPrompt(false);
-          setTokenDismissed(true);
-        }}
-      />
+      <TokenDialog open={gate.open} onClose={gate.close} />
     </div>
   );
 }

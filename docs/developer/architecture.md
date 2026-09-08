@@ -5,9 +5,23 @@
 ```text
 openings/
   config.py          settings.yaml -> typed dataclasses; strict keys; $ENV secrets
-  models.py          Job, JobStatus, Note, Attachment, Event, BlacklistEntry, RunSummary
-  database.py        SQLite schema and every query; JobQuery, retention, runs
+  models.py          Job, JobStatus, Posting, Note, Attachment, Event, RunSummary;
+                     posting keys, identities, aware timestamps
+  text.py            text normalisation shared by scoring and sources
   scoring.py         keyword scoring, explain_score, thresholds, post filter
+  db/                SQLite behind the JobDatabase facade
+    base.py          connection, WAL, row mapping, events
+    schema.py        tables and indexes
+    jobs.py          upsert, queries, status, merge, statistics, facets
+    postings.py      the postings of a job, lookups by posting key
+    material.py      labels, notes, attachments
+    events.py        timeline
+    embeddings.py    vectors as float32 blobs
+    runs.py          open, finish and list runs
+    retention.py     cleanup restricted to status new
+  embeddings.py      ONNX sentence model, embed on save, backfill, cosine search
+  runtime.py         one object per process: config (reloaded on change), db,
+                     attachments, embeddings, service
   sources/           one module per source, all returning the canonical frame
     base.py          CANONICAL_COLUMNS, HTTP helpers, html_to_markdown, to_date
     jobspy.py        boards through JobSpy: throttling, retry, thread pool
@@ -16,12 +30,11 @@ openings/
     adzuna.py        Adzuna search API (keyed, optional)
     manual.py        add_job records
     collect.py       collect_all: run every source, isolate failures, dedupe
-  pipeline.py        collect -> score -> partition -> upsert -> embed -> notify -> runs row
-  scheduler.py       APScheduler loop with start-to-start intervals and retry
+  pipeline.py        collect -> score -> partition -> upsert -> embed -> notify
+  scheduler.py       APScheduler loop, start-to-start intervals, retry, run-now
   notifier.py        Telegram digest
-  vector_store.py    Chroma index; vector_commands.py keeps it in sync
-  application/       JobApplicationService, AttachmentStore, command/result types
-  web/               FastAPI app: api.py routes, mcp.py tools, static dashboard
+  application/       JobApplicationService, AttachmentStore, bundle, command types
+  web/               FastAPI app: api.py routes, mcp.py tools, token gate, dashboard
   cli.py             openings {run, scheduler, web, healthcheck}
 ```
 
@@ -32,53 +45,71 @@ openings/
    a failing task or company never aborts the run.
 2. `score_jobs` adds `relevance_score`; `partition_by_thresholds` splits rows
    into save and notify sets.
-3. `JobDatabase.upsert_jobs` skips blacklisted identities, inserts new rows
-   with status `new` and an `ingested` event, and refreshes posting fields and
-   `last_seen` on existing rows. **It never touches `status`.**
-4. New rows above the notify threshold go to Telegram; the run is recorded in
-   `runs`.
+3. `JobDatabase.upsert_jobs` matches each row to a job: by posting key
+   (canonical URL or `source:external_id`), else by identity
+   (`sha256(title | company | location)`) against jobs seen on other sources,
+   else it inserts a new job with status `new` and an `ingested` event.
+   Known jobs get their posting fields and `last_seen` refreshed; a new
+   posting of a known job is recorded with a `posting` event. Blacklisted
+   jobs are skipped. **It never touches `status`.**
+4. New and refreshed jobs are embedded; new rows above the notify threshold
+   go to Telegram; the run row opened at the start is closed with its
+   statistics.
 
 ## Schema
 
 | Table | Holds |
 |-------|-------|
-| `jobs` | the posting fields, `raw_json`, `first_seen`, `last_seen`, `relevance_score`, `status`, `status_changed_at` |
+| `jobs` | posting fields, `raw_json`, `identity`, `first_seen`, `last_seen`, `relevance_score`, `status`, `status_changed_at` |
+| `postings` | `(job_id, key, source, external_id, url, first_seen, last_seen)`; `key` is unique |
 | `job_labels` | `(job_id, label)` |
-| `notes` | `kind` (`note`, `qa`), `title`, `body` |
+| `notes` | `kind` (`note`, `qa`), `title`, `body`, `updated_at` |
 | `attachments` | `kind`, `filename`, `stored_name`, `sha256`, `size_bytes`, `note`; files under `attachments/<job_id>/` |
-| `events` | append-only timeline: `ingested`, `status`, `label`, `note`, `attachment` |
-| `blacklist` | suppressed identities with title, company, location |
-| `runs` | one row per collection with the per-source JSON |
+| `events` | append-only timeline: `ingested`, `posting`, `status`, `label`, `note`, `attachment`, `updated`, `merged` |
+| `embeddings` | `(job_id, model, vector, updated_at)` |
+| `runs` | one row per collection with the per-source JSON; `finished_at` is null while open |
 
-Foreign keys cascade from `jobs`; deleting a job removes its labels, notes,
-attachment rows and events, and the service removes its files.
+Foreign keys cascade from `jobs`; deleting a job removes its postings,
+labels, notes, attachment rows, events and embedding, and the service removes
+its files. Every timestamp is stored in UTC with an offset.
 
 ## Invariants
 
-- Identity is `generate_job_id(title, company, location)` everywhere: sources,
-  the database, `add_job`, the blacklist.
+- A job id is `sha256(posting key)` when the first posting has one, else the
+  identity. `Job.from_row` applies the rule for every producer.
 - Retention SQL is restricted to `status = 'new'`; the protected set is
-  `PROTECTED_STATUSES` and is enforced in `database.py`, not in callers.
-- Blacklisting deletes the row and inserts the identity; `upsert_jobs` and
-  `add_job` consult the blacklist first.
-- The web process never writes the vector index. The scheduler runs
-  `sync_deletions` and `backfill_embeddings` on its own interval.
+  `PROTECTED_STATUSES` and is enforced in `db/`, not in callers.
+- Blacklisting is `set_status(blacklisted)`; `upsert_jobs` skips blacklisted
+  jobs in one statement, `add_job` refuses them, every list excludes them
+  unless asked, and `unblacklist_jobs` restores the status recorded in the
+  last status event.
 - Every surface calls `JobApplicationService`. Routes and tools only parse
-  input and serialize output.
-- Configuration is parsed once per run (`reload_config` at the start of a
-  collection) and is never consulted to decide a job's status.
+  input and serialize output. `/api` and `/mcp` share one token check.
+- Configuration is read through `Runtime.config()`, which reloads the file
+  when its modification time changes, and is never consulted to decide a
+  job's status.
+- Both processes may write the database and the embeddings; SQLite WAL and
+  the connection lock serialize them.
 
 ## Frontend
 
 `frontend/src`:
 
 ```text
-api/        client.ts (fetch, token, query building), types.ts
-app/        App, Shell, router (?view=&job=), hotkeys, toast, dialogs
-components/ Button, Badge, Dialog, Field, FileDrop, Kbd, MarkdownBody, ScoreBar
-features/   inbox, pipeline, companies, runs, system, job, shared (queries, JobList, format)
+api/        client.ts (fetch, token, query building, downloads), types.ts
+app/        App, Shell, router (?view=&job=&...), HotkeyProvider + hotkeys registry,
+            theme, toast, confirm, ErrorBoundary, HelpDialog, TokenDialog
+components/ Button, Badge, Card, Table, Stat, Menu, Dialog, Field, FileDrop,
+            Kbd, MarkdownBody, ScoreBar, EmptyState
+features/   inbox, pipeline, companies, runs, system, job,
+            shared (queries, actions, JobList, LabelsEditor, dialogs, format, labels)
+styles.css  design tokens (@theme over CSS variables), dark variant, markdown
 ```
 
-State lives in TanStack Query; every write invalidates the lists it can
-change. The built `dist/` is copied into the image at `/opt/openings/frontend`
-and served by `openings web`; `OPENINGS_FRONTEND_DIST` overrides the path.
+Colours, radii and shadows are tokens; `[data-theme=dark]` overrides them and
+an inline script applies the stored preference before paint. State lives in
+TanStack Query; writes patch the cached lists optimistically and invalidate
+only what they can change. One hotkey registry with scopes (dialog > view >
+global) also generates the Help dialog. The built `dist/` is copied into the
+image at `/opt/openings/frontend` and served by `openings web`;
+`OPENINGS_FRONTEND_DIST` overrides the path.

@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
-export type ToastTone = "info" | "success" | "error";
+import { ToastContext } from "./toastContext";
+import type { ToastTone } from "./toastContext";
 
 interface Toast {
   id: number;
@@ -9,16 +10,10 @@ interface Toast {
   tone: ToastTone;
 }
 
-interface ToastApi {
-  push: (message: string, tone?: ToastTone) => void;
-}
-
-const ToastContext = createContext<ToastApi | null>(null);
-
 const TONE_CLASS: Record<ToastTone, string> = {
-  info: "bg-slate-900 text-white",
-  success: "bg-emerald-700 text-white",
-  error: "bg-rose-700 text-white",
+  info: "bg-fg text-bg",
+  success: "bg-positive text-white",
+  error: "bg-negative text-white",
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -27,7 +22,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const push = useCallback((message: string, tone: ToastTone = "info") => {
     const id = ++counter.current;
-    setToasts((current) => [...current, { id, message, tone }]);
+    setToasts((current) => [...current.slice(-3), { id, message, tone }]);
     window.setTimeout(() => {
       setToasts((current) => current.filter((toast) => toast.id !== id));
     }, 4000);
@@ -40,13 +35,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div
         aria-live="polite"
-        className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col gap-2"
+        className="pointer-events-none fixed inset-x-3 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-50 flex flex-col items-center gap-2 sm:inset-x-auto sm:bottom-4 sm:right-4 sm:items-end"
       >
         {toasts.map((toast) => (
           <div
             key={toast.id}
             role="status"
-            className={`pointer-events-auto rounded-md px-3 py-2 text-sm shadow-lg ${TONE_CLASS[toast.tone]}`}
+            className={`pointer-events-auto max-w-sm rounded-md px-3 py-2 text-sm shadow-panel ${TONE_CLASS[toast.tone]}`}
           >
             {toast.message}
           </div>
@@ -54,12 +49,4 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       </div>
     </ToastContext.Provider>
   );
-}
-
-export function useToast(): ToastApi {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error("useToast must be used inside ToastProvider");
-  }
-  return context;
 }

@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Sequence
 
 import pandas as pd
 
 from openings.logger import get_logger, log_section
-from openings.models import SourceRunStats, generate_job_id
+from openings.models import SourceRunStats, generate_job_id, posting_key
 from openings.sources import rss
 from openings.sources.adzuna import run_adzuna
 from openings.sources.ats import FETCHERS
@@ -25,6 +25,9 @@ from openings.sources.jobspy import run_jobspy
 if TYPE_CHECKING:
     from openings.config import CompanySourceConfig, Config, FeedSourceConfig
 
+KnownExternalIds = Callable[[str, Sequence[str]], set[str]]
+"""``(source, external ids) -> ids already stored``; lets feeds skip detail fetches."""
+
 
 @dataclass
 class CollectResult:
@@ -40,19 +43,36 @@ class CollectResult:
     def errors(self) -> list[str]:
         return [f"{stat.name}: {error}" for stat in self.stats for error in stat.errors]
 
+    @property
+    def every_task_failed(self) -> bool:
+        """True when every source that had work to do failed entirely."""
+        busy = [stat for stat in self.stats if stat.tasks]
+        return bool(busy) and all(stat.succeeded == 0 for stat in busy)
 
-def fetch_company(company: CompanySourceConfig, config: Config) -> SourceResult:
+
+def _keep(record: dict, locations: Sequence[str], titles: Sequence[str] = ()) -> bool:
+    """Location filter (rows without a location pass) and optional title filter."""
+    location = record.get("location")
+    if location and not location_allowed(location, locations):
+        return False
+    return not titles or location_allowed(record.get("title"), titles)
+
+
+def fetch_company(
+    company: CompanySourceConfig, config: Config, known: KnownExternalIds | None = None
+) -> SourceResult:
     stats = SourceRunStats(name=f"{company.ats}:{company.slug}", tasks=1)
     fetcher = FETCHERS[company.ats]
+    known_for_ats = (lambda ids: known(company.ats, ids)) if known else None
     try:
-        records = fetcher(company, config.sources.user_agent, config.sources.timeout_seconds)
+        records = fetcher(
+            company, config.sources.user_agent, config.sources.timeout_seconds, known_for_ats
+        )
     except SourceError as exc:
         stats.failed = 1
         stats.errors.append(str(exc))
         return SourceResult(stats=stats)
-    kept = [
-        record for record in records if location_allowed(record.get("location"), company.locations)
-    ]
+    kept = [record for record in records if _keep(record, company.locations, company.titles)]
     stats.succeeded = 1
     stats.rows = len(kept)
     return SourceResult(stats=stats, frame=frame_from_records(kept))
@@ -66,31 +86,36 @@ def fetch_feed(feed: FeedSourceConfig, config: Config) -> SourceResult:
         stats.failed = 1
         stats.errors.append(str(exc))
         return SourceResult(stats=stats)
-    kept = [
-        record
-        for record in records
-        if not record.get("location") or location_allowed(record.get("location"), feed.locations)
-    ]
+    kept = [record for record in records if _keep(record, feed.locations, feed.titles)]
     stats.succeeded = 1
     stats.rows = len(kept)
     return SourceResult(stats=stats, frame=frame_from_records(kept))
 
 
 def _dedupe(frame: pd.DataFrame) -> pd.DataFrame:
+    """Drop repeated postings: same posting key, else same identity."""
     if frame.empty:
         return frame
-    ids = frame.apply(
-        lambda row: generate_job_id(
+
+    def key(row: pd.Series) -> str:
+        posting = posting_key(
+            str(row.get("source") or ""),
+            None if pd.isna(row.get("external_id")) else str(row.get("external_id")),
+            None if pd.isna(row.get("job_url")) else str(row.get("job_url")),
+        )
+        if posting:
+            return posting
+        return "id:" + generate_job_id(
             str(row.get("title") or ""),
             str(row.get("company") or ""),
             str(row.get("location") or ""),
-        ),
-        axis=1,
-    )
-    return frame.loc[~ids.duplicated()].copy()
+        )
+
+    keys = frame.apply(key, axis=1)
+    return frame.loc[~keys.duplicated()].copy()
 
 
-def collect_all(config: Config) -> CollectResult:
+def collect_all(config: Config, *, known: KnownExternalIds | None = None) -> CollectResult:
     """Sources run in order: boards, companies, feeds, Adzuna. Failures are
     isolated per source and per company; a broken feed costs nothing but a
     line in the run summary."""
@@ -101,7 +126,7 @@ def collect_all(config: Config) -> CollectResult:
     if config.sources.jobspy.enabled:
         results.append(run_jobspy(config))
     for company in config.sources.companies:
-        result = fetch_company(company, config)
+        result = fetch_company(company, config, known)
         results.append(result)
         logger.info(
             "Company %s (%s): %d rows%s",

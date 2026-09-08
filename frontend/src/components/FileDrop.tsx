@@ -1,18 +1,21 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { Upload } from "lucide-react";
 
 export function FileDrop({
   onFiles,
   disabled = false,
-  label = "Drop files here or click to choose",
+  label = "Drop files here or choose…",
+  hint,
 }: {
   onFiles: (files: File[]) => void;
   disabled?: boolean;
   label?: string;
+  hint?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
+  const hintId = useId();
 
   const handle = (list: FileList | null) => {
     const files = Array.from(list ?? []);
@@ -31,28 +34,31 @@ export function FileDrop({
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      aria-disabled={disabled}
-      onClick={() => !disabled && input.current?.click()}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          input.current?.click();
-        }
-      }}
       onDragOver={(event) => {
         event.preventDefault();
         setOver(true);
       }}
       onDragLeave={() => setOver(false)}
       onDrop={onDrop}
-      className={`flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed px-3 py-4 text-sm ${
-        over ? "border-slate-700 bg-slate-100" : "border-slate-300 bg-white"
-      } ${disabled ? "cursor-not-allowed opacity-60" : "hover:bg-slate-50"}`}
+      className={`rounded-md border border-dashed px-3 py-4 text-center text-sm transition-colors ${
+        over ? "border-accent bg-accent/8" : "border-edge-strong bg-surface"
+      } ${disabled ? "opacity-60" : ""}`}
     >
-      <Upload size={16} />
-      <span>{label}</span>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => input.current?.click()}
+        aria-describedby={hint ? hintId : undefined}
+        className="inline-flex items-center gap-2 text-fg-muted hover:text-fg disabled:cursor-not-allowed"
+      >
+        <Upload size={16} aria-hidden="true" />
+        <span>{label}</span>
+      </button>
+      {hint ? (
+        <p id={hintId} className="mt-1 text-xs text-fg-faint">
+          {hint}
+        </p>
+      ) : null}
       <input
         ref={input}
         type="file"
