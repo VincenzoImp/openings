@@ -215,3 +215,6 @@ jobs:
           curl -fsS http://127.0.0.1:18501/api/jobs
           curl -fsS http://127.0.0.1:18501/ >/tmp/openings-index.html
           grep -q '<div id="root"></div>' /tmp/openings-index.html
+
+      - name: End-to-end smoke (REST and MCP against the built image)
+        run: SKIP_BUILD=1 IMAGE=openings:test PORT=18652 sh docker/smoke.sh

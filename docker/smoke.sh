@@ -5,7 +5,8 @@
 #
 #   sh docker/smoke.sh
 #
-# Environment: IMAGE, PORT, CONTAINER, OPENINGS_API_TOKEN.
+# Environment: IMAGE, PORT, CONTAINER, OPENINGS_API_TOKEN; set SKIP_BUILD=1 to
+# test an image that is already built (CI builds it once and reuses it).
 
 set -eu
 
@@ -27,7 +28,9 @@ mkdir -p "$DATA_DIR/config" "$DATA_DIR/db" "$DATA_DIR/attachments" "$DATA_DIR/ch
 cp "$ROOT_DIR/config/settings.example.yaml" "$DATA_DIR/config/settings.yaml"
 chmod -R 0777 "$DATA_DIR"
 
-docker build -t "$IMAGE" "$ROOT_DIR"
+if [ -z "${SKIP_BUILD:-}" ]; then
+  docker build -t "$IMAGE" "$ROOT_DIR"
+fi
 
 docker run -d --rm \
   --name "$CONTAINER" \
