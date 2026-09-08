@@ -2,61 +2,70 @@
 
 ## Health
 
-Run the container health check directly:
-
 ```bash
-docker compose exec scheduler job-search-healthcheck
+docker compose exec scheduler openings healthcheck
+curl -s http://127.0.0.1:8501/health
 ```
 
-Check web health:
-
-```bash
-curl http://127.0.0.1:8501/health
-```
+The health check parses the configuration, opens the database and verifies
+the data directories. The `runs` table (Runs view, `GET /api/runs`,
+`list_runs`) answers "did the last collection work": per-source task counts,
+rows and errors.
 
 ## Logs
-
-Container logs:
 
 ```bash
 docker compose logs -f scheduler
 docker compose logs -f web
 ```
 
-Application logs are written to `/data/logs/search.log` inside the shared data
-volume.
+The application log is `/data/logs/openings.log`, rotated by size according to
+the `logging` section.
 
 ## Backups
 
-The important state is the host `settings.yaml` plus the Docker volume
-`jobsearch-data`.
-
-Example SQLite backup:
+State is `settings.yaml` on the host plus the `openings-data` volume. The
+database and the attachments directory belong together: attachment rows point
+at files under `/data/attachments/<job_id>/`.
 
 ```bash
-docker compose exec scheduler python -c "import sqlite3; sqlite3.connect('/data/db/jobs.db').backup(sqlite3.connect('/data/db/jobs.backup.db'))"
+docker compose exec scheduler python -c \
+  "import sqlite3; sqlite3.connect('/data/db/openings.db').backup(sqlite3.connect('/data/db/openings.backup.db'))"
+docker run --rm -v openings-data:/data -v "$PWD":/backup alpine \
+  tar czf /backup/openings-data.tgz -C /data db attachments
 ```
 
-For full-state backups, snapshot the Docker volume using your normal host backup
-tooling.
+The vector index under `/data/chroma` is disposable: delete it and the
+scheduler rebuilds it on the next start when `vector_search.backfill_on_startup`
+is on.
+
+## Retention
+
+Retention only ever touches jobs in status `new`. `scoring.save_threshold`
+removes low scores on every run, `retention.max_age_days` removes rows not
+seen for that long, `retention.purge_blacklist_after_days` trims the
+blacklist. Every job you shortlisted, applied to or otherwise moved is
+protected. `GET /api/cleanup/preview` (System view, `preview_cleanup`) shows
+what a cleanup would do before it runs.
 
 ## Concurrency
 
-The scheduler writes to SQLite. The web server reads from the same database and
-can mutate curation state through the dashboard, REST API, and MCP tools.
-SQLite WAL mode and the application connection lock cover normal single-user
-local usage.
-
-Do not run multiple independent scheduler/search instances against the same data
-directory at the same time.
+The scheduler writes collected rows and the vector index. The web process
+writes state changes (status, labels, notes, attachments, blacklist) but never
+the vector index. SQLite in WAL mode with the application's connection lock
+covers this single-user setup. Do not run two schedulers against one data
+directory.
 
 ## Recovery
 
-If Compose accidentally created `settings.yaml` as a directory because the file
-was missing on first start:
+Compose creates `settings.yaml` as a directory when the host file is missing
+at first start:
 
 ```bash
 rm -rf settings.yaml
 cp config/settings.example.yaml settings.yaml
 docker compose up -d
 ```
+
+A configuration error stops the container at boot with the offending key in
+the log. `openings healthcheck` reproduces it outside the scheduler.

@@ -1,1 +1,1 @@
-"""Test suite for Job Search Tool."""
+"""Test suite for Openings."""

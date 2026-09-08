@@ -57,7 +57,7 @@ jobs:
         run: uv run pre-commit run --all-files
 
       - name: Type check with mypy
-        run: uv run mypy src/job_search_tool --ignore-missing-imports
+        run: uv run mypy src/openings --ignore-missing-imports
 
   test:
     runs-on: ubuntu-latest
@@ -89,7 +89,7 @@ jobs:
 
       - name: Run tests with coverage
         if: matrix.python-version == '3.11'
-        run: uv run pytest --cov=job_search_tool --cov-report=xml --cov-fail-under=60
+        run: uv run pytest --cov=openings --cov-report=xml --cov-fail-under=60
 
       - name: Run tests
         if: matrix.python-version != '3.11'
@@ -179,7 +179,7 @@ jobs:
         with:
           context: .
           load: true
-          tags: job-search-tool:test
+          tags: openings:test
           cache-from: type=gha,scope=ci-docker
           cache-to: type=gha,scope=ci-docker,mode=max
           provenance: false
@@ -189,7 +189,7 @@ jobs:
         run: |
           docker run --rm \
             -v "$PWD/config/settings.example.yaml:/data/config/settings.yaml:ro" \
-            job-search-tool:test job-search-healthcheck
+            openings:test openings healthcheck
 
       - name: Validate Compose topology
         run: |
@@ -199,13 +199,13 @@ jobs:
 
       - name: Smoke web container
         run: |
-          docker rm -f job-search-web-smoke || true
+          docker rm -f openings-web-smoke || true
           docker run --rm -d \
-            --name job-search-web-smoke \
+            --name openings-web-smoke \
             -p 18501:8501 \
             -v "$PWD/config/settings.example.yaml:/data/config/settings.yaml:ro" \
-            job-search-tool:test job-search-web
-          trap 'docker rm -f job-search-web-smoke' EXIT
+            openings:test openings web
+          trap 'docker rm -f openings-web-smoke' EXIT
           for i in {1..30}; do
             if curl -fsS http://127.0.0.1:18501/health; then
               break
@@ -213,5 +213,8 @@ jobs:
             sleep 1
           done
           curl -fsS http://127.0.0.1:18501/api/jobs
-          curl -fsS http://127.0.0.1:18501/ >/tmp/job-search-index.html
-          grep -q '<div id="root"></div>' /tmp/job-search-index.html
+          curl -fsS http://127.0.0.1:18501/ >/tmp/openings-index.html
+          grep -q '<div id="root"></div>' /tmp/openings-index.html
+
+      - name: End-to-end smoke (REST and MCP against the built image)
+        run: SKIP_BUILD=1 IMAGE=openings:test PORT=18652 sh docker/smoke.sh

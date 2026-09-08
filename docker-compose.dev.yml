@@ -1,20 +1,17 @@
-# Override that rebuilds the single image from the local checkout and gives
-# the resulting containers distinct names so they can coexist with a
-# pull-based `docker compose up` from the same folder.
+# Build the image from the local checkout instead of pulling it.
 #
-# Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
 
 x-local-build: &local-build
   build:
     context: .
-  image: ${JOB_SEARCH_DEV_IMAGE:-job-search-tool:dev}
+  image: ${OPENINGS_DEV_IMAGE:-openings:dev}
 
 services:
   scheduler:
     <<: *local-build
-    container_name: jobsearch-scheduler-dev
+    container_name: openings-scheduler-dev
 
   web:
     <<: *local-build
-    container_name: jobsearch-web-dev
+    container_name: openings-web-dev

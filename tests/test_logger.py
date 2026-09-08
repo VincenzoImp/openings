@@ -15,8 +15,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from job_search_tool.config import Config, LoggingConfig
-from job_search_tool.logger import (
+from openings.config import Config, LoggingConfig
+from openings.logger import (
     ColoredFormatter,
     Colors,
     DedupeFilter,
@@ -272,19 +272,19 @@ class TestGetLogger:
         """Test get_logger returns child logger with name."""
         logger = get_logger("test_module")
 
-        assert logger.name == "job_search.test_module"
+        assert logger.name == "openings.test_module"
 
     def test_get_logger_without_name(self):
         """Test get_logger returns root logger without name."""
         logger = get_logger()
 
-        assert logger.name == "job_search"
+        assert logger.name == "openings"
 
     def test_get_logger_none_name(self):
         """Test get_logger with None returns root logger."""
         logger = get_logger(None)
 
-        assert logger.name == "job_search"
+        assert logger.name == "openings"
 
     def test_get_logger_returns_logger_instance(self):
         """Test get_logger returns a Logger instance."""
@@ -358,11 +358,11 @@ class TestSetupLogging:
         )
 
         # Patch the config path properties
-        with patch.object(Config, "log_path", temp_log_dir / "test.log"):
+        with patch.object(Config, "log_file", temp_log_dir / "test.log"):
             logger = setup_logging(config)
 
             assert isinstance(logger, logging.Logger)
-            assert logger.name == "job_search"
+            assert logger.name == "openings"
 
     def test_setup_logging_creates_handlers(self, temp_log_dir):
         """Test setup_logging creates console and file handlers."""
@@ -372,7 +372,7 @@ class TestSetupLogging:
             )
         )
 
-        with patch.object(Config, "log_path", temp_log_dir / "test.log"):
+        with patch.object(Config, "log_file", temp_log_dir / "test.log"):
             logger = setup_logging(config)
 
             # Should have at least 2 handlers (console + file)
@@ -386,7 +386,7 @@ class TestSetupLogging:
             )
         )
 
-        with patch.object(Config, "log_path", temp_log_dir / "test.log"):
+        with patch.object(Config, "log_file", temp_log_dir / "test.log"):
             logger = setup_logging(config)
 
             assert logger.level == logging.WARNING
@@ -400,7 +400,7 @@ class TestSetupLogging:
             )
         )
 
-        with patch.object(Config, "log_path", log_path):
+        with patch.object(Config, "log_file", log_path):
             setup_logging(config)
 
             assert log_path.parent.exists()
@@ -413,7 +413,7 @@ class TestSetupLogging:
             )
         )
 
-        with patch.object(Config, "log_path", temp_log_dir / "test.log"):
+        with patch.object(Config, "log_file", temp_log_dir / "test.log"):
             # First setup
             logger1 = setup_logging(config)
             handler_count1 = len(logger1.handlers)
@@ -433,7 +433,7 @@ class TestSetupLogging:
             )
         )
 
-        with patch.object(Config, "log_path", log_path):
+        with patch.object(Config, "log_file", log_path):
             logger = setup_logging(config)
             old_file_handler = next(
                 handler
@@ -462,13 +462,13 @@ class TestTimezoneConverter:
     def test_utc_matches_gmtime(self):
         import time
 
-        from job_search_tool.logger import _timezone_converter
+        from openings.logger import _timezone_converter
 
         ts = 1700000000.0
         assert _timezone_converter("UTC")(ts)[:6] == time.gmtime(ts)[:6]
 
     def test_named_zone_offsets_from_utc(self):
-        from job_search_tool.logger import _timezone_converter
+        from openings.logger import _timezone_converter
 
         ts = 1700000000.0
         utc = _timezone_converter("UTC")(ts)
@@ -479,18 +479,18 @@ class TestTimezoneConverter:
     def test_invalid_zone_falls_back_to_localtime(self):
         import time
 
-        from job_search_tool.logger import _timezone_converter
+        from openings.logger import _timezone_converter
 
         assert _timezone_converter("Not/ARealZone") is time.localtime
 
     def test_setup_logging_applies_configured_timezone(self, tmp_path):
-        from job_search_tool.logger import _timezone_converter
+        from openings.logger import _timezone_converter
 
         config = Config(logging=LoggingConfig(timezone="Pacific/Kiritimati"))
         ts = 1700000000.0
         expected = _timezone_converter("Pacific/Kiritimati")(ts)
 
-        with patch.object(Config, "log_path", tmp_path / "test.log"):
+        with patch.object(Config, "log_file", tmp_path / "test.log"):
             logger = setup_logging(config)
 
             for handler in logger.handlers:
@@ -551,10 +551,8 @@ class TestDedupeFilter:
     def test_prefix_is_respected(self):
         """Records outside the configured name prefix pass through unchanged."""
         f = DedupeFilter(name_prefix="JobSpy")
-        a = _make_record("job_search.main", "hello")
-        b = _make_record(
-            "job_search.main", "hello"
-        )  # would be deduped if prefix was ""
+        a = _make_record("openings.main", "hello")
+        b = _make_record("openings.main", "hello")  # would be deduped if prefix was ""
         assert f.filter(a) is True
         assert f.filter(b) is True  # NOT deduped because name prefix doesn't match
 
@@ -601,12 +599,12 @@ class TestRerouteJobSpyLoggers:
         """End-to-end: setup_logging + duplicate JobSpy emission → 1 output line."""
         import io
 
-        from job_search_tool.config import Config, LoggingConfig
+        from openings.config import Config, LoggingConfig
 
         config = Config(logging=LoggingConfig(level="DEBUG"))
         buffer = io.StringIO()
 
-        with patch.object(Config, "log_path", tmp_path / "test.log"):
+        with patch.object(Config, "log_file", tmp_path / "test.log"):
             setup_logging(config)
 
             # Replace the root console StreamHandler's stream with our StringIO
@@ -615,8 +613,7 @@ class TestRerouteJobSpyLoggers:
             stream_handler = next(
                 h
                 for h in root.handlers
-                if isinstance(h, logging.StreamHandler)
-                and not isinstance(h, logging.FileHandler)
+                if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
             )
             stream_handler.stream = buffer
 

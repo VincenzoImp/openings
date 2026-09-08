@@ -1,43 +1,38 @@
-# Release Process
+# Release process
 
-The project publishes Docker images from Git tags.
+Images are published from Git tags.
 
-## Before Tagging
-
-Run:
+## Before tagging
 
 ```bash
-uv run pytest
-npm --prefix frontend run typecheck
-npm --prefix frontend run test
-npm --prefix frontend run build
 uv run pre-commit run --all-files
-uv run mypy src/job_search_tool --ignore-missing-imports
-docker build -t job-search-tool:release .
+uv run mypy src/openings
+uv run pytest --cov=openings --cov-fail-under=60
+npm --prefix frontend run quality
 docker compose config
+sh docker/smoke.sh
 ```
 
-Also verify that `CHANGELOG.md`, `pyproject.toml`, and release docs agree on the
-intended version.
+Check that `pyproject.toml`, `CHANGELOG.md` and the docs agree on the version.
+Move the `Unreleased` notes under the new heading with the date.
 
-## Docker Publishing
+## Tag
 
-`.github/workflows/publish-release.yml` runs when a `v*` tag is pushed. It
-builds multi-arch images for Docker Hub and publishes:
+```bash
+git tag -a v1.2.0 -m "Openings 1.2.0"
+git push origin v1.2.0
+```
 
-- full semver tag,
-- major/minor tag,
-- major tag,
-- `latest`,
-- SHA tag,
-- SBOM,
-- provenance.
+## Publish
 
-The default image name is `vincenzoimp/job-search-tool`, overridable through the
-repository variable `DOCKERHUB_IMAGE`.
+`.github/workflows/publish-release.yml` runs on `v*` tags: multi-arch build
+(`linux/amd64`, `linux/arm64`), SBOM and provenance, pushed to Docker Hub as
+`<semver>`, `<major>.<minor>`, `<major>`, `latest` and `sha-<commit>`. The
+image name is `vincenzoimp/openings`, overridable through the repository
+variable `DOCKERHUB_IMAGE`.
 
-## Release PR Scope
+## Scope
 
-Release PRs should keep runtime behavior, packaging, Docker deployment, docs,
-and verification aligned. Avoid carrying internal planning artifacts or
-generated runtime state in release branches.
+A release changes runtime behaviour, packaging, Docker deployment, docs and
+verification together. Planning notes and generated state stay out of the
+repository.

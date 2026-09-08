@@ -7,7 +7,7 @@ import tomllib
 
 
 def test_project_version_matches_pyproject():
-    from job_search_tool.project_meta import FALLBACK_VERSION, get_project_version
+    from openings.project_meta import FALLBACK_VERSION, get_project_version
 
     pyproject = tomllib.loads(
         (Path(__file__).parent.parent / "pyproject.toml").read_text(encoding="utf-8")
@@ -23,9 +23,9 @@ def test_console_scripts_are_declared():
     )
 
     assert pyproject["project"]["scripts"] == {
-        "job-search": "job_search_tool.main:main",
-        "job-search-web": "job_search_tool.web.app:main",
-        "job-search-healthcheck": "job_search_tool.healthcheck:main",
+        "openings": "openings.cli:main",
+        "openings-web": "openings.web.app:main",
+        "openings-healthcheck": "openings.healthcheck:main",
     }
 
 
@@ -35,6 +35,5 @@ def test_streamlit_runtime_dependency_is_removed():
     )
 
     assert not any(
-        dependency.startswith("streamlit")
-        for dependency in pyproject["project"]["dependencies"]
+        dependency.startswith("streamlit") for dependency in pyproject["project"]["dependencies"]
     )

@@ -1,0 +1,21 @@
+"""Public postings feeds of applicant tracking systems."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Callable
+
+from openings.sources.ats import ashby, greenhouse, lever, smartrecruiters
+
+if TYPE_CHECKING:
+    from openings.config import CompanySourceConfig
+
+Fetcher = Callable[["CompanySourceConfig", str | None, float], list[dict[str, Any]]]
+
+FETCHERS: dict[str, Fetcher] = {
+    "greenhouse": greenhouse.fetch,
+    "lever": lever.fetch,
+    "ashby": ashby.fetch,
+    "smartrecruiters": smartrecruiters.fetch,
+}
+
+__all__ = ["FETCHERS"]
