@@ -30,7 +30,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-mkdir -p "$DATA_DIR/config" "$DATA_DIR/db" "$DATA_DIR/attachments" "$DATA_DIR/chroma" "$DATA_DIR/logs"
+mkdir -p "$DATA_DIR/config" "$DATA_DIR/db" "$DATA_DIR/attachments" "$DATA_DIR/models" "$DATA_DIR/logs"
 cp "$ROOT_DIR/config/settings.example.yaml" "$DATA_DIR/config/settings.yaml"
 chmod -R 0777 "$DATA_DIR"
 

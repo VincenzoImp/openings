@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from openings.models import Attachment, Event, Job, JobStatus, Note
+from openings.models import Attachment, Event, Job, JobStatus, Note, Posting
 from openings.scoring import ScoreExplanation
 
 ExportFormat = Literal["csv", "json"]
@@ -74,14 +74,25 @@ class JobDetail:
     job: Job
     explain: ScoreExplanation
     labels: list[str]
+    postings: list[Posting]
     notes: list[Note]
     attachments: list[Attachment]
     events: list[Event]
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(
+        self, *, include_raw: bool = True, max_description_chars: int | None = None
+    ) -> dict[str, Any]:
         data = self.job.to_dict()
+        if not include_raw:
+            data.pop("raw_json", None)
+        if max_description_chars is not None and data.get("description"):
+            text = str(data["description"])
+            if len(text) > max_description_chars:
+                data["description"] = text[:max_description_chars] + "…"
+                data["description_truncated"] = True
         data["explain"] = self.explain.to_dict()
         data["labels"] = list(self.labels)
+        data["postings"] = [posting.to_dict() for posting in self.postings]
         data["notes"] = [note.to_dict() for note in self.notes]
         data["attachments"] = [attachment.to_dict() for attachment in self.attachments]
         data["events"] = [event.to_dict() for event in self.events]
@@ -90,28 +101,13 @@ class JobDetail:
 
 @dataclass(frozen=True)
 class SemanticResult:
-    job_id: str
-    title: str | None
-    company: str | None
-    location: str | None
+    job: Job
     similarity: float
-    relevance_score: int | None
-    source: str | None
-    status: str | None
-    job_url: str | None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "job_id": self.job_id,
-            "title": self.title,
-            "company": self.company,
-            "location": self.location,
-            "similarity": round(self.similarity, 4),
-            "relevance_score": self.relevance_score,
-            "source": self.source,
-            "status": self.status,
-            "job_url": self.job_url,
-        }
+        data = self.job.to_summary()
+        data["similarity"] = round(self.similarity, 4)
+        return data
 
 
 @dataclass(frozen=True)
@@ -123,6 +119,7 @@ class SourceStatus:
     detail: str
     enabled: bool
     active_jobs: int
+    last_run: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -131,7 +128,23 @@ class SourceStatus:
             "detail": self.detail,
             "enabled": self.enabled,
             "active_jobs": self.active_jobs,
+            "last_run": self.last_run,
         }
+
+
+@dataclass(frozen=True)
+class AttachmentEntry:
+    """An attachment together with the job it belongs to."""
+
+    attachment: Attachment
+    job_title: str
+    company: str
+
+    def to_dict(self) -> dict[str, Any]:
+        data = self.attachment.to_dict()
+        data["job_title"] = self.job_title
+        data["company"] = self.company
+        return data
 
 
 @dataclass(frozen=True)

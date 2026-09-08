@@ -14,7 +14,7 @@ import requests
 from markdownify import markdownify
 
 from openings.models import SourceRunStats
-from openings.scoring import normalize_text
+from openings.text import normalize_text
 
 CANONICAL_COLUMNS = (
     "title",
