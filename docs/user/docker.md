@@ -1,100 +1,80 @@
-# Docker Deployment
+# Docker deployment
 
-Docker Compose is the recommended way to run the tool locally or on a trusted
-LAN. The image is `vincenzoimp/job-search-tool`.
+Docker Compose is the intended way to run Openings. The image is
+`vincenzoimp/openings`; one image, two roles.
 
 ## Services
 
-| Service | Role | Default bind |
-|---------|------|--------------|
-| `scheduler` | continuous search loop | none |
-| `web` | React dashboard, REST API, MCP endpoint | `127.0.0.1:8501` |
+| Service | Command | Bind |
+|---------|---------|------|
+| `scheduler` | `openings scheduler` | none |
+| `web` | `openings web` | `127.0.0.1:8501` |
 
-Both services share the Docker-managed `jobsearch-data` volume for the
-database, vector store, exports, and logs. The editable configuration remains a
-host file: `./settings.yaml`, mounted read-only at
-`/data/config/settings.yaml`.
+Both share the named volume `openings-data` mounted at `/data`:
 
-## Quick Start
+```text
+/data/config/settings.yaml   bind-mounted from ./settings.yaml, read-only
+/data/db/openings.db         the database
+/data/attachments/<job_id>/  uploaded files
+/data/chroma/                the vector index (optional)
+/data/logs/openings.log      application log
+```
+
+## Start
 
 ```bash
 cp config/settings.example.yaml settings.yaml
 docker compose up -d
-```
-
-Open:
-
-```text
-http://127.0.0.1:8501
-```
-
-Show logs:
-
-```bash
 docker compose logs -f scheduler
-docker compose logs -f web
 ```
 
-Stop everything:
+The container refuses to start without `settings.yaml`; there is no default
+configuration. Edit the file and `docker compose restart` to apply changes.
 
-```bash
-docker compose down
-```
+## Environment
 
-## LAN Binding
+Set these in `.env` next to the Compose file (see `.env.example`):
 
-Published ports are localhost-only by default. This is intentional for a local
-automation tool that can expose personal job data and mutate state.
+| Variable | Purpose |
+|----------|---------|
+| `OPENINGS_WEB_BIND` | host interface for the web port, default `127.0.0.1` |
+| `OPENINGS_WEB_PORT` | host port, default `8501` |
+| `OPENINGS_API_TOKEN` | protect `/api`, the dashboard and `/mcp` |
+| `OPENINGS_WEB_ALLOWED_HOSTS`, `OPENINGS_WEB_ALLOWED_ORIGINS` | extra hosts and origins for MCP DNS-rebinding protection and CORS |
+| `TELEGRAM_BOT_TOKEN`, `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` | secrets referenced as `$NAME` in `settings.yaml` |
 
-To expose the web surface on a trusted LAN, create `.env`:
+Inside the container `OPENINGS_DATA_DIR=/data` and
+`OPENINGS_CONFIG=/data/config/settings.yaml`.
+
+## LAN access
+
+Ports are localhost-only by default because the data is personal and every
+surface can change it. On a trusted network:
 
 ```dotenv
-JOB_SEARCH_WEB_BIND=0.0.0.0
+OPENINGS_WEB_BIND=0.0.0.0
+OPENINGS_API_TOKEN=<long random string>
+OPENINGS_WEB_ALLOWED_HOSTS=192.168.1.10:8501
+OPENINGS_WEB_ALLOWED_ORIGINS=http://192.168.1.10:8501
 ```
 
-For API or dashboard access outside the same machine, set `JOB_SEARCH_API_TOKEN`.
-Scripts can send `Authorization: Bearer <token>`. The dashboard will show a token
-gate and then send `X-Job-Search-Token` on browser API requests.
+Do not expose the port to untrusted networks.
 
-For MCP access from another LAN device, also allow the host seen by the MCP
-client:
-
-```dotenv
-JOB_SEARCH_WEB_ALLOWED_HOSTS=192.168.1.10:8501
-JOB_SEARCH_WEB_ALLOWED_ORIGINS=http://192.168.1.10:8501
-```
-
-`JOB_SEARCH_WEB_ALLOWED_ORIGINS` also controls browser CORS for API calls from a
-separate origin. It is not required when the built dashboard and API are served
-from the same web process.
-
-Do not expose the web port directly to untrusted networks.
-
-## Updates
+## Update
 
 ```bash
 docker compose pull
 docker compose up -d
 ```
 
-Since 9.0.0, the current SQLite schema is the runtime baseline and does
-not migrate prior database layouts. For a clean major-version start, reset the
-Docker-managed state volume before bringing services back up:
+The database schema is created by the running version; back up the volume
+before upgrading across major versions.
+
+## Build locally
 
 ```bash
-docker compose down -v
-docker compose up -d
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
 ```
 
-Release tags are published by GitHub Actions to Docker Hub when `v*` tags are
-pushed.
-
-## Commands
-
-Runtime services use installed package entrypoints:
-
-```text
-job-search scheduler
-job-search-web
-job-search-healthcheck
-```
+`docker/smoke.sh` builds the image and exercises the dashboard, REST and MCP
+end to end.
