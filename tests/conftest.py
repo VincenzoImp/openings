@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
 from typing import Generator
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 import yaml
 
@@ -38,7 +40,7 @@ def minimal_settings() -> dict:
                 "penalty": ["10+ years"],
             },
         },
-        "vector_search": {"enabled": False, "embed_on_save": False, "backfill_on_startup": False},
+        "embeddings": {"enabled": False},
         "notifications": {"enabled": False},
     }
 
@@ -70,37 +72,57 @@ def settings_file(data_dir: Path, settings_dict: dict) -> Path:
 
 
 @pytest.fixture
-def env(
-    monkeypatch: pytest.MonkeyPatch, data_dir: Path, settings_file: Path
-) -> Generator[Path, None, None]:
-    """Point the process at the temp data directory and reset every singleton."""
-    from openings import config as config_module
-    from openings import database as database_module
-    from openings.web import service as service_module
+def runtime(monkeypatch: pytest.MonkeyPatch, data_dir: Path, settings_file: Path):
+    """A process-wide runtime pointed at the temp data directory."""
+    from openings.runtime import Runtime, set_runtime
 
     monkeypatch.setenv("OPENINGS_DATA_DIR", str(data_dir))
     monkeypatch.setenv("OPENINGS_CONFIG", str(settings_file))
     monkeypatch.setenv("OPENINGS_WEB_ALLOWED_HOSTS", "testserver")
     monkeypatch.setenv("OPENINGS_WEB_ALLOWED_ORIGINS", "http://testserver")
     monkeypatch.delenv("OPENINGS_API_TOKEN", raising=False)
-    monkeypatch.setattr(config_module, "DATA_DIR", data_dir)
-    monkeypatch.setattr(config_module, "CONFIG_FILE", settings_file)
-    config_module.set_config(None)
-    database_module.close_database()
-    service_module.reset_service()
-    yield data_dir
-    service_module.reset_service()
-    database_module.close_database()
-    config_module.set_config(None)
+    instance = Runtime(data_dir=data_dir, config_path=settings_file)
+    set_runtime(instance)
+    yield instance
+    set_runtime(None)
+
+
+@pytest.fixture
+def env(runtime) -> Generator[Path, None, None]:
+    """The data directory of an installed runtime (kept for readability)."""
+    yield runtime.data_dir
 
 
 @pytest.fixture
 def db(data_dir: Path):
-    from openings.database import JobDatabase
+    from openings.db import JobDatabase
 
     database = JobDatabase(data_dir / "db" / "openings.db")
     yield database
     database.close()
+
+
+def fake_vector(text: str) -> np.ndarray:
+    """A deterministic unit vector: identical texts are identical, others differ."""
+    digest = hashlib.sha256(text.encode("utf-8")).digest()
+    seed = int.from_bytes(digest[:8], "big")
+    generator = np.random.default_rng(seed)
+    vector = generator.standard_normal(384).astype(np.float32)
+    return vector / np.linalg.norm(vector)
+
+
+@pytest.fixture
+def fake_embedding_model(monkeypatch: pytest.MonkeyPatch):
+    """Replace the ONNX model with a hash-based stand-in (no download, no runtime)."""
+    from openings import embeddings as module
+
+    def embed(self, texts, batch_size=32):
+        return np.vstack([fake_vector(text) for text in texts])
+
+    monkeypatch.setattr(module.EmbeddingModel, "embed", embed)
+    monkeypatch.setattr(module.EmbeddingModel, "_load", lambda self: None)
+    monkeypatch.setattr(module.EmbeddingModel, "ensure_downloaded", lambda self, timeout=0: None)
+    return module
 
 
 def make_job(**overrides):
@@ -111,7 +133,7 @@ def make_job(**overrides):
         "company": "Acme",
         "location": "Remote",
         "source": "linkedin",
-        "job_url": "https://example.com/jobs/1",
+        "job_url": "https://www.linkedin.com/jobs/view/1000001",
         "description": "Python services with PostgreSQL.",
         "relevance_score": 35,
     }
@@ -129,7 +151,11 @@ def jobs():
     return [
         make_job(),
         make_job(
-            title="Data Engineer", company="Beta", location="Berlin, Germany", relevance_score=15
+            title="Data Engineer",
+            company="Beta",
+            location="Berlin, Germany",
+            relevance_score=15,
+            job_url="https://www.linkedin.com/jobs/view/1000002",
         ),
         make_job(
             title="Sales Manager",
@@ -137,19 +163,18 @@ def jobs():
             location="Remote",
             relevance_score=-40,
             source="greenhouse",
+            job_url="https://boards.greenhouse.io/gamma/jobs/77",
         ),
     ]
 
 
 @pytest.fixture
-def service(env: Path):
-    from openings.web.service import get_service
-
-    return get_service()
+def service(runtime):
+    return runtime.service
 
 
 @pytest.fixture
-def client(env: Path):
+def client(runtime):
     from fastapi.testclient import TestClient
 
     from openings.web.app import create_app

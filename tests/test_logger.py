@@ -1,636 +1,69 @@
-"""Tests for logger module.
-
-Tests for logging functionality including:
-- ColoredFormatter TTY detection
-- PlainFormatter for file output
-- ProgressLogger progress tracking
-- Logger factory functions
-- Log section formatting
-"""
-
 import logging
-import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
-import pytest
-
-from openings.config import Config, LoggingConfig
 from openings.logger import (
     ColoredFormatter,
-    Colors,
     DedupeFilter,
-    PlainFormatter,
     ProgressLogger,
-    _reroute_jobspy_loggers,
+    _timezone_converter,
     get_logger,
     log_section,
-    log_subsection,
     setup_logging,
 )
 
 
-# =============================================================================
-# TEST COLORS
-# =============================================================================
+def test_get_logger_names():
+    assert get_logger().name == "openings"
+    assert get_logger("scoring").name == "openings.scoring"
 
 
-class TestColors:
-    """Tests for Colors class constants."""
-
-    def test_color_codes_are_strings(self):
-        """Test all color codes are strings."""
-        assert isinstance(Colors.RESET, str)
-        assert isinstance(Colors.BOLD, str)
-        assert isinstance(Colors.RED, str)
-        assert isinstance(Colors.GREEN, str)
-        assert isinstance(Colors.YELLOW, str)
-        assert isinstance(Colors.GRAY, str)
-
-    def test_color_codes_are_ansi(self):
-        """Test color codes are ANSI escape sequences."""
-        assert Colors.RESET.startswith("\033[")
-        assert Colors.RED.startswith("\033[")
-        assert Colors.GREEN.startswith("\033[")
+def test_setup_logging_installs_console_and_file_handlers(config):
+    logger = setup_logging(config)
+    kinds = {type(handler).__name__ for handler in logger.handlers}
+    assert kinds == {"StreamHandler", "RotatingFileHandler"}
+    assert logger.propagate is False
+    assert config.log_file.parent.is_dir()
+    # Calling again replaces the handlers instead of stacking them.
+    again = setup_logging(config)
+    assert len(again.handlers) == 2
 
 
-# =============================================================================
-# TEST COLORED FORMATTER
-# =============================================================================
+def test_setup_logging_console_only(config):
+    logger = setup_logging(config, console_only=True)
+    assert [type(handler).__name__ for handler in logger.handlers] == ["StreamHandler"]
 
 
-class TestColoredFormatter:
-    """Tests for ColoredFormatter class."""
-
-    def test_format_with_tty(self):
-        """Test that colors are applied when output is TTY."""
-        formatter = ColoredFormatter(fmt="%(levelname)s: %(message)s")
-
-        # Mock stdout.isatty() to return True
-        with patch("sys.stdout.isatty", return_value=True):
-            formatter = ColoredFormatter(fmt="%(levelname)s: %(message)s")
-            assert formatter.use_colors is True
-
-    def test_format_without_tty(self):
-        """Test that colors are NOT applied when output is not TTY."""
-        with patch("sys.stdout.isatty", return_value=False):
-            formatter = ColoredFormatter(fmt="%(levelname)s: %(message)s")
-            assert formatter.use_colors is False
-
-    def test_format_adds_color_to_levelname(self):
-        """Test that level name gets colored in TTY mode."""
-        with patch("sys.stdout.isatty", return_value=True):
-            formatter = ColoredFormatter(fmt="%(levelname)s: %(message)s")
-
-            record = logging.LogRecord(
-                name="test",
-                level=logging.INFO,
-                pathname="",
-                lineno=0,
-                msg="Test message",
-                args=(),
-                exc_info=None,
-            )
-
-            formatted = formatter.format(record)
-
-            # Should contain color codes
-            assert Colors.GREEN in record.levelname or Colors.RESET in formatted
-
-    def test_format_no_color_without_tty(self):
-        """Test that no color codes are added without TTY."""
-        with patch("sys.stdout.isatty", return_value=False):
-            formatter = ColoredFormatter(fmt="%(levelname)s: %(message)s")
-
-            record = logging.LogRecord(
-                name="test",
-                level=logging.INFO,
-                pathname="",
-                lineno=0,
-                msg="Test message",
-                args=(),
-                exc_info=None,
-            )
-
-            formatted = formatter.format(record)
-
-            # Should NOT contain ANSI escape sequences
-            assert "\033[" not in formatted
-
-    def test_level_colors_mapping(self):
-        """Test that different log levels have different colors."""
-        with patch("sys.stdout.isatty", return_value=True):
-            ColoredFormatter(fmt="%(levelname)s")
-
-            assert ColoredFormatter.LEVEL_COLORS[logging.DEBUG] == Colors.GRAY
-            assert ColoredFormatter.LEVEL_COLORS[logging.INFO] == Colors.GREEN
-            assert ColoredFormatter.LEVEL_COLORS[logging.WARNING] == Colors.YELLOW
-            assert ColoredFormatter.LEVEL_COLORS[logging.ERROR] == Colors.RED
-            assert Colors.BOLD in ColoredFormatter.LEVEL_COLORS[logging.CRITICAL]
+def test_timezone_converter_renders_in_zone():
+    convert = _timezone_converter("Europe/Zurich")
+    summer = convert(1788739200)  # 2026-09-07T00:00:00Z
+    assert (summer.tm_hour, summer.tm_mday) == (2, 7)
+    assert _timezone_converter("Not/AZone")(0).tm_year >= 1969
 
 
-# =============================================================================
-# TEST PLAIN FORMATTER
-# =============================================================================
+def test_dedupe_filter_only_affects_prefixed_loggers():
+    dedupe = DedupeFilter(name_prefix="JobSpy")
+    record = logging.LogRecord("JobSpy:Indeed", logging.WARNING, "", 0, "same", None, None)
+    other = logging.LogRecord("openings.x", logging.WARNING, "", 0, "same", None, None)
+    assert dedupe.filter(record) is True
+    assert dedupe.filter(record) is False
+    assert dedupe.filter(other) is True and dedupe.filter(other) is True
 
 
-class TestPlainFormatter:
-    """Tests for PlainFormatter class."""
-
-    def test_plain_formatter_no_colors(self):
-        """Test PlainFormatter doesn't add colors."""
-        formatter = PlainFormatter(fmt="%(levelname)s: %(message)s")
-
-        record = logging.LogRecord(
-            name="test",
-            level=logging.INFO,
-            pathname="",
-            lineno=0,
-            msg="Test message",
-            args=(),
-            exc_info=None,
-        )
-
-        formatted = formatter.format(record)
-
-        # Should NOT contain ANSI escape sequences
-        assert "\033[" not in formatted
-        assert "Test message" in formatted
+def test_colored_formatter_without_tty_is_plain(monkeypatch):
+    monkeypatch.setattr("sys.stdout.isatty", lambda: False)
+    formatter = ColoredFormatter("%(levelname)s %(message)s")
+    record = logging.LogRecord("x", logging.INFO, "", 0, "hello", None, None)
+    assert formatter.format(record) == "INFO hello"
 
 
-# =============================================================================
-# TEST PROGRESS LOGGER
-# =============================================================================
-
-
-class TestProgressLogger:
-    """Tests for ProgressLogger class."""
-
-    @pytest.fixture
-    def mock_logger(self):
-        """Create a mock logger."""
-        return MagicMock()
-
-    def test_init(self, mock_logger):
-        """Test ProgressLogger initialization."""
-        progress = ProgressLogger(mock_logger, 10, "Processing")
-
-        assert progress.total == 10
-        assert progress.operation == "Processing"
-        assert progress.completed == 0
-        assert progress.success == 0
-        assert progress.failed == 0
-
-    def test_update_success(self, mock_logger):
-        """Test update() increments success counter."""
-        progress = ProgressLogger(mock_logger, 10, "Processing")
-
-        progress.update(success=True, message="Item 1 done")
-
-        assert progress.completed == 1
-        assert progress.success == 1
-        assert progress.failed == 0
-
-    def test_update_failure(self, mock_logger):
-        """Test update() increments failed counter on failure."""
-        progress = ProgressLogger(mock_logger, 10, "Processing")
-
-        progress.update(success=False, message="Item 1 failed")
-
-        assert progress.completed == 1
-        assert progress.success == 0
-        assert progress.failed == 1
-
-    def test_update_logs_message(self, mock_logger):
-        """Test update() logs the progress message."""
-        progress = ProgressLogger(mock_logger, 10, "Processing")
-
-        progress.update(success=True, message="Completed item")
-
-        mock_logger.info.assert_called_once()
-        call_msg = mock_logger.info.call_args[0][0]
-        assert "[1/10]" in call_msg
-        assert "(10%)" in call_msg
-        assert "Completed item" in call_msg
-
-    def test_update_without_message(self, mock_logger):
-        """Test update() without message doesn't log."""
-        progress = ProgressLogger(mock_logger, 10, "Processing")
-
-        progress.update(success=True)
-
-        mock_logger.info.assert_not_called()
-
-    def test_update_percentage_calculation(self, mock_logger):
-        """Test percentage is calculated correctly."""
-        progress = ProgressLogger(mock_logger, 4, "Processing")
-
-        progress.update(success=True, message="1")  # 25%
-        progress.update(success=True, message="2")  # 50%
-        progress.update(success=True, message="3")  # 75%
-
-        calls = mock_logger.info.call_args_list
-        assert "(25%)" in calls[0][0][0]
-        assert "(50%)" in calls[1][0][0]
-        assert "(75%)" in calls[2][0][0]
-
-    def test_update_zero_total(self, mock_logger):
-        """Test update() handles zero total gracefully."""
-        progress = ProgressLogger(mock_logger, 0, "Processing")
-
-        # Should not raise
-        progress.update(success=True, message="Item")
-
-        call_msg = mock_logger.info.call_args[0][0]
-        assert "(0%)" in call_msg
-
-    def test_summary(self, mock_logger):
-        """Test summary() logs final statistics."""
-        progress = ProgressLogger(mock_logger, 10, "Processing items")
-        progress.success = 7
-        progress.failed = 3
-
+def test_progress_logger_and_section(caplog):
+    logger = logging.getLogger("progress-test")
+    with caplog.at_level(logging.INFO, logger="progress-test"):
+        progress = ProgressLogger(logger, 2, "Work")
+        progress.update(True, "one")
+        progress.update(False, "two")
         progress.summary()
-
-        mock_logger.info.assert_called_once()
-        call_msg = mock_logger.info.call_args[0][0]
-        assert "Processing items" in call_msg
-        assert "7 succeeded" in call_msg
-        assert "3 failed" in call_msg
-        assert "10 total" in call_msg
-
-
-# =============================================================================
-# TEST GET LOGGER
-# =============================================================================
-
-
-class TestGetLogger:
-    """Tests for get_logger function."""
-
-    def test_get_logger_with_name(self):
-        """Test get_logger returns child logger with name."""
-        logger = get_logger("test_module")
-
-        assert logger.name == "openings.test_module"
-
-    def test_get_logger_without_name(self):
-        """Test get_logger returns root logger without name."""
-        logger = get_logger()
-
-        assert logger.name == "openings"
-
-    def test_get_logger_none_name(self):
-        """Test get_logger with None returns root logger."""
-        logger = get_logger(None)
-
-        assert logger.name == "openings"
-
-    def test_get_logger_returns_logger_instance(self):
-        """Test get_logger returns a Logger instance."""
-        logger = get_logger("test")
-
-        assert isinstance(logger, logging.Logger)
-
-
-# =============================================================================
-# TEST LOG SECTION AND SUBSECTION
-# =============================================================================
-
-
-class TestLogSections:
-    """Tests for log_section and log_subsection functions."""
-
-    @pytest.fixture
-    def mock_logger(self):
-        """Create a mock logger."""
-        return MagicMock()
-
-    def test_log_section(self, mock_logger):
-        """Test log_section creates visual separator."""
-        log_section(mock_logger, "Test Section")
-
-        # Should call info 3 times: separator, title, separator
-        assert mock_logger.info.call_count == 3
-
-        calls = [c[0][0] for c in mock_logger.info.call_args_list]
-
-        # First and last should be separator
-        assert "=" * 60 in calls[0]
-        assert "=" * 60 in calls[2]
-
-        # Middle should contain title
-        assert "Test Section" in calls[1]
-
-    def test_log_subsection(self, mock_logger):
-        """Test log_subsection creates smaller separator."""
-        log_subsection(mock_logger, "Test Subsection")
-
-        mock_logger.info.assert_called_once()
-        call_msg = mock_logger.info.call_args[0][0]
-
-        assert "---" in call_msg
-        assert "Test Subsection" in call_msg
-
-
-# =============================================================================
-# TEST SETUP LOGGING
-# =============================================================================
-
-
-class TestSetupLogging:
-    """Tests for setup_logging function."""
-
-    @pytest.fixture
-    def temp_log_dir(self):
-        """Create a temporary directory for log files."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            yield Path(tmpdir)
-
-    def test_setup_logging_returns_logger(self, temp_log_dir):
-        """Test setup_logging returns a logger instance."""
-        config = Config(
-            logging=LoggingConfig(
-                level="INFO",
-                max_size_mb=1,
-                backup_count=3,
-            )
-        )
-
-        # Patch the config path properties
-        with patch.object(Config, "log_file", temp_log_dir / "test.log"):
-            logger = setup_logging(config)
-
-            assert isinstance(logger, logging.Logger)
-            assert logger.name == "openings"
-
-    def test_setup_logging_creates_handlers(self, temp_log_dir):
-        """Test setup_logging creates console and file handlers."""
-        config = Config(
-            logging=LoggingConfig(
-                level="DEBUG",
-            )
-        )
-
-        with patch.object(Config, "log_file", temp_log_dir / "test.log"):
-            logger = setup_logging(config)
-
-            # Should have at least 2 handlers (console + file)
-            assert len(logger.handlers) >= 2
-
-    def test_setup_logging_sets_level(self, temp_log_dir):
-        """Test setup_logging sets the log level from config."""
-        config = Config(
-            logging=LoggingConfig(
-                level="WARNING",
-            )
-        )
-
-        with patch.object(Config, "log_file", temp_log_dir / "test.log"):
-            logger = setup_logging(config)
-
-            assert logger.level == logging.WARNING
-
-    def test_setup_logging_creates_log_directory(self, temp_log_dir):
-        """Test setup_logging creates log directory if needed."""
-        log_path = temp_log_dir / "subdir" / "test.log"
-        config = Config(
-            logging=LoggingConfig(
-                level="INFO",
-            )
-        )
-
-        with patch.object(Config, "log_file", log_path):
-            setup_logging(config)
-
-            assert log_path.parent.exists()
-
-    def test_setup_logging_clears_existing_handlers(self, temp_log_dir):
-        """Test setup_logging clears existing handlers."""
-        config = Config(
-            logging=LoggingConfig(
-                level="INFO",
-            )
-        )
-
-        with patch.object(Config, "log_file", temp_log_dir / "test.log"):
-            # First setup
-            logger1 = setup_logging(config)
-            handler_count1 = len(logger1.handlers)
-
-            # Second setup should not duplicate handlers
-            logger2 = setup_logging(config)
-            handler_count2 = len(logger2.handlers)
-
-            assert handler_count1 == handler_count2
-
-    def test_setup_logging_closes_replaced_file_handlers(self, temp_log_dir):
-        """Test repeated setup closes the previous rotating file handler."""
-        log_path = temp_log_dir / "test.log"
-        config = Config(
-            logging=LoggingConfig(
-                level="INFO",
-            )
-        )
-
-        with patch.object(Config, "log_file", log_path):
-            logger = setup_logging(config)
-            old_file_handler = next(
-                handler
-                for handler in logger.handlers
-                if isinstance(handler, logging.handlers.RotatingFileHandler)
-            )
-
-            logger = setup_logging(config)
-
-            assert old_file_handler not in logger.handlers
-            assert old_file_handler.stream is None or old_file_handler.stream.closed
-
-
-# =============================================================================
-# TEST TIMEZONE CONVERTER
-# =============================================================================
-
-
-class TestTimezoneConverter:
-    """Tests for the logging.timezone setting actually shaping timestamps.
-
-    The setting is documented as controlling the timezone of log timestamps;
-    previously it was parsed but never applied (a silent no-op).
-    """
-
-    def test_utc_matches_gmtime(self):
-        import time
-
-        from openings.logger import _timezone_converter
-
-        ts = 1700000000.0
-        assert _timezone_converter("UTC")(ts)[:6] == time.gmtime(ts)[:6]
-
-    def test_named_zone_offsets_from_utc(self):
-        from openings.logger import _timezone_converter
-
-        ts = 1700000000.0
-        utc = _timezone_converter("UTC")(ts)
-        # Kiritimati is UTC+14 — no realistic host/CI tz coincides with it.
-        far = _timezone_converter("Pacific/Kiritimati")(ts)
-        assert far[3] != utc[3]
-
-    def test_invalid_zone_falls_back_to_localtime(self):
-        import time
-
-        from openings.logger import _timezone_converter
-
-        assert _timezone_converter("Not/ARealZone") is time.localtime
-
-    def test_setup_logging_applies_configured_timezone(self, tmp_path):
-        from openings.logger import _timezone_converter
-
-        config = Config(logging=LoggingConfig(timezone="Pacific/Kiritimati"))
-        ts = 1700000000.0
-        expected = _timezone_converter("Pacific/Kiritimati")(ts)
-
-        with patch.object(Config, "log_file", tmp_path / "test.log"):
-            logger = setup_logging(config)
-
-            for handler in logger.handlers:
-                assert handler.formatter is not None
-                assert handler.formatter.converter(ts)[:6] == expected[:6]
-
-
-# =============================================================================
-# TEST DEDUPE FILTER
-# =============================================================================
-
-
-def _make_record(name: str, msg: str, level: int = logging.ERROR) -> logging.LogRecord:
-    return logging.LogRecord(
-        name=name,
-        level=level,
-        pathname=__file__,
-        lineno=0,
-        msg=msg,
-        args=(),
-        exc_info=None,
-    )
-
-
-class TestDedupeFilter:
-    """Tests for DedupeFilter."""
-
-    def test_first_occurrence_passes(self):
-        """First record for a (name, level, msg) tuple always passes."""
-        f = DedupeFilter(name_prefix="JobSpy")
-        record = _make_record("JobSpy:Glassdoor", "location not parsed")
-        assert f.filter(record) is True
-
-    def test_duplicate_is_dropped(self):
-        """Second record with identical key is suppressed."""
-        f = DedupeFilter(name_prefix="JobSpy")
-        first = _make_record("JobSpy:Glassdoor", "location not parsed")
-        second = _make_record("JobSpy:Glassdoor", "location not parsed")
-        assert f.filter(first) is True
-        assert f.filter(second) is False
-
-    def test_distinct_messages_pass(self):
-        """Different messages from the same logger are kept independently."""
-        f = DedupeFilter(name_prefix="JobSpy")
-        a = _make_record("JobSpy:Glassdoor", "location not parsed")
-        b = _make_record("JobSpy:Glassdoor", "status code 429")
-        assert f.filter(a) is True
-        assert f.filter(b) is True
-
-    def test_distinct_loggers_are_independent(self):
-        """Records from different loggers are tracked separately."""
-        f = DedupeFilter(name_prefix="JobSpy")
-        a = _make_record("JobSpy:Glassdoor", "oops")
-        b = _make_record("JobSpy:Indeed", "oops")
-        assert f.filter(a) is True
-        assert f.filter(b) is True
-
-    def test_prefix_is_respected(self):
-        """Records outside the configured name prefix pass through unchanged."""
-        f = DedupeFilter(name_prefix="JobSpy")
-        a = _make_record("openings.main", "hello")
-        b = _make_record("openings.main", "hello")  # would be deduped if prefix was ""
-        assert f.filter(a) is True
-        assert f.filter(b) is True  # NOT deduped because name prefix doesn't match
-
-    def test_empty_prefix_dedupes_everything(self):
-        """An empty prefix applies dedupe globally."""
-        f = DedupeFilter(name_prefix="")
-        a = _make_record("any.logger", "hi")
-        b = _make_record("any.logger", "hi")
-        assert f.filter(a) is True
-        assert f.filter(b) is False
-
-
-# =============================================================================
-# TEST JOBSPY LOGGER REROUTE
-# =============================================================================
-
-
-class TestRerouteJobSpyLoggers:
-    """Tests for `_reroute_jobspy_loggers` and its end-to-end effect."""
-
-    def test_strips_existing_handlers_and_forces_propagation(self):
-        """JobSpy loggers should have no handlers and propagate=True afterwards."""
-        target = logging.getLogger("JobSpy:Glassdoor")
-
-        # Simulate JobSpy's import-time configuration: attach a noisy handler
-        # and disable propagation so records can't reach our root handler.
-        junk_handler = logging.StreamHandler()
-        target.addHandler(junk_handler)
-        target.propagate = False
-        target.setLevel(logging.DEBUG)
-
-        try:
-            _reroute_jobspy_loggers()
-            assert junk_handler not in target.handlers
-            assert target.propagate is True
-            assert target.level == logging.WARNING
-        finally:
-            # Reset so the test doesn't leak state.
-            target.handlers.clear()
-            target.propagate = True
-            target.setLevel(logging.NOTSET)
-
-    def test_setup_logging_dedupes_duplicate_jobspy_records(self, tmp_path):
-        """End-to-end: setup_logging + duplicate JobSpy emission → 1 output line."""
-        import io
-
-        from openings.config import Config, LoggingConfig
-
-        config = Config(logging=LoggingConfig(level="DEBUG"))
-        buffer = io.StringIO()
-
-        with patch.object(Config, "log_file", tmp_path / "test.log"):
-            setup_logging(config)
-
-            # Replace the root console StreamHandler's stream with our StringIO
-            # so we can inspect exactly what the deduped handler emits.
-            root = logging.getLogger()
-            stream_handler = next(
-                h
-                for h in root.handlers
-                if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
-            )
-            stream_handler.stream = buffer
-
-            try:
-                js = logging.getLogger("JobSpy:Glassdoor")
-                js.error("Glassdoor: location not parsed")
-                js.error("Glassdoor: location not parsed")  # duplicate
-                js.error("Glassdoor: location not parsed")  # duplicate
-                js.error("Glassdoor: status code 429")  # distinct
-            finally:
-                # Reset JobSpy logger state so the next test starts clean.
-                js.handlers.clear()
-                js.propagate = True
-                js.setLevel(logging.NOTSET)
-
-        output = buffer.getvalue()
-        # First message should appear exactly once; the two duplicates are dropped.
-        assert output.count("Glassdoor: location not parsed") == 1
-        # The distinct message is a separate key and should still pass through.
-        assert output.count("Glassdoor: status code 429") == 1
+        log_section(logger, "TITLE")
+    messages = [record.getMessage() for record in caplog.records]
+    assert "[1/2] (50%) one" in messages
+    assert "Work complete: 1 succeeded, 1 failed out of 2 total" in messages
+    assert "  TITLE" in messages

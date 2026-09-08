@@ -230,9 +230,48 @@ def test_collect_all_merges_and_dedupes(data_dir):
     ):
         result = collect_all(config)
     assert result.total_found == 3
-    assert result.unique_found == 2  # the Lever row is the same opening as the Greenhouse one
+    # Distinct postings stay distinct here; the database merges cross-board mirrors on upsert.
+    assert result.unique_found == 3
     assert [stat.name for stat in result.stats] == ["greenhouse:x", "lever:x"]
     assert result.errors == []
+    assert result.every_task_failed is False
+
+
+def test_collect_all_dedupes_repeated_postings(data_dir):
+    data = minimal_settings()
+    data["sources"]["companies"] = [{"name": "X", "ats": "greenhouse", "slug": "x"}]
+    config = parse_config(data, data_dir=data_dir)
+    twice = {"jobs": GREENHOUSE["jobs"] + GREENHOUSE["jobs"][:1]}
+    with patch("openings.sources.ats.greenhouse.http_get_json", return_value=twice):
+        result = collect_all(config)
+    assert result.total_found == 3 and result.unique_found == 2
+
+
+def test_fetch_company_keeps_rows_without_location(config):
+    company = CompanySourceConfig(name="X", ats="greenhouse", slug="x", locations=["Remote"])
+    payload = {"jobs": [{"id": 3, "title": "Anywhere", "absolute_url": "u3", "location": {}}]}
+    with patch("openings.sources.ats.greenhouse.http_get_json", return_value=payload):
+        result = fetch_company(company, config)
+    assert list(result.frame["title"]) == ["Anywhere"]
+
+
+def test_smartrecruiters_skips_details_for_known_ids():
+    listing = {
+        "totalFound": 1,
+        "content": [
+            {"id": "1", "name": "Engineer", "location": {"city": "Geneva"}, "ref": "https://api/1"}
+        ],
+    }
+    calls = []
+
+    def fake(url, **kwargs):
+        calls.append(url)
+        return listing
+
+    company = CompanySourceConfig(name="CERN", ats="smartrecruiters", slug="CERN")
+    with patch("openings.sources.ats.smartrecruiters.http_get_json", side_effect=fake):
+        records = smartrecruiters.fetch(company, None, 5.0, known=lambda ids: {"1"})
+    assert records[0]["description"] is None and len(calls) == 1
 
 
 @pytest.mark.parametrize("value", [None, float("nan"), ""])

@@ -1,12 +1,13 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from openings.config import TelegramConfig, parse_config
-from openings.database import ReconciliationReport
+from openings.db import ReconciliationReport
 from openings.models import RunSummary, SourceRunStats
 from openings.notifier import (
+    TELEGRAM_MESSAGE_LIMIT,
     NotificationManager,
     TelegramNotifier,
     build_run_notification,
@@ -22,25 +23,38 @@ def test_escape_markdown_escapes_reserved_characters():
     )
 
 
-def test_build_run_notification_sorts_by_score():
-    summary = RunSummary(started_at=datetime(2026, 9, 8, 6), finished_at=datetime(2026, 9, 8, 6, 5))
+def test_build_run_notification_sorts_by_score_and_keeps_timezone():
+    summary = RunSummary(
+        started_at=datetime(2026, 9, 8, 6, tzinfo=timezone.utc),
+        finished_at=datetime(2026, 9, 8, 6, 5, tzinfo=timezone.utc),
+    )
     summary.sources.append(SourceRunStats(name="linkedin", tasks=2, succeeded=2, rows=4))
     jobs = [make_job(title="Low", relevance_score=10), make_job(title="High", relevance_score=90)]
-    data = build_run_notification(summary, jobs, notify_threshold=20, total_in_db=7)
+    data = build_run_notification(summary, jobs, 20, 7, timezone="Europe/Zurich")
     assert [job.title for job in data.new_jobs] == ["High", "Low"]
     assert data.source_lines == ["linkedin: 4 rows, 2/2 ok"]
+    header = TelegramNotifier(TelegramConfig()).header(data, 2)
+    assert "2026\\-09\\-08 08:05" in header  # rendered in Zurich time
 
 
 def test_format_job_and_chunks():
-    notifier = TelegramNotifier(
-        TelegramConfig(enabled=True, bot_token="t", chat_ids=["1"], jobs_per_chunk=2)
-    )
+    config = TelegramConfig(enabled=True, bot_token="t", chat_ids=["1"], jobs_per_chunk=2)
+    notifier = TelegramNotifier(config)
     text = notifier.format_job(make_job(is_remote=True), 1)
     assert text.startswith("1️⃣ *Backend Engineer*")
-    assert "🏠 Remote" in text and "[Open posting →](https://example.com/jobs/1)" in text
+    assert "🏠 Remote" in text
+    assert "[Open posting →](https://www.linkedin.com/jobs/view/1000001)" in text
     chunks = notifier.chunks([make_job(title=f"J{i}") for i in range(5)])
     assert len(chunks) == 3
     assert chunks[0].startswith("📋 *New postings \\(1/3\\)*")
+
+
+def test_chunks_stay_under_the_telegram_limit():
+    notifier = TelegramNotifier(TelegramConfig(jobs_per_chunk=15))
+    jobs = [make_job(title="X" * 600, company="Y" * 300) for _ in range(15)]
+    chunks = notifier.chunks(jobs)
+    assert len(chunks) > 1
+    assert all(len(chunk) <= TELEGRAM_MESSAGE_LIMIT for chunk in chunks)
 
 
 def test_is_configured_requires_token_and_chat():
@@ -61,7 +75,8 @@ async def test_send_run_sends_header_and_chunks():
         enabled=True, bot_token="t", chat_ids=["1", "2"], max_jobs=3, jobs_per_chunk=2
     )
     notifier = TelegramNotifier(config)
-    summary = RunSummary(started_at=datetime.now(), finished_at=datetime.now())
+    now = datetime.now(timezone.utc)
+    summary = RunSummary(started_at=now, finished_at=now)
     data = build_run_notification(summary, [make_job(title=f"J{i}") for i in range(5)], 20, 5)
     with patch("openings.notifier.Bot") as bot_class:
         bot = AsyncMock()
@@ -72,21 +87,24 @@ async def test_send_run_sends_header_and_chunks():
 
 
 @pytest.mark.asyncio
-async def test_send_run_without_summary_and_without_jobs():
-    config = TelegramConfig(enabled=True, bot_token="t", chat_ids=["1"], send_summary=False)
-    notifier = TelegramNotifier(config)
-    data = build_run_notification(RunSummary(started_at=datetime.now()), [], 20, 0)
-    assert await notifier.send_run(data) is False
+async def test_send_run_skips_empty_digest_unless_asked():
+    quiet = TelegramNotifier(TelegramConfig(enabled=True, bot_token="t", chat_ids=["1"]))
+    data = build_run_notification(RunSummary(started_at=datetime.now(timezone.utc)), [], 20, 0)
+    assert await quiet.send_run(data) is False
+    chatty = TelegramNotifier(
+        TelegramConfig(enabled=True, bot_token="t", chat_ids=["1"], send_empty=True)
+    )
+    with patch("openings.notifier.Bot") as bot_class:
+        bot_class.return_value = AsyncMock()
+        assert await chatty.send_run(data) is True
 
 
 def test_manager_without_channels(data_dir):
     config = parse_config(minimal_settings(), data_dir=data_dir)
     manager = NotificationManager(config)
     assert not manager.has_channels()
-    assert (
-        manager.send_run(build_run_notification(RunSummary(started_at=datetime.now()), [], 20, 0))
-        == {}
-    )
+    empty = build_run_notification(RunSummary(started_at=datetime.now(timezone.utc)), [], 20, 0)
+    assert manager.send_run(empty) == {}
 
 
 def test_manager_sends_reconcile(data_dir, monkeypatch):
@@ -100,7 +118,6 @@ def test_manager_sends_reconcile(data_dir, monkeypatch):
     assert manager.has_channels()
     with patch("openings.notifier.Bot") as bot_class:
         bot_class.return_value = AsyncMock()
-        assert manager.send_reconcile(ReconciliationReport(deleted_stale=2, protected=1)) == {
-            "telegram": True
-        }
+        report = ReconciliationReport(deleted_stale=2, protected=1)
+        assert manager.send_reconcile(report) == {"telegram": True}
     assert "Stale: 2" in format_reconcile_message(ReconciliationReport(deleted_stale=2))

@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Sequence
 
 from openings.sources.ats import ashby, greenhouse, lever, smartrecruiters
 
 if TYPE_CHECKING:
     from openings.config import CompanySourceConfig
 
-Fetcher = Callable[["CompanySourceConfig", str | None, float], list[dict[str, Any]]]
+KnownIds = Callable[[Sequence[str]], set[str]]
+"""Given external ids, the subset already stored; lets a feed skip detail fetches."""
+
+Fetcher = Callable[
+    ["CompanySourceConfig", str | None, float, KnownIds | None], list[dict[str, Any]]
+]
 
 FETCHERS: dict[str, Fetcher] = {
     "greenhouse": greenhouse.fetch,
@@ -18,4 +23,4 @@ FETCHERS: dict[str, Fetcher] = {
     "smartrecruiters": smartrecruiters.fetch,
 }
 
-__all__ = ["FETCHERS"]
+__all__ = ["FETCHERS", "Fetcher", "KnownIds"]

@@ -6,34 +6,32 @@ import argparse
 import sys
 
 from openings.project_meta import get_project_version
+from openings.runtime import Runtime, set_runtime
 
 
-def _cmd_run() -> int:
+def _cmd_run(runtime: Runtime) -> int:
+    from openings.logger import setup_logging
     from openings.pipeline import prepare_runtime, run_collection
     from openings.scheduler import create_scheduler
 
-    config, _db = prepare_runtime(scheduled=False)
-    scheduler = create_scheduler(config, run_collection)
+    setup_logging(runtime.config())
+    config = prepare_runtime(runtime, scheduled=False)
+    scheduler = create_scheduler(config, lambda: run_collection(runtime))
     return 0 if scheduler.run_once() else 1
 
 
-def _cmd_scheduler() -> int:
-    from openings.logger import get_logger
-    from openings.pipeline import make_vector_maintenance, prepare_runtime, run_collection
+def _cmd_scheduler(runtime: Runtime) -> int:
+    from openings.logger import get_logger, setup_logging
+    from openings.pipeline import prepare_runtime, run_collection
     from openings.scheduler import create_scheduler
 
-    logger = get_logger("main")
-    config, db = prepare_runtime(scheduled=True)
-    scheduler = create_scheduler(
-        config,
-        run_collection,
-        vector_sync_function=make_vector_maintenance(config, db),
-        vector_sync_interval_minutes=config.vector_search.sync_interval_minutes,
-    )
+    logger = setup_logging(runtime.config())
+    config = prepare_runtime(runtime, scheduled=True)
+    scheduler = create_scheduler(config, lambda: run_collection(runtime))
     try:
         scheduler.start()
     except KeyboardInterrupt:
-        logger.info("Interrupted")
+        get_logger("main").info("Interrupted")
         return 0
     except Exception as exc:  # noqa: BLE001
         logger.error("Fatal error: %s", exc)
@@ -41,17 +39,17 @@ def _cmd_scheduler() -> int:
     return 0
 
 
-def _cmd_web() -> int:
+def _cmd_web(runtime: Runtime) -> int:
     from openings.web.app import main as web_main
 
     web_main()
     return 0
 
 
-def _cmd_healthcheck() -> int:
+def _cmd_healthcheck(runtime: Runtime) -> int:
     from openings.healthcheck import main as healthcheck_main
 
-    return healthcheck_main()
+    return healthcheck_main(runtime)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -77,7 +75,9 @@ def main(argv: list[str] | None = None) -> int:
         "web": _cmd_web,
         "healthcheck": _cmd_healthcheck,
     }
-    return handlers[command]()
+    runtime = Runtime.from_env()
+    set_runtime(runtime)
+    return handlers[command](runtime)
 
 
 if __name__ == "__main__":

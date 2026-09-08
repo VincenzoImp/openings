@@ -5,12 +5,13 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import re
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
 
 from openings.logger import get_logger
+from openings.models import utcnow
 
 try:
     from telegram import Bot
@@ -23,11 +24,12 @@ except ImportError:  # pragma: no cover - optional at import time, required at s
 
 if TYPE_CHECKING:
     from openings.config import Config, TelegramConfig
-    from openings.database import ReconciliationReport
+    from openings.db import ReconciliationReport
     from openings.models import Job, RunSummary
 
 POSITION_EMOJIS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
 _MARKDOWN_ESCAPE = re.compile(r"([_*\[\]()~`>#+=|{}.!\-\\])")
+TELEGRAM_MESSAGE_LIMIT = 4096
 
 
 def escape_markdown(text: str | None) -> str:
@@ -56,13 +58,18 @@ class RunNotification:
     total_in_db: int
     source_lines: list[str]
     errors: int
+    timezone: str = "UTC"
 
 
 def build_run_notification(
-    summary: RunSummary, new_jobs: list[Job], notify_threshold: int, total_in_db: int
+    summary: RunSummary,
+    new_jobs: list[Job],
+    notify_threshold: int,
+    total_in_db: int,
+    timezone: str = "UTC",
 ) -> RunNotification:
     return RunNotification(
-        run_timestamp=summary.finished_at or datetime.now(),
+        run_timestamp=summary.finished_at or utcnow(),
         duration=summary.duration_formatted,
         total_found=summary.total_found,
         unique_found=summary.unique_found,
@@ -76,23 +83,11 @@ def build_run_notification(
             for stat in summary.sources
         ],
         errors=len(summary.errors),
+        timezone=timezone,
     )
 
 
-class BaseNotifier(ABC):
-    name = "base"
-
-    @abstractmethod
-    def is_configured(self) -> bool: ...
-
-    @abstractmethod
-    async def send_run(self, data: RunNotification) -> bool: ...
-
-    @abstractmethod
-    async def send_text(self, text: str) -> bool: ...
-
-
-class TelegramNotifier(BaseNotifier):
+class TelegramNotifier:
     name = "telegram"
 
     def __init__(self, config: TelegramConfig):
@@ -126,10 +121,14 @@ class TelegramNotifier(BaseNotifier):
         return "\n".join(lines)
 
     def header(self, data: RunNotification, shown: int) -> str:
+        try:
+            stamp = data.run_timestamp.astimezone(ZoneInfo(data.timezone))
+        except (ValueError, KeyError):
+            stamp = data.run_timestamp
         lines = [
             "🔔 *Openings \\- run complete*",
             "━━━━━━━━━━━━━━━━━━━━━",
-            f"• {escape_markdown(data.run_timestamp.strftime('%Y-%m-%d %H:%M'))} · {escape_markdown(data.duration)}",
+            f"• {escape_markdown(stamp.strftime('%Y-%m-%d %H:%M'))} · {escape_markdown(data.duration)}",
             f"• Collected {data.total_found}, unique {data.unique_found}, saved {data.saved}",
             f"• New: {data.new_count} · In database: {data.total_in_db}",
         ]
@@ -145,19 +144,37 @@ class TelegramNotifier(BaseNotifier):
         return "\n".join(lines)
 
     def chunks(self, jobs: list[Job]) -> list[str]:
+        """Messages of at most ``jobs_per_chunk`` postings, each under Telegram's limit."""
         size = self.config.jobs_per_chunk
-        total = (len(jobs) + size - 1) // size
-        messages = []
-        for chunk_index in range(total):
-            start = chunk_index * size
-            lines = []
-            if total > 1:
-                lines.append(f"📋 *New postings \\({chunk_index + 1}/{total}\\)*\n")
-            for offset, job in enumerate(jobs[start : start + size], start + 1):
-                lines.append(self.format_job(job, offset))
-                lines.append("")
-            messages.append("\n".join(lines).rstrip())
-        return messages
+        groups: list[list[tuple[int, Job]]] = [
+            list(enumerate(jobs[start : start + size], start + 1))
+            for start in range(0, len(jobs), size)
+        ]
+        # Split any group whose rendering would exceed the message limit.
+        index = 0
+        while index < len(groups):
+            group = groups[index]
+            if (
+                len(self._render(group, index + 1, len(groups))) > TELEGRAM_MESSAGE_LIMIT
+                and len(group) > 1
+            ):
+                half = len(group) // 2
+                groups[index : index + 1] = [group[:half], group[half:]]
+                continue
+            index += 1
+        return [
+            self._render(group, position + 1, len(groups))[:TELEGRAM_MESSAGE_LIMIT]
+            for position, group in enumerate(groups)
+        ]
+
+    def _render(self, group: list[tuple[int, Job]], position: int, total: int) -> str:
+        lines: list[str] = []
+        if total > 1:
+            lines.append(f"📋 *New postings \\({position}/{total}\\)*\n")
+        for number, job in group:
+            lines.append(self.format_job(job, number))
+            lines.append("")
+        return "\n".join(lines).rstrip()
 
     # ------------------------------------------------------------------
     # Sending
@@ -192,6 +209,9 @@ class TelegramNotifier(BaseNotifier):
         if not self.is_configured():
             return False
         jobs = data.new_jobs[: self.config.max_jobs]
+        if not jobs and not self.config.send_empty:
+            self.logger.info("Nothing new; digest skipped")
+            return False
         messages: list[str] = []
         if self.config.send_summary:
             messages.append(self.header(data, len(jobs)))
@@ -216,7 +236,6 @@ def format_reconcile_message(report: ReconciliationReport) -> str:
         f"• Removed: {report.total_deleted}\n"
         f"• Below save threshold: {report.deleted_below_score}\n"
         f"• Stale: {report.deleted_stale}\n"
-        f"• Blacklist entries purged: {report.purged_blacklist}\n"
         f"• Protected \\(acted on\\): {report.protected}"
     )
 
@@ -245,7 +264,7 @@ class NotificationManager:
     def __init__(self, config: Config):
         self.config = config
         self.logger = get_logger("notifications")
-        self._channels: list[BaseNotifier] = []
+        self._channels: list[TelegramNotifier] = []
         if config.notifications.enabled and config.notifications.telegram.enabled:
             telegram = TelegramNotifier(config.notifications.telegram)
             if telegram.is_configured():

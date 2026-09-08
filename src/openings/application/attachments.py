@@ -47,8 +47,7 @@ class AttachmentStore:
         return stored_name, hashlib.sha256(content).hexdigest(), len(content)
 
     def path(self, job_id: str, stored_name: str) -> Path:
-        path = self._job_dir(job_id) / Path(stored_name).name
-        return path
+        return self._job_dir(job_id) / Path(stored_name).name
 
     def delete(self, job_id: str, stored_name: str) -> None:
         path = self.path(job_id, stored_name)
@@ -62,3 +61,15 @@ class AttachmentStore:
         directory = self._job_dir(job_id)
         if directory.is_dir():
             shutil.rmtree(directory, ignore_errors=True)
+
+    def move(self, from_job: str, to_job: str, stored_name: str) -> None:
+        """Relocate one file when jobs are merged; stored names are unique."""
+        source = self.path(from_job, stored_name)
+        if not source.is_file():
+            return
+        target_dir = self._job_dir(to_job)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(source), str(target_dir / stored_name))
+        old_dir = self._job_dir(from_job)
+        if old_dir.is_dir() and not any(old_dir.iterdir()):
+            old_dir.rmdir()

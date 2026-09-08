@@ -7,9 +7,7 @@ of silently ignored. Secrets accept ``$ENV_VAR`` indirection.
 
 from __future__ import annotations
 
-import logging
 import os
-import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -17,23 +15,26 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
 
-logger = logging.getLogger("openings.config")
-
-# Repository root, used for local-development defaults.
+# Repository root, used for the local-development data directory.
 BASE_DIR = Path(__file__).resolve().parents[2]
 
 KNOWN_ATS = ("greenhouse", "lever", "ashby", "smartrecruiters")
 
+EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
-def _resolve_data_dir() -> Path:
+
+def default_data_dir() -> Path:
     env_dir = os.environ.get("OPENINGS_DATA_DIR")
     if env_dir:
         return Path(env_dir).expanduser().resolve()
-    return BASE_DIR
+    return BASE_DIR / "data"
 
 
-DATA_DIR = _resolve_data_dir()
-CONFIG_FILE = Path(os.environ.get("OPENINGS_CONFIG", DATA_DIR / "config" / "settings.yaml"))
+def default_config_path(data_dir: Path | None = None) -> Path:
+    env_path = os.environ.get("OPENINGS_CONFIG")
+    if env_path:
+        return Path(env_path).expanduser().resolve()
+    return (data_dir or default_data_dir()) / "config" / "settings.yaml"
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +114,7 @@ def _optional(value: Any, cast, name: str):
 
 @dataclass
 class ProfileConfig:
-    """Informational only: shown in the banner and the dashboard."""
+    """Informational only: shown in the log banner and the settings summary."""
 
     name: str = ""
     headline: str = ""
@@ -126,7 +127,6 @@ class ThrottlingConfig:
     default_delay: float = 2.0
     site_delays: dict[str, float] = field(default_factory=dict)
     jitter: float = 0.3
-    rate_limit_cooldown: float = 60.0
 
 
 @dataclass
@@ -196,6 +196,7 @@ class CompanySourceConfig:
     ats: str
     slug: str
     locations: list[str] = field(default_factory=list)
+    titles: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -205,6 +206,7 @@ class FeedSourceConfig:
     name: str
     url: str
     locations: list[str] = field(default_factory=list)
+    titles: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -253,6 +255,7 @@ class TelegramConfig:
     bot_token: str = ""
     chat_ids: list[str] = field(default_factory=list)
     send_summary: bool = True
+    send_empty: bool = False
     max_jobs: int = 20
     jobs_per_chunk: int = 10
 
@@ -266,7 +269,6 @@ class NotificationsConfig:
 @dataclass
 class RetentionConfig:
     max_age_days: int = 30
-    purge_blacklist_after_days: int = 90
 
 
 @dataclass
@@ -275,13 +277,11 @@ class AttachmentsConfig:
 
 
 @dataclass
-class VectorSearchConfig:
+class EmbeddingsConfig:
     enabled: bool = True
     embed_on_save: bool = True
-    default_results: int = 20
     backfill_on_startup: bool = True
-    batch_size: int = 100
-    sync_interval_minutes: int = 30
+    batch_size: int = 64
 
 
 @dataclass
@@ -290,6 +290,10 @@ class LoggingConfig:
     max_size_mb: int = 10
     backup_count: int = 5
     timezone: str = "UTC"
+
+    @property
+    def zone(self) -> ZoneInfo:
+        return ZoneInfo(self.timezone)
 
 
 @dataclass
@@ -303,17 +307,17 @@ class Config:
     notifications: NotificationsConfig = field(default_factory=NotificationsConfig)
     retention: RetentionConfig = field(default_factory=RetentionConfig)
     attachments: AttachmentsConfig = field(default_factory=AttachmentsConfig)
-    vector_search: VectorSearchConfig = field(default_factory=VectorSearchConfig)
+    embeddings: EmbeddingsConfig = field(default_factory=EmbeddingsConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
-    data_dir: Path = field(default_factory=lambda: DATA_DIR)
+    data_dir: Path = field(default_factory=default_data_dir)
 
     @property
     def database_path(self) -> Path:
         return self.data_dir / "db" / "openings.db"
 
     @property
-    def chroma_path(self) -> Path:
-        return self.data_dir / "chroma"
+    def models_dir(self) -> Path:
+        return self.data_dir / "models"
 
     @property
     def logs_dir(self) -> Path:
@@ -326,6 +330,10 @@ class Config:
     @property
     def attachments_dir(self) -> Path:
         return self.data_dir / "attachments"
+
+    @property
+    def run_now_path(self) -> Path:
+        return self.data_dir / "run-now"
 
 
 # ---------------------------------------------------------------------------
@@ -346,7 +354,7 @@ def _parse_throttling(data: dict) -> ThrottlingConfig:
     section = _section(
         data,
         "throttling",
-        {"enabled", "default_delay", "site_delays", "jitter", "rate_limit_cooldown"},
+        {"enabled", "default_delay", "site_delays", "jitter"},
         path="sources.jobspy.throttling",
     )
     raw_delays = section.get("site_delays") or {}
@@ -366,11 +374,6 @@ def _parse_throttling(data: dict) -> ThrottlingConfig:
         ),
         site_delays=site_delays,
         jitter=jitter,
-        rate_limit_cooldown=_float_min(
-            section.get("rate_limit_cooldown", 60.0),
-            "throttling.rate_limit_cooldown",
-            0.0,
-        ),
     )
 
 
@@ -523,7 +526,7 @@ def _parse_companies(value: Any) -> list[CompanySourceConfig]:
         path = f"sources.companies[{index}]"
         if not isinstance(item, dict):
             raise ConfigError(f"{path} must be a mapping")
-        unknown = sorted(set(item) - {"name", "ats", "slug", "locations"})
+        unknown = sorted(set(item) - {"name", "ats", "slug", "locations", "titles"})
         if unknown:
             raise ConfigError(f"Unsupported configuration key: {path}.{unknown[0]}")
         for required in ("name", "ats", "slug"):
@@ -543,6 +546,7 @@ def _parse_companies(value: Any) -> list[CompanySourceConfig]:
                 ats=ats,
                 slug=slug,
                 locations=_str_list(item.get("locations"), f"{path}.locations"),
+                titles=_str_list(item.get("titles"), f"{path}.titles"),
             )
         )
     return companies
@@ -558,7 +562,7 @@ def _parse_feeds(value: Any) -> list[FeedSourceConfig]:
         path = f"sources.feeds[{index}]"
         if not isinstance(item, dict):
             raise ConfigError(f"{path} must be a mapping")
-        unknown = sorted(set(item) - {"name", "url", "locations"})
+        unknown = sorted(set(item) - {"name", "url", "locations", "titles"})
         if unknown:
             raise ConfigError(f"Unsupported configuration key: {path}.{unknown[0]}")
         for required in ("name", "url"):
@@ -572,6 +576,7 @@ def _parse_feeds(value: Any) -> list[FeedSourceConfig]:
                 name=_str(item["name"], f"{path}.name").strip(),
                 url=url,
                 locations=_str_list(item.get("locations"), f"{path}.locations"),
+                titles=_str_list(item.get("titles"), f"{path}.titles"),
             )
         )
     return feeds
@@ -707,7 +712,15 @@ def _parse_notifications(data: dict) -> NotificationsConfig:
     telegram = _section(
         section,
         "telegram",
-        {"enabled", "bot_token", "chat_ids", "send_summary", "max_jobs", "jobs_per_chunk"},
+        {
+            "enabled",
+            "bot_token",
+            "chat_ids",
+            "send_summary",
+            "send_empty",
+            "max_jobs",
+            "jobs_per_chunk",
+        },
         path="notifications.telegram",
     )
     jobs_per_chunk = _int_min(
@@ -727,6 +740,9 @@ def _parse_notifications(data: dict) -> NotificationsConfig:
             send_summary=_bool(
                 telegram.get("send_summary", True), "notifications.telegram.send_summary"
             ),
+            send_empty=_bool(
+                telegram.get("send_empty", False), "notifications.telegram.send_empty"
+            ),
             max_jobs=_int_min(telegram.get("max_jobs", 20), "notifications.telegram.max_jobs", 1),
             jobs_per_chunk=jobs_per_chunk,
         ),
@@ -734,14 +750,9 @@ def _parse_notifications(data: dict) -> NotificationsConfig:
 
 
 def _parse_retention(data: dict) -> RetentionConfig:
-    section = _section(data, "retention", {"max_age_days", "purge_blacklist_after_days"})
+    section = _section(data, "retention", {"max_age_days"})
     return RetentionConfig(
         max_age_days=_int_min(section.get("max_age_days", 30), "retention.max_age_days", 1),
-        purge_blacklist_after_days=_int_min(
-            section.get("purge_blacklist_after_days", 90),
-            "retention.purge_blacklist_after_days",
-            1,
-        ),
     )
 
 
@@ -752,32 +763,17 @@ def _parse_attachments(data: dict) -> AttachmentsConfig:
     )
 
 
-def _parse_vector_search(data: dict) -> VectorSearchConfig:
+def _parse_embeddings(data: dict) -> EmbeddingsConfig:
     section = _section(
-        data,
-        "vector_search",
-        {
-            "enabled",
-            "embed_on_save",
-            "default_results",
-            "backfill_on_startup",
-            "batch_size",
-            "sync_interval_minutes",
-        },
+        data, "embeddings", {"enabled", "embed_on_save", "backfill_on_startup", "batch_size"}
     )
-    return VectorSearchConfig(
-        enabled=_bool(section.get("enabled", True), "vector_search.enabled"),
-        embed_on_save=_bool(section.get("embed_on_save", True), "vector_search.embed_on_save"),
-        default_results=_int_min(
-            section.get("default_results", 20), "vector_search.default_results", 1
-        ),
+    return EmbeddingsConfig(
+        enabled=_bool(section.get("enabled", True), "embeddings.enabled"),
+        embed_on_save=_bool(section.get("embed_on_save", True), "embeddings.embed_on_save"),
         backfill_on_startup=_bool(
-            section.get("backfill_on_startup", True), "vector_search.backfill_on_startup"
+            section.get("backfill_on_startup", True), "embeddings.backfill_on_startup"
         ),
-        batch_size=_int_min(section.get("batch_size", 100), "vector_search.batch_size", 1),
-        sync_interval_minutes=_int_min(
-            section.get("sync_interval_minutes", 30), "vector_search.sync_interval_minutes", 1
-        ),
+        batch_size=_int_min(section.get("batch_size", 64), "embeddings.batch_size", 1),
     )
 
 
@@ -807,7 +803,7 @@ TOP_LEVEL_KEYS = {
     "notifications",
     "retention",
     "attachments",
-    "vector_search",
+    "embeddings",
     "logging",
 }
 
@@ -828,15 +824,15 @@ def parse_config(data: dict[str, Any] | None, *, data_dir: Path | None = None) -
         notifications=_parse_notifications(data),
         retention=_parse_retention(data),
         attachments=_parse_attachments(data),
-        vector_search=_parse_vector_search(data),
+        embeddings=_parse_embeddings(data),
         logging=_parse_logging(data),
-        data_dir=data_dir or DATA_DIR,
+        data_dir=data_dir or default_data_dir(),
     )
 
 
-def load_config(path: Path | None = None) -> Config:
+def load_config(path: Path | None = None, *, data_dir: Path | None = None) -> Config:
     """Load and validate the settings file."""
-    config_path = path or CONFIG_FILE
+    config_path = path or default_config_path(data_dir)
     if not config_path.exists():
         raise ConfigError(f"Configuration file not found: {config_path}")
     with config_path.open("r", encoding="utf-8") as handle:
@@ -844,33 +840,4 @@ def load_config(path: Path | None = None) -> Config:
             data = yaml.safe_load(handle)
         except yaml.YAMLError as exc:
             raise ConfigError(f"Invalid YAML in {config_path}: {exc}") from exc
-    return parse_config(data)
-
-
-_config: Config | None = None
-_config_lock = threading.Lock()
-
-
-def get_config() -> Config:
-    """Return the process-wide configuration, loading it on first use."""
-    global _config
-    if _config is None:
-        with _config_lock:
-            if _config is None:
-                _config = load_config()
-    return _config
-
-
-def reload_config() -> Config:
-    """Re-read the settings file and replace the process-wide configuration."""
-    global _config
-    with _config_lock:
-        _config = load_config()
-        return _config
-
-
-def set_config(config: Config | None) -> None:
-    """Replace the process-wide configuration (tests and embedding callers)."""
-    global _config
-    with _config_lock:
-        _config = config
+    return parse_config(data, data_dir=data_dir)

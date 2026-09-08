@@ -1,332 +1,232 @@
-"""
-Scheduler for Openings.
-
-Provides automated periodic execution of job searches using APScheduler.
-"""
+"""The continuous loop: collect on a start-to-start interval, retry failures,
+run on demand when ``{DATA_DIR}/run-now`` appears."""
 
 from __future__ import annotations
 
 import signal
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from openings.logger import get_logger, log_section
+from openings.models import utcnow
+
 if TYPE_CHECKING:
     from openings.config import Config
 
-from openings.logger import get_logger, log_section
+RUN_NOW_POLL_SECONDS = 30
+MAIN_JOB = "main"
+RETRY_JOB = "retry"
+RUN_NOW_JOB = "run-now"
 
 
-class JobSearchScheduler:
-    """
-    Manages scheduled execution of job searches.
+def request_run(path: Path) -> None:
+    """Ask the scheduler for a collection as soon as possible."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(utcnow().isoformat(), encoding="utf-8")
 
-    Provides both single-shot and scheduled execution modes.
-    Handles graceful shutdown and retry logic.
-    """
 
-    def __init__(
-        self,
-        config: Config,
-        job_function: Callable[[], bool],
-        *,
-        vector_sync_function: Callable[[], None] | None = None,
-        vector_sync_interval_minutes: int | None = None,
-    ):
-        """
-        Initialize the scheduler.
+def run_requested(path: Path) -> bool:
+    return path.is_file()
 
-        Args:
-            config: Configuration object.
-            job_function: Function to execute for each search.
-                         Should return True on success, False on failure.
-            vector_sync_function: Optional callable that prunes stale Chroma
-                embeddings. Run on its own interval alongside the main job
-                because the scheduler process is the sole writer to Chroma's
-                on-disk index — the web process only reads it, so deletions
-                made from the dashboard are pruned here instead.
-            vector_sync_interval_minutes: Interval, in minutes, between
-                ``vector_sync_function`` runs. Ignored if
-                ``vector_sync_function`` is None.
-        """
+
+class Scheduler:
+    """Single-shot or continuous execution of the collection function."""
+
+    def __init__(self, config: Config, job_function: Callable[[], bool]):
         self.config = config
         self.job_function = job_function
-        self.vector_sync_function = vector_sync_function
-        self.vector_sync_interval_minutes = vector_sync_interval_minutes
         self.logger = get_logger("scheduler")
         self._scheduler: BlockingScheduler | None = None
-        self._running = False
         self._last_run_success = False
         self._run_count = 0
         self._consecutive_failures = 0
 
+    # ------------------------------------------------------------------
+
+    def _stamp(self, moment: datetime | None = None) -> str:
+        return (
+            (moment or utcnow())
+            .astimezone(self.config.logging.zone)
+            .strftime("%Y-%m-%d %H:%M:%S %Z")
+        )
+
     def _setup_signal_handlers(self) -> None:
-        """Set up signal handlers for graceful shutdown.
-
-        Note: We don't call sys.exit() here because APScheduler's BlockingScheduler
-        will handle the shutdown gracefully when stop() is called. Calling sys.exit()
-        can interrupt cleanup and cause issues with database connections.
-        """
-
         def shutdown_handler(signum: int, frame) -> None:
-            self.logger.info(f"Received signal {signum}, requesting graceful shutdown...")
+            self.logger.info("Received signal %s, shutting down", signum)
             self.stop()
 
-        signal.signal(signal.SIGINT, shutdown_handler)
-        signal.signal(signal.SIGTERM, shutdown_handler)
+        try:
+            signal.signal(signal.SIGINT, shutdown_handler)
+            signal.signal(signal.SIGTERM, shutdown_handler)
+        except ValueError:
+            # Signal handlers can only be installed from the main thread.
+            self.logger.debug("Not the main thread; signal handlers not installed")
 
-    def _execute_job(self, *, is_retry: bool = False) -> None:
-        """Execute the job search with error handling and retry logic."""
+    def _execute_job(self, *, is_retry: bool = False, manual: bool = False) -> None:
         self._run_count += 1
-        run_start = datetime.now()
-
-        # Schedule next run immediately based on START time (not end time)
-        # so the interval is start-to-start, not end-to-start.
-        if self._scheduler and not is_retry:
+        run_start = utcnow()
+        # The interval is start-to-start: schedule the next run before this one begins.
+        if self._scheduler and not is_retry and not manual:
             self._schedule_next_run(run_start)
 
-        run_label = "RETRY RUN" if is_retry else "SCHEDULED RUN"
-        log_section(self.logger, f"{run_label} #{self._run_count}")
-        self.logger.info(
-            f"Starting {'retry' if is_retry else 'scheduled'} search at "
-            f"{run_start.strftime('%Y-%m-%d %H:%M:%S')}"
-        )
+        label = "RETRY RUN" if is_retry else "REQUESTED RUN" if manual else "SCHEDULED RUN"
+        log_section(self.logger, f"{label} #{self._run_count}")
+        self.logger.info("Started at %s", self._stamp(run_start))
 
         try:
             self._last_run_success = self.job_function()
-
             if self._last_run_success:
-                self.logger.info("Scheduled search completed successfully")
                 self._consecutive_failures = 0
             else:
                 self._consecutive_failures += 1
                 self.logger.warning(
-                    f"Scheduled search completed with issues "
-                    f"(consecutive failures: {self._consecutive_failures})"
+                    "Run finished with failures (consecutive: %d)", self._consecutive_failures
                 )
-
-                # Retry logic with max retries limit
                 if self.config.scheduler.retry_on_failure:
                     self._schedule_retry()
-
-        except Exception as e:
+        except Exception as exc:  # noqa: BLE001 - the loop must survive any run
             self._last_run_success = False
             self._consecutive_failures += 1
             self.logger.error(
-                f"Scheduled search failed (consecutive failures: {self._consecutive_failures}): {e}"
+                "Run failed (consecutive failures: %d): %s", self._consecutive_failures, exc
             )
-
             if self.config.scheduler.retry_on_failure:
                 self._schedule_retry()
 
-        run_duration = (datetime.now() - run_start).total_seconds()
-        self.logger.info(f"Run #{self._run_count} completed in {run_duration:.1f} seconds")
-
-        # Log next scheduled run
+        self.logger.info(
+            "Run #%d took %.1f seconds",
+            self._run_count,
+            (utcnow() - run_start).total_seconds(),
+        )
         if self._scheduler and not is_retry:
-            jobs = self._scheduler.get_jobs()
-            main_job = next((j for j in jobs if j.id == "main_job"), None)
-            if main_job:
-                next_run = getattr(main_job, "next_run_time", None)
-                if next_run:
-                    self.logger.info(
-                        f"Next scheduled run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}"
-                    )
+            main = self._scheduler.get_job(MAIN_JOB)
+            next_run = getattr(main, "next_run_time", None) if main else None
+            if next_run:
+                self.logger.info("Next scheduled run: %s", self._stamp(next_run))
 
     def _schedule_next_run(self, current_run_start: datetime) -> None:
-        """
-        Schedule the next run based on the START time of the current run.
-
-        This ensures consistent start-to-start intervals regardless of how long
-        each run takes to complete.
-
-        If the run duration exceeds the interval, the next run is scheduled
-        for the next future interval slot (skipping missed slots).
-
-        Args:
-            current_run_start: The start time of the current run.
-        """
         interval = timedelta(hours=self.config.scheduler.interval_hours)
         next_run_time = current_run_start + interval
-        now = datetime.now()
-
-        # If next_run_time is in the past, find the next future slot
+        now = utcnow()
         if next_run_time <= now:
-            # Calculate how many intervals have passed
-            time_since_start = now - current_run_start
-            intervals_passed = int(time_since_start / interval) + 1
-            next_run_time = current_run_start + (interval * intervals_passed)
+            passed = int((now - current_run_start) / interval) + 1
+            next_run_time = current_run_start + interval * passed
             self.logger.warning(
-                f"Run duration exceeded interval. Skipped {intervals_passed - 1} slot(s). "
-                f"Next run at {next_run_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                "Run duration exceeded the interval; skipped %d slot(s), next at %s",
+                passed - 1,
+                self._stamp(next_run_time),
             )
-
         if self._scheduler:
             self._scheduler.add_job(
                 self._execute_job,
                 trigger=DateTrigger(run_date=next_run_time),
-                id="main_job",
-                name="Job Search",
+                id=MAIN_JOB,
+                name="Collection",
                 kwargs={"is_retry": False},
                 replace_existing=True,
                 max_instances=1,
             )
-            self.logger.debug(
-                f"Scheduled next run at {next_run_time.strftime('%Y-%m-%d %H:%M:%S')}"
-            )
 
     def _schedule_retry(self) -> None:
-        """Schedule a retry after failure, respecting max_retries limit."""
         max_retries = self.config.scheduler.max_retries
         if max_retries > 0 and self._consecutive_failures >= max_retries:
-            self.logger.error(
-                f"Max retries reached ({max_retries}). Will not retry until next scheduled run."
-            )
+            self.logger.error("Max retries reached (%d); waiting for the next slot", max_retries)
             return
-
-        delay_minutes = self.config.scheduler.retry_delay_minutes
-        self.logger.info(
-            f"Scheduling retry {self._consecutive_failures}/{max_retries or '∞'} "
-            f"in {delay_minutes} minutes..."
-        )
-
+        delay = timedelta(minutes=self.config.scheduler.retry_delay_minutes)
         if self._scheduler:
-            retry_time = datetime.now() + timedelta(minutes=delay_minutes)
+            retry_time = utcnow() + delay
             self._scheduler.add_job(
                 self._execute_job,
-                trigger="date",
-                run_date=retry_time,
-                id="retry_job",
+                trigger=DateTrigger(run_date=retry_time),
+                id=RETRY_JOB,
+                name="Retry",
                 kwargs={"is_retry": True},
                 replace_existing=True,
             )
-            self.logger.info(f"Retry scheduled at {retry_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            self.logger.info(
+                "Retry %d/%s at %s",
+                self._consecutive_failures,
+                max_retries or "unlimited",
+                self._stamp(retry_time),
+            )
+
+    def _poll_run_now(self) -> None:
+        path = self.config.run_now_path
+        if not run_requested(path):
+            return
+        try:
+            path.unlink()
+        except OSError:
+            return
+        self.logger.info("Run requested through %s", path)
+        self._execute_job(manual=True)
+
+    # ------------------------------------------------------------------
 
     def run_once(self) -> bool:
-        """
-        Execute a single search (non-scheduled mode).
-
-        Returns:
-            True if search was successful, False otherwise.
-        """
-        self.logger.info("Running in single-shot mode")
+        """Execute one collection and return whether it succeeded."""
         self._setup_signal_handlers()
-
         try:
             self._run_count += 1
             self._last_run_success = self.job_function()
             return self._last_run_success
-        except Exception as e:
-            self.logger.error(f"Search failed: {e}")
+        except Exception as exc:  # noqa: BLE001
+            self.logger.error("Run failed: %s", exc)
             return False
 
     def start(self) -> None:
-        """Start the scheduler in continuous mode.
-
-        Blocks until the scheduler is stopped via SIGINT/SIGTERM or
-        :meth:`stop`. The operating mode is chosen by the CLI subcommand in
-        ``main.py``; this method unconditionally runs the continuous loop.
-        """
-        log_section(self.logger, "STARTING JOB SEARCH SCHEDULER")
-        self.logger.info(f"Interval: {self.config.scheduler.interval_hours} hours")
-        self.logger.info(f"Run on startup: {self.config.scheduler.run_on_startup}")
-        self.logger.info(f"Retry on failure: {self.config.scheduler.retry_on_failure}")
-
+        """Block until stopped, collecting on the configured interval."""
+        log_section(self.logger, "STARTING SCHEDULER")
+        self.logger.info("Interval: %d hours", self.config.scheduler.interval_hours)
+        self.logger.info("Run on startup: %s", self.config.scheduler.run_on_startup)
+        self.logger.info("Retry on failure: %s", self.config.scheduler.retry_on_failure)
         self._setup_signal_handlers()
-        self._running = True
-
-        # Initialize scheduler
-        self._scheduler = BlockingScheduler()
-
-        if self.vector_sync_function is not None:
-            interval_minutes = self.vector_sync_interval_minutes or 30
-            self._scheduler.add_job(
-                self.vector_sync_function,
-                trigger=IntervalTrigger(minutes=interval_minutes),
-                id="vector_sync_job",
-                name="Vector Store Sync",
-                max_instances=1,
-            )
-            self.logger.info(f"Vector store sync scheduled every {interval_minutes} minutes")
-
-        # Run immediately on startup if configured, otherwise schedule first run
+        self._scheduler = BlockingScheduler(timezone="UTC")
+        self._scheduler.add_job(
+            self._poll_run_now,
+            trigger=IntervalTrigger(seconds=RUN_NOW_POLL_SECONDS),
+            id=RUN_NOW_JOB,
+            name="Run-now poll",
+            max_instances=1,
+        )
         if self.config.scheduler.run_on_startup:
-            self.logger.info("Executing initial run on startup...")
             self._execute_job()
         else:
-            # Schedule first run after interval_hours from now
-            first_run_time = datetime.now() + timedelta(hours=self.config.scheduler.interval_hours)
+            first_run = utcnow() + timedelta(hours=self.config.scheduler.interval_hours)
             self._scheduler.add_job(
                 self._execute_job,
-                trigger=DateTrigger(run_date=first_run_time),
-                id="main_job",
-                name="Job Search",
+                trigger=DateTrigger(run_date=first_run),
+                id=MAIN_JOB,
+                name="Collection",
                 kwargs={"is_retry": False},
                 max_instances=1,
             )
-            self.logger.info(
-                f"First run scheduled at {first_run_time.strftime('%Y-%m-%d %H:%M:%S')}"
-            )
-
-        # Start the scheduler (this blocks)
-        self.logger.info("Scheduler started, waiting for next run...")
+            self.logger.info("First run at %s", self._stamp(first_run))
+        self.logger.info("Waiting for the next run")
         try:
             self._scheduler.start()
         except (KeyboardInterrupt, SystemExit):
-            self.logger.info("Scheduler interrupted")
             self.stop()
 
     def stop(self) -> None:
-        """Stop the scheduler gracefully."""
-        self._running = False
         if self._scheduler and self._scheduler.running:
-            self.logger.info("Stopping scheduler...")
+            self.logger.info("Stopping")
             self._scheduler.shutdown(wait=False)
-            self._scheduler = None
-
-    @property
-    def is_running(self) -> bool:
-        """Check if scheduler is currently running."""
-        return self._running
+        self._scheduler = None
 
     @property
     def last_run_success(self) -> bool:
-        """Check if the last run was successful."""
         return self._last_run_success
 
     @property
     def run_count(self) -> int:
-        """Get total number of runs executed."""
         return self._run_count
 
 
-def create_scheduler(
-    config: Config,
-    job_function: Callable[[], bool],
-    *,
-    vector_sync_function: Callable[[], None] | None = None,
-    vector_sync_interval_minutes: int | None = None,
-) -> JobSearchScheduler:
-    """
-    Factory function to create a JobSearchScheduler.
-
-    Args:
-        config: Configuration object.
-        job_function: Function to execute for each search.
-        vector_sync_function: Optional periodic Chroma stale-embedding
-            cleanup callable (see ``JobSearchScheduler.__init__``).
-        vector_sync_interval_minutes: Interval, in minutes, between
-            ``vector_sync_function`` runs.
-
-    Returns:
-        Configured JobSearchScheduler instance.
-    """
-    return JobSearchScheduler(
-        config,
-        job_function,
-        vector_sync_function=vector_sync_function,
-        vector_sync_interval_minutes=vector_sync_interval_minutes,
-    )
+def create_scheduler(config: Config, job_function: Callable[[], bool]) -> Scheduler:
+    return Scheduler(config, job_function)

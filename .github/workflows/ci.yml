@@ -38,7 +38,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v8.0.0
@@ -64,7 +64,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v6
@@ -88,15 +88,15 @@ jobs:
         run: uv sync --locked
 
       - name: Run tests with coverage
-        if: matrix.python-version == '3.11'
+        if: matrix.python-version == '3.12'
         run: uv run pytest --cov=openings --cov-report=xml --cov-fail-under=60
 
       - name: Run tests
-        if: matrix.python-version != '3.11'
+        if: matrix.python-version != '3.12'
         run: uv run pytest
 
       - name: Upload coverage
-        if: matrix.python-version == '3.11'
+        if: matrix.python-version == '3.12'
         uses: actions/upload-artifact@v6
         with:
           name: coverage-report
@@ -131,7 +131,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v8.0.0
@@ -149,20 +149,8 @@ jobs:
           uv export --frozen --no-dev --no-emit-project --output-file .tmp/requirements-audit.txt
 
       - name: Security audit
-        # Ignored vulnerabilities:
-        # - CVE-2025-46656: markdownify pinned by python-jobspy<0.14.0
-        # - GHSA-2wm9-hf6c-p5cr, GHSA-36p7-vc44-83pf, GHSA-xph7-9rjv-w5fr:
-        #   chromadb has no patched release (every version up to 1.5.9 is
-        #   affected) and all three require the HTTP server with RBAC auth,
-        #   while this project only uses an embedded PersistentClient.
-        #   Drop these once upstream ships a fix.
         run: |
-          uvx --python 3.11 --from 'pip-audit==2.9.0' pip-audit \
-            --ignore-vuln CVE-2025-46656 \
-            --ignore-vuln GHSA-2wm9-hf6c-p5cr \
-            --ignore-vuln GHSA-36p7-vc44-83pf \
-            --ignore-vuln GHSA-xph7-9rjv-w5fr \
-            -r .tmp/requirements-audit.txt
+          uvx --python 3.12 --from 'pip-audit==2.9.0' pip-audit -r .tmp/requirements-audit.txt
 
   docker:
     # Runs on PRs and on push to main so a direct push (skipping a PR) still

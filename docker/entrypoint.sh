@@ -16,7 +16,7 @@ mkdir -p \
   "$OPENINGS_DATA_DIR/config" \
   "$OPENINGS_DATA_DIR/db" \
   "$OPENINGS_DATA_DIR/attachments" \
-  "$OPENINGS_DATA_DIR/chroma" \
+  "$OPENINGS_DATA_DIR/models" \
   "$OPENINGS_DATA_DIR/logs"
 
 SETTINGS="$OPENINGS_DATA_DIR/config/settings.yaml"
