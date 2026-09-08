@@ -10,9 +10,9 @@ if (!Element.prototype.scrollIntoView) {
 
 // Web Storage is not guaranteed by the test DOM; the dashboard only needs a
 // string map with the Storage interface.
-if (typeof globalThis.localStorage === "undefined") {
+function memoryStorage(): Storage {
   const memory = new Map<string, string>();
-  const storage: Storage = {
+  return {
     get length() {
       return memory.size;
     },
@@ -26,7 +26,17 @@ if (typeof globalThis.localStorage === "undefined") {
       memory.set(key, String(value));
     },
   };
-  Object.defineProperty(globalThis, "localStorage", { value: storage, configurable: true });
+}
+for (const name of ["localStorage", "sessionStorage"] as const) {
+  if (typeof globalThis[name] === "undefined") {
+    Object.defineProperty(globalThis, name, { value: memoryStorage(), configurable: true });
+  }
+}
+
+// Downloads hand a Blob to an object URL; jsdom has no implementation.
+if (typeof URL.createObjectURL !== "function") {
+  URL.createObjectURL = () => "blob:test";
+  URL.revokeObjectURL = () => {};
 }
 
 // jsdom has no layout, so virtualized lists would measure a 0px viewport and
@@ -47,5 +57,7 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   localStorage.clear();
+  sessionStorage.clear();
+  delete document.documentElement.dataset.theme;
   window.history.replaceState(null, "", "/");
 });

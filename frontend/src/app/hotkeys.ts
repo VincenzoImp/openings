@@ -1,6 +1,38 @@
-import { useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef } from "react";
 
-export type HotkeyHandler = (event: KeyboardEvent) => void;
+/**
+ * One keyboard listener for the whole app. Views, dialogs and the shell
+ * register bindings in scopes; the innermost scope wins. The registry also
+ * feeds the Help dialog, so the shortcut list never drifts from reality.
+ */
+
+export type HotkeyScope = "global" | "view" | "dialog";
+export const SCOPE_ORDER: HotkeyScope[] = ["dialog", "view", "global"];
+
+export interface HotkeyBinding {
+  key: string;
+  run: (event: KeyboardEvent) => void;
+  description?: string;
+  group?: string;
+  /** Keys that are shown together in the help (e.g. "j / k"). */
+  label?: string;
+}
+
+export interface ShortcutEntry {
+  group: string;
+  label: string;
+  description: string;
+}
+
+export interface HotkeyRegistry {
+  /** Stable for the provider's lifetime, so effects can depend on it. */
+  register: (scope: HotkeyScope, id: string, bindings: HotkeyBinding[]) => () => void;
+  list: () => ShortcutEntry[];
+  /** Bumped on every (un)registration; the help dialog re-reads the list. */
+  version: number;
+}
+
+export const HotkeyContext = createContext<HotkeyRegistry | null>(null);
 
 /** Keys typed into a field belong to the field, except Escape. */
 export function isTypingTarget(target: EventTarget | null): boolean {
@@ -17,36 +49,39 @@ export function isTypingTarget(target: EventTarget | null): boolean {
   );
 }
 
+let counter = 0;
+
 /**
- * Bind single-key shortcuts while the component is mounted. Keys are matched
- * on `event.key` ("j", "?", "Escape", "Enter"); chords with Ctrl/Meta/Alt are
- * never intercepted so the browser keeps its own shortcuts.
+ * Bind keys while the component is mounted. Handlers always see the latest
+ * render through a ref, so callers can pass inline closures.
  */
-export function useHotkeys(bindings: Record<string, HotkeyHandler>, enabled = true): void {
+export function useHotkeys(scope: HotkeyScope, bindings: HotkeyBinding[], enabled = true): void {
+  const register = useContext(HotkeyContext)?.register;
   const latest = useRef(bindings);
+  const id = useRef<string | null>(null);
+  if (id.current === null) {
+    id.current = `hk-${++counter}`;
+  }
   useEffect(() => {
     latest.current = bindings;
   });
-
+  const signature = bindings.map((binding) => binding.key).join("|");
   useEffect(() => {
-    if (!enabled) {
+    if (!register || !enabled) {
       return;
     }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) {
-        return;
-      }
-      const handler = latest.current[event.key];
-      if (!handler) {
-        return;
-      }
-      if (event.key !== "Escape" && isTypingTarget(event.target)) {
-        return;
-      }
-      event.preventDefault();
-      handler(event);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [enabled]);
+    const proxies = latest.current.map((binding) => ({
+      ...binding,
+      run: (event: KeyboardEvent) =>
+        latest.current.find((entry) => entry.key === binding.key)?.run(event),
+    }));
+    return register(scope, id.current as string, proxies);
+    // Re-register when the set of keys changes (signature), not on every render.
+  }, [register, scope, enabled, signature]);
+}
+
+export function useShortcutList(): ShortcutEntry[] {
+  const registry = useContext(HotkeyContext);
+  const version = registry?.version ?? 0;
+  return useMemo(() => registry?.list() ?? [], [registry, version]);
 }

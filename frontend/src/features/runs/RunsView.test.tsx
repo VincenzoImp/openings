@@ -1,8 +1,8 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { RunsView } from "./RunsView";
-import { mockApi, run } from "../../test/mockApi";
+import { commonRoutes, mockApi, run } from "../../test/mockApi";
 import { renderWithProviders } from "../../test/render";
 
 describe("RunsView", () => {
@@ -22,6 +22,7 @@ describe("RunsView", () => {
           }),
         ],
       },
+      ...commonRoutes(),
     ]);
     renderWithProviders(<RunsView />);
     const runs = await screen.findAllByTestId("run");
@@ -32,9 +33,34 @@ describe("RunsView", () => {
     expect(runs[1]).toHaveTextContent("3 errors");
   });
 
-  it("explains an empty history", async () => {
-    mockApi([{ path: "/api/runs", reply: () => [] }]);
+  it("explains an empty history and requests a run", async () => {
+    const { calls } = mockApi([
+      {
+        method: "POST",
+        path: "/api/runs",
+        reply: () => ({ running: false, run: null, requested: true }),
+      },
+      ...commonRoutes(),
+    ]);
     renderWithProviders(<RunsView />);
     expect(await screen.findByText("No runs yet")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Run now/ }));
+    await waitFor(() =>
+      expect(calls.some((call) => call.method === "POST" && call.url === "/api/runs")).toBe(true),
+    );
+  });
+
+  it("shows an open run as running", async () => {
+    const open = run({ id: 3, finished_at: null, running: true, duration_seconds: 0 });
+    mockApi([
+      { path: "/api/runs/status", reply: () => ({ running: true, run: open, requested: false }) },
+      { path: "/api/runs", reply: () => [open] },
+      ...commonRoutes(),
+    ]);
+    renderWithProviders(<RunsView />);
+    const runs = await screen.findAllByTestId("run");
+    expect(runs[0]).toHaveTextContent("running");
+    expect(await screen.findByText(/Running since/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Run now/ })).toBeDisabled();
   });
 });
