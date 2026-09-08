@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RotateCcw } from "lucide-react";
 
-import { api, getToken, setToken } from "../../api/client";
+import { TOKEN_CHANGED_EVENT, api, getToken, setToken } from "../../api/client";
 import { JOB_STATUSES } from "../../api/types";
 import type { ExportFormat, JobStatus } from "../../api/types";
 import { useConfirm } from "../../app/confirmContext";
@@ -539,7 +539,10 @@ function SettingsCard() {
         </dl>
       ) : null}
       {showReference ? (
-        <pre className="mt-3 max-h-96 overflow-auto rounded bg-surface-2 p-3 text-[11px] text-fg">
+        <pre
+          tabIndex={0}
+          className="mt-3 max-h-96 overflow-auto rounded bg-surface-2 p-3 text-[11px] text-fg"
+        >
           {reference.isPending
             ? "Loading…"
             : reference.error
@@ -551,12 +554,17 @@ function SettingsCard() {
   );
 }
 
+function subscribeToken(callback: () => void): () => void {
+  window.addEventListener(TOKEN_CHANGED_EVENT, callback);
+  return () => window.removeEventListener(TOKEN_CHANGED_EVENT, callback);
+}
+
 function AccessCard() {
   const client = useQueryClient();
   const toast = useToast();
   const [draft, setDraft] = useState("");
   const auth = useQuery({ queryKey: keys.auth, queryFn: api.dashboardAuth });
-  const stored = Boolean(getToken());
+  const stored = useSyncExternalStore(subscribeToken, () => Boolean(getToken()));
   const apply = (value: string | null) => {
     setToken(value);
     setDraft("");

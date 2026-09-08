@@ -43,12 +43,14 @@ export function HelpDialog({ open, onClose }: { open: boolean; onClose: () => vo
           <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-fg-muted">
             Dialogs
           </h3>
-          <div className="flex items-start gap-2">
-            <dt className="w-20 shrink-0">
-              <Kbd>Esc</Kbd>
-            </dt>
-            <dd>Close the dialog</dd>
-          </div>
+          <dl className="flex flex-col gap-1">
+            <div className="flex items-start gap-2">
+              <dt className="w-20 shrink-0">
+                <Kbd>Esc</Kbd>
+              </dt>
+              <dd>Close the dialog</dd>
+            </div>
+          </dl>
         </div>
       </div>
     </Dialog>

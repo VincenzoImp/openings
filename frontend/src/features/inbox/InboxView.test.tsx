@@ -42,7 +42,7 @@ describe("InboxView", () => {
     renderWithProviders(<InboxView />);
     const rows = await screen.findAllByTestId("job-row");
     expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveAttribute("aria-selected", "true");
+    expect(rows[0]).toHaveAttribute("aria-current", "true");
     expect(screen.getByText("1 since last visit")).toBeInTheDocument();
     expect(screen.getByText("seed")).toBeInTheDocument();
     const list = calls.find((call) => call.url.startsWith("/api/jobs?"));
@@ -51,7 +51,7 @@ describe("InboxView", () => {
 
     fireEvent.keyDown(window, { key: "j" });
     await waitFor(() =>
-      expect(screen.getAllByTestId("job-row")[1]).toHaveAttribute("aria-selected", "true"),
+      expect(screen.getAllByTestId("job-row")[1]).toHaveAttribute("aria-current", "true"),
     );
 
     fireEvent.keyDown(window, { key: "s" });

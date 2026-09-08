@@ -96,7 +96,9 @@ export function Dialog({
             <X size={16} aria-hidden="true" />
           </Button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3" tabIndex={0}>
+          {children}
+        </div>
         {footer ? (
           <div className="flex flex-wrap justify-end gap-2 border-t border-edge px-4 py-3">
             {footer}

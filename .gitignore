@@ -12,6 +12,8 @@ build/
 node_modules/
 frontend/node_modules/
 frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
 *.tsbuildinfo
 
 # Runtime state (all persistent data lives under data/)

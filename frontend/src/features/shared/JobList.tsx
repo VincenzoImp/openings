@@ -66,10 +66,11 @@ export function JobList({
   return (
     <div
       ref={parent}
-      role="listbox"
+      role="list"
       aria-label="Jobs"
-      aria-multiselectable={selectable}
-      className={`min-h-0 overflow-auto rounded-lg border border-edge bg-surface ${className}`}
+      tabIndex={0}
+      data-testid="job-list"
+      className={`min-h-0 overflow-auto rounded-lg border border-edge bg-surface focus-visible:outline-2 focus-visible:outline-accent ${className}`}
     >
       <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
         {virtualItems.map((item) => {
@@ -83,8 +84,8 @@ export function JobList({
               key={job.job_id}
               ref={virtualizer.measureElement}
               data-index={item.index}
-              role="option"
-              aria-selected={selected}
+              role="listitem"
+              aria-current={selected ? "true" : undefined}
               data-testid="job-row"
               onClick={() => onSelect(item.index)}
               onDoubleClick={() => onOpen(job)}

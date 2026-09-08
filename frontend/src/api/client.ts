@@ -29,6 +29,7 @@ const API_ROOT = "/api";
 const TOKEN_KEY = "openings.dashboard-token";
 export const TOKEN_HEADER = "X-Openings-Token";
 export const TOKEN_INVALID_EVENT = "openings.token-invalid";
+export const TOKEN_CHANGED_EVENT = "openings.token-changed";
 
 export class ApiError extends Error {
   status: number;
@@ -64,6 +65,7 @@ export function setToken(token: string | null): void {
   } else {
     store.removeItem(TOKEN_KEY);
   }
+  globalThis.dispatchEvent(new Event(TOKEN_CHANGED_EVENT));
 }
 
 /** Serialize query parameters; arrays repeat the key, empty values are dropped. */

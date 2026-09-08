@@ -28,7 +28,10 @@ export function Table<T>({
     return <p className="px-3 py-3 text-sm text-fg-muted">{empty}</p>;
   }
   return (
-    <div className="overflow-x-auto">
+    <div
+      className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-accent"
+      tabIndex={0}
+    >
       <table className="w-full text-sm" style={{ minWidth }}>
         <thead className="text-left text-[11px] uppercase tracking-wide text-fg-muted">
           <tr>
