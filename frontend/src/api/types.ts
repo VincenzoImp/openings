@@ -8,11 +8,22 @@ export const JOB_STATUSES = [
   "offer",
   "rejected",
   "withdrawn",
+  "blacklisted",
 ] as const;
 export type JobStatus = (typeof JOB_STATUSES)[number];
 
-/** Every status the user moved a job into; `new` is the inbox. */
-export const PIPELINE_STATUSES: JobStatus[] = JOB_STATUSES.filter((status) => status !== "new");
+/** The statuses a job moves through once the user acted on it. */
+export const PIPELINE_STATUSES: JobStatus[] = [
+  "shortlisted",
+  "applied",
+  "interviewing",
+  "offer",
+  "rejected",
+  "withdrawn",
+];
+
+/** Statuses shown when no filter is given: everything except blacklisted. */
+export const ACTIVE_STATUSES: JobStatus[] = JOB_STATUSES.filter((s) => s !== "blacklisted");
 
 export const NOTE_KINDS = ["note", "qa"] as const;
 export type NoteKind = (typeof NOTE_KINDS)[number];
@@ -20,7 +31,8 @@ export type NoteKind = (typeof NOTE_KINDS)[number];
 export const ATTACHMENT_KINDS = ["cv", "cover_letter", "form_answers", "other"] as const;
 export type AttachmentKind = (typeof ATTACHMENT_KINDS)[number];
 
-export type EventKind = "ingested" | "status" | "label" | "note" | "attachment";
+export type EventKind =
+  "ingested" | "posting" | "status" | "label" | "note" | "attachment" | "updated" | "merged";
 
 export const JOB_SORTS = [
   "score",
@@ -32,6 +44,7 @@ export const JOB_SORTS = [
   "salary",
 ] as const;
 export type JobSort = (typeof JOB_SORTS)[number];
+export type SortDirection = "asc" | "desc";
 
 export interface JobSummary {
   job_id: string;
@@ -39,6 +52,7 @@ export interface JobSummary {
   company: string;
   location: string;
   source: string;
+  external_id: string | null;
   job_url: string | null;
   job_type: string | null;
   is_remote: boolean | null;
@@ -47,17 +61,33 @@ export interface JobSummary {
   min_amount: number | null;
   max_amount: number | null;
   currency: string | null;
+  salary_interval: string | null;
+  company_url: string | null;
   first_seen: string;
   last_seen: string;
   relevance_score: number;
   status: JobStatus;
   status_changed_at: string | null;
+  postings_count: number;
+  notes_count: number;
+  attachments_count: number;
   labels: string[];
 }
 
 export interface ScoreExplanation {
   score: number;
   matched: { category: string; weight: number }[];
+}
+
+export interface Posting {
+  id: number;
+  job_id: string;
+  key: string;
+  source: string;
+  external_id: string | null;
+  url: string | null;
+  first_seen: string;
+  last_seen: string;
 }
 
 export interface Note {
@@ -67,6 +97,7 @@ export interface Note {
   title: string | null;
   body: string;
   created_at: string;
+  updated_at: string | null;
 }
 
 export interface Attachment {
@@ -80,6 +111,11 @@ export interface Attachment {
   created_at: string;
 }
 
+export interface AttachmentEntry extends Attachment {
+  job_title: string;
+  company: string;
+}
+
 export interface JobEvent {
   id: number;
   job_id: string;
@@ -90,12 +126,10 @@ export interface JobEvent {
 }
 
 export interface JobDetail extends JobSummary {
-  external_id: string | null;
   description: string | null;
-  salary_interval: string | null;
-  company_url: string | null;
   raw_json: string | null;
   explain: ScoreExplanation;
+  postings: Posting[];
   notes: Note[];
   attachments: Attachment[];
   events: JobEvent[];
@@ -111,13 +145,13 @@ export interface JobListResponse {
 export interface JobListParams {
   limit?: number;
   offset?: number;
-  status?: JobStatus[];
-  source?: string[];
-  label?: string[];
+  statuses?: JobStatus[];
+  sources?: string[];
+  labels?: string[];
   company?: string;
   location?: string;
   locations?: string[];
-  job_type?: string[];
+  job_types?: string[];
   remote?: boolean;
   min_score?: number;
   max_score?: number;
@@ -129,8 +163,13 @@ export interface JobListParams {
   first_seen_to?: string;
   last_seen_from?: string;
   last_seen_to?: string;
+  status_changed_from?: string;
+  status_changed_to?: string;
+  has_attachments?: boolean;
+  without_labels?: boolean;
   text?: string;
   sort?: JobSort;
+  direction?: SortDirection;
 }
 
 export interface CommandResponse {
@@ -140,9 +179,9 @@ export interface CommandResponse {
   message: string | null;
 }
 
-export interface AddJobRequest {
-  title: string;
-  company: string;
+export interface PostingFields {
+  title?: string;
+  company?: string;
   location?: string;
   job_url?: string | null;
   description?: string | null;
@@ -155,6 +194,11 @@ export interface AddJobRequest {
   currency?: string | null;
   salary_interval?: string | null;
   company_url?: string | null;
+}
+
+export interface AddJobRequest extends PostingFields {
+  title: string;
+  company: string;
   source?: string | null;
   external_id?: string | null;
   status?: JobStatus;
@@ -168,27 +212,14 @@ export interface NoteRequest {
   body: string;
 }
 
-export interface BlacklistEntry {
-  job_id: string;
-  title: string;
-  company: string;
-  location: string;
-  blacklisted_at: string;
-}
-
-export interface BlacklistListResponse {
-  items: BlacklistEntry[];
-  total: number;
-  limit: number;
-  offset: number;
-}
-
-export interface BlacklistListParams {
-  limit?: number;
-  offset?: number;
-  text?: string;
-  company?: string;
-  location?: string;
+export interface SourceRunStats {
+  name: string;
+  tasks: number;
+  succeeded: number;
+  failed: number;
+  rows: number;
+  errors: string[];
+  started_at?: string;
 }
 
 export interface SourceStatus {
@@ -197,21 +228,14 @@ export interface SourceStatus {
   detail: string;
   enabled: boolean;
   active_jobs: number;
-}
-
-export interface SourceRunStats {
-  name: string;
-  tasks: number;
-  succeeded: number;
-  failed: number;
-  rows: number;
-  errors: string[];
+  last_run: SourceRunStats | null;
 }
 
 export interface RunRecord {
   id: number | null;
   started_at: string;
   finished_at: string | null;
+  running: boolean;
   duration_seconds: number;
   total_found: number;
   unique_found: number;
@@ -223,6 +247,12 @@ export interface RunRecord {
   errors: string[];
 }
 
+export interface RunStatus {
+  running: boolean;
+  run: RunRecord | null;
+  requested: boolean;
+}
+
 export interface StatsResponse {
   total_jobs: number;
   by_status: Record<JobStatus, number>;
@@ -230,10 +260,12 @@ export interface StatsResponse {
   seen_today: number;
   avg_relevance_score: number;
   blacklisted: number;
+  attachments: number;
+  notes: number;
 }
 
 /** `[bin_start, count]` pairs. */
-export type ScoreDistribution = number[][];
+export type ScoreDistribution = [number, number][];
 
 export interface Facet {
   value: string;
@@ -252,25 +284,47 @@ export interface FacetsResponse {
 export interface CleanupReport {
   deleted_below_score: number;
   deleted_stale: number;
-  purged_blacklist: number;
   protected: number;
   total_deleted: number;
 }
 
-export interface SemanticResult {
-  job_id: string;
-  title: string | null;
-  company: string | null;
-  location: string | null;
+export interface SemanticResult extends JobSummary {
   similarity: number;
-  relevance_score: number | null;
-  source: string | null;
-  status: JobStatus | null;
-  job_url: string | null;
 }
 
 export interface DashboardAuthResponse {
   token_required: boolean;
+}
+
+export interface SettingsSummary {
+  version: string;
+  profile: { name: string; headline: string; target: string };
+  scoring: {
+    save_threshold: number;
+    notify_threshold: number;
+    weights: Record<string, number>;
+    keywords: Record<string, string[]>;
+  };
+  scheduler: { interval_hours: number; run_on_startup: boolean };
+  sources: {
+    jobspy: {
+      enabled: boolean;
+      sites: string[];
+      locations: string[];
+      queries: string[];
+      job_types: string[];
+      hours_old: number;
+    };
+    companies: { name: string; ats: string; slug: string; locations: string[] }[];
+    feeds: { name: string; url: string }[];
+    adzuna: { enabled: boolean };
+  };
+  notifications: { telegram: boolean };
+  retention: { max_age_days: number };
+  attachments: { max_size_mb: number };
+  embeddings: { enabled: boolean; status: string };
+  timezone: string;
+  data_dir: string;
 }
 
 export type ExportFormat = "csv" | "json";

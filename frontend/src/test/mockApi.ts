@@ -6,6 +6,7 @@ import type {
   JobDetail,
   JobSummary,
   RunRecord,
+  SettingsSummary,
   SourceStatus,
   StatsResponse,
 } from "../api/types";
@@ -62,6 +63,8 @@ export function mockApi(routes: Route[]) {
   return { calls, fetchMock };
 }
 
+export const ok = { success: true, affected_count: 1, job_ids: [] as string[], message: null };
+
 export function job(overrides: Partial<JobSummary> = {}): JobSummary {
   return {
     job_id: "a".repeat(64),
@@ -69,6 +72,7 @@ export function job(overrides: Partial<JobSummary> = {}): JobSummary {
     company: "Acme",
     location: "Remote",
     source: "linkedin",
+    external_id: "li-1",
     job_url: "https://example.com/jobs/1",
     job_type: "fulltime",
     is_remote: true,
@@ -77,11 +81,16 @@ export function job(overrides: Partial<JobSummary> = {}): JobSummary {
     min_amount: 100000,
     max_amount: 120000,
     currency: "USD",
+    salary_interval: "yearly",
+    company_url: "https://example.com",
     first_seen: "2026-09-07",
     last_seen: "2026-09-08",
     relevance_score: 42,
     status: "new",
     status_changed_at: null,
+    postings_count: 1,
+    notes_count: 0,
+    attachments_count: 0,
     labels: [],
     ...overrides,
   };
@@ -91,10 +100,7 @@ export function jobDetail(overrides: Partial<JobDetail> = {}): JobDetail {
   const summary = job();
   return {
     ...summary,
-    external_id: "li-1",
     description: "## About\n\nPython services with **PostgreSQL**.",
-    salary_interval: "yearly",
-    company_url: "https://example.com",
     raw_json: '{"title": "Backend Engineer"}',
     explain: {
       score: 42,
@@ -104,6 +110,18 @@ export function jobDetail(overrides: Partial<JobDetail> = {}): JobDetail {
       ],
     },
     labels: ["seed"],
+    postings: [
+      {
+        id: 1,
+        job_id: summary.job_id,
+        key: "linkedin:li-1",
+        source: "linkedin",
+        external_id: "li-1",
+        url: "https://example.com/jobs/1",
+        first_seen: "2026-09-07",
+        last_seen: "2026-09-08",
+      },
+    ],
     notes: [],
     attachments: [],
     events: [
@@ -113,7 +131,7 @@ export function jobDetail(overrides: Partial<JobDetail> = {}): JobDetail {
         kind: "ingested",
         summary: "Ingested from linkedin",
         data: null,
-        created_at: "2026-09-07T06:00:00",
+        created_at: "2026-09-07T06:00:00+00:00",
       },
     ],
     ...overrides,
@@ -131,11 +149,14 @@ export function stats(overrides: Partial<StatsResponse> = {}): StatsResponse {
       offer: 0,
       rejected: 1,
       withdrawn: 0,
+      blacklisted: 7,
     },
     new_today: 4,
     seen_today: 9,
     avg_relevance_score: 21.5,
     blacklisted: 7,
+    attachments: 3,
+    notes: 4,
     ...overrides,
   };
 }
@@ -165,6 +186,15 @@ export function source(overrides: Partial<SourceStatus> = {}): SourceStatus {
     detail: "1 queries x 1 locations",
     enabled: true,
     active_jobs: 8,
+    last_run: {
+      name: "linkedin",
+      tasks: 6,
+      succeeded: 6,
+      failed: 0,
+      rows: 30,
+      errors: [],
+      started_at: "2026-09-08T06:00:00+00:00",
+    },
     ...overrides,
   };
 }
@@ -172,8 +202,9 @@ export function source(overrides: Partial<SourceStatus> = {}): SourceStatus {
 export function run(overrides: Partial<RunRecord> = {}): RunRecord {
   return {
     id: 1,
-    started_at: "2026-09-08T06:00:00",
-    finished_at: "2026-09-08T06:25:00",
+    started_at: "2026-09-08T06:00:00+00:00",
+    finished_at: "2026-09-08T06:25:00+00:00",
+    running: false,
     duration_seconds: 1500,
     total_found: 40,
     unique_found: 30,
@@ -191,9 +222,52 @@ export function cleanup(overrides: Partial<CleanupReport> = {}): CleanupReport {
   return {
     deleted_below_score: 0,
     deleted_stale: 0,
-    purged_blacklist: 0,
     protected: 3,
     total_deleted: 0,
     ...overrides,
   };
+}
+
+export function settings(overrides: Partial<SettingsSummary> = {}): SettingsSummary {
+  return {
+    version: "0.2.0",
+    profile: { name: "Test User", headline: "Engineer", target: "Backend" },
+    scoring: { save_threshold: 10, notify_threshold: 45, weights: {}, keywords: {} },
+    scheduler: { interval_hours: 6, run_on_startup: false },
+    sources: {
+      jobspy: {
+        enabled: true,
+        sites: ["linkedin"],
+        locations: ["Zurich"],
+        queries: ["backend engineer"],
+        job_types: [],
+        hours_old: 24,
+      },
+      companies: [],
+      feeds: [],
+      adzuna: { enabled: false },
+    },
+    notifications: { telegram: false },
+    retention: { max_age_days: 90 },
+    attachments: { max_size_mb: 25 },
+    embeddings: { enabled: true, status: "ready" },
+    timezone: "Europe/Zurich",
+    data_dir: "/data",
+    ...overrides,
+  };
+}
+
+/** The read-only routes almost every view touches on mount. */
+export function commonRoutes(): Route[] {
+  return [
+    { path: "/api/dashboard/auth", reply: () => ({ token_required: false }) },
+    { path: "/api/stats", reply: () => stats() },
+    { path: "/api/jobs/facets", reply: () => facets() },
+    { path: "/api/labels", reply: () => [{ value: "seed", count: 1 }] },
+    { path: "/api/settings", reply: () => settings() },
+    { path: "/api/settings/reference", reply: () => new Response("# reference", { status: 200 }) },
+    { path: "/api/sources", reply: () => [] },
+    { path: "/api/runs/status", reply: () => ({ running: false, run: null, requested: false }) },
+    { path: "/api/runs", reply: () => [] },
+  ];
 }

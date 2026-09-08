@@ -11,10 +11,13 @@ export function TokenDialog({ open, onClose }: { open: boolean; onClose: () => v
   const [draft, setDraft] = useState("");
 
   const save = () => {
+    if (!draft.trim()) {
+      return;
+    }
     setToken(draft);
     setDraft("");
     onClose();
-    client.invalidateQueries();
+    void client.invalidateQueries();
   };
 
   return (
@@ -35,13 +38,12 @@ export function TokenDialog({ open, onClose }: { open: boolean; onClose: () => v
         className="flex flex-col gap-2"
         onSubmit={(event) => {
           event.preventDefault();
-          if (draft.trim()) {
-            save();
-          }
+          save();
         }}
       >
-        <p className="text-sm text-slate-600">
-          This server sets <code>OPENINGS_API_TOKEN</code>. Paste it here; it stays in this browser.
+        <p className="text-sm text-fg-muted">
+          This server sets <code>OPENINGS_API_TOKEN</code>. Paste it here; it stays in this browser
+          only.
         </p>
         <Field label="Token" htmlFor="token-input">
           <Input
@@ -50,6 +52,7 @@ export function TokenDialog({ open, onClose }: { open: boolean; onClose: () => v
             autoComplete="off"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
+            autoFocus
           />
         </Field>
       </form>

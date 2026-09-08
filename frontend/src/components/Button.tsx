@@ -4,16 +4,16 @@ type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md";
 
 const VARIANT: Record<Variant, string> = {
-  primary: "bg-slate-900 text-white hover:bg-slate-700 disabled:bg-slate-400",
+  primary: "bg-accent text-on-accent hover:brightness-110 active:brightness-95 disabled:opacity-50",
   secondary:
-    "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:text-slate-400",
-  ghost: "text-slate-700 hover:bg-slate-100 disabled:text-slate-400",
-  danger: "bg-rose-600 text-white hover:bg-rose-500 disabled:bg-rose-300",
+    "border border-edge bg-surface text-fg hover:bg-surface-2 active:bg-surface-2 disabled:opacity-50",
+  ghost: "text-fg-muted hover:bg-surface-2 hover:text-fg active:bg-surface-2 disabled:opacity-50",
+  danger: "bg-negative text-white hover:brightness-110 active:brightness-95 disabled:opacity-50",
 };
 
 const SIZE: Record<Size, string> = {
-  sm: "px-2 py-1 text-xs",
-  md: "px-3 py-1.5 text-sm",
+  sm: "h-7 px-2 text-xs",
+  md: "h-8 px-3 text-sm",
 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -31,7 +31,7 @@ export function Button({
   return (
     <button
       type={type}
-      className={`inline-flex items-center gap-1.5 rounded-md font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed ${VARIANT[variant]} ${SIZE[size]} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition-colors disabled:cursor-not-allowed ${VARIANT[variant]} ${SIZE[size]} ${className}`}
       {...rest}
     />
   );

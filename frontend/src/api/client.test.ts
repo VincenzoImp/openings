@@ -6,8 +6,8 @@ import { jsonResponse, mockApi } from "../test/mockApi";
 describe("buildQuery", () => {
   it("repeats array keys and drops empty values", () => {
     expect(
-      buildQuery({ status: ["new", "applied"], text: "", limit: 5, remote: true, x: null }),
-    ).toBe("?status=new&status=applied&limit=5&remote=true");
+      buildQuery({ statuses: ["new", "applied"], text: "", limit: 5, remote: true, x: null }),
+    ).toBe("?statuses=new&statuses=applied&limit=5&remote=true");
     expect(buildQuery({})).toBe("");
     expect(buildQuery(undefined)).toBe("");
   });
@@ -66,8 +66,8 @@ describe("api", () => {
     const { calls } = mockApi([
       { path: "/api/jobs", reply: () => ({ items: [], total: 0, limit: 50, offset: 0 }) },
     ]);
-    await api.listJobs({ status: ["new"], min_score: 10, sort: "date" });
-    expect(calls[0].url).toBe("/api/jobs?status=new&min_score=10&sort=date");
+    await api.listJobs({ statuses: ["new"], min_score: 10, sort: "date" });
+    expect(calls[0].url).toBe("/api/jobs?statuses=new&min_score=10&sort=date");
   });
 
   it("is an ApiError instance", () => {
