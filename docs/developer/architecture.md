@@ -1,57 +1,84 @@
 # Architecture
 
-Job Search Tool is a local-first, single-user automation system packaged under
-`src/job_search_tool`. Docker, local `uv run` commands, CI, and release images
-all execute installed entrypoints.
+## Modules
 
-## Runtime Surfaces
+```text
+openings/
+  config.py          settings.yaml -> typed dataclasses; strict keys; $ENV secrets
+  models.py          Job, JobStatus, Note, Attachment, Event, BlacklistEntry, RunSummary
+  database.py        SQLite schema and every query; JobQuery, retention, runs
+  scoring.py         keyword scoring, explain_score, thresholds, post filter
+  sources/           one module per source, all returning the canonical frame
+    base.py          CANONICAL_COLUMNS, HTTP helpers, html_to_markdown, to_date
+    jobspy.py        boards through JobSpy: throttling, retry, thread pool
+    ats/             greenhouse, lever, ashby, smartrecruiters public feeds
+    rss.py           RSS and Atom through feedparser
+    adzuna.py        Adzuna search API (keyed, optional)
+    manual.py        add_job records
+    collect.py       collect_all: run every source, isolate failures, dedupe
+  pipeline.py        collect -> score -> partition -> upsert -> embed -> notify -> runs row
+  scheduler.py       APScheduler loop with start-to-start intervals and retry
+  notifier.py        Telegram digest
+  vector_store.py    Chroma index; vector_commands.py keeps it in sync
+  application/       JobApplicationService, AttachmentStore, command/result types
+  web/               FastAPI app: api.py routes, mcp.py tools, static dashboard
+  cli.py             openings {run, scheduler, web, healthcheck}
+```
 
-| Surface | Module | Role |
-|---------|--------|------|
-| CLI scheduler | `job_search_tool.main` | scheduled or one-shot job collection |
-| Web server | `job_search_tool.web.app` | React dashboard, REST API, MCP mount, health |
-| REST routes | `job_search_tool.web.api` | JSON automation under `/api` |
-| MCP tools | `job_search_tool.web.mcp` | streamable HTTP tools under `/mcp` |
-| Dashboard | `frontend/` | browser UI built into the Docker image |
+## Data flow
 
-The scheduler remains a separate process from the web server. Dashboard, REST,
-and MCP behavior share the application layer in
-`job_search_tool.application.jobs`.
+1. `collect_all` runs the configured sources. Each source returns a
+   `SourceResult` with a DataFrame in the canonical shape plus per-task stats;
+   a failing task or company never aborts the run.
+2. `score_jobs` adds `relevance_score`; `partition_by_thresholds` splits rows
+   into save and notify sets.
+3. `JobDatabase.upsert_jobs` skips blacklisted identities, inserts new rows
+   with status `new` and an `ingested` event, and refreshes posting fields and
+   `last_seen` on existing rows. **It never touches `status`.**
+4. New rows above the notify threshold go to Telegram; the run is recorded in
+   `runs`.
 
-## Data Flow
+## Schema
 
-1. Load `settings.yaml`.
-2. Search configured query/site/location combinations through JobSpy.
-3. Post-filter and deduplicate results.
-4. Score rows with configured keyword weights.
-5. Partition rows by `save_threshold` and `notify_threshold`.
-6. Save accepted rows to SQLite.
-7. Embed saved rows into ChromaDB when vector search is enabled.
-8. Notify about new rows above `notify_threshold`.
+| Table | Holds |
+|-------|-------|
+| `jobs` | the posting fields, `raw_json`, `first_seen`, `last_seen`, `relevance_score`, `status`, `status_changed_at` |
+| `job_labels` | `(job_id, label)` |
+| `notes` | `kind` (`note`, `qa`), `title`, `body` |
+| `attachments` | `kind`, `filename`, `stored_name`, `sha256`, `size_bytes`, `note`; files under `attachments/<job_id>/` |
+| `events` | append-only timeline: `ingested`, `status`, `label`, `note`, `attachment` |
+| `blacklist` | suppressed identities with title, company, location |
+| `runs` | one row per collection with the per-source JSON |
 
-## Web Flow
+Foreign keys cascade from `jobs`; deleting a job removes its labels, notes,
+attachment rows and events, and the service removes its files.
 
-1. `job-search-web` starts FastAPI on port 8501.
-2. `/` serves the built React dashboard.
-3. `/api/*` routes call `JobApplicationService`.
-4. `/mcp` mounts FastMCP streamable HTTP tools over the same service layer.
-5. `/health` reports process readiness and current job count.
+## Invariants
 
-## Persistence
+- Identity is `generate_job_id(title, company, location)` everywhere: sources,
+  the database, `add_job`, the blacklist.
+- Retention SQL is restricted to `status = 'new'`; the protected set is
+  `PROTECTED_STATUSES` and is enforced in `database.py`, not in callers.
+- Blacklisting deletes the row and inserts the identity; `upsert_jobs` and
+  `add_job` consult the blacklist first.
+- The web process never writes the vector index. The scheduler runs
+  `sync_deletions` and `backfill_embeddings` on its own interval.
+- Every surface calls `JobApplicationService`. Routes and tools only parse
+  input and serialize output.
+- Configuration is parsed once per run (`reload_config` at the start of a
+  collection) and is never consulted to decide a job's status.
 
-`JOB_SEARCH_DATA_DIR` owns all runtime state:
+## Frontend
 
-- `config/settings.yaml`
-- `db/jobs.db`
-- `chroma/`
-- `logs/search.log`
+`frontend/src`:
 
-Docker defaults this root to `/data`. Local development defaults to the repo
-root unless overridden.
+```text
+api/        client.ts (fetch, token, query building), types.ts
+app/        App, Shell, router (?view=&job=), hotkeys, toast, dialogs
+components/ Button, Badge, Dialog, Field, FileDrop, Kbd, MarkdownBody, ScoreBar
+features/   inbox, pipeline, companies, runs, system, job, shared (queries, JobList, format)
+```
 
-## Configuration Contract
-
-`config/settings.example.yaml` is the user-facing configuration reference. The
-same template is also packaged under `job_search_tool.defaults` so installed
-MCP tools can generate settings documentation without depending on a source
-checkout. Tests assert both copies stay synchronized.
+State lives in TanStack Query; every write invalidates the lists it can
+change. The built `dist/` is copied into the image at `/opt/openings/frontend`
+and served by `openings web`; `OPENINGS_FRONTEND_DIST` overrides the path.

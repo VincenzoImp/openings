@@ -26,7 +26,7 @@
 
 
 # -----------------------------------------------------------------------------
-# profile — informational. Shown in the log banner and the dashboard.
+# profile — informational. Shown in the log banner.
 # -----------------------------------------------------------------------------
 profile:
   name: ""
