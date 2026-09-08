@@ -20,7 +20,13 @@ DATA_DIR="$WORK_DIR/data"
 
 cleanup() {
   docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
-  rm -rf "$WORK_DIR"
+  # The container wrote attachments as its own user; remove them as root
+  # through a throwaway container so the host user never needs sudo.
+  if ! rm -rf "$WORK_DIR" 2>/dev/null; then
+    docker run --rm --user 0 --entrypoint sh -v "$WORK_DIR:/work" "$IMAGE" \
+      -c 'rm -rf /work/data' >/dev/null 2>&1 || true
+    rm -rf "$WORK_DIR" 2>/dev/null || true
+  fi
 }
 trap cleanup EXIT INT TERM
 
