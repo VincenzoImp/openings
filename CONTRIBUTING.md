@@ -11,6 +11,7 @@ git clone https://github.com/VincenzoImp/openings.git
 cd openings
 uv sync --locked
 npm --prefix frontend install
+npx --prefix frontend playwright install chromium
 cp config/settings.example.yaml settings.yaml
 ```
 
@@ -37,8 +38,9 @@ CI runs exactly this; run it before opening a pull request:
 ```bash
 uv run pre-commit run --all-files
 uv run mypy src/openings
-uv run pytest --cov=openings --cov-fail-under=60
+uv run pytest --cov=openings --cov-fail-under=80
 npm --prefix frontend run quality
+npm --prefix frontend run build && npm --prefix frontend run test:e2e
 docker compose config
 sh docker/smoke.sh
 ```
@@ -46,14 +48,15 @@ sh docker/smoke.sh
 ## Layout
 
 ```text
-src/openings/              package: config, models, database, scoring, pipeline
+src/openings/              package: config, models, runtime, scoring, pipeline, embeddings
+src/openings/db/           SQLite behind the JobDatabase facade
 src/openings/sources/      jobspy, ats/{greenhouse,lever,ashby,smartrecruiters}, rss, adzuna, manual
-src/openings/application/  the service every surface calls; attachments on disk
-src/openings/web/          FastAPI app: /api routes, /mcp tools, static dashboard
+src/openings/application/  the service every surface calls; attachments and bundles on disk
+src/openings/web/          FastAPI app: /api routes, /mcp tools, token gate, static dashboard
 src/openings/defaults/     packaged copy of config/settings.example.yaml
-frontend/                  dashboard (React, Vite, Tailwind, TanStack)
+frontend/                  dashboard (React, Vite, Tailwind, TanStack); e2e/ holds Playwright
 config/                    the annotated example configuration
-tests/                     pytest suite, including docs and packaging guards
+tests/                     pytest suite, including integration, docs and packaging guards
 docs/user, docs/developer  operator and contributor documentation
 docker/                    entrypoint and smoke test
 ```
@@ -62,10 +65,12 @@ docker/                    entrypoint and smoke test
 
 - `uv.lock` and `frontend/package-lock.json` are the dependency sources of
   truth.
-- No generated state in Git: no databases, builds, attachments or logs.
+- No generated state in Git: no databases, builds, attachments, models or
+  logs.
 - Behaviour changes come with tests. `tests/test_docs.py` guards the docs
   against drift, `tests/test_settings_reference.py` keeps the packaged
   example identical to `config/settings.example.yaml`.
 - Nothing in code, defaults or docs assumes a country, language, currency or
   board. Those are user configuration.
-- No compatibility layers for earlier products; Openings starts at 0.1.0.
+- No compatibility layers for earlier products or earlier data formats; data
+  moves through explicit scripts outside the product.

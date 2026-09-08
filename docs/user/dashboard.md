@@ -2,54 +2,80 @@
 
 The dashboard is built for triage: get through new postings fast, keep the
 ones you are pursuing in view, and keep the application material with the
-job. Press `?` anywhere for the shortcut list.
+job. It works on a phone, a tablet and a desktop, in light and dark (System
+follows the operating system; change it in System › Appearance or with the
+button in the header). Press `?` anywhere for the shortcut list, which is
+generated from the shortcuts that are actually active.
 
 ## Views
 
 | Key | View | What it shows |
 |-----|------|---------------|
-| `1` | Inbox | jobs in status `new`, by score; a dot marks postings first seen after your previous visit |
-| `2` | Pipeline | one column per status from `shortlisted` to `withdrawn`; move cards with the keyboard or by dragging |
-| `3` | Companies | configured sources with their active job counts, and every employer with a stored posting |
-| `4` | Runs | every collection run: duration, totals, per-source counts, errors |
-| `5` | System | statistics, score distribution, retention, blacklist, export, API token |
+| `1` | Inbox | jobs in status `new`; a dot marks postings that arrived after your previous visit |
+| `2` | Pipeline | one column per status from `shortlisted` to `offer`, with `rejected` and `withdrawn` on demand; move cards with the keyboard, by dragging, or from the card menu |
+| `3` | Companies | configured sources with the health of their last run, and every employer with a stored posting and its status counts |
+| `4` | Runs | every collection run: duration, totals, per-source counts, errors grouped by source; "Run now" asks the scheduler to collect |
+| `5` | System | appearance, statistics, score distribution, retention with dry-run counts, export, the blacklist with Restore, the settings summary and reference, the API token |
 
-The Inbox toolbar filters by text, source and minimum score and sorts by
-score, date, first seen, last update, company, title or salary. Filters are
-sent to the API, so they work on the whole archive, not the loaded page.
+Inbox filters (sources, labels, company, location, job types, remote, score
+range, first-seen range, material) live in the URL, so a filtered Inbox is a
+link you can keep. Search covers title, company, location, description and
+notes; a query that starts with `~` runs the semantic search instead. Lists
+load a page at a time as you scroll.
+
+## Bulk actions
+
+Tick the checkboxes (or press `Space`, `Shift+J`/`Shift+K`, `*`) and a bar
+appears with Shortlist, Applied, Status with a note, Labels, Blacklist and
+Delete for the whole selection.
 
 ## Job page
 
-Open a job with `Enter` or a click. Three tabs:
+Open a job with `Enter`, a double click, or its title. Three tabs, kept in
+the URL:
 
-- **Posting**: the description as markdown, the score breakdown (each matched
-  category and its weight), source, dates, salary, links, the raw source
-  payload.
+- **Posting**: the description as markdown, every posting of the opening
+  (the same job seen on two boards), similar postings, the score breakdown
+  (each matched category and its weight), source, dates, salary, links, the
+  raw source payload. Edit any posting field from the dialog (`e`).
 - **Application**: attachments (drop files, pick the kind: CV, cover letter,
-  form answers, other), form questions with your answers, free notes.
-- **Activity**: the timeline: ingestion, status changes, labels, notes,
-  attachments.
+  form answers, other; preview PDFs, images, markdown and text inline;
+  download one file or the whole bundle as a zip), form questions with your
+  answers, free notes; notes and answers are editable in place.
+- **Activity**: the timeline: ingestion, further postings, status changes
+  with their notes, labels, notes, attachments, edits, merges.
 
-The header holds the status selector, labels, the link to the posting, and
-blacklist and delete actions.
+The header holds the status selector, "Status with note", the link to the
+posting, labels, and a menu with edit, copy link, bundle download, merge,
+blacklist and delete. A blacklisted job shows a banner with Restore. When a
+job was opened from a list, `[` and `]` step through that list.
 
 ## Keyboard
 
 | Key | Action |
 |-----|--------|
 | `j` / `k` | next / previous job |
+| `Shift+J` / `Shift+K` | extend the selection |
+| `Space`, `*` | select the job, select every loaded job |
 | `Enter` | open the job page |
 | `o` | open the posting in a new tab |
 | `s` | shortlist |
 | `a` | mark applied |
+| `Shift+S` | change status with a note |
 | `x` | blacklist (asks first) |
+| `d` | delete (asks first) |
 | `l` | edit labels |
-| `/` | search |
+| `/` | search (`~` prefix for semantic search) |
+| `f` | filters |
+| `e` | export the current list as CSV (Inbox), edit the posting (job page) |
+| `b` | download the application bundle (job page) |
 | `n` | add a posting by hand |
 | `←` / `→` | previous / next Pipeline column |
-| `[` / `]` | move the job one status back / forward (Pipeline) |
-| `Esc` | close a dialog, leave the job page |
+| `[` / `]` | move the card one status back / forward (Pipeline); previous / next job (job page) |
+| `Esc` | close a dialog, clear the selection, leave the job page |
 | `?` | shortcut help |
+
+Keyboard hints are shown only on devices with a mouse or trackpad.
 
 ## Access token
 

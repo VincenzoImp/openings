@@ -18,17 +18,22 @@ from starlette.applications import Starlette
 from openings.application.attachments import AttachmentTooLarge
 from openings.application.jobs import VectorStoreUnavailableError
 from openings.application.models import AddJobCommand
-from openings.database import JOB_SORTS, BlacklistQuery, JobQuery
-from openings.models import AttachmentKind, JobStatus, NoteKind
+from openings.db import JOB_SORTS, SORT_DIRECTIONS, JobQuery
+from openings.models import POSTING_FIELDS, AttachmentKind, JobStatus, NoteKind
 from openings.settings_reference import get_settings_reference as read_settings_reference
 from openings.web.service import get_service
 
 DEFAULT_ALLOWED_HOSTS = ["127.0.0.1:*", "localhost:*", "[::1]:*"]
 DEFAULT_ALLOWED_ORIGINS = ["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*"]
+MAX_INLINE_ATTACHMENT = 5 * 1024 * 1024
 
 
 def _json(data: Any) -> str:
     return json.dumps(data, ensure_ascii=False)
+
+
+def _error(message: str) -> str:
+    return _json({"success": False, "message": message})
 
 
 def _env_csv(name: str) -> list[str]:
@@ -54,6 +59,20 @@ def _status(value: str) -> JobStatus:
         raise ValueError(f"status must be one of {', '.join(s.value for s in JobStatus)}") from exc
 
 
+def _statuses(values: list[str] | None) -> tuple[str, ...]:
+    return tuple(_status(value).value for value in values or [])
+
+
+def _query(**kwargs: Any) -> JobQuery:
+    sort = kwargs.pop("sort", "score")
+    direction = kwargs.pop("direction", None)
+    return JobQuery(
+        **kwargs,
+        sort=sort if sort in JOB_SORTS else "score",
+        direction=direction if direction in SORT_DIRECTIONS else None,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Read tools
 # ---------------------------------------------------------------------------
@@ -67,6 +86,7 @@ def list_jobs(
     labels: list[str] | None = None,
     company: str | None = None,
     location: str | None = None,
+    locations: list[str] | None = None,
     job_types: list[str] | None = None,
     remote: bool | None = None,
     min_score: int | None = None,
@@ -77,54 +97,91 @@ def list_jobs(
     date_posted_to: str | None = None,
     first_seen_from: str | None = None,
     first_seen_to: str | None = None,
+    status_changed_from: str | None = None,
+    status_changed_to: str | None = None,
+    has_attachments: bool | None = None,
+    without_labels: bool | None = None,
     text: str | None = None,
     sort: str = "score",
+    direction: str | None = None,
 ) -> str:
-    """List job summaries with filters and pagination. ``statuses`` accepts
-    new, shortlisted, applied, interviewing, offer, rejected, withdrawn.
-    ``sort`` accepts score, date, first_seen, updated, company, title, salary."""
-    query = JobQuery(
-        limit=limit,
-        offset=offset,
-        statuses=tuple(statuses or ()),
-        sources=tuple(sources or ()),
-        labels=tuple(labels or ()),
-        company=company,
-        location=location,
-        job_types=tuple(job_types or ()),
-        remote=remote,
-        min_score=min_score,
-        max_score=max_score,
-        min_salary=min_salary,
-        max_salary=max_salary,
-        date_posted_from=date_posted_from,
-        date_posted_to=date_posted_to,
-        first_seen_from=first_seen_from,
-        first_seen_to=first_seen_to,
-        text=text,
-        sort=sort if sort in JOB_SORTS else "score",
-    )
+    """List job summaries with filters and pagination. Without ``statuses`` every
+    status except blacklisted is returned. ``statuses`` accepts new, shortlisted,
+    applied, interviewing, offer, rejected, withdrawn, blacklisted. ``text`` also
+    searches notes. ``sort``: score, date, first_seen, updated, company, title,
+    salary; ``direction``: asc or desc."""
+    try:
+        query = _query(
+            limit=limit,
+            offset=offset,
+            statuses=_statuses(statuses),
+            sources=tuple(sources or ()),
+            labels=tuple(labels or ()),
+            company=company,
+            location=location,
+            locations=tuple(locations or ()),
+            job_types=tuple(job_types or ()),
+            remote=remote,
+            min_score=min_score,
+            max_score=max_score,
+            min_salary=min_salary,
+            max_salary=max_salary,
+            date_posted_from=date_posted_from,
+            date_posted_to=date_posted_to,
+            first_seen_from=first_seen_from,
+            first_seen_to=first_seen_to,
+            status_changed_from=status_changed_from,
+            status_changed_to=status_changed_to,
+            has_attachments=has_attachments,
+            without_labels=without_labels,
+            text=text,
+            sort=sort,
+            direction=direction,
+        )
+    except ValueError as exc:
+        return _error(str(exc))
     return _json(get_service().list_jobs(query).to_dict())
 
 
-def get_job(job_id: str) -> str:
-    """Full job: posting, score breakdown, labels, notes, attachments, timeline."""
+def get_job(
+    job_id: str, include_raw: bool = False, max_description_chars: int | None = None
+) -> str:
+    """Full job: posting, score breakdown, postings, labels, notes, attachments,
+    timeline. ``include_raw`` adds the source payload; ``max_description_chars``
+    truncates long descriptions."""
     detail = get_service().get_job_detail(job_id)
     if detail is None:
-        return _json({"error": f"Job not found: {job_id}"})
-    return _json(detail.to_dict())
+        return _error(f"Job not found: {job_id}")
+    return _json(
+        detail.to_dict(include_raw=include_raw, max_description_chars=max_description_chars)
+    )
 
 
 def search_similar(
-    query: str, n_results: int = 10, min_score: int | None = None, source: str | None = None
+    query: str | None = None,
+    job_id: str | None = None,
+    n_results: int = 10,
+    min_score: int | None = None,
+    source: str | None = None,
+    statuses: list[str] | None = None,
 ) -> str:
-    """Semantic search over stored jobs (local embeddings)."""
+    """Semantic search over stored jobs: closest to ``query`` text, or to an
+    existing ``job_id``."""
+    if not query and not job_id:
+        return _error("query or job_id is required")
     try:
         results = get_service().search_similar(
-            query, n_results=n_results, min_score=min_score, source=source
+            query,
+            job_id=job_id,
+            n_results=n_results,
+            min_score=min_score,
+            source=source,
+            statuses=_statuses(statuses),
         )
-    except VectorStoreUnavailableError:
-        return _json({"error": "Vector store not available"})
+    except VectorStoreUnavailableError as exc:
+        return _error(str(exc))
+    except ValueError as exc:
+        return _error(str(exc))
     return _json([result.to_dict() for result in results])
 
 
@@ -138,9 +195,15 @@ def get_score_distribution(bin_size: int = 5) -> str:
     return _json(get_service().get_score_distribution(bin_size))
 
 
-def get_facets() -> str:
-    """Distinct values with counts for statuses, sources, companies, locations, job types, labels."""
-    return _json(get_service().get_facets())
+def get_facets(limit: int = 50, q: str | None = None) -> str:
+    """Distinct values with counts for statuses, sources, companies, locations,
+    job types, labels. ``q`` filters values by substring."""
+    return _json(get_service().get_facets(limit=limit, q=q))
+
+
+def list_labels() -> str:
+    """Every label with its job count."""
+    return _json(get_service().get_facets(limit=1000)["labels"])
 
 
 def list_blacklist(
@@ -150,9 +213,47 @@ def list_blacklist(
     company: str | None = None,
     location: str | None = None,
 ) -> str:
-    """Blacklist entries with filters and pagination."""
-    entries, total = get_service().list_blacklist(
-        BlacklistQuery(limit=limit, offset=offset, text=text, company=company, location=location)
+    """Blacklisted jobs with filters and pagination."""
+    query = _query(
+        limit=limit,
+        offset=offset,
+        statuses=(JobStatus.BLACKLISTED.value,),
+        text=text,
+        company=company,
+        location=location,
+        sort="updated",
+    )
+    return _json(get_service().list_jobs(query).to_dict())
+
+
+def list_sources() -> str:
+    """Configured sources with the number of active jobs each one produced and
+    what happened to each in the last run."""
+    return _json([source.to_dict() for source in get_service().list_sources()])
+
+
+def list_runs(limit: int = 20) -> str:
+    """Recent collection runs: timing, per-source counts, failures, whether one is running."""
+    service = get_service()
+    return _json(
+        {
+            "status": service.run_status(),
+            "runs": [run.to_dict() for run in service.list_runs(limit)],
+        }
+    )
+
+
+def list_attachments(
+    kind: str | None = None, statuses: list[str] | None = None, limit: int = 100, offset: int = 0
+) -> str:
+    """Attachments across jobs, newest first, with the job title and company."""
+    try:
+        attachment_kind = AttachmentKind(kind.strip().lower()) if kind else None
+        clean = _statuses(statuses)
+    except ValueError as exc:
+        return _error(str(exc))
+    entries, total = get_service().list_attachments(
+        kind=attachment_kind, statuses=clean, limit=limit, offset=offset
     )
     return _json(
         {
@@ -164,14 +265,22 @@ def list_blacklist(
     )
 
 
-def list_sources() -> str:
-    """Configured sources with the number of active jobs each one produced."""
-    return _json([source.to_dict() for source in get_service().list_sources()])
+def get_attachment(job_id: str, attachment_id: int) -> str:
+    """A stored file as base64 with its metadata (files up to 5 MB)."""
+    found = get_service().get_attachment_file(job_id, attachment_id)
+    if found is None:
+        return _error("Attachment not found")
+    attachment, path = found
+    if attachment.size_bytes > MAX_INLINE_ATTACHMENT:
+        return _error("Attachment larger than 5 MB; download it through the REST API")
+    data = attachment.to_dict()
+    data["content_base64"] = base64.b64encode(path.read_bytes()).decode("ascii")
+    return _json({"success": True, "attachment": data})
 
 
-def list_runs(limit: int = 20) -> str:
-    """Recent collection runs: timing, per-source counts, failures."""
-    return _json([run.to_dict() for run in get_service().list_runs(limit)])
+def get_settings() -> str:
+    """Profile, thresholds, sources and runtime facts from the live configuration."""
+    return _json(get_service().settings_summary())
 
 
 def get_settings_reference() -> str:
@@ -207,7 +316,9 @@ def add_job(
 ) -> str:
     """Add a posting by hand. The caller supplies the fields it digested from
     the page; the job is scored with the live configuration and lands in the
-    given status (default shortlisted, so retention never removes it)."""
+    given status (default shortlisted, so retention never removes it). A
+    posting already stored (same URL or same title, company and location) is
+    updated with the fields given and keeps its status."""
     try:
         command = AddJobCommand(
             title=title,
@@ -231,16 +342,30 @@ def add_job(
             note=note,
         )
     except ValueError as exc:
-        return _json({"success": False, "message": str(exc)})
+        return _error(str(exc))
     return _json(get_service().add_job(command).to_dict())
 
 
+def update_job(job_id: str, **fields: Any) -> str:
+    """Edit posting fields: title, company, location, job_url, description,
+    date_posted, job_type, is_remote, job_level, min_amount, max_amount,
+    currency, salary_interval, company_url. The job is rescored."""
+    changes = {key: value for key, value in fields.items() if key in POSTING_FIELDS}
+    if not changes:
+        return _error(f"No editable field given; allowed: {', '.join(POSTING_FIELDS)}")
+    updated = get_service().update_job(job_id, changes)
+    if updated is None:
+        return _error(f"Job not found: {job_id}")
+    return _json({"success": True, "job": updated.to_dict()})
+
+
 def set_status(job_ids: list[str], status: str, note: str | None = None) -> str:
-    """Move jobs to a status: new, shortlisted, applied, interviewing, offer, rejected, withdrawn."""
+    """Move jobs to a status: new, shortlisted, applied, interviewing, offer,
+    rejected, withdrawn, blacklisted. ``note`` lands on the timeline."""
     try:
         target = _status(status)
     except ValueError as exc:
-        return _json({"success": False, "message": str(exc)})
+        return _error(str(exc))
     return _json(get_service().set_status(job_ids, target, note).to_dict())
 
 
@@ -254,6 +379,11 @@ def remove_labels(job_ids: list[str], labels: list[str]) -> str:
     return _json(get_service().remove_labels(job_ids, labels).to_dict())
 
 
+def rename_label(old: str, new: str) -> str:
+    """Rename a label on every job that carries it."""
+    return _json(get_service().rename_label(old, new).to_dict())
+
+
 def add_note(job_id: str, body: str, kind: str = "note", title: str | None = None) -> str:
     """Add a note (kind ``note``) or a form question and answer (kind ``qa``:
     question in ``title``, answer in ``body``)."""
@@ -261,10 +391,34 @@ def add_note(job_id: str, body: str, kind: str = "note", title: str | None = Non
         note_kind = NoteKind(kind.strip().lower())
         note = get_service().add_note(job_id, note_kind, body, title)
     except ValueError as exc:
-        return _json({"success": False, "message": str(exc)})
+        return _error(str(exc))
     if note is None:
-        return _json({"success": False, "message": f"Job not found: {job_id}"})
+        return _error(f"Job not found: {job_id}")
     return _json({"success": True, "note": note.to_dict()})
+
+
+def update_note(
+    job_id: str,
+    note_id: int,
+    body: str | None = None,
+    title: str | None = None,
+    kind: str | None = None,
+) -> str:
+    """Edit a note or answer in place."""
+    try:
+        note_kind = NoteKind(kind.strip().lower()) if kind else None
+        note = get_service().update_note(job_id, note_id, body=body, title=title, kind=note_kind)
+    except ValueError as exc:
+        return _error(str(exc))
+    if note is None:
+        return _error("Note not found")
+    return _json({"success": True, "note": note.to_dict()})
+
+
+def delete_note(job_id: str, note_id: int) -> str:
+    """Remove a note."""
+    ok = get_service().delete_note(job_id, note_id)
+    return _json({"success": ok, "message": None if ok else "Note not found"})
 
 
 def add_attachment(
@@ -275,15 +429,35 @@ def add_attachment(
         attachment_kind = AttachmentKind(kind.strip().lower())
         content = base64.b64decode(content_base64, validate=True)
     except (ValueError, binascii.Error) as exc:
-        return _json({"success": False, "message": f"Invalid input: {exc}"})
+        return _error(f"Invalid input: {exc}")
     try:
         attachment = get_service().add_attachment(
             job_id, kind=attachment_kind, filename=filename, content=content, note=note
         )
     except (AttachmentTooLarge, ValueError) as exc:
-        return _json({"success": False, "message": str(exc)})
+        return _error(str(exc))
     if attachment is None:
-        return _json({"success": False, "message": f"Job not found: {job_id}"})
+        return _error(f"Job not found: {job_id}")
+    return _json({"success": True, "attachment": attachment.to_dict()})
+
+
+def update_attachment(
+    job_id: str,
+    attachment_id: int,
+    kind: str | None = None,
+    note: str | None = None,
+    filename: str | None = None,
+) -> str:
+    """Change an attachment's kind, note or display name."""
+    try:
+        attachment_kind = AttachmentKind(kind.strip().lower()) if kind else None
+    except ValueError as exc:
+        return _error(str(exc))
+    attachment = get_service().update_attachment(
+        job_id, attachment_id, kind=attachment_kind, note=note, filename=filename
+    )
+    if attachment is None:
+        return _error("Attachment not found")
     return _json({"success": True, "attachment": attachment.to_dict()})
 
 
@@ -293,19 +467,31 @@ def delete_attachment(job_id: str, attachment_id: int) -> str:
     return _json({"success": ok, "message": None if ok else "Attachment not found"})
 
 
-def blacklist_jobs(job_ids: list[str]) -> str:
-    """Delete jobs and block them from being ingested again."""
-    return _json(get_service().blacklist_jobs(job_ids).to_dict())
+def blacklist_jobs(job_ids: list[str], note: str | None = None) -> str:
+    """Hide jobs everywhere and block them from being ingested again. Their
+    notes, attachments and timeline are kept; ``unblacklist_jobs`` restores them."""
+    return _json(get_service().blacklist_jobs(job_ids, note).to_dict())
 
 
 def unblacklist_jobs(job_ids: list[str]) -> str:
-    """Lift the suppression; the job returns only if a source finds it again."""
+    """Restore blacklisted jobs to the status they held before."""
     return _json(get_service().unblacklist_jobs(job_ids).to_dict())
 
 
 def delete_jobs(job_ids: list[str]) -> str:
-    """Delete jobs permanently without blacklisting them."""
+    """Delete jobs permanently, with their notes and attachments."""
     return _json(get_service().delete_jobs(job_ids).to_dict())
+
+
+def merge_jobs(primary_id: str, other_ids: list[str]) -> str:
+    """Fold duplicate jobs into ``primary_id``: their postings, notes,
+    attachments, labels and timeline move over and the duplicates disappear."""
+    return _json(get_service().merge_jobs(primary_id, other_ids).to_dict())
+
+
+def run_now() -> str:
+    """Ask the scheduler to collect as soon as possible (within about 30 seconds)."""
+    return _json(get_service().request_run())
 
 
 def preview_cleanup() -> str:
@@ -333,33 +519,38 @@ def export_jobs(
     text: str | None = None,
     sort: str = "score",
 ) -> str:
-    """Export selected or filtered jobs. ``limit=0`` exports every match."""
+    """Export selected or filtered jobs. ``limit=0`` exports every match. The
+    result is an envelope with ``content`` (CSV text or a JSON array), ``format``,
+    ``row_count`` and ``total``."""
     fmt: Literal["csv", "json"] = "json" if format == "json" else "csv"
     service = get_service()
-    if job_ids is not None:
-        exported = service.export_jobs(job_ids=job_ids, fmt=fmt)
-    else:
-        exported = service.export_jobs(
-            query=JobQuery(
-                limit=limit,
-                offset=offset,
-                statuses=tuple(statuses or ()),
-                sources=tuple(sources or ()),
-                labels=tuple(labels or ()),
-                company=company,
-                location=location,
-                min_score=min_score,
-                max_score=max_score,
-                text=text,
-                sort=sort if sort in JOB_SORTS else "score",
-            ),
-            fmt=fmt,
-        )
-    if fmt == "json":
-        return exported.content.decode("utf-8")
+    try:
+        if job_ids is not None:
+            exported = service.export_jobs(job_ids=job_ids, fmt=fmt)
+        else:
+            exported = service.export_jobs(
+                query=_query(
+                    limit=limit,
+                    offset=offset,
+                    statuses=_statuses(statuses),
+                    sources=tuple(sources or ()),
+                    labels=tuple(labels or ()),
+                    company=company,
+                    location=location,
+                    min_score=min_score,
+                    max_score=max_score,
+                    text=text,
+                    sort=sort,
+                ),
+                fmt=fmt,
+            )
+    except ValueError as exc:
+        return _error(str(exc))
+    text_content = exported.content.decode("utf-8")
     return _json(
         {
-            "content": exported.content.decode("utf-8"),
+            "format": fmt,
+            "content": json.loads(text_content) if fmt == "json" else text_content,
             "media_type": exported.media_type,
             "filename": exported.filename,
             "row_count": exported.row_count,
@@ -375,20 +566,31 @@ TOOLS = (
     get_statistics,
     get_score_distribution,
     get_facets,
+    list_labels,
     list_blacklist,
     list_sources,
     list_runs,
+    list_attachments,
+    get_attachment,
+    get_settings,
     get_settings_reference,
     add_job,
+    update_job,
     set_status,
     add_labels,
     remove_labels,
+    rename_label,
     add_note,
+    update_note,
+    delete_note,
     add_attachment,
+    update_attachment,
     delete_attachment,
     blacklist_jobs,
     unblacklist_jobs,
     delete_jobs,
+    merge_jobs,
+    run_now,
     preview_cleanup,
     run_cleanup,
     export_jobs,

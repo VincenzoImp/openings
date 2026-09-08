@@ -1,9 +1,8 @@
 import type {
   AddJobRequest,
   Attachment,
+  AttachmentEntry,
   AttachmentKind,
-  BlacklistListParams,
-  BlacklistListResponse,
   CleanupReport,
   CommandResponse,
   DashboardAuthResponse,
@@ -14,10 +13,14 @@ import type {
   JobListResponse,
   JobStatus,
   Note,
+  NoteKind,
   NoteRequest,
+  PostingFields,
   RunRecord,
+  RunStatus,
   ScoreDistribution,
   SemanticResult,
+  SettingsSummary,
   SourceStatus,
   StatsResponse,
 } from "./types";
@@ -26,6 +29,7 @@ const API_ROOT = "/api";
 const TOKEN_KEY = "openings.dashboard-token";
 export const TOKEN_HEADER = "X-Openings-Token";
 export const TOKEN_INVALID_EVENT = "openings.token-invalid";
+export const TOKEN_CHANGED_EVENT = "openings.token-changed";
 
 export class ApiError extends Error {
   status: number;
@@ -61,6 +65,7 @@ export function setToken(token: string | null): void {
   } else {
     store.removeItem(TOKEN_KEY);
   }
+  globalThis.dispatchEvent(new Event(TOKEN_CHANGED_EVENT));
 }
 
 /** Serialize query parameters; arrays repeat the key, empty values are dropped. */
@@ -93,6 +98,12 @@ async function errorMessage(response: Response): Promise<string> {
     if (typeof payload.detail === "string") {
       return payload.detail;
     }
+    if (Array.isArray(payload.detail)) {
+      return payload.detail
+        .map((item) => (item && typeof item === "object" && "msg" in item ? String(item.msg) : ""))
+        .filter(Boolean)
+        .join("; ");
+    }
     if (payload.detail) {
       return JSON.stringify(payload.detail);
     }
@@ -106,6 +117,7 @@ interface RequestOptions {
   method?: string;
   json?: unknown;
   body?: BodyInit;
+  signal?: AbortSignal;
 }
 
 async function send(path: string, options: RequestOptions = {}): Promise<Response> {
@@ -123,8 +135,9 @@ async function send(path: string, options: RequestOptions = {}): Promise<Respons
     method: options.method ?? (body ? "POST" : "GET"),
     headers,
     body,
+    signal: options.signal,
   });
-  if (response.status === 401 || response.status === 403) {
+  if (response.status === 401) {
     globalThis.dispatchEvent(new Event(TOKEN_INVALID_EVENT));
   }
   if (!response.ok) {
@@ -141,30 +154,26 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return (await response.json()) as T;
 }
 
-export function saveBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}
-
-function filenameFrom(response: Response, fallback: string): string {
+export function filenameFrom(response: Response, fallback: string): string {
   const header = response.headers.get("Content-Disposition") ?? "";
   const match = /filename="?([^";]+)"?/.exec(header);
   return match?.[1] ?? fallback;
 }
 
+export interface Download {
+  blob: Blob;
+  filename: string;
+}
+
 export const api = {
   dashboardAuth: () => request<DashboardAuthResponse>("/dashboard/auth"),
 
-  listJobs: (params: JobListParams = {}) =>
-    request<JobListResponse>(`/jobs${buildQuery(params as Record<string, unknown>)}`),
+  listJobs: (params: JobListParams = {}, signal?: AbortSignal) =>
+    request<JobListResponse>(`/jobs${buildQuery(params as Record<string, unknown>)}`, { signal }),
   getJob: (jobId: string) => request<JobDetail>(`/jobs/${encodeURIComponent(jobId)}`),
   addJob: (payload: AddJobRequest) => request<CommandResponse>("/jobs", { json: payload }),
+  updateJob: (jobId: string, fields: PostingFields) =>
+    request<JobDetail>(`/jobs/${encodeURIComponent(jobId)}`, { method: "PATCH", json: fields }),
   setStatus: (jobIds: string[], status: JobStatus, note?: string | null) =>
     request<CommandResponse>("/jobs/status", {
       json: { job_ids: jobIds, status, note: note ?? null },
@@ -175,9 +184,28 @@ export const api = {
     request<CommandResponse>("/jobs/labels/remove", { json: { job_ids: jobIds, labels } }),
   deleteJobs: (jobIds: string[]) =>
     request<CommandResponse>("/jobs/delete", { json: { job_ids: jobIds } }),
+  mergeJobs: (primaryId: string, otherIds: string[]) =>
+    request<CommandResponse>("/jobs/merge", {
+      json: { primary_id: primaryId, other_ids: otherIds },
+    }),
+  similarJobs: (jobId: string, n = 8) =>
+    request<SemanticResult[]>(
+      `/jobs/${encodeURIComponent(jobId)}/similar${buildQuery({ n_results: n })}`,
+    ),
+  semanticSearch: (q: string, params: { n_results?: number; statuses?: JobStatus[] } = {}) =>
+    request<SemanticResult[]>(`/jobs/search/semantic${buildQuery({ q, ...params })}`),
 
   addNote: (jobId: string, payload: NoteRequest) =>
     request<Note>(`/jobs/${encodeURIComponent(jobId)}/notes`, { json: payload }),
+  updateNote: (
+    jobId: string,
+    noteId: number,
+    payload: { kind?: NoteKind; title?: string | null; body?: string },
+  ) =>
+    request<Note>(`/jobs/${encodeURIComponent(jobId)}/notes/${noteId}`, {
+      method: "PUT",
+      json: payload,
+    }),
   deleteNote: (jobId: string, noteId: number) =>
     request<{ success: boolean }>(`/jobs/${encodeURIComponent(jobId)}/notes/${noteId}`, {
       method: "DELETE",
@@ -195,49 +223,90 @@ export const api = {
       body: form,
     });
   },
-  downloadAttachment: async (jobId: string, attachment: Attachment) => {
+  updateAttachment: (
+    jobId: string,
+    attachmentId: number,
+    payload: { kind?: AttachmentKind; note?: string | null; filename?: string },
+  ) =>
+    request<Attachment>(`/jobs/${encodeURIComponent(jobId)}/attachments/${attachmentId}`, {
+      method: "PATCH",
+      json: payload,
+    }),
+  attachmentUrl: (jobId: string, attachmentId: number, inline = false) =>
+    `${API_ROOT}/jobs/${encodeURIComponent(jobId)}/attachments/${attachmentId}${inline ? "?inline=true" : ""}`,
+  downloadAttachment: async (jobId: string, attachment: Attachment): Promise<Download> => {
     const response = await send(`/jobs/${encodeURIComponent(jobId)}/attachments/${attachment.id}`);
-    saveBlob(await response.blob(), filenameFrom(response, attachment.filename));
+    return { blob: await response.blob(), filename: filenameFrom(response, attachment.filename) };
+  },
+  fetchAttachmentBlob: async (jobId: string, attachmentId: number): Promise<Blob> => {
+    const response = await send(
+      `/jobs/${encodeURIComponent(jobId)}/attachments/${attachmentId}?inline=true`,
+    );
+    return response.blob();
   },
   deleteAttachment: (jobId: string, attachmentId: number) =>
     request<{ success: boolean }>(
       `/jobs/${encodeURIComponent(jobId)}/attachments/${attachmentId}`,
       { method: "DELETE" },
     ),
+  listAttachments: (params: {
+    kind?: AttachmentKind;
+    statuses?: JobStatus[];
+    limit?: number;
+    offset?: number;
+  }) =>
+    request<{ items: AttachmentEntry[]; total: number; limit: number; offset: number }>(
+      `/attachments${buildQuery(params)}`,
+    ),
+  downloadBundle: async (jobId: string): Promise<Download> => {
+    const response = await send(`/jobs/${encodeURIComponent(jobId)}/bundle.zip`);
+    return { blob: await response.blob(), filename: filenameFrom(response, "openings.zip") };
+  },
 
-  listBlacklist: (params: BlacklistListParams = {}) =>
-    request<BlacklistListResponse>(`/blacklist${buildQuery(params as Record<string, unknown>)}`),
-  blacklist: (jobIds: string[]) =>
-    request<CommandResponse>("/blacklist", { json: { job_ids: jobIds } }),
+  listLabels: () => request<{ value: string; count: number }[]>("/labels"),
+  renameLabel: (oldName: string, newName: string) =>
+    request<CommandResponse>("/labels/rename", { json: { old: oldName, new: newName } }),
+  deleteLabel: (label: string) => request<CommandResponse>("/labels/delete", { json: { label } }),
+
+  listBlacklist: (params: { limit?: number; offset?: number; text?: string } = {}) =>
+    request<JobListResponse>(`/blacklist${buildQuery(params)}`),
+  blacklist: (jobIds: string[], note?: string | null) =>
+    request<CommandResponse>("/blacklist", { json: { job_ids: jobIds, note: note ?? null } }),
   unblacklist: (jobIds: string[]) =>
     request<CommandResponse>("/blacklist/remove", { json: { job_ids: jobIds } }),
-  purgeBlacklist: (olderThanDays?: number | null) =>
-    request<CommandResponse>("/blacklist/purge", {
-      json: { older_than_days: olderThanDays ?? null },
-    }),
 
   listSources: () => request<SourceStatus[]>("/sources"),
-  listRuns: (limit = 20) => request<RunRecord[]>(`/runs${buildQuery({ limit })}`),
+  companyStatuses: (company: string) =>
+    request<Record<string, number>>(`/companies/${encodeURIComponent(company)}/statuses`),
+  listRuns: (limit = 30) => request<RunRecord[]>(`/runs${buildQuery({ limit })}`),
+  runStatus: () => request<RunStatus>("/runs/status"),
+  requestRun: () => request<RunStatus>("/runs", { method: "POST" }),
   stats: () => request<StatsResponse>("/stats"),
   distribution: (binSize = 5) =>
     request<ScoreDistribution>(`/distribution${buildQuery({ bin_size: binSize })}`),
-  facets: () => request<FacetsResponse>("/jobs/facets"),
-  semanticSearch: (q: string, nResults = 10) =>
-    request<SemanticResult[]>(`/jobs/search/semantic${buildQuery({ q, n_results: nResults })}`),
+  facets: (params: { limit?: number; q?: string } = {}) =>
+    request<FacetsResponse>(`/jobs/facets${buildQuery(params)}`),
+  settings: () => request<SettingsSummary>("/settings"),
+  settingsReference: async () => (await send("/settings/reference")).text(),
 
-  exportJobs: async (params: JobListParams, format: ExportFormat) => {
+  exportJobs: async (params: JobListParams, format: ExportFormat): Promise<Download> => {
     const response = await send(
       `/export/jobs${buildQuery({ ...(params as Record<string, unknown>), format })}`,
     );
-    saveBlob(await response.blob(), filenameFrom(response, `openings-export.${format}`));
+    return {
+      blob: await response.blob(),
+      filename: filenameFrom(response, `openings-export.${format}`),
+    };
   },
 
   cleanupPreview: () => request<CleanupReport>("/cleanup/preview"),
   cleanupRun: () => request<CleanupReport>("/cleanup/run", { method: "POST" }),
-  deleteBelowScore: (score: number) =>
-    request<CommandResponse>("/cleanup/delete-below-score", { json: { score } }),
-  deleteStale: (days: number) =>
-    request<CommandResponse>("/cleanup/delete-stale", { json: { days } }),
+  deleteBelowScore: (score: number, dryRun = false) =>
+    request<CommandResponse>("/cleanup/delete-below-score", {
+      json: { score, dry_run: dryRun },
+    }),
+  deleteStale: (days: number, dryRun = false) =>
+    request<CommandResponse>("/cleanup/delete-stale", { json: { days, dry_run: dryRun } }),
 };
 
 export type Api = typeof api;

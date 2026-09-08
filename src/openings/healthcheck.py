@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import sys
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from openings.runtime import Runtime
 
 
 def check_imports() -> bool:
     try:
         import jobspy  # noqa: F401
+        import numpy  # noqa: F401
+        import onnxruntime  # noqa: F401
         import pandas  # noqa: F401
+        import tokenizers  # noqa: F401
         import yaml  # noqa: F401
 
         return True
@@ -17,37 +24,29 @@ def check_imports() -> bool:
         return False
 
 
-def check_config() -> bool:
+def check_config(runtime: Runtime) -> bool:
     try:
-        from openings.config import load_config
-
-        load_config()
+        runtime.config(reload=True)
         return True
     except Exception as exc:  # noqa: BLE001
         print(f"Config error: {exc}", file=sys.stderr)
         return False
 
 
-def check_database() -> bool:
+def check_database(runtime: Runtime) -> bool:
     try:
-        from openings.config import get_config
-        from openings.database import get_database
-
-        stats = get_database(get_config()).get_statistics()
-        return isinstance(stats, dict)
+        return isinstance(runtime.db.get_statistics(), dict)
     except Exception as exc:  # noqa: BLE001
         print(f"Database error: {exc}", file=sys.stderr)
         return False
 
 
-def check_directories() -> bool:
+def check_directories(runtime: Runtime) -> bool:
     try:
-        from openings.config import get_config
-
-        config = get_config()
+        config = runtime.config()
         for directory in (
             config.database_path.parent,
-            config.chroma_path,
+            config.models_dir,
             config.logs_dir,
             config.attachments_dir,
         ):
@@ -61,12 +60,16 @@ def check_directories() -> bool:
         return False
 
 
-def main() -> int:
+def main(runtime: Runtime | None = None) -> int:
+    if runtime is None:
+        from openings.runtime import get_runtime
+
+        runtime = get_runtime()
     checks = (
         ("imports", check_imports),
-        ("config", check_config),
-        ("database", check_database),
-        ("directories", check_directories),
+        ("config", lambda: check_config(runtime)),
+        ("database", lambda: check_database(runtime)),
+        ("directories", lambda: check_directories(runtime)),
     )
     healthy = True
     for name, check in checks:

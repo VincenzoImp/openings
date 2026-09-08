@@ -3,7 +3,17 @@
 Every source produces the same job object (title, company, location, URL,
 description as markdown, posting date, type, remote flag, level, salary
 fields, company URL, the raw payload). Scoring, deduplication, the blacklist
-and notifications are shared. A job seen by two sources is one job.
+and notifications are shared.
+
+A posting is identified by its URL (LinkedIn, Indeed, Glassdoor, Google and
+the ATS feeds reduce to `board:id`; other URLs keep host, path and their
+identifying query parameters) or, failing that, by `source:external_id`. A
+job is the opening behind one or more postings: the same URL refreshes its
+job; an unknown URL whose title, company and location match a job seen on
+another source becomes a second posting of that job; anything else is a new
+job. Two different postings from the same source stay two jobs, even with the
+same title, and `merge_jobs` folds them together when you decide they are
+one.
 
 Runs record per-source counts and failures (`Runs` view, `GET /api/runs`,
 `list_runs`). One failing task never aborts the others.
@@ -39,10 +49,12 @@ Probe a feed before adding it:
 curl -s 'https://boards-api.greenhouse.io/v1/boards/<slug>/jobs' | head -c 300
 ```
 
-`locations` is a list of substrings matched case-insensitively against the
-posting's location; omit it to keep everything. SmartRecruiters listings are
-filtered by location before their details are fetched, so a narrow list also
-keeps the run short.
+`locations` and `titles` are lists of substrings matched case-insensitively
+against the posting's location and title; omit them to keep everything. A
+posting without a location passes the location filter and lets scoring
+decide. SmartRecruiters listings are filtered before their details are
+fetched, and details are fetched only for postings not already stored, so a
+narrow list keeps the run short.
 
 Workday, SAP SuccessFactors and JavaScript-rendered careers pages are not
 supported; add those postings by hand or through an agent.
@@ -51,7 +63,8 @@ supported; add those postings by hand or through an agent.
 
 Any RSS or Atom feed. Title, link, description or content, publication date
 and, when present, `company`/`author` and `location` fields are read. Many
-boards, universities and public bodies publish one.
+boards, universities and public bodies publish one. `titles` keeps a broad
+feed to the roles you want.
 
 ## Adzuna (`sources.adzuna`)
 
@@ -66,5 +79,6 @@ tune `weights` or the thresholds with that in mind. Set `app_id` and
 `POST /api/jobs`, the MCP tool `add_job`, or the dashboard's "Add posting"
 create a job from digested fields. It is scored with the live configuration,
 lands in the given status (default `shortlisted`, so retention never removes
-it) and is refused if its identity is blacklisted. The source is recorded as
-`manual` unless the caller names another.
+it) and is refused if the job is blacklisted. A URL that is already known
+updates that job's posting fields instead of creating a second one. The
+source is recorded as `manual` unless the caller names another.

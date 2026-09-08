@@ -137,7 +137,6 @@ sources:
         glassdoor: 2.0
         google: 2.5
       jitter: 0.3               # 0.0 to 1.0, fraction of the delay
-      rate_limit_cooldown: 60.0
 
     retry:
       max_attempts: 3
@@ -162,8 +161,9 @@ sources:
   # smartrecruiters. Find the slug in the company's careers URL:
   #   boards.greenhouse.io/<slug>   jobs.lever.co/<slug>
   #   jobs.ashbyhq.com/<slug>       careers.smartrecruiters.com/<slug>
-  # `locations` is an optional list of substrings; a posting is kept when its
-  # location contains any of them. Omit it to keep every posting.
+  # `locations` and `titles` are optional lists of substrings: a posting is
+  # kept when its location contains any of `locations` and its title contains
+  # any of `titles`. Omit them to keep every posting.
   # ---------------------------------------------------------------------------
   companies: []
   # companies:
@@ -171,10 +171,11 @@ sources:
   #     ats: "greenhouse"
   #     slug: "examplecorp"
   #     locations: ["Berlin", "Remote"]
+  #     titles: ["engineer", "developer"]
 
   # ---------------------------------------------------------------------------
-  # feeds — RSS or Atom feeds of postings. `locations` works as above and is
-  # applied only to entries that carry a location.
+  # feeds — RSS or Atom feeds of postings. `locations` and `titles` work as
+  # above; the location filter applies only to entries that carry one.
   # ---------------------------------------------------------------------------
   feeds: []
   # feeds:
@@ -271,18 +272,18 @@ notifications:
     bot_token: "$TELEGRAM_BOT_TOKEN"
     chat_ids: []
     send_summary: true          # a header with run statistics
+    send_empty: false           # also send a digest when nothing is new
     max_jobs: 20                # cap on postings per digest
     jobs_per_chunk: 10          # postings per Telegram message, at most 15
 
 
 # -----------------------------------------------------------------------------
 # retention — applied at every start and by `run_cleanup`. Only jobs in
-# status `new` are affected; anything you shortlisted, applied to or
-# otherwise moved is protected.
+# status `new` are affected; anything you shortlisted, applied to, otherwise
+# moved or blacklisted is kept forever.
 # -----------------------------------------------------------------------------
 retention:
   max_age_days: 30              # drop `new` jobs not seen for this long
-  purge_blacklist_after_days: 90
 
 
 # -----------------------------------------------------------------------------
@@ -293,16 +294,15 @@ attachments:
 
 
 # -----------------------------------------------------------------------------
-# vector_search — local semantic search over stored jobs, embedded with
-# ChromaDB's bundled ONNX model. No external service.
+# embeddings — local semantic search. A small sentence model (all-MiniLM-L6-v2,
+# ONNX, ~90 MB) is downloaded once into {OPENINGS_DATA_DIR}/models and every
+# active job gets a vector in the database. No external service.
 # -----------------------------------------------------------------------------
-vector_search:
+embeddings:
   enabled: true
-  embed_on_save: true
-  default_results: 20
-  backfill_on_startup: true
-  batch_size: 100
-  sync_interval_minutes: 30
+  embed_on_save: true           # embed as jobs are stored
+  backfill_on_startup: true     # embed anything missing when a process starts
+  batch_size: 64
 
 
 # -----------------------------------------------------------------------------
@@ -321,6 +321,6 @@ logging:
 #   config/settings.yaml   this file
 #   db/openings.db         the database
 #   attachments/<job_id>/  uploaded files
-#   chroma/                vector index
+#   models/                the embedding model
 #   logs/openings.log      log
 # =============================================================================

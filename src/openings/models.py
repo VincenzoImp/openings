@@ -1,7 +1,8 @@
 """Core data model for Openings.
 
-A *job* is the canonical posting object. Everything the user builds around it
-(status, labels, notes, attachments, timeline) hangs off its ``job_id``.
+A *job* is one opening: the canonical posting plus everything the user builds
+around it (status, labels, notes, attachments, timeline). The same opening
+seen on several boards is one job with several *postings*.
 """
 
 from __future__ import annotations
@@ -9,18 +10,21 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 import unicodedata
 from dataclasses import asdict, dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from enum import StrEnum
 from typing import Any, Mapping
+from urllib.parse import parse_qsl, urlsplit
 
 
 class JobStatus(StrEnum):
     """Where a job stands in the user's pipeline.
 
-    Only ``NEW`` rows are subject to retention and reconciliation. Every other
-    status means the user has acted on the job, so the row is protected.
+    Only ``NEW`` rows are subject to retention. Every other status means the
+    user acted on the job, so the row is protected. ``BLACKLISTED`` keeps the
+    job and its history but hides it everywhere and blocks re-ingestion.
     """
 
     NEW = "new"
@@ -30,11 +34,18 @@ class JobStatus(StrEnum):
     OFFER = "offer"
     REJECTED = "rejected"
     WITHDRAWN = "withdrawn"
+    BLACKLISTED = "blacklisted"
 
 
 PROTECTED_STATUSES: frozenset[JobStatus] = frozenset(
     status for status in JobStatus if status is not JobStatus.NEW
 )
+"""Statuses retention never touches."""
+
+ACTIVE_STATUSES: frozenset[JobStatus] = frozenset(
+    status for status in JobStatus if status is not JobStatus.BLACKLISTED
+)
+"""Statuses shown when a query names none."""
 
 
 class NoteKind(StrEnum):
@@ -51,28 +62,26 @@ class AttachmentKind(StrEnum):
 
 class EventKind(StrEnum):
     INGESTED = "ingested"
+    POSTING = "posting"
     STATUS = "status"
     LABEL = "label"
     NOTE = "note"
     ATTACHMENT = "attachment"
+    UPDATED = "updated"
+    MERGED = "merged"
 
 
 SOURCE_MANUAL = "manual"
 
 
-def generate_job_id(title: str, company: str, location: str) -> str:
-    """Stable identity for a posting: SHA-256 of normalized title, company, location.
+# ---------------------------------------------------------------------------
+# Time
+# ---------------------------------------------------------------------------
 
-    The same opening seen on two sources produces the same id, which is how
-    cross-source deduplication works.
-    """
-    parts = []
-    for value in (title, company, location):
-        normalized = unicodedata.normalize("NFKC", value or "")
-        normalized = " ".join(normalized.split())
-        parts.append(normalized.casefold())
-    identifier = "|".join(parts)
-    return hashlib.sha256(identifier.encode("utf-8")).hexdigest()
+
+def utcnow() -> datetime:
+    """The current time, timezone-aware, in UTC."""
+    return datetime.now(timezone.utc)
 
 
 def parse_date(value: object) -> date | None:
@@ -95,18 +104,110 @@ def parse_date(value: object) -> date | None:
 
 
 def parse_datetime(value: object) -> datetime | None:
+    """Parse an ISO datetime; naive values are taken as UTC."""
     if value is None or value == "":
         return None
+    parsed: datetime | None = None
     if isinstance(value, datetime):
-        return value
-    if isinstance(value, date):
-        return datetime(value.year, value.month, value.day)
-    if isinstance(value, str):
+        parsed = value
+    elif isinstance(value, date):
+        parsed = datetime(value.year, value.month, value.day)
+    elif isinstance(value, str):
         try:
-            return datetime.fromisoformat(value.strip())
+            parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
         except ValueError:
             return None
+    if parsed is None:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+# ---------------------------------------------------------------------------
+# Identity
+# ---------------------------------------------------------------------------
+
+
+def generate_job_id(title: str, company: str, location: str) -> str:
+    """Identity of an opening: SHA-256 of the normalized title, company, location.
+
+    Used to recognise the same opening across boards and as the job id when a
+    posting carries no URL or external id.
+    """
+    parts = []
+    for value in (title, company, location):
+        normalized = unicodedata.normalize("NFKC", value or "")
+        normalized = " ".join(normalized.split())
+        parts.append(normalized.casefold())
+    identifier = "|".join(parts)
+    return hashlib.sha256(identifier.encode("utf-8")).hexdigest()
+
+
+_BOARD_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("linkedin", re.compile(r"linkedin\.com/jobs/view/(?:[^/?#]*?-)?(\d+)")),
+    ("greenhouse", re.compile(r"greenhouse\.io/[^/?#]+/jobs/(\d+)")),
+    ("lever", re.compile(r"jobs\.lever\.co/[^/?#]+/([0-9a-f-]{36})")),
+    ("ashby", re.compile(r"jobs\.ashbyhq\.com/[^/?#]+/([0-9a-f-]{36})")),
+    ("smartrecruiters", re.compile(r"smartrecruiters\.com/[^/?#]+/(\d+)")),
+    ("google", re.compile(r"careers\.google\.com/jobs/results/(\d+)")),
+)
+_ID_PARAMS = {"jk", "gh_jid", "id", "jobid", "job_id", "reqid", "requisitionid", "job", "p"}
+
+
+def canonical_url(url: str | None) -> str | None:
+    """A stable key for a posting URL.
+
+    Known boards reduce to ``board:id`` so tracking parameters and slugs do
+    not matter. Other URLs keep scheme, host and path plus identifying query
+    parameters only.
+    """
+    if not url:
+        return None
+    text = str(url).strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    for board, pattern in _BOARD_PATTERNS:
+        match = pattern.search(lowered)
+        if match:
+            return f"{board}:{match.group(1)}"
+    parts = urlsplit(text)
+    if not parts.netloc:
+        return None
+    host = parts.netloc.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    path = re.sub(r"/+$", "", parts.path) or "/"
+    kept = sorted(
+        (key.lower(), value)
+        for key, value in parse_qsl(parts.query, keep_blank_values=False)
+        if key.lower() in _ID_PARAMS
+    )
+    query = "&".join(f"{key}={value}" for key, value in kept)
+    return f"url:{host}{path}" + (f"?{query}" if query else "")
+
+
+def posting_key(source: str | None, external_id: str | None, url: str | None) -> str | None:
+    """What identifies one posting: its canonical URL, else ``source:external_id``."""
+    key = canonical_url(url)
+    if key:
+        return key
+    if external_id and source:
+        return f"{source.lower()}:{external_id}"
     return None
+
+
+def job_id_for(key: str | None, identity: str) -> str:
+    """The job id of a new job: hash of its posting key, else its identity."""
+    if key:
+        return hashlib.sha256(key.encode("utf-8")).hexdigest()
+    return identity
+
+
+# ---------------------------------------------------------------------------
+# Value cleaning
+# ---------------------------------------------------------------------------
 
 
 def clean_value(value: Any) -> Any:
@@ -153,9 +254,42 @@ def _clean_str(value: Any) -> str | None:
     return str(value)
 
 
+def _clean_int(value: Any, default: int = 0) -> int:
+    value = clean_value(value)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+# ---------------------------------------------------------------------------
+# Entities
+# ---------------------------------------------------------------------------
+
+POSTING_FIELDS = (
+    "title",
+    "company",
+    "location",
+    "job_url",
+    "description",
+    "date_posted",
+    "job_type",
+    "is_remote",
+    "job_level",
+    "min_amount",
+    "max_amount",
+    "currency",
+    "salary_interval",
+    "company_url",
+)
+"""Posting fields a user may edit through ``update_job``."""
+
+
 @dataclass(frozen=True)
 class Job:
-    """A canonical posting plus the tracking state attached to it."""
+    """One opening plus the tracking state attached to it."""
 
     job_id: str
     title: str
@@ -180,31 +314,47 @@ class Job:
     relevance_score: int = 0
     status: JobStatus = JobStatus.NEW
     status_changed_at: datetime | None = None
+    postings_count: int = 0
+    notes_count: int = 0
+    attachments_count: int = 0
+
+    @property
+    def identity(self) -> str:
+        return generate_job_id(self.title, self.company, self.location)
+
+    @property
+    def posting_key(self) -> str | None:
+        return posting_key(self.source, self.external_id, self.job_url)
 
     @classmethod
     def from_row(cls, data: Mapping[str, Any]) -> Job:
         """Build a job from a canonical row (DataFrame record, DB row, command).
 
-        ``job_id`` is computed from title, company and location when absent so
-        every producer shares one identity rule.
+        ``job_id`` is derived from the posting key, else from the identity,
+        when absent, so every producer shares one identity rule.
         """
         title = _clean_str(data.get("title")) or ""
         company = _clean_str(data.get("company")) or ""
         location = _clean_str(data.get("location")) or ""
-        job_id = _clean_str(data.get("job_id")) or generate_job_id(title, company, location)
+        source = _clean_str(data.get("source")) or SOURCE_MANUAL
+        external_id = _clean_str(data.get("external_id"))
+        job_url = _clean_str(data.get("job_url"))
+        job_id = _clean_str(data.get("job_id")) or job_id_for(
+            posting_key(source, external_id, job_url),
+            generate_job_id(title, company, location),
+        )
         raw = data.get("raw_json")
         if raw is not None and not isinstance(raw, str):
             raw = json.dumps(raw, default=str)
         status_value = _clean_str(data.get("status")) or JobStatus.NEW.value
-        score = clean_value(data.get("relevance_score"))
         return cls(
             job_id=job_id,
             title=title,
             company=company,
             location=location,
-            source=_clean_str(data.get("source")) or SOURCE_MANUAL,
-            external_id=_clean_str(data.get("external_id")),
-            job_url=_clean_str(data.get("job_url")),
+            source=source,
+            external_id=external_id,
+            job_url=job_url,
             description=_clean_str(data.get("description")),
             date_posted=parse_date(clean_value(data.get("date_posted"))),
             job_type=_clean_str(data.get("job_type")),
@@ -218,9 +368,12 @@ class Job:
             raw_json=_clean_str(raw),
             first_seen=parse_date(clean_value(data.get("first_seen"))) or date.today(),
             last_seen=parse_date(clean_value(data.get("last_seen"))) or date.today(),
-            relevance_score=int(score) if score is not None else 0,
+            relevance_score=_clean_int(data.get("relevance_score")),
             status=JobStatus(status_value),
             status_changed_at=parse_datetime(clean_value(data.get("status_changed_at"))),
+            postings_count=_clean_int(data.get("postings_count")),
+            notes_count=_clean_int(data.get("notes_count")),
+            attachments_count=_clean_int(data.get("attachments_count")),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -233,28 +386,36 @@ class Job:
         return data
 
     def to_summary(self) -> dict[str, Any]:
-        """Compact representation for list views, without the description."""
+        """Compact representation for list views, without description and raw payload."""
+        data = self.to_dict()
+        data.pop("description", None)
+        data.pop("raw_json", None)
+        return data
+
+
+@dataclass(frozen=True)
+class Posting:
+    """One appearance of a job on one source."""
+
+    id: int
+    job_id: str
+    key: str
+    source: str
+    external_id: str | None
+    url: str | None
+    first_seen: date
+    last_seen: date
+
+    def to_dict(self) -> dict[str, Any]:
         return {
+            "id": self.id,
             "job_id": self.job_id,
-            "title": self.title,
-            "company": self.company,
-            "location": self.location,
+            "key": self.key,
             "source": self.source,
-            "job_url": self.job_url,
-            "job_type": self.job_type,
-            "is_remote": self.is_remote,
-            "job_level": self.job_level,
-            "date_posted": self.date_posted.isoformat() if self.date_posted else None,
-            "min_amount": self.min_amount,
-            "max_amount": self.max_amount,
-            "currency": self.currency,
+            "external_id": self.external_id,
+            "url": self.url,
             "first_seen": self.first_seen.isoformat(),
             "last_seen": self.last_seen.isoformat(),
-            "relevance_score": self.relevance_score,
-            "status": self.status.value,
-            "status_changed_at": (
-                self.status_changed_at.isoformat() if self.status_changed_at else None
-            ),
         }
 
 
@@ -266,6 +427,7 @@ class Note:
     title: str | None
     body: str
     created_at: datetime
+    updated_at: datetime | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -275,6 +437,7 @@ class Note:
             "title": self.title,
             "body": self.body,
             "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
 
@@ -323,24 +486,6 @@ class Event:
         }
 
 
-@dataclass(frozen=True)
-class BlacklistEntry:
-    job_id: str
-    title: str
-    company: str
-    location: str
-    blacklisted_at: datetime
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "job_id": self.job_id,
-            "title": self.title,
-            "company": self.company,
-            "location": self.location,
-            "blacklisted_at": self.blacklisted_at.isoformat(),
-        }
-
-
 @dataclass
 class SourceRunStats:
     """What one source did during a collection run."""
@@ -374,23 +519,27 @@ class RunSummary:
 
     @property
     def duration_seconds(self) -> float:
-        if self.finished_at is None:
-            return 0.0
-        return (self.finished_at - self.started_at).total_seconds()
+        end = self.finished_at or utcnow()
+        return max(0.0, (end - self.started_at).total_seconds())
 
     @property
     def duration_formatted(self) -> str:
         seconds = int(self.duration_seconds)
         return f"{seconds // 60}m {seconds % 60}s"
 
+    @property
+    def running(self) -> bool:
+        return self.finished_at is None
+
     def finish(self) -> None:
-        self.finished_at = datetime.now()
+        self.finished_at = utcnow()
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "started_at": self.started_at.isoformat(),
             "finished_at": self.finished_at.isoformat() if self.finished_at else None,
+            "running": self.running,
             "duration_seconds": self.duration_seconds,
             "total_found": self.total_found,
             "unique_found": self.unique_found,

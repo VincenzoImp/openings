@@ -8,6 +8,7 @@ from openings.sources.base import html_to_markdown, http_get_json, raw_json, to_
 
 if TYPE_CHECKING:
     from openings.config import CompanySourceConfig
+    from openings.sources.ats import KnownIds
 
 API = "https://api.lever.co/v0/postings/{slug}"
 
@@ -32,7 +33,10 @@ def _description(job: dict[str, Any]) -> str | None:
 
 
 def fetch(
-    company: CompanySourceConfig, user_agent: str | None, timeout: float
+    company: CompanySourceConfig,
+    user_agent: str | None,
+    timeout: float,
+    known: KnownIds | None = None,
 ) -> list[dict[str, Any]]:
     payload = http_get_json(
         API.format(slug=company.slug),

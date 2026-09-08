@@ -1,8 +1,4 @@
-"""
-Logging configuration for Openings.
-
-Provides structured logging with file rotation and colored console output.
-"""
+"""Logging: a coloured console, a rotating file, timestamps in the configured zone."""
 
 from __future__ import annotations
 
@@ -19,15 +15,7 @@ if TYPE_CHECKING:
 
 
 def _timezone_converter(tz_name: str) -> Callable[[float | None], time.struct_time]:
-    """Build a ``logging.Formatter.converter`` for the given IANA timezone.
-
-    ``logging.Formatter`` renders ``%(asctime)s`` by passing the record's
-    epoch timestamp through ``converter`` (``time.localtime`` by default). We
-    swap in a converter that resolves the timestamp in ``tz_name`` so the
-    documented ``logging.timezone`` setting actually shapes log timestamps.
-    Falls back to ``time.localtime`` for an unknown zone (defensive — the
-    config layer already validates the value at load time).
-    """
+    """A ``logging.Formatter.converter`` that renders timestamps in ``tz_name``."""
     try:
         tz = ZoneInfo(tz_name)
     except (ZoneInfoNotFoundError, ValueError):
@@ -39,10 +27,7 @@ def _timezone_converter(tz_name: str) -> Callable[[float | None], time.struct_ti
     return convert
 
 
-# ANSI color codes for console output
 class Colors:
-    """ANSI color codes for terminal output."""
-
     RESET = "\033[0m"
     BOLD = "\033[1m"
     RED = "\033[91m"
@@ -52,7 +37,7 @@ class Colors:
 
 
 class ColoredFormatter(logging.Formatter):
-    """Custom formatter that adds colors to log levels in console output (only if TTY)."""
+    """Colour the level name when writing to a terminal."""
 
     LEVEL_COLORS = {
         logging.DEBUG: Colors.GRAY,
@@ -64,37 +49,23 @@ class ColoredFormatter(logging.Formatter):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Check if output is a TTY (terminal)
         self.use_colors = sys.stdout.isatty()
 
     def format(self, record: logging.LogRecord) -> str:
-        """Format log record with colors (only if TTY)."""
-        if self.use_colors:
-            # Save original levelname and restore after formatting
-            original_levelname = record.levelname
-            color = self.LEVEL_COLORS.get(record.levelno, Colors.RESET)
-            record.levelname = f"{color}{record.levelname}{Colors.RESET}"
-            try:
-                return super().format(record)
-            finally:
-                record.levelname = original_levelname
-        return super().format(record)
-
-
-class PlainFormatter(logging.Formatter):
-    """Plain formatter for file output without colors."""
-
-    pass
+        if not self.use_colors:
+            return super().format(record)
+        original = record.levelname
+        record.levelname = (
+            f"{self.LEVEL_COLORS.get(record.levelno, Colors.RESET)}{original}{Colors.RESET}"
+        )
+        try:
+            return super().format(record)
+        finally:
+            record.levelname = original
 
 
 class DedupeFilter(logging.Filter):
-    """Collapse repeated identical records from noisy third-party loggers.
-
-    Emits the first record for each ``(logger_name, level, message)`` tuple
-    verbatim and drops subsequent duplicates for the remainder of the process.
-    Useful for third-party libraries (JobSpy, ChromaDB, ...) that spam the
-    same error for every item in a batch — we keep one sample instead of 24.
-    """
+    """Emit the first of identical records from a noisy logger family, drop the rest."""
 
     def __init__(self, name_prefix: str = "") -> None:
         super().__init__()
@@ -111,11 +82,8 @@ class DedupeFilter(logging.Filter):
         return True
 
 
-# Known JobSpy per-site logger names. JobSpy uses colons as separators, which
-# are *not* hierarchical in Python logging, so each site gets its own
-# independent logger. We pre-configure them at setup time to (a) strip any
-# handlers JobSpy attached at import, (b) force propagation to the root
-# logger where our DedupeFilter lives, and (c) set a sensible level.
+# JobSpy names its per-site loggers with colons, which are not hierarchical
+# in Python logging, so each one is configured explicitly.
 _JOBSPY_LOGGER_NAMES = (
     "JobSpy",
     "JobSpy:Indeed",
@@ -130,173 +98,105 @@ _JOBSPY_LOGGER_NAMES = (
 
 
 def _reroute_jobspy_loggers() -> None:
-    """Purge and reconfigure every JobSpy per-site logger.
-
-    JobSpy attaches its own StreamHandler at import time, which bypasses
-    our root-level ``DedupeFilter``. By removing those handlers and forcing
-    propagation back to the root logger, all JobSpy records flow through
-    our filter chain and get deduped like any other noisy third-party log.
-    """
+    """Drop JobSpy's own handlers so its records flow through the root handler."""
     for name in _JOBSPY_LOGGER_NAMES:
-        jl = logging.getLogger(name)
-        for handler in list(jl.handlers):
-            jl.removeHandler(handler)
+        jobspy_logger = logging.getLogger(name)
+        for handler in list(jobspy_logger.handlers):
+            jobspy_logger.removeHandler(handler)
             try:
                 handler.close()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
-        jl.propagate = True
-        jl.setLevel(logging.WARNING)
-
-
-def setup_logging(config: Config) -> logging.Logger:
-    """Configure application-wide logging with console and file handlers.
-
-    The tool owns both its own ``openings`` logger (with a compact coloured
-    format) and the root logger (where third-party libraries like JobSpy log
-    via ``logging.basicConfig``). Both routes share a ``DedupeFilter`` that
-    collapses repeated identical records from ``JobSpy:*`` per-site loggers —
-    typically the ``Glassdoor: location not parsed`` error that otherwise
-    fires 24 times per run.
-
-    Args:
-        config: Configuration object with logging settings.
-
-    Returns:
-        Configured ``openings`` logger instance.
-    """
-    level = getattr(logging, config.logging.level.upper(), logging.INFO)
-
-    # Dedupe filter shared between all handlers so the same (name, level,
-    # message) tuple is suppressed everywhere after the first occurrence.
-    jobspy_dedupe = DedupeFilter(name_prefix="JobSpy")
-
-    # Render all timestamps in the configured timezone (default UTC).
-    tz_converter = _timezone_converter(config.logging.timezone)
-
-    console_format = ColoredFormatter(
-        fmt="%(asctime)s | %(levelname)s | %(message)s",
-        datefmt="%H:%M:%S",
-    )
-    console_format.converter = tz_converter
-    file_format = PlainFormatter(
-        fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-    file_format.converter = tz_converter
-
-    # --- Our application logger (openings) ------------------------------
-    logger = logging.getLogger("openings")
-    logger.setLevel(level)
-    logger.propagate = False  # keep application logs off the root handlers
-
-    for handler in list(logger.handlers):
-        logger.removeHandler(handler)
-        handler.close()
-
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.DEBUG)
-    console_handler.setFormatter(console_format)
-    console_handler.addFilter(jobspy_dedupe)
-    logger.addHandler(console_handler)
-
-    # File handler with rotation (skip if the directory is not writable).
-    log_path = config.log_file
-    try:
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        file_handler = RotatingFileHandler(
-            log_path,
-            maxBytes=config.logging.max_size_mb * 1024 * 1024,
-            backupCount=config.logging.backup_count,
-            encoding="utf-8",
-        )
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(file_format)
-        file_handler.addFilter(jobspy_dedupe)
-        logger.addHandler(file_handler)
-    except PermissionError:
-        logger.warning(
-            "Cannot write to log file %s (permission denied). "
-            "Continuing with console-only logging.",
-            log_path,
-        )
-
-    # --- Root logger (third-party libraries) ------------------------------
-    # Install a root handler with the same dedupe filter so records from
-    # JobSpy / ChromaDB / ... that never touch our application logger are
-    # still deduped. Without this, JobSpy's ``logging.basicConfig`` call
-    # would attach an unfiltered StreamHandler at first import.
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.WARNING)
-    _purge_dedupe_filters(root_logger)
-    for handler in list(root_logger.handlers):
-        # Close every existing handler — libraries may attach non-StreamHandler
-        # variants at import time. We replace them with our own deduped one.
-        try:
-            handler.close()
-        except Exception:
-            pass
-        root_logger.removeHandler(handler)
-
-    root_console = logging.StreamHandler(sys.stdout)
-    root_console.setLevel(logging.WARNING)
-    root_console.setFormatter(file_format)
-    root_console.addFilter(jobspy_dedupe)
-    root_logger.addHandler(root_console)
-
-    # Reroute JobSpy's per-site loggers through the root handler we just
-    # installed so they inherit the DedupeFilter and uniform format.
-    _reroute_jobspy_loggers()
-
-    # Keep third-party ChromaDB logs visible at warning/error level. Product
-    # telemetry itself is disabled in the vector-store client configuration.
-    logging.getLogger("chromadb").setLevel(logging.WARNING)
-
-    return logger
+        jobspy_logger.propagate = True
+        jobspy_logger.setLevel(logging.WARNING)
 
 
 def _purge_dedupe_filters(target: logging.Logger | logging.Handler) -> None:
-    """Remove previously attached ``DedupeFilter`` instances from ``target``.
-
-    Prevents filter accumulation when ``setup_logging`` is called multiple
-    times in the same process (tests, re-loads, config reloads).
-    """
     for existing in list(target.filters):
         if isinstance(existing, DedupeFilter):
             target.removeFilter(existing)
 
 
+def setup_logging(config: Config, *, console_only: bool = False) -> logging.Logger:
+    """Configure the ``openings`` logger and the root logger once per process.
+
+    The web process passes ``console_only`` so two processes never rotate the
+    same file.
+    """
+    level = getattr(logging, config.logging.level.upper(), logging.INFO)
+    dedupe = DedupeFilter(name_prefix="JobSpy")
+    converter = _timezone_converter(config.logging.timezone)
+
+    console_format = ColoredFormatter(
+        fmt="%(asctime)s | %(levelname)s | %(message)s", datefmt="%H:%M:%S"
+    )
+    console_format.converter = converter
+    file_format = logging.Formatter(
+        fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    file_format.converter = converter
+
+    logger = logging.getLogger("openings")
+    logger.setLevel(level)
+    logger.propagate = False
+    for handler in list(logger.handlers):
+        logger.removeHandler(handler)
+        handler.close()
+
+    console = logging.StreamHandler(sys.stdout)
+    console.setLevel(logging.DEBUG)
+    console.setFormatter(console_format)
+    console.addFilter(dedupe)
+    logger.addHandler(console)
+
+    if not console_only:
+        log_path = config.log_file
+        try:
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            file_handler = RotatingFileHandler(
+                log_path,
+                maxBytes=config.logging.max_size_mb * 1024 * 1024,
+                backupCount=config.logging.backup_count,
+                encoding="utf-8",
+            )
+            file_handler.setLevel(logging.DEBUG)
+            file_handler.setFormatter(file_format)
+            file_handler.addFilter(dedupe)
+            logger.addHandler(file_handler)
+        except PermissionError:
+            logger.warning(
+                "Cannot write to log file %s (permission denied); console only", log_path
+            )
+
+    root = logging.getLogger()
+    root.setLevel(logging.WARNING)
+    _purge_dedupe_filters(root)
+    for handler in list(root.handlers):
+        try:
+            handler.close()
+        except Exception:  # noqa: BLE001
+            pass
+        root.removeHandler(handler)
+    root_console = logging.StreamHandler(sys.stdout)
+    root_console.setLevel(logging.WARNING)
+    root_console.setFormatter(file_format)
+    root_console.addFilter(dedupe)
+    root.addHandler(root_console)
+    _reroute_jobspy_loggers()
+    return logger
+
+
 def get_logger(name: str | None = None) -> logging.Logger:
-    """
-    Get a logger instance.
-
-    Args:
-        name: Optional name for the logger. If None, returns the main logger.
-
-    Returns:
-        Logger instance.
-    """
     if name:
         return logging.getLogger(f"openings.{name}")
     return logging.getLogger("openings")
 
 
 class ProgressLogger:
-    """
-    Helper class for logging progress of long-running operations.
-
-    Provides methods for tracking progress with counts and percentages.
-    """
+    """Counts and percentages for a long operation."""
 
     def __init__(self, logger: logging.Logger, total: int, operation: str):
-        """
-        Initialize progress logger.
-
-        Args:
-            logger: Logger instance to use.
-            total: Total number of items to process.
-            operation: Description of the operation.
-        """
         self.logger = logger
         self.total = total
         self.operation = operation
@@ -305,53 +205,27 @@ class ProgressLogger:
         self.failed = 0
 
     def update(self, success: bool = True, message: str = "") -> None:
-        """
-        Update progress counter.
-
-        Args:
-            success: Whether the current item succeeded.
-            message: Optional message to log.
-        """
         self.completed += 1
         if success:
             self.success += 1
         else:
             self.failed += 1
-
         percentage = (self.completed / self.total) * 100 if self.total > 0 else 0
-
         if message:
-            self.logger.info(f"[{self.completed}/{self.total}] ({percentage:.0f}%) {message}")
+            self.logger.info("[%d/%d] (%.0f%%) %s", self.completed, self.total, percentage, message)
 
     def summary(self) -> None:
-        """Log final summary of the operation."""
         self.logger.info(
-            f"{self.operation} complete: "
-            f"{self.success} succeeded, {self.failed} failed "
-            f"out of {self.total} total"
+            "%s complete: %d succeeded, %d failed out of %d total",
+            self.operation,
+            self.success,
+            self.failed,
+            self.total,
         )
 
 
 def log_section(logger: logging.Logger, title: str) -> None:
-    """
-    Log a section header for visual separation.
-
-    Args:
-        logger: Logger instance.
-        title: Section title.
-    """
     separator = "=" * 60
     logger.info(separator)
-    logger.info(f"  {title}")
+    logger.info("  %s", title)
     logger.info(separator)
-
-
-def log_subsection(logger: logging.Logger, title: str) -> None:
-    """
-    Log a subsection header.
-
-    Args:
-        logger: Logger instance.
-        title: Subsection title.
-    """
-    logger.info(f"--- {title} ---")

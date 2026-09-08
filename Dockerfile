@@ -23,7 +23,7 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 # Python dependencies into a pruned virtual environment
 # ---------------------------------------------------------------------------
-FROM python:3.11.12-slim AS builder
+FROM python:3.12-slim AS builder
 
 WORKDIR /app
 COPY --from=uv /uv /uvx /bin/
@@ -48,7 +48,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ---------------------------------------------------------------------------
 # Runtime
 # ---------------------------------------------------------------------------
-FROM python:3.11.12-slim AS runtime
+FROM python:3.12-slim AS runtime
 
 ARG BUILD_DATE=unknown
 ARG VCS_REF=unknown
@@ -69,7 +69,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends tini \
     && useradd -m -u 1000 -s /bin/bash appuser \
     && install -d -o appuser -g appuser \
         /app \
-        /data /data/config /data/db /data/attachments /data/chroma /data/logs \
+        /data /data/config /data/db /data/attachments /data/models /data/logs \
         /opt/openings/defaults \
         /opt/openings/frontend
 
@@ -90,10 +90,6 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV OPENINGS_DATA_DIR=/data
 ENV OPENINGS_TEMPLATE_PATH=/opt/openings/defaults/settings.example.yaml
 ENV TZ=UTC
-# ChromaDB telemetry off, with a local no-op client so no PostHog code runs.
-ENV ANONYMIZED_TELEMETRY=False
-ENV CHROMA_PRODUCT_TELEMETRY_IMPL=openings.chroma_telemetry.NoOpProductTelemetryClient
-ENV CHROMA_TELEMETRY_IMPL=openings.chroma_telemetry.NoOpProductTelemetryClient
 
 VOLUME ["/data"]
 

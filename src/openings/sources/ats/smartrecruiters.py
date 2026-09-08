@@ -1,8 +1,9 @@
 """SmartRecruiters Posting API: ``api.smartrecruiters.com/v1/companies/{slug}/postings``.
 
-The listing carries no description; each surviving posting is fetched once
+The listing carries no description; a posting not yet stored is fetched once
 more through its ``ref`` URL, capped so a large board cannot turn one run
-into hundreds of requests.
+into hundreds of requests. Known postings are emitted without a detail
+fetch: the database keeps their description and refreshes ``last_seen``.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from openings.sources.base import (
 
 if TYPE_CHECKING:
     from openings.config import CompanySourceConfig
+    from openings.sources.ats import KnownIds
 
 API = "https://api.smartrecruiters.com/v1/companies/{slug}/postings"
 PAGE_SIZE = 100
@@ -49,7 +51,10 @@ def _details_description(detail: dict[str, Any]) -> str | None:
 
 
 def fetch(
-    company: CompanySourceConfig, user_agent: str | None, timeout: float
+    company: CompanySourceConfig,
+    user_agent: str | None,
+    timeout: float,
+    known: KnownIds | None = None,
 ) -> list[dict[str, Any]]:
     listing: list[dict[str, Any]] = []
     offset = 0
@@ -67,29 +72,36 @@ def fetch(
         if not content or offset >= total:
             break
 
+    kept = [
+        posting
+        for posting in listing
+        if location_allowed(_location_text(posting.get("location")), company.locations)
+    ]
+    ids = [str(posting["id"]) for posting in kept if posting.get("id") is not None]
+    already_stored = known(ids) if known else set()
+
     records: list[dict[str, Any]] = []
     details_fetched = 0
-    for posting in listing:
-        location = _location_text(posting.get("location"))
-        if not location_allowed(location, company.locations):
-            continue
+    for posting in kept:
+        posting_id = posting.get("id")
+        external_id = str(posting_id) if posting_id is not None else None
         description = None
         ref = posting.get("ref")
-        if ref and details_fetched < MAX_DETAILS:
+        if ref and external_id not in already_stored and details_fetched < MAX_DETAILS:
             details_fetched += 1
             try:
-                detail = http_get_json(ref, user_agent=user_agent, timeout=timeout)
-                description = _details_description(detail)
+                description = _details_description(
+                    http_get_json(ref, user_agent=user_agent, timeout=timeout)
+                )
             except SourceError:
                 description = None
-        posting_id = posting.get("id")
         records.append(
             {
                 "title": posting.get("name") or "",
                 "company": company.name,
-                "location": location,
+                "location": _location_text(posting.get("location")),
                 "source": "smartrecruiters",
-                "external_id": str(posting_id) if posting_id is not None else None,
+                "external_id": external_id,
                 "job_url": f"https://jobs.smartrecruiters.com/{company.slug}/{posting_id}",
                 "description": description,
                 "date_posted": to_date(posting.get("releasedDate")),
