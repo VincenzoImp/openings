@@ -32,8 +32,8 @@ MCP endpoint at `/mcp`. Ports bind to `127.0.0.1` by default.
 ## How it works
 
 ```text
-sources ──▶ score ──▶ dedupe, drop blacklisted ──▶ upsert ──▶ notify
-                                                     │
+sources ──▶ score ──▶ match postings to jobs ──▶ upsert ──▶ embed ──▶ notify
+                                                    │
                      dashboard ◀── application ◀── SQLite ──▶ MCP
                      REST API  ◀── service                     agents
 ```
@@ -45,14 +45,18 @@ sources ──▶ score ──▶ dedupe, drop blacklisted ──▶ upsert ─�
 - **Scoring** is plain keyword matching over title, description, company and
   location: every category you define adds its weight, negative weights
   penalize, and each job page shows which categories matched.
-- **Identity** is `sha256(title | company | location)`, so one opening seen on
-  two sources merges into one job.
+- **One job, many postings.** A posting is identified by its URL (or the
+  source's own id). The same opening seen on a second board becomes a second
+  posting of the same job, so the material you built stays with it.
 - **Status** is one value per job: `new`, `shortlisted`, `applied`,
-  `interviewing`, `offer`, `rejected`, `withdrawn`. Only `new` rows are
-  subject to retention; every other status is protected.
-- **Blacklist** deletes a posting and blocks its re-ingestion.
-- **Attachments, notes, form answers and events** hang off the job so the
-  application you built for it stays with the posting.
+  `interviewing`, `offer`, `rejected`, `withdrawn`, `blacklisted`. Only `new`
+  rows are subject to retention; every other status is protected.
+- **Blacklisting** hides a job and blocks its re-ingestion; nothing is
+  deleted, and the job can be restored with its notes and files.
+- **Attachments, notes, form answers and events** hang off the job. One
+  request downloads the whole application as a zip.
+- **Semantic search** runs locally: a small sentence model embeds every active
+  job, and "similar postings" and free-text search use it.
 
 ## Commands
 
@@ -72,10 +76,13 @@ Point an MCP client at `http://127.0.0.1:8501/mcp` (streamable HTTP):
 ```
 
 Read tools: `list_jobs`, `get_job`, `search_similar`, `get_statistics`,
-`get_score_distribution`, `get_facets`, `list_blacklist`, `list_sources`,
-`list_runs`, `get_settings_reference`. Write tools: `add_job`, `set_status`,
-`add_labels`, `remove_labels`, `add_note`, `add_attachment`,
-`delete_attachment`, `blacklist_jobs`, `unblacklist_jobs`, `delete_jobs`,
+`get_score_distribution`, `get_facets`, `list_labels`, `list_blacklist`,
+`list_sources`, `list_runs`, `list_attachments`, `get_attachment`,
+`get_settings`, `get_settings_reference`. Write tools: `add_job`,
+`update_job`, `set_status`, `add_labels`, `remove_labels`, `rename_label`,
+`add_note`, `update_note`, `delete_note`, `add_attachment`,
+`update_attachment`, `delete_attachment`, `blacklist_jobs`,
+`unblacklist_jobs`, `delete_jobs`, `merge_jobs`, `run_now`,
 `preview_cleanup`, `run_cleanup`, `export_jobs`.
 
 A typical agent flow: read a posting the crawler missed, `add_job` with the
@@ -97,7 +104,7 @@ sources:
     queries:
       core: ["backend engineer", "platform engineer"]
   companies:
-    - { name: Example, ats: greenhouse, slug: example }
+    - { name: Example, ats: greenhouse, slug: example, titles: [engineer] }
 scoring:
   save_threshold: 0
   notify_threshold: 20
@@ -133,6 +140,7 @@ cp config/settings.example.yaml settings.yaml
 OPENINGS_DATA_DIR=./data OPENINGS_CONFIG=./settings.yaml uv run openings web
 uv run pytest
 npm --prefix frontend run quality
+npm --prefix frontend run test:e2e
 ```
 
 See [CONTRIBUTING](CONTRIBUTING.md).

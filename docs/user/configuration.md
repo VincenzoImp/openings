@@ -6,7 +6,9 @@ database and change through the dashboard, the API or MCP.
 
 [`config/settings.example.yaml`](../../config/settings.example.yaml) is the
 annotated reference; every value in it is the default. The same text is
-available at runtime through the MCP tool `get_settings_reference`.
+available at runtime through `GET /api/settings/reference` and the MCP tool
+`get_settings_reference`; `GET /api/settings` and `get_settings` summarize
+the live values.
 
 Rules:
 
@@ -15,14 +17,16 @@ Rules:
   variable `NAME` at startup.
 - `notify_threshold` must be at least `save_threshold`; every category in
   `scoring.keywords` needs a weight.
-- The file is read at the start of every collection, so edits apply on the
-  next run without a restart. The web process reads it when it starts.
+- The file is read at the start of every collection, and the web process
+  reloads it when its modification time changes, so edits apply without a
+  restart.
 
 ## Sections
 
 ### `profile`
 
-Informational: `name`, `headline`, `target`. Shown in the log banner.
+Informational: `name`, `headline`, `target`. Shown in the log banner and in
+System.
 
 ### `sources`
 
@@ -49,13 +53,14 @@ companies:
     ats: "greenhouse"          # greenhouse | lever | ashby | smartrecruiters
     slug: "examplecorp"
     locations: ["Berlin", "Remote"]   # optional substrings; omit to keep all
+    titles: ["engineer", "developer"] # optional substrings on the title
 ```
 
 See [Sources](sources.md) for how to find the slug.
 
 #### `sources.feeds`
 
-RSS or Atom feeds: `name`, `url`, optional `locations`.
+RSS or Atom feeds: `name`, `url`, optional `locations` and `titles`.
 
 #### `sources.adzuna`
 
@@ -88,46 +93,52 @@ tune: watch `GET /api/distribution` after a run and move the thresholds.
 ### `scheduler`
 
 `interval_hours` (start to start), `run_on_startup`, `retry_on_failure`,
-`retry_delay_minutes`, `max_retries`. `openings run` ignores this section.
+`retry_delay_minutes`, `max_retries`. A run whose every task failed counts as
+failed and is retried. `openings run` ignores this section. "Run now" (the
+Runs view, `POST /api/runs`, `run_now`) is picked up within 30 seconds.
 
 ### `notifications`
 
 `telegram`: `enabled`, `bot_token` (`"$TELEGRAM_BOT_TOKEN"`), `chat_ids`,
-`send_summary`, `max_jobs`, `jobs_per_chunk`. A digest goes out after each
-run with the postings that are new in that run and at or above
-`notify_threshold`; nothing already seen is repeated.
+`send_summary`, `send_empty`, `max_jobs`, `jobs_per_chunk`. A digest goes out
+after each run with the postings that are new in that run and at or above
+`notify_threshold`; nothing already seen is repeated, and nothing is sent
+when nothing is new unless `send_empty` is on.
 
 ### `retention`
 
-`max_age_days` removes jobs in status `new` not seen for that long;
-`purge_blacklist_after_days` trims the blacklist. Both run at every start and
-through `run_cleanup`. Jobs in any other status are never touched.
+`max_age_days` removes jobs in status `new` not seen for that long, at every
+start and through `run_cleanup`. Jobs in any other status, blacklisted ones
+included, are never touched.
 
 ### `attachments`
 
 `max_size_mb` per uploaded file.
 
-### `vector_search`
+### `embeddings`
 
-Local semantic search with Chroma's bundled embedder: `enabled`,
-`embed_on_save`, `default_results`, `backfill_on_startup`, `batch_size`,
-`sync_interval_minutes`. The scheduler is the only writer.
+Local semantic search: `enabled`, `embed_on_save`, `backfill_on_startup`,
+`batch_size`. The sentence model (all-MiniLM-L6-v2 as ONNX, about 90 MB) is
+downloaded once into `models/` under the data directory; vectors are stored
+in the database. Both the scheduler and the web process embed the jobs they
+write.
 
 ### `logging`
 
-`level`, `max_size_mb`, `backup_count`, `timezone` (IANA name).
+`level`, `max_size_mb`, `backup_count`, `timezone` (IANA name). Timestamps
+are stored in UTC and rendered in this zone in logs and digests.
 
 ## Environment
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `OPENINGS_DATA_DIR` | `/data` | root of the data tree |
+| `OPENINGS_DATA_DIR` | `./data` (`/data` in Docker) | root of the data tree |
 | `OPENINGS_CONFIG` | `$OPENINGS_DATA_DIR/config/settings.yaml` | the settings file |
 | `OPENINGS_API_TOKEN` | unset | token for `/api`, the dashboard and `/mcp` |
 | `OPENINGS_WEB_LISTEN_PORT` | `8501` | port inside the process |
 | `OPENINGS_WEB_ALLOWED_HOSTS`, `OPENINGS_WEB_ALLOWED_ORIGINS` | localhost | MCP DNS-rebinding and CORS allow-lists |
 | `OPENINGS_FRONTEND_DIST` | packaged | directory of the built dashboard |
-| `OPENINGS_TEMPLATE_PATH` | packaged | the example file served by `get_settings_reference` |
+| `OPENINGS_TEMPLATE_PATH` | packaged | the example file served as the settings reference |
 
 ## Storage layout
 
@@ -137,6 +148,7 @@ Relative to `OPENINGS_DATA_DIR`:
 config/settings.yaml
 db/openings.db
 attachments/<job_id>/<file>
-chroma/
+models/
 logs/openings.log
+run-now                      # created by "Run now", consumed by the scheduler
 ```
