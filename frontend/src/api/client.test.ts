@@ -1,213 +1,76 @@
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import {
-  blacklistJobs,
-  clearDashboardToken,
-  deleteJobs,
-  deleteJobsBelowScore,
-  exportJobs,
-  getDashboardAuthStatus,
-  getFacets,
-  listBlacklistedJobs,
-  listJobs,
-  purgeBlacklist,
-  searchSimilarJobs,
-  setApplied,
-  setBookmarked,
-  setDashboardToken,
-  unblacklistJobs,
-} from "./client";
+import { ApiError, TOKEN_HEADER, TOKEN_INVALID_EVENT, api, buildQuery, setToken } from "./client";
+import { jsonResponse, mockApi } from "../test/mockApi";
 
-function jsonResponse(body: unknown): Response {
-  return {
-    ok: true,
-    status: 200,
-    json: vi.fn().mockResolvedValue(body),
-    text: vi.fn().mockResolvedValue(JSON.stringify(body)),
-  } as unknown as Response;
-}
-
-beforeEach(() => {
-  const storage = new Map<string, string>();
-  vi.stubGlobal("localStorage", {
-    clear: vi.fn(() => storage.clear()),
-    getItem: vi.fn((key: string) => storage.get(key) ?? null),
-    removeItem: vi.fn((key: string) => storage.delete(key)),
-    setItem: vi.fn((key: string, value: string) => storage.set(key, value)),
-  });
-  vi.stubGlobal(
-    "fetch",
-    vi.fn().mockResolvedValue(
-      jsonResponse({
-        items: [],
-        limit: 20,
-        offset: 0,
-        total: 0,
-      }),
-    ),
-  );
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
-
-test("includes the saved dashboard token on API requests", async () => {
-  setDashboardToken("secret-token");
-
-  await listJobs();
-
-  const [, init] = vi.mocked(fetch).mock.calls[0];
-  expect(init?.headers).toMatchObject({
-    "X-Job-Search-Token": "secret-token",
+describe("buildQuery", () => {
+  it("repeats array keys and drops empty values", () => {
+    expect(
+      buildQuery({ status: ["new", "applied"], text: "", limit: 5, remote: true, x: null }),
+    ).toBe("?status=new&status=applied&limit=5&remote=true");
+    expect(buildQuery({})).toBe("");
+    expect(buildQuery(undefined)).toBe("");
   });
 });
 
-test("clears a stale dashboard token when the API rejects it", async () => {
-  setDashboardToken("stale-token");
-  vi.mocked(fetch).mockResolvedValueOnce({
-    ok: false,
-    status: 401,
-    json: vi.fn(),
-    text: vi.fn().mockResolvedValue("Unauthorized"),
-  } as unknown as Response);
-
-  await expect(listJobs()).rejects.toThrow("Unauthorized");
-
-  expect(localStorage.removeItem).toHaveBeenCalledWith("job-search-tool.dashboard-token");
-  expect(clearDashboardToken()).toBeUndefined();
-});
-
-test("fetches dashboard auth status from the public API route", async () => {
-  vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ token_required: true }));
-
-  await expect(getDashboardAuthStatus()).resolves.toEqual({ token_required: true });
-  expect(fetch).toHaveBeenCalledWith(
-    "/api/dashboard/auth",
-    expect.objectContaining({
-      headers: expect.objectContaining({
-        "Content-Type": "application/json",
-      }),
-    }),
-  );
-});
-
-test("serializes array query parameters for server-backed filters", async () => {
-  await listJobs({
-    sites: ["indeed", "linkedin"],
-    job_types: ["fulltime"],
-    location: "remote",
-    min_salary: 120000,
-    sort: "salary",
+describe("api", () => {
+  it("sends the stored token and JSON bodies", async () => {
+    setToken("secret");
+    const { fetchMock } = mockApi([
+      {
+        method: "POST",
+        path: "/api/jobs/status",
+        reply: () => ({ success: true, affected_count: 1, job_ids: ["x"], message: null }),
+      },
+    ]);
+    const result = await api.setStatus(["x"], "applied", "sent");
+    expect(result.affected_count).toBe(1);
+    const [, init] = fetchMock.mock.calls[0];
+    expect((init?.headers as Record<string, string>)[TOKEN_HEADER]).toBe("secret");
+    expect(JSON.parse(init?.body as string)).toEqual({
+      job_ids: ["x"],
+      status: "applied",
+      note: "sent",
+    });
   });
 
-  expect(fetch).toHaveBeenCalledWith(
-    "/api/jobs?sites=indeed&sites=linkedin&job_types=fulltime&location=remote&min_salary=120000&sort=salary",
-    expect.any(Object),
-  );
-});
-
-test("sends bulk command request bodies with the dashboard token", async () => {
-  setDashboardToken("secret-token");
-
-  await setBookmarked(["job-1", "job-2"], true);
-  await setApplied(["job-1"], false);
-  await blacklistJobs(["job-3"]);
-  await deleteJobs(["job-4"]);
-
-  expect(fetch).toHaveBeenNthCalledWith(
-    1,
-    "/api/jobs/bookmark",
-    expect.objectContaining({
-      body: JSON.stringify({ job_ids: ["job-1", "job-2"], bookmarked: true }),
-      headers: expect.objectContaining({ "X-Job-Search-Token": "secret-token" }),
-      method: "POST",
-    }),
-  );
-  expect(fetch).toHaveBeenNthCalledWith(
-    2,
-    "/api/jobs/applied",
-    expect.objectContaining({
-      body: JSON.stringify({ job_ids: ["job-1"], applied: false }),
-      method: "POST",
-    }),
-  );
-  expect(fetch).toHaveBeenNthCalledWith(
-    3,
-    "/api/blacklist",
-    expect.objectContaining({
-      body: JSON.stringify({ job_ids: ["job-3"] }),
-      method: "POST",
-    }),
-  );
-  expect(fetch).toHaveBeenNthCalledWith(
-    4,
-    "/api/jobs/delete",
-    expect.objectContaining({
-      body: JSON.stringify({ job_ids: ["job-4"] }),
-      method: "POST",
-    }),
-  );
-});
-
-test("covers facets blacklist cleanup and export endpoints", async () => {
-  vi.mocked(fetch).mockResolvedValue(
-    jsonResponse({
-      items: [],
-      limit: 100,
-      offset: 0,
-      total: 0,
-    }),
-  );
-
-  await getFacets();
-  await listBlacklistedJobs({ text: "acme" });
-  await searchSimilarJobs({
-    min_score: 35,
-    n_results: 12,
-    q: "backend platform",
-    site: "linkedin",
+  it("raises ApiError with the server detail and signals invalid tokens", async () => {
+    mockApi([{ path: "/api/stats", reply: () => jsonResponse({ detail: "nope" }, 401) }]);
+    const listener = vi.fn();
+    window.addEventListener(TOKEN_INVALID_EVENT, listener);
+    await expect(api.stats()).rejects.toMatchObject({ status: 401, message: "nope" });
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener(TOKEN_INVALID_EVENT, listener);
   });
-  await unblacklistJobs(["job-1"]);
-  await purgeBlacklist(30);
-  await deleteJobsBelowScore(20);
 
-  vi.mocked(fetch).mockResolvedValueOnce({
-    blob: vi.fn().mockResolvedValue(new Blob(["id,title"])),
-    ok: true,
-    status: 200,
-    text: vi.fn().mockResolvedValue(""),
-  } as unknown as Response);
-  await exportJobs({ format: "csv", job_ids: ["job-1"] });
+  it("uploads attachments as multipart form data", async () => {
+    const { fetchMock } = mockApi([
+      {
+        method: "POST",
+        path: /\/api\/jobs\/[^/]+\/attachments$/,
+        reply: () => ({ id: 1, filename: "cv.pdf" }),
+      },
+    ]);
+    const file = new File(["%PDF"], "cv.pdf", { type: "application/pdf" });
+    await api.uploadAttachment("abc", file, "cv", "v1");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe("/api/jobs/abc/attachments");
+    const form = init?.body as FormData;
+    expect(form.get("kind")).toBe("cv");
+    expect(form.get("note")).toBe("v1");
+    expect((form.get("file") as File).name).toBe("cv.pdf");
+    expect((init?.headers as Record<string, string>)["Content-Type"]).toBeUndefined();
+  });
 
-  expect(fetch).toHaveBeenNthCalledWith(1, "/api/jobs/facets", expect.any(Object));
-  expect(fetch).toHaveBeenNthCalledWith(2, "/api/blacklist?text=acme", expect.any(Object));
-  expect(fetch).toHaveBeenNthCalledWith(
-    3,
-    "/api/jobs/search/semantic?q=backend+platform&n_results=12&min_score=35&site=linkedin",
-    expect.any(Object),
-  );
-  expect(fetch).toHaveBeenNthCalledWith(
-    4,
-    "/api/blacklist/remove",
-    expect.objectContaining({ body: JSON.stringify({ job_ids: ["job-1"] }) }),
-  );
-  expect(fetch).toHaveBeenNthCalledWith(
-    5,
-    "/api/blacklist/purge",
-    expect.objectContaining({ body: JSON.stringify({ older_than_days: 30 }) }),
-  );
-  expect(fetch).toHaveBeenNthCalledWith(
-    6,
-    "/api/cleanup/delete-below-score",
-    expect.objectContaining({ body: JSON.stringify({ score: 20 }) }),
-  );
-  expect(fetch).toHaveBeenNthCalledWith(
-    7,
-    "/api/export/jobs",
-    expect.objectContaining({
-      body: JSON.stringify({ job_ids: ["job-1"], format: "csv" }),
-      method: "POST",
-    }),
-  );
+  it("builds list URLs from params", async () => {
+    const { calls } = mockApi([
+      { path: "/api/jobs", reply: () => ({ items: [], total: 0, limit: 50, offset: 0 }) },
+    ]);
+    await api.listJobs({ status: ["new"], min_score: 10, sort: "date" });
+    expect(calls[0].url).toBe("/api/jobs?status=new&min_score=10&sort=date");
+  });
+
+  it("is an ApiError instance", () => {
+    expect(new ApiError(500, "x")).toBeInstanceOf(Error);
+  });
 });
