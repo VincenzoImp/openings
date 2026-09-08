@@ -21,8 +21,8 @@ data/
 results/
 logs/
 *.log
-chroma/
-db/
+/chroma/
+/db/
 
 # User configuration
 settings.yaml
