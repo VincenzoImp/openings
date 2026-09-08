@@ -5,6 +5,7 @@ import { navigate } from "../../app/router";
 import { Badge, StatusBadge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
+import { Collapsible } from "../../components/Collapsible";
 import { MarkdownBody } from "../../components/MarkdownBody";
 import { formatDate, formatDateTime, formatSalary } from "../shared/format";
 import { useSettings, useSimilar } from "../shared/queries";
@@ -93,7 +94,9 @@ export function PostingTab({ job, onEdit }: { job: JobDetail; onEdit: () => void
           }
         >
           {job.description ? (
-            <MarkdownBody text={job.description} />
+            <Collapsible lines={18}>
+              <MarkdownBody text={job.description} />
+            </Collapsible>
           ) : (
             <p className="text-sm text-fg-muted">
               No description stored. Open the posting for the full text, or paste it with Edit.
@@ -156,7 +159,7 @@ export function PostingTab({ job, onEdit }: { job: JobDetail; onEdit: () => void
             <ul className="flex flex-col gap-1">
               {job.explain.matched.map((item) => (
                 <li key={item.category} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="truncate">{item.category}</span>
+                  <span className="truncate">{item.category.replace(/_/g, " ")}</span>
                   <Badge tone={item.weight >= 0 ? "positive" : "negative"}>
                     {item.weight >= 0 ? `+${item.weight}` : item.weight}
                   </Badge>

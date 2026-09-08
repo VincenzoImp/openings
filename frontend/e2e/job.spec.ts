@@ -55,7 +55,7 @@ test.describe("Job page", () => {
       await page.getByRole("button", { name: "Add note" }).click();
       await expect(page.getByText("A note from the browser.")).toBeVisible();
 
-      await page.getByRole("button", { name: "More" }).click();
+      await page.getByRole("button", { name: "Actions" }).click();
       await page.getByRole("menuitem", { name: "Edit posting" }).click();
       const dialog = page.getByRole("dialog", { name: "Edit Posting" });
       await dialog.getByLabel("Location").fill("Basel, Switzerland");
@@ -134,7 +134,7 @@ test.describe("Job page", () => {
     });
     try {
       await openJob(page, id);
-      await page.getByRole("button", { name: "More" }).click();
+      await page.getByRole("button", { name: "Actions" }).click();
       await page.getByRole("menuitem", { name: "Blacklist…" }).click();
       await page.getByRole("dialog").getByRole("button", { name: "Blacklist" }).click();
       await expect(page.getByText("Blacklisted.")).toBeVisible();

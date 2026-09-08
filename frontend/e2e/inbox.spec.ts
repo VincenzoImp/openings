@@ -134,10 +134,10 @@ test.describe("Inbox", () => {
       await gotoView(page, "inbox", "&q=Status+Note+Target");
       await page.getByLabel("Select E2E Status Note Target").check();
       await page.getByRole("toolbar").getByRole("button", { name: "Status…" }).click();
-      const dialog = page.getByRole("dialog", { name: "Change status" });
+      const dialog = page.getByRole("dialog", { name: "Update status" });
       await dialog.getByLabel("Status").selectOption("applied");
       await dialog.getByLabel("Note for the timeline").fill("Sent through the portal.");
-      await dialog.getByRole("button", { name: "Save Status" }).click();
+      await dialog.getByRole("button", { name: "Save", exact: true }).click();
       await toast(page, "1 moved to Applied");
       const job = await api.job(id);
       expect(job.status).toBe("applied");

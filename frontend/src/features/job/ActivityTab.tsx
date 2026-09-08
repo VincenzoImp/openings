@@ -24,7 +24,7 @@ function EventData({ event }: { event: JobEvent }) {
     if (["from", "to"].includes(key) && event.kind === "status") {
       continue;
     }
-    if (value === null || value === undefined || value === "") {
+    if (value === null || value === undefined || value === "" || key.endsWith("_id")) {
       continue;
     }
     const text = Array.isArray(value)

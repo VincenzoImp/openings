@@ -15,6 +15,10 @@ job. Two different postings from the same source stay two jobs, even with the
 same title, and `merge_jobs` folds them together when you decide they are
 one.
 
+Employment types are folded into one vocabulary whatever the board calls
+them: `fulltime`, `parttime`, `contract`, `internship`, `temporary`,
+`volunteer`, else `other`.
+
 Runs record per-source counts and failures (`Runs` view, `GET /api/runs`,
 `list_runs`). One failing task never aborts the others.
 
@@ -52,7 +56,9 @@ curl -s 'https://boards-api.greenhouse.io/v1/boards/<slug>/jobs' | head -c 300
 `locations` and `titles` are lists of substrings matched case-insensitively
 against the posting's location and title; omit them to keep everything. A
 posting without a location passes the location filter and lets scoring
-decide. SmartRecruiters listings are filtered before their details are
+decide. Postings older than `max_age_days` (or `sources.feed_max_age_days`)
+by their own date are dropped, so long-lived boards do not flood the Inbox
+with evergreen roles. SmartRecruiters listings are filtered before their details are
 fetched, and details are fetched only for postings not already stored, so a
 narrow list keeps the run short.
 

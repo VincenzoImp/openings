@@ -19,7 +19,7 @@ test.describe("System", () => {
     await gotoView(page, "system");
     await page.getByRole("button", { name: "Run configured cleanup…" }).click();
     const dialog = page.getByRole("dialog", { name: "Run the configured cleanup?" });
-    await expect(dialog).toContainText(/\d+ jobs below the save threshold/);
+    await expect(dialog).toContainText(/\d+ new jobs below the save threshold/);
     await expect(dialog.getByRole("button", { name: /Delete \d+/ })).toBeVisible();
     await dialog.getByRole("button", { name: "Cancel" }).click();
     await expect(dialog).toHaveCount(0);

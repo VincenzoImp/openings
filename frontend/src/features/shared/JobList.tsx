@@ -20,6 +20,7 @@ export function JobList({
   showStatus = false,
   selectable = true,
   isFresh,
+  scoreMax = 100,
   footer,
   className = "",
 }: {
@@ -33,6 +34,7 @@ export function JobList({
   showStatus?: boolean;
   selectable?: boolean;
   isFresh?: (job: JobSummary) => boolean;
+  scoreMax?: number;
   footer?: React.ReactNode;
   className?: string;
 }) {
@@ -169,7 +171,7 @@ export function JobList({
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2 sm:flex-col sm:items-end sm:gap-1">
-                  <ScoreBar score={job.relevance_score} />
+                  <ScoreBar score={job.relevance_score} max={scoreMax} />
                   {showStatus ? <StatusBadge status={job.status} /> : null}
                 </div>
               </div>

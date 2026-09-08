@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from typing import TYPE_CHECKING, Callable, Sequence
 
 import pandas as pd
@@ -19,6 +20,8 @@ from openings.sources.base import (
     empty_frame,
     frame_from_records,
     location_allowed,
+    normalize_job_type,
+    to_date,
 )
 from openings.sources.jobspy import run_jobspy
 
@@ -50,12 +53,24 @@ class CollectResult:
         return bool(busy) and all(stat.succeeded == 0 for stat in busy)
 
 
-def _keep(record: dict, locations: Sequence[str], titles: Sequence[str] = ()) -> bool:
-    """Location filter (rows without a location pass) and optional title filter."""
+def _keep(
+    record: dict,
+    locations: Sequence[str],
+    titles: Sequence[str] = (),
+    max_age_days: int | None = None,
+    today: date | None = None,
+) -> bool:
+    """Location, title and age filters; rows without a location or a date pass."""
     location = record.get("location")
     if location and not location_allowed(location, locations):
         return False
-    return not titles or location_allowed(record.get("title"), titles)
+    if titles and not location_allowed(record.get("title"), titles):
+        return False
+    if max_age_days is not None:
+        posted = to_date(record.get("date_posted"))
+        if posted is not None and posted < (today or date.today()) - timedelta(days=max_age_days):
+            return False
+    return True
 
 
 def fetch_company(
@@ -72,7 +87,10 @@ def fetch_company(
         stats.failed = 1
         stats.errors.append(str(exc))
         return SourceResult(stats=stats)
-    kept = [record for record in records if _keep(record, company.locations, company.titles)]
+    max_age = company.max_age_days or config.sources.feed_max_age_days
+    kept = [
+        record for record in records if _keep(record, company.locations, company.titles, max_age)
+    ]
     stats.succeeded = 1
     stats.rows = len(kept)
     return SourceResult(stats=stats, frame=frame_from_records(kept))
@@ -86,7 +104,8 @@ def fetch_feed(feed: FeedSourceConfig, config: Config) -> SourceResult:
         stats.failed = 1
         stats.errors.append(str(exc))
         return SourceResult(stats=stats)
-    kept = [record for record in records if _keep(record, feed.locations, feed.titles)]
+    max_age = feed.max_age_days or config.sources.feed_max_age_days
+    kept = [record for record in records if _keep(record, feed.locations, feed.titles, max_age)]
     stats.succeeded = 1
     stats.rows = len(kept)
     return SourceResult(stats=stats, frame=frame_from_records(kept))
@@ -155,6 +174,7 @@ def collect_all(config: Config, *, known: KnownExternalIds | None = None) -> Col
         combined = pd.concat(frames, ignore_index=True)[list(CANONICAL_COLUMNS)]
         combined = combined[combined["title"].astype(str).str.strip() != ""]
         combined = _dedupe(combined)
+        combined["job_type"] = combined["job_type"].map(normalize_job_type)
     else:
         combined = empty_frame()
     logger.info("Collected %d rows, %d unique", total_found, len(combined))

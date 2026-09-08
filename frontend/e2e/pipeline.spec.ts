@@ -4,15 +4,13 @@ import { Api, uniqueUrl } from "./api";
 import { gotoView, isPhone } from "./helpers";
 
 test.describe("Pipeline", () => {
-  test("groups the seeded jobs by status and reveals closed columns", async ({ page }) => {
+  test("shows every status column with the seeded jobs", async ({ page }) => {
     await gotoView(page, "pipeline");
     await expect(page.getByTestId("column-shortlisted")).toContainText("E2E Platform Engineer");
     await expect(page.getByTestId("column-applied")).toContainText("E2E Site Reliability Engineer");
     await expect(page.getByTestId("column-interviewing")).toContainText("E2E Security Engineer");
-    await expect(page.getByTestId("column-rejected")).toHaveCount(0);
-    await page.getByRole("checkbox", { name: "Show closed" }).check();
     await expect(page.getByTestId("column-rejected")).toContainText("E2E Mobile Engineer");
-    await expect(page).toHaveURL(/closed=1/);
+    await expect(page.getByTestId("column-withdrawn")).toBeVisible();
   });
 
   test("moves a card from its menu", async ({ page }) => {
@@ -28,7 +26,7 @@ test.describe("Pipeline", () => {
     try {
       await gotoView(page, "pipeline", "&q=Menu+Card");
       const card = page.getByTestId("pipeline-card").filter({ hasText: "E2E Menu Card" });
-      await card.getByRole("button", { name: "Card actions" }).click();
+      await card.getByRole("button", { name: /Actions for/ }).click();
       await page.getByRole("menuitem", { name: "Move to Interviewing" }).click();
       await expect(page.getByTestId("column-interviewing")).toContainText("E2E Menu Card");
       await expect.poll(async () => (await api.job(id)).status).toBe("interviewing");

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from openings.models import SOURCE_MANUAL
-from openings.sources.base import raw_json
+from openings.sources.base import normalize_job_type, raw_json
 
 
 def record_from_fields(
@@ -38,7 +38,7 @@ def record_from_fields(
         "job_url": job_url,
         "description": description,
         "date_posted": date_posted,
-        "job_type": job_type,
+        "job_type": normalize_job_type(job_type),
         "is_remote": is_remote,
         "job_level": job_level,
         "min_amount": min_amount,

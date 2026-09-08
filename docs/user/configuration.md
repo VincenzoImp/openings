@@ -31,6 +31,9 @@ System.
 ### `sources`
 
 `user_agent` and `timeout_seconds` apply to every direct HTTP request.
+`feed_max_age_days` (default 60, `null` to disable) drops company-feed and
+RSS postings whose date is older than that; evergreen postings on Greenhouse
+or Lever boards otherwise return forever.
 
 #### `sources.jobspy`
 
@@ -54,13 +57,15 @@ companies:
     slug: "examplecorp"
     locations: ["Berlin", "Remote"]   # optional substrings; omit to keep all
     titles: ["engineer", "developer"] # optional substrings on the title
+    max_age_days: 90                  # optional; overrides feed_max_age_days
 ```
 
 See [Sources](sources.md) for how to find the slug.
 
 #### `sources.feeds`
 
-RSS or Atom feeds: `name`, `url`, optional `locations` and `titles`.
+RSS or Atom feeds: `name`, `url`, optional `locations`, `titles` and
+`max_age_days`.
 
 #### `sources.adzuna`
 

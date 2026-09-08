@@ -63,7 +63,7 @@ function StatusNoteForm({
       <div className="flex justify-end gap-2">
         <Button onClick={onClose}>Cancel</Button>
         <Button type="submit" variant="primary" disabled={setStatus.isPending}>
-          {setStatus.isPending ? "Saving…" : "Save Status"}
+          {setStatus.isPending ? "Saving…" : "Save"}
         </Button>
       </div>
     </form>
@@ -85,7 +85,7 @@ export function StatusNoteDialog({
   return (
     <Dialog
       open={open}
-      title={jobIds.length > 1 ? `Change status of ${jobIds.length} jobs` : "Change status"}
+      title={jobIds.length > 1 ? `Update status of ${jobIds.length} jobs` : "Update status"}
       onClose={onClose}
     >
       <StatusNoteForm jobIds={jobIds} initialStatus={initialStatus} onClose={onClose} />

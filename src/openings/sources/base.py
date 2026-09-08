@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import json
+import re
 import time
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
@@ -64,6 +65,59 @@ def frame_from_records(records: Iterable[dict[str, Any]]) -> pd.DataFrame:
     if not rows:
         return empty_frame()
     return pd.DataFrame(rows, columns=list(CANONICAL_COLUMNS))
+
+
+JOB_TYPES = ("fulltime", "parttime", "contract", "internship", "temporary", "volunteer")
+_JOB_TYPE_ALIASES = {
+    "full": "fulltime",
+    "fulltime": "fulltime",
+    "permanent": "fulltime",
+    "regular": "fulltime",
+    "employee": "fulltime",
+    "part": "parttime",
+    "parttime": "parttime",
+    "contract": "contract",
+    "contractor": "contract",
+    "freelance": "contract",
+    "consultant": "contract",
+    "intern": "internship",
+    "internship": "internship",
+    "trainee": "internship",
+    "apprentice": "internship",
+    "apprenticeship": "internship",
+    "working student": "internship",
+    "student": "internship",
+    "temporary": "temporary",
+    "temp": "temporary",
+    "fixed term": "temporary",
+    "fixedterm": "temporary",
+    "seasonal": "temporary",
+    "volunteer": "volunteer",
+}
+
+
+def normalize_job_type(value: Any) -> str | None:
+    """One vocabulary for every board's employment type; unknown values become ``other``.
+
+    Compound values keep the first recognised part (``"parttime, fulltime"`` is
+    ``parttime``); empty or missing values stay ``None``.
+    """
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if not text or text in {"nan", "none", "null", "not applicable", "n/a"}:
+        return None
+    for part in re.split(r"[,/;|&]| and ", text):
+        key = re.sub(r"[\s\-_]+", " ", part).strip()
+        if not key:
+            continue
+        compact = key.replace(" ", "")
+        for candidate in (key, compact, key.split()[0]):
+            if candidate in _JOB_TYPE_ALIASES:
+                return _JOB_TYPE_ALIASES[candidate]
+        if compact.endswith("time") and compact[:-4] in _JOB_TYPE_ALIASES:
+            return _JOB_TYPE_ALIASES[compact[:-4]]
+    return "other"
 
 
 def location_allowed(location: str | None, patterns: Iterable[str]) -> bool:

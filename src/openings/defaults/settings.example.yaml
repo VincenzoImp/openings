@@ -46,6 +46,11 @@ sources:
   # Timeout in seconds for ATS, RSS and Adzuna requests.
   timeout_seconds: 30.0
 
+  # Company and RSS feeds list every open posting, evergreen ones included.
+  # Postings whose date is older than this many days are dropped; null keeps
+  # them all. A feed can override it with its own max_age_days.
+  feed_max_age_days: 60
+
   # ---------------------------------------------------------------------------
   # jobspy — job boards through the JobSpy library (linkedin, indeed, glassdoor,
   # google, zip_recruiter, bayt, naukri, bdjobs). Each query is run at each
@@ -163,7 +168,8 @@ sources:
   #   jobs.ashbyhq.com/<slug>       careers.smartrecruiters.com/<slug>
   # `locations` and `titles` are optional lists of substrings: a posting is
   # kept when its location contains any of `locations` and its title contains
-  # any of `titles`. Omit them to keep every posting.
+  # any of `titles`. Omit them to keep every posting. `max_age_days` overrides
+  # feed_max_age_days for one feed.
   # ---------------------------------------------------------------------------
   companies: []
   # companies:
@@ -172,6 +178,7 @@ sources:
   #     slug: "examplecorp"
   #     locations: ["Berlin", "Remote"]
   #     titles: ["engineer", "developer"]
+  #     max_age_days: 90
 
   # ---------------------------------------------------------------------------
   # feeds — RSS or Atom feeds of postings. `locations` and `titles` work as

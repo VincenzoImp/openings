@@ -100,12 +100,15 @@ export function CompaniesView() {
                 header: "Name",
                 render: (source) => <span className="font-medium">{source.name}</span>,
               },
-              { key: "kind", header: "Kind", render: (source) => <Badge>{source.kind}</Badge> },
               {
-                key: "detail",
-                header: "Detail",
-                compact: true,
-                render: (source) => <span className="text-fg-muted">{source.detail}</span>,
+                key: "kind",
+                header: "Source",
+                render: (source) => (
+                  <span className="inline-flex items-center gap-1">
+                    <Badge>{source.kind}</Badge>
+                    <span className="hidden text-xs text-fg-muted sm:inline">{source.detail}</span>
+                  </span>
+                ),
               },
               {
                 key: "health",
@@ -118,7 +121,11 @@ export function CompaniesView() {
                       <Badge tone={state.tone}>{state.label}</Badge>
                       {run ? (
                         <span className="text-xs text-fg-muted">
-                          {run.rows} rows, {run.failed}/{run.tasks} failed
+                          {run.rows} rows from {run.tasks}{" "}
+                          {run.tasks === 1 ? "request" : "requests"}
+                          {run.failed ? (
+                            <span className="text-negative">, {run.failed} failed</span>
+                          ) : null}
                           {run.started_at ? ` · ${relativeDays(run.started_at)}` : ""}
                         </span>
                       ) : null}

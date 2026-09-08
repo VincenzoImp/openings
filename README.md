@@ -5,15 +5,35 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/docker-vincenzoimp%2Fopenings-brightgreen.svg)](https://hub.docker.com/r/vincenzoimp/openings)
 
-A configurable job crawler, archive and application tracker you run yourself.
-Agent-operable through MCP.
+A job crawler, archive and application tracker you run yourself, operable by
+you and by your AI agents through the same API.
 
-Openings collects postings from job boards, company career pages and feeds,
-scores them against criteria you write in one YAML file, and keeps every job
-and everything you build around it (status, labels, notes, form answers, CV
-and cover letter files, timeline) in one local database. A dashboard, a REST
-API and an MCP server operate on that database, so you, your scripts and your
-AI agents work from the same state.
+![The Inbox: new postings ranked by your own scoring](docs/images/inbox-light.png)
+
+## Why
+
+Job boards forget what you saw, spreadsheets forget what you sent, and the
+CV you tailored for a role ends up in a folder nobody opens again. Openings
+keeps all of it in one local database: every posting it collected, every
+status change with its date, every note, form answer, CV and cover letter
+attached to the job it belongs to. It is built for one person, runs in two
+containers on your own machine, and never sends your data anywhere.
+
+- **Collect** from job boards (through [JobSpy](https://github.com/speedyapply/JobSpy)),
+  company career pages on Greenhouse, Lever, Ashby and SmartRecruiters, RSS
+  feeds and the Adzuna API. Anything the crawler cannot see, you or an agent
+  add by hand.
+- **Rank** with keyword categories and signed weights you write yourself;
+  every job shows which categories matched and why it scored what it did.
+- **Track** one status per job from `new` to `offer`, with a timeline. A job
+  is the opening, not the advert: the same role seen on two boards is one job
+  with two postings. Blacklisting hides, never deletes, and can be undone.
+- **Archive** the application itself next to the posting, and take it out
+  again as one zip.
+- **Search by meaning** with a small sentence model that runs locally.
+- **Automate** through a REST API and an MCP server with the same tools the
+  dashboard uses, so an agent can triage the inbox, attach a tailored CV and
+  record an application while you watch the pipeline.
 
 **The YAML owns intake and scoring; the database owns state.** A job's status
 is never derived from configuration.
@@ -26,46 +46,18 @@ docker compose up -d
 open http://127.0.0.1:8501
 ```
 
-The same process serves the dashboard at `/`, the REST API at `/api` and the
-MCP endpoint at `/mcp`. Ports bind to `127.0.0.1` by default.
+One process serves the dashboard at `/`, the REST API at `/api` and the MCP
+endpoint at `/mcp`. Ports bind to `127.0.0.1` by default.
 
-## How it works
+## A look around
 
-```text
-sources ──▶ score ──▶ match postings to jobs ──▶ upsert ──▶ embed ──▶ notify
-                                                    │
-                     dashboard ◀── application ◀── SQLite ──▶ MCP
-                     REST API  ◀── service                     agents
-```
+| | |
+|---|---|
+| ![Pipeline](docs/images/pipeline-light.png) | ![Job page](docs/images/application-dark.png) |
+| The Pipeline: one column per status, cards move with the keyboard, by dragging or from a menu. | The application: files with inline previews, form answers, notes, one zip for everything. |
 
-- **Sources** return one canonical shape: job boards through
-  [JobSpy](https://github.com/speedyapply/JobSpy), company career feeds on
-  Greenhouse, Lever, Ashby and SmartRecruiters, RSS and Atom feeds, the Adzuna
-  API, and postings you add by hand or through an agent.
-- **Scoring** is plain keyword matching over title, description, company and
-  location: every category you define adds its weight, negative weights
-  penalize, and each job page shows which categories matched.
-- **One job, many postings.** A posting is identified by its URL (or the
-  source's own id). The same opening seen on a second board becomes a second
-  posting of the same job, so the material you built stays with it.
-- **Status** is one value per job: `new`, `shortlisted`, `applied`,
-  `interviewing`, `offer`, `rejected`, `withdrawn`, `blacklisted`. Only `new`
-  rows are subject to retention; every other status is protected.
-- **Blacklisting** hides a job and blocks its re-ingestion; nothing is
-  deleted, and the job can be restored with its notes and files.
-- **Attachments, notes, form answers and events** hang off the job. One
-  request downloads the whole application as a zip.
-- **Semantic search** runs locally: a small sentence model embeds every active
-  job, and "similar postings" and free-text search use it.
-
-## Commands
-
-| Command | Role |
-|---------|------|
-| `openings scheduler` | collect on the configured interval (container default) |
-| `openings run` | collect once and exit |
-| `openings web` | dashboard, REST API and MCP endpoint on port 8501 |
-| `openings healthcheck` | verify config, database and directories |
+The dashboard works on a phone as well as a desk, in light and dark. More
+in [Dashboard](docs/user/dashboard.md).
 
 ## Agents
 
@@ -75,19 +67,12 @@ Point an MCP client at `http://127.0.0.1:8501/mcp` (streamable HTTP):
 { "mcpServers": { "openings": { "type": "http", "url": "http://127.0.0.1:8501/mcp" } } }
 ```
 
-Read tools: `list_jobs`, `get_job`, `search_similar`, `get_statistics`,
-`get_score_distribution`, `get_facets`, `list_labels`, `list_blacklist`,
-`list_sources`, `list_runs`, `list_attachments`, `get_attachment`,
-`get_settings`, `get_settings_reference`. Write tools: `add_job`,
-`update_job`, `set_status`, `add_labels`, `remove_labels`, `rename_label`,
-`add_note`, `update_note`, `delete_note`, `add_attachment`,
-`update_attachment`, `delete_attachment`, `blacklist_jobs`,
-`unblacklist_jobs`, `delete_jobs`, `merge_jobs`, `run_now`,
-`preview_cleanup`, `run_cleanup`, `export_jobs`.
-
-A typical agent flow: read a posting the crawler missed, `add_job` with the
-digested fields, `add_attachment` with the tailored CV, `add_note` with the
-form answers, `set_status applied`.
+A typical session: `list_jobs(statuses=["new"], min_score=40)` to triage,
+`blacklist_jobs` for the noise, `get_job` for the posting and its score
+breakdown, `add_attachment` with the tailored CV, `add_note` with the form
+answers, `set_status(..., "applied", note="sent through the careers page")`.
+For a posting the crawler never saw, `add_job` with the digested fields. The
+full tool list is in [MCP server](docs/user/mcp.md).
 
 ## Configuration
 
@@ -106,8 +91,8 @@ sources:
   companies:
     - { name: Example, ats: greenhouse, slug: example, titles: [engineer] }
 scoring:
-  save_threshold: 0
-  notify_threshold: 20
+  save_threshold: 20
+  notify_threshold: 60
   weights: { role: 25, stack: 15, language_required: -60 }
   keywords:
     role: ["backend engineer", "platform engineer"]
@@ -117,6 +102,15 @@ scoring:
 
 See [Configuration](docs/user/configuration.md) and
 [Sources](docs/user/sources.md).
+
+## Commands
+
+| Command | Role |
+|---------|------|
+| `openings scheduler` | collect on the configured interval (container default) |
+| `openings run` | collect once and exit |
+| `openings web` | dashboard, REST API and MCP endpoint on port 8501 |
+| `openings healthcheck` | verify config, database and directories |
 
 ## Documentation
 
@@ -143,7 +137,8 @@ npm --prefix frontend run quality
 npm --prefix frontend run test:e2e
 ```
 
-See [CONTRIBUTING](CONTRIBUTING.md).
+See [CONTRIBUTING](CONTRIBUTING.md). Openings is a personal tool that grew
+into a small product; issues and pull requests are welcome.
 
 ## License
 

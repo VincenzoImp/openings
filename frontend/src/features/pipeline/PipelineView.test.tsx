@@ -13,8 +13,9 @@ const APPLIED = job({
   status: "applied",
   status_changed_at: "2026-09-07T10:00:00+00:00",
 });
+const REJECTED = job({ job_id: "3".repeat(64), title: "Mobile Engineer", status: "rejected" });
 
-function routes(items = [SHORTLISTED, APPLIED]): Route[] {
+function routes(items = [SHORTLISTED, APPLIED, REJECTED]): Route[] {
   return [
     {
       method: "GET",
@@ -27,7 +28,7 @@ function routes(items = [SHORTLISTED, APPLIED]): Route[] {
 }
 
 describe("PipelineView", () => {
-  it("groups jobs by status and moves the selected one forward with ]", async () => {
+  it("shows every status column and moves the selected card forward with ]", async () => {
     const { calls } = mockApi(routes());
     renderWithProviders(<PipelineView />);
     const shortlisted = await screen.findByTestId("column-shortlisted");
@@ -37,8 +38,11 @@ describe("PipelineView", () => {
     expect(
       within(screen.getByTestId("column-applied")).getByText("Data Engineer"),
     ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("column-rejected")).getByText("Mobile Engineer"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("column-withdrawn")).toHaveTextContent("None closed this way yet.");
     expect(calls[0].url).toContain("statuses=shortlisted&statuses=applied");
-    expect(screen.queryByTestId("column-rejected")).not.toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: "]" });
     await waitFor(() => expect(calls.some((call) => call.url === "/api/jobs/status")).toBe(true));
@@ -61,19 +65,15 @@ describe("PipelineView", () => {
     });
   });
 
-  it("moves a card from its menu and shows closed columns on demand", async () => {
+  it("moves a card from its menu", async () => {
     const { calls } = mockApi(routes([SHORTLISTED]));
     renderWithProviders(<PipelineView />);
     await screen.findByTestId("pipeline-card");
-    fireEvent.click(screen.getByRole("button", { name: "Card actions" }));
+    fireEvent.click(screen.getByRole("button", { name: /Actions for/ }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Move to Offer" }));
     await waitFor(() => expect(calls.some((call) => call.url === "/api/jobs/status")).toBe(true));
     expect(calls.find((call) => call.url === "/api/jobs/status")?.body).toMatchObject({
       status: "offer",
     });
-
-    fireEvent.click(screen.getByRole("checkbox", { name: "Show closed" }));
-    expect(await screen.findByTestId("column-rejected")).toBeInTheDocument();
-    expect(window.location.search).toContain("closed=1");
   });
 });

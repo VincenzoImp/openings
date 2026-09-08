@@ -32,19 +32,19 @@ export function BulkBar({
         <Star size={14} aria-hidden="true" /> Shortlist
       </Button>
       <Button size="sm" onClick={onApplied}>
-        <Check size={14} aria-hidden="true" /> Applied
+        <Check size={14} aria-hidden="true" /> Mark applied
       </Button>
       <Button size="sm" onClick={onStatus}>
-        Status…
+        Set status…
       </Button>
       <Button size="sm" onClick={onLabels}>
-        <Tag size={14} aria-hidden="true" /> Labels
+        <Tag size={14} aria-hidden="true" /> Labels…
       </Button>
       <Button size="sm" onClick={onBlacklist}>
-        <Ban size={14} aria-hidden="true" /> Blacklist
+        <Ban size={14} aria-hidden="true" /> Blacklist…
       </Button>
       <Button size="sm" variant="ghost" onClick={onDelete}>
-        <Trash2 size={14} aria-hidden="true" /> Delete
+        <Trash2 size={14} aria-hidden="true" /> Delete…
       </Button>
       <Button
         size="sm"

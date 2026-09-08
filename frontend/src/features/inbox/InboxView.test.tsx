@@ -100,7 +100,7 @@ describe("InboxView", () => {
     expect(await screen.findByText("2 selected")).toBeInTheDocument();
 
     const toolbar = screen.getByRole("toolbar", { name: "Bulk actions" });
-    fireEvent.click(within(toolbar).getByRole("button", { name: "Applied" }));
+    fireEvent.click(within(toolbar).getByRole("button", { name: "Mark applied" }));
     await waitFor(() => expect(calls.some((call) => call.url === "/api/jobs/status")).toBe(true));
     expect(calls.find((call) => call.url === "/api/jobs/status")?.body).toMatchObject({
       job_ids: [FIRST.job_id, SECOND.job_id],
@@ -136,7 +136,7 @@ describe("InboxView", () => {
       target: { value: "nothing" },
     });
     expect(await screen.findByText("No postings match")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Clear Search and Filters" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear search and filters" }));
     expect(await screen.findByText("Nothing new")).toBeInTheDocument();
   });
 

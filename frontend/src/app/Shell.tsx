@@ -13,10 +13,8 @@ import {
 } from "lucide-react";
 
 import { Button } from "../components/Button";
-import { Kbd } from "../components/Kbd";
 import { AddJobDialog } from "../features/shared/AddJobDialog";
 import { useStats } from "../features/shared/queries";
-import { useFinePointer } from "../features/shared/useMediaQuery";
 import { HelpDialog } from "./HelpDialog";
 import { useHotkeys } from "./hotkeys";
 import { VIEWS, navigate } from "./router";
@@ -41,7 +39,7 @@ function ThemeButton() {
       size="sm"
       variant="ghost"
       aria-label={`Switch to ${next} theme`}
-      title={`Theme: ${theme.preference}`}
+      title={`Switch to the ${next} theme`}
       onClick={() => theme.setPreference(next)}
     >
       {theme.resolved === "dark" ? (
@@ -58,7 +56,6 @@ export function Shell({ view, children }: { view: View; children: ReactNode }) {
   const [adding, setAdding] = useState(false);
   const gate = useAuthGate();
   const stats = useStats();
-  const finePointer = useFinePointer();
   const counts = stats.data?.by_status;
 
   useHotkeys("global", [
@@ -181,11 +178,6 @@ export function Shell({ view, children }: { view: View; children: ReactNode }) {
                 {count !== undefined ? (
                   <span className={`tabular text-xs ${active ? "opacity-70" : "text-fg-faint"}`}>
                     {count}
-                  </span>
-                ) : null}
-                {finePointer ? (
-                  <span aria-hidden="true">
-                    <Kbd>{entry.key}</Kbd>
                   </span>
                 ) : null}
               </a>

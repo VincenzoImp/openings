@@ -21,8 +21,8 @@ with the date.
 ## Tag
 
 ```bash
-git tag -a v0.2.0 -m "Openings 0.2.0"
-git push origin v0.2.0
+git tag -a v0.1.0 -m "Openings 0.1.0"
+git push origin v0.1.0
 ```
 
 ## Publish
