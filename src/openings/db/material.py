@@ -380,4 +380,7 @@ class MaterialMixin(Store):
 
     def _job_exists(self, job_id: str) -> bool:
         with self._connection() as conn:
-            return conn.execute("SELECT 1 FROM jobs WHERE job_id = ?", (job_id,)).fetchone() is not None
+            return (
+                conn.execute("SELECT 1 FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
+                is not None
+            )

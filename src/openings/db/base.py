@@ -77,7 +77,9 @@ JOB_SELECT = ", ".join(f"jobs.{column}" for column in JOB_COLUMNS) + (
 )
 
 
-def chunks(values: Sequence[Any], size: int = SQLITE_VAR_LIMIT) -> Generator[Sequence[Any], None, None]:
+def chunks(
+    values: Sequence[Any], size: int = SQLITE_VAR_LIMIT
+) -> Generator[Sequence[Any], None, None]:
     for start in range(0, len(values), size):
         yield values[start : start + size]
 

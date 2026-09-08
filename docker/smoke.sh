@@ -167,12 +167,12 @@ names = zipfile.ZipFile(io.BytesIO(bundle)).namelist()
 assert any(name.endswith("posting.md") for name in names), names
 assert any(name.endswith("cv.pdf") for name in names), names
 
-# Merge: a mirror of the same posting on another board folds into the first
+# Merge: a duplicate posting stored as its own job folds into the first
 mirror = request(
     "/api/jobs",
     method="POST",
     body={
-        "title": "Backend Python Engineer",
+        "title": "Backend Python Engineer (Remote, EU)",
         "company": "Acme Labs",
         "location": "Remote",
         "job_url": "https://mirror.example.com/backend-copy",
@@ -181,7 +181,7 @@ mirror = request(
     },
 )
 mirror_id = mirror["job_ids"][0]
-assert mirror_id != job_id, mirror
+assert mirror["message"] == "created" and mirror_id != job_id, mirror
 merged = request("/api/jobs/merge", method="POST", body={"primary_id": job_id, "other_ids": [mirror_id]})
 assert merged["affected_count"] == 1, merged
 detail = request(f"/api/jobs/{job_id}")
