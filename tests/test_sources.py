@@ -282,3 +282,37 @@ def test_frame_from_records_tolerates_missing_values(value):
         [{"title": "T", "company": "C", "location": "L", "description": value}]
     )
     assert list(frame.columns) == list(CANONICAL_COLUMNS)
+
+
+def test_job_types_share_one_vocabulary():
+    from openings.sources.base import normalize_job_type
+
+    assert normalize_job_type("Full-time") == "fulltime"
+    assert normalize_job_type("FullTime") == "fulltime"
+    assert normalize_job_type("fulltime") == "fulltime"
+    assert normalize_job_type("Part time") == "parttime"
+    assert normalize_job_type("parttime, fulltime") == "parttime"
+    assert normalize_job_type("Contract") == "contract"
+    assert normalize_job_type("Intern") == "internship"
+    assert normalize_job_type("Working Student") == "internship"
+    assert normalize_job_type("Fixed-term") == "temporary"
+    assert normalize_job_type("Volunteer") == "volunteer"
+    assert normalize_job_type("Board member") == "other"
+    assert normalize_job_type("Not Applicable") is None
+    assert normalize_job_type(None) is None
+    assert normalize_job_type("") is None
+
+
+def test_keep_drops_postings_older_than_the_feed_age():
+    from datetime import date
+
+    from openings.sources.collect import _keep
+
+    today = date(2026, 9, 8)
+    fresh = {"title": "Engineer", "location": "Zurich", "date_posted": "2026-08-20"}
+    old = {"title": "Engineer", "location": "Zurich", "date_posted": "2021-05-12"}
+    undated = {"title": "Engineer", "location": "Zurich", "date_posted": None}
+    assert _keep(fresh, [], (), 60, today)
+    assert not _keep(old, [], (), 60, today)
+    assert _keep(undated, [], (), 60, today)
+    assert _keep(old, [], (), None, today)

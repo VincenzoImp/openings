@@ -197,6 +197,7 @@ class CompanySourceConfig:
     slug: str
     locations: list[str] = field(default_factory=list)
     titles: list[str] = field(default_factory=list)
+    max_age_days: int | None = None
 
 
 @dataclass
@@ -207,6 +208,7 @@ class FeedSourceConfig:
     url: str
     locations: list[str] = field(default_factory=list)
     titles: list[str] = field(default_factory=list)
+    max_age_days: int | None = None
 
 
 @dataclass
@@ -230,6 +232,7 @@ class SourcesConfig:
     adzuna: AdzunaConfig = field(default_factory=AdzunaConfig)
     user_agent: str | None = None
     timeout_seconds: float = 30.0
+    feed_max_age_days: int | None = 60
 
 
 @dataclass
@@ -526,7 +529,7 @@ def _parse_companies(value: Any) -> list[CompanySourceConfig]:
         path = f"sources.companies[{index}]"
         if not isinstance(item, dict):
             raise ConfigError(f"{path} must be a mapping")
-        unknown = sorted(set(item) - {"name", "ats", "slug", "locations", "titles"})
+        unknown = sorted(set(item) - {"name", "ats", "slug", "locations", "titles", "max_age_days"})
         if unknown:
             raise ConfigError(f"Unsupported configuration key: {path}.{unknown[0]}")
         for required in ("name", "ats", "slug"):
@@ -547,6 +550,11 @@ def _parse_companies(value: Any) -> list[CompanySourceConfig]:
                 slug=slug,
                 locations=_str_list(item.get("locations"), f"{path}.locations"),
                 titles=_str_list(item.get("titles"), f"{path}.titles"),
+                max_age_days=_optional(
+                    item.get("max_age_days"),
+                    lambda value, name: _int_min(value, name, 1),
+                    f"{path}.max_age_days",
+                ),
             )
         )
     return companies
@@ -562,7 +570,7 @@ def _parse_feeds(value: Any) -> list[FeedSourceConfig]:
         path = f"sources.feeds[{index}]"
         if not isinstance(item, dict):
             raise ConfigError(f"{path} must be a mapping")
-        unknown = sorted(set(item) - {"name", "url", "locations", "titles"})
+        unknown = sorted(set(item) - {"name", "url", "locations", "titles", "max_age_days"})
         if unknown:
             raise ConfigError(f"Unsupported configuration key: {path}.{unknown[0]}")
         for required in ("name", "url"):
@@ -577,6 +585,11 @@ def _parse_feeds(value: Any) -> list[FeedSourceConfig]:
                 url=url,
                 locations=_str_list(item.get("locations"), f"{path}.locations"),
                 titles=_str_list(item.get("titles"), f"{path}.titles"),
+                max_age_days=_optional(
+                    item.get("max_age_days"),
+                    lambda value, name: _int_min(value, name, 1),
+                    f"{path}.max_age_days",
+                ),
             )
         )
     return feeds
@@ -629,7 +642,15 @@ def _parse_sources(data: dict) -> SourcesConfig:
     section = _section(
         data,
         "sources",
-        {"jobspy", "companies", "feeds", "adzuna", "user_agent", "timeout_seconds"},
+        {
+            "jobspy",
+            "companies",
+            "feeds",
+            "adzuna",
+            "user_agent",
+            "timeout_seconds",
+            "feed_max_age_days",
+        },
     )
     return SourcesConfig(
         jobspy=_parse_jobspy(section),
@@ -639,6 +660,11 @@ def _parse_sources(data: dict) -> SourcesConfig:
         user_agent=_optional(section.get("user_agent"), _str, "sources.user_agent"),
         timeout_seconds=_float_min(
             section.get("timeout_seconds", 30.0), "sources.timeout_seconds", 1.0
+        ),
+        feed_max_age_days=_optional(
+            section.get("feed_max_age_days", 60),
+            lambda value, name: _int_min(value, name, 1),
+            "sources.feed_max_age_days",
         ),
     )
 

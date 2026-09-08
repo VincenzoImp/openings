@@ -45,6 +45,15 @@ docker compose config
 sh docker/smoke.sh
 ```
 
+## Screenshots
+
+```bash
+npm --prefix frontend run build && npm --prefix frontend run screenshots
+```
+
+Starts a throwaway server, seeds a fictional archive and rewrites
+`docs/images/*.png`. Never take documentation screenshots of a real database.
+
 ## Layout
 
 ```text

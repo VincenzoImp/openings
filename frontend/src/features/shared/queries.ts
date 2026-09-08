@@ -141,6 +141,15 @@ export function useSettings() {
   return useQuery({ queryKey: keys.settings, queryFn: api.settings });
 }
 
+/** The scoring thresholds from the live settings; sensible defaults while loading. */
+export function useThresholds(): { save: number; notify: number } {
+  const settings = useSettings();
+  return {
+    save: settings.data?.scoring.save_threshold ?? 0,
+    notify: settings.data?.scoring.notify_threshold ?? 100,
+  };
+}
+
 export function useSettingsReference(enabled: boolean) {
   return useQuery({
     queryKey: keys.settingsReference,

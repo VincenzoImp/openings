@@ -1,6 +1,6 @@
 {
   "name": "openings-dashboard",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,7 +13,8 @@
     "test": "vitest run",
     "quality": "npm run lint && npm run format:check && npm run typecheck && npm run test && npm run build",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "screenshots": "SCREENSHOTS=1 playwright test --project=screenshots"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",

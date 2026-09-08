@@ -152,3 +152,22 @@ def test_load_config_reports_missing_file(tmp_path):
 def test_load_config_reads_yaml(settings_file):
     config = load_config(settings_file)
     assert config.scoring.weights["role"] == 25
+
+
+def test_feed_age_limits_parse_with_a_default():
+    data = minimal_settings()
+    data["sources"]["companies"] = [
+        {"name": "A", "ats": "greenhouse", "slug": "acme", "max_age_days": 90},
+        {"name": "B", "ats": "lever", "slug": "beta"},
+    ]
+    config = parse_config(data)
+    assert config.sources.feed_max_age_days == 60
+    assert config.sources.companies[0].max_age_days == 90
+    assert config.sources.companies[1].max_age_days is None
+
+    data["sources"]["feed_max_age_days"] = None
+    assert parse_config(data).sources.feed_max_age_days is None
+
+    data["sources"]["companies"][0]["max_age_days"] = 0
+    with pytest.raises(ConfigError):
+        parse_config(data)

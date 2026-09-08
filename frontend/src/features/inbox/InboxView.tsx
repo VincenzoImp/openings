@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Filter, Search, SlidersHorizontal, X } from "lucide-react";
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, Filter, Search, X } from "lucide-react";
 
 import { api } from "../../api/client";
 import type { JobListParams, JobSort, JobStatus, JobSummary, SortDirection } from "../../api/types";
@@ -20,12 +20,23 @@ import { useJobsInfinite } from "../shared/queries";
 import { StatusNoteDialog } from "../shared/StatusNoteDialog";
 import { useSelection } from "../shared/useSelection";
 import { BulkBar } from "./BulkBar";
+import { ActiveFilters } from "./ActiveFilters";
 import { FilterDrawer } from "./FilterDrawer";
 import { activeFilterCount, clearedFilters, paramsToFilters } from "./filters";
 import { rememberList } from "../shared/listContext";
 import { useSemanticSearch } from "./useSemanticSearch";
 
 const VISITED_KEY = "openings.inbox.visited-at";
+
+const SORT_LABELS: Record<JobSort, string> = {
+  score: "score",
+  date: "posting date",
+  first_seen: "first seen",
+  updated: "last change",
+  company: "company",
+  title: "title",
+  salary: "salary",
+};
 
 function readVisited(): string | null {
   try {
@@ -97,6 +108,8 @@ export function InboxView() {
   const error = semantic ? semanticQuery.error : listQuery.error;
 
   const ids = useMemo(() => jobs.map((job) => job.job_id), [jobs]);
+  const scoreMax = useMemo(() => Math.max(100, ...jobs.map((job) => job.relevance_score)), [jobs]);
+  const descending = direction !== "asc";
   const selection = useSelection(ids);
   const selected = selection.index >= 0 ? jobs[selection.index] : undefined;
   const targets = useMemo(
@@ -219,14 +232,14 @@ export function InboxView() {
     {
       key: "/",
       run: () => search.current?.focus(),
-      description: "Search (prefix ~ for semantic search)",
+      description: "Search (start with ~ to search by meaning)",
       group: "Lists",
     },
     { key: "f", run: () => setFiltersOpen(true), description: "Filters", group: "Lists" },
     {
       key: "e",
       run: () => void exportCurrent(),
-      description: "Export the current list as CSV",
+      description: "Download the current list as CSV",
       group: "Lists",
     },
     {
@@ -271,7 +284,7 @@ export function InboxView() {
               name="q"
               autoComplete="off"
               spellCheck={false}
-              placeholder="Search… (~ for semantic)"
+              placeholder="Search… (~ searches by meaning)"
               className="!pl-7"
               value={text}
               onChange={(event) => setParams({ q: event.target.value })}
@@ -292,32 +305,39 @@ export function InboxView() {
             <span className="hidden sm:inline">Filters</span>
             {filterCount > 0 ? <Badge tone="accent">{filterCount}</Badge> : null}
           </Button>
-          <div className="col-span-2 flex items-center gap-2 sm:col-auto">
-            <SlidersHorizontal size={14} className="text-fg-faint" aria-hidden="true" />
+          <div className="col-span-2 flex items-center gap-1 sm:col-auto">
             <Select
-              aria-label="Sort"
+              aria-label="Sort by"
               className="!w-auto"
               value={sort}
               onChange={(event) => setParams({ sort: event.target.value })}
             >
               {JOB_SORTS.map((value) => (
                 <option key={value} value={value}>
-                  by {value.replace("_", " ")}
+                  Sort: {SORT_LABELS[value]}
                 </option>
               ))}
             </Select>
-            <Select
-              aria-label="Direction"
-              className="!w-auto"
-              value={direction ?? ""}
-              onChange={(event) => setParams({ direction: event.target.value || null })}
+            <Button
+              variant="ghost"
+              aria-label={
+                descending
+                  ? "Sorted high to low; switch to low to high"
+                  : "Sorted low to high; switch to high to low"
+              }
+              aria-pressed={!descending}
+              title={descending ? "High to low" : "Low to high"}
+              onClick={() => setParams({ direction: descending ? "asc" : null })}
             >
-              <option value="">natural</option>
-              <option value="desc">descending</option>
-              <option value="asc">ascending</option>
-            </Select>
+              {descending ? (
+                <ArrowDownWideNarrow size={16} aria-hidden="true" />
+              ) : (
+                <ArrowUpNarrowWide size={16} aria-hidden="true" />
+              )}
+            </Button>
           </div>
         </div>
+        <ActiveFilters filters={filters} />
       </header>
 
       {selection.checked.size > 0 ? (
@@ -354,15 +374,15 @@ export function InboxView() {
             title="No postings match"
             action={
               <Button onClick={() => setParams({ q: null, ...clearedFilters() })}>
-                Clear Search and Filters
+                Clear search and filters
               </Button>
             }
           >
-            Try fewer filters or a different search. Semantic search starts with ~.
+            Try fewer filters or another search. Start with ~ to search by meaning.
           </EmptyState>
         ) : (
           <EmptyState title="Nothing new">
-            Every posting has been shortlisted, applied to or blacklisted. The next run adds more.
+            Every posting has been sorted. The next collection run brings more.
           </EmptyState>
         )
       ) : null}
@@ -376,7 +396,8 @@ export function InboxView() {
           onOpen={open}
           onEndReached={loadMore}
           isFresh={isFresh}
-          className="flex-1"
+          scoreMax={scoreMax}
+          className="max-h-full"
           footer={
             semantic
               ? `${jobs.length} semantic matches`

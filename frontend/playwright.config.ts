@@ -6,8 +6,10 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export const PLAIN_PORT = 18660;
 export const TOKEN_PORT = 18661;
+export const SHOTS_PORT = 18662;
 export const PLAIN_URL = `http://127.0.0.1:${PLAIN_PORT}`;
 export const TOKEN_URL = `http://127.0.0.1:${TOKEN_PORT}`;
+export const SHOTS_URL = `http://127.0.0.1:${SHOTS_PORT}`;
 export const API_TOKEN = "e2e-token";
 
 const isCI = Boolean(process.env.CI);
@@ -31,7 +33,7 @@ export default defineConfig({
   projects: [
     {
       name: "desktop",
-      testIgnore: /token\.spec\.ts/,
+      testIgnore: /(token|screenshots)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } },
     },
     {
@@ -54,6 +56,11 @@ export default defineConfig({
       use: { ...devices["iPad (gen 7)"], browserName: "chromium" },
     },
     {
+      name: "screenshots",
+      testMatch: /screenshots\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"], baseURL: SHOTS_URL },
+    },
+    {
       name: "token",
       testMatch: /token\.spec\.ts/,
       use: {
@@ -67,6 +74,14 @@ export default defineConfig({
     {
       command: `sh e2e/serve.sh ${PLAIN_PORT}`,
       url: `${PLAIN_URL}/health`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      command: `sh e2e/serve.sh ${SHOTS_PORT}`,
+      url: `${SHOTS_URL}/health`,
       reuseExistingServer: false,
       timeout: 120_000,
       stdout: "ignore",

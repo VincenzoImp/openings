@@ -58,7 +58,7 @@ describe("SystemView", () => {
     expect(await screen.findByText("12")).toBeInTheDocument();
     expect(screen.getByText("Applied 2")).toBeInTheDocument();
     expect(await screen.findByText("Sales Manager")).toBeInTheDocument();
-    expect(await screen.findByText(/would delete/)).toHaveTextContent("2 stale");
+    expect(await screen.findByText(/Cleanup only ever removes/)).toHaveTextContent("2 not seen");
     expect(await screen.findByText("Europe/Zurich")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Restore/ }));

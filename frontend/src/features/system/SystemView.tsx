@@ -185,7 +185,7 @@ function RetentionCard() {
     const report = preview.data ?? (await api.cleanupPreview());
     const ok = await confirm({
       title: "Run the configured cleanup?",
-      message: `${report.deleted_below_score} jobs below the save threshold and ${report.deleted_stale} stale jobs are deleted. ${report.protected} jobs you acted on are kept. Only jobs in status New are affected.`,
+      message: `${report.deleted_below_score} new jobs below the save threshold and ${report.deleted_stale} new jobs not seen lately are deleted. Nothing else is touched: shortlisted, applied, later statuses and blacklisted jobs (${report.protected}) stay.`,
       confirmLabel: `Delete ${report.total_deleted}`,
       danger: true,
     });
@@ -232,12 +232,12 @@ function RetentionCard() {
     <Card title="Retention">
       {preview.data ? (
         <p className="mb-3 text-sm text-fg-muted">
-          The configured cleanup would delete{" "}
-          <strong className="text-fg">{formatNumber(preview.data.deleted_below_score)}</strong> jobs
+          Cleanup only ever removes jobs still in status New: right now{" "}
+          <strong className="text-fg">{formatNumber(preview.data.deleted_below_score)}</strong>{" "}
           below the save threshold and{" "}
-          <strong className="text-fg">{formatNumber(preview.data.deleted_stale)}</strong> stale
-          jobs, and keep <strong className="text-fg">{formatNumber(preview.data.protected)}</strong>{" "}
-          you acted on.
+          <strong className="text-fg">{formatNumber(preview.data.deleted_stale)}</strong> not seen
+          lately. Everything you acted on, blacklisted included, stays (
+          <strong className="text-fg">{formatNumber(preview.data.protected)}</strong> jobs).
         </p>
       ) : null}
       <div className="flex flex-col gap-3">
@@ -333,7 +333,7 @@ function ExportCard() {
   );
 }
 
-const BLACKLIST_PAGE = 50;
+const BLACKLIST_PAGE = 25;
 
 function BlacklistCard() {
   const commands = useJobCommands();

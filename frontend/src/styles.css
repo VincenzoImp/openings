@@ -205,6 +205,9 @@ textarea {
   margin: 0.6em 0;
 }
 .markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
   border-collapse: collapse;
   margin: 0.6em 0;
   display: block;

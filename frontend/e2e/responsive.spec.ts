@@ -23,7 +23,7 @@ test.describe("Responsive layout", () => {
     await api.dispose();
     await openJob(page, job!.job_id, "application");
     await expectNoHorizontalOverflow(page);
-    await page.getByRole("button", { name: "More" }).click();
+    await page.getByRole("button", { name: "Actions" }).click();
     await page.getByRole("menuitem", { name: "Edit posting" }).click();
     const dialog = page.getByRole("dialog", { name: "Edit Posting" });
     await expect(dialog).toBeVisible();

@@ -125,7 +125,7 @@ export function JobView({ jobId }: { jobId: string }) {
     {
       key: "S",
       run: () => setStatusNote(true),
-      description: "Change status with a note",
+      description: "Update status with a note",
       group: "Job page",
       label: "Shift+S",
     },
@@ -139,7 +139,7 @@ export function JobView({ jobId }: { jobId: string }) {
     {
       key: "b",
       run: () => void downloadBundle(),
-      description: "Download the application bundle",
+      description: "Download everything as a zip",
       group: "Job page",
     },
   ]);
@@ -255,7 +255,7 @@ export function JobView({ jobId }: { jobId: string }) {
             )}
           </Select>
           <Button onClick={() => setStatusNote(true)} disabled={blacklisted}>
-            Status with note…
+            Update status with a note…
           </Button>
           {job.job_url ? (
             <a
@@ -269,8 +269,8 @@ export function JobView({ jobId }: { jobId: string }) {
           ) : null}
           <Menu
             trigger={({ toggle }) => (
-              <Button onClick={toggle} aria-label="More actions" className="justify-center">
-                <MoreHorizontal size={14} aria-hidden="true" /> More
+              <Button onClick={toggle} className="justify-center">
+                <MoreHorizontal size={14} aria-hidden="true" /> Actions
               </Button>
             )}
             items={[
@@ -290,8 +290,8 @@ export function JobView({ jobId }: { jobId: string }) {
                 ),
                 onSelect: () => void copyLink(),
               },
-              { label: "Download bundle (.zip)", onSelect: () => void downloadBundle() },
-              { label: "Merge another job into this one…", onSelect: () => setMerging(true) },
+              { label: "Download everything (zip)", onSelect: () => void downloadBundle() },
+              { label: "Merge duplicates into this job…", onSelect: () => setMerging(true) },
               {
                 label: (
                   <span className="inline-flex items-center gap-2">
@@ -302,7 +302,7 @@ export function JobView({ jobId }: { jobId: string }) {
                 disabled: blacklisted,
               },
               {
-                label: "Delete…",
+                label: "Delete job…",
                 onSelect: () => void actions.remove([job]).then((ok) => ok && back()),
                 danger: true,
               },

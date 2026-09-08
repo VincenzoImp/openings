@@ -10,6 +10,7 @@ import { useToast } from "../../app/toastContext";
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
+import { Collapsible } from "../../components/Collapsible";
 import { Dialog } from "../../components/Dialog";
 import { Field, Input, Select, Textarea } from "../../components/Field";
 import { FileDrop } from "../../components/FileDrop";
@@ -133,7 +134,9 @@ function NoteItem({ note, jobId }: { note: Note; jobId: string }) {
               </Button>
             </div>
           </div>
-          <MarkdownBody text={note.body} className="mt-1" />
+          <Collapsible lines={10} className="mt-1">
+            <MarkdownBody text={note.body} />
+          </Collapsible>
         </>
       )}
     </li>
