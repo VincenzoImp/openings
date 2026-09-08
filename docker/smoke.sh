@@ -60,6 +60,7 @@ python3 - "$BASE_URL" "$TOKEN" <<'PY'
 import base64
 import json
 import sys
+import urllib.error
 import urllib.request
 import uuid
 
@@ -120,7 +121,7 @@ created = request(
 assert created["success"], created
 job_id = created["job_ids"][0]
 
-listed = request("/api/jobs?status=shortlisted&label=smoke")
+listed = request("/api/jobs?statuses=shortlisted&labels=smoke")
 assert listed["total"] == 1 and listed["items"][0]["job_id"] == job_id, listed
 
 body, content_type = multipart({"kind": "cv", "note": "smoke"}, "file", "cv.pdf", b"%PDF-1.4 smoke")
@@ -155,6 +156,56 @@ facets = request("/api/jobs/facets")
 assert facets["sources"][0]["value"] == "manual", facets
 assert request("/api/runs") == []
 assert request("/api/cleanup/preview")["protected"] == 1
+
+# Bundle: one zip with the posting, the notes and every attachment
+bundle = request(f"/api/jobs/{job_id}/bundle.zip")
+assert bundle[:2] == b"PK", bundle[:20]
+import io
+import zipfile
+
+names = zipfile.ZipFile(io.BytesIO(bundle)).namelist()
+assert any(name.endswith("posting.md") for name in names), names
+assert any(name.endswith("cv.pdf") for name in names), names
+
+# Merge: a mirror of the same posting on another board folds into the first
+mirror = request(
+    "/api/jobs",
+    method="POST",
+    body={
+        "title": "Backend Python Engineer",
+        "company": "Acme Labs",
+        "location": "Remote",
+        "job_url": "https://mirror.example.com/backend-copy",
+        "source": "indeed",
+        "status": "new",
+    },
+)
+mirror_id = mirror["job_ids"][0]
+assert mirror_id != job_id, mirror
+merged = request("/api/jobs/merge", method="POST", body={"primary_id": job_id, "other_ids": [mirror_id]})
+assert merged["affected_count"] == 1, merged
+detail = request(f"/api/jobs/{job_id}")
+assert len(detail["postings"]) == 2, detail["postings"]
+assert any(event["kind"] == "merged" for event in detail["events"]), detail["events"]
+
+# Run now: accepted and reported as requested until the scheduler picks it up
+requested = request("/api/runs", method="POST")
+assert requested["requested"] is True and requested["running"] is False, requested
+assert request("/api/runs/status")["requested"] is True
+
+# The MCP endpoint is behind the same token as the REST API
+try:
+    request(
+        "/mcp/",
+        method="POST",
+        body={"jsonrpc": "2.0", "id": 0, "method": "tools/list"},
+        headers={"Accept": "application/json, text/event-stream"},
+        auth=False,
+    )
+except urllib.error.HTTPError as error:
+    assert error.code == 401, error.code
+else:
+    raise AssertionError("MCP accepted a request without the API token")
 
 
 # MCP: add a second posting and move it

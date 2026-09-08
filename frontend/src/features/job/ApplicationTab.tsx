@@ -391,7 +391,7 @@ export function ApplicationTab({
                 ))}
               </Select>
             </Field>
-            <Field label="Note" htmlFor="attachment-note">
+            <Field label="File note" htmlFor="attachment-note">
               <Input
                 id="attachment-note"
                 placeholder="e.g. tailored for this posting"

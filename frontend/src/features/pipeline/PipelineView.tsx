@@ -175,14 +175,13 @@ export function PipelineView() {
       {query.total > 0 ? (
         <div
           className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 md:mx-0 md:px-0 xl:grid xl:snap-none xl:overflow-visible"
+          tabIndex={0}
           style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
         >
           {columns.map((entry, columnIndex) => (
             <div
               key={entry.status}
               data-testid={`column-${entry.status}`}
-              role="listbox"
-              aria-label={STATUS_LABELS[entry.status]}
               onDragOver={(event) => event.preventDefault()}
               onDrop={onDrop(entry.status)}
               className={`flex w-[82vw] min-w-[260px] shrink-0 snap-start flex-col gap-2 rounded-lg border border-edge border-t-4 bg-surface-2/50 p-2 sm:w-72 xl:w-auto ${COLUMN_ACCENT[entry.status]} ${
@@ -198,106 +197,112 @@ export function PipelineView() {
               {entry.jobs.length === 0 ? (
                 <p className="px-1 py-3 text-center text-xs text-fg-faint">Empty</p>
               ) : null}
-              {entry.jobs.map((job, rowIndex) => {
-                const isSelected = columnIndex === safeColumn && rowIndex === currentRow;
-                return (
-                  <div
-                    key={job.job_id}
-                    role="option"
-                    aria-selected={isSelected}
-                    tabIndex={0}
-                    draggable
-                    data-testid="pipeline-card"
-                    onDragStart={(event) => event.dataTransfer.setData("text/plain", job.job_id)}
-                    onClick={() => {
-                      setColumn(columnIndex);
-                      setRow(rowIndex);
-                    }}
-                    onDoubleClick={() => open(job)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        open(job);
-                      }
-                    }}
-                    className={`rounded-md border bg-surface p-2 text-left shadow-sm ${
-                      isSelected ? "border-accent ring-1 ring-accent/40" : "border-edge"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-1">
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
+              <div
+                role="list"
+                aria-label={STATUS_LABELS[entry.status]}
+                className="flex flex-col gap-2"
+              >
+                {entry.jobs.map((job, rowIndex) => {
+                  const isSelected = columnIndex === safeColumn && rowIndex === currentRow;
+                  return (
+                    <div
+                      key={job.job_id}
+                      role="listitem"
+                      aria-current={isSelected ? "true" : undefined}
+                      tabIndex={0}
+                      draggable
+                      data-testid="pipeline-card"
+                      onDragStart={(event) => event.dataTransfer.setData("text/plain", job.job_id)}
+                      onClick={() => {
+                        setColumn(columnIndex);
+                        setRow(rowIndex);
+                      }}
+                      onDoubleClick={() => open(job)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
                           open(job);
-                        }}
-                        className="min-w-0 truncate text-left text-sm font-medium text-fg hover:underline"
-                      >
-                        {job.title}
-                      </button>
-                      <Menu
-                        trigger={({ toggle }) => (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            aria-label="Card actions"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              toggle();
-                            }}
-                          >
-                            <MoreHorizontal size={14} aria-hidden="true" />
-                          </Button>
-                        )}
-                        items={[
-                          ...PIPELINE_STATUSES.filter((status) => status !== job.status).map(
-                            (status) => ({
-                              label: `Move to ${STATUS_LABELS[status]}`,
-                              onSelect: () => move(job, status),
-                            }),
-                          ),
-                          {
-                            label: "Change status with a note…",
-                            onSelect: () => setStatusFor(job),
-                          },
-                          {
-                            label: "Open posting",
-                            onSelect: () => actions.openPosting(job),
-                            disabled: !job.job_url,
-                          },
-                          {
-                            label: "Blacklist…",
-                            onSelect: () => void actions.blacklist([job]),
-                            danger: true,
-                          },
-                        ]}
-                      />
-                    </div>
-                    <div className="truncate text-xs text-fg-muted">
-                      {job.company}
-                      {job.location ? ` · ${job.location}` : ""}
-                    </div>
-                    <div className="mt-1 flex items-center justify-between gap-2">
-                      <ScoreBar score={job.relevance_score} />
-                      <span className="text-[11px] text-fg-faint">
-                        {relativeDays(job.status_changed_at ?? job.last_seen)}
-                      </span>
-                    </div>
-                    {job.labels.length || job.attachments_count ? (
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {job.labels.map((label) => (
-                          <Badge key={label} tone="accent">
-                            {label}
-                          </Badge>
-                        ))}
-                        {job.attachments_count ? (
-                          <Badge tone="positive">{job.attachments_count} files</Badge>
-                        ) : null}
+                        }
+                      }}
+                      className={`rounded-md border bg-surface p-2 text-left shadow-sm ${
+                        isSelected ? "border-accent ring-1 ring-accent/40" : "border-edge"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-1">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            open(job);
+                          }}
+                          className="min-w-0 truncate text-left text-sm font-medium text-fg hover:underline"
+                        >
+                          {job.title}
+                        </button>
+                        <Menu
+                          trigger={({ toggle }) => (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              aria-label="Card actions"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                toggle();
+                              }}
+                            >
+                              <MoreHorizontal size={14} aria-hidden="true" />
+                            </Button>
+                          )}
+                          items={[
+                            ...PIPELINE_STATUSES.filter((status) => status !== job.status).map(
+                              (status) => ({
+                                label: `Move to ${STATUS_LABELS[status]}`,
+                                onSelect: () => move(job, status),
+                              }),
+                            ),
+                            {
+                              label: "Change status with a note…",
+                              onSelect: () => setStatusFor(job),
+                            },
+                            {
+                              label: "Open posting",
+                              onSelect: () => actions.openPosting(job),
+                              disabled: !job.job_url,
+                            },
+                            {
+                              label: "Blacklist…",
+                              onSelect: () => void actions.blacklist([job]),
+                              danger: true,
+                            },
+                          ]}
+                        />
                       </div>
-                    ) : null}
-                  </div>
-                );
-              })}
+                      <div className="truncate text-xs text-fg-muted">
+                        {job.company}
+                        {job.location ? ` · ${job.location}` : ""}
+                      </div>
+                      <div className="mt-1 flex items-center justify-between gap-2">
+                        <ScoreBar score={job.relevance_score} />
+                        <span className="text-[11px] text-fg-faint">
+                          {relativeDays(job.status_changed_at ?? job.last_seen)}
+                        </span>
+                      </div>
+                      {job.labels.length || job.attachments_count ? (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {job.labels.map((label) => (
+                            <Badge key={label} tone="accent">
+                              {label}
+                            </Badge>
+                          ))}
+                          {job.attachments_count ? (
+                            <Badge tone="positive">{job.attachments_count} files</Badge>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>

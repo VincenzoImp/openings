@@ -102,7 +102,10 @@ export function PostingTab({ job, onEdit }: { job: JobDetail; onEdit: () => void
           {job.raw_json ? (
             <details className="mt-4">
               <summary className="cursor-pointer text-xs text-fg-muted">Raw source payload</summary>
-              <pre className="mt-2 max-h-80 overflow-auto rounded bg-surface-2 p-2 text-[11px] text-fg-muted">
+              <pre
+                tabIndex={0}
+                className="mt-2 max-h-80 overflow-auto rounded bg-surface-2 p-2 text-[11px] text-fg-muted"
+              >
                 {job.raw_json}
               </pre>
             </details>

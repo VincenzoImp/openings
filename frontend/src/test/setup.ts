@@ -40,7 +40,7 @@ if (typeof URL.createObjectURL !== "function") {
 }
 
 // jsdom has no layout, so virtualized lists would measure a 0px viewport and
-// render nothing. Give scroll containers (role="listbox") a fixed size.
+// render nothing. Give the virtualized job list a fixed size.
 for (const [name, value] of [
   ["offsetHeight", 600],
   ["offsetWidth", 900],
@@ -48,7 +48,7 @@ for (const [name, value] of [
   Object.defineProperty(HTMLElement.prototype, name, {
     configurable: true,
     get(this: HTMLElement) {
-      return this.getAttribute("role") === "listbox" ? value : 0;
+      return this.getAttribute("data-testid") === "job-list" ? value : 0;
     },
   });
 }

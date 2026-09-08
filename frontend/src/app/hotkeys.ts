@@ -81,7 +81,8 @@ export function useHotkeys(scope: HotkeyScope, bindings: HotkeyBinding[], enable
 }
 
 export function useShortcutList(): ShortcutEntry[] {
+  // The registry object is rebuilt on every (un)registration, so this memo
+  // re-reads the list exactly when the bindings change.
   const registry = useContext(HotkeyContext);
-  const version = registry?.version ?? 0;
-  return useMemo(() => registry?.list() ?? [], [registry, version]);
+  return useMemo(() => registry?.list() ?? [], [registry]);
 }

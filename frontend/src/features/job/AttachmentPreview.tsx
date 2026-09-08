@@ -108,7 +108,10 @@ export function AttachmentPreview({
       return <MarkdownBody text={state.text} className="rounded border border-edge p-3" />;
     case "text":
       return (
-        <pre className="max-h-[70dvh] overflow-auto whitespace-pre-wrap rounded border border-edge bg-surface-2 p-3 text-xs text-fg">
+        <pre
+          tabIndex={0}
+          className="max-h-[70dvh] overflow-auto whitespace-pre-wrap rounded border border-edge bg-surface-2 p-3 text-xs text-fg"
+        >
           {state.text}
         </pre>
       );

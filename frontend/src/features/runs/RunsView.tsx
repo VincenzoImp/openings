@@ -92,7 +92,10 @@ function RunCard({ run, now }: { run: RunRecord; now: number }) {
         {errorCount > 0 ? (
           <details className="border-t border-edge px-3 py-2">
             <summary className="cursor-pointer text-xs text-negative">{errorCount} errors</summary>
-            <div className="mt-1 max-h-72 overflow-auto rounded bg-negative/8 p-2 text-[11px] text-fg">
+            <div
+              tabIndex={0}
+              className="mt-1 max-h-72 overflow-auto rounded bg-negative/8 p-2 text-[11px] text-fg"
+            >
               {run.errors.length ? (
                 <ul className="mb-2">
                   {run.errors.map((error, index) => (

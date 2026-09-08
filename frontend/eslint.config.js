@@ -6,7 +6,7 @@ import tseslint from "typescript-eslint";
 import prettier from "eslint-config-prettier";
 
 export default tseslint.config(
-  { ignores: ["dist", "coverage"] },
+  { ignores: ["dist", "coverage", "playwright-report", "test-results"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -32,9 +32,9 @@ export default tseslint.config(
       "react-hooks/exhaustive-deps": "warn",
     },
   },
-  // Test files rely on jsdom + vitest globals.
+  // Test files rely on jsdom + vitest globals; e2e specs run under Node.
   {
-    files: ["**/*.test.{ts,tsx}", "src/test/**/*.{ts,tsx}"],
+    files: ["**/*.test.{ts,tsx}", "src/test/**/*.{ts,tsx}", "e2e/**/*.ts", "playwright.config.ts"],
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },
     },

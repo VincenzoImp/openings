@@ -162,7 +162,11 @@ export function CompaniesView() {
               ))}
             </Select>
           </div>
-          <ul className="hidden max-h-[60dvh] overflow-auto lg:block" aria-label="Companies">
+          <ul
+            className="hidden max-h-[60dvh] overflow-auto lg:block"
+            aria-label="Companies"
+            tabIndex={0}
+          >
             {companies.map((entry) => (
               <li key={entry.value}>
                 <button

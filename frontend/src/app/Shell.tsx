@@ -183,7 +183,11 @@ export function Shell({ view, children }: { view: View; children: ReactNode }) {
                     {count}
                   </span>
                 ) : null}
-                {finePointer ? <Kbd>{entry.key}</Kbd> : null}
+                {finePointer ? (
+                  <span aria-hidden="true">
+                    <Kbd>{entry.key}</Kbd>
+                  </span>
+                ) : null}
               </a>
             );
           })}
