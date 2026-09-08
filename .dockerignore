@@ -75,3 +75,4 @@ docker-compose.override.yml
 
 # Local user config should never be baked into an image build context
 config/settings.yaml
+settings.yaml
