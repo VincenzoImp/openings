@@ -1,0 +1,326 @@
+# =============================================================================
+# Openings — settings.yaml reference
+# =============================================================================
+#
+# This file configures two things, and only two things:
+#
+#   1. INTAKE   which sources are read, what they are asked for, how often
+#   2. SCORING  how a posting is ranked against your own criteria
+#
+# It never describes the state of a job. Whether you shortlisted, applied,
+# interviewed or were rejected lives in the database, changed through the
+# dashboard, the REST API or the MCP tools.
+#
+# Every value shown here is the default. Unknown keys fail startup on purpose,
+# so a typo or a removed option is noticed instead of silently ignored.
+#
+# Getting started:
+#   1. Copy this file to settings.yaml next to docker-compose.yml.
+#   2. Set sources.jobspy.locations and queries for your search.
+#   3. Write scoring.keywords and scoring.weights for your profile.
+#   4. Optionally add companies (ATS feeds), feeds (RSS) and Telegram.
+#
+# Secrets accept indirection from the environment: "$TELEGRAM_BOT_TOKEN" is
+# read from the variable TELEGRAM_BOT_TOKEN at startup.
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# profile — informational. Shown in the log banner.
+# -----------------------------------------------------------------------------
+profile:
+  name: ""
+  headline: ""
+  target: ""
+
+
+# -----------------------------------------------------------------------------
+# sources — where postings come from. Every source produces the same canonical
+# job object; scoring, deduplication, blacklist and notifications are shared.
+# -----------------------------------------------------------------------------
+sources:
+
+  # Free-text User-Agent for every outbound request. Leave null for a default.
+  user_agent: null
+
+  # Timeout in seconds for ATS, RSS and Adzuna requests.
+  timeout_seconds: 30.0
+
+  # ---------------------------------------------------------------------------
+  # jobspy — job boards through the JobSpy library (linkedin, indeed, glassdoor,
+  # google, zip_recruiter, bayt, naukri, bdjobs). Each query is run at each
+  # location for each job type, so the number of requests is
+  #   len(queries) x len(locations) x len(job_types).
+  # LinkedIn rate-limits aggressively: keep parallel.max_workers low and a
+  # site delay of a few seconds. Google Jobs answers with HTTP 429 to most
+  # unauthenticated clients; treat it as unreliable.
+  # ---------------------------------------------------------------------------
+  jobspy:
+    enabled: true
+    sites:
+      - "linkedin"
+
+    # Locations exactly as the board understands them. Examples:
+    #   "Remote"   "Berlin, Germany"   "London, UK"   "Switzerland"
+    # A country name searches nationwide where the board supports it.
+    locations:
+      - "Remote"
+
+    # Queries grouped by category. Categories are for your own organization;
+    # every term in every category is searched.
+    queries:
+      engineering:
+        - "software engineer"
+        - "backend engineer"
+        - "data engineer"
+      early_career:
+        - "graduate software engineer"
+
+    # fulltime, parttime, contract, temporary, internship, perdiem, nights,
+    # summer, volunteer. Each entry costs a separate request per query.
+    job_types:
+      - "fulltime"
+
+    # Only postings newer than this. Pair it with scheduler.interval_hours so
+    # consecutive runs overlap slightly and nothing is missed.
+    hours_old: 72
+
+    # Results requested per query per site. Boards cap around 1000; LinkedIn
+    # starts rate-limiting around page 10 (~250 results).
+    results_wanted: 50
+
+    # Search radius in miles around each location (ignored for "Remote").
+    distance: 50
+
+    # Restrict to remote postings only.
+    is_remote: false
+
+    # null = no filter, true = easy-apply only, false = exclude easy-apply.
+    easy_apply: null
+
+    # Skip the first N results (pagination).
+    offset: 0
+
+    # Indeed domain to use, by country name: USA, UK, Germany, Switzerland...
+    country_indeed: "USA"
+
+    # Normalize hourly, weekly and monthly pay to annual amounts.
+    enforce_annual_salary: true
+
+    # markdown, html or plain.
+    description_format: "markdown"
+
+    # JobSpy log verbosity: 0 errors, 1 warnings, 2 everything.
+    verbose: 1
+
+    # Fetch the full LinkedIn description (doubles LinkedIn requests).
+    linkedin_fetch_description: true
+
+    # Restrict LinkedIn to specific company ids, or null for all companies.
+    linkedin_company_ids: null
+
+    # Google Jobs needs the exact search string from its own search box.
+    google_search_term: null
+
+    # "user:pass@host:port" or "host:port" entries, rotated; null for none.
+    proxies: null
+
+    # Path to a CA bundle for HTTPS proxies; null for the system default.
+    ca_cert: null
+
+    throttling:
+      enabled: true
+      default_delay: 2.0
+      site_delays:
+        linkedin: 4.0
+        indeed: 1.5
+        glassdoor: 2.0
+        google: 2.5
+      jitter: 0.3               # 0.0 to 1.0, fraction of the delay
+      rate_limit_cooldown: 60.0
+
+    retry:
+      max_attempts: 3
+      base_delay: 3.0
+      backoff_factor: 2.0
+
+    parallel:
+      max_workers: 3
+
+    # Boards return "related" results. The post filter keeps only rows whose
+    # text actually contains the query terms (and the location), with fuzzy
+    # matching so Zürich and Zurich are the same word.
+    post_filter:
+      enabled: true
+      min_similarity: 80        # 0 to 100
+      check_query_terms: true
+      check_location: true
+
+  # ---------------------------------------------------------------------------
+  # companies — named employers whose applicant tracking system exposes a
+  # public postings feed. No key needed. Supported: greenhouse, lever, ashby,
+  # smartrecruiters. Find the slug in the company's careers URL:
+  #   boards.greenhouse.io/<slug>   jobs.lever.co/<slug>
+  #   jobs.ashbyhq.com/<slug>       careers.smartrecruiters.com/<slug>
+  # `locations` is an optional list of substrings; a posting is kept when its
+  # location contains any of them. Omit it to keep every posting.
+  # ---------------------------------------------------------------------------
+  companies: []
+  # companies:
+  #   - name: "Example Corp"
+  #     ats: "greenhouse"
+  #     slug: "examplecorp"
+  #     locations: ["Berlin", "Remote"]
+
+  # ---------------------------------------------------------------------------
+  # feeds — RSS or Atom feeds of postings. `locations` works as above and is
+  # applied only to entries that carry a location.
+  # ---------------------------------------------------------------------------
+  feeds: []
+  # feeds:
+  #   - name: "Example board"
+  #     url: "https://example.com/jobs.rss"
+
+  # ---------------------------------------------------------------------------
+  # adzuna — the Adzuna search API (developer.adzuna.com, free key). Country
+  # codes follow Adzuna: gb, us, de, fr, it, ch, nl, at, ... Descriptions are
+  # snippets, so scoring has less text to work with than with other sources.
+  # ---------------------------------------------------------------------------
+  adzuna:
+    enabled: false
+    country: ""
+    queries: []
+    locations: []
+    app_id: "$ADZUNA_APP_ID"
+    app_key: "$ADZUNA_APP_KEY"
+    results_per_page: 50
+    max_pages: 2
+    max_days_old: 7
+
+
+# -----------------------------------------------------------------------------
+# scoring — how a posting is ranked. For each category in `keywords`, if ANY
+# of its terms appears in the posting text (title, description, company,
+# location; case-insensitive; accents ignored), the category's weight is
+# added once. Negative weights subtract. Every category in keywords needs an
+# entry in weights.
+#
+#   save_threshold    minimum score for a posting to be stored at all
+#   notify_threshold  minimum score for a posting to appear in notifications
+#
+# Rows below save_threshold in status `new` are removed on the next start;
+# rows you acted on are never removed automatically.
+# -----------------------------------------------------------------------------
+scoring:
+  save_threshold: 0
+  notify_threshold: 20
+
+  weights:
+    role: 25
+    stack: 15
+    domain: 10
+    location: 5
+    # Negative categories express hard limits: a language you do not speak,
+    # a years bar you cannot meet, a domain you are not moving into.
+    language_required: -60
+    years_bar_high: -40
+
+  keywords:
+    role:
+      - "software engineer"
+      - "backend engineer"
+      - "data engineer"
+    stack:
+      - "python"
+      - "typescript"
+      - "postgresql"
+    domain:
+      - "data pipeline"
+      - "distributed systems"
+    location:
+      - "remote"
+    language_required:
+      - "fluent in german"
+      - "native french"
+    years_bar_high:
+      - "8+ years"
+      - "10+ years"
+
+
+# -----------------------------------------------------------------------------
+# scheduler — the continuous loop (`openings scheduler`). `openings run`
+# collects once and ignores this section.
+# -----------------------------------------------------------------------------
+scheduler:
+  interval_hours: 12
+  run_on_startup: true
+  retry_on_failure: true
+  retry_delay_minutes: 30
+  max_retries: 3                # 0 = unlimited
+
+
+# -----------------------------------------------------------------------------
+# notifications — a digest after every run with the postings that are new in
+# that run and score at or above scoring.notify_threshold. Nothing already
+# seen is repeated.
+# -----------------------------------------------------------------------------
+notifications:
+  enabled: false
+  telegram:
+    enabled: false
+    bot_token: "$TELEGRAM_BOT_TOKEN"
+    chat_ids: []
+    send_summary: true          # a header with run statistics
+    max_jobs: 20                # cap on postings per digest
+    jobs_per_chunk: 10          # postings per Telegram message, at most 15
+
+
+# -----------------------------------------------------------------------------
+# retention — applied at every start and by `run_cleanup`. Only jobs in
+# status `new` are affected; anything you shortlisted, applied to or
+# otherwise moved is protected.
+# -----------------------------------------------------------------------------
+retention:
+  max_age_days: 30              # drop `new` jobs not seen for this long
+  purge_blacklist_after_days: 90
+
+
+# -----------------------------------------------------------------------------
+# attachments — files stored per job (CV, cover letter, form answers).
+# -----------------------------------------------------------------------------
+attachments:
+  max_size_mb: 20
+
+
+# -----------------------------------------------------------------------------
+# vector_search — local semantic search over stored jobs, embedded with
+# ChromaDB's bundled ONNX model. No external service.
+# -----------------------------------------------------------------------------
+vector_search:
+  enabled: true
+  embed_on_save: true
+  default_results: 20
+  backfill_on_startup: true
+  batch_size: 100
+  sync_interval_minutes: 30
+
+
+# -----------------------------------------------------------------------------
+# logging — file at {OPENINGS_DATA_DIR}/logs/openings.log plus console.
+# -----------------------------------------------------------------------------
+logging:
+  level: "INFO"
+  max_size_mb: 10
+  backup_count: 5
+  timezone: "UTC"               # IANA name, e.g. Europe/Berlin
+
+
+# =============================================================================
+# Storage layout (fixed, relative to OPENINGS_DATA_DIR; /data in Docker)
+#
+#   config/settings.yaml   this file
+#   db/openings.db         the database
+#   attachments/<job_id>/  uploaded files
+#   chroma/                vector index
+#   logs/openings.log      log
+# =============================================================================

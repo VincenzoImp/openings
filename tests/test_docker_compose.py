@@ -29,8 +29,8 @@ def test_runtime_services_use_installed_entrypoints():
     compose = _load_yaml("docker-compose.yml")
     services = compose["services"]
 
-    assert services["scheduler"]["command"] == ["job-search", "scheduler"]
-    assert services["web"]["command"] == ["job-search-web"]
+    assert services["scheduler"]["command"] == ["openings", "scheduler"]
+    assert services["web"]["command"] == ["openings", "web"]
 
 
 def test_docker_image_does_not_ship_legacy_command_wrappers():
@@ -47,7 +47,7 @@ def test_published_ports_are_localhost_by_default():
     services = compose["services"]
 
     assert services["web"]["ports"] == [
-        "${JOB_SEARCH_WEB_BIND:-127.0.0.1}:${JOB_SEARCH_WEB_PORT:-8501}:8501"
+        "${OPENINGS_WEB_BIND:-127.0.0.1}:${OPENINGS_WEB_PORT:-8501}:8501"
     ]
 
 
