@@ -31,8 +31,7 @@ results/
 data/
 logs/
 
-# Documentation (not needed in container)
-README.md
+# The package metadata reads README.md at build time; LICENSE is not needed.
 LICENSE
 
 # Temporary files
