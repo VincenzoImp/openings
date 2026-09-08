@@ -31,4 +31,4 @@ def test_docs_do_not_reference_removed_state_vocabulary():
 
 def test_changelog_starts_at_one():
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "## [1.0.0]" in changelog
+    assert "## [0.1.0]" in changelog

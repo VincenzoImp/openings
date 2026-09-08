@@ -68,4 +68,4 @@ docker/                    entrypoint and smoke test
   example identical to `config/settings.example.yaml`.
 - Nothing in code, defaults or docs assumes a country, language, currency or
   board. Those are user configuration.
-- No compatibility layers for earlier products; Openings starts at 1.0.
+- No compatibility layers for earlier products; Openings starts at 0.1.0.
