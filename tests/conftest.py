@@ -1,398 +1,158 @@
-"""Pytest configuration and shared fixtures for Job Search Tool tests.
+"""Shared fixtures."""
 
-This module provides centralized fixtures used across all test modules:
-- Job and JobDBRecord fixtures
-- Config fixtures with various configurations
-- Database fixtures with temporary databases
-- Mock fixtures for external dependencies (JobSpy, Telegram)
-"""
+from __future__ import annotations
 
 import sys
-import tempfile
-from datetime import datetime
 from pathlib import Path
 from typing import Generator
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
-import pandas as pd
 import pytest
+import yaml
 
-# Mock jobspy before any imports that might use it
-# This prevents ImportError when jobspy is not installed in test environment
-sys.modules["jobspy"] = MagicMock()
+# JobSpy is only imported inside the jobspy source at call time; keep the
+# module importable in environments where the scraper is not installed.
+sys.modules.setdefault("jobspy", MagicMock())
 
-
-# =============================================================================
-# GLOBAL STATE RESET
-# =============================================================================
-
-
-@pytest.fixture(autouse=True)
-def _reset_config_singleton():
-    """Reset the config singleton between tests."""
-    import job_search_tool.config as config_module
-
-    original = config_module._config
-    yield
-    config_module._config = original
+ROOT = Path(__file__).resolve().parents[1]
+EXAMPLE_SETTINGS = ROOT / "config" / "settings.example.yaml"
 
 
-# =============================================================================
-# JOB FIXTURES
-# =============================================================================
-
-
-@pytest.fixture
-def sample_job_data() -> dict:
-    """Basic job data dictionary for creating Job instances."""
+def minimal_settings() -> dict:
+    """The smallest configuration that exercises scoring meaningfully."""
     return {
-        "title": "Software Engineer",
-        "company": "Test Corp",
-        "location": "New York, NY",
-        "job_url": "https://example.com/job/123",
-        "description": "Build amazing software products",
-        "is_remote": True,
-        "job_type": "fulltime",
-        "date_posted": "2024-01-15",
-        "min_amount": 100000.0,
-        "max_amount": 150000.0,
-        "currency": "USD",
-        "relevance_score": 25,
+        "sources": {
+            "jobspy": {
+                "enabled": False,
+                "locations": ["Remote"],
+                "queries": {"core": ["software engineer"]},
+            }
+        },
+        "scoring": {
+            "save_threshold": 0,
+            "notify_threshold": 20,
+            "weights": {"role": 25, "stack": 10, "penalty": -40},
+            "keywords": {
+                "role": ["software engineer", "backend"],
+                "stack": ["python", "postgresql"],
+                "penalty": ["10+ years"],
+            },
+        },
+        "vector_search": {"enabled": False, "embed_on_save": False, "backfill_on_startup": False},
+        "notifications": {"enabled": False},
     }
 
 
 @pytest.fixture
-def sample_job(sample_job_data):
-    """Create a sample Job instance."""
-    from job_search_tool.models import Job
-
-    return Job.from_dict(sample_job_data)
-
-
-@pytest.fixture
-def sample_job_db_record(sample_job):
-    """Create a sample JobDBRecord from a Job."""
-    from job_search_tool.models import JobDBRecord
-
-    return JobDBRecord.from_job(
-        sample_job,
-        site="linkedin",
-        job_level="senior",
-        company_url="https://example.com/company",
-    )
+def data_dir(tmp_path: Path) -> Path:
+    directory = tmp_path / "data"
+    (directory / "config").mkdir(parents=True)
+    return directory
 
 
 @pytest.fixture
-def multiple_jobs() -> list:
-    """Create multiple Job instances for batch testing."""
-    from job_search_tool.models import Job
-
-    jobs_data = [
-        {
-            "title": "Software Engineer",
-            "company": "Tech Corp",
-            "location": "New York, NY",
-            "relevance_score": 30,
-        },
-        {
-            "title": "Backend Developer",
-            "company": "Startup Inc",
-            "location": "San Francisco, CA",
-            "relevance_score": 25,
-        },
-        {
-            "title": "Full Stack Developer",
-            "company": "Big Tech Co",
-            "location": "Remote",
-            "is_remote": True,
-            "relevance_score": 35,
-        },
-    ]
-    return [Job.from_dict(data) for data in jobs_data]
+def settings_dict() -> dict:
+    return minimal_settings()
 
 
 @pytest.fixture
-def sample_dataframe(sample_job_data) -> pd.DataFrame:
-    """Create a sample DataFrame with job data."""
-    return pd.DataFrame([sample_job_data])
+def config(data_dir: Path, settings_dict: dict):
+    from openings.config import parse_config
+
+    return parse_config(settings_dict, data_dir=data_dir)
 
 
 @pytest.fixture
-def multiple_jobs_dataframe() -> pd.DataFrame:
-    """Create a DataFrame with multiple jobs."""
-    jobs_data = [
-        {
-            "title": "Software Engineer",
-            "company": "Tech Corp",
-            "location": "New York, NY",
-            "site": "linkedin",
-            "is_remote": False,
-            "relevance_score": 30,
-        },
-        {
-            "title": "Backend Developer",
-            "company": "Startup Inc",
-            "location": "San Francisco, CA",
-            "site": "indeed",
-            "is_remote": False,
-            "relevance_score": 25,
-        },
-        {
-            "title": "Full Stack Developer",
-            "company": "Big Tech Co",
-            "location": "Remote",
-            "site": "glassdoor",
-            "is_remote": True,
-            "relevance_score": 35,
-        },
-    ]
-    return pd.DataFrame(jobs_data)
-
-
-# =============================================================================
-# CONFIG FIXTURES
-# =============================================================================
+def settings_file(data_dir: Path, settings_dict: dict) -> Path:
+    path = data_dir / "config" / "settings.yaml"
+    path.write_text(yaml.safe_dump(settings_dict), encoding="utf-8")
+    return path
 
 
 @pytest.fixture
-def default_config():
-    """Create a default Config instance with all defaults."""
-    from job_search_tool.config import Config
+def env(
+    monkeypatch: pytest.MonkeyPatch, data_dir: Path, settings_file: Path
+) -> Generator[Path, None, None]:
+    """Point the process at the temp data directory and reset every singleton."""
+    from openings import config as config_module
+    from openings import database as database_module
+    from openings.web import service as service_module
 
-    return Config()
-
-
-@pytest.fixture
-def scoring_config():
-    """Create a ScoringConfig for testing scoring functionality."""
-    from job_search_tool.config import ScoringConfig
-
-    return ScoringConfig(
-        save_threshold=0,
-        notify_threshold=10,
-        weights={
-            "primary": 20,
-            "secondary": 10,
-            "bonus": 5,
-        },
-        keywords={
-            "primary": ["software engineer", "developer"],
-            "secondary": ["python", "javascript"],
-            "bonus": ["remote"],
-        },
-    )
+    monkeypatch.setenv("OPENINGS_DATA_DIR", str(data_dir))
+    monkeypatch.setenv("OPENINGS_CONFIG", str(settings_file))
+    monkeypatch.setenv("OPENINGS_WEB_ALLOWED_HOSTS", "testserver")
+    monkeypatch.setenv("OPENINGS_WEB_ALLOWED_ORIGINS", "http://testserver")
+    monkeypatch.delenv("OPENINGS_API_TOKEN", raising=False)
+    monkeypatch.setattr(config_module, "DATA_DIR", data_dir)
+    monkeypatch.setattr(config_module, "CONFIG_FILE", settings_file)
+    config_module.set_config(None)
+    database_module.close_database()
+    service_module.reset_service()
+    yield data_dir
+    service_module.reset_service()
+    database_module.close_database()
+    config_module.set_config(None)
 
 
 @pytest.fixture
-def test_config(scoring_config):
-    """Create a Config instance optimized for testing."""
-    from job_search_tool.config import (
-        Config,
-        DatabaseConfig,
-        LoggingConfig,
-        NotificationsConfig,
-        ParallelConfig,
-        PostFilterConfig,
-        ProfileConfig,
-        RetryConfig,
-        SchedulerConfig,
-        SearchConfig,
-        ThrottlingConfig,
-    )
+def db(data_dir: Path):
+    from openings.database import JobDatabase
 
-    return Config(
-        search=SearchConfig(
-            results_wanted=10,
-            hours_old=24,
-            sites=["indeed", "linkedin"],
-            locations=["Remote"],
+    database = JobDatabase(data_dir / "db" / "openings.db")
+    yield database
+    database.close()
+
+
+def make_job(**overrides):
+    from openings.models import Job
+
+    fields = {
+        "title": "Backend Engineer",
+        "company": "Acme",
+        "location": "Remote",
+        "source": "linkedin",
+        "job_url": "https://example.com/jobs/1",
+        "description": "Python services with PostgreSQL.",
+        "relevance_score": 35,
+    }
+    fields.update(overrides)
+    return Job.from_row(fields)
+
+
+@pytest.fixture
+def job():
+    return make_job()
+
+
+@pytest.fixture
+def jobs():
+    return [
+        make_job(),
+        make_job(
+            title="Data Engineer", company="Beta", location="Berlin, Germany", relevance_score=15
         ),
-        queries={"test": ["software engineer", "python developer"]},
-        scoring=scoring_config,
-        parallel=ParallelConfig(max_workers=2),
-        retry=RetryConfig(max_attempts=2, base_delay=0.1, backoff_factor=1.5),
-        throttling=ThrottlingConfig(enabled=False),
-        post_filter=PostFilterConfig(enabled=True, min_similarity=80),
-        logging=LoggingConfig(level="DEBUG"),
-        database=DatabaseConfig(),
-        profile=ProfileConfig(name="Test User"),
-        scheduler=SchedulerConfig(),
-        notifications=NotificationsConfig(enabled=False),
-    )
+        make_job(
+            title="Sales Manager",
+            company="Gamma",
+            location="Remote",
+            relevance_score=-40,
+            source="greenhouse",
+        ),
+    ]
 
 
 @pytest.fixture
-def telegram_config():
-    """Create a TelegramConfig for testing notifications."""
-    from job_search_tool.config import TelegramConfig
+def service(env: Path):
+    from openings.web.service import get_service
 
-    return TelegramConfig(
-        enabled=True,
-        bot_token="123456:ABC-test-token",
-        chat_ids=["12345", "67890"],
-        send_summary=True,
-        max_jobs_in_message=5,
-        jobs_per_chunk=10,
-        include_top_overall=True,
-        max_top_overall=10,
-    )
+    return get_service()
 
 
 @pytest.fixture
-def notifications_config(telegram_config):
-    """Create a NotificationsConfig for testing."""
-    from job_search_tool.config import NotificationsConfig
+def client(env: Path):
+    from fastapi.testclient import TestClient
 
-    return NotificationsConfig(
-        enabled=True,
-        telegram=telegram_config,
-    )
+    from openings.web.app import create_app
 
-
-# =============================================================================
-# DATABASE FIXTURES
-# =============================================================================
-
-
-@pytest.fixture
-def temp_db_path() -> Generator[Path, None, None]:
-    """Create a temporary database path."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        yield Path(tmpdir) / "test.db"
-
-
-@pytest.fixture
-def temp_db(temp_db_path) -> Generator:
-    """Create a temporary JobDatabase instance."""
-    from job_search_tool.database import JobDatabase
-
-    db = JobDatabase(temp_db_path)
-    yield db
-
-
-@pytest.fixture
-def populated_db(temp_db, multiple_jobs):
-    """Create a database pre-populated with test jobs."""
-    for job in multiple_jobs:
-        temp_db.save_job(job, site="linkedin")
-    return temp_db
-
-
-# =============================================================================
-# MOCK FIXTURES
-# =============================================================================
-
-
-@pytest.fixture
-def mock_jobspy():
-    """Mock the jobspy scrape_jobs function."""
-    with patch("job_search_tool.search_jobs.scrape_jobs") as mock:
-        # Return an empty DataFrame by default
-        mock.return_value = pd.DataFrame()
-        yield mock
-
-
-@pytest.fixture
-def mock_jobspy_with_results(sample_dataframe):
-    """Mock jobspy to return sample results."""
-    with patch("job_search_tool.search_jobs.scrape_jobs") as mock:
-        mock.return_value = sample_dataframe.copy()
-        yield mock
-
-
-@pytest.fixture
-def mock_telegram_bot():
-    """Mock the Telegram Bot for notification testing."""
-    with patch("job_search_tool.notifier.Bot") as mock_bot_class:
-        mock_bot = AsyncMock()
-        mock_bot.send_message = AsyncMock(return_value=MagicMock())
-        mock_bot_class.return_value = mock_bot
-        yield mock_bot
-
-
-# =============================================================================
-# NOTIFICATION DATA FIXTURES
-# =============================================================================
-
-
-@pytest.fixture
-def sample_notification_data(sample_job_db_record):
-    """Create sample NotificationData for testing."""
-    from job_search_tool.notifier import NotificationData
-
-    return NotificationData(
-        run_timestamp=datetime.now(),
-        total_jobs_found=10,
-        new_jobs_count=3,
-        updated_jobs_count=2,
-        avg_score=25.5,
-        new_jobs=[sample_job_db_record],
-        top_jobs_overall=[sample_job_db_record],
-        total_jobs_in_db=100,
-    )
-
-
-@pytest.fixture
-def empty_notification_data():
-    """Create empty NotificationData for testing edge cases."""
-    from job_search_tool.notifier import NotificationData
-
-    return NotificationData(
-        run_timestamp=datetime.now(),
-        total_jobs_found=0,
-        new_jobs_count=0,
-        updated_jobs_count=0,
-        avg_score=0.0,
-        new_jobs=[],
-        top_jobs_overall=[],
-        total_jobs_in_db=0,
-    )
-
-
-# =============================================================================
-# EXPORTER FIXTURES
-# =============================================================================
-
-
-@pytest.fixture
-def export_dataframe() -> pd.DataFrame:
-    """Create a DataFrame suitable for export testing."""
-    return pd.DataFrame(
-        {
-            "title": ["Software Engineer", "Data Scientist"],
-            "company": ["Corp A", "Corp B"],
-            "location": ["NYC", "SF"],
-            "relevance_score": [30, 25],
-            "job_url": ["https://example.com/1", "https://example.com/2"],
-        }
-    )
-
-
-# =============================================================================
-# HELPER FUNCTIONS
-# =============================================================================
-
-
-def create_job_row(
-    title: str = "Developer",
-    company: str = "Corp",
-    location: str = "NYC",
-    description: str = "",
-    **kwargs,
-) -> pd.Series:
-    """Helper to create a pandas Series representing a job row."""
-    data = {
-        "title": title,
-        "company": company,
-        "location": location,
-        "description": description,
-        **kwargs,
-    }
-    return pd.Series(data)
-
-
-# Make helper available as fixture too
-@pytest.fixture
-def create_job_row_fixture():
-    """Fixture that returns the create_job_row helper function."""
-    return create_job_row
+    with TestClient(create_app()) as test_client:
+        yield test_client

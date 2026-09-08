@@ -1,38 +1,33 @@
-name: jobsearch
+name: openings
 
-# Two runtime roles sharing a single Docker-managed named volume for all
-# application state (database, vector store, results, logs). The user-provided
-# settings.yaml is bind-mounted as a read-only file so it can be edited with
-# any host-side editor.
+# Two containers, one image, one data volume.
 #
-#   scheduler  -> `job-search scheduler`  (continuous search loop)
-#   web        -> `job-search-web`        (React dashboard, REST API, MCP endpoint)
+#   scheduler  -> `openings scheduler`  collects on the configured interval
+#   web        -> `openings web`        dashboard, REST API, MCP endpoint
 #
-# All containers run as non-root (`appuser`, UID 1000) in every environment —
-# no host-side `chown`, no UID override, no privileged init. The named volume
-# inherits ownership from the image; settings.yaml is read-only so the
-# mismatch between host UID and container UID doesn't matter.
+# settings.yaml is bind-mounted read-only from the host so it can be edited
+# with any editor; edit it and `docker compose restart`. Everything else
+# (database, attachments, vector index, logs) lives in the named volume.
 #
-# Network defaults harden a couple of common home-lab / cloud-VM edge cases:
-# IPv6 is disabled on the stack bridge (prevents [Errno 113] No route to host
-# from broken dual-stack routing) and explicit public DNS resolvers bypass
-# the embedded Docker DNS → host DNS chain.
+# Both containers run as an unprivileged user (UID 1000). The web port binds to
+# localhost by default; set OPENINGS_WEB_BIND=0.0.0.0 in .env only on a trusted
+# network.
 
 networks:
   default:
-    name: jobsearch
+    name: openings
     enable_ipv6: false
 
 volumes:
-  jobsearch-data:
-    name: jobsearch-data
+  openings-data:
+    name: openings-data
 
 services:
   scheduler:
-    image: vincenzoimp/job-search-tool:latest
-    container_name: jobsearch-scheduler
+    image: vincenzoimp/openings:latest
+    container_name: openings-scheduler
     restart: unless-stopped
-    command: ["job-search", "scheduler"]
+    command: ["openings", "scheduler"]
     dns:
       - 1.1.1.1
       - 8.8.8.8
@@ -40,22 +35,22 @@ services:
       - path: .env
         required: false
     volumes:
-      - jobsearch-data:/data
+      - openings-data:/data
       - ./settings.yaml:/data/config/settings.yaml:ro
 
   web:
-    image: vincenzoimp/job-search-tool:latest
-    container_name: jobsearch-web
+    image: vincenzoimp/openings:latest
+    container_name: openings-web
     restart: unless-stopped
-    command: ["job-search-web"]
+    command: ["openings", "web"]
     dns:
       - 1.1.1.1
       - 8.8.8.8
     ports:
-      - "${JOB_SEARCH_WEB_BIND:-127.0.0.1}:${JOB_SEARCH_WEB_PORT:-8501}:8501"
+      - "${OPENINGS_WEB_BIND:-127.0.0.1}:${OPENINGS_WEB_PORT:-8501}:8501"
     env_file:
       - path: .env
         required: false
     volumes:
-      - jobsearch-data:/data
+      - openings-data:/data
       - ./settings.yaml:/data/config/settings.yaml:ro

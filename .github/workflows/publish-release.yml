@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IMAGE_NAME: ${{ vars.DOCKERHUB_IMAGE || 'vincenzoimp/job-search-tool' }}
+  IMAGE_NAME: ${{ vars.DOCKERHUB_IMAGE || 'vincenzoimp/openings' }}
 
 jobs:
   docker:

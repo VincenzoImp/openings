@@ -1,188 +1,79 @@
-"""Tests for models module."""
-
 from datetime import date
 
+import pandas as pd
 
-from job_search_tool.models import Job, JobDBRecord, SearchSummary, generate_job_id
+from openings.models import (
+    PROTECTED_STATUSES,
+    Job,
+    JobStatus,
+    RunSummary,
+    SourceRunStats,
+    generate_job_id,
+    parse_date,
+)
 
 
-class TestJob:
-    """Tests for Job dataclass."""
+def test_job_id_is_normalized():
+    a = generate_job_id("Backend  Engineer", "Acme", "Zürich, Switzerland")
+    b = generate_job_id("backend engineer", "ACME", "Zürich, Switzerland")
+    assert a == b
+    assert len(a) == 64
 
-    def test_job_id_generation(self):
-        """Test that job_id is generated correctly."""
-        job = Job(
-            title="Software Engineer",
-            company="Test Corp",
-            location="New York, NY",
-        )
 
-        # Verify it's a full SHA256 hash (64 characters)
-        assert len(job.job_id) == 64
-        assert all(c in "0123456789abcdef" for c in job.job_id)
+def test_job_id_changes_with_location():
+    assert generate_job_id("Engineer", "Acme", "Zurich") != generate_job_id(
+        "Engineer", "Acme", "Geneva"
+    )
 
-    def test_job_id_deterministic(self):
-        """Test that same inputs produce same job_id."""
-        job1 = Job(title="Dev", company="Corp", location="NYC")
-        job2 = Job(title="Dev", company="Corp", location="NYC")
 
-        assert job1.job_id == job2.job_id
-
-    def test_job_id_case_insensitive(self):
-        """Test that job_id is case-insensitive."""
-        job1 = Job(title="Software Engineer", company="Test Corp", location="NYC")
-        job2 = Job(title="SOFTWARE ENGINEER", company="TEST CORP", location="nyc")
-
-        assert job1.job_id == job2.job_id
-
-    def test_job_id_different_for_different_jobs(self):
-        """Test that different jobs have different IDs."""
-        job1 = Job(title="Dev", company="Corp", location="NYC")
-        job2 = Job(title="Engineer", company="Corp", location="NYC")
-
-        assert job1.job_id != job2.job_id
-
-    def test_job_id_ignores_trivial_whitespace_differences(self):
-        """Test that leading/trailing and repeated whitespace do not change the ID."""
-        job1 = Job(title="Senior Engineer", company="Acme", location="Remote")
-        job2 = Job(title="  Senior   Engineer  ", company="Acme", location="Remote")
-
-        assert job1.job_id == job2.job_id
-
-    def test_job_id_normalizes_unicode_whitespace(self):
-        """Test that equivalent Unicode spacing normalizes to the same ID."""
-        assert generate_job_id("Senior Engineer", "Acme", "Remote") == generate_job_id(
-            "Senior\u00a0Engineer",
-            "Acme",
-            "Remote",
-        )
-
-    def test_job_from_dict(self):
-        """Test Job.from_dict() conversion."""
-        data = {
+def test_from_row_computes_id_and_cleans_nan():
+    job = Job.from_row(
+        {
             "title": "Engineer",
-            "company": "Test",
+            "company": "Acme",
             "location": "Remote",
-            "job_url": "https://example.com",
-            "is_remote": True,
-            "relevance_score": 25,
+            "description": float("nan"),
+            "min_amount": pd.NA if hasattr(pd, "NA") else None,
+            "is_remote": "true",
+            "date_posted": "2026-09-01",
         }
-
-        job = Job.from_dict(data)
-
-        assert job.title == "Engineer"
-        assert job.company == "Test"
-        assert job.location == "Remote"
-        assert job.job_url == "https://example.com"
-        assert job.is_remote is True
-        assert job.relevance_score == 25
-
-    def test_job_from_dict_with_date_string(self):
-        """Test Job.from_dict() handles date strings."""
-        data = {
-            "title": "Dev",
-            "company": "Corp",
-            "location": "NYC",
-            "date_posted": "2024-01-15",
-        }
-
-        job = Job.from_dict(data)
-
-        assert job.date_posted == date(2024, 1, 15)
-
-    def test_job_from_dict_with_missing_fields(self):
-        """Test Job.from_dict() handles missing optional fields."""
-        data = {
-            "title": "Dev",
-            "company": "Corp",
-            "location": "NYC",
-        }
-
-        job = Job.from_dict(data)
-
-        assert job.job_url is None
-        assert job.description is None
-        assert job.is_remote is None
-        assert job.relevance_score == 0
-
-    def test_job_to_dict(self):
-        """Test Job.to_dict() conversion."""
-        job = Job(
-            title="Engineer",
-            company="Test",
-            location="Remote",
-            is_remote=True,
-            relevance_score=30,
-        )
-
-        data = job.to_dict()
-
-        assert data["title"] == "Engineer"
-        assert data["company"] == "Test"
-        assert data["location"] == "Remote"
-        assert data["is_remote"] is True
-        assert data["relevance_score"] == 30
-        assert "job_id" in data
+    )
+    assert job.job_id == generate_job_id("Engineer", "Acme", "Remote")
+    assert job.description is None
+    assert job.is_remote is True
+    assert job.date_posted == date(2026, 9, 1)
+    assert job.status is JobStatus.NEW
+    assert job.source == "manual"
 
 
-class TestSearchSummary:
-    """Tests for SearchSummary dataclass."""
-
-    def test_initial_values(self):
-        """Test default values."""
-        summary = SearchSummary()
-
-        assert summary.total_queries == 0
-        assert summary.successful_queries == 0
-        assert summary.failed_queries == 0
-        assert summary.unique_jobs == 0
-
-    def test_duration_before_finish(self):
-        """Test duration is 0 before finish() is called."""
-        summary = SearchSummary()
-
-        assert summary.duration_seconds == 0.0
-        assert summary.duration_formatted == "0m 0s"
-
-    def test_duration_after_finish(self):
-        """Test duration after finish() is called."""
-        from datetime import timedelta
-
-        summary = SearchSummary()
-        # Directly set start_time to a known past value instead of using time.sleep
-        summary.start_time = summary.start_time - timedelta(seconds=5)
-        summary.finish()
-
-        assert summary.duration_seconds >= 4.0
-        assert summary.end_time is not None
-
-    def test_duration_formatted(self):
-        """Test duration formatting."""
-        summary = SearchSummary()
-        summary.end_time = summary.start_time  # 0 duration
-
-        assert summary.duration_formatted == "0m 0s"
+def test_to_dict_and_summary_are_json_safe():
+    job = Job.from_row({"title": "E", "company": "C", "location": "L", "source": "rss"})
+    data = job.to_dict()
+    assert data["status"] == "new"
+    assert isinstance(data["first_seen"], str)
+    summary = job.to_summary()
+    assert "description" not in summary
+    assert summary["source"] == "rss"
 
 
-class TestJobDBRecord:
-    """Tests for JobDBRecord dataclass."""
+def test_new_is_the_only_unprotected_status():
+    assert JobStatus.NEW not in PROTECTED_STATUSES
+    assert set(PROTECTED_STATUSES) == set(JobStatus) - {JobStatus.NEW}
 
-    def test_from_job(self):
-        """Test JobDBRecord.from_job() conversion."""
-        job = Job(
-            title="Engineer",
-            company="Test",
-            location="Remote",
-            is_remote=True,
-            relevance_score=25,
-        )
 
-        record = JobDBRecord.from_job(job, site="linkedin", job_level="senior")
+def test_parse_date_accepts_datetime_strings():
+    assert parse_date("2026-09-07T10:00:00") == date(2026, 9, 7)
+    assert parse_date("nonsense") is None
+    assert parse_date(None) is None
 
-        assert record.job_id == job.job_id
-        assert record.title == "Engineer"
-        assert record.company == "Test"
-        assert record.site == "linkedin"
-        assert record.job_level == "senior"
-        assert record.relevance_score == 25
-        assert record.applied is False
+
+def test_run_summary_duration_and_dict():
+    from datetime import datetime, timedelta
+
+    summary = RunSummary(started_at=datetime(2026, 9, 8, 10, 0, 0))
+    summary.finished_at = summary.started_at + timedelta(minutes=2, seconds=5)
+    summary.sources.append(SourceRunStats(name="rss:x", tasks=1, succeeded=1, rows=3))
+    assert summary.duration_formatted == "2m 5s"
+    data = summary.to_dict()
+    assert data["sources"][0]["rows"] == 3
+    assert data["duration_seconds"] == 125.0

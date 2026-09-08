@@ -1,435 +1,154 @@
-"""Tests for config module."""
-
 from pathlib import Path
 
 import pytest
+import yaml
+
+from openings.config import ConfigError, load_config, parse_config
+from tests.conftest import EXAMPLE_SETTINGS, minimal_settings
+
+
+def test_example_settings_parse_with_documented_defaults():
+    config = parse_config(yaml.safe_load(EXAMPLE_SETTINGS.read_text()))
+    assert config.sources.jobspy.sites == ["linkedin"]
+    assert config.sources.jobspy.locations == ["Remote"]
+    assert config.scoring.notify_threshold == 20
+    assert config.scheduler.interval_hours == 12
+    assert config.retention.max_age_days == 30
+    assert config.attachments.max_size_mb == 20
+    assert config.notifications.enabled is False
+
+
+def test_packaged_template_matches_reference():
+    packaged = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "openings"
+        / "defaults"
+        / "settings.example.yaml"
+    )
+    assert packaged.read_text() == EXAMPLE_SETTINGS.read_text()
+
+
+def test_unknown_top_level_key_fails():
+    data = minimal_settings()
+    data["search"] = {}
+    with pytest.raises(ConfigError, match="Unsupported configuration key: search"):
+        parse_config(data)
+
+
+def test_unknown_nested_key_fails_with_path():
+    data = minimal_settings()
+    data["sources"]["jobspy"]["hours"] = 3
+    with pytest.raises(ConfigError, match="sources.jobspy.hours"):
+        parse_config(data)
+
+
+def test_notify_threshold_below_save_threshold_fails():
+    data = minimal_settings()
+    data["scoring"]["save_threshold"] = 30
+    with pytest.raises(ConfigError, match="notify_threshold"):
+        parse_config(data)
+
 
-from job_search_tool.config import (
-    Config,
-    _parse_database_config,
-    _parse_parallel_config,
-    _parse_logging_config,
-    _parse_post_filter_config,
-    _parse_retry_config,
-    _parse_scheduler_config,
-    _parse_scoring_config,
-    _parse_telegram_config,
-    _parse_throttling_config,
-    _parse_vector_search_config,
-)
-
-
-class TestParallelConfigValidation:
-    """Tests for parallel config validation."""
-
-    def test_valid_max_workers(self):
-        """Test valid max_workers values."""
-        config = _parse_parallel_config({"parallel": {"max_workers": 5}})
-        assert config.max_workers == 5
-
-    def test_max_workers_minimum(self):
-        """Test max_workers must be at least 1."""
-        with pytest.raises(ValueError, match="max_workers must be at least 1"):
-            _parse_parallel_config({"parallel": {"max_workers": 0}})
-
-    def test_max_workers_negative(self):
-        """Test max_workers cannot be negative."""
-        with pytest.raises(ValueError, match="max_workers must be at least 1"):
-            _parse_parallel_config({"parallel": {"max_workers": -1}})
-
-
-class TestRetryConfigValidation:
-    """Tests for retry config validation."""
-
-    def test_valid_retry_config(self):
-        """Test valid retry configuration."""
-        config = _parse_retry_config(
-            {
-                "retry": {
-                    "max_attempts": 5,
-                    "base_delay": 3.0,
-                    "backoff_factor": 2.5,
-                }
-            }
-        )
-        assert config.max_attempts == 5
-        assert config.base_delay == 3.0
-        assert config.backoff_factor == 2.5
-
-    def test_max_attempts_minimum(self):
-        """Test max_attempts must be at least 1."""
-        with pytest.raises(ValueError, match="max_attempts must be at least 1"):
-            _parse_retry_config({"retry": {"max_attempts": 0}})
-
-    def test_base_delay_negative(self):
-        """Test base_delay cannot be negative."""
-        with pytest.raises(ValueError, match="base_delay cannot be negative"):
-            _parse_retry_config({"retry": {"base_delay": -1}})
-
-    def test_backoff_factor_minimum(self):
-        """Test backoff_factor must be at least 1.0."""
-        with pytest.raises(ValueError, match="backoff_factor must be at least 1.0"):
-            _parse_retry_config({"retry": {"backoff_factor": 0.5}})
-
-
-class TestThrottlingConfigValidation:
-    """Tests for throttling config validation."""
-
-    def test_valid_throttling_config(self):
-        """Test valid throttling configuration."""
-        config = _parse_throttling_config(
-            {
-                "throttling": {
-                    "enabled": True,
-                    "default_delay": 2.0,
-                    "jitter": 0.5,
-                }
-            }
-        )
-        assert config.enabled is True
-        assert config.default_delay == 2.0
-        assert config.jitter == 0.5
-
-    def test_default_delay_negative(self):
-        """Test default_delay cannot be negative."""
-        with pytest.raises(ValueError, match="default_delay cannot be negative"):
-            _parse_throttling_config({"throttling": {"default_delay": -1}})
-
-    def test_jitter_range_low(self):
-        """Test jitter must be >= 0."""
-        with pytest.raises(ValueError, match="jitter must be between 0 and 1.0"):
-            _parse_throttling_config({"throttling": {"jitter": -0.1}})
-
-    def test_jitter_range_high(self):
-        """Test jitter must be <= 1.0."""
-        with pytest.raises(ValueError, match="jitter must be between 0 and 1.0"):
-            _parse_throttling_config({"throttling": {"jitter": 1.5}})
-
-    def test_site_delay_negative(self):
-        """Test site delays cannot be negative."""
-        with pytest.raises(ValueError, match="site_delays"):
-            _parse_throttling_config(
-                {"throttling": {"site_delays": {"linkedin": -1.0}}}
-            )
-
-
-class TestPostFilterConfigValidation:
-    """Tests for post-filter config validation."""
-
-    def test_valid_post_filter_config(self):
-        """Test valid post-filter configuration."""
-        config = _parse_post_filter_config(
-            {
-                "post_filter": {
-                    "enabled": True,
-                    "min_similarity": 85,
-                }
-            }
-        )
-        assert config.enabled is True
-        assert config.min_similarity == 85
-
-    def test_min_similarity_range_low(self):
-        """Test min_similarity must be >= 0."""
-        with pytest.raises(
-            ValueError, match="min_similarity must be between 0 and 100"
-        ):
-            _parse_post_filter_config({"post_filter": {"min_similarity": -10}})
-
-    def test_min_similarity_range_high(self):
-        """Test min_similarity must be <= 100."""
-        with pytest.raises(
-            ValueError, match="min_similarity must be between 0 and 100"
-        ):
-            _parse_post_filter_config({"post_filter": {"min_similarity": 150}})
-
-
-class TestLoggingConfigValidation:
-    """Tests for logging config validation."""
-
-    def test_valid_logging_config(self):
-        """Test valid logging configuration."""
-        config = _parse_logging_config(
-            {
-                "logging": {
-                    "level": "DEBUG",
-                    "max_size_mb": 20,
-                    "backup_count": 3,
-                    "timezone": "America/New_York",
-                }
-            }
-        )
-        assert config.level == "DEBUG"
-        assert config.max_size_mb == 20
-        assert config.backup_count == 3
-        assert config.timezone == "America/New_York"
-
-    def test_max_size_mb_positive(self):
-        """Test max_size_mb must be positive."""
-        with pytest.raises(ValueError, match="max_size_mb must be at least 1"):
-            _parse_logging_config({"logging": {"max_size_mb": 0}})
-
-    def test_backup_count_non_negative(self):
-        """Test backup_count cannot be negative."""
-        with pytest.raises(ValueError, match="backup_count cannot be negative"):
-            _parse_logging_config({"logging": {"backup_count": -1}})
-
-    def test_invalid_timezone_is_rejected(self):
-        """An unknown IANA timezone must fail fast instead of being ignored."""
-        with pytest.raises(ValueError, match="timezone"):
-            _parse_logging_config({"logging": {"timezone": "Not/ARealZone"}})
-
-    def test_valid_timezone_is_accepted(self):
-        """A real IANA timezone is accepted."""
-        config = _parse_logging_config({"logging": {"timezone": "Europe/Zurich"}})
-        assert config.timezone == "Europe/Zurich"
-
-
-class TestSchedulerConfigValidation:
-    """Tests for scheduler config validation."""
-
-    def test_valid_scheduler_config(self):
-        """Test valid scheduler configuration."""
-        config = _parse_scheduler_config(
-            {
-                "scheduler": {
-                    "interval_hours": 12,
-                    "retry_delay_minutes": 15,
-                }
-            }
-        )
-        assert config.interval_hours == 12
-        assert config.retry_delay_minutes == 15
-
-    def test_legacy_enabled_key_is_rejected(self):
-        """Old scheduler.enabled configs should fail fast instead of being ignored."""
-        with pytest.raises(ValueError, match="scheduler.enabled"):
-            _parse_scheduler_config({"scheduler": {"enabled": True}})
-
-    def test_interval_hours_positive(self):
-        """Test interval_hours must be positive."""
-        with pytest.raises(ValueError, match="interval_hours must be at least 1"):
-            _parse_scheduler_config({"scheduler": {"interval_hours": 0}})
-
-    def test_retry_delay_non_negative(self):
-        """Test retry_delay_minutes cannot be negative."""
-        with pytest.raises(ValueError, match="retry_delay_minutes cannot be negative"):
-            _parse_scheduler_config({"scheduler": {"retry_delay_minutes": -1}})
-
-
-class TestTelegramConfigValidation:
-    """Tests for telegram config validation."""
-
-    def test_valid_telegram_config(self):
-        """Test valid telegram configuration."""
-        config = _parse_telegram_config(
-            {
-                "telegram": {
-                    "enabled": True,
-                    "bot_token": "123456:ABC",
-                    "chat_ids": ["12345", "67890"],
-                    "max_jobs_in_message": 20,
-                }
-            }
-        )
-        assert config.enabled is True
-        assert config.bot_token == "123456:ABC"
-        assert config.chat_ids == ["12345", "67890"]
-        assert config.max_jobs_in_message == 20
-
-    def test_max_jobs_minimum(self):
-        """Test max_jobs_in_message must be at least 1."""
-        with pytest.raises(ValueError, match="max_jobs_in_message must be at least 1"):
-            _parse_telegram_config({"telegram": {"max_jobs_in_message": 0}})
-
-    def test_jobs_per_chunk_minimum(self):
-        """Test jobs_per_chunk must be at least 1."""
-        with pytest.raises(ValueError, match="jobs_per_chunk must be at least 1"):
-            _parse_telegram_config({"telegram": {"jobs_per_chunk": 0}})
-
-    def test_jobs_per_chunk_maximum(self):
-        """Test jobs_per_chunk must be at most 15 (Telegram limit)."""
-        with pytest.raises(ValueError, match="jobs_per_chunk must be at most 15"):
-            _parse_telegram_config({"telegram": {"jobs_per_chunk": 20}})
-
-    def test_jobs_per_chunk_valid(self):
-        """Test valid jobs_per_chunk values."""
-        config = _parse_telegram_config({"telegram": {"jobs_per_chunk": 10}})
-        assert config.jobs_per_chunk == 10
-
-        config = _parse_telegram_config({"telegram": {"jobs_per_chunk": 15}})
-        assert config.jobs_per_chunk == 15
-
-    def test_chat_ids_normalized(self):
-        """Test chat_ids are normalized to strings."""
-        config = _parse_telegram_config(
-            {
-                "telegram": {
-                    "chat_ids": [12345, "67890", "", None, "  99999  "],
-                }
-            }
-        )
-        # Empty and None values should be filtered out
-        assert "12345" in config.chat_ids
-        assert "67890" in config.chat_ids
-        assert "99999" in config.chat_ids
-        assert "" not in config.chat_ids
-
-
-class TestConfigPaths:
-    """Tests for Config path properties."""
-
-    def test_path_properties(self):
-        """All path properties return concrete Path objects."""
-        config = Config()
-
-        assert isinstance(config.data_dir, Path)
-        assert isinstance(config.config_dir, Path)
-        assert isinstance(config.database_path, Path)
-        assert isinstance(config.chroma_path, Path)
-        assert isinstance(config.logs_dir, Path)
-        assert isinstance(config.log_path, Path)
-
-    def test_fixed_layout_under_data_dir(self):
-        """Every persistent path must live under DATA_DIR with a fixed layout."""
-        config = Config()
-        root = config.data_dir
-
-        assert config.config_dir == root / "config"
-        assert config.database_path == root / "db" / "jobs.db"
-        assert config.chroma_path == root / "chroma"
-        assert config.logs_dir == root / "logs"
-        assert config.log_path == root / "logs" / "search.log"
-
-    def test_data_dir_respects_environment(self, tmp_path, monkeypatch):
-        """JOB_SEARCH_DATA_DIR must relocate the whole tree."""
-        monkeypatch.setenv("JOB_SEARCH_DATA_DIR", str(tmp_path))
-        # config.DATA_DIR is resolved at import time, so re-import the module.
-        import importlib
-
-        import job_search_tool.config as config_module
-
-        importlib.reload(config_module)
-        try:
-            assert config_module.DATA_DIR == tmp_path.resolve()
-            cfg = config_module.Config()
-            assert cfg.database_path == tmp_path.resolve() / "db" / "jobs.db"
-        finally:
-            monkeypatch.delenv("JOB_SEARCH_DATA_DIR", raising=False)
-            importlib.reload(config_module)
-
-
-class TestScoringConfigValidation:
-    """Tests for scoring config parsing and cross-section validation."""
-
-    def test_defaults(self):
-        cfg = _parse_scoring_config({})
-        assert cfg.save_threshold == 0
-        assert cfg.notify_threshold == 20
-
-    def test_legacy_threshold_key_is_rejected(self):
-        """Old scoring.threshold configs should fail fast instead of being ignored."""
-        with pytest.raises(ValueError, match="scoring.threshold"):
-            _parse_scoring_config({"scoring": {"threshold": 15}})
-
-    def test_notify_must_be_ge_save(self, tmp_path, monkeypatch):
-        import job_search_tool.config as config_module
-
-        yaml_file = tmp_path / "settings.yaml"
-        yaml_file.write_text(
-            "scoring:\n  save_threshold: 20\n  notify_threshold: 10\n",
-        )
-        monkeypatch.setattr(config_module, "CONFIG_FILE", yaml_file)
-
-        with pytest.raises(ValueError, match="notify_threshold"):
-            config_module.load_config()
-
-    def test_load_config_rejects_unknown_top_level_key(self, tmp_path, monkeypatch):
-        import job_search_tool.config as config_module
-
-        yaml_file = tmp_path / "settings.yaml"
-        yaml_file.write_text("old_section:\n  enabled: true\n", encoding="utf-8")
-        monkeypatch.setattr(config_module, "CONFIG_FILE", yaml_file)
-
-        with pytest.raises(
-            ValueError, match="Unsupported configuration key: old_section"
-        ):
-            config_module.load_config()
-
-    def test_load_config_rejects_non_mapping_root(self, tmp_path, monkeypatch):
-        import job_search_tool.config as config_module
-
-        yaml_file = tmp_path / "settings.yaml"
-        yaml_file.write_text("- search\n- scoring\n", encoding="utf-8")
-        monkeypatch.setattr(config_module, "CONFIG_FILE", yaml_file)
-
-        with pytest.raises(ValueError, match="settings must be a mapping"):
-            config_module.load_config()
-
-
-class TestDatabaseRetentionConfig:
-    """Tests for database.retention parsing."""
-
-    def test_defaults(self):
-        cfg = Config()
-        assert cfg.database.retention.max_age_days == 30
-        assert cfg.database.retention.purge_blacklist_after_days == 90
-
-    def test_legacy_database_cleanup_keys_are_rejected(self):
-        """Old cleanup_* database configs should fail fast instead of being ignored."""
-        with pytest.raises(ValueError, match="database.cleanup_enabled"):
-            _parse_database_config({"database": {"cleanup_enabled": True}})
-
-
-class TestVectorSearchConfigValidation:
-    """Tests for vector search config parsing."""
-
-    def test_legacy_vector_storage_keys_are_rejected(self):
-        """Old vector_search storage/model keys should fail fast."""
-        with pytest.raises(ValueError, match="vector_search.model_name"):
-            _parse_vector_search_config(
-                {"vector_search": {"model_name": "all-MiniLM-L6-v2"}}
-            )
-
-    def test_sync_interval_minutes_default(self):
-        """Default sync_interval_minutes is 30 when unset."""
-        config = _parse_vector_search_config({})
-        assert config.sync_interval_minutes == 30
-
-    def test_sync_interval_minutes_custom(self):
-        """A configured sync_interval_minutes value is honored."""
-        config = _parse_vector_search_config(
-            {"vector_search": {"sync_interval_minutes": 10}}
-        )
-        assert config.sync_interval_minutes == 10
-
-    def test_sync_interval_minutes_rejects_non_positive(self):
-        """sync_interval_minutes must be at least 1."""
-        with pytest.raises(ValueError, match="sync_interval_minutes"):
-            _parse_vector_search_config({"vector_search": {"sync_interval_minutes": 0}})
-
-
-class TestConfigQueries:
-    """Tests for Config query methods."""
-
-    def test_get_all_queries_empty(self):
-        """Test get_all_queries with no queries."""
-        config = Config(queries={})
-
-        assert config.get_all_queries() == []
-
-    def test_get_all_queries_flattened(self):
-        """Test get_all_queries flattens all categories."""
-        config = Config(
-            queries={
-                "category1": ["query1", "query2"],
-                "category2": ["query3"],
-            }
-        )
-
-        queries = config.get_all_queries()
-
-        assert len(queries) == 3
-        assert "query1" in queries
-        assert "query2" in queries
-        assert "query3" in queries
+def test_keyword_category_without_weight_fails():
+    data = minimal_settings()
+    data["scoring"]["keywords"]["orphan"] = ["x"]
+    with pytest.raises(ConfigError, match="orphan"):
+        parse_config(data)
+
+
+def test_keywords_are_lower_cased():
+    data = minimal_settings()
+    data["scoring"]["keywords"]["role"] = ["Software Engineer"]
+    assert parse_config(data).scoring.keywords["role"] == ["software engineer"]
+
+
+def test_all_queries_deduplicates_across_categories():
+    data = minimal_settings()
+    data["sources"]["jobspy"]["queries"] = {"a": ["x", "y"], "b": ["y", "z"]}
+    assert parse_config(data).sources.jobspy.all_queries == ["x", "y", "z"]
+
+
+def test_company_requires_known_ats_and_unique_slug():
+    data = minimal_settings()
+    data["sources"]["companies"] = [{"name": "A", "ats": "workday", "slug": "a"}]
+    with pytest.raises(ConfigError, match="ats must be one of"):
+        parse_config(data)
+    data["sources"]["companies"] = [
+        {"name": "A", "ats": "greenhouse", "slug": "a"},
+        {"name": "B", "ats": "greenhouse", "slug": "A"},
+    ]
+    with pytest.raises(ConfigError, match="duplicates"):
+        parse_config(data)
+
+
+def test_company_parses_locations():
+    data = minimal_settings()
+    data["sources"]["companies"] = [
+        {"name": "A", "ats": "Lever", "slug": "acme", "locations": ["Berlin", " Remote "]}
+    ]
+    company = parse_config(data).sources.companies[0]
+    assert company.ats == "lever"
+    assert company.locations == ["Berlin", "Remote"]
+
+
+def test_feed_requires_http_url():
+    data = minimal_settings()
+    data["sources"]["feeds"] = [{"name": "x", "url": "ftp://nope"}]
+    with pytest.raises(ConfigError, match="http"):
+        parse_config(data)
+
+
+def test_adzuna_enabled_requires_country_queries_and_keys(monkeypatch):
+    data = minimal_settings()
+    data["sources"]["adzuna"] = {"enabled": True, "country": "de", "queries": ["dev"]}
+    with pytest.raises(ConfigError, match="app_id"):
+        parse_config(data)
+    monkeypatch.setenv("ADZUNA_APP_ID", "id")
+    monkeypatch.setenv("ADZUNA_APP_KEY", "key")
+    data["sources"]["adzuna"].update({"app_id": "$ADZUNA_APP_ID", "app_key": "$ADZUNA_APP_KEY"})
+    adzuna = parse_config(data).sources.adzuna
+    assert adzuna.app_id == "id" and adzuna.app_key == "key"
+
+
+def test_secrets_resolve_from_environment(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:abc")
+    data = minimal_settings()
+    data["notifications"] = {
+        "enabled": True,
+        "telegram": {"enabled": True, "bot_token": "$TELEGRAM_BOT_TOKEN", "chat_ids": [42]},
+    }
+    telegram = parse_config(data).notifications.telegram
+    assert telegram.bot_token == "123:abc"
+    assert telegram.chat_ids == ["42"]
+
+
+def test_jobs_per_chunk_capped_at_fifteen():
+    data = minimal_settings()
+    data["notifications"] = {"telegram": {"jobs_per_chunk": 16}}
+    with pytest.raises(ConfigError, match="at most 15"):
+        parse_config(data)
+
+
+def test_invalid_timezone_fails():
+    data = minimal_settings()
+    data["logging"] = {"timezone": "Mars/Olympus"}
+    with pytest.raises(ConfigError, match="timezone"):
+        parse_config(data)
+
+
+def test_paths_derive_from_data_dir(tmp_path):
+    config = parse_config(minimal_settings(), data_dir=tmp_path)
+    assert config.database_path == tmp_path / "db" / "openings.db"
+    assert config.attachments_dir == tmp_path / "attachments"
+    assert config.log_file == tmp_path / "logs" / "openings.log"
+
+
+def test_load_config_reports_missing_file(tmp_path):
+    with pytest.raises(ConfigError, match="not found"):
+        load_config(tmp_path / "missing.yaml")
+
+
+def test_load_config_reads_yaml(settings_file):
+    config = load_config(settings_file)
+    assert config.scoring.weights["role"] == 25

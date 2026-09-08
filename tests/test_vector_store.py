@@ -26,7 +26,7 @@ sys.modules["chromadb.utils.embedding_functions"] = _mock_chromadb_utils_ef
 @pytest.fixture(autouse=True)
 def _reset_vector_store_singleton():
     """Reset the vector store singleton between tests."""
-    import job_search_tool.vector_store as vs_module
+    import openings.vector_store as vs_module
 
     original = vs_module._vector_store
     original_key = getattr(vs_module, "_vector_store_key", None)
@@ -61,7 +61,7 @@ def mock_client(mock_collection):
 def vector_store(mock_client, mock_collection, tmp_path):
     """Create a JobVectorStore with mocked ChromaDB."""
     with patch.object(_mock_chromadb, "PersistentClient", return_value=mock_client):
-        from job_search_tool.vector_store import JobVectorStore
+        from openings.vector_store import JobVectorStore
 
         store = JobVectorStore(persist_dir=tmp_path / "chroma")
     return store
@@ -77,7 +77,7 @@ def sample_jobs():
             "company": "Acme Corp",
             "location": "New York, NY",
             "description": "Build cool stuff",
-            "site": "linkedin",
+            "source": "linkedin",
             "relevance_score": 30,
             "first_seen": "2026-01-01",
             "job_url": "https://example.com/1",
@@ -88,7 +88,7 @@ def sample_jobs():
             "company": "Big Data Inc",
             "location": "Remote",
             "description": "Analyze data",
-            "site": "indeed",
+            "source": "indeed",
             "relevance_score": 25,
             "first_seen": "2026-01-02",
             "job_url": "https://example.com/2",
@@ -98,18 +98,19 @@ def sample_jobs():
 
 @pytest.fixture
 def mock_db_record():
-    """Create a mock JobDBRecord."""
-    record = MagicMock()
-    record.job_id = "abc123"
-    record.title = "Software Engineer"
-    record.company = "Acme Corp"
-    record.location = "New York, NY"
-    record.description = "Build cool stuff"
-    record.site = "linkedin"
-    record.relevance_score = 30
-    record.first_seen = "2026-01-01"
-    record.job_url = "https://example.com/1"
-    return record
+    """A stored job as the database hands it to the vector commands."""
+    from openings.models import Job
+
+    return Job(
+        job_id="abc123",
+        title="Software Engineer",
+        company="Acme Corp",
+        location="New York, NY",
+        source="linkedin",
+        description="Build cool stuff",
+        relevance_score=30,
+        job_url="https://example.com/1",
+    )
 
 
 # =============================================================================
@@ -121,7 +122,7 @@ class TestSemanticSearchResult:
     """Tests for the SemanticSearchResult dataclass."""
 
     def test_creation(self):
-        from job_search_tool.vector_store import SemanticSearchResult
+        from openings.vector_store import SemanticSearchResult
 
         result = SemanticSearchResult(
             job_id="abc123",
@@ -135,11 +136,9 @@ class TestSemanticSearchResult:
         assert result.metadata == {"title": "Engineer"}
 
     def test_frozen(self):
-        from job_search_tool.vector_store import SemanticSearchResult
+        from openings.vector_store import SemanticSearchResult
 
-        result = SemanticSearchResult(
-            job_id="abc123", distance=0.2, similarity=0.8, metadata={}
-        )
+        result = SemanticSearchResult(job_id="abc123", distance=0.2, similarity=0.8, metadata={})
         with pytest.raises(AttributeError):
             result.job_id = "new_id"
 
@@ -158,7 +157,7 @@ class TestJobVectorStore:
 
     def test_initialization_uses_noop_product_telemetry(self, mock_client, tmp_path):
         """Test ChromaDB product telemetry is disabled at the implementation layer."""
-        from job_search_tool.vector_store import JobVectorStore
+        from openings.vector_store import JobVectorStore
 
         _mock_chromadb_config.Settings.reset_mock()
 
@@ -167,12 +166,8 @@ class TestJobVectorStore:
 
         _mock_chromadb_config.Settings.assert_called_once_with(
             anonymized_telemetry=False,
-            chroma_product_telemetry_impl=(
-                "job_search_tool.chroma_telemetry.NoOpProductTelemetryClient"
-            ),
-            chroma_telemetry_impl=(
-                "job_search_tool.chroma_telemetry.NoOpProductTelemetryClient"
-            ),
+            chroma_product_telemetry_impl=("openings.chroma_telemetry.NoOpProductTelemetryClient"),
+            chroma_telemetry_impl=("openings.chroma_telemetry.NoOpProductTelemetryClient"),
         )
 
     def test_add_jobs_valid(self, vector_store, mock_collection, sample_jobs):
@@ -293,10 +288,10 @@ class TestJobVectorStore:
             "metadatas": [[]],
         }
 
-        vector_store.search("engineer", site="linkedin")
+        vector_store.search("engineer", source="linkedin")
 
         call_kwargs = mock_collection.query.call_args.kwargs
-        assert call_kwargs["where"] == {"site": "linkedin"}
+        assert call_kwargs["where"] == {"source": "linkedin"}
 
     def test_search_with_combined_filters(self, vector_store, mock_collection):
         """Test search combines multiple filters with $and."""
@@ -307,13 +302,13 @@ class TestJobVectorStore:
             "metadatas": [[]],
         }
 
-        vector_store.search("engineer", min_score=15, site="indeed")
+        vector_store.search("engineer", min_score=15, source="indeed")
 
         call_kwargs = mock_collection.query.call_args.kwargs
         where = call_kwargs["where"]
         assert "$and" in where
         assert {"relevance_score": {"$gte": 15}} in where["$and"]
-        assert {"site": "indeed"} in where["$and"]
+        assert {"source": "indeed"} in where["$and"]
 
     def test_search_similarity_clamped(self, vector_store, mock_collection):
         """Test similarity is clamped to [0, 1]."""
@@ -344,9 +339,7 @@ class TestJobVectorStore:
         assert results[0].metadata == {}
         assert results[1].metadata == {"title": "Engineer"}
 
-    def test_search_keeps_results_when_metadata_list_is_absent(
-        self, vector_store, mock_collection
-    ):
+    def test_search_keeps_results_when_metadata_list_is_absent(self, vector_store, mock_collection):
         """Test Chroma rows are not dropped when metadata is unavailable."""
         mock_collection.count.return_value = 5
         mock_collection.query.return_value = {
@@ -415,13 +408,11 @@ class TestJobVectorStore:
         assert meta["title"] == "Software Engineer"
         assert meta["company"] == "Acme Corp"
         assert meta["relevance_score"] == 30
-        assert meta["site"] == "linkedin"
+        assert meta["source"] == "linkedin"
 
     def test_build_metadata_skips_nan(self, vector_store):
         """Test _build_metadata skips nan/None values."""
-        meta = vector_store._build_metadata(
-            {"title": "Eng", "company": None, "site": "nan"}
-        )
+        meta = vector_store._build_metadata({"title": "Eng", "company": None, "site": "nan"})
         assert "company" not in meta
         assert "site" not in meta
 
@@ -441,7 +432,7 @@ class TestReadOnlyVectorStore:
     """
 
     def test_search_delegates_to_wrapped_store(self, vector_store, mock_collection):
-        from job_search_tool.vector_store import ReadOnlyVectorStore
+        from openings.vector_store import ReadOnlyVectorStore
 
         mock_collection.count.return_value = 5
         mock_collection.query.return_value = {
@@ -457,7 +448,7 @@ class TestReadOnlyVectorStore:
         assert results[0].job_id == "abc123"
 
     def test_count_delegates_to_wrapped_store(self, vector_store, mock_collection):
-        from job_search_tool.vector_store import ReadOnlyVectorStore
+        from openings.vector_store import ReadOnlyVectorStore
 
         mock_collection.count.return_value = 42
 
@@ -466,7 +457,7 @@ class TestReadOnlyVectorStore:
         assert readonly.count() == 42
 
     def test_does_not_expose_mutating_methods(self, vector_store):
-        from job_search_tool.vector_store import ReadOnlyVectorStore
+        from openings.vector_store import ReadOnlyVectorStore
 
         readonly = ReadOnlyVectorStore(vector_store)
 
@@ -487,7 +478,7 @@ class TestGetVectorStore:
 
     def test_creates_instance(self, mock_client, tmp_path):
         """Test that get_vector_store creates a new instance."""
-        import job_search_tool.vector_store as vs_module
+        import openings.vector_store as vs_module
 
         vs_module._vector_store = None
         vs_module._vector_store_key = None
@@ -500,7 +491,7 @@ class TestGetVectorStore:
 
     def test_returns_singleton(self, mock_client, tmp_path):
         """Test that get_vector_store returns the same instance."""
-        import job_search_tool.vector_store as vs_module
+        import openings.vector_store as vs_module
 
         vs_module._vector_store = None
         vs_module._vector_store_key = None
@@ -513,7 +504,7 @@ class TestGetVectorStore:
 
     def test_recreates_singleton_when_path_changes(self, mock_client, tmp_path):
         """Test singleton refreshes when the persist_dir changes."""
-        import job_search_tool.vector_store as vs_module
+        import openings.vector_store as vs_module
 
         vs_module._vector_store = None
         vs_module._vector_store_key = None
@@ -533,14 +524,12 @@ class TestGetVectorStore:
 class TestBackfillEmbeddings:
     """Tests for backfill_embeddings command."""
 
-    def test_backfill_with_jobs_to_embed(
-        self, vector_store, mock_collection, mock_db_record
-    ):
+    def test_backfill_with_jobs_to_embed(self, vector_store, mock_collection, mock_db_record):
         """Test backfilling jobs that aren't yet embedded."""
-        from job_search_tool.vector_commands import backfill_embeddings
+        from openings.vector_commands import backfill_embeddings
 
         mock_db = MagicMock()
-        mock_db.get_all_jobs.return_value = [mock_db_record]
+        mock_db.iter_jobs.return_value = [mock_db_record]
 
         # Vector store has no jobs embedded yet
         mock_collection.get.return_value = {"ids": []}
@@ -552,14 +541,12 @@ class TestBackfillEmbeddings:
         upsert_kwargs = mock_collection.upsert.call_args.kwargs
         assert "abc123" in upsert_kwargs["ids"]
 
-    def test_backfill_nothing_to_embed(
-        self, vector_store, mock_collection, mock_db_record
-    ):
+    def test_backfill_nothing_to_embed(self, vector_store, mock_collection, mock_db_record):
         """Test backfill when all jobs are already embedded."""
-        from job_search_tool.vector_commands import backfill_embeddings
+        from openings.vector_commands import backfill_embeddings
 
         mock_db = MagicMock()
-        mock_db.get_all_jobs.return_value = [mock_db_record]
+        mock_db.iter_jobs.return_value = [mock_db_record]
 
         # Vector store already has this job
         mock_collection.get.return_value = {"ids": ["abc123"]}
@@ -571,10 +558,10 @@ class TestBackfillEmbeddings:
 
     def test_backfill_empty_database(self, vector_store, mock_collection):
         """Test backfill when database has no jobs."""
-        from job_search_tool.vector_commands import backfill_embeddings
+        from openings.vector_commands import backfill_embeddings
 
         mock_db = MagicMock()
-        mock_db.get_all_jobs.return_value = []
+        mock_db.iter_jobs.return_value = []
         mock_collection.get.return_value = {"ids": []}
 
         count = backfill_embeddings(mock_db, vector_store, batch_size=50)
@@ -586,13 +573,13 @@ class TestSyncDeletions:
 
     def test_sync_removes_stale_entries(self, vector_store, mock_collection):
         """Test that stale embeddings are removed."""
-        from job_search_tool.vector_commands import sync_deletions
+        from openings.vector_commands import sync_deletions
 
         mock_db = MagicMock()
         # DB only has "abc123"
         mock_db_record = MagicMock()
         mock_db_record.job_id = "abc123"
-        mock_db.get_all_jobs.return_value = [mock_db_record]
+        mock_db.iter_jobs.return_value = [mock_db_record]
 
         # Vector store has "abc123" and "stale_id"
         mock_collection.get.side_effect = [
@@ -607,12 +594,12 @@ class TestSyncDeletions:
 
     def test_sync_no_stale_entries(self, vector_store, mock_collection):
         """Test sync when everything is in sync."""
-        from job_search_tool.vector_commands import sync_deletions
+        from openings.vector_commands import sync_deletions
 
         mock_db = MagicMock()
         mock_db_record = MagicMock()
         mock_db_record.job_id = "abc123"
-        mock_db.get_all_jobs.return_value = [mock_db_record]
+        mock_db.iter_jobs.return_value = [mock_db_record]
 
         mock_collection.get.return_value = {"ids": ["abc123"]}
 
@@ -623,10 +610,10 @@ class TestSyncDeletions:
 
     def test_sync_empty_vector_store(self, vector_store, mock_collection):
         """Test sync when vector store is empty."""
-        from job_search_tool.vector_commands import sync_deletions
+        from openings.vector_commands import sync_deletions
 
         mock_db = MagicMock()
-        mock_db.get_all_jobs.return_value = []
+        mock_db.iter_jobs.return_value = []
         mock_collection.get.return_value = {"ids": []}
 
         removed = sync_deletions(mock_db, vector_store)
