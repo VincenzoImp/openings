@@ -9,7 +9,7 @@ generated from the shortcuts that are actually active.
 
 ## Views
 
-![Inbox, dark](images/inbox-dark.png)
+![Inbox, dark](../images/inbox-dark.png)
 
 | Key | View | What it shows |
 |-----|------|---------------|
@@ -34,11 +34,11 @@ Tick the checkboxes (or press `Space`, `Shift+J`/`Shift+K`, `*`) and a bar
 appears with Shortlist, Applied, Status with a note, Labels, Blacklist and
 Delete for the whole selection.
 
-![Pipeline](images/pipeline-dark.png)
+![Pipeline](../images/pipeline-dark.png)
 
 ## Job page
 
-![Job page, posting tab](images/job-light.png)
+![Job page, posting tab](../images/job-light.png)
 
 Open a job with `Enter`, a double click, or its title. Three tabs, kept in
 the URL:
@@ -60,9 +60,9 @@ everything, merge duplicates, blacklist and delete. A blacklisted job shows a ba
 job was opened from a list, `[` and `]` step through that list.
 
 <p>
-<img src="images/phone-inbox.png" alt="Inbox on a phone" width="30%">
-<img src="images/phone-pipeline.png" alt="Pipeline on a phone" width="30%">
-<img src="images/phone-job.png" alt="Application tab on a phone" width="30%">
+<img src="../images/phone-inbox.png" alt="Inbox on a phone" width="30%">
+<img src="../images/phone-pipeline.png" alt="Pipeline on a phone" width="30%">
+<img src="../images/phone-job.png" alt="Application tab on a phone" width="30%">
 </p>
 
 ## Keyboard
