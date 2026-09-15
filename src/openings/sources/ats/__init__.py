@@ -7,9 +7,13 @@ from typing import TYPE_CHECKING, Any, Callable, Sequence
 from openings.sources.ats import (
     ashby,
     bamboohr,
+    breezy,
     greenhouse,
     joincom,
     lever,
+    oracle,
+    personio,
+    recruitee,
     rippling,
     smartrecruiters,
     workable,
@@ -36,6 +40,10 @@ FETCHERS: dict[str, Fetcher] = {
     "workable": workable.fetch,
     "rippling": rippling.fetch,
     "bamboohr": bamboohr.fetch,
+    "oracle": oracle.fetch,
+    "personio": personio.fetch,
+    "recruitee": recruitee.fetch,
+    "breezy": breezy.fetch,
 }
 
 __all__ = ["FETCHERS", "Fetcher", "KnownIds"]

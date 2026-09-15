@@ -99,7 +99,7 @@ def fetch(
                 "location": location,
                 "source": "workday",
                 "external_id": external_id,
-                "job_url": info.get("externalUrl") or f"{public}/job{path}",
+                "job_url": info.get("externalUrl") or f"{public}{path}",
                 "description": html_to_markdown(info.get("jobDescription")),
                 "date_posted": to_date(info.get("startDate")),
                 "job_type": info.get("timeType") or None,

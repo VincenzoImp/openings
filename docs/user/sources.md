@@ -36,29 +36,48 @@ Google Jobs answers HTTP 429 to most unauthenticated clients.
 Applicant tracking systems with a public JSON feed. No key, complete
 descriptions, exact locations. Find the slug in the company's careers URL:
 
-| ATS | Careers URL | Feed used |
-|-----|-------------|-----------|
-| Greenhouse | `boards.greenhouse.io/<slug>` (or `job-boards.greenhouse.io/<slug>`) | `boards-api.greenhouse.io/v1/boards/<slug>/jobs?content=true` |
-| Lever | `jobs.lever.co/<slug>` | `api.lever.co/v0/postings/<slug>?mode=json` |
-| Ashby | `jobs.ashbyhq.com/<slug>` | `api.ashbyhq.com/posting-api/job-board/<slug>` |
-| SmartRecruiters | `careers.smartrecruiters.com/<Company>` | `api.smartrecruiters.com/v1/companies/<Company>/postings` |
-| Workday | `<host>.myworkdayjobs.com/<site>` | `POST <host>/wday/cxs/<tenant>/<site>/jobs` |
-| join.com | `join.com/companies/<slug>` | the page's own `__NEXT_DATA__` payload |
-| Workable | `apply.workable.com/<slug>` | `apply.workable.com/api/v1/widget/accounts/<slug>?details=true` |
-| Rippling | `ats.rippling.com/<slug>/jobs` | `api.rippling.com/platform/api/ats/v1/board/<slug>/jobs` |
-| BambooHR | `<slug>.bamboohr.com/careers` | `<slug>.bamboohr.com/careers/list` |
+| ATS | `ats:` value | Careers URL | Feed used |
+|-----|--------------|-------------|-----------|
+| Greenhouse | `greenhouse` | `boards.greenhouse.io/<slug>` (or `job-boards.greenhouse.io/<slug>`) | `boards-api.greenhouse.io/v1/boards/<slug>/jobs?content=true` |
+| Lever | `lever` | `jobs.lever.co/<slug>` | `api.lever.co/v0/postings/<slug>?mode=json` |
+| Ashby | `ashby` | `jobs.ashbyhq.com/<slug>` | `api.ashbyhq.com/posting-api/job-board/<slug>` |
+| SmartRecruiters | `smartrecruiters` | `careers.smartrecruiters.com/<Company>` | `api.smartrecruiters.com/v1/companies/<Company>/postings` |
+| Workday | `workday` | `<host>.myworkdayjobs.com/<site>` | `POST <host>/wday/cxs/<tenant>/<site>/jobs` |
+| join.com | `joincom` | `join.com/companies/<slug>` | the page's own `__NEXT_DATA__` payload |
+| Workable | `workable` | `apply.workable.com/<slug>` | `apply.workable.com/api/v1/widget/accounts/<slug>?details=true` |
+| Rippling | `rippling` | `ats.rippling.com/<slug>/jobs` | `api.rippling.com/platform/api/ats/v1/board/<slug>/jobs` |
+| BambooHR | `bamboohr` | `<slug>.bamboohr.com/careers` | `<slug>.bamboohr.com/careers/list` |
+| Oracle Cloud Recruiting | `oracle` | `<host>/hcmUI/CandidateExperience/.../sites/<site>` | `<host>/hcmRestApi/.../recruitingCEJobRequisitions` |
+| Personio | `personio` | `<slug>.jobs.personio.de` | `<slug>.jobs.personio.de/xml` |
+| Recruitee | `recruitee` | `<slug>.recruitee.com` | `<slug>.recruitee.com/api/offers/` |
+| BreezyHR | `breezy` | `<slug>.breezy.hr` | `<slug>.breezy.hr/json` |
 
 Companies whose careers site is built on one of these but served from their
 own domain still work: open a posting, look at the network requests or the
 "apply" link for the ATS domain and slug.
 
-Two of these need more than a bare slug. **Workday**'s slug is the whole board
-address, `host/site` (for example `abb.wd3.myworkdayjobs.com/External_Career_Page`),
-because the tenant, the datacenter number and the site name vary
-independently; copy it from the careers URL. **join.com** publishes no
-documented API, so its adapter reads the JSON the page ships to the browser.
-That is a scrape: it fails loudly if join.com changes its page shape, rather
-than silently returning nothing.
+Three of these need more than a bare slug or carry a caveat worth knowing.
+
+**Workday** and **Oracle Cloud Recruiting** take the whole board address,
+`host/site` (for example `abb.wd3.myworkdayjobs.com/External_Career_Page` or
+`eipb.fa.em2.oraclecloud.com/CX_5`), because the tenant, the datacenter and the
+site name vary independently; copy it from the careers URL. Both refuse a slug
+without a site rather than guessing at one.
+
+**join.com** publishes no documented API, so its adapter reads the JSON the
+page ships to the browser. That is a scrape: it fails loudly if join.com
+changes its page shape, rather than silently returning nothing.
+
+**Personio**'s feed is public but must be switched on by the employer
+(Settings > Recruiting > Career page). A tenant that never enabled it answers
+with the career site's HTML, which surfaces as `response is not XML`. Personio
+also rate-limits non-browser clients aggressively; an occasional `HTTP 429` in
+the run summary is the board throttling, not a broken adapter.
+
+**BreezyHR** publishes no description anywhere public: the feed carries none and
+the posting page is client-rendered. Its postings arrive with title, company,
+location, salary and URL but no body, so they are scored on the title alone.
+Set a lower `save_threshold` for a Breezy board, or expect to lose them.
 
 ### Finding companies to add
 
@@ -98,8 +117,59 @@ with evergreen roles. SmartRecruiters listings are filtered before their details
 fetched, and details are fetched only for postings not already stored, so a
 narrow list keeps the run short.
 
-Workday, SAP SuccessFactors and JavaScript-rendered careers pages are not
-supported; add those postings by hand or through an agent.
+iCIMS, SAP SuccessFactors, JazzHR, Jobvite, Teamtailor, softgarden and other
+JavaScript-rendered careers pages are not supported: they publish no machine-
+readable feed, and a per-vendor scraper of themed markup breaks silently rather
+than loudly. Add those postings by hand or through an agent.
+
+## JobCloud (`sources.jobcloud`)
+
+JobCloud runs several regional job boards from one engine, so the host is
+configuration rather than a constant: `www.jobs.ch` and `www.jobup.ch` are the
+same API, and a second configured source costs no code. The search is public
+and needs no key.
+
+```yaml
+sources:
+  jobcloud:
+    enabled: true
+    host: "www.jobs.ch"
+    queries: ["software engineer", "data engineer"]
+    locations: ["Zurich", "Bern"]
+    rows: 50           # results per page
+    max_pages: 3       # pages per query and location
+    max_details: 100   # per-posting description fetches per run
+```
+
+The search returns a truncated preview, so the full copy needs one extra
+request per posting; `max_details` caps that, and postings are deduplicated
+across queries before any detail is fetched. `rows`, `max_pages` and
+`max_details` are also clamped in code, because the board has thousands of
+result pages and a generous setting should not become thousands of requests.
+
+### The language line
+
+Where JobCloud reports a language requirement structurally, the adapter
+prepends one canonical line to the description:
+
+```
+Required languages: German (level 3), English (level 2)
+```
+
+The level is whatever the board reported; no scale is invented and no
+judgement is made about whether a requirement disqualifies you. That is a
+scoring decision, so match the line from your own configuration:
+
+```yaml
+scoring:
+  keywords:
+    language_required:
+      terms: ["required languages: german"]
+      match_in: ["description"]
+```
+
+Matching a field the employer filled in is far more reliable than hunting for
+phrasings in free text, which is the usual way this goes wrong.
 
 ## Feeds (`sources.feeds`)
 

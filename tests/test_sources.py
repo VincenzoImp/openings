@@ -1,5 +1,6 @@
 import json
 from types import SimpleNamespace
+from xml.etree import ElementTree
 from unittest.mock import patch
 
 import pandas as pd
@@ -10,9 +11,13 @@ from openings.sources import CANONICAL_COLUMNS, collect_all
 from openings.sources.ats import (
     ashby,
     bamboohr,
+    breezy,
     greenhouse,
     joincom,
     lever,
+    oracle,
+    personio,
+    recruitee,
     rippling,
     smartrecruiters,
     workable,
@@ -499,3 +504,200 @@ def test_every_known_ats_has_an_adapter():
     from openings.sources.ats import FETCHERS
 
     assert set(FETCHERS) == set(KNOWN_ATS)
+
+
+def test_oracle_pages_the_nested_listing_and_fetches_details():
+    listing = {
+        "items": [
+            {
+                "TotalJobsCount": 2,
+                "requisitionList": [
+                    {"Id": "1", "Title": "Data Engineer", "PrimaryLocation": "Zurich"},
+                    {"Id": "2", "Title": "Nurse", "PrimaryLocation": "Lyon"},
+                ],
+            }
+        ]
+    }
+    detail = {"items": [{"ExternalDescriptionStr": "<p>Build</p>"}]}
+    calls = []
+
+    def fake(url, **kwargs):
+        calls.append(url)
+        return listing if "JobRequisitions" in url else detail
+
+    company = CompanySourceConfig(
+        name="Acme", ats="oracle", slug="acme.fa.em2.oraclecloud.com/CX_5", locations=["Zurich"]
+    )
+    with patch("openings.sources.ats.oracle.http_get_json", side_effect=fake):
+        records = oracle.fetch(company, None, 5.0)
+
+    assert [record["title"] for record in records] == ["Data Engineer"]
+    assert records[0]["description"] == "Build"
+    # The Lyon row is filtered before any detail fetch, so only one detail call.
+    assert sum("Details" in call for call in calls) == 1
+
+
+def test_oracle_rejects_a_slug_without_a_site():
+    company = CompanySourceConfig(name="X", ats="oracle", slug="acme.oraclecloud.com")
+    with pytest.raises(SourceError):
+        oracle.fetch(company, None, 5.0)
+
+
+PERSONIO_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
+<workzag-jobs>
+  <position>
+    <id>4103</id>
+    <office>Zurich</office>
+    <department>Engineering</department>
+    <name>Backend Engineer</name>
+    <employmentType>permanent</employmentType>
+    <seniority>experienced</seniority>
+    <schedule>full-time</schedule>
+    <createdAt>2026-05-31T12:14:07+0200</createdAt>
+    <jobDescriptions>
+      <jobDescription><name>Tasks</name><value>&lt;p&gt;Build&lt;/p&gt;</value></jobDescription>
+    </jobDescriptions>
+  </position>
+  <position>
+    <id>4104</id>
+    <office>Munich</office>
+    <name>Sales</name>
+  </position>
+</workzag-jobs>"""
+
+
+def test_personio_parses_its_own_schema_and_filters_by_office():
+    root = ElementTree.fromstring(PERSONIO_XML)
+    company = CompanySourceConfig(name="Acme", ats="personio", slug="acme", locations=["Zurich"])
+    with patch("openings.sources.ats.personio.http_get_xml", return_value=root):
+        records = personio.fetch(company, None, 5.0)
+
+    assert [record["title"] for record in records] == ["Backend Engineer"]
+    assert records[0]["description"] == "## Tasks\n\nBuild"
+    assert records[0]["job_url"] == "https://acme.jobs.personio.de/job/4103"
+    assert records[0]["job_type"] == "fulltime"
+    assert records[0]["job_level"] == "experienced"
+
+
+def test_recruitee_needs_no_detail_fetch():
+    payload = {
+        "offers": [
+            {
+                "id": 1,
+                "title": "Platform Engineer",
+                "description": "<p>Run it</p>",
+                "requirements": "<p>Go</p>",
+                "location": "Zurich, Switzerland",
+                "careers_url": "https://acme.recruitee.com/o/platform-engineer",
+                "published_at": "2026-09-01 10:00:00 UTC",
+                "remote": True,
+            }
+        ]
+    }
+    calls = []
+
+    def fake(url, **kwargs):
+        calls.append(url)
+        return payload
+
+    company = CompanySourceConfig(name="Acme", ats="recruitee", slug="acme")
+    with patch("openings.sources.ats.recruitee.http_get_json", side_effect=fake):
+        records = recruitee.fetch(company, None, 5.0)
+
+    assert records[0]["description"] == "Run it\n\n## Requirements\n\nGo"
+    assert records[0]["is_remote"] is True
+    assert len(calls) == 1
+
+
+def test_breezy_reports_no_description_because_the_feed_carries_none():
+    payload = [
+        {
+            "id": "abc",
+            "name": "Engineer",
+            "url": "https://acme.breezy.hr/p/abc-engineer",
+            "published_date": "2026-09-01T00:00:00Z",
+            "location": {"name": "Zurich, CH", "is_remote": True},
+            "company": {"name": "Acme"},
+        }
+    ]
+    company = CompanySourceConfig(name="Acme", ats="breezy", slug="acme")
+    with patch("openings.sources.ats.breezy.http_get_json", return_value=payload):
+        records = breezy.fetch(company, None, 5.0)
+
+    assert records[0]["title"] == "Engineer"
+    assert records[0]["location"] == "Zurich, CH (Remote)"
+    # Breezy publishes no copy anywhere public; the record is title-only by design.
+    assert records[0]["description"] is None
+
+
+def test_jobcloud_turns_structured_language_skills_into_one_canonical_line():
+    from openings.sources.jobcloud import _record
+
+    document = {
+        "job_id": "abc",
+        "title": "Backend Engineer",
+        "company_name": "Acme",
+        "place": "Zurich",
+        "preview": "short preview",
+        "publication_date": "2026-09-07T08:17:05+02:00",
+        "language_skills": [{"language": "de", "level": 3}, {"language": "en", "level": 2}],
+        "_links": {"detail_de": {"href": "https://www.jobs.ch/de/x/detail/abc/"}},
+    }
+    record = _record(document, "www.jobs.ch", None)
+    assert record["description"].startswith(
+        "Required languages: German (level 3), English (level 2)"
+    )
+    assert record["job_url"] == "https://www.jobs.ch/de/x/detail/abc/"
+    assert record["external_id"] == "abc"
+
+
+def test_jobcloud_without_language_skills_leaves_the_description_alone():
+    from openings.sources.jobcloud import _record
+
+    record = _record({"job_id": "a", "title": "T", "preview": "body"}, "www.jobs.ch", None)
+    assert record["description"] == "body"
+
+
+def test_every_ats_has_a_canonical_url_pattern():
+    """The 0.3.0 adapters shipped without one, so their postings deduped worse
+    than they should have and nothing caught it."""
+    from openings.models import _BOARD_PATTERNS
+    from openings.sources.ats import FETCHERS
+
+    boards = {board for board, _pattern in _BOARD_PATTERNS}
+    assert set(FETCHERS) <= boards, sorted(set(FETCHERS) - boards)
+
+
+def test_http_get_xml_refuses_a_document_that_declares_entities():
+    """Entity expansion is the reason; this parses XML from arbitrary hosts."""
+    from openings.sources.base import http_get_xml
+
+    bomb = SimpleNamespace(
+        content=b'<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY lol "lol">]><lolz>&lol;</lolz>'
+    )
+    with patch("openings.sources.base.http_get", return_value=bomb):
+        with pytest.raises(SourceError):
+            http_get_xml("https://example.test/xml", user_agent=None, timeout=5.0)
+
+
+def test_jobcloud_clamps_paging_to_the_module_ceiling():
+    """A generous max_pages in someone's settings must not become thousands of
+    requests against a board with thousands of result pages."""
+    from openings.config import JobCloudConfig
+    from openings.sources import jobcloud
+
+    calls = []
+
+    def fake(url, **kwargs):
+        calls.append(kwargs.get("params", {}).get("page"))
+        return {"documents": [{"job_id": f"{len(calls)}", "title": "T", "place": "Zurich"}]}
+
+    config = parse_config(minimal_settings())
+    config.sources.jobcloud = JobCloudConfig(
+        enabled=True, host="www.jobs.ch", queries=["x"], rows=1, max_pages=9999, max_details=0
+    )
+    with patch("openings.sources.jobcloud.http_get_json", side_effect=fake):
+        result = jobcloud.run_jobcloud(config)
+
+    assert len(calls) == jobcloud.MAX_PAGES
+    assert result.stats.rows == jobcloud.MAX_PAGES

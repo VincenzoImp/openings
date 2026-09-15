@@ -7,7 +7,7 @@ from datetime import date
 from typing import Sequence
 
 from openings.db.base import Store, chunks, placeholders, unique
-from openings.models import Posting
+from openings.models import Posting, canonical_url
 
 
 class PostingsMixin(Store):
@@ -76,3 +76,28 @@ class PostingsMixin(Store):
                 (seen, url, external_id, row["id"]),
             )
         return False
+
+    def renormalize_posting_keys(self) -> int:
+        """Recompute every posting key against the current canonical rules.
+
+        Adding a board to ``_BOARD_PATTERNS`` changes the key its postings hash
+        to. Without this pass the next collection would miss the key lookup,
+        fail the identity fallback in ``upsert_jobs`` (which refuses to mirror
+        onto a job already seen on that source) and store the same opening
+        again as a new job. Idempotent: a database already normalized reports
+        zero. A row whose new key is taken by another posting is left alone, so
+        the pass can never fail on the UNIQUE constraint.
+        """
+        updated = 0
+        with self._connection() as conn:
+            rows = conn.execute("SELECT id, key, url FROM postings").fetchall()
+            taken = {row["key"] for row in rows}
+            for row in rows:
+                new_key = canonical_url(row["url"]) if row["url"] else None
+                if not new_key or new_key == row["key"] or new_key in taken:
+                    continue
+                conn.execute("UPDATE postings SET key = ? WHERE id = ?", (new_key, row["id"]))
+                taken.discard(row["key"])
+                taken.add(new_key)
+                updated += 1
+        return updated

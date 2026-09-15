@@ -7,7 +7,7 @@ from importlib import metadata
 from pathlib import Path
 
 PROJECT_NAME = "openings"
-FALLBACK_VERSION = "0.3.0"
+FALLBACK_VERSION = "0.4.0"
 ROOT_DIR = Path(__file__).resolve().parents[2]
 
 

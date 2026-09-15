@@ -9,6 +9,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from typing import Any, Iterable
+from xml.etree import ElementTree
 
 import pandas as pd
 import requests
@@ -242,3 +243,32 @@ def http_post_json(
         return response.json()
     except ValueError as exc:
         raise SourceError(f"{url}: response is not JSON") from exc
+
+
+def http_get_xml(
+    url: str,
+    *,
+    user_agent: str | None,
+    timeout: float,
+    params: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+) -> ElementTree.Element:
+    """GET and parse XML. Personio serves a custom schema, not RSS, so feedparser
+    does not apply; the bytes are parsed rather than the decoded text so the XML
+    declaration's own encoding wins."""
+    request_headers = {"Accept": "application/xml, text/xml, */*"}
+    if headers:
+        request_headers.update(headers)
+    response = http_get(
+        url, user_agent=user_agent, timeout=timeout, params=params, headers=request_headers
+    )
+    body = response.content
+    # This parses XML from arbitrary third-party hosts, and ElementTree expands
+    # internal entities, so a document declaring one is refused rather than
+    # handed to the parser. No feed this project reads needs a DTD.
+    if b"<!DOCTYPE" in body[:2048] or b"<!ENTITY" in body[:4096]:
+        raise SourceError(f"{url}: XML declaring a DTD or entities is refused")
+    try:
+        return ElementTree.fromstring(body)
+    except ElementTree.ParseError as exc:
+        raise SourceError(f"{url}: response is not XML") from exc

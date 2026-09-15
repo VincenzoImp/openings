@@ -20,9 +20,10 @@ attached to the job it belongs to. It is built for one person, runs in two
 containers on your own machine, and never sends your data anywhere.
 
 - **Collect** from job boards (through [JobSpy](https://github.com/speedyapply/JobSpy)),
-  company career pages on nine applicant tracking systems (Greenhouse, Lever,
-  Ashby, SmartRecruiters, Workday, join.com, Workable, Rippling, BambooHR),
-  RSS feeds and the Adzuna API. Anything the crawler cannot see, you or an
+  company career pages on thirteen applicant tracking systems (Greenhouse,
+  Lever, Ashby, SmartRecruiters, Workday, join.com, Workable, Rippling,
+  BambooHR, Oracle Cloud Recruiting, Personio, Recruitee, BreezyHR), regional
+  boards on JobCloud (jobs.ch, jobup.ch), RSS feeds and the Adzuna API. Anything the crawler cannot see, you or an
   agent add by hand. No ATS publishes a directory of its customers, so
   [docs/user/sources.md](docs/user/sources.md#finding-companies-to-add) lists
   the community-maintained slug lists worth screening for the companies near

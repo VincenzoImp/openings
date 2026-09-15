@@ -6,6 +6,70 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-15
+
+### Added
+
+- Four more applicant tracking systems behind the existing `sources.companies`
+  shape: **Oracle Cloud Recruiting**, **Personio**, **Recruitee** and
+  **BreezyHR**. Thirteen are now supported. Oracle covers roughly 1,279 known
+  corporate tenants; Personio covers the small and mid-size employers of the
+  German-speaking market, a segment no aggregator reaches well.
+- **JobCloud** (`sources.jobcloud`), a regional job board with a public search
+  API. One engine serves several domains, so the host is configuration rather
+  than a constant and a second board is a second entry, not new code.
+- A canonical language line. Where a source reports language requirements
+  structurally, the description gains one line, `Required languages: German
+  (level 3), English (level 2)`. Keyword scoring otherwise has to guess at
+  phrasings; this states what the employer filled in, in the same words every
+  time. The tool reports the requirement and invents no scale; whether a
+  language disqualifies a role stays a `scoring.keywords` decision.
+- `http_get_xml` in `sources.base`, for the first source whose feed is XML in a
+  schema of its own rather than RSS.
+
+### Fixed
+
+- **Postings on the 0.3.0 adapters deduped worse than they should have.**
+  `canonical_url` had no pattern for workday, joincom, workable, rippling or
+  bamboohr, so their postings fell back to generic URL normalization and the
+  same opening seen twice could stay two jobs. Patterns added for those and for
+  everything new here, and a test now asserts every registered adapter has one.
+- Boards whose posting ids are only unique inside one tenant now include the
+  host in their canonical key. Without it two employers' requisition 7 would
+  collapse into a single job.
+- A Workday posting with no `externalUrl` in its payload built a URL with a
+  doubled `/job/job/` segment.
+
+### Changed
+
+- Posting keys are renormalized once at startup. Teaching `canonical_url` a new
+  board changes the key its stored postings hash to, and without this pass the
+  next collection would miss the key lookup, be refused by the identity
+  fallback (which will not mirror onto a job already seen on that source) and
+  store those openings again as new jobs. The pass is idempotent and reports
+  the count it changed.
+
+### Notes
+
+- Personio's feed is public but the employer must switch it on; a tenant that
+  never did answers with its career-site HTML, which surfaces as `response is
+  not XML`. Personio also throttles non-browser clients hard, so an occasional
+  `HTTP 429` in a run summary is the board, not the adapter.
+- BreezyHR publishes no description anywhere public: the feed carries none and
+  the posting page is client-rendered. Its postings arrive title-only and are
+  scored on the title alone.
+- XML from third-party hosts is refused when it declares a DTD or entities.
+  Nothing this project reads needs one, and the parser expands internal
+  entities.
+- `sources.jobcloud` clamps `rows`, `max_pages` and `max_details` in code as
+  well as in configuration. The board has thousands of result pages, and a
+  generous setting should not become thousands of requests.
+- Still unsupported, deliberately: iCIMS, SAP SuccessFactors, JazzHR, Jobvite,
+  Teamtailor and softgarden. They publish no machine-readable feed, and a
+  per-vendor scraper of tenant-themed markup breaks silently rather than
+  loudly, which is the one failure mode this project's source layer is built to
+  avoid.
+
 ## [0.3.0] - 2026-09-15
 
 ### Added

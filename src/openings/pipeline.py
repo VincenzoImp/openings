@@ -162,6 +162,12 @@ def prepare_runtime(runtime: Runtime, *, scheduled: bool) -> Config:
     if total:
         changed = db.rescore_all(config)
         logger.info("Rescored %d of %d jobs against the current configuration", changed, total)
+        # A release that teaches canonical_url a new board changes the key its
+        # postings hash to. Without this, the next collection stores those
+        # openings again as new jobs.
+        rekeyed = db.renormalize_posting_keys()
+        if rekeyed:
+            logger.info("Renormalized %d posting key(s) to the current canonical rules", rekeyed)
 
     report = db.reconcile(config)
     logger.info(

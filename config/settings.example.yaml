@@ -163,14 +163,18 @@ sources:
   # ---------------------------------------------------------------------------
   # companies — named employers whose applicant tracking system exposes a
   # public postings feed. No key needed. Supported: greenhouse, lever, ashby,
-  # smartrecruiters, workday, joincom, workable, rippling, bamboohr.
+  # smartrecruiters, workday, joincom, workable, rippling, bamboohr, oracle,
+  # personio, recruitee, breezy.
   # Find the slug in the company's careers URL:
   #   boards.greenhouse.io/<slug>   jobs.lever.co/<slug>
   #   jobs.ashbyhq.com/<slug>       careers.smartrecruiters.com/<slug>
   #   join.com/companies/<slug>     apply.workable.com/<slug>
   #   ats.rippling.com/<slug>/jobs  <slug>.bamboohr.com/careers
-  # Workday is the exception: its slug is the whole board address, host/site,
-  # e.g. "abb.wd3.myworkdayjobs.com/External_Career_Page".
+  #   <slug>.jobs.personio.de       <slug>.recruitee.com
+  #   <slug>.breezy.hr
+  # workday and oracle are the exceptions: their slug is the whole board
+  # address, host/site, e.g. "abb.wd3.myworkdayjobs.com/External_Career_Page"
+  # or "eipb.fa.em2.oraclecloud.com/CX_5".
   # Community-maintained slug lists (no ATS publishes a customer directory):
   #   https://github.com/kalil0321/ats-scrapers  (one CSV per ATS, widest)
   #   https://github.com/Feashliaa/job-board-aggregator  (daily refresh)
@@ -199,6 +203,24 @@ sources:
   # feeds:
   #   - name: "Example board"
   #     url: "https://example.com/jobs.rss"
+
+  # ---------------------------------------------------------------------------
+  # jobcloud — a regional job board with a public search API. One engine serves
+  # several domains (www.jobs.ch, www.jobup.ch), so the host is configuration:
+  # a second board is a second entry, not new code. `rows`, `max_pages` and
+  # `max_details` are clamped in code as well, because the board has thousands
+  # of result pages. Where it reports a language requirement structurally the
+  # description gains one canonical line, "Required languages: German (level
+  # 3)"; match it from scoring.keywords if that matters to you.
+  # ---------------------------------------------------------------------------
+  jobcloud:
+    enabled: false
+    host: "www.jobs.ch"
+    queries: []
+    locations: []
+    rows: 50
+    max_pages: 3
+    max_details: 100
 
   # ---------------------------------------------------------------------------
   # adzuna — the Adzuna search API (developer.adzuna.com, free key). Country

@@ -144,6 +144,9 @@ def generate_job_id(title: str, company: str, location: str) -> str:
     return hashlib.sha256(identifier.encode("utf-8")).hexdigest()
 
 
+# Every ATS adapter needs an entry here, or its postings fall back to generic
+# URL normalization and the same opening seen on two boards stays two jobs.
+# tests/test_sources.py asserts this stays in step with the adapter registry.
 _BOARD_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("linkedin", re.compile(r"linkedin\.com/jobs/view/(?:[^/?#]*?-)?(\d+)")),
     ("greenhouse", re.compile(r"greenhouse\.io/[^/?#]+/jobs/(\d+)")),
@@ -151,6 +154,18 @@ _BOARD_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("ashby", re.compile(r"jobs\.ashbyhq\.com/[^/?#]+/([0-9a-f-]{36})")),
     ("smartrecruiters", re.compile(r"smartrecruiters\.com/[^/?#]+/(\d+)")),
     ("google", re.compile(r"careers\.google\.com/jobs/results/(\d+)")),
+    # Boards whose ids are only unique inside one tenant capture the host too,
+    # or two employers' requisition 7 would collapse into one job.
+    ("workday", re.compile(r"([\w-]+\.wd\d+\.myworkdayjobs\.com/[^?#]*/job/[^?#/]+)")),
+    ("joincom", re.compile(r"join\.com/companies/[^/?#]+/(\d+)")),
+    ("workable", re.compile(r"workable\.com/j/([0-9a-z]+)")),
+    ("rippling", re.compile(r"ats\.rippling\.com/[^/?#]+/jobs/([0-9a-f-]{36})")),
+    ("bamboohr", re.compile(r"([\w-]+\.bamboohr\.com/careers/\d+)")),
+    ("oracle", re.compile(r"([\w.-]+\.oraclecloud\.com/[^?#]*/job/\d+)")),
+    ("personio", re.compile(r"([\w-]+\.jobs\.personio\.(?:de|com)/job/\d+)")),
+    ("recruitee", re.compile(r"([\w-]+\.recruitee\.com/o/[^/?#]+)")),
+    ("breezy", re.compile(r"([\w-]+\.breezy\.hr/p/[0-9a-f]+)")),
+    ("jobcloud", re.compile(r"job(?:s|up)\.ch/[^?#]*/detail/([0-9a-f-]{36})")),
 )
 _ID_PARAMS = {"jk", "gh_jid", "id", "jobid", "job_id", "reqid", "requisitionid", "job", "p"}
 

@@ -25,8 +25,9 @@ openings/
   sources/           one module per source, all returning the canonical frame
     base.py          CANONICAL_COLUMNS, HTTP helpers, html_to_markdown, to_date
     jobspy.py        boards through JobSpy: throttling, retry, thread pool
-    ats/             nine ATS public feeds (greenhouse, lever, ashby, smartrecruiters,
-                     workday, joincom, workable, rippling, bamboohr)
+    ats/             thirteen ATS public feeds (greenhouse, lever, ashby,
+                     smartrecruiters, workday, joincom, workable, rippling,
+                     bamboohr, oracle, personio, recruitee, breezy)
     rss.py           RSS and Atom through feedparser
     adzuna.py        Adzuna search API (keyed, optional)
     manual.py        add_job records

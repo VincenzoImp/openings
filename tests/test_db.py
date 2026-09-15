@@ -4,7 +4,15 @@ import numpy as np
 import pytest
 
 from openings.db import JobQuery, RescoreReport
-from openings.models import AttachmentKind, EventKind, JobStatus, NoteKind, RunSummary, utcnow
+from openings.models import (
+    AttachmentKind,
+    EventKind,
+    JobStatus,
+    NoteKind,
+    RunSummary,
+    canonical_url,
+    utcnow,
+)
 from tests.conftest import make_job
 
 
@@ -405,3 +413,19 @@ def test_timestamps_are_utc_aware(db, job):
     db.upsert_jobs([job])
     stored = db.get_job(job.job_id)
     assert stored.status_changed_at.tzinfo == timezone.utc
+
+
+def test_renormalize_posting_keys_rewrites_stale_keys_and_is_idempotent(db):
+    """A release that teaches canonical_url a new board must not orphan the
+    postings stored under the old key, or the next run duplicates every job."""
+    job = make_job(job_url="https://acme.bamboohr.com/careers/7", source="bamboohr")
+    result = db.upsert_jobs([job])
+    stored_id = result.new_ids[0]
+    stale = "url:acme.bamboohr.com/careers/7"
+    with db._connection() as conn:
+        conn.execute("UPDATE postings SET key = ?", (stale,))
+
+    assert db.renormalize_posting_keys() == 1
+    fresh = canonical_url("https://acme.bamboohr.com/careers/7")
+    assert db.jobs_for_posting_keys([fresh]) == {fresh: stored_id}
+    assert db.renormalize_posting_keys() == 0

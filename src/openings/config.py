@@ -28,6 +28,10 @@ KNOWN_ATS = (
     "workable",
     "rippling",
     "bamboohr",
+    "oracle",
+    "personio",
+    "recruitee",
+    "breezy",
 )
 
 # The posting fields a scoring category may look at, in the order they are
@@ -241,11 +245,26 @@ class AdzunaConfig:
 
 
 @dataclass
+class JobCloudConfig:
+    """One JobCloud board. The host is configuration because the same engine
+    serves several regional domains (jobs.ch, jobup.ch)."""
+
+    enabled: bool = False
+    host: str = "www.jobs.ch"
+    queries: list[str] = field(default_factory=list)
+    locations: list[str] = field(default_factory=list)
+    rows: int = 50
+    max_pages: int = 3
+    max_details: int = 100
+
+
+@dataclass
 class SourcesConfig:
     jobspy: JobSpyConfig = field(default_factory=JobSpyConfig)
     companies: list[CompanySourceConfig] = field(default_factory=list)
     feeds: list[FeedSourceConfig] = field(default_factory=list)
     adzuna: AdzunaConfig = field(default_factory=AdzunaConfig)
+    jobcloud: JobCloudConfig = field(default_factory=JobCloudConfig)
     user_agent: str | None = None
     timeout_seconds: float = 30.0
     feed_max_age_days: int | None = 60
@@ -668,6 +687,28 @@ def _parse_adzuna(data: dict) -> AdzunaConfig:
     return config
 
 
+def _parse_jobcloud(data: dict) -> JobCloudConfig:
+    section = _section(
+        data,
+        "jobcloud",
+        {"enabled", "host", "queries", "locations", "rows", "max_pages", "max_details"},
+        path="sources.jobcloud",
+    )
+    enabled = _bool(section.get("enabled", False), "sources.jobcloud.enabled")
+    config = JobCloudConfig(
+        enabled=enabled,
+        host=_str(section.get("host", "www.jobs.ch"), "sources.jobcloud.host").strip().lower(),
+        queries=_str_list(section.get("queries"), "sources.jobcloud.queries"),
+        locations=_str_list(section.get("locations"), "sources.jobcloud.locations"),
+        rows=_int_min(section.get("rows", 50), "sources.jobcloud.rows", 1),
+        max_pages=_int_min(section.get("max_pages", 3), "sources.jobcloud.max_pages", 1),
+        max_details=_int_min(section.get("max_details", 100), "sources.jobcloud.max_details", 0),
+    )
+    if enabled and not config.host:
+        raise ConfigError("sources.jobcloud.host is required when jobcloud is enabled")
+    return config
+
+
 def _parse_sources(data: dict) -> SourcesConfig:
     section = _section(
         data,
@@ -677,6 +718,7 @@ def _parse_sources(data: dict) -> SourcesConfig:
             "companies",
             "feeds",
             "adzuna",
+            "jobcloud",
             "user_agent",
             "timeout_seconds",
             "feed_max_age_days",
@@ -687,6 +729,7 @@ def _parse_sources(data: dict) -> SourcesConfig:
         companies=_parse_companies(section.get("companies")),
         feeds=_parse_feeds(section.get("feeds")),
         adzuna=_parse_adzuna(section),
+        jobcloud=_parse_jobcloud(section),
         user_agent=_optional(section.get("user_agent"), _str, "sources.user_agent"),
         timeout_seconds=_float_min(
             section.get("timeout_seconds", 30.0), "sources.timeout_seconds", 1.0

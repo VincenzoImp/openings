@@ -12,6 +12,7 @@ from openings.logger import get_logger, log_section
 from openings.models import SourceRunStats, generate_job_id, posting_key
 from openings.sources import rss
 from openings.sources.adzuna import run_adzuna
+from openings.sources.jobcloud import run_jobcloud
 from openings.sources.ats import FETCHERS
 from openings.sources.base import (
     CANONICAL_COLUMNS,
@@ -135,7 +136,8 @@ def _dedupe(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def collect_all(config: Config, *, known: KnownExternalIds | None = None) -> CollectResult:
-    """Sources run in order: boards, companies, feeds, Adzuna. Failures are
+    """Sources run in order: boards, companies, feeds, JobCloud, Adzuna.
+    Failures are
     isolated per source and per company; a broken feed costs nothing but a
     line in the run summary."""
     logger = get_logger("collect")
@@ -163,6 +165,8 @@ def collect_all(config: Config, *, known: KnownExternalIds | None = None) -> Col
             result.stats.rows,
             f", error: {result.stats.errors[0]}" if result.stats.errors else "",
         )
+    if config.sources.jobcloud.enabled:
+        results.append(run_jobcloud(config))
     if config.sources.adzuna.enabled:
         results.append(run_adzuna(config))
 

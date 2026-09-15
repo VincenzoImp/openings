@@ -53,7 +53,7 @@ Employers whose applicant tracking system publishes a feed:
 ```yaml
 companies:
   - name: "Example Corp"
-    ats: "greenhouse"          # greenhouse | lever | ashby | smartrecruiters | workday | joincom | workable | rippling | bamboohr
+    ats: "greenhouse"          # greenhouse | lever | ashby | smartrecruiters | workday | joincom | workable | rippling | bamboohr | oracle | personio | recruitee | breezy
     slug: "examplecorp"
     locations: ["Berlin", "Remote"]   # optional substrings; omit to keep all
     titles: ["engineer", "developer"] # optional substrings on the title
