@@ -45,6 +45,23 @@ One job's whole application (posting, notes, answers, timeline and files) can
 also be taken out as a zip: `GET /api/jobs/{job_id}/bundle.zip` or the
 "Download bundle" button.
 
+## Rescoring
+
+Every process rescores the archive against `settings.yaml` at startup, so a
+scoring edit reaches the stored jobs on the next restart. To do it on demand,
+or to see what an edit would do before it does it:
+
+```bash
+docker compose exec scheduler openings rescore --dry-run
+docker compose exec scheduler openings rescore
+```
+
+Both report how many jobs would change or did change, with the score
+distribution before and after and how many rows sit at or above
+`save_threshold` and `notify_threshold`. `--dry-run` writes nothing. A
+configuration error is reported on stdout and exits non-zero instead of
+touching the database. Blacklisted jobs are not rescored.
+
 ## Retention
 
 Retention only ever touches jobs in status `new`. `scoring.save_threshold`

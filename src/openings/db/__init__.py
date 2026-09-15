@@ -18,6 +18,8 @@ from openings.db.jobs import (
     JobQuery,
     JobsMixin,
     MergeResult,
+    RescoreReport,
+    ScoreSummary,
     UpsertResult,
 )
 from openings.db.material import MaterialMixin
@@ -34,6 +36,8 @@ __all__ = [
     "JobQuery",
     "MergeResult",
     "ReconciliationReport",
+    "RescoreReport",
+    "ScoreSummary",
     "UpsertResult",
 ]
 

@@ -111,6 +111,7 @@ See [Configuration](docs/user/configuration.md) and
 | `openings run` | collect once and exit |
 | `openings web` | dashboard, REST API and MCP endpoint on port 8501 |
 | `openings healthcheck` | verify config, database and directories |
+| `openings rescore` | rescore every stored job against the current configuration (`--dry-run` to preview) |
 
 ## Documentation
 

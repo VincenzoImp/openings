@@ -219,7 +219,9 @@ class JobApplicationService:
                 "save_threshold": config.scoring.save_threshold,
                 "notify_threshold": config.scoring.notify_threshold,
                 "weights": dict(config.scoring.weights),
-                "keywords": {key: list(value) for key, value in config.scoring.keywords.items()},
+                "keywords": {
+                    key: list(value.terms) for key, value in config.scoring.keywords.items()
+                },
             },
             "scheduler": {
                 "interval_hours": config.scheduler.interval_hours,

@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from openings.config import ConfigError, load_config, parse_config
+from openings.config import KEYWORD_FIELDS, ConfigError, load_config, parse_config
 from tests.conftest import EXAMPLE_SETTINGS, minimal_settings
 
 
@@ -60,7 +60,65 @@ def test_keyword_category_without_weight_fails():
 def test_keywords_are_lower_cased():
     data = minimal_settings()
     data["scoring"]["keywords"]["role"] = ["Software Engineer"]
-    assert parse_config(data).scoring.keywords["role"] == ["software engineer"]
+    assert parse_config(data).scoring.keywords["role"].terms == ("software engineer",)
+
+
+def test_bare_keyword_list_keeps_the_historical_matching_defaults():
+    category = parse_config(minimal_settings()).scoring.keywords["role"]
+    assert category.match_in == KEYWORD_FIELDS
+    assert category.whole_word is False
+
+
+def test_extended_keyword_form_parses_match_in_and_whole_word():
+    data = minimal_settings()
+    data["scoring"]["keywords"]["role"] = {
+        "match_in": ["location", "Title"],
+        "whole_word": True,
+        "terms": ["Backend Engineer"],
+    }
+    category = parse_config(data).scoring.keywords["role"]
+    assert category.terms == ("backend engineer",)
+    assert category.match_in == ("title", "location")  # canonical order, case-folded
+    assert category.whole_word is True
+
+
+def test_extended_keyword_form_defaults_to_todays_behaviour():
+    data = minimal_settings()
+    data["scoring"]["keywords"]["role"] = {"terms": ["backend"]}
+    category = parse_config(data).scoring.keywords["role"]
+    assert category.match_in == KEYWORD_FIELDS
+    assert category.whole_word is False
+
+
+def test_unknown_match_in_field_names_the_category_and_the_value():
+    data = minimal_settings()
+    data["scoring"]["keywords"]["role"] = {"match_in": ["titel"], "terms": ["backend"]}
+    with pytest.raises(ConfigError) as error:
+        parse_config(data)
+    message = str(error.value)
+    assert "scoring.keywords.role.match_in" in message
+    assert "'titel'" in message
+
+
+def test_empty_match_in_is_rejected():
+    data = minimal_settings()
+    data["scoring"]["keywords"]["role"] = {"match_in": [], "terms": ["backend"]}
+    with pytest.raises(ConfigError, match="scoring.keywords.role.match_in"):
+        parse_config(data)
+
+
+def test_unknown_key_inside_a_keyword_category_fails():
+    data = minimal_settings()
+    data["scoring"]["keywords"]["role"] = {"terms": ["backend"], "wholeword": True}
+    with pytest.raises(ConfigError, match="scoring.keywords.role.wholeword"):
+        parse_config(data)
+
+
+def test_whole_word_must_be_a_boolean():
+    data = minimal_settings()
+    data["scoring"]["keywords"]["role"] = {"terms": ["backend"], "whole_word": "yes"}
+    with pytest.raises(ConfigError, match="scoring.keywords.role.whole_word"):
+        parse_config(data)
 
 
 def test_all_queries_deduplicates_across_categories():

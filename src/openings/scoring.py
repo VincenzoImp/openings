@@ -6,21 +6,30 @@ terms appears in the job text. Negative weights penalize. Matching is a
 case-insensitive substring test over title, description, company and
 location, with Unicode normalization so accented and unaccented spellings
 match alike.
+
+A category can narrow that default. ``match_in`` restricts it to a subset of
+the four fields, so a term that is decisive in a title but incidental in a
+long description only counts where it means something. ``whole_word`` matches
+the term as a token instead of a substring, so ``go`` stops matching Lugano
+and Google. Both are optional and off by default: a category written as a
+bare list of terms scores exactly as it always has.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any, Mapping
 
 import pandas as pd
 from rapidfuzz import fuzz
 
-from openings.config import Config, JobSpyConfig
+from openings.config import KEYWORD_FIELDS, Config, JobSpyConfig, KeywordCategory
 from openings.logger import get_logger
 from openings.text import extract_words, normalize_text
 
-TEXT_FIELDS = ("title", "description", "company", "location")
+TEXT_FIELDS = KEYWORD_FIELDS
 
 
 def fuzzy_word_match(word: str, text: str, min_similarity: int) -> bool:
@@ -54,19 +63,51 @@ def _field(obj: Any, name: str) -> str:
     return str(value)
 
 
-def job_text(obj: Any) -> str:
+def job_text(obj: Any, fields: tuple[str, ...] = TEXT_FIELDS) -> str:
     """Concatenated text used for both scoring and post-filtering."""
-    return " ".join(part for part in (_field(obj, name) for name in TEXT_FIELDS) if part)
+    return " ".join(part for part in (_field(obj, name) for name in fields) if part)
+
+
+@lru_cache(maxsize=4096)
+def _whole_word_pattern(term: str) -> re.Pattern[str]:
+    """``term`` as a token: a word boundary at each end that has a word there.
+
+    A term may start or end with punctuation (``c#``, ``.net``, ``intern (``),
+    where ``\\b`` would demand a word character that is not coming. The
+    assertion is therefore added only at an end that is itself a word
+    character, and ``\\w`` is Unicode-aware, so the whole normalized text is
+    covered and not only ASCII.
+    """
+    prefix = r"(?<!\w)" if term[:1].isalnum() or term[:1] == "_" else ""
+    suffix = r"(?!\w)" if term[-1:].isalnum() or term[-1:] == "_" else ""
+    return re.compile(f"{prefix}{re.escape(term)}{suffix}")
+
+
+def _term_matches(term: str, text: str, whole_word: bool) -> bool:
+    if term not in text:
+        # A token match implies a substring match, so this rejects cheaply.
+        return False
+    return not whole_word or _whole_word_pattern(term).search(text) is not None
+
+
+def _category_matches(category: KeywordCategory, text: str) -> bool:
+    return any(
+        _term_matches(normalize_text(term), text, category.whole_word) for term in category.terms
+    )
 
 
 def matched_categories(obj: Any, config: Config) -> list[str]:
     """Categories whose keywords appear in the job text, in config order."""
-    text = normalize_text(job_text(obj))
-    if not text.strip():
-        return []
+    texts: dict[tuple[str, ...], str] = {}
     matched: list[str] = []
-    for category, terms in config.scoring.keywords.items():
-        if any(normalize_text(term) in text for term in terms):
+    for category, keywords in config.scoring.keywords.items():
+        text = texts.get(keywords.match_in)
+        if text is None:
+            text = normalize_text(job_text(obj, keywords.match_in))
+            texts[keywords.match_in] = text
+        if not text.strip():
+            continue
+        if _category_matches(keywords, text):
             matched.append(category)
     return matched
 

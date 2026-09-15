@@ -95,6 +95,36 @@ category's weight is added once. Negative weights express hard limits. The
 job page and `get_job` show which categories matched, so weights are easy to
 tune: watch `GET /api/distribution` after a run and move the thresholds.
 
+#### Narrowing how a category matches
+
+A category written as a bare list matches every field as a plain substring.
+Written as a mapping it can also say where it may match and whether a term is
+a whole token. Both keys are optional; a bare list keeps today's semantics
+exactly.
+
+```yaml
+keywords:
+  wrong_role:
+    match_in: ["title"]      # default: all four fields
+    whole_word: true         # default: false
+    terms: ["account manager", "recruiter"]
+```
+
+- `match_in` takes any subset of `title`, `description`, `company`,
+  `location`. An unknown field name fails startup. Use it when a term decides
+  the role in a title but is incidental in a description: "our talent
+  acquisition team will be in touch" in an application footer should not cost
+  a posting the penalty meant for a recruiting job.
+- `whole_word` matches a term as a token, so `go` matches "Go" and "Go," but
+  not Google, Lugano or ongoing. A multi-word term is bounded at its two ends,
+  not between its words, and a term that starts or ends with punctuation
+  (`c#`, `.net`, `8+ years`) is bounded only at the end that is a letter or a
+  digit.
+
+Both options are per category, not per term. After editing this section, run
+`openings rescore --dry-run` to see what it would do to the scores already in
+the database before letting it write.
+
 ### `scheduler`
 
 `interval_hours` (start to start), `run_on_startup`, `retry_on_failure`,

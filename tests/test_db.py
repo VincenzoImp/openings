@@ -3,7 +3,7 @@ from datetime import date, timedelta, timezone
 import numpy as np
 import pytest
 
-from openings.db import JobQuery
+from openings.db import JobQuery, RescoreReport
 from openings.models import AttachmentKind, EventKind, JobStatus, NoteKind, RunSummary, utcnow
 from tests.conftest import make_job
 
@@ -156,6 +156,83 @@ def test_rescore_all_skips_blacklisted(db, config, job):
     db.set_status([other.job_id], JobStatus.BLACKLISTED)
     assert db.rescore_all(config) == 1
     assert db.get_job(job.job_id).relevance_score == 35
+
+
+def written_rows(db) -> int:
+    """SQLite's cumulative count of inserted, updated and deleted rows."""
+    with db._connection() as conn:
+        return int(conn.total_changes)
+
+
+def test_rescore_writes_only_the_rows_whose_score_changed(db, config):
+    stale = make_job(relevance_score=0)
+    current = make_job(
+        title="Data Engineer",
+        job_url="https://www.linkedin.com/jobs/view/2",
+        description="python postgresql",
+        relevance_score=10,
+    )
+    db.upsert_jobs([stale, current])
+    baseline = written_rows(db)
+
+    report = db.rescore(config)
+
+    assert (report.total, report.changed, report.applied) == (2, 1, True)
+    assert written_rows(db) - baseline == 1  # the second row was never written
+    assert db.get_job(stale.job_id).relevance_score == 35
+    assert db.get_job(current.job_id).relevance_score == 10
+    # Running it again has nothing left to do.
+    assert db.rescore(config) == RescoreReport(
+        total=2, changed=0, applied=False, before=report.after, after=report.after
+    )
+
+
+def test_rescore_dry_run_writes_nothing_and_still_reports(db, config):
+    job = make_job(relevance_score=0)
+    db.upsert_jobs([job])
+    baseline = written_rows(db)
+
+    report = db.rescore(config, dry_run=True)
+
+    assert report.changed == 1
+    assert report.applied is False
+    assert report.before.median == 0
+    assert report.after.median == 35
+    assert written_rows(db) == baseline
+    assert db.get_job(job.job_id).relevance_score == 0
+    # The count-only form honours it too.
+    assert db.rescore_all(config, dry_run=True) == 1
+    assert written_rows(db) == baseline
+    assert db.get_job(job.job_id).relevance_score == 0
+
+
+def test_rescore_report_summarizes_against_the_configured_thresholds(db, config):
+    scores = [-40, 0, 10, 25, 35]
+    db.upsert_jobs(
+        [
+            make_job(
+                title=f"Job {index}",
+                job_url=f"https://www.linkedin.com/jobs/view/{index}",
+                description="",
+                relevance_score=score,
+            )
+            for index, score in enumerate(scores)
+        ]
+    )
+
+    before = db.rescore(config, dry_run=True).before
+
+    assert config.scoring.save_threshold == 0 and config.scoring.notify_threshold == 20
+    assert (before.count, before.minimum, before.maximum) == (5, -40, 35)
+    assert (before.q1, before.median, before.q3) == (0, 10, 25)
+    assert (before.at_save, before.at_notify) == (4, 2)
+
+
+def test_rescore_report_on_an_empty_database(db, config):
+    report = db.rescore(config)
+    assert (report.total, report.changed, report.applied) == (0, 0, False)
+    assert report.before.count == 0
+    assert report.to_dict()["after"]["count"] == 0
 
 
 # ---------------------------------------------------------------------------

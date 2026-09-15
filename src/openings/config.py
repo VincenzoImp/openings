@@ -20,6 +20,12 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 
 KNOWN_ATS = ("greenhouse", "lever", "ashby", "smartrecruiters")
 
+# The posting fields a scoring category may look at, in the order they are
+# concatenated before matching. ``scoring.keywords.<category>.match_in`` names
+# a subset of these; omitting it means all four, which is the historical
+# behaviour.
+KEYWORD_FIELDS = ("title", "description", "company", "location")
+
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 
@@ -235,12 +241,26 @@ class SourcesConfig:
     feed_max_age_days: int | None = 60
 
 
+@dataclass(frozen=True)
+class KeywordCategory:
+    """One scoring category: its terms and how they are matched.
+
+    ``match_in`` is always a subset of :data:`KEYWORD_FIELDS` in that order, so
+    it doubles as a cache key for the text the scorer builds. The defaults are
+    the historical behaviour: match every field, as a bare substring.
+    """
+
+    terms: tuple[str, ...] = ()
+    match_in: tuple[str, ...] = KEYWORD_FIELDS
+    whole_word: bool = False
+
+
 @dataclass
 class ScoringConfig:
     save_threshold: int = 0
     notify_threshold: int = 20
     weights: dict[str, int] = field(default_factory=dict)
-    keywords: dict[str, list[str]] = field(default_factory=dict)
+    keywords: dict[str, KeywordCategory] = field(default_factory=dict)
 
 
 @dataclass
@@ -669,6 +689,39 @@ def _parse_sources(data: dict) -> SourcesConfig:
     )
 
 
+def _parse_match_in(value: Any, path: str) -> tuple[str, ...]:
+    """The subset of :data:`KEYWORD_FIELDS` a category may match in."""
+    if value is None:
+        return KEYWORD_FIELDS
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ConfigError(f"{path} must be a list of field names")
+    known = ", ".join(KEYWORD_FIELDS)
+    selected: set[str] = set()
+    for item in value:
+        name = item.strip().lower()
+        if name not in KEYWORD_FIELDS:
+            raise ConfigError(f"{path} must name one of {known}, got {item!r}")
+        selected.add(name)
+    if not selected:
+        raise ConfigError(f"{path} must name at least one of {known}")
+    return tuple(name for name in KEYWORD_FIELDS if name in selected)
+
+
+def _parse_keyword_category(category: str, value: Any) -> KeywordCategory:
+    """A bare list of terms, or the extended mapping with matching options."""
+    path = f"scoring.keywords.{category}"
+    if not isinstance(value, dict):
+        return KeywordCategory(terms=tuple(term.lower() for term in _str_list(value, path)))
+    unknown = sorted(set(value) - {"terms", "match_in", "whole_word"})
+    if unknown:
+        raise ConfigError(f"Unsupported configuration key: {path}.{unknown[0]}")
+    return KeywordCategory(
+        terms=tuple(term.lower() for term in _str_list(value.get("terms"), f"{path}.terms")),
+        match_in=_parse_match_in(value.get("match_in"), f"{path}.match_in"),
+        whole_word=_bool(value.get("whole_word", False), f"{path}.whole_word"),
+    )
+
+
 def _parse_scoring(data: dict) -> ScoringConfig:
     section = _section(
         data, "scoring", {"save_threshold", "notify_threshold", "weights", "keywords"}
@@ -684,9 +737,9 @@ def _parse_scoring(data: dict) -> ScoringConfig:
         if isinstance(weight, bool) or not isinstance(weight, int):
             raise ConfigError(f"scoring.weights.{category} must be an integer")
         weights[str(category)] = weight
-    keywords: dict[str, list[str]] = {
-        str(category): [term.lower() for term in _str_list(terms, f"scoring.keywords.{category}")]
-        for category, terms in raw_keywords.items()
+    keywords: dict[str, KeywordCategory] = {
+        str(category): _parse_keyword_category(str(category), value)
+        for category, value in raw_keywords.items()
     }
     for category in keywords:
         if category not in weights:

@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.2.0] - 2026-09-15
+
+### Added
+
+- Per-category matching options in `scoring.keywords`. A category can be
+  written as a mapping with `terms` plus an optional `match_in` (any subset of
+  `title`, `description`, `company`, `location`) and `whole_word` (match a
+  term as a token, so `go` stops matching Google and Lugano). A category
+  written as a bare list of terms is unchanged: all four fields, substring
+  matching, identical scores.
+- `openings rescore`, which recomputes every stored score against the current
+  configuration, and `openings rescore --dry-run`, which reports the count and
+  the before/after score distribution without writing, so a scoring change can
+  be validated before it lands.
+
 ## [0.1.0] - 2026-09-08
 
 First release of Openings: a configurable job crawler, archive and application

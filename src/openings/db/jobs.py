@@ -107,6 +107,82 @@ class MergeResult:
     """``(previous job id, stored name)`` of every attachment file to relocate."""
 
 
+@dataclass(frozen=True)
+class ScoreSummary:
+    """The shape of a set of scores: how many, where they sit, what they clear.
+
+    Quartiles use the nearest rank, so every number is an actual score rather
+    than an interpolation between two of them.
+    """
+
+    count: int = 0
+    minimum: int = 0
+    q1: int = 0
+    median: int = 0
+    q3: int = 0
+    maximum: int = 0
+    at_save: int = 0
+    """Scores at or above ``scoring.save_threshold``."""
+    at_notify: int = 0
+    """Scores at or above ``scoring.notify_threshold``."""
+
+    def to_dict(self) -> dict[str, int]:
+        return {
+            "count": self.count,
+            "min": self.minimum,
+            "q1": self.q1,
+            "median": self.median,
+            "q3": self.q3,
+            "max": self.maximum,
+            "at_save": self.at_save,
+            "at_notify": self.at_notify,
+        }
+
+
+def summarize_scores(scores: Iterable[int], config: Config) -> ScoreSummary:
+    """Describe a set of scores against the thresholds that will act on them."""
+    ordered = sorted(scores)
+    if not ordered:
+        return ScoreSummary()
+
+    def rank(fraction: float) -> int:
+        return ordered[int(fraction * (len(ordered) - 1) + 0.5)]
+
+    save = config.scoring.save_threshold
+    notify = config.scoring.notify_threshold
+    return ScoreSummary(
+        count=len(ordered),
+        minimum=ordered[0],
+        q1=rank(0.25),
+        median=rank(0.5),
+        q3=rank(0.75),
+        maximum=ordered[-1],
+        at_save=sum(1 for score in ordered if score >= save),
+        at_notify=sum(1 for score in ordered if score >= notify),
+    )
+
+
+@dataclass(frozen=True)
+class RescoreReport:
+    """What a rescore did, or would do, to every stored score."""
+
+    total: int = 0
+    changed: int = 0
+    applied: bool = False
+    """False for a dry run, and for a run that found nothing to change."""
+    before: ScoreSummary = field(default_factory=ScoreSummary)
+    after: ScoreSummary = field(default_factory=ScoreSummary)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "total": self.total,
+            "changed": self.changed,
+            "applied": self.applied,
+            "before": self.before.to_dict(),
+            "after": self.after.to_dict(),
+        }
+
+
 def _date_value(value: Any) -> str | None:
     if value is None or value == "":
         return None
@@ -461,20 +537,38 @@ class JobsMixin(PostingsMixin, Store):
             conn.commit()
         return result
 
-    def rescore_all(self, config: Config) -> int:
-        """Recompute every active job's score against the current configuration."""
+    def rescore(self, config: Config, *, dry_run: bool = False) -> RescoreReport:
+        """Recompute every active job's score against ``config``.
+
+        With ``dry_run`` the new scores are computed and reported but nothing
+        is written, so a configuration change can be inspected before it lands.
+        """
         from openings.scoring import calculate_relevance_score
 
         updates: list[tuple[int, str]] = []
+        before: list[int] = []
+        after: list[int] = []
         for job in self.iter_jobs():
             score = calculate_relevance_score(job, config)
+            before.append(job.relevance_score)
+            after.append(score)
             if score != job.relevance_score:
                 updates.append((score, job.job_id))
-        if updates:
+        if updates and not dry_run:
             with self._connection() as conn:
                 conn.executemany("UPDATE jobs SET relevance_score = ? WHERE job_id = ?", updates)
                 conn.commit()
-        return len(updates)
+        return RescoreReport(
+            total=len(before),
+            changed=len(updates),
+            applied=bool(updates) and not dry_run,
+            before=summarize_scores(before, config),
+            after=summarize_scores(after, config),
+        )
+
+    def rescore_all(self, config: Config, *, dry_run: bool = False) -> int:
+        """The count-only form of :meth:`rescore`: how many rows changed."""
+        return self.rescore(config, dry_run=dry_run).changed
 
     # ------------------------------------------------------------------
     # Read

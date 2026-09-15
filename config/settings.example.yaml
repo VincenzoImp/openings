@@ -218,6 +218,40 @@ sources:
 #
 # Rows below save_threshold in status `new` are removed on the next start;
 # rows you acted on are never removed automatically.
+#
+# `openings rescore` recomputes every stored score against this file, and
+# `openings rescore --dry-run` reports what would change without writing, so
+# an edit here can be checked before it lands.
+#
+# Matching options. A category is normally written as a bare list of terms,
+# which matches every field as a plain substring. A category can instead be
+# written as a mapping, where `terms` holds the list and two optional keys
+# narrow how it matches. A bare list means exactly what it always meant, so
+# nothing below changes unless you ask for it.
+#
+#   match_in     which fields the terms may match in; any subset of
+#                [title, description, company, location]. Omitted means all
+#                four. Use it for a term that decides the role when it is in
+#                the title but means nothing in a long description: "talent
+#                acquisition" in an application footer should not cost a
+#                posting the penalty meant for a recruiting job.
+#   whole_word   when true, a term matches only as a whole token, so `go`
+#                matches "Go" and "Go," but not Google, Lugano or ongoing.
+#                A multi-word term is bounded at its two ends, not between
+#                its words. A term that starts or ends with punctuation
+#                (`c#`, `.net`) is only bounded at the end that is a letter
+#                or a digit. Omitted means false: plain substring matching.
+#
+#   keywords:
+#     wrong_role:
+#       match_in: ["title"]     # only the title decides
+#       whole_word: true        # tokens, not substrings
+#       terms:
+#         - "account manager"
+#         - "recruiter"
+#     owned_stack:
+#       whole_word: true        # every field, but as whole tokens
+#       terms: ["go", "rust", "c#"]
 # -----------------------------------------------------------------------------
 scoring:
   save_threshold: 0
