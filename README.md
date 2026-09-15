@@ -20,9 +20,13 @@ attached to the job it belongs to. It is built for one person, runs in two
 containers on your own machine, and never sends your data anywhere.
 
 - **Collect** from job boards (through [JobSpy](https://github.com/speedyapply/JobSpy)),
-  company career pages on Greenhouse, Lever, Ashby and SmartRecruiters, RSS
-  feeds and the Adzuna API. Anything the crawler cannot see, you or an agent
-  add by hand.
+  company career pages on nine applicant tracking systems (Greenhouse, Lever,
+  Ashby, SmartRecruiters, Workday, join.com, Workable, Rippling, BambooHR),
+  RSS feeds and the Adzuna API. Anything the crawler cannot see, you or an
+  agent add by hand. No ATS publishes a directory of its customers, so
+  [docs/user/sources.md](docs/user/sources.md#finding-companies-to-add) lists
+  the community-maintained slug lists worth screening for the companies near
+  you.
 - **Rank** with keyword categories and signed weights you write yourself;
   every job shows which categories matched and why it scored what it did.
 - **Track** one status per job from `new` to `offer`, with a timeline. A job

@@ -214,3 +214,31 @@ def http_get_json(
         return response.json()
     except ValueError as exc:
         raise SourceError(f"{url}: response is not JSON") from exc
+
+
+def http_post_json(
+    url: str,
+    *,
+    user_agent: str | None,
+    timeout: float,
+    body: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+) -> Any:
+    """POST JSON and decode JSON. Workday's listing is a search request, not a GET."""
+    request_headers = {
+        "User-Agent": user_agent or DEFAULT_USER_AGENT,
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    if headers:
+        request_headers.update(headers)
+    try:
+        response = requests.post(url, json=body or {}, headers=request_headers, timeout=timeout)
+    except requests.RequestException as exc:
+        raise SourceError(f"{url}: {exc}") from exc
+    if response.status_code >= 400:
+        raise SourceError(f"{url}: HTTP {response.status_code}")
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise SourceError(f"{url}: response is not JSON") from exc

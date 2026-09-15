@@ -59,7 +59,7 @@ Starts a throwaway server, seeds a fictional archive and rewrites
 ```text
 src/openings/              package: config, models, runtime, scoring, pipeline, embeddings
 src/openings/db/           SQLite behind the JobDatabase facade
-src/openings/sources/      jobspy, ats/{greenhouse,lever,ashby,smartrecruiters}, rss, adzuna, manual
+src/openings/sources/      jobspy, ats/{greenhouse,lever,ashby,smartrecruiters,workday,joincom,workable,rippling,bamboohr}, rss, adzuna, manual
 src/openings/application/  the service every surface calls; attachments and bundles on disk
 src/openings/web/          FastAPI app: /api routes, /mcp tools, token gate, static dashboard
 src/openings/defaults/     packaged copy of config/settings.example.yaml

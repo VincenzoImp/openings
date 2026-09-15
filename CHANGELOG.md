@@ -6,6 +6,41 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-15
+
+### Added
+
+- Five more applicant tracking systems behind the existing `sources.companies`
+  shape: **Workday**, **join.com**, **Workable**, **Rippling** and
+  **BambooHR**. Nine are now supported. The reach matters more than the count:
+  join.com is where most small and mid-size employers in the German-speaking
+  market publish, and Workday is where the large corporates and several big
+  technology employers sit. Neither was reachable before.
+- `http_post_json` in `sources.base`. Workday's listing is a search request
+  rather than a GET, and it is the first feed that needs a body.
+- A "Finding companies to add" section in `docs/user/sources.md`. No ATS
+  publishes a directory of its customers, so every list of board slugs is
+  community-scraped; the three worth starting from are named and linked, with
+  the caveat that roughly 40 percent of published slugs are dead or private
+  and that a list should be screened against your own locations before it is
+  configured. Companies are fetched sequentially, so a source list is a
+  decision, not a dump.
+
+### Notes
+
+- Workday's slug is the whole board address, `host/site` (for example
+  `abb.wd3.myworkdayjobs.com/External_Career_Page`), because the tenant, the
+  datacenter number and the site name vary independently and cannot be derived
+  from a company name. The adapter rejects a slug without a site rather than
+  guessing.
+- join.com publishes no documented API, so its adapter reads the JSON the page
+  ships to the browser. That is a scrape, and it is written to fail loudly when
+  the page shape changes rather than to quietly return nothing.
+- Workday, join.com, Rippling and BambooHR carry no description in their
+  listings, so each fetches details only for postings not already stored, and
+  only for postings that survive the location filter, capped per run. Workable
+  returns the whole board with the copy included and needs no second request.
+
 ## [0.2.0] - 2026-09-15
 
 ### Added

@@ -1,3 +1,5 @@
+import json
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pandas as pd
@@ -5,7 +7,17 @@ import pytest
 
 from openings.config import CompanySourceConfig, FeedSourceConfig, parse_config
 from openings.sources import CANONICAL_COLUMNS, collect_all
-from openings.sources.ats import ashby, greenhouse, lever, smartrecruiters
+from openings.sources.ats import (
+    ashby,
+    bamboohr,
+    greenhouse,
+    joincom,
+    lever,
+    rippling,
+    smartrecruiters,
+    workable,
+    workday,
+)
 from openings.sources.base import SourceError, html_to_markdown, location_allowed, to_date
 from openings.sources.collect import fetch_company, fetch_feed
 from openings.sources.jobspy import to_canonical
@@ -316,3 +328,174 @@ def test_keep_drops_postings_older_than_the_feed_age():
     assert not _keep(old, [], (), 60, today)
     assert _keep(undated, [], (), 60, today)
     assert _keep(old, [], (), None, today)
+
+
+def test_workday_splits_the_board_address_and_fetches_details():
+    listing = {
+        "total": 2,
+        "jobPostings": [
+            {
+                "title": "Platform Engineer",
+                "externalPath": "/job/Zurich/Platform_1",
+                "locationsText": "Zurich",
+            },
+            {"title": "Nurse", "externalPath": "/job/Lyon/Nurse_2", "locationsText": "Lyon"},
+        ],
+    }
+    detail = {
+        "jobPostingInfo": {
+            "jobDescription": "<p>Run it</p>",
+            "location": "Zurich",
+            "startDate": "2026-09-01",
+            "externalUrl": "https://abb.wd3.myworkdayjobs.com/ext/job/Zurich/Platform_1",
+        }
+    }
+    posts, gets = [], []
+
+    def fake_post(url, **kwargs):
+        posts.append(url)
+        return listing
+
+    def fake_get(url, **kwargs):
+        gets.append(url)
+        return detail
+
+    company = CompanySourceConfig(
+        name="ABB", ats="workday", slug="abb.wd3.myworkdayjobs.com/ext", locations=["Zurich"]
+    )
+    with (
+        patch("openings.sources.ats.workday.http_post_json", side_effect=fake_post),
+        patch("openings.sources.ats.workday.http_get_json", side_effect=fake_get),
+    ):
+        records = workday.fetch(company, None, 5.0)
+
+    assert [record["title"] for record in records] == ["Platform Engineer"]
+    assert records[0]["description"] == "Run it"
+    assert posts == ["https://abb.wd3.myworkdayjobs.com/wday/cxs/abb/ext/jobs"]
+    # The Lyon row is filtered before any detail fetch, so only one GET happens.
+    assert gets == ["https://abb.wd3.myworkdayjobs.com/wday/cxs/abb/ext/job/Zurich/Platform_1"]
+
+
+def test_workday_rejects_a_slug_without_a_site():
+    company = CompanySourceConfig(name="X", ats="workday", slug="abb.wd3.myworkdayjobs.com")
+    with pytest.raises(SourceError):
+        workday.fetch(company, None, 5.0)
+
+
+def _join_page(state):
+    return (
+        '<html><script id="__NEXT_DATA__" type="application/json">'
+        + json.dumps({"props": {"pageProps": {"initialState": state}}})
+        + "</script></html>"
+    )
+
+
+def test_joincom_reads_the_embedded_state_and_merges_the_job_page():
+    listing = {
+        "jobs": {
+            "items": [
+                {
+                    "id": 1,
+                    "idParam": "1-platform-engineer",
+                    "title": "Platform Engineer",
+                    "city": {"cityName": "Zug", "countryName": "Switzerland"},
+                    "createdAt": "2026-09-01T00:00:00.000Z",
+                }
+            ]
+        }
+    }
+    detail = {"job": {"intro": "<p>Who we are</p>", "tasks": "<p>Build</p>"}}
+    pages = [_join_page(listing), _join_page(detail)]
+
+    def fake_get(url, **kwargs):
+        return SimpleNamespace(text=pages.pop(0))
+
+    company = CompanySourceConfig(
+        name="Enshift", ats="joincom", slug="enshift", locations=["Switzerland"]
+    )
+    with patch("openings.sources.ats.joincom.http_get", side_effect=fake_get):
+        records = joincom.fetch(company, None, 5.0)
+
+    assert records[0]["title"] == "Platform Engineer"
+    assert records[0]["location"] == "Zug, Switzerland"
+    assert records[0]["description"] == "Who we are\n\n## Tasks\n\nBuild"
+    assert records[0]["job_url"] == "https://join.com/companies/enshift/1-platform-engineer"
+
+
+def test_joincom_reports_a_changed_page_shape_instead_of_returning_nothing():
+    company = CompanySourceConfig(name="X", ats="joincom", slug="x")
+    with patch(
+        "openings.sources.ats.joincom.http_get",
+        return_value=SimpleNamespace(text="<html>no payload</html>"),
+    ):
+        with pytest.raises(SourceError):
+            joincom.fetch(company, None, 5.0)
+
+
+def test_workable_needs_no_detail_fetch():
+    payload = {
+        "jobs": [
+            {
+                "title": "Backend Engineer",
+                "shortcode": "ABC",
+                "city": "Zurich",
+                "country": "Switzerland",
+                "telecommuting": True,
+                "description": "<p>Ship</p>",
+                "published_on": "2026-09-01",
+                "url": "https://apply.workable.com/j/ABC",
+            }
+        ]
+    }
+    calls = []
+
+    def fake(url, **kwargs):
+        calls.append(url)
+        return payload
+
+    company = CompanySourceConfig(name="X", ats="workable", slug="x")
+    with patch("openings.sources.ats.workable.http_get_json", side_effect=fake):
+        records = workable.fetch(company, None, 5.0)
+
+    assert records[0]["description"] == "Ship"
+    assert records[0]["location"] == "Zurich, Switzerland (Remote)"
+    assert records[0]["is_remote"] is True
+    assert len(calls) == 1
+
+
+def test_rippling_skips_details_for_known_ids():
+    listing = [{"uuid": "u1", "name": "SRE", "workLocation": {"label": "Zurich"}}]
+    calls = []
+
+    def fake(url, **kwargs):
+        calls.append(url)
+        return listing if url.endswith("/jobs") else {"description": "<p>x</p>"}
+
+    company = CompanySourceConfig(name="X", ats="rippling", slug="x")
+    with patch("openings.sources.ats.rippling.http_get_json", side_effect=fake):
+        records = rippling.fetch(company, None, 5.0, lambda ids: {"u1"})
+
+    assert records[0]["description"] is None
+    assert calls == ["https://api.rippling.com/platform/api/ats/v1/board/x/jobs"]
+
+
+def test_bamboohr_builds_the_public_url_when_the_detail_has_none():
+    listing = {
+        "result": [{"id": "7", "jobOpeningName": "Engineer", "location": {"city": "Zurich"}}]
+    }
+
+    def fake(url, **kwargs):
+        return listing if url.endswith("/careers/list") else {"result": {"jobOpening": {}}}
+
+    company = CompanySourceConfig(name="X", ats="bamboohr", slug="acme")
+    with patch("openings.sources.ats.bamboohr.http_get_json", side_effect=fake):
+        records = bamboohr.fetch(company, None, 5.0)
+
+    assert records[0]["job_url"] == "https://acme.bamboohr.com/careers/7"
+
+
+def test_every_known_ats_has_an_adapter():
+    from openings.config import KNOWN_ATS
+    from openings.sources.ats import FETCHERS
+
+    assert set(FETCHERS) == set(KNOWN_ATS)

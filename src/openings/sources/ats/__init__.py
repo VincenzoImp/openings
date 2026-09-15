@@ -4,7 +4,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Sequence
 
-from openings.sources.ats import ashby, greenhouse, lever, smartrecruiters
+from openings.sources.ats import (
+    ashby,
+    bamboohr,
+    greenhouse,
+    joincom,
+    lever,
+    rippling,
+    smartrecruiters,
+    workable,
+    workday,
+)
 
 if TYPE_CHECKING:
     from openings.config import CompanySourceConfig
@@ -21,6 +31,11 @@ FETCHERS: dict[str, Fetcher] = {
     "lever": lever.fetch,
     "ashby": ashby.fetch,
     "smartrecruiters": smartrecruiters.fetch,
+    "workday": workday.fetch,
+    "joincom": joincom.fetch,
+    "workable": workable.fetch,
+    "rippling": rippling.fetch,
+    "bamboohr": bamboohr.fetch,
 }
 
 __all__ = ["FETCHERS", "Fetcher", "KnownIds"]

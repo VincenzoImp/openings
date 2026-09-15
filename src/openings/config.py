@@ -18,7 +18,17 @@ import yaml
 # Repository root, used for the local-development data directory.
 BASE_DIR = Path(__file__).resolve().parents[2]
 
-KNOWN_ATS = ("greenhouse", "lever", "ashby", "smartrecruiters")
+KNOWN_ATS = (
+    "greenhouse",
+    "lever",
+    "ashby",
+    "smartrecruiters",
+    "workday",
+    "joincom",
+    "workable",
+    "rippling",
+    "bamboohr",
+)
 
 # The posting fields a scoring category may look at, in the order they are
 # concatenated before matching. ``scoring.keywords.<category>.match_in`` names

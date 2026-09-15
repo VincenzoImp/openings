@@ -129,7 +129,9 @@ def test_all_queries_deduplicates_across_categories():
 
 def test_company_requires_known_ats_and_unique_slug():
     data = minimal_settings()
-    data["sources"]["companies"] = [{"name": "A", "ats": "workday", "slug": "a"}]
+    # Workday was the example here until it became supported; taleo is the
+    # current stand-in for an ATS with no adapter.
+    data["sources"]["companies"] = [{"name": "A", "ats": "taleo", "slug": "a"}]
     with pytest.raises(ConfigError, match="ats must be one of"):
         parse_config(data)
     data["sources"]["companies"] = [

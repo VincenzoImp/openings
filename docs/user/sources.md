@@ -42,10 +42,46 @@ descriptions, exact locations. Find the slug in the company's careers URL:
 | Lever | `jobs.lever.co/<slug>` | `api.lever.co/v0/postings/<slug>?mode=json` |
 | Ashby | `jobs.ashbyhq.com/<slug>` | `api.ashbyhq.com/posting-api/job-board/<slug>` |
 | SmartRecruiters | `careers.smartrecruiters.com/<Company>` | `api.smartrecruiters.com/v1/companies/<Company>/postings` |
+| Workday | `<host>.myworkdayjobs.com/<site>` | `POST <host>/wday/cxs/<tenant>/<site>/jobs` |
+| join.com | `join.com/companies/<slug>` | the page's own `__NEXT_DATA__` payload |
+| Workable | `apply.workable.com/<slug>` | `apply.workable.com/api/v1/widget/accounts/<slug>?details=true` |
+| Rippling | `ats.rippling.com/<slug>/jobs` | `api.rippling.com/platform/api/ats/v1/board/<slug>/jobs` |
+| BambooHR | `<slug>.bamboohr.com/careers` | `<slug>.bamboohr.com/careers/list` |
 
 Companies whose careers site is built on one of these but served from their
 own domain still work: open a posting, look at the network requests or the
 "apply" link for the ATS domain and slug.
+
+Two of these need more than a bare slug. **Workday**'s slug is the whole board
+address, `host/site` (for example `abb.wd3.myworkdayjobs.com/External_Career_Page`),
+because the tenant, the datacenter number and the site name vary
+independently; copy it from the careers URL. **join.com** publishes no
+documented API, so its adapter reads the JSON the page ships to the browser.
+That is a scrape: it fails loudly if join.com changes its page shape, rather
+than silently returning nothing.
+
+### Finding companies to add
+
+No ATS publishes a directory of its customers, so every list is
+community-scraped. These are the ones worth starting from:
+
+- [kalil0321/ats-scrapers](https://github.com/kalil0321/ats-scrapers) —
+  `ats-companies/*.csv`, one file per ATS with name, slug and URL. The widest
+  coverage: join.com (23.5k), Greenhouse (6k), BambooHR (5.6k), Workable (4.8k),
+  Workday (3.5k), Ashby (3.4k), SmartRecruiters (2.7k), JazzHR, iCIMS, Oracle,
+  Rippling, Paycom, Lever.
+- [Feashliaa/job-board-aggregator](https://github.com/Feashliaa/job-board-aggregator)
+  — `data/*_companies.json` for Greenhouse, Ashby, Lever and Workday, refreshed
+  daily by CI, plus the postings themselves.
+- [blakegrudzien/find-jobs](https://github.com/blakegrudzien/find-jobs) — four
+  plain `companies_*.txt` slug lists, small and easy to diff.
+
+A slug list is a starting point, not an answer: roughly 40 percent of the
+published slugs are dead or private, and of those that answer only a small
+fraction post anywhere near you. Screen a list once, offline, against the
+locations you would actually accept, and configure what survives. Adding
+boards wholesale is the wrong move in any case: companies are fetched
+sequentially each run.
 
 Probe a feed before adding it:
 

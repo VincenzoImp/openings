@@ -163,9 +163,20 @@ sources:
   # ---------------------------------------------------------------------------
   # companies — named employers whose applicant tracking system exposes a
   # public postings feed. No key needed. Supported: greenhouse, lever, ashby,
-  # smartrecruiters. Find the slug in the company's careers URL:
+  # smartrecruiters, workday, joincom, workable, rippling, bamboohr.
+  # Find the slug in the company's careers URL:
   #   boards.greenhouse.io/<slug>   jobs.lever.co/<slug>
   #   jobs.ashbyhq.com/<slug>       careers.smartrecruiters.com/<slug>
+  #   join.com/companies/<slug>     apply.workable.com/<slug>
+  #   ats.rippling.com/<slug>/jobs  <slug>.bamboohr.com/careers
+  # Workday is the exception: its slug is the whole board address, host/site,
+  # e.g. "abb.wd3.myworkdayjobs.com/External_Career_Page".
+  # Community-maintained slug lists (no ATS publishes a customer directory):
+  #   https://github.com/kalil0321/ats-scrapers  (one CSV per ATS, widest)
+  #   https://github.com/Feashliaa/job-board-aggregator  (daily refresh)
+  #   https://github.com/blakegrudzien/find-jobs  (plain slug text files)
+  # Screen such a list against your own locations before configuring it:
+  # companies are fetched sequentially, one request each, every run.
   # `locations` and `titles` are optional lists of substrings: a posting is
   # kept when its location contains any of `locations` and its title contains
   # any of `titles`. Omit them to keep every posting. `max_age_days` overrides
