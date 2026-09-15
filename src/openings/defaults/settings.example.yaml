@@ -218,7 +218,7 @@ sources:
     host: "www.jobs.ch"
     queries: []
     locations: []
-    rows: 50
+    rows: 20          # the board rejects a larger page with HTTP 422
     max_pages: 3
     max_details: 100
 

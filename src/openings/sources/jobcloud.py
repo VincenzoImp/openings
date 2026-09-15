@@ -18,8 +18,11 @@ the employer asked for, and the operator decides which languages matter.
 ``locations`` is the board's own search parameter, not a post-filter. The board
 already resolves a city to its commuting region, so filtering its answers again
 by city name would discard exactly the neighbouring towns the operator asked
-for by naming the city. The board is answered faster than it is polite to ask,
-so requests are spaced.
+for by naming the city.
+
+``rows`` above 20 is rejected outright with HTTP 422, so it is clamped rather
+than trusted: a configuration asking for 50 would otherwise fail every request
+and report an empty board.
 """
 
 from __future__ import annotations
@@ -49,13 +52,15 @@ SOURCE_NAME = "jobcloud"
 # Configuration is an input, not a promise. The board has thousands of result
 # pages, so a generous max_pages in someone's settings file must not turn into
 # thousands of requests per query per location.
-MAX_ROWS = 100
+# The board rejects a page larger than 20 with HTTP 422, whatever the client
+# asks for, so this is the API's limit rather than a policy of ours: a
+# configured 50 fails every single request and collects nothing.
+MAX_ROWS = 20
 MAX_PAGES = 20
 MAX_DETAILS = 200
 
-# The board answers HTTP 422 to a client that asks too quickly. A failed
-# request is reported rather than swallowed, but a run that trips the limit
-# collects nothing useful, so requests are spaced by default.
+# Requests are spaced because this is an undocumented API on someone else's
+# infrastructure, not because it has been seen to throttle.
 DELAY_SECONDS = 1.5
 
 LANGUAGE_NAMES = {

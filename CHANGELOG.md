@@ -6,6 +6,23 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-09-16
+
+### Fixed
+
+- **`sources.jobcloud` collected nothing whenever `rows` was above 20.** The
+  board refuses a larger page with HTTP 422 rather than truncating it, so the
+  shipped example's `rows: 50` failed every single request and reported an
+  empty source. `rows` is now clamped to the API's own limit, and the example
+  and documentation no longer advertise a value that cannot work. Found in
+  production: 48 tasks, 48 failures, 0 rows.
+- **A filter on `status_changed_from` or `status_changed_to` returned nothing
+  during the first hours of the day** in any timezone ahead of UTC.
+  `status_changed_at` is stored as a UTC timestamp while the other date
+  filters compare plain local dates, so "changed today" asked for a date the
+  stored value would not reach until later. The timestamp is now converted
+  before comparison.
+
 ## [0.4.1] - 2026-09-15
 
 A review pass over the source layer before the repository goes public. Every

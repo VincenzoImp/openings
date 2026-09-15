@@ -166,7 +166,7 @@ sources:
     host: "www.jobs.ch"
     queries: ["software engineer", "data engineer"]
     locations: ["Zurich", "Bern"]
-    rows: 50           # results per page
+    rows: 20           # the board rejects a larger page with HTTP 422
     max_pages: 3       # pages per query and location
     max_details: 100   # per-posting description fetches per run
 ```
@@ -174,8 +174,10 @@ sources:
 The search returns a truncated preview, so the full copy needs one extra
 request per posting; `max_details` caps that, and postings are deduplicated
 across queries before any detail is fetched. `rows`, `max_pages` and
-`max_details` are also clamped in code, because the board has thousands of
-result pages and a generous setting should not become thousands of requests.
+`max_details` are clamped in code as well: the board has thousands of result
+pages and a generous setting should not become thousands of requests, and
+`rows` above 20 is refused by the API itself with HTTP 422 rather than
+truncated, so asking for more collects nothing at all.
 
 ### The language line
 

@@ -1,6 +1,6 @@
 [project]
 name = "openings"
-version = "0.4.1"
+version = "0.4.2"
 description = "A configurable job crawler, archive and application tracker you run yourself. Agent-operable through MCP."
 readme = "README.md"
 license = { text = "MIT" }

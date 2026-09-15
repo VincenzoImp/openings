@@ -669,19 +669,24 @@ class JobsMixin(PostingsMixin, Store):
         if query.max_salary is not None:
             where.append("COALESCE(jobs.min_amount, jobs.max_amount) <= ?")
             params.append(float(query.max_salary))
-        for column, start, end in (
-            ("date_posted", query.date_posted_from, query.date_posted_to),
-            ("first_seen", query.first_seen_from, query.first_seen_to),
-            ("last_seen", query.last_seen_from, query.last_seen_to),
-            ("status_changed_at", query.status_changed_from, query.status_changed_to),
+        # date_posted, first_seen and last_seen are plain dates written in local
+        # time; status_changed_at is a UTC timestamp. Comparing the latter
+        # without converting means a filter for "changed today" returns nothing
+        # for the first hours of the day in any timezone ahead of UTC.
+        for column, start, end, utc in (
+            ("date_posted", query.date_posted_from, query.date_posted_to, False),
+            ("first_seen", query.first_seen_from, query.first_seen_to, False),
+            ("last_seen", query.last_seen_from, query.last_seen_to, False),
+            ("status_changed_at", query.status_changed_from, query.status_changed_to, True),
         ):
+            stored = f"date(jobs.{column}, 'localtime')" if utc else f"date(jobs.{column})"
             start_value = _date_value(start)
             end_value = _date_value(end)
             if start_value is not None:
-                where.append(f"date(jobs.{column}) >= date(?)")
+                where.append(f"{stored} >= date(?)")
                 params.append(start_value)
             if end_value is not None:
-                where.append(f"date(jobs.{column}) <= date(?)")
+                where.append(f"{stored} <= date(?)")
                 params.append(end_value)
         if query.has_attachments is not None:
             clause = "jobs.job_id IN (SELECT job_id FROM attachments)"

@@ -819,6 +819,31 @@ def test_jobcloud_keeps_the_neighbouring_towns_the_board_returned():
     assert result.stats.rows == 3
 
 
+def test_jobcloud_never_asks_for_more_rows_than_the_api_accepts():
+    """The board answers 422 to any page larger than 20, so a configured 50
+    failed every request and reported an empty board."""
+    from openings.config import JobCloudConfig
+    from openings.sources import jobcloud
+
+    config = parse_config(minimal_settings())
+    config.sources.jobcloud = JobCloudConfig(
+        enabled=True, host="www.jobs.ch", queries=["x"], rows=50, max_pages=1, max_details=0
+    )
+    seen = []
+
+    def fake(url, **kwargs):
+        seen.append(kwargs["params"]["rows"])
+        return {"documents": []}
+
+    with (
+        patch("openings.sources.jobcloud.http_get_json", side_effect=fake),
+        patch("openings.sources.jobcloud.time.sleep"),
+    ):
+        jobcloud.run_jobcloud(config)
+
+    assert seen == [jobcloud.MAX_ROWS] and jobcloud.MAX_ROWS <= 20
+
+
 def test_jobcloud_clamps_paging_to_the_module_ceiling():
     """A generous max_pages in someone's settings must not become thousands of
     requests against a board with thousands of result pages."""
