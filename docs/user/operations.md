@@ -47,9 +47,11 @@ also be taken out as a zip: `GET /api/jobs/{job_id}/bundle.zip` or the
 
 ## Rescoring
 
-Every process rescores the archive against `settings.yaml` at startup, so a
-scoring edit reaches the stored jobs on the next restart. To do it on demand,
-or to see what an edit would do before it does it:
+`openings run` and `openings scheduler` rescore the archive against
+`settings.yaml` at startup, so a scoring edit reaches the stored jobs the next
+time one of them starts. `openings web` does not: restarting only the web
+container after a scoring edit changes no scores. To do it on demand, or to see
+what an edit would do before it does it:
 
 ```bash
 docker compose exec scheduler openings rescore --dry-run

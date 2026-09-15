@@ -14,8 +14,9 @@ from openings.sources.base import (
     SourceError,
     html_to_markdown,
     http_get_json,
-    location_allowed,
+    location_kept,
     raw_json,
+    remote_flag,
     to_date,
 )
 
@@ -67,15 +68,17 @@ def fetch(
         )
         content = payload.get("content") or []
         listing.extend(content)
-        total = int(payload.get("totalFound") or 0)
         offset += PAGE_SIZE
-        if not content or offset >= total:
+        # A short page is the only reliable end of a listing. Trusting the
+        # vendor's total instead ends the loop after one page the moment that
+        # field is renamed or absent, which looks exactly like a small board.
+        if len(content) < PAGE_SIZE:
             break
 
     kept = [
         posting
         for posting in listing
-        if location_allowed(_location_text(posting.get("location")), company.locations)
+        if location_kept(_location_text(posting.get("location")), company.locations)
     ]
     ids = [str(posting["id"]) for posting in kept if posting.get("id") is not None]
     already_stored = known(ids) if known else set()
@@ -106,7 +109,7 @@ def fetch(
                 "description": description,
                 "date_posted": to_date(posting.get("releasedDate")),
                 "job_type": (posting.get("typeOfEmployment") or {}).get("label"),
-                "is_remote": bool((posting.get("location") or {}).get("remote")) or None,
+                "is_remote": remote_flag((posting.get("location") or {}).get("remote")),
                 "job_level": (posting.get("experienceLevel") or {}).get("label"),
                 "company_url": f"https://careers.smartrecruiters.com/{company.slug}",
                 "raw_json": raw_json(posting),

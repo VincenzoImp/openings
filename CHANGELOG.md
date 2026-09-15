@@ -6,6 +6,90 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-15
+
+A review pass over the source layer before the repository goes public. Every
+item here is a defect found by reading the code that 0.3.0 and 0.4.0 shipped,
+not a new feature.
+
+### Fixed
+
+- **The Workday posting key captured the city instead of the requisition**, so
+  every Workday opening at one employer in one city collapsed into a single
+  job. Two roles in Zurich at the same company became one row, and the loss
+  happened during collection, before the database could see it.
+- **The Workable posting key never matched the URL the adapter builds.** The
+  pattern required `/j/` immediately after the host, while the widget API
+  returns `apply.workable.com/<slug>/j/<code>`, so one opening seen through
+  both of its URLs stayed two postings — the exact defect 0.4.0 claimed to
+  close.
+- **The parity test that was supposed to catch both asserted only that a name
+  existed in the table.** It never checked that a pattern matched a URL any
+  adapter actually produces, nor that two distinct postings produced distinct
+  keys. Replaced with a table of real posting URLs per adapter and two
+  assertions: a known board must canonicalize, and two postings on one board
+  must never share a key.
+- **One company with an unexpected payload discarded every other source's rows
+  in the same run.** `fetch_company` caught only `SourceError`, but a vendor
+  that changes its payload shape raises `TypeError` or `AttributeError` inside
+  the adapter, and the combined frame is built after the whole loop. The
+  docstring promised isolation the code did not provide.
+- **Three adapters stopped after the first page when the vendor's total was
+  missing.** `offset >= int(payload.get("total") or 0)` is true at offset 0
+  when the field is absent or renamed, so a board with hundreds of postings
+  silently returned twenty and looked small. A short page is now the only end
+  of a listing. Workday returned 79 rows instead of 20 after the fix.
+- **Three adapters built a shared fallback URL** when a posting carried no id,
+  which gave every such row the same posting key and merged them. The fallback
+  is now `None`, so the key falls back to `source:external_id`.
+- `sources.jobcloud` fetched the same descriptions on every run forever: it
+  never received the `known` callback its own docstring said it used.
+- The jobs.ch pattern matched any host ending in `jobs.ch`, including
+  `alljobs.ch`.
+
+### Changed
+
+- **`locations` on a company source no longer means two different things
+  depending on the ATS.** Seven adapters pre-filtered with a predicate that
+  rejects a posting with no location, while `collect._keep` has always kept
+  those and let scoring decide. One `location_kept` helper now backs both.
+- **`is_remote` is three-valued again everywhere.** Nine adapters wrote
+  `bool(x) or None`, which turns "the employer said this is not remote" into
+  "we do not know", and the two are queried separately. One `remote_flag`
+  helper keeps what the board stated and only ever infers `True` from a
+  location.
+- `sources.jobcloud` spaces its requests and no longer filters the board's own
+  answers a second time. The board resolves a city to its commuting region, so
+  filtering its results by city name again discarded the neighbouring towns the
+  operator asked for by naming the city.
+- An enabled `sources.jobcloud` with neither a query nor a location is now a
+  configuration error instead of a download of the whole board.
+
+### Added
+
+- `docs/user/getting-started.md`: the path from clone to collecting, including
+  how to write a scoring configuration that works and where to find the
+  employers worth watching. The README now leads with it.
+- `docs/user/troubleshooting.md`, collecting the symptoms that were scattered
+  across four pages or absent: an edit that appears to do nothing, a run that
+  collects nothing, `response is not XML`, `HTTP 429`, and jobs that disappear.
+- A "What it does not do" section in the README.
+
+### Notes
+
+- Several documented statements were wrong and are corrected: only `openings
+  run` and `openings scheduler` rescore at startup (not `openings web`);
+  `notifications.enabled` gates the whole section and both it and
+  `telegram.enabled` must be true; `sources.jobcloud` was missing from the
+  configuration reference entirely; an invalid file on a live reload is logged
+  and the previous configuration kept, which contradicts the "a typo is an
+  error, not a silent no-op" rule that holds only at startup.
+- `save_threshold` is applied retroactively and deletes stored jobs still in
+  status `new` at every `run`/`scheduler` start. That was documented in two
+  places but not on the page where the value is edited.
+- The documentation guard now checks spelled-out counts and table rows, not
+  just that each name appears somewhere.
+
 ## [0.4.0] - 2026-09-15
 
 ### Added

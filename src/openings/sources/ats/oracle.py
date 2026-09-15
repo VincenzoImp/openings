@@ -18,8 +18,9 @@ from openings.sources.base import (
     SourceError,
     html_to_markdown,
     http_get_json,
-    location_allowed,
+    location_kept,
     raw_json,
+    remote_flag,
     to_date,
 )
 
@@ -99,12 +100,11 @@ def fetch(
         items = payload.get("items") or [{}]
         page = items[0].get("requisitionList") or []
         listing.extend(page)
-        total = int(items[0].get("TotalJobsCount") or 0)
         offset += PAGE_SIZE
-        if not page or offset >= total:
+        if len(page) < PAGE_SIZE:
             break
 
-    kept = [job for job in listing if location_allowed(_location(job), company.locations)]
+    kept = [job for job in listing if location_kept(_location(job), company.locations)]
     ids = [str(job["Id"]) for job in kept if job.get("Id") is not None]
     already_stored = known(ids) if known else set()
 
@@ -135,11 +135,12 @@ def fetch(
             except SourceError:
                 detail = {}
         merged = {**job, **detail}
+        location = _location(merged)
         records.append(
             {
                 "title": merged.get("Title") or "",
                 "company": company.name,
-                "location": _location(merged),
+                "location": location,
                 "source": "oracle",
                 "external_id": external_id,
                 "job_url": f"https://{host}/hcmUI/CandidateExperience/en/sites/{site}/job/{job_id}",
@@ -148,7 +149,7 @@ def fetch(
                     merged.get("PostedDate") or merged.get("ExternalPostedStartDate")
                 ),
                 "job_type": merged.get("JobSchedule") or merged.get("WorkerType") or None,
-                "is_remote": True if "remote" in _location(merged).lower() else None,
+                "is_remote": remote_flag(location=location),
                 "job_level": merged.get("JobLevel") or merged.get("ManagerLevel") or None,
                 "company_url": f"https://{host}/hcmUI/CandidateExperience/en/sites/{site}",
                 "raw_json": raw_json(merged),

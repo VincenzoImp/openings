@@ -28,6 +28,7 @@ openings/
     ats/             thirteen ATS public feeds (greenhouse, lever, ashby,
                      smartrecruiters, workday, joincom, workable, rippling,
                      bamboohr, oracle, personio, recruitee, breezy)
+    jobcloud.py      a regional board search API, host-parameterized
     rss.py           RSS and Atom through feedparser
     adzuna.py        Adzuna search API (keyed, optional)
     manual.py        add_job records
@@ -37,7 +38,7 @@ openings/
   notifier.py        Telegram digest
   application/       JobApplicationService, AttachmentStore, bundle, command types
   web/               FastAPI app: api.py routes, mcp.py tools, token gate, dashboard
-  cli.py             openings {run, scheduler, web, healthcheck}
+  cli.py             openings {run, scheduler, web, rescore, healthcheck}
 ```
 
 ## Data flow

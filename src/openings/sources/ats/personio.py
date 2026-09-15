@@ -20,7 +20,7 @@ from xml.etree import ElementTree
 from openings.sources.base import (
     html_to_markdown,
     http_get_xml,
-    location_allowed,
+    location_kept,
     raw_json,
     to_date,
 )
@@ -68,7 +68,7 @@ def fetch(
     records: list[dict[str, Any]] = []
     for position in root.iterfind("position"):
         location = _location(position)
-        if not location_allowed(location, company.locations):
+        if not location_kept(location, company.locations):
             continue
         position_id = _text(position, "id")
         schedule = _text(position, "schedule")
@@ -79,7 +79,7 @@ def fetch(
                 "location": location,
                 "source": "personio",
                 "external_id": position_id or None,
-                "job_url": f"{base}/job/{position_id}" if position_id else base,
+                "job_url": f"{base}/job/{position_id}" if position_id else None,
                 "description": _description(position),
                 "date_posted": to_date(_text(position, "createdAt")),
                 "job_type": SCHEDULE_TO_JOB_TYPE.get(schedule)

@@ -130,6 +130,34 @@ def location_allowed(location: str | None, patterns: Iterable[str]) -> bool:
     return any(pattern in haystack for pattern in patterns)
 
 
+def location_kept(location: str | None, patterns: Iterable[str]) -> bool:
+    """Whether a posting survives a location filter, tolerating a missing one.
+
+    ``location_allowed`` answers "does this text match", which is ``False`` for
+    an empty string. A posting with no location at all is a different case: the
+    board simply did not say, and scoring should decide rather than the filter.
+    ``collect._keep`` has always kept those, so every adapter that pre-filters
+    must keep them too or the same configuration means two different things
+    depending on which ATS a company happens to use.
+    """
+    return not location or location_allowed(location, patterns)
+
+
+def remote_flag(stated: Any = None, *, location: str | None = None) -> bool | None:
+    """Three-valued remote: what the board said, or ``None`` when it did not.
+
+    ``is_remote`` is ``bool | None`` and queries distinguish all three, so
+    "the employer said this is not remote" must not be flattened into "we do
+    not know". ``location`` is the last-resort heuristic and only ever promotes
+    to ``True``: a location that fails to mention remote proves nothing.
+    """
+    if stated is not None:
+        return bool(stated)
+    if location and "remote" in location.lower():
+        return True
+    return None
+
+
 def html_to_markdown(value: str | None) -> str | None:
     """Convert an HTML fragment to Markdown; passes plain text through."""
     if not value:

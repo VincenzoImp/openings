@@ -14,10 +14,17 @@ buried in the advert; that is turned into one canonical line at the top of the
 description so a keyword category can match a stated fact instead of guessing
 at phrasings. The line is deliberately language-agnostic: the tool states what
 the employer asked for, and the operator decides which languages matter.
+
+``locations`` is the board's own search parameter, not a post-filter. The board
+already resolves a city to its commuting region, so filtering its answers again
+by city name would discard exactly the neighbouring towns the operator asked
+for by naming the city. The board is answered faster than it is polite to ask,
+so requests are spaced.
 """
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING, Any
 
 from openings.models import SourceRunStats
@@ -27,13 +34,13 @@ from openings.sources.base import (
     frame_from_records,
     html_to_markdown,
     http_get_json,
-    location_allowed,
     raw_json,
     to_date,
 )
 
 if TYPE_CHECKING:
     from openings.config import Config
+    from openings.sources.collect import KnownExternalIds
 
 SEARCH = "https://{host}/api/v1/public/search"
 DETAIL = "https://{host}/api/v1/public/search/job/{job_id}"
@@ -45,6 +52,11 @@ SOURCE_NAME = "jobcloud"
 MAX_ROWS = 100
 MAX_PAGES = 20
 MAX_DETAILS = 200
+
+# The board answers HTTP 422 to a client that asks too quickly. A failed
+# request is reported rather than swallowed, but a run that trips the limit
+# collects nothing useful, so requests are spaced by default.
+DELAY_SECONDS = 1.5
 
 LANGUAGE_NAMES = {
     "de": "German",
@@ -114,7 +126,7 @@ def _record(document: dict[str, Any], host: str, detail: dict[str, Any] | None) 
     }
 
 
-def run_jobcloud(config: Config) -> SourceResult:
+def run_jobcloud(config: Config, known: KnownExternalIds | None = None) -> SourceResult:
     settings = config.sources.jobcloud
     stats = SourceRunStats(name=SOURCE_NAME)
     if not settings.enabled:
@@ -138,6 +150,7 @@ def run_jobcloud(config: Config) -> SourceResult:
                         params["query"] = query
                     if where:
                         params["location"] = where
+                    time.sleep(DELAY_SECONDS)
                     payload = http_get_json(
                         SEARCH.format(host=settings.host),
                         user_agent=config.sources.user_agent,
@@ -145,16 +158,21 @@ def run_jobcloud(config: Config) -> SourceResult:
                         params=params,
                     )
                     documents = payload.get("documents") or []
+                    fresh = [
+                        str(document.get("job_id") or "")
+                        for document in documents
+                        if document.get("job_id")
+                    ]
+                    already_stored = known(SOURCE_NAME, fresh) if known else set()
                     for document in documents:
                         job_id = str(document.get("job_id") or "")
                         if not job_id or job_id in seen:
                             continue
                         seen.add(job_id)
-                        if not location_allowed(document.get("place") or "", settings.locations):
-                            continue
                         detail = None
-                        if details_fetched < detail_budget:
+                        if job_id not in already_stored and details_fetched < detail_budget:
                             details_fetched += 1
+                            time.sleep(DELAY_SECONDS)
                             try:
                                 detail = http_get_json(
                                     DETAIL.format(host=settings.host, job_id=job_id),

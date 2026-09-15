@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from openings.sources.base import html_to_markdown, http_get_json, raw_json, to_date
+from openings.sources.base import remote_flag, html_to_markdown, http_get_json, raw_json, to_date
 
 if TYPE_CHECKING:
     from openings.config import CompanySourceConfig
@@ -41,7 +41,7 @@ def fetch(
                 "job_url": job.get("absolute_url"),
                 "description": html_to_markdown(job.get("content")),
                 "date_posted": to_date(job.get("first_published") or job.get("updated_at")),
-                "is_remote": "remote" in location.lower() or None,
+                "is_remote": remote_flag(location=location),
                 "company_url": f"https://boards.greenhouse.io/{company.slug}",
                 "raw_json": raw_json(job),
             }

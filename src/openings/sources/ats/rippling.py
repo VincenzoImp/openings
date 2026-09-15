@@ -12,7 +12,7 @@ from openings.sources.base import (
     SourceError,
     html_to_markdown,
     http_get_json,
-    location_allowed,
+    location_kept,
     raw_json,
     to_date,
 )
@@ -44,7 +44,7 @@ def fetch(
     kept = [
         job
         for job in listing
-        if location_allowed((job.get("workLocation") or {}).get("label") or "", company.locations)
+        if location_kept((job.get("workLocation") or {}).get("label") or "", company.locations)
     ]
     ids = [str(job["uuid"]) for job in kept if job.get("uuid")]
     already_stored = known(ids) if known else set()

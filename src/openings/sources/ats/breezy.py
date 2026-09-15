@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from openings.sources.base import http_get_json, raw_json, to_date
+from openings.sources.base import remote_flag, http_get_json, raw_json, to_date
 
 if TYPE_CHECKING:
     from openings.config import CompanySourceConfig
@@ -64,7 +64,7 @@ def fetch(
                 "description": None,
                 "date_posted": to_date(posting.get("published_date")),
                 "job_type": (posting.get("type") or {}).get("name"),
-                "is_remote": bool(place.get("is_remote")) or None,
+                "is_remote": remote_flag(place.get("is_remote")),
                 "company_url": f"https://{company.slug}.breezy.hr/",
                 "raw_json": raw_json(posting),
             }

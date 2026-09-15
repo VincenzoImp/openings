@@ -13,8 +13,9 @@ from openings.sources.base import (
     SourceError,
     html_to_markdown,
     http_get_json,
-    location_allowed,
+    location_kept,
     raw_json,
+    remote_flag,
     to_date,
 )
 
@@ -45,7 +46,7 @@ def fetch(
     payload = http_get_json(f"{base}/careers/list", user_agent=user_agent, timeout=timeout)
     listing = payload.get("result") or []
 
-    kept = [job for job in listing if location_allowed(_location(job), company.locations)]
+    kept = [job for job in listing if location_kept(_location(job), company.locations)]
     ids = [str(job["id"]) for job in kept if job.get("id") is not None]
     already_stored = known(ids) if known else set()
 
@@ -75,11 +76,14 @@ def fetch(
                 "location": _location(job),
                 "source": "bamboohr",
                 "external_id": external_id,
-                "job_url": opening.get("jobOpeningShareUrl") or f"{base}/careers/{job_id}",
+                "job_url": opening.get("jobOpeningShareUrl")
+                or (f"{base}/careers/{job_id}" if job_id is not None else None),
                 "description": html_to_markdown(opening.get("description")),
                 "date_posted": to_date(opening.get("datePosted") or opening.get("postedDate")),
                 "job_type": job.get("employmentStatusLabel") or job.get("employmentType"),
-                "is_remote": bool(job.get("isRemote")) or None,
+                "is_remote": remote_flag(
+                    job.get("isRemote") or (job.get("locationType") or "") == "remote"
+                ),
                 "company_url": f"{base}/careers",
                 "raw_json": raw_json({**job, **opening} if opening else job),
             }

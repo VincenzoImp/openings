@@ -704,8 +704,13 @@ def _parse_jobcloud(data: dict) -> JobCloudConfig:
         max_pages=_int_min(section.get("max_pages", 3), "sources.jobcloud.max_pages", 1),
         max_details=_int_min(section.get("max_details", 100), "sources.jobcloud.max_details", 0),
     )
-    if enabled and not config.host:
-        raise ConfigError("sources.jobcloud.host is required when jobcloud is enabled")
+    if enabled:
+        if not config.host:
+            raise ConfigError("sources.jobcloud.host is required when jobcloud is enabled")
+        if not config.queries and not config.locations:
+            # Both empty would search the whole board and spend the detail
+            # budget on whatever happened to be first.
+            raise ConfigError("sources.jobcloud needs at least one query or location when enabled")
     return config
 
 

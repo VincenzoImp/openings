@@ -20,8 +20,9 @@ from openings.sources.base import (
     html_to_markdown,
     http_get_json,
     http_post_json,
-    location_allowed,
+    location_kept,
     raw_json,
+    remote_flag,
     to_date,
 )
 
@@ -67,13 +68,11 @@ def fetch(
         page = payload.get("jobPostings") or []
         listing.extend(page)
         offset += PAGE_SIZE
-        if not page or offset >= int(payload.get("total") or 0):
+        if len(page) < PAGE_SIZE:
             break
 
     kept = [
-        job
-        for job in listing
-        if location_allowed(job.get("locationsText") or "", company.locations)
+        job for job in listing if location_kept(job.get("locationsText") or "", company.locations)
     ]
     ids = [str(job.get("externalPath")) for job in kept if job.get("externalPath")]
     already_stored = known(ids) if known else set()
@@ -103,7 +102,7 @@ def fetch(
                 "description": html_to_markdown(info.get("jobDescription")),
                 "date_posted": to_date(info.get("startDate")),
                 "job_type": info.get("timeType") or None,
-                "is_remote": True if "remote" in location.lower() else None,
+                "is_remote": remote_flag(location=location),
                 "company_url": public,
                 "raw_json": raw_json({"listing": job, "detail": info} if info else job),
             }

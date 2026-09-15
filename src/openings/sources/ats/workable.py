@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from openings.sources.base import html_to_markdown, http_get_json, raw_json, to_date
+from openings.sources.base import remote_flag, html_to_markdown, http_get_json, raw_json, to_date
 
 if TYPE_CHECKING:
     from openings.config import CompanySourceConfig
@@ -50,7 +50,7 @@ def fetch(
                 "description": html_to_markdown(job.get("description")),
                 "date_posted": to_date(job.get("published_on") or job.get("created_at")),
                 "job_type": job.get("employment_type") or None,
-                "is_remote": bool(job.get("telecommuting")) or None,
+                "is_remote": remote_flag(job.get("telecommuting")),
                 "job_level": job.get("experience") or None,
                 "company_url": f"https://apply.workable.com/{company.slug}",
                 "raw_json": raw_json(job),

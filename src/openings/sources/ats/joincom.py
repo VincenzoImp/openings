@@ -18,8 +18,9 @@ from openings.sources.base import (
     SourceError,
     html_to_markdown,
     http_get,
-    location_allowed,
+    location_kept,
     raw_json,
+    remote_flag,
     to_date,
 )
 
@@ -86,7 +87,7 @@ def fetch(
     )
     listing = (state.get("jobs") or {}).get("items") or []
 
-    kept = [job for job in listing if location_allowed(_location(job), company.locations)]
+    kept = [job for job in listing if location_kept(_location(job), company.locations)]
     ids = [str(job["id"]) for job in kept if job.get("id") is not None]
     already_stored = known(ids) if known else set()
 
@@ -96,9 +97,11 @@ def fetch(
         job_id = job.get("id")
         external_id = str(job_id) if job_id is not None else None
         id_param = job.get("idParam") or ""
-        job_url = f"{url}/{id_param}" if id_param else url
+        # No shared fallback: every row pointing at the company page would
+        # give them all one posting key. None lets posting_key use the id.
+        job_url = f"{url}/{id_param}" if id_param else None
         detail: dict[str, Any] = {}
-        if id_param and external_id not in already_stored and details_fetched < MAX_DETAILS:
+        if job_url and external_id not in already_stored and details_fetched < MAX_DETAILS:
             details_fetched += 1
             try:
                 page = _next_data(
@@ -126,7 +129,7 @@ def fetch(
                 "description": _description(merged) if detail else None,
                 "date_posted": to_date(merged.get("createdAt")),
                 "job_type": employment.get("googleType") or employment.get("name"),
-                "is_remote": (merged.get("workplaceType") or "").upper() == "REMOTE" or None,
+                "is_remote": remote_flag((merged.get("workplaceType") or "").upper() == "REMOTE"),
                 "company_url": url,
                 "raw_json": raw_json(merged),
             }

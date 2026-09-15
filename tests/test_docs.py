@@ -49,3 +49,53 @@ def test_every_source_name_appears_in_the_docs_and_the_example():
         text = target.read_text(encoding="utf-8").lower()
         missing = [name for name in KNOWN_ATS if name not in text]
         assert not missing, f"{target.name} does not mention {missing}"
+
+
+def test_the_spelled_out_ats_count_matches_the_registry():
+    """Prose counts drift silently; the previous release left "nine ATS" behind
+    in three files and a "Three of these" in front of five paragraphs."""
+    from openings.config import KNOWN_ATS
+
+    words = {
+        4: "four",
+        5: "five",
+        6: "six",
+        7: "seven",
+        8: "eight",
+        9: "nine",
+        10: "ten",
+        11: "eleven",
+        12: "twelve",
+        13: "thirteen",
+        14: "fourteen",
+        15: "fifteen",
+        16: "sixteen",
+    }
+    expected = words[len(KNOWN_ATS)]
+    stale = {count: word for count, word in words.items() if count != len(KNOWN_ATS)}
+
+    root = Path(__file__).resolve().parents[1]
+    for name in ("README.md", "CONTRIBUTING.md"):
+        text = (root / name).read_text(encoding="utf-8").lower()
+        for word in stale.values():
+            assert f"{word} applicant tracking" not in text, f"{name} says {word}"
+        if "applicant tracking system" in text:
+            assert f"{expected} applicant tracking" in text, f"{name} has no current count"
+
+
+def test_every_adapter_has_a_row_in_the_sources_table():
+    from openings.sources.ats import FETCHERS
+
+    root = Path(__file__).resolve().parents[1]
+    table = (root / "docs" / "user" / "sources.md").read_text(encoding="utf-8")
+    missing = [name for name in FETCHERS if f"| `{name}` |" not in table]
+    assert not missing, f"sources.md table has no row for {missing}"
+
+
+def test_getting_started_is_reachable_from_the_readme():
+    """Nine of ten docs used to be link dead-ends; the entry point at least
+    must be linked from the front page."""
+    root = Path(__file__).resolve().parents[1]
+    assert (root / "docs" / "user" / "getting-started.md").exists()
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    assert "docs/user/getting-started.md" in readme

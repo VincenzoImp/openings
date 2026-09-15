@@ -56,7 +56,7 @@ Companies whose careers site is built on one of these but served from their
 own domain still work: open a posting, look at the network requests or the
 "apply" link for the ATS domain and slug.
 
-Three of these need more than a bare slug or carry a caveat worth knowing.
+Five of these need more than a bare slug or carry a caveat worth knowing.
 
 **Workday** and **Oracle Cloud Recruiting** take the whole board address,
 `host/site` (for example `abb.wd3.myworkdayjobs.com/External_Career_Page` or
@@ -77,7 +77,9 @@ the run summary is the board throttling, not a broken adapter.
 **BreezyHR** publishes no description anywhere public: the feed carries none and
 the posting page is client-rendered. Its postings arrive with title, company,
 location, salary and URL but no body, so they are scored on the title alone.
-Set a lower `save_threshold` for a Breezy board, or expect to lose them.
+`save_threshold` is global rather than per board, so a Breezy posting
+competes on its title alone against everything else: expect to lose them
+unless the title carries the score by itself.
 
 ### Finding companies to add
 
@@ -86,21 +88,49 @@ community-scraped. These are the ones worth starting from:
 
 - [kalil0321/ats-scrapers](https://github.com/kalil0321/ats-scrapers) —
   `ats-companies/*.csv`, one file per ATS with name, slug and URL. The widest
-  coverage: join.com (23.5k), Greenhouse (6k), BambooHR (5.6k), Workable (4.8k),
-  Workday (3.5k), Ashby (3.4k), SmartRecruiters (2.7k), JazzHR, iCIMS, Oracle,
-  Rippling, Paycom, Lever.
+  coverage. The files this tool can read are `join_com.csv` (23.5k),
+  `greenhouse.csv` (6k), `bamboohr.csv` (5.6k), `workable.csv` (4.8k),
+  `workday.csv` (3.5k), `ashby.csv` (3.4k), `smartrecruiters.csv` (2.7k),
+  `lever.csv` (2.4k), `oracle.csv` (1.3k) and `rippling.csv` (1.9k). The rest
+  of the directory (`icims`, `jazzhr`, `paycom`, `paylocity`) is for systems
+  with no adapter here; screening those costs time and buys nothing.
 - [Feashliaa/job-board-aggregator](https://github.com/Feashliaa/job-board-aggregator)
   — `data/*_companies.json` for Greenhouse, Ashby, Lever and Workday, refreshed
   daily by CI, plus the postings themselves.
 - [blakegrudzien/find-jobs](https://github.com/blakegrudzien/find-jobs) — four
   plain `companies_*.txt` slug lists, small and easy to diff.
 
-A slug list is a starting point, not an answer: roughly 40 percent of the
-published slugs are dead or private, and of those that answer only a small
-fraction post anywhere near you. Screen a list once, offline, against the
-locations you would actually accept, and configure what survives. Adding
-boards wholesale is the wrong move in any case: companies are fetched
-sequentially each run.
+A slug list is a starting point, not an answer. Slugs go stale as companies
+change ATS or close their board, and of those that still answer only a small
+fraction post anywhere near you: screening 15,862 slugs from these lists in
+September 2026 left 9,606 reachable boards and 150 posting in Switzerland at
+all. Screen a list once, offline, against the locations you would accept, and
+configure what survives. Adding boards wholesale is the wrong move in any case:
+companies are fetched sequentially each run, so the list is a decision about
+where you would work, not a dump of everything that exists.
+
+To screen a list, ask each board the same question you would ask by hand. Every
+feed in the table above is a plain GET except Workday, so one request per slug
+answers "does this board exist, and does it post where I live":
+
+```bash
+# Greenhouse, and the same shape for the other GET feeds in the table
+curl -s "https://boards-api.greenhouse.io/v1/boards/<slug>/jobs" |
+  jq -r '.jobs[] | "\(.location.name)\t\(.title)"' | grep -i zurich
+
+# Ashby
+curl -s "https://api.ashbyhq.com/posting-api/job-board/<slug>" |
+  jq -r '.jobs[] | "\(.location)\t\(.title)"'
+
+# Workday needs a POST, and the slug is host/site
+curl -s -X POST "https://<host>/wday/cxs/<tenant>/<site>/jobs" \
+  -H 'Content-Type: application/json' \
+  -d '{"appliedFacets":{},"limit":20,"offset":0,"searchText":""}' |
+  jq -r '.jobPostings[] | "\(.locationsText)\t\(.title)"'
+```
+
+Match on location, not on the company name: a board with no posting near you
+today is a board that will cost a request every run and return nothing.
 
 Probe a feed before adding it:
 

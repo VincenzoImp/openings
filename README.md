@@ -46,10 +46,17 @@ is never derived from configuration.
 ## Quick start
 
 ```bash
+git clone https://github.com/VincenzoImp/openings.git && cd openings
 cp config/settings.example.yaml settings.yaml   # edit locations, queries, scoring
 docker compose up -d
 open http://127.0.0.1:8501
 ```
+
+Those four lines get it running. Deciding what to put in `settings.yaml` is the
+part that takes thought, and
+**[Getting started](docs/user/getting-started.md)** walks through it: how to
+write a scoring configuration that works, and how to find the employers worth
+watching.
 
 One process serves the dashboard at `/`, the REST API at `/api` and the MCP
 endpoint at `/mcp`. Ports bind to `127.0.0.1` by default.
@@ -118,18 +125,43 @@ See [Configuration](docs/user/configuration.md) and
 | `openings healthcheck` | verify config, database and directories |
 | `openings rescore` | rescore every stored job against the current configuration (`--dry-run` to preview) |
 
+## What it does not do
+
+It does not apply to anything for you, and it never will: it collects, ranks
+and remembers, and the sending stays yours. It is built for one person rather
+than a team, so there are no accounts and no permissions. It reads boards that
+publish a machine-readable feed and deliberately does not scrape
+JavaScript-rendered careers pages, because a scraper of themed markup breaks
+silently and a silent source is worse than a missing one.
+
 ## Documentation
 
+**Start here**
+
+- [Getting started](docs/user/getting-started.md) — clone to collecting, including
+  how to write a scoring configuration and how to find employers to watch
+
+**Configure**
+
+- [Configuration](docs/user/configuration.md) — every key, section by section
+- [Sources](docs/user/sources.md) — the thirteen ATS, the board sources, and
+  [where to find company slugs](docs/user/sources.md#finding-companies-to-add)
+
+**Operate**
+
 - [Docker deployment](docs/user/docker.md)
-- [Configuration](docs/user/configuration.md)
-- [Sources](docs/user/sources.md)
+- [Operations](docs/user/operations.md) — backups, retention, rescoring, recovery
 - [Dashboard](docs/user/dashboard.md)
+
+**Reference**
+
 - [REST API](docs/user/api.md)
 - [MCP server](docs/user/mcp.md)
-- [Operations](docs/user/operations.md)
 - [Architecture](docs/developer/architecture.md)
 - [Testing](docs/developer/testing.md)
 - [Release process](docs/developer/release.md)
+- [Changelog](CHANGELOG.md) — read it before upgrading
+- [Security policy](SECURITY.md)
 
 ## Development
 
@@ -148,4 +180,4 @@ into a small product; issues and pull requests are welcome.
 
 ## License
 
-MIT.
+[MIT](LICENSE).

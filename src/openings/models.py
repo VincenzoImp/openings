@@ -156,16 +156,16 @@ _BOARD_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("google", re.compile(r"careers\.google\.com/jobs/results/(\d+)")),
     # Boards whose ids are only unique inside one tenant capture the host too,
     # or two employers' requisition 7 would collapse into one job.
-    ("workday", re.compile(r"([\w-]+\.wd\d+\.myworkdayjobs\.com/[^?#]*/job/[^?#/]+)")),
+    ("workday", re.compile(r"([\w-]+\.wd\d+\.myworkdayjobs\.com/[^?#]*/job/[^?#]+)")),
     ("joincom", re.compile(r"join\.com/companies/[^/?#]+/(\d+)")),
-    ("workable", re.compile(r"workable\.com/j/([0-9a-z]+)")),
+    ("workable", re.compile(r"workable\.com/(?:[^/?#]+/)?j/([0-9a-z]+)")),
     ("rippling", re.compile(r"ats\.rippling\.com/[^/?#]+/jobs/([0-9a-f-]{36})")),
     ("bamboohr", re.compile(r"([\w-]+\.bamboohr\.com/careers/\d+)")),
     ("oracle", re.compile(r"([\w.-]+\.oraclecloud\.com/[^?#]*/job/\d+)")),
     ("personio", re.compile(r"([\w-]+\.jobs\.personio\.(?:de|com)/job/\d+)")),
     ("recruitee", re.compile(r"([\w-]+\.recruitee\.com/o/[^/?#]+)")),
     ("breezy", re.compile(r"([\w-]+\.breezy\.hr/p/[0-9a-f]+)")),
-    ("jobcloud", re.compile(r"job(?:s|up)\.ch/[^?#]*/detail/([0-9a-f-]{36})")),
+    ("jobcloud", re.compile(r"(?:^|//|\.)(?:www\.)?job(?:s|up)\.ch/[^?#]*/detail/([0-9a-f-]{36})")),
 )
 _ID_PARAMS = {"jk", "gh_jid", "id", "jobid", "job_id", "reqid", "requisitionid", "job", "p"}
 

@@ -187,6 +187,17 @@ def test_smartrecruiters_pages_and_fetches_details_only_for_kept_rows():
     assert calls == ["https://api.smartrecruiters.com/v1/companies/CERN/postings", "https://api/1"]
 
 
+def test_fetch_company_isolates_an_unexpected_payload_shape(config):
+    """A vendor that changes its payload raises TypeError or AttributeError
+    inside the adapter, not SourceError. Catching only SourceError meant one
+    such company discarded every other source's rows in the same run."""
+    company = CompanySourceConfig(name="X", ats="greenhouse", slug="x")
+    with patch("openings.sources.ats.greenhouse.http_get_json", return_value=["not", "a", "dict"]):
+        result = fetch_company(company, config)
+    assert result.stats.failed == 1
+    assert result.stats.errors and "AttributeError" in result.stats.errors[0]
+
+
 def test_fetch_company_isolates_errors(config):
     company = CompanySourceConfig(name="X", ats="greenhouse", slug="x")
     with patch("openings.sources.ats.greenhouse.http_get_json", side_effect=SourceError("boom")):
@@ -658,14 +669,109 @@ def test_jobcloud_without_language_skills_leaves_the_description_alone():
     assert record["description"] == "body"
 
 
-def test_every_ats_has_a_canonical_url_pattern():
-    """The 0.3.0 adapters shipped without one, so their postings deduped worse
-    than they should have and nothing caught it."""
-    from openings.models import _BOARD_PATTERNS
+# One real posting URL per adapter, of the shape that adapter actually builds,
+# and a second URL for a *different* posting on the same board. Name parity
+# alone is not enough: the first version of this guard asserted only that every
+# adapter appeared in the table, and passed while the Workday pattern captured
+# the city instead of the requisition, collapsing every Zurich job at one
+# employer into a single row.
+_POSTING_URLS: dict[str, tuple[str, str]] = {
+    "greenhouse": (
+        "https://job-boards.greenhouse.io/acme/jobs/4717008005",
+        "https://job-boards.greenhouse.io/acme/jobs/4717008006",
+    ),
+    "lever": (
+        "https://jobs.lever.co/acme/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "https://jobs.lever.co/acme/ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee",
+    ),
+    "ashby": (
+        "https://jobs.ashbyhq.com/acme/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "https://jobs.ashbyhq.com/acme/ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee",
+    ),
+    "smartrecruiters": (
+        "https://jobs.smartrecruiters.com/Acme/743999",
+        "https://jobs.smartrecruiters.com/Acme/744000",
+    ),
+    "workday": (
+        "https://abb.wd3.myworkdayjobs.com/ext/job/Zurich-Switzerland/Software-Engineer_R1",
+        "https://abb.wd3.myworkdayjobs.com/ext/job/Zurich-Switzerland/Data-Engineer_R2",
+    ),
+    "joincom": (
+        "https://join.com/companies/acme/16668437-bess-project-engineer",
+        "https://join.com/companies/acme/16668438-other-role",
+    ),
+    "workable": (
+        "https://apply.workable.com/acme/j/abcdef1234/",
+        "https://apply.workable.com/acme/j/abcdef1235/",
+    ),
+    "rippling": (
+        "https://ats.rippling.com/acme/jobs/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "https://ats.rippling.com/acme/jobs/ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee",
+    ),
+    "bamboohr": ("https://acme.bamboohr.com/careers/7", "https://acme.bamboohr.com/careers/8"),
+    "oracle": (
+        "https://eipb.fa.em2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_5/job/1147",
+        "https://eipb.fa.em2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_5/job/1148",
+    ),
+    "personio": (
+        "https://acme.jobs.personio.de/job/4103",
+        "https://acme.jobs.personio.de/job/4104",
+    ),
+    "recruitee": (
+        "https://acme.recruitee.com/o/platform-engineer",
+        "https://acme.recruitee.com/o/data-engineer",
+    ),
+    "breezy": (
+        "https://acme.breezy.hr/p/aaaaaaaaaaaa-engineer",
+        "https://acme.breezy.hr/p/bbbbbbbbbbbb-engineer",
+    ),
+}
+
+
+def test_every_ats_has_a_canonical_url_pattern_that_actually_matches():
+    """The 0.3.0 adapters shipped without a pattern at all; 0.4.0 shipped two
+    that never matched the URL their adapter builds."""
+    from openings.models import canonical_url
     from openings.sources.ats import FETCHERS
 
-    boards = {board for board, _pattern in _BOARD_PATTERNS}
-    assert set(FETCHERS) <= boards, sorted(set(FETCHERS) - boards)
+    missing = sorted(set(FETCHERS) - set(_POSTING_URLS))
+    assert not missing, f"no sample posting URL for {missing}"
+
+    for ats, (first, _second) in _POSTING_URLS.items():
+        key = canonical_url(first)
+        assert key and key.startswith(f"{ats}:"), f"{ats}: {first} canonicalized to {key}"
+
+
+def test_two_postings_on_one_board_never_share_a_key():
+    """A pattern that captures the wrong path segment passes the name-parity
+    check and silently merges unrelated openings."""
+    from openings.models import canonical_url
+
+    for ats, (first, second) in _POSTING_URLS.items():
+        assert canonical_url(first) != canonical_url(second), f"{ats} collapses two postings"
+
+
+def test_one_posting_seen_twice_shares_a_key():
+    """Adapters build a URL from the payload with a constructed fallback; both
+    shapes must reduce to the same key or one opening becomes two postings."""
+    from openings.models import canonical_url
+
+    pairs = [
+        (
+            "https://apply.workable.com/acme/j/abcdef1234/",
+            "https://apply.workable.com/j/abcdef1234",
+        ),
+        (
+            "https://acme.bamboohr.com/careers/7",
+            "https://acme.bamboohr.com/careers/7?source=indeed",
+        ),
+        (
+            "https://www.jobs.ch/de/stellenangebote/detail/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/",
+            "https://www.jobs.ch/en/vacancies/detail/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/?x=1",
+        ),
+    ]
+    for first, second in pairs:
+        assert canonical_url(first) == canonical_url(second), first
 
 
 def test_http_get_xml_refuses_a_document_that_declares_entities():
@@ -678,6 +784,39 @@ def test_http_get_xml_refuses_a_document_that_declares_entities():
     with patch("openings.sources.base.http_get", return_value=bomb):
         with pytest.raises(SourceError):
             http_get_xml("https://example.test/xml", user_agent=None, timeout=5.0)
+
+
+def test_jobcloud_keeps_the_neighbouring_towns_the_board_returned():
+    """`locations` is the board's search parameter, not a post-filter. The board
+    resolves a city to its commuting region, so filtering its answers again by
+    city name would throw away exactly what the operator asked for."""
+    from openings.config import JobCloudConfig
+    from openings.sources import jobcloud
+
+    config = parse_config(minimal_settings())
+    config.sources.jobcloud = JobCloudConfig(
+        enabled=True,
+        host="www.jobs.ch",
+        queries=["x"],
+        locations=["Zurich"],
+        rows=3,
+        max_pages=1,
+        max_details=0,
+    )
+    payload = {
+        "documents": [
+            {"job_id": "1", "title": "A", "place": "Zürich"},
+            {"job_id": "2", "title": "B", "place": "Rüti ZH"},
+            {"job_id": "3", "title": "C", "place": "Bülach"},
+        ]
+    }
+    with (
+        patch("openings.sources.jobcloud.http_get_json", return_value=payload),
+        patch("openings.sources.jobcloud.time.sleep"),
+    ):
+        result = jobcloud.run_jobcloud(config)
+
+    assert result.stats.rows == 3
 
 
 def test_jobcloud_clamps_paging_to_the_module_ceiling():
@@ -696,7 +835,10 @@ def test_jobcloud_clamps_paging_to_the_module_ceiling():
     config.sources.jobcloud = JobCloudConfig(
         enabled=True, host="www.jobs.ch", queries=["x"], rows=1, max_pages=9999, max_details=0
     )
-    with patch("openings.sources.jobcloud.http_get_json", side_effect=fake):
+    with (
+        patch("openings.sources.jobcloud.http_get_json", side_effect=fake),
+        patch("openings.sources.jobcloud.time.sleep"),
+    ):
         result = jobcloud.run_jobcloud(config)
 
     assert len(calls) == jobcloud.MAX_PAGES

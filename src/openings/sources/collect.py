@@ -88,6 +88,14 @@ def fetch_company(
         stats.failed = 1
         stats.errors.append(str(exc))
         return SourceResult(stats=stats)
+    except Exception as exc:  # noqa: BLE001 - one vendor must not end the run
+        # A vendor that changes its payload shape raises TypeError or
+        # AttributeError inside an adapter, not SourceError. Catching only
+        # SourceError meant one such company discarded every other source's
+        # rows, because the combined frame is built after the whole loop.
+        stats.failed = 1
+        stats.errors.append(f"{type(exc).__name__}: {exc}")
+        return SourceResult(stats=stats)
     max_age = company.max_age_days or config.sources.feed_max_age_days
     kept = [
         record for record in records if _keep(record, company.locations, company.titles, max_age)
@@ -137,9 +145,10 @@ def _dedupe(frame: pd.DataFrame) -> pd.DataFrame:
 
 def collect_all(config: Config, *, known: KnownExternalIds | None = None) -> CollectResult:
     """Sources run in order: boards, companies, feeds, JobCloud, Adzuna.
-    Failures are
-    isolated per source and per company; a broken feed costs nothing but a
-    line in the run summary."""
+
+    Failures are isolated per source and per company: a broken feed costs
+    nothing but a line in the run summary.
+    """
     logger = get_logger("collect")
     log_section(logger, "COLLECTING")
     results: list[SourceResult] = []
@@ -166,7 +175,7 @@ def collect_all(config: Config, *, known: KnownExternalIds | None = None) -> Col
             f", error: {result.stats.errors[0]}" if result.stats.errors else "",
         )
     if config.sources.jobcloud.enabled:
-        results.append(run_jobcloud(config))
+        results.append(run_jobcloud(config, known))
     if config.sources.adzuna.enabled:
         results.append(run_adzuna(config))
 

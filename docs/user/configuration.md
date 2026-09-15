@@ -12,7 +12,10 @@ the live values.
 
 Rules:
 
-- Unknown keys fail startup. A typo is an error, not a silent no-op.
+- Unknown keys fail startup. A typo is an error, not a silent no-op **at
+  startup**. On a later reload an invalid file is logged and the previous
+  configuration is kept, so an edit that appears to do nothing is worth
+  checking against `logs/openings.log`.
 - Any secret can be written as `"$NAME"` and is read from the environment
   variable `NAME` at startup.
 - `notify_threshold` must be at least `save_threshold`; every category in
@@ -67,6 +70,16 @@ See [Sources](sources.md) for how to find the slug.
 RSS or Atom feeds: `name`, `url`, optional `locations`, `titles` and
 `max_age_days`.
 
+#### `sources.jobcloud`
+
+A regional job board with a public search API, off by default: `enabled`,
+`host` (one engine serves several domains, so this is configuration),
+`queries`, `locations`, `rows`, `max_pages`, `max_details`. `locations` is the
+board's own search parameter rather than a filter on its answers, so naming a
+city also returns the towns the board considers part of its commuting region.
+The last three are clamped in code as well. See
+[Sources](sources.md#jobcloud-sourcesjobcloud).
+
 #### `sources.adzuna`
 
 The Adzuna API, off by default: `enabled`, `country` (Adzuna code: `gb`, `us`,
@@ -88,6 +101,13 @@ scoring:
     stack: ["python", "go", "postgresql"]
     language_required: ["fluent in german", "deutsch erforderlich"]
 ```
+
+`save_threshold` is not only an intake filter. `openings run` and `openings
+scheduler` rescore the archive at startup and then reconcile it, which deletes
+jobs still in status `new` that now score below the threshold. Raising it
+therefore removes stored postings at the next scheduler start. Check
+`GET /api/cleanup/preview` (or the `preview_cleanup` MCP tool) before raising
+it; anything you have moved out of `new` is never touched.
 
 For each category, if any term appears in the posting text (title,
 description, company, location; case-insensitive; accents ignored), the
@@ -133,6 +153,10 @@ failed and is retried. `openings run` ignores this section. "Run now" (the
 Runs view, `POST /api/runs`, `run_now`) is picked up within 30 seconds.
 
 ### `notifications`
+
+`enabled` gates the whole section and defaults to off. Both it and
+`telegram.enabled` must be true or nothing is sent and nothing is logged as an
+error.
 
 `telegram`: `enabled`, `bot_token` (`"$TELEGRAM_BOT_TOKEN"`), `chat_ids`,
 `send_summary`, `send_empty`, `max_jobs`, `jobs_per_chunk`. A digest goes out
