@@ -1,4 +1,5 @@
 import base64
+import itertools
 import json
 
 import pytest
@@ -9,6 +10,62 @@ from openings.web import mcp
 @pytest.fixture
 def tools(runtime):
     return mcp
+
+
+@pytest.fixture
+def mcp_rpc(client):
+    headers = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
+    response = client.post(
+        "/mcp/",
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {"name": "test", "version": "1"},
+            },
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200
+    headers["Mcp-Session-Id"] = response.headers["mcp-session-id"]
+    initialized = client.post(
+        "/mcp/", json={"jsonrpc": "2.0", "method": "notifications/initialized"}, headers=headers
+    )
+    assert initialized.status_code == 202
+    request_ids = itertools.count(2)
+
+    def request(method, params=None):
+        request_id = next(request_ids)
+        message = {"jsonrpc": "2.0", "id": request_id, "method": method}
+        if params is not None:
+            message["params"] = params
+        response = client.post("/mcp/", json=message, headers=headers)
+        assert response.status_code == 200
+        if response.headers["content-type"].startswith("text/event-stream"):
+            payloads = [
+                json.loads(line.removeprefix("data: "))
+                for line in response.text.splitlines()
+                if line.startswith("data: ")
+            ]
+            return next(payload for payload in payloads if payload.get("id") == request_id)
+        return response.json()
+
+    return request
+
+
+@pytest.fixture
+def mcp_call(mcp_rpc):
+    def call(name, arguments):
+        response = mcp_rpc("tools/call", {"name": name, "arguments": arguments})
+        assert "error" not in response, response
+        result = response["result"]
+        assert not result.get("isError"), result
+        return json.loads(result["content"][0]["text"])
+
+    return call
 
 
 def test_every_tool_is_registered():
@@ -40,12 +97,93 @@ def test_add_job_and_get_job(tools):
 
 def test_update_job_and_set_status_validate(tools):
     job_id = json.loads(tools.add_job("T", "C", "L"))["job_ids"][0]
-    updated = json.loads(tools.update_job(job_id, job_level="senior", bogus=1))
+    updated = json.loads(tools.update_job(job_id, {"job_level": "senior", "bogus": 1}))
     assert updated["success"] and updated["job"]["job_level"] == "senior"
-    assert json.loads(tools.update_job(job_id))["success"] is False
+    assert json.loads(tools.update_job(job_id, {}))["success"] is False
     assert json.loads(tools.set_status([job_id], "APPLIED"))["affected_count"] == 1
     assert json.loads(tools.set_status([job_id], "bookmarked"))["success"] is False
     assert json.loads(tools.list_jobs(statuses=["bookmarked"]))["success"] is False
+
+
+def test_update_job_over_http_uses_declared_fields_and_preserves_application(mcp_rpc, mcp_call):
+    schemas = mcp_rpc("tools/list")["result"]["tools"]
+    schema = next(tool["inputSchema"] for tool in schemas if tool["name"] == "update_job")
+    assert schema["properties"]["fields"]["type"] == "object"
+    assert set(schema["required"]) == {"job_id", "fields"}
+    created = mcp_call(
+        "add_job",
+        {
+            "title": "Original title",
+            "company": "Acme",
+            "location": "Remote",
+            "job_url": "https://example.test/original",
+            "company_url": "https://example.test/company",
+            "is_remote": True,
+            "min_amount": 10000,
+            "labels": ["keep"],
+        },
+    )
+    job_id = created["job_ids"][0]
+    mcp_call("set_status", {"job_ids": [job_id], "status": "applied"})
+    note = mcp_call("add_note", {"job_id": job_id, "body": "Keep this note."})["note"]
+    attachment = mcp_call(
+        "add_attachment",
+        {
+            "job_id": job_id,
+            "filename": "cv.txt",
+            "content_base64": base64.b64encode(b"CV").decode(),
+        },
+    )["attachment"]
+    before = mcp_call("get_job", {"job_id": job_id})
+    changed = mcp_call(
+        "update_job",
+        {
+            "job_id": job_id,
+            "fields": {
+                "title": "Backend Engineer",
+                "description": "Python and PostgreSQL",
+                "job_url": "https://example.test/updated",
+                "is_remote": False,
+                "min_amount": 0,
+                "company_url": None,
+            },
+        },
+    )
+    assert changed["success"] and changed["job"]["job_id"] == job_id
+    after = mcp_call("get_job", {"job_id": job_id})
+    assert after["title"] == "Backend Engineer"
+    assert after["description"] == "Python and PostgreSQL"
+    assert after["job_url"] == "https://example.test/updated"
+    assert after["is_remote"] is False and after["min_amount"] == 0
+    assert after["company_url"] is None
+    assert after["explain"]["score"] > before["explain"]["score"]
+    assert after["company"] == before["company"] and after["location"] == before["location"]
+    assert after["status"] == "applied" and after["labels"] == ["keep"]
+    assert after["notes"] == before["notes"] and after["notes"][0]["id"] == note["id"]
+    assert after["attachments"] == before["attachments"]
+    downloaded = mcp_call("get_attachment", {"job_id": job_id, "attachment_id": attachment["id"]})
+    assert base64.b64decode(downloaded["attachment"]["content_base64"]) == b"CV"
+
+
+@pytest.mark.parametrize("fields", [{}, {"bogus": 1}, {"status": "applied"}])
+def test_update_job_over_http_rejects_non_editable_fields_without_changes(mcp_call, fields):
+    job_id = mcp_call("add_job", {"title": "Keep", "company": "Acme"})["job_ids"][0]
+    before = mcp_call("get_job", {"job_id": job_id})
+    result = mcp_call("update_job", {"job_id": job_id, "fields": fields})
+    assert result["success"] is False and "No editable field" in result["message"]
+    assert mcp_call("get_job", {"job_id": job_id}) == before
+
+
+def test_update_job_over_http_missing_job_and_invalid_fields(mcp_rpc, mcp_call):
+    missing = mcp_call("update_job", {"job_id": "0" * 64, "fields": {"title": "Changed"}})
+    assert missing["success"] is False and "Job not found" in missing["message"]
+    job_id = mcp_call("add_job", {"title": "Keep", "company": "Acme"})["job_ids"][0]
+    before = mcp_call("get_job", {"job_id": job_id})
+    invalid = mcp_rpc(
+        "tools/call", {"name": "update_job", "arguments": {"job_id": job_id, "fields": []}}
+    )
+    assert invalid["result"]["isError"] is True
+    assert mcp_call("get_job", {"job_id": job_id}) == before
 
 
 def test_notes_attachments_and_labels(tools):
@@ -121,28 +259,7 @@ def test_blacklist_merge_and_delete(tools):
     assert json.loads(tools.delete_jobs([job_id]))["affected_count"] == 1
 
 
-def test_mcp_over_http(client):
-    headers = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
-    init = client.post(
-        "/mcp/",
-        json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2025-06-18",
-                "capabilities": {},
-                "clientInfo": {"name": "t", "version": "1"},
-            },
-        },
-        headers=headers,
-    )
-    assert init.status_code == 200
-    headers["Mcp-Session-Id"] = init.headers["mcp-session-id"]
-    client.post(
-        "/mcp/", json={"jsonrpc": "2.0", "method": "notifications/initialized"}, headers=headers
-    )
-    tools_list = client.post(
-        "/mcp/", json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"}, headers=headers
-    )
-    assert "add_job" in tools_list.text and "merge_jobs" in tools_list.text
+def test_mcp_over_http(mcp_rpc):
+    tools_list = mcp_rpc("tools/list")["result"]["tools"]
+    names = {tool["name"] for tool in tools_list}
+    assert {"add_job", "merge_jobs", "update_job"} <= names

@@ -6,6 +6,21 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-10-15
+
+### Fixed
+
+- MCP `update_job` now accepts the `fields` object advertised by its tool
+  schema. Previously, a valid MCP request ignored the supplied changes and
+  returned "No editable field given". Updates keep the job ID and application
+  state, preserve labels, notes and attachments, and rescore the posting.
+
+### Added
+
+- Regression tests through the HTTP MCP protocol for posting edits, preserved
+  application data, false/null/zero values and rejected inputs. The Docker
+  smoke test also updates a posting through MCP and verifies it through REST.
+
 ## [0.4.2] - 2026-09-16
 
 ### Fixed

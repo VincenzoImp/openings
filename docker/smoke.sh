@@ -304,6 +304,24 @@ got_text, _ = mcp(
 got = mcp_result(got_text)
 assert got["status"] == "interviewing" and got["attachments"][0]["kind"] == "cover_letter", got
 
+edited_text, _ = mcp(
+    {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "tools/call",
+        "params": {
+            "name": "update_job",
+            "arguments": {"job_id": second, "fields": {"title": "Senior Platform Engineer", "is_remote": False}},
+        },
+    },
+    session,
+)
+edited = mcp_result(edited_text)
+assert edited["success"] and edited["job"]["job_id"] == second, edited
+persisted = request(f"/api/jobs/{second}")
+assert persisted["title"] == "Senior Platform Engineer" and persisted["is_remote"] is False, persisted
+assert persisted["status"] == "interviewing" and persisted["attachments"] == got["attachments"], persisted
+
 stats = request("/api/stats")
 assert stats["total_jobs"] == 2 and stats["by_status"]["applied"] == 1, stats
 PY

@@ -14,9 +14,10 @@ docker compose config
 sh docker/smoke.sh
 ```
 
-Check that `pyproject.toml`, `frontend/package.json`, `CHANGELOG.md` and the
-docs agree on the version. Move the `Unreleased` notes under the new heading
-with the date.
+Check that `pyproject.toml`, `uv.lock`, `src/openings/project_meta.py`,
+`frontend/package.json`, `frontend/package-lock.json`, `CHANGELOG.md` and
+the docs agree on the version. Move the `Unreleased` notes under the new
+heading with the date.
 
 ## Tag
 

@@ -346,8 +346,9 @@ def add_job(
     return _json(get_service().add_job(command).to_dict())
 
 
-def update_job(job_id: str, **fields: Any) -> str:
-    """Edit posting fields: title, company, location, job_url, description,
+def update_job(job_id: str, fields: dict[str, Any]) -> str:
+    """Edit a job by passing changes in the ``fields`` object: title, company, location,
+    job_url, description,
     date_posted, job_type, is_remote, job_level, min_amount, max_amount,
     currency, salary_interval, company_url. The job is rescored."""
     changes = {key: value for key, value in fields.items() if key in POSTING_FIELDS}
