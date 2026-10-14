@@ -40,6 +40,7 @@ uv run pre-commit run --all-files
 uv run mypy src/openings
 uv run pytest --cov=openings --cov-fail-under=80
 npm --prefix frontend run quality
+npm --prefix frontend audit --audit-level=moderate
 npm --prefix frontend run build && npm --prefix frontend run test:e2e
 docker compose config
 sh docker/smoke.sh

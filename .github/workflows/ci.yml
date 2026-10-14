@@ -123,6 +123,9 @@ jobs:
       - name: Quality gate (lint, format, typecheck, test, build)
         run: npm run quality
 
+      - name: Audit frontend dependencies
+        run: npm audit --audit-level=moderate
+
   e2e:
     # Playwright drives the built dashboard against a real `openings web`
     # (temporary data directory, no network sources) on desktop, phone and

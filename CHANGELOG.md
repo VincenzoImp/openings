@@ -14,12 +14,16 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   schema. Previously, a valid MCP request ignored the supplied changes and
   returned "No editable field given". Updates keep the job ID and application
   state, preserve labels, notes and attachments, and rescore the posting.
+- Updated the affected Python dependencies and frontend `brace-expansion`
+  and `source-map-js` packages to patched releases. The dependency locks and security floors
+  prevent reinstalling the vulnerable versions reported during release checks.
 
 ### Added
 
 - Regression tests through the HTTP MCP protocol for posting edits, preserved
   application data, false/null/zero values and rejected inputs. The Docker
   smoke test also updates a posting through MCP and verifies it through REST.
+- CI audits frontend dependencies as well as Python runtime dependencies.
 
 ## [0.4.2] - 2026-09-16
 
