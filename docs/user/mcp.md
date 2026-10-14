@@ -56,7 +56,7 @@ Filters take plural lists (`statuses`, `sources`, `labels`, `job_types`,
 | Tool | Effect |
 |------|--------|
 | `add_job` | add a posting from digested fields; scored live; default status `shortlisted`; a known URL updates the existing job; refuses blacklisted jobs |
-| `update_job` | edit posting fields; the job is rescored |
+| `update_job` | edit posting fields using `job_id` and a `fields` object; the job is rescored |
 | `set_status` | move jobs to `new`, `shortlisted`, `applied`, `interviewing`, `offer`, `rejected`, `withdrawn`, with an optional note on the timeline |
 | `add_labels`, `remove_labels`, `rename_label` | free tags |
 | `add_note`, `update_note`, `delete_note` | `kind` `note` or `qa` (question in `title`, answer in `body`), markdown |
@@ -70,6 +70,24 @@ Filters take plural lists (`statuses`, `sources`, `labels`, `job_types`,
 | `export_jobs` | CSV or JSON by ids or filters; `limit=0` for every match |
 
 ## A typical agent session
+
+To edit an existing posting, call `update_job` with the job ID and the changes
+inside `fields`:
+
+```json
+{
+  "job_id": "<64-character job ID>",
+  "fields": {
+    "title": "Backend Engineer",
+    "description": "Python services with PostgreSQL.",
+    "is_remote": false
+  }
+}
+```
+
+Only supplied posting fields change. The job keeps its ID, status, labels,
+notes and attachments, and is rescored. `null`, `false` and zero are valid
+values where the field allows them. Use `set_status` for application state.
 
 1. `list_jobs(statuses=["new"], min_score=20, sort="score")` to triage the
    inbox; `blacklist_jobs` the noise, `set_status(..., "shortlisted")` the
