@@ -89,6 +89,55 @@ def test_find_job_by_key_or_identity(db, job):
     assert db.find_job("linkedin:999", "nope") is None
 
 
+@pytest.mark.parametrize("status", [JobStatus.APPLIED, JobStatus.WITHDRAWN, JobStatus.BLACKLISTED])
+def test_distinct_requisitions_do_not_inherit_status_across_sources(db, status):
+    first = make_job(source="manual", job_url="https://job-boards.greenhouse.io/acme/jobs/1")
+    db.upsert_jobs([first])
+    db.set_status([first.job_id], status)
+    second = make_job(source="greenhouse", job_url="https://job-boards.greenhouse.io/acme/jobs/2")
+    result = db.upsert_jobs([second])
+    assert result.new_ids == [second.job_id]
+    assert result.skipped_blacklisted == 0
+    assert db.get_job(first.job_id).status is status
+    assert db.get_job(second.job_id).status is JobStatus.NEW
+    assert db.find_job(second.posting_key, second.identity).job_id == second.job_id
+    assert db.find_job("greenhouse:3", second.identity) is None
+
+
+def test_distinct_requisitions_in_one_batch_do_not_merge(db):
+    first = make_job(source="manual", job_url="https://careers.google.com/jobs/results/11-a")
+    second = make_job(
+        source="google",
+        job_url="https://www.google.com/about/careers/applications/jobs/results/22-a",
+    )
+    assert len(db.upsert_jobs([first, second]).new_ids) == 2
+
+
+@pytest.mark.parametrize("status", [JobStatus.WITHDRAWN, JobStatus.BLACKLISTED])
+def test_workday_repost_does_not_reappear_in_inbox_after_rekey(db, status):
+    first = make_job(
+        source="workday", job_url="https://acme.wd3.myworkdayjobs.com/ext/job/Zurich/Engineer_R123"
+    )
+    db.upsert_jobs([first])
+    db.set_status([first.job_id], status)
+    # Simulate the key stored before the new normalization rules shipped.
+    with db._connection() as conn:
+        conn.execute(
+            "UPDATE postings SET key = ?",
+            ("workday:acme.wd3.myworkdayjobs.com/ext/job/zurich/engineer_r123",),
+        )
+        conn.commit()
+    assert db.renormalize_posting_keys() == 1
+    later = make_job(
+        source="workday",
+        job_url="https://acme.wd3.myworkdayjobs.com/en-US/ext/job/London/Engineer_R123/apply",
+    )
+    result = db.upsert_jobs([later])
+    assert not result.new_ids
+    assert db.get_job(first.job_id).status is status
+    assert db.query_jobs(JobQuery(statuses=("new",)))[1] == 0
+
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------

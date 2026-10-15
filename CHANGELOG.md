@@ -6,6 +6,19 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-10-15
+
+### Fixed
+
+- Google legacy and current careers URLs now share a requisition key. Workday
+  locale, city, board and title changes keep the same tenant/requisition key
+  when the URL provides a final numeric requisition token.
+- Distinct known employer requisitions no longer merge solely because title,
+  company and location match across sources. Manual additions with distinct
+  posting keys no longer overwrite earlier application records.
+- Posting-key normalization now commits its changes before the next ingest
+  transaction. Re-imports preserve withdrawn/blacklisted states and history.
+
 ## [0.4.3] - 2026-10-15
 
 ### Fixed

@@ -60,6 +60,37 @@ def test_canonical_url_keeps_identifying_query_only():
     assert canonical_url(None) is None
 
 
+def test_current_and_legacy_google_urls_identify_the_same_requisition():
+    assert (
+        canonical_url("https://careers.google.com/jobs/results/123456-title/")
+        == canonical_url(
+            "https://www.google.com/about/careers/applications/jobs/results/123456-other-title?location=Zurich"
+        )
+        == "google:123456"
+    )
+
+
+def test_workday_identity_survives_locale_city_slug_and_board_changes():
+    urls = [
+        "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite/job/Zurich/Research-Intern_JR2027948",
+        "https://nvidia.wd5.myworkdayjobs.com/en-US/External/job/Bristol/Different-Title_JR2027948/apply",
+    ]
+    assert canonical_url(urls[0]) == canonical_url(urls[1])
+    assert canonical_url(urls[0]) != canonical_url(urls[0].replace("JR2027948", "JR2027949"))
+    assert canonical_url(urls[0]) != canonical_url(urls[0].replace("nvidia.", "other."))
+    # An ambiguous underscored suffix is not a proven requisition token.
+    assert canonical_url(urls[0].replace("JR2027948", "R1_1")) != canonical_url(
+        urls[0].replace("JR2027948", "R2_1")
+    )
+    for token in ["J-020004", "R-104035", "202610-125361-1"]:
+        assert canonical_url(urls[0].replace("JR2027948", token)) == canonical_url(
+            urls[1].replace("JR2027948", token)
+        )
+    assert canonical_url(urls[0].replace("JR2027948", "R1_123456")) != canonical_url(
+        urls[0].replace("JR2027948", "R2_123456")
+    )
+
+
 def test_posting_key_prefers_url_then_external_id():
     assert posting_key("linkedin", "1", "https://linkedin.com/jobs/view/1") == "linkedin:1"
     assert posting_key("greenhouse", "42", None) == "greenhouse:42"

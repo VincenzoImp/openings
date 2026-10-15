@@ -10,10 +10,21 @@ the ATS feeds reduce to `board:id`; other URLs keep host, path and their
 identifying query parameters) or, failing that, by `source:external_id`. A
 job is the opening behind one or more postings: the same URL refreshes its
 job; an unknown URL whose title, company and location match a job seen on
-another source becomes a second posting of that job; anything else is a new
+another source can become a second posting of that job, provided known
+requisition keys do not conflict; anything else is a new
 job. Two different postings from the same source stay two jobs, even with the
 same title, and `merge_jobs` folds them together when you decide they are
 one.
+
+Google's legacy and current careers URLs share the numeric requisition ID.
+Workday URLs with a final requisition token use tenant plus requisition ID,
+independent of locale, city and title slug. Collector refreshes never change
+an existing job's status: withdrawn stays archived and blacklisted stays
+blocked. A genuinely different requisition is a new opportunity. Manual
+additions with a URL or external ID require an exact posting-key match to
+update an existing record; title/company/location alone cannot overwrite an
+earlier application. Use explicit `merge_jobs` after reviewing ambiguous
+cross-board reposts, rather than assuming every identical title is one job.
 
 Employment types are folded into one vocabulary whatever the board calls
 them: `fulltime`, `parttime`, `contract`, `internship`, `temporary`,

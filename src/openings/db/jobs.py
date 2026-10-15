@@ -24,6 +24,7 @@ from openings.models import (
     JobStatus,
     generate_job_id,
     job_id_for,
+    posting_keys_conflict,
     utcnow,
 )
 
@@ -255,7 +256,9 @@ class JobsMixin(PostingsMixin, Store):
                     known.update(sources.get(job_id, set()))
         return found
 
-    def upsert_jobs(self, jobs: Iterable[Job]) -> UpsertResult:
+    def upsert_jobs(
+        self, jobs: Iterable[Job], *, allow_identity_mirrors: bool = True
+    ) -> UpsertResult:
         """Insert new openings, refresh known ones, attach mirrors. Never touches status.
 
         A posting whose key is known refreshes its job. An unknown posting
@@ -274,15 +277,25 @@ class JobsMixin(PostingsMixin, Store):
 
         with self._connection() as conn:
             by_identity = self._jobs_for_identities(conn, [job.identity for job in batch])
+            posting_keys: dict[str, set[str]] = {}
+            candidate_ids = [entry[0] for entries in by_identity.values() for entry in entries]
+            for chunk in chunks(candidate_ids):
+                for row in conn.execute(
+                    f"SELECT job_id, key FROM postings WHERE job_id IN ({placeholders(len(chunk))})",
+                    list(chunk),
+                ):
+                    posting_keys.setdefault(row["job_id"], set()).add(row["key"])
             conn.execute("BEGIN")
             for job, key in zip(batch, keys):
                 target: str | None = known_keys.get(key) if key else None
                 mirror = False
                 if target is None and key:
                     target = seen_in_batch.get(key)
-                if target is None:
+                if target is None and allow_identity_mirrors:
                     for job_id, _status, sources in by_identity.get(job.identity, []):
-                        if job.source.lower() not in sources:
+                        if job.source.lower() not in sources and not posting_keys_conflict(
+                            key, posting_keys.get(job_id, set())
+                        ):
                             target, mirror = job_id, True
                             sources.add(job.source.lower())
                             break
@@ -336,6 +349,7 @@ class JobsMixin(PostingsMixin, Store):
                         result.updated_ids.append(target)
 
                 if key:
+                    posting_keys.setdefault(target, set()).add(key)
                     is_new_posting = self._touch_posting(
                         conn,
                         target,
@@ -361,7 +375,12 @@ class JobsMixin(PostingsMixin, Store):
         return result
 
     def find_job(self, key: str | None, identity: str) -> Job | None:
-        """The job a posting key or an identity already belongs to, if any."""
+        """Find an exact posting, or an identity when no posting key was given.
+
+        A URL identifies a requisition more precisely than its title. Manual
+        additions with a distinct URL must not overwrite an existing applied
+        or blacklisted row merely because its title/company/location match.
+        """
         if key:
             known = self.jobs_for_posting_keys([key])
             if key in known:
@@ -369,6 +388,7 @@ class JobsMixin(PostingsMixin, Store):
             direct = self.get_job(job_id_for(key, identity))
             if direct is not None:
                 return direct
+            return None
         with self._connection() as conn:
             row = conn.execute(
                 f"SELECT {JOB_SELECT} FROM jobs WHERE identity = ? ORDER BY first_seen LIMIT 1",

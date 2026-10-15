@@ -15,7 +15,7 @@ import unicodedata
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timezone
 from enum import StrEnum
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 from urllib.parse import parse_qsl, urlsplit
 
 
@@ -153,7 +153,12 @@ _BOARD_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("lever", re.compile(r"jobs\.lever\.co/[^/?#]+/([0-9a-f-]{36})")),
     ("ashby", re.compile(r"jobs\.ashbyhq\.com/[^/?#]+/([0-9a-f-]{36})")),
     ("smartrecruiters", re.compile(r"smartrecruiters\.com/[^/?#]+/(\d+)")),
-    ("google", re.compile(r"careers\.google\.com/jobs/results/(\d+)")),
+    (
+        "google",
+        re.compile(
+            r"(?:careers\.google\.com/jobs/results/|google\.com/about/careers/applications/jobs/results/)(\d+)"
+        ),
+    ),
     # Boards whose ids are only unique inside one tenant capture the host too,
     # or two employers' requisition 7 would collapse into one job.
     ("workday", re.compile(r"([\w-]+\.wd\d+\.myworkdayjobs\.com/[^?#]*/job/[^?#]+)")),
@@ -183,6 +188,15 @@ def canonical_url(url: str | None) -> str | None:
     if not text:
         return None
     lowered = text.lower()
+    # Workday changes the locale, board, city and title slug without changing
+    # the requisition. Scope the final requisition token to its tenant. Keep
+    # the older path key if there is no unambiguous final token.
+    workday = re.search(
+        r"([\w-]+\.wd\d+\.myworkdayjobs\.com)/[^?#]*/job/(?:[^/?#]+/)*[^/_?#]+_([a-z]+-?\d+[a-z0-9-]*|\d{6,}(?:-\d+)*)(?:/apply)?/?(?:[?#]|$)",
+        lowered,
+    )
+    if workday:
+        return f"workday:{workday.group(1)}:{workday.group(2)}"
     for board, pattern in _BOARD_PATTERNS:
         match = pattern.search(lowered)
         if match:
@@ -218,6 +232,35 @@ def job_id_for(key: str | None, identity: str) -> str:
     if key:
         return hashlib.sha256(key.encode("utf-8")).hexdigest()
     return identity
+
+
+def posting_keys_conflict(key: str | None, known: Iterable[str]) -> bool:
+    """Distinct known requisitions must never merge on title/company/location.
+
+    An aggregator and an employer board may describe the same opening; two
+    different employer requisitions are not evidence of a mirror. URL-only
+    sources remain conservative when they belong to the same host.
+    """
+    if not key:
+        return False
+    employer_boards = {name for name, _pattern in _BOARD_PATTERNS} - {
+        "linkedin",
+        "jobcloud",
+        "joincom",
+    }
+    namespace = key.split(":", 1)[0]
+    for other in known:
+        if other == key:
+            continue
+        other_namespace = other.split(":", 1)[0]
+        if namespace == other_namespace and namespace != "url":
+            return True
+        if namespace in employer_boards and other_namespace in employer_boards:
+            return True
+        if namespace == other_namespace == "url":
+            if key[4:].split("/", 1)[0] == other[4:].split("/", 1)[0]:
+                return True
+    return False
 
 
 # ---------------------------------------------------------------------------
