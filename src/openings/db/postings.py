@@ -100,4 +100,5 @@ class PostingsMixin(Store):
                 taken.discard(row["key"])
                 taken.add(new_key)
                 updated += 1
+            conn.commit()
         return updated

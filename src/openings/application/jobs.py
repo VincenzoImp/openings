@@ -354,7 +354,7 @@ class JobApplicationService:
             job = Job.from_row(
                 {**record, "relevance_score": calculate_relevance_score(job, self.config)}
             )
-            result = self.db.upsert_jobs([job])
+            result = self.db.upsert_jobs([job], allow_identity_mirrors=False)
             job_id, was_new = job.job_id, job.job_id in result.new_ids
             if result.skipped_blacklisted:
                 return CommandResult(

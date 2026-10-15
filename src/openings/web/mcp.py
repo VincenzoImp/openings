@@ -317,8 +317,10 @@ def add_job(
     """Add a posting by hand. The caller supplies the fields it digested from
     the page; the job is scored with the live configuration and lands in the
     given status (default shortlisted, so retention never removes it). A
-    posting already stored (same URL or same title, company and location) is
-    updated with the fields given and keeps its status."""
+    posting already stored with the same canonical URL is updated with the
+    fields given and keeps its status. Without a URL or external ID, matching
+    title, company and location identifies an existing record. Distinct URLs
+    do not overwrite an earlier application just because the titles match."""
     try:
         command = AddJobCommand(
             title=title,

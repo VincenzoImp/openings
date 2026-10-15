@@ -49,6 +49,33 @@ def test_add_job_refuses_blacklisted_identity(service):
     assert refused.job_ids == created.job_ids
 
 
+@pytest.mark.parametrize("status", [JobStatus.APPLIED, JobStatus.BLACKLISTED])
+def test_manual_add_distinct_url_never_overwrites_earlier_application(service, status):
+    first = add(
+        service, job_url="https://job-boards.greenhouse.io/acme/jobs/1", description="Original"
+    )
+    service.set_status(first.job_ids, status)
+    second = add(
+        service, job_url="https://job-boards.greenhouse.io/acme/jobs/2", description="Different"
+    )
+    assert second.success and second.message == "created"
+    assert second.job_ids != first.job_ids
+    original = service.get_job(first.job_ids[0])
+    assert original.status is status
+    assert original.description == "Original"
+    assert original.job_url.endswith("/1")
+
+
+def test_manual_distinct_cross_board_posting_returns_a_real_separate_job(service):
+    first = add(service, job_url="https://linkedin.com/jobs/view/1", source="linkedin")
+    service.set_status(first.job_ids, JobStatus.APPLIED)
+    second = add(service, job_url="https://ch.indeed.com/viewjob?jk=abc", source="indeed")
+    assert second.success and second.message == "created"
+    assert service.get_job(second.job_ids[0]) is not None
+    assert second.job_ids != first.job_ids
+    assert service.get_job(first.job_ids[0]).status is JobStatus.APPLIED
+
+
 def test_add_job_requires_title_and_company(service):
     assert service.add_job(AddJobCommand(title=" ", company="x", location="")).success is False
 
