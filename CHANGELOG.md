@@ -6,6 +6,16 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-10-16
+
+### Fixed
+
+- Semantic inference no longer retains its largest CPU tensor arena for the
+  lifetime of the web or scheduler process. Concurrent requests share one
+  tokenizer/inference batch at a time, bounding temporary tensor allocations.
+- The default embedding batch is 8 instead of 64. Explicit batch settings are
+  preserved; existing vectors and ranking semantics do not change.
+
 ## [0.4.4] - 2026-10-15
 
 ### Fixed

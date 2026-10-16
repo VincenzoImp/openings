@@ -91,6 +91,20 @@ what makes semantic search and "similar jobs" work. It happens once.
 If it fails, the tool keeps working: embeddings are optional and their absence
 is reported on `/health`. Only semantic search is lost.
 
+## The container is killed during indexing or semantic search
+
+Check `docker inspect` restart counts and the host's OOM logs: a container may
+be healthy again after Docker restarts it. Model download size is not a RAM
+requirement. The model, input tensors, source data and web requests need memory
+at the same time.
+
+The default embedding batch is 8. Smaller batches lower temporary memory, at
+the cost of more inference calls. Inference is serialized per process, and the
+CPU allocator does not keep the largest tensor arena for the process lifetime.
+The web and scheduler are separate processes and each can load its own model.
+Leave headroom for both and for source collection; do not assume a 1 GiB limit
+will fit every archive and source configuration.
+
 ## `docker compose up` fails with a schema error
 
 The Compose file uses the long form of `env_file`, which needs Compose v2.24 or
