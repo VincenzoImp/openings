@@ -45,6 +45,7 @@ class EmbeddingModel:
         self.name = name
         self.directory = Path(models_dir) / name
         self._lock = threading.Lock()
+        self._inference_lock = threading.Lock()
         self._session = None
         self._tokenizer = None
         self.logger = get_logger("embeddings")
@@ -78,6 +79,10 @@ class EmbeddingModel:
             options = ort.SessionOptions()
             options.intra_op_num_threads = 2
             options.log_severity_level = 3
+            # A long indexing batch must not keep its peak allocation alive
+            # for the entire web/scheduler process lifetime.
+            options.enable_cpu_mem_arena = False
+            options.enable_mem_pattern = False
             self._tokenizer = tokenizer
             self._session = ort.InferenceSession(
                 str(self.directory / "model.onnx"),
@@ -85,7 +90,7 @@ class EmbeddingModel:
                 providers=["CPUExecutionProvider"],
             )
 
-    def embed(self, texts: Sequence[str], batch_size: int = 32) -> np.ndarray:
+    def embed(self, texts: Sequence[str], batch_size: int = 8) -> np.ndarray:
         """Unit vectors, one row per text."""
         if not texts:
             return np.zeros((0, 384), dtype=np.float32)
@@ -95,17 +100,23 @@ class EmbeddingModel:
         vectors: list[np.ndarray] = []
         for start in range(0, len(texts), max(1, batch_size)):
             batch = [text or " " for text in texts[start : start + batch_size]]
-            encoded = self._tokenizer.encode_batch(batch)
-            ids = np.array([item.ids for item in encoded], dtype=np.int64)
-            mask = np.array([item.attention_mask for item in encoded], dtype=np.int64)
-            feeds = {"input_ids": ids, "attention_mask": mask}
-            if "token_type_ids" in input_names:
-                feeds["token_type_ids"] = np.zeros_like(ids)
-            hidden = self._session.run(None, feeds)[0]
-            weights = mask[..., None].astype(np.float32)
-            pooled = (hidden * weights).sum(axis=1) / np.clip(weights.sum(axis=1), 1e-9, None)
-            norms = np.linalg.norm(pooled, axis=1, keepdims=True)
-            vectors.append((pooled / np.clip(norms, 1e-9, None)).astype(np.float32))
+            # The tokenizer is shared, and concurrent ONNX calls multiply
+            # temporary tensors. Serialize one batch, allowing other callers
+            # to make progress between batches of a longer indexing request.
+            with self._inference_lock:
+                encoded = self._tokenizer.encode_batch(batch)
+                ids = np.array([item.ids for item in encoded], dtype=np.int64)
+                mask = np.array([item.attention_mask for item in encoded], dtype=np.int64)
+                feeds = {"input_ids": ids, "attention_mask": mask}
+                if "token_type_ids" in input_names:
+                    feeds["token_type_ids"] = np.zeros_like(ids)
+                hidden = self._session.run(None, feeds)[0]
+                weights = mask[..., None].astype(np.float32)
+                pooled = (hidden * weights).sum(axis=1) / np.clip(weights.sum(axis=1), 1e-9, None)
+                norms = np.linalg.norm(pooled, axis=1, keepdims=True)
+                vectors.append((pooled / np.clip(norms, 1e-9, None)).astype(np.float32))
+                # Do not retain this batch's tensors while another caller runs.
+                del encoded, feeds, hidden, ids, mask, norms, pooled, weights
         return np.vstack(vectors)
 
 
