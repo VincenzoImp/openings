@@ -177,7 +177,7 @@ included, are never touched.
 ### `embeddings`
 
 Local semantic search: `enabled`, `embed_on_save`, `backfill_on_startup`,
-`batch_size`. The sentence model (all-MiniLM-L6-v2 as ONNX, about 90 MB) is
+`batch_size` (default 8). The sentence model (all-MiniLM-L6-v2 as ONNX, about 90 MB) is
 downloaded once into `models/` under the data directory; vectors are stored
 in the database. Both the scheduler and the web process embed the jobs they
 write.

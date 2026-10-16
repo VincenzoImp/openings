@@ -376,7 +376,7 @@ embeddings:
   enabled: true
   embed_on_save: true           # embed as jobs are stored
   backfill_on_startup: true     # embed anything missing when a process starts
-  batch_size: 64
+  batch_size: 8                 # smaller batches bound inference memory
 
 
 # -----------------------------------------------------------------------------

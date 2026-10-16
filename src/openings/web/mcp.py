@@ -604,6 +604,10 @@ def create_mcp_server() -> FastMCP:
     server = FastMCP(
         "openings",
         streamable_http_path="/",
+        session_idle_timeout=300,
+        max_sessions=128,
+        # A documented 5 MiB attachment expands to about 6.7 MiB as base64.
+        max_request_body_size=8 * 1024 * 1024,
         transport_security=get_transport_security_settings(),
     )
     for tool in TOOLS:

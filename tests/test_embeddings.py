@@ -1,9 +1,69 @@
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
+
 import numpy as np
 import yaml
 
 from openings.embeddings import Embeddings, EmbeddingModel, job_text
 from openings.models import JobStatus
 from tests.conftest import make_job
+
+
+def test_concurrent_requests_do_not_overlap_tokenization_and_inference(tmp_path, monkeypatch):
+    entered = threading.Event()
+    release = threading.Event()
+    second_started = threading.Event()
+    second_tokenized = threading.Event()
+    active = False
+    calls = 0
+
+    class Tokenizer:
+        def encode_batch(self, texts):
+            if second_started.is_set():
+                second_tokenized.set()
+            if active:
+                raise RuntimeError("Tokenizer borrowed during another inference")
+            return [SimpleNamespace(ids=[1, 2], attention_mask=[1, 1]) for _ in texts]
+
+    class Session:
+        def get_inputs(self):
+            return [SimpleNamespace(name="input_ids"), SimpleNamespace(name="attention_mask")]
+
+        def run(self, outputs, feeds):
+            nonlocal active, calls
+            active = True
+            calls += 1
+            try:
+                if calls == 1:
+                    entered.set()
+                    assert release.wait(5)
+                return [np.ones((len(feeds["input_ids"]), 2, 384), dtype=np.float32)]
+            finally:
+                active = False
+
+    model = EmbeddingModel(tmp_path)
+    model._session = Session()
+    model._tokenizer = Tokenizer()
+    monkeypatch.setattr(model, "_load", lambda: None)
+
+    def second_request():
+        second_started.set()
+        return model.embed(["second"])
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(model.embed, ["first"])
+        try:
+            assert entered.wait(5)
+            second = pool.submit(second_request)
+            assert second_started.wait(5)
+            assert not second_tokenized.wait(0.1)
+        finally:
+            release.set()
+        for result in [first.result(timeout=5), second.result(timeout=5)]:
+            assert result.shape == (1, 384)
+            assert np.isclose(np.linalg.norm(result[0]), 1.0)
+    assert calls == 2
 
 
 def enabled_runtime(runtime, settings_dict):

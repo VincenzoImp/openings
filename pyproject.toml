@@ -1,6 +1,6 @@
 [project]
 name = "openings"
-version = "0.4.4"
+version = "0.4.5"
 description = "A configurable job crawler, archive and application tracker you run yourself. Agent-operable through MCP."
 readme = "README.md"
 license = { text = "MIT" }
@@ -29,7 +29,7 @@ dependencies = [
     "numpy>=1.26.0",
     "fastapi>=0.115.0,<1.0.0",
     "uvicorn>=0.34.0,<1.0.0",
-    "mcp[cli]>=1.0.0,<2.0.0",
+    "mcp[cli]>=1.30.0,<2.0.0",
     "requests>=2.31.0,<3.0.0",
     "markdownify>=0.13.0,<2.0.0",
     "feedparser>=6.0.0,<7.0.0",

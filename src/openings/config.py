@@ -333,7 +333,7 @@ class EmbeddingsConfig:
     enabled: bool = True
     embed_on_save: bool = True
     backfill_on_startup: bool = True
-    batch_size: int = 64
+    batch_size: int = 8
 
 
 @dataclass
@@ -910,7 +910,7 @@ def _parse_embeddings(data: dict) -> EmbeddingsConfig:
         backfill_on_startup=_bool(
             section.get("backfill_on_startup", True), "embeddings.backfill_on_startup"
         ),
-        batch_size=_int_min(section.get("batch_size", 64), "embeddings.batch_size", 1),
+        batch_size=_int_min(section.get("batch_size", 8), "embeddings.batch_size", 1),
     )
 
 

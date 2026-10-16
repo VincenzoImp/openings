@@ -29,6 +29,11 @@ OPENINGS_WEB_ALLOWED_ORIGINS=http://192.168.1.10:8501
 ## Tools
 
 Every tool returns JSON text. Job identifiers are the 64-character `job_id`.
+
+Reuse the MCP session while working and send `DELETE` to close it when done.
+Idle sessions expire after five minutes; clients must initialize a new session
+after an expired session returns HTTP 404. Up to 128 sessions can be active.
+The transport accepts bodies up to 8 MiB, including base64 attachment overhead.
 Filters take plural lists (`statuses`, `sources`, `labels`, `job_types`,
 `locations`); without `statuses`, blacklisted jobs are left out.
 
