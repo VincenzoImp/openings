@@ -3,8 +3,35 @@ import itertools
 import json
 
 import pytest
+from starlette.testclient import TestClient
 
 from openings.web import mcp
+
+
+def test_closed_mcp_sessions_release_capacity(runtime):
+    server = mcp.create_mcp_server()
+    server.settings.max_sessions = 2
+    headers = {"Accept": "application/json, text/event-stream"}
+    initialize = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "capacity-test", "version": "1"},
+        },
+    }
+    with TestClient(server.streamable_http_app()) as client:
+        first = client.post("/", json=initialize, headers=headers)
+        second = client.post("/", json=initialize, headers=headers)
+        assert first.status_code == second.status_code == 200
+        assert client.post("/", json=initialize, headers=headers).status_code == 503
+        closed = client.delete(
+            "/", headers={**headers, "Mcp-Session-Id": first.headers["mcp-session-id"]}
+        )
+        assert closed.status_code in (200, 204)
+        assert client.post("/", json=initialize, headers=headers).status_code == 200
 
 
 @pytest.fixture

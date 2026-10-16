@@ -15,6 +15,10 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   tokenizer/inference batch at a time, bounding temporary tensor allocations.
 - The default embedding batch is 8 instead of 64. Explicit batch settings are
   preserved; existing vectors and ranking semantics do not change.
+- Updated the MCP SDK to the patched 1.30 release line for
+  GHSA-84m7-p3x7-pcfv while retaining the supported 1.x API. Idle sessions expire
+  after five minutes, at most 128 sessions are retained, and the HTTP body limit
+  still accommodates the documented 5 MiB inline attachment size.
 
 ## [0.4.4] - 2026-10-15
 
