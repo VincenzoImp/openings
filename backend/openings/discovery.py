@@ -587,6 +587,9 @@ def score_call(config: dict, state: dict) -> dict:
     if not isinstance(result, dict):
         raise DomainError(502, "scorer_format", "The scorer returned an invalid response object.")
     usage = result.get("usage") or {}
+    answers = result.get("answers") or {}
+    if not isinstance(usage, dict) or not isinstance(answers, dict):
+        raise DomainError(502, "scorer_format", "The scorer returned invalid usage or answers.")
     if (
         usage.get("truncated")
         or usage.get("state_tokens_dropped", 0)
@@ -597,7 +600,7 @@ def score_call(config: dict, state: dict) -> dict:
             "context_too_long",
             "The scorer truncated the supplied context; this result was not saved.",
         )
-    answer = (result.get("answers") or {}).get("fit") or {}
+    answer = answers.get("fit") or {}
     if not isinstance(answer, dict):
         raise DomainError(502, "scorer_format", "The scorer returned an invalid fit answer.")
     value = answer.get("score")
@@ -748,11 +751,13 @@ class DiscoveryService:
         self.db.execute("DELETE FROM sources WHERE id=?", (source_id,))
         return {"deleted": True, "id": source_id}
 
-    def queue_collection(self, source_id, *, manual=True):
+    def queue_collection(self, source_id, *, manual=True, _stopping=None):
         source = self._source(source_id)
         if not manual and not source["enabled"]:
             return None
         with self.db.transaction() as connection:
+            if _stopping is not None and _stopping.is_set():
+                return None
             existing = connection.execute(
                 "SELECT * FROM tasks WHERE source_id=? AND kind='collect' AND state IN ('queued','running') ORDER BY created_at LIMIT 1",
                 (source_id,),
@@ -962,7 +967,7 @@ class DiscoveryService:
             "provider": config["provider"],
         }
 
-    def enqueue_job(self, job_id, *, force=False, manual=False):
+    def enqueue_job(self, job_id, *, force=False, manual=False, _stopping=None):
         config, _ = self._config()
         if not config["enabled"]:
             return None
@@ -976,6 +981,8 @@ class DiscoveryService:
         ):
             return None
         with self.db.transaction() as connection:
+            if _stopping is not None and _stopping.is_set():
+                return None
             existing = connection.execute(
                 "SELECT * FROM tasks WHERE kind='score' AND job_id=? AND state IN ('queued','running') ORDER BY created_at LIMIT 1",
                 (job_id,),
@@ -1021,7 +1028,7 @@ class DiscoveryService:
                 )
         return self.get_task(task_id)
 
-    def queue_rescore(self, value: RescoreRequest):
+    def queue_rescore(self, value: RescoreRequest, *, _stopping=None):
         config, _ = self._config()
         if not config["enabled"]:
             raise DomainError(
@@ -1039,6 +1046,8 @@ class DiscoveryService:
             ]
         queued, skipped = [], []
         for job_id in ids:
+            if _stopping is not None and _stopping.is_set():
+                break
             job = self.workspace.get_job(job_id)
             if job["triage"] == "dismissed" or (
                 value.outdated_only
@@ -1047,7 +1056,9 @@ class DiscoveryService:
             ):
                 skipped.append(job_id)
                 continue
-            task = self.enqueue_job(job_id, force=not value.outdated_only, manual=True)
+            task = self.enqueue_job(
+                job_id, force=not value.outdated_only, manual=True, _stopping=_stopping
+            )
             if task:
                 queued.append(task["id"])
             else:
@@ -1098,7 +1109,7 @@ class DiscoveryService:
                 return
             source = decode_record(row, ("schedule", "config"))
             if next_due(source["schedule"], source["last_run_at"], moment) <= moment:
-                self.queue_collection(source["id"], manual=False)
+                self.queue_collection(source["id"], manual=False, _stopping=stopping)
         config, _ = self._config()
         periodic = config["periodic_rescore"]
         if config["enabled"] and periodic["enabled"] and not (stopping and stopping.is_set()):
@@ -1109,8 +1120,10 @@ class DiscoveryService:
                 previous is None
                 or parse_time(previous) + timedelta(minutes=periodic["minutes"]) <= moment
             ):
-                self.queue_rescore(RescoreRequest(limit=periodic["batch_size"]))
-                self.workspace.set_settings("scoring_periodic_last_run", now())
+                self.queue_rescore(RescoreRequest(limit=periodic["batch_size"]), _stopping=stopping)
+                with self.db.lock:
+                    if stopping is None or not stopping.is_set():
+                        self.workspace.set_settings("scoring_periodic_last_run", now())
 
     def claim_task(self, owner):
         stamp = now()
@@ -1158,9 +1171,13 @@ class DiscoveryService:
         source = self._source(task["source_id"])
         if not source["enabled"] and not task["payload"].get("manual"):
             return {"skipped": "source_paused"}
-        self.db.execute(
-            "UPDATE sources SET last_run_at=?,last_error=NULL WHERE id=?", (now(), source["id"])
-        )
+        with self.db.transaction() as connection:
+            if not self._active(task["id"], owner):
+                return {"cancelled": True}
+            connection.execute(
+                "UPDATE sources SET last_run_at=?,last_error=NULL WHERE id=?",
+                (now(), source["id"]),
+            )
         postings = fetch_postings(source)
         if len(postings) > 2000:
             raise DomainError(
@@ -1270,22 +1287,23 @@ class DiscoveryService:
             next_run = (
                 datetime.now(timezone.utc) + timedelta(seconds=15 * (4 ** (task["attempts"] - 1)))
             ).isoformat(timespec="microseconds")
-            changed = self.db.execute(
-                "UPDATE tasks SET state=?,error=?,next_run_at=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE id=? AND state='running' AND lease_owner=?",
-                (
-                    "queued" if retry else "failed",
-                    message[:1000],
-                    next_run,
-                    now(),
-                    task["id"],
-                    owner,
-                ),
-            )
-            if changed and task["source_id"]:
-                self.db.execute(
-                    "UPDATE sources SET last_error=? WHERE id=?",
-                    (message[:1000], task["source_id"]),
+            with self.db.transaction() as connection:
+                changed = connection.execute(
+                    "UPDATE tasks SET state=?,error=?,next_run_at=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE id=? AND state='running' AND lease_owner=?",
+                    (
+                        "queued" if retry else "failed",
+                        message[:1000],
+                        next_run,
+                        now(),
+                        task["id"],
+                        owner,
+                    ),
                 )
+                if changed.rowcount and task["source_id"]:
+                    connection.execute(
+                        "UPDATE sources SET last_error=? WHERE id=?",
+                        (message[:1000], task["source_id"]),
+                    )
             LOG.warning(
                 "Background task %s failed (%s).",
                 task["id"],

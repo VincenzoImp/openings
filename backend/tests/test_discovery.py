@@ -175,7 +175,16 @@ def test_daily_schedule_avoids_double_run_during_fall_back():
     assert next_due(schedule, previous, current).date().isoformat() == "2026-10-26"
 
 
-def test_score_protocol_rejects_truncated_and_nonfinite_results(monkeypatch):
+@pytest.mark.parametrize(
+    "payload, code",
+    [
+        ({"usage": {"truncated": True}}, "context_too_long"),
+        ({"usage": ["invalid"]}, "scorer_format"),
+        ({"answers": ["invalid"]}, "scorer_format"),
+        ({"answers": {"fit": {"type": "score", "score": True}}}, "scorer_format"),
+    ],
+)
+def test_score_protocol_rejects_truncation_and_malformed_results(monkeypatch, payload, code):
     original = httpx.Client
 
     def transport(request):
@@ -184,7 +193,8 @@ def test_score_protocol_rejects_truncated_and_nonfinite_results(monkeypatch):
             json={
                 "model": "synthetic",
                 "answers": {"fit": {"type": "score", "score": 3}},
-                "usage": {"truncated": True},
+                "usage": {},
+                **payload,
             },
         )
 
@@ -193,10 +203,31 @@ def test_score_protocol_rejects_truncated_and_nonfinite_results(monkeypatch):
         "Client",
         lambda **kwargs: original(transport=httpx.MockTransport(transport), **kwargs),
     )
-    with pytest.raises(DomainError, match="truncated"):
+    with pytest.raises(DomainError) as caught:
         score_call(
             {"base_url": "https://model.example", "provider": "systemone"}, {"job": "synthetic"}
         )
+    assert caught.value.code == code
+
+
+def test_cancel_between_claim_and_collection_does_not_touch_source(case, monkeypatch):
+    _, service = case
+    source = service.create_source(
+        SourceCreate(name="Example", kind="greenhouse", config={"board": "example"})
+    )
+    service.queue_collection(source["id"])
+    task = service.claim_task("test-worker")
+    original = service._source
+
+    def cancel_on_source_read(source_id):
+        result = original(source_id)
+        service.cancel_task(task["id"])
+        return result
+
+    monkeypatch.setattr(service, "_source", cancel_on_source_read)
+    monkeypatch.setattr(module, "fetch_postings", lambda source: pytest.fail("Cancelled fetch"))
+    service.run_task(task, "test-worker")
+    assert original(source["id"])["last_run_at"] is None
 
 
 def test_worker_restart_ignores_old_inflight_result(case, monkeypatch):
