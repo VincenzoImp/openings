@@ -380,7 +380,12 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
                     "join.com embedded job data was unavailable; its page shape may have changed.",
                 )
             try:
-                result = json.loads(match.group(1))["props"]["pageProps"]["initialState"]
+                page_props = json.loads(match.group(1))["props"]["pageProps"]
+                result = (
+                    page_props["initialState"]
+                    if "initialState" in page_props
+                    else page_props["pageData"]
+                )
                 if not isinstance(result, dict):
                     raise ValueError()
                 return result

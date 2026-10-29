@@ -20,7 +20,7 @@ Settings, `GET /api/v1/export`, or the scoped `workspace_export` MCP grant. Use 
 
 ## Restore or move hosts
 
-On the destination host, install Openings 0.5.0, set its owner password, then restore
+On the destination host, install Openings 0.5.1, set its owner password, then restore
 through Settings or `POST /api/v1/backup/restore` with the raw SQLite body. Restore
 checks the schema, database integrity and foreign keys before replacement. It
 preserves the destination installation's owner credentials/API tokens, clears

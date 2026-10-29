@@ -10,8 +10,8 @@ docker compose pull
 docker compose up -d --no-build
 ```
 
-Compose pins `vincenzoimp/openings:0.5.0` and the optional
-`vincenzoimp/openings:scorer-0.5.0`, for Linux amd64 and arm64. No Python, Node,
+Compose pins `vincenzoimp/openings:0.5.1` and the optional
+`vincenzoimp/openings:scorer-0.5.1`, for Linux amd64 and arm64. No Python, Node,
 AI account or TeX installation is needed on the host. To build images yourself,
 see [Contributing](../../CONTRIBUTING.md).
 
@@ -89,5 +89,5 @@ Health checks the core and SQLite. An idle scorer is healthy before loading a
 model. For upgrades, take a [backup](operations.md), update the checkout/image tags,
 then run `docker compose pull` and `docker compose up -d --no-build`.
 
-Version 0.5.0 starts a new database format; earlier Openings data/configuration
-are not compatible. Stable public API/data-format compatibility is not yet promised.
+Version 0.5.0 introduced a new database format; 0.4.x data/configuration
+are not compatible. Patch releases in the 0.5 line share this workspace format. Stable public API/data-format compatibility is not yet promised.

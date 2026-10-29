@@ -70,7 +70,7 @@ with TestClient(app) as client:
     response = client.get('/api/v1/capabilities', headers={'Authorization': 'Bearer ' + token})
     response.raise_for_status()
     inventory = response.json()
-    assert inventory['version'] == version('openings') == openings.__version__ == '0.5.0'
+    assert inventory['version'] == version('openings') == openings.__version__
     assert len(inventory['operations']) >= 84
     assert client.get('/health').json()['status'] == 'ok'
     print(json.dumps({'installed_version': version('openings'),
