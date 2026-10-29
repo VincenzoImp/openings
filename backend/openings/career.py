@@ -56,8 +56,19 @@ class Input(BaseModel):
         return value
 
 
-class ProfileUpdate(Input):
-    expected_version: int = Field(ge=0)
+class NonNullUpdate(Input):
+    @field_validator("*", mode="before")
+    @classmethod
+    def reject_null(cls, value):
+        if value is None:
+            raise ValueError(
+                "Omit unchanged fields; clear text with an empty string or use an empty list/object."
+            )
+        return value
+
+
+class ProfileUpdate(NonNullUpdate):
+    expected_version: int = Field(ge=0, strict=True)
     name: str | None = Field(default=None, max_length=200)
     headline: str | None = Field(default=None, max_length=500)
     location: str | None = Field(default=None, max_length=300)
@@ -83,8 +94,8 @@ class KnowledgeCreate(Input):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class KnowledgeUpdate(Input):
-    expected_version: int = Field(ge=1)
+class KnowledgeUpdate(NonNullUpdate):
+    expected_version: int = Field(ge=1, strict=True)
     kind: KnowledgeKind | None = None
     title: str | None = Field(default=None, min_length=1, max_length=300)
     narrative: str | None = Field(default=None, max_length=100000)
@@ -98,8 +109,8 @@ class ClaimCreate(Input):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class ClaimUpdate(Input):
-    expected_version: int = Field(ge=1)
+class ClaimUpdate(NonNullUpdate):
+    expected_version: int = Field(ge=1, strict=True)
     knowledge_id: str | None = None
     text: str | None = Field(default=None, min_length=1, max_length=5000)
     approved: bool | None = None
@@ -120,8 +131,8 @@ class TemplateCreate(Input):
         return validate_rules(value)
 
 
-class TemplateUpdate(Input):
-    expected_version: int = Field(ge=1)
+class TemplateUpdate(NonNullUpdate):
+    expected_version: int = Field(ge=1, strict=True)
     name: str | None = Field(default=None, min_length=1, max_length=200)
     kind: Literal["resume", "cover_letter"] | None = None
     tex: str | None = Field(default=None, max_length=1000000)
@@ -136,7 +147,7 @@ class TemplateUpdate(Input):
 
 
 class InstructionsUpdate(Input):
-    expected_version: int = Field(ge=0)
+    expected_version: int = Field(ge=0, strict=True)
     general: str = Field(max_length=30000)
 
 
@@ -148,7 +159,7 @@ class ImportPreview(Input):
 class CareerImport(Input):
     knowledge: list[KnowledgeCreate] = Field(default_factory=list, max_length=200)
     profile: dict[str, Any] | None = None
-    expected_profile_version: int | None = Field(default=None, ge=0)
+    expected_profile_version: int | None = Field(default=None, ge=0, strict=True)
 
 
 def validate_rules(value):
@@ -261,9 +272,14 @@ class CareerService:
         return self.get_instructions()
 
     def list_knowledge(
-        self, q: str = "", kind: str = "", limit: int = 100, offset: int = 0
+        self,
+        q: str = "",
+        kind: str = "",
+        limit: int = 100,
+        offset: int = 0,
+        summary: bool = False,
     ) -> dict:
-        """Search detailed career evidence. Returns a paginated object with stable IDs, narratives and metadata."""
+        """Search career evidence. summary=true returns bounded previews/counts; get a record for its full narrative and metadata."""
         _page(limit, offset)
         where, params = [], []
         if q:
@@ -273,12 +289,22 @@ class CareerService:
             where.append("kind=?")
             params.append(kind)
         clause = " WHERE " + " AND ".join(where) if where else ""
+        columns = (
+            "id,kind,title,version,created_at,updated_at,substr(narrative,1,240) AS narrative_preview,"
+            "(SELECT COUNT(*) FROM claims WHERE knowledge_id=knowledge.id) AS claim_count,"
+            "(SELECT COUNT(*) FROM files WHERE knowledge_id=knowledge.id) AS file_count"
+            if summary
+            else "*"
+        )
         rows = self.db.all(
-            f"SELECT * FROM knowledge{clause} ORDER BY created_at DESC,id LIMIT ? OFFSET ?",
+            f"SELECT {columns} FROM knowledge{clause} ORDER BY created_at DESC,id LIMIT ? OFFSET ?",
             (*params, limit, offset),
         )
         total = self.db.one(f"SELECT COUNT(*) AS n FROM knowledge{clause}", params)["n"]
-        return {"items": [decode_record(row, ["metadata"]) for row in rows], "total": total}
+        return {
+            "items": rows if summary else [decode_record(row, ["metadata"]) for row in rows],
+            "total": total,
+        }
 
     def get_knowledge(self, knowledge_id: str) -> dict:
         """Read one detailed experience, project, course or factual evidence record."""
@@ -349,8 +375,10 @@ class CareerService:
         approved: bool | None = None,
         limit: int = 100,
         offset: int = 0,
+        summary: bool = False,
+        q: str = "",
     ) -> dict:
-        """List reusable claim wording, optionally filtered by evidence or approval state."""
+        """List reusable claims by evidence, approval or text. summary=true omits metadata and bounds wording previews."""
         _page(limit, offset)
         where, params = [], []
         if knowledge_id:
@@ -359,14 +387,25 @@ class CareerService:
         if approved is not None:
             where.append("approved=?")
             params.append(int(approved))
+        if q:
+            where.append(
+                "(text LIKE ? OR EXISTS(SELECT 1 FROM knowledge WHERE knowledge.id=claims.knowledge_id AND title LIKE ?))"
+            )
+            params.extend([f"%{q}%", f"%{q}%"])
         clause = " WHERE " + " AND ".join(where) if where else ""
+        columns = (
+            "id,knowledge_id,approved,version,created_at,updated_at,substr(text,1,240) AS text_preview,"
+            "(SELECT title FROM knowledge WHERE knowledge.id=claims.knowledge_id) AS knowledge_title"
+            if summary
+            else "*"
+        )
         rows = self.db.all(
-            f"SELECT * FROM claims{clause} ORDER BY created_at DESC,id LIMIT ? OFFSET ?",
+            f"SELECT {columns} FROM claims{clause} ORDER BY created_at DESC,id LIMIT ? OFFSET ?",
             (*params, limit, offset),
         )
         result = []
         for row in rows:
-            row = decode_record(row, ["metadata"])
+            row = row if summary else decode_record(row, ["metadata"])
             row["approved"] = bool(row["approved"])
             result.append(row)
         return {
@@ -440,22 +479,42 @@ class CareerService:
             _bump_scoring(conn)
         return {"deleted": True, "id": claim_id}
 
-    def list_templates(self, kind: str = "", limit: int = 100, offset: int = 0) -> dict:
-        """List user-owned LaTeX templates and defaults; no template is compiled by this server."""
+    def list_templates(
+        self,
+        kind: str = "",
+        limit: int = 100,
+        offset: int = 0,
+        summary: bool = False,
+        q: str = "",
+    ) -> dict:
+        """List template packages/defaults. summary=true omits TeX, guidance and rules; get the template before editing or compiling externally."""
         _page(limit, offset)
-        where, params = (" WHERE kind=?", [kind]) if kind else ("", [])
+        where, params = [], []
+        if kind:
+            where.append("kind=?")
+            params.append(kind)
+        if q:
+            where.append("(name LIKE ? OR guidance LIKE ?)")
+            params.extend([f"%{q}%", f"%{q}%"])
+        clause = " WHERE " + " AND ".join(where) if where else ""
+        columns = (
+            "id,name,kind,is_default,version,created_at,updated_at,"
+            "(SELECT COUNT(*) FROM files WHERE template_id=templates.id) AS file_count"
+            if summary
+            else "*"
+        )
         rows = self.db.all(
-            f"SELECT * FROM templates{where} ORDER BY is_default DESC,created_at,id LIMIT ? OFFSET ?",
+            f"SELECT {columns} FROM templates{clause} ORDER BY is_default DESC,created_at,id LIMIT ? OFFSET ?",
             (*params, limit, offset),
         )
         items = []
         for row in rows:
-            row = decode_record(row, ["rules"])
+            row = row if summary else decode_record(row, ["rules"])
             row["is_default"] = bool(row["is_default"])
             items.append(row)
         return {
             "items": items,
-            "total": self.db.one(f"SELECT COUNT(*) AS n FROM templates{where}", params)["n"],
+            "total": self.db.one(f"SELECT COUNT(*) AS n FROM templates{clause}", params)["n"],
         }
 
     def get_template(self, template_id: str) -> dict:
@@ -674,8 +733,10 @@ def register_api(router, career: CareerService):
         return career.update_profile(value)
 
     @router.get("/career/knowledge")
-    def list_knowledge(q: str = "", kind: str = "", limit: int = 100, offset: int = 0):
-        return career.list_knowledge(q, kind, limit, offset)
+    def list_knowledge(
+        q: str = "", kind: str = "", limit: int = 100, offset: int = 0, summary: bool = False
+    ):
+        return career.list_knowledge(q, kind, limit, offset, summary)
 
     @router.post("/career/knowledge", status_code=201)
     def create_knowledge(value: KnowledgeCreate):
@@ -695,9 +756,14 @@ def register_api(router, career: CareerService):
 
     @router.get("/career/claims")
     def list_claims(
-        knowledge_id: str = "", approved: bool | None = None, limit: int = 100, offset: int = 0
+        knowledge_id: str = "",
+        approved: bool | None = None,
+        limit: int = 100,
+        offset: int = 0,
+        summary: bool = False,
+        q: str = "",
     ):
-        return career.list_claims(knowledge_id, approved, limit, offset)
+        return career.list_claims(knowledge_id, approved, limit, offset, summary, q)
 
     @router.post("/career/claims", status_code=201)
     def create_claim(value: ClaimCreate):
@@ -716,8 +782,10 @@ def register_api(router, career: CareerService):
         return career.delete_claim(claim_id, expected_version)
 
     @router.get("/templates")
-    def list_templates(kind: str = "", limit: int = 100, offset: int = 0):
-        return career.list_templates(kind, limit, offset)
+    def list_templates(
+        kind: str = "", limit: int = 100, offset: int = 0, summary: bool = False, q: str = ""
+    ):
+        return career.list_templates(kind, limit, offset, summary, q)
 
     @router.post("/templates", status_code=201)
     def create_template(value: TemplateCreate):
@@ -789,6 +857,15 @@ def register_mcp(mcp, career: CareerService):
             annotations=ToolAnnotations(
                 readOnlyHint=read_only,
                 destructiveHint=name.endswith("_delete"),
+                idempotentHint=read_only
+                or name
+                in {
+                    "career_update_profile",
+                    "instructions_update",
+                    "knowledge_update",
+                    "claims_update",
+                    "templates_update",
+                },
                 openWorldHint=False,
             ),
         )

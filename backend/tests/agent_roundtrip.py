@@ -48,12 +48,20 @@ async def exercise(base, token, folder, tectonic):
                 await session.initialize()
                 tools = await session.list_tools()
                 names = {tool.name for tool in tools.tools}
+                by_name = {tool.name: tool for tool in tools.tools}
                 checks["typed_module_discovery"] = {
                     "career_get_profile",
                     "templates_create",
                     "application_prepare_context",
                     "files_reserve_upload",
                 } <= names
+                checks["career_file_tool_annotations"] = (
+                    by_name["knowledge_list"].annotations.readOnlyHint
+                    and by_name["documents_get"].annotations.readOnlyHint
+                    and by_name["documents_delete"].annotations.destructiveHint
+                    and not by_name["files_reserve_upload"].annotations.readOnlyHint
+                    and not by_name["files_reserve_upload"].annotations.openWorldHint
+                )
                 profile = unpack(await session.call_tool("career_get_profile", {}))
                 unpack(
                     await session.call_tool(
@@ -229,6 +237,64 @@ async def exercise(base, token, folder, tectonic):
                     )
                 )
                 checks["revision_has_no_inherited_pdf"] = revised["files"] == []
+                summaries = unpack(
+                    await session.call_tool(
+                        "documents_list",
+                        {
+                            "application_id": application["id"],
+                            "summary": True,
+                            "limit": 1,
+                        },
+                    )
+                )
+                rest_summaries = (
+                    await http.get(
+                        base + "/api/v1/documents",
+                        params={
+                            "application_id": application["id"],
+                            "summary": "true",
+                            "limit": 1,
+                        },
+                    )
+                ).json()
+                checks["rest_mcp_compact_document_page"] = (
+                    summaries == rest_summaries
+                    and summaries["total"] == 2
+                    and "content" not in summaries["items"][0]
+                    and "files" not in summaries["items"][0]
+                    and summaries["items"][0]["revision_number"] == 2
+                )
+                checks["summary_filters_preserve_detail"] = (
+                    unpack(
+                        await session.call_tool(
+                            "knowledge_list",
+                            {
+                                "summary": True,
+                                "q": "Example API",
+                            },
+                        )
+                    )["items"][0]["id"]
+                    == evidence["id"]
+                    and unpack(
+                        await session.call_tool(
+                            "templates_get",
+                            {
+                                "template_id": template["id"],
+                            },
+                        )
+                    )["tex"]
+                    == tex
+                    and unpack(
+                        await session.call_tool(
+                            "contexts_list",
+                            {
+                                "application_id": application["id"],
+                                "summary": True,
+                            },
+                        )
+                    )["items"][0]["document_count"]
+                    == 2
+                )
                 checks["files_do_not_mark_application_sent"] = (
                     unpack(
                         await session.call_tool(

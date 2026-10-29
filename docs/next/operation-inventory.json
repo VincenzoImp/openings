@@ -1,0 +1,1438 @@
+{
+  "format": "openings-operation-inventory-v1",
+  "version": "0.5.0",
+  "status": "final-integration-contract",
+  "api_prefix": "/api/v1",
+  "operations": [
+    {
+      "id": "workspace.info",
+      "group": "Archive",
+      "operation": "Read workspace identity and workflow",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/workspace"
+        }
+      ],
+      "mcp": [
+        "workspace_info"
+      ],
+      "dashboard": "Settings: workspace information"
+    },
+    {
+      "id": "workspace.capabilities",
+      "group": "Archive",
+      "operation": "Read supported logical operations and transport exceptions",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/capabilities"
+        }
+      ],
+      "mcp": [
+        "capabilities_get"
+      ],
+      "dashboard": "Settings: capabilities/help"
+    },
+    {
+      "id": "overview.read",
+      "group": "Archive",
+      "operation": "Read submitted-attempt funnel and activity for a period",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/overview"
+        }
+      ],
+      "mcp": [
+        "overview_get"
+      ],
+      "dashboard": "Overview: period selector and funnel",
+      "notes": "since/until select the submitted-attempt cohort; counts are independent of loaded pages."
+    },
+    {
+      "id": "jobs.list",
+      "group": "Archive",
+      "operation": "Search/filter/sort paginated job summaries",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/jobs"
+        }
+      ],
+      "mcp": [
+        "jobs_search"
+      ],
+      "dashboard": "Inbox: search, filters, pagination",
+      "notes": "q, triage, company, location, source, remote, job_type, score_min/max, score_state, created_since/until, sort, limit, offset; includes facets."
+    },
+    {
+      "id": "jobs.read",
+      "group": "Archive",
+      "operation": "Read full posting, metadata and source provenance",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/jobs/{job_id}"
+        }
+      ],
+      "mcp": [
+        "job_get"
+      ],
+      "dashboard": "Inbox: job detail"
+    },
+    {
+      "id": "jobs.create",
+      "group": "Archive",
+      "operation": "Import a URL, pasted posting or structured job",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/jobs"
+        }
+      ],
+      "mcp": [
+        "job_ingest"
+      ],
+      "dashboard": "Inbox: Add job",
+      "notes": "One deduplicated ingestion service; URL fetch is bounded and may contact an external site."
+    },
+    {
+      "id": "jobs.update",
+      "group": "Archive",
+      "operation": "Correct job fields and metadata",
+      "rest": [
+        {
+          "method": "PATCH",
+          "path": "/api/v1/jobs/{job_id}"
+        }
+      ],
+      "mcp": [
+        "job_update"
+      ],
+      "dashboard": "Inbox: edit job",
+      "notes": "expected_version prevents lost updates."
+    },
+    {
+      "id": "jobs.triage",
+      "group": "Archive",
+      "operation": "Save, dismiss or restore one job",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/jobs/{job_id}/triage"
+        }
+      ],
+      "mcp": [
+        "job_triage"
+      ],
+      "dashboard": "Inbox: Save, Dismiss, Restore"
+    },
+    {
+      "id": "jobs.bulk",
+      "group": "Archive",
+      "operation": "Save/dismiss/restore/forget/rescore selected jobs",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/jobs/bulk"
+        }
+      ],
+      "mcp": [
+        "jobs_bulk"
+      ],
+      "dashboard": "Inbox: selection toolbar",
+      "notes": "At most 200 versioned items, with per-item results/errors; rescore remains explicit and bounded."
+    },
+    {
+      "id": "jobs.merge",
+      "group": "Archive",
+      "operation": "Merge verified duplicate jobs and retain history",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/jobs/{job_id}/merge"
+        }
+      ],
+      "mcp": [
+        "job_merge"
+      ],
+      "dashboard": "Inbox: merge duplicate",
+      "notes": "Both record versions are required."
+    },
+    {
+      "id": "jobs.delete",
+      "group": "Archive",
+      "operation": "Permanently forget job-owned data and identities",
+      "rest": [
+        {
+          "method": "DELETE",
+          "path": "/api/v1/jobs/{job_id}"
+        }
+      ],
+      "mcp": [
+        "job_forget"
+      ],
+      "dashboard": "Inbox: Forget",
+      "notes": "Future acquisition is new; deletion includes attempts, snapshots and owned files."
+    },
+    {
+      "id": "notes.list",
+      "group": "Archive",
+      "operation": "List job notes",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/jobs/{job_id}/notes"
+        }
+      ],
+      "mcp": [
+        "notes_list"
+      ],
+      "dashboard": "Inbox: notes"
+    },
+    {
+      "id": "notes.read",
+      "group": "Archive",
+      "operation": "Read one note and its version",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/notes/{note_id}"
+        }
+      ],
+      "mcp": [
+        "note_get"
+      ],
+      "dashboard": "Inbox: note editor"
+    },
+    {
+      "id": "notes.create",
+      "group": "Archive",
+      "operation": "Add a job note with optional application association",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/jobs/{job_id}/notes"
+        }
+      ],
+      "mcp": [
+        "note_add"
+      ],
+      "dashboard": "Inbox/Applications: add note"
+    },
+    {
+      "id": "notes.update",
+      "group": "Archive",
+      "operation": "Edit a note with version protection",
+      "rest": [
+        {
+          "method": "PATCH",
+          "path": "/api/v1/notes/{note_id}"
+        }
+      ],
+      "mcp": [
+        "note_update"
+      ],
+      "dashboard": "Inbox/Applications: edit note"
+    },
+    {
+      "id": "notes.delete",
+      "group": "Archive",
+      "operation": "Delete one note",
+      "rest": [
+        {
+          "method": "DELETE",
+          "path": "/api/v1/notes/{note_id}"
+        }
+      ],
+      "mcp": [
+        "note_delete"
+      ],
+      "dashboard": "Inbox/Applications: remove note"
+    },
+    {
+      "id": "collection.read",
+      "group": "Collection and scoring",
+      "operation": "Read global collection state and status",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/collection"
+        }
+      ],
+      "mcp": [
+        "collection_get"
+      ],
+      "dashboard": "Settings/Collection: automatic collection"
+    },
+    {
+      "id": "collection.update",
+      "group": "Collection and scoring",
+      "operation": "Enable or pause automatic collection globally",
+      "rest": [
+        {
+          "method": "PATCH",
+          "path": "/api/v1/collection"
+        }
+      ],
+      "mcp": [
+        "collection_update"
+      ],
+      "dashboard": "Settings/Collection: automatic collection",
+      "notes": "Preserves per-source settings; manual ingestion remains available."
+    },
+    {
+      "id": "providers.list",
+      "group": "Collection and scoring",
+      "operation": "Read provider capabilities, policies and runtime",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/providers"
+        }
+      ],
+      "mcp": [
+        "providers_list"
+      ],
+      "dashboard": "Settings: provider budgets",
+      "notes": "Runtime, cooldown and capability/version are read-only."
+    },
+    {
+      "id": "providers.update",
+      "group": "Collection and scoring",
+      "operation": "Edit versioned provider HTTP policy",
+      "rest": [
+        {
+          "method": "PATCH",
+          "path": "/api/v1/providers/{provider_id}"
+        }
+      ],
+      "mcp": [
+        "providers_update"
+      ],
+      "dashboard": "Settings: provider budgets",
+      "notes": "Flat policy fields: enabled, min_interval_seconds, max_requests_per_hour/day/run; expected_version required."
+    },
+    {
+      "id": "sources.list",
+      "group": "Collection and scoring",
+      "operation": "List saved searches/company feeds and health",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/sources"
+        }
+      ],
+      "mcp": [
+        "sources_list"
+      ],
+      "dashboard": "Collection: Saved searches and Companies tabs"
+    },
+    {
+      "id": "sources.read",
+      "group": "Collection and scoring",
+      "operation": "Read full source configuration",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/sources/{source_id}"
+        }
+      ],
+      "mcp": [
+        "sources_get"
+      ],
+      "dashboard": "Collection: source editor"
+    },
+    {
+      "id": "sources.preview",
+      "group": "Collection and scoring",
+      "operation": "Preview a source without storing jobs",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/sources/preview"
+        }
+      ],
+      "mcp": [
+        "sources_preview"
+      ],
+      "dashboard": "Collection: source preview",
+      "notes": "Uses the same per-HTTP budgets/cooldowns as scheduled and manual collection; bounded diagnostic/estimate response."
+    },
+    {
+      "id": "sources.create",
+      "group": "Collection and scoring",
+      "operation": "Save a typed search or company/feed source",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/sources"
+        }
+      ],
+      "mcp": [
+        "sources_create"
+      ],
+      "dashboard": "Collection: add saved search/company",
+      "notes": "New sources are individually paused; one query/location per JobSpy source, no implicit Cartesian product."
+    },
+    {
+      "id": "sources.update",
+      "group": "Collection and scoring",
+      "operation": "Edit source configuration, schedule or enabled state",
+      "rest": [
+        {
+          "method": "PATCH",
+          "path": "/api/v1/sources/{source_id}"
+        }
+      ],
+      "mcp": [
+        "sources_update"
+      ],
+      "dashboard": "Collection: edit/pause source"
+    },
+    {
+      "id": "sources.delete",
+      "group": "Collection and scoring",
+      "operation": "Delete a source while retaining archived jobs",
+      "rest": [
+        {
+          "method": "DELETE",
+          "path": "/api/v1/sources/{source_id}"
+        }
+      ],
+      "mcp": [
+        "sources_delete"
+      ],
+      "dashboard": "Collection: remove source"
+    },
+    {
+      "id": "sources.run",
+      "group": "Collection and scoring",
+      "operation": "Queue one immediate collection",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/sources/{source_id}/run"
+        }
+      ],
+      "mcp": [
+        "sources_run"
+      ],
+      "dashboard": "Collection: Run now",
+      "notes": "Honors provider budgets. JobSpy queues one task per selected provider and returns task_ids."
+    },
+    {
+      "id": "sources.bulk",
+      "group": "Collection and scoring",
+      "operation": "Enable/pause/run/delete selected sources",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/sources/bulk"
+        }
+      ],
+      "mcp": [
+        "sources_bulk"
+      ],
+      "dashboard": "Collection: selection toolbar",
+      "notes": "Versioned items and per-item outcomes."
+    },
+    {
+      "id": "scoring.read",
+      "group": "Collection and scoring",
+      "operation": "Read optional scorer configuration and criteria",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/scoring"
+        }
+      ],
+      "mcp": [
+        "scoring_get"
+      ],
+      "dashboard": "Settings: scoring",
+      "notes": "API key is never returned."
+    },
+    {
+      "id": "scoring.update",
+      "group": "Collection and scoring",
+      "operation": "Edit disabled/local/remote scorer, rubric and criteria",
+      "rest": [
+        {
+          "method": "PATCH",
+          "path": "/api/v1/scoring"
+        }
+      ],
+      "mcp": [
+        "scoring_update"
+      ],
+      "dashboard": "Settings: scoring and criteria",
+      "notes": "Relevant changes mark existing scores outdated; no implicit full rescore."
+    },
+    {
+      "id": "scoring.test",
+      "group": "Collection and scoring",
+      "operation": "Test current/draft scoring endpoint",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/scoring/test"
+        }
+      ],
+      "mcp": [
+        "scoring_test"
+      ],
+      "dashboard": "Settings: test scorer",
+      "notes": "Contacts configured optional scorer; no document generation."
+    },
+    {
+      "id": "scoring.context",
+      "group": "Collection and scoring",
+      "operation": "Read exact compact scoring input and omissions",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/scoring/context/{job_id}"
+        }
+      ],
+      "mcp": [
+        "scoring_context"
+      ],
+      "dashboard": "Inbox: score details"
+    },
+    {
+      "id": "scoring.rescore",
+      "group": "Collection and scoring",
+      "operation": "Queue bounded selected/outdated rescoring",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/scoring/rescore"
+        }
+      ],
+      "mcp": [
+        "scoring_rescore"
+      ],
+      "dashboard": "Settings/Inbox: explicit rescore"
+    },
+    {
+      "id": "tasks.list",
+      "group": "Collection and scoring",
+      "operation": "List/filter paginated collection and scoring tasks",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/tasks"
+        }
+      ],
+      "mcp": [
+        "tasks_list"
+      ],
+      "dashboard": "Settings: tasks/activity",
+      "notes": "state, kind, source_id, job_id, limit, offset; source/job labels accompany IDs."
+    },
+    {
+      "id": "tasks.read",
+      "group": "Collection and scoring",
+      "operation": "Read task progress, result and diagnostics",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/tasks/{task_id}"
+        }
+      ],
+      "mcp": [
+        "tasks_get"
+      ],
+      "dashboard": "Settings: task detail"
+    },
+    {
+      "id": "tasks.cancel",
+      "group": "Collection and scoring",
+      "operation": "Cancel queued/running work",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/tasks/{task_id}/cancel"
+        }
+      ],
+      "mcp": [
+        "tasks_cancel"
+      ],
+      "dashboard": "Settings: cancel task"
+    },
+    {
+      "id": "tasks.retry",
+      "group": "Collection and scoring",
+      "operation": "Explicitly retry failed/cancelled work",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/tasks/{task_id}/retry"
+        }
+      ],
+      "mcp": [
+        "tasks_retry"
+      ],
+      "dashboard": "Settings: retry task"
+    },
+    {
+      "id": "profile.read",
+      "group": "Career and templates",
+      "operation": "Read profile, links, metadata and version",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/career/profile"
+        }
+      ],
+      "mcp": [
+        "career_get_profile"
+      ],
+      "dashboard": "Career: profile"
+    },
+    {
+      "id": "profile.update",
+      "group": "Career and templates",
+      "operation": "Edit profile/preferences/contact/scoring summary",
+      "rest": [
+        {
+          "method": "PATCH",
+          "path": "/api/v1/career/profile"
+        }
+      ],
+      "mcp": [
+        "career_update_profile"
+      ],
+      "dashboard": "Career: profile and Advanced JSON",
+      "notes": "links is a list of string-valued objects; metadata is an arbitrary finite JSON object. expected_version required."
+    },
+    {
+      "id": "knowledge.list",
+      "group": "Career and templates",
+      "operation": "Search/filter paginated knowledge summaries",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/career/knowledge"
+        }
+      ],
+      "mcp": [
+        "knowledge_list"
+      ],
+      "dashboard": "Career: evidence: list/search",
+      "notes": "q searches title/narrative; kind filters evidence type. summary=true omits narrative/metadata and includes 240-character preview plus claim/file counts. Detail-oriented default is preserved."
+    },
+    {
+      "id": "knowledge.read",
+      "group": "Career and templates",
+      "operation": "Read full knowledge",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/career/knowledge/{knowledge_id}"
+        }
+      ],
+      "mcp": [
+        "knowledge_get"
+      ],
+      "dashboard": "Career: evidence: detail",
+      "notes": "All eight kinds: experience, project, course, education, fact, skill, language, other. Narrative and arbitrary finite metadata are available in detail/edit."
+    },
+    {
+      "id": "knowledge.create",
+      "group": "Career and templates",
+      "operation": "Create knowledge",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/career/knowledge"
+        }
+      ],
+      "mcp": [
+        "knowledge_create"
+      ],
+      "dashboard": "Career: evidence: add",
+      "notes": "All eight kinds: experience, project, course, education, fact, skill, language, other. Narrative and arbitrary finite metadata are available in detail/edit."
+    },
+    {
+      "id": "knowledge.update",
+      "group": "Career and templates",
+      "operation": "Edit knowledge with version protection",
+      "rest": [
+        {
+          "method": "PATCH",
+          "path": "/api/v1/career/knowledge/{knowledge_id}"
+        }
+      ],
+      "mcp": [
+        "knowledge_update"
+      ],
+      "dashboard": "Career: evidence: edit and Advanced JSON",
+      "notes": "expected_version required. Omit unchanged fields; clear strings/lists/objects with empty values, never null."
+    },
+    {
+      "id": "knowledge.delete",
+      "group": "Career and templates",
+      "operation": "Delete live knowledge",
+      "rest": [
+        {
+          "method": "DELETE",
+          "path": "/api/v1/career/knowledge/{knowledge_id}"
+        }
+      ],
+      "mcp": [
+        "knowledge_delete"
+      ],
+      "dashboard": "Career: evidence: remove",
+      "notes": "expected_version required. Frozen contexts retain their exact copies; knowledge deletion also removes its live claims/assets."
+    },
+    {
+      "id": "claims.list",
+      "group": "Career and templates",
+      "operation": "Search/filter paginated claims summaries",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/career/claims"
+        }
+      ],
+      "mcp": [
+        "claims_list"
+      ],
+      "dashboard": "Career: reusable claims: list/search",
+      "notes": "q searches claim text/evidence title; knowledge_id and approved filter provenance/review state. summary=true omits metadata and returns a 240-character text preview. Detail-oriented default is preserved."
+    },
+    {
+      "id": "claims.read",
+      "group": "Career and templates",
+      "operation": "Read full claim",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/career/claims/{claim_id}"
+        }
+      ],
+      "mcp": [
+        "claims_get"
+      ],
+      "dashboard": "Career: reusable claims: detail",
+      "notes": "Claims retain knowledge_id provenance, approved flag and arbitrary finite metadata; new claims default unapproved."
+    },
+    {
+      "id": "claims.create",
+      "group": "Career and templates",
+      "operation": "Create claim",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/career/claims"
+        }
+      ],
+      "mcp": [
+        "claims_create"
+      ],
+      "dashboard": "Career: reusable claims: add",
+      "notes": "Claims retain knowledge_id provenance, approved flag and arbitrary finite metadata; new claims default unapproved."
+    },
+    {
+      "id": "claims.update",
+      "group": "Career and templates",
+      "operation": "Edit claim with version protection",
+      "rest": [
+        {
+          "method": "PATCH",
+          "path": "/api/v1/career/claims/{claim_id}"
+        }
+      ],
+      "mcp": [
+        "claims_update"
+      ],
+      "dashboard": "Career: reusable claims: edit and Advanced JSON",
+      "notes": "expected_version required. Omit unchanged fields; clear strings/lists/objects with empty values, never null."
+    },
+    {
+      "id": "claims.delete",
+      "group": "Career and templates",
+      "operation": "Delete live claim",
+      "rest": [
+        {
+          "method": "DELETE",
+          "path": "/api/v1/career/claims/{claim_id}"
+        }
+      ],
+      "mcp": [
+        "claims_delete"
+      ],
+      "dashboard": "Career: reusable claims: remove",
+      "notes": "expected_version required. Frozen contexts retain their exact copies; knowledge deletion also removes its live claims/assets."
+    },
+    {
+      "id": "templates.list",
+      "group": "Career and templates",
+      "operation": "Search/filter paginated templates summaries",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/templates"
+        }
+      ],
+      "mcp": [
+        "templates_list"
+      ],
+      "dashboard": "Templates: packages/defaults: list/search",
+      "notes": "q searches package name/guidance; kind filters resume/cover_letter. summary=true omits TeX/guidance/rules and includes file_count. Detail-oriented default is preserved."
+    },
+    {
+      "id": "templates.read",
+      "group": "Career and templates",
+      "operation": "Read full template",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/templates/{template_id}"
+        }
+      ],
+      "mcp": [
+        "templates_get"
+      ],
+      "dashboard": "Templates: packages/defaults: detail",
+      "notes": "Raw TeX, guidance, arbitrary finite rules and assets are user-owned; no server compilation. First template per kind becomes default."
+    },
+    {
+      "id": "templates.create",
+      "group": "Career and templates",
+      "operation": "Create template",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/templates"
+        }
+      ],
+      "mcp": [
+        "templates_create"
+      ],
+      "dashboard": "Templates: packages/defaults: add",
+      "notes": "Raw TeX, guidance, arbitrary finite rules and assets are user-owned; no server compilation. First template per kind becomes default."
+    },
+    {
+      "id": "templates.update",
+      "group": "Career and templates",
+      "operation": "Edit template with version protection",
+      "rest": [
+        {
+          "method": "PATCH",
+          "path": "/api/v1/templates/{template_id}"
+        }
+      ],
+      "mcp": [
+        "templates_update"
+      ],
+      "dashboard": "Templates: packages/defaults: edit and Advanced JSON",
+      "notes": "expected_version required. Omit unchanged fields; clear strings/lists/objects with empty values, never null."
+    },
+    {
+      "id": "templates.delete",
+      "group": "Career and templates",
+      "operation": "Delete live template",
+      "rest": [
+        {
+          "method": "DELETE",
+          "path": "/api/v1/templates/{template_id}"
+        }
+      ],
+      "mcp": [
+        "templates_delete"
+      ],
+      "dashboard": "Templates: packages/defaults: remove",
+      "notes": "expected_version required. Frozen contexts retain their exact copies; knowledge deletion also removes its live claims/assets."
+    },
+    {
+      "id": "instructions.read",
+      "group": "Career and templates",
+      "operation": "Read general document writing instructions",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/instructions"
+        }
+      ],
+      "mcp": [
+        "instructions_get"
+      ],
+      "dashboard": "Templates: general instructions"
+    },
+    {
+      "id": "instructions.update",
+      "group": "Career and templates",
+      "operation": "Edit general document writing instructions",
+      "rest": [
+        {
+          "method": "PATCH",
+          "path": "/api/v1/instructions"
+        }
+      ],
+      "mcp": [
+        "instructions_update"
+      ],
+      "dashboard": "Templates: general instructions",
+      "notes": "Template guidance and application notes append separately; prior contexts remain frozen."
+    },
+    {
+      "id": "career.preview_import",
+      "group": "Career and templates",
+      "operation": "Preview JSON/text career import without mutation",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/career/import/preview"
+        }
+      ],
+      "mcp": [
+        "career_preview_import"
+      ],
+      "dashboard": "Career: import preview"
+    },
+    {
+      "id": "career.import",
+      "group": "Career and templates",
+      "operation": "Confirm append-only evidence and optional versioned profile import",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/career/import"
+        }
+      ],
+      "mcp": [
+        "career_import"
+      ],
+      "dashboard": "Career: confirm import",
+      "notes": "Profile replacement fields require expected_profile_version from preview."
+    },
+    {
+      "id": "applications.list",
+      "group": "Applications and documents",
+      "operation": "Search/filter/sort paginated application summaries",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/applications"
+        }
+      ],
+      "mcp": [
+        "applications_list"
+      ],
+      "dashboard": "Applications: list/Kanban filters",
+      "notes": "q, status, outcome, company, sort, limit, offset; stage_counts span all matching records."
+    },
+    {
+      "id": "applications.read",
+      "group": "Applications and documents",
+      "operation": "Read full attempt, questions/answers and job",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/applications/{application_id}"
+        }
+      ],
+      "mcp": [
+        "application_get"
+      ],
+      "dashboard": "Applications: attempt detail"
+    },
+    {
+      "id": "applications.create",
+      "group": "Applications and documents",
+      "operation": "Create an independent draft attempt",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/applications"
+        }
+      ],
+      "mcp": [
+        "application_create"
+      ],
+      "dashboard": "Inbox/Applications: create attempt",
+      "notes": "Never submits a portal application or generates documents."
+    },
+    {
+      "id": "applications.update",
+      "group": "Applications and documents",
+      "operation": "Record stage, outcome, questions/answers and application instructions",
+      "rest": [
+        {
+          "method": "PATCH",
+          "path": "/api/v1/applications/{application_id}"
+        }
+      ],
+      "mcp": [
+        "application_update"
+      ],
+      "dashboard": "Applications: progress and questions/answers",
+      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history."
+    },
+    {
+      "id": "applications.delete",
+      "group": "Applications and documents",
+      "operation": "Delete one attempt and its owned history/files",
+      "rest": [
+        {
+          "method": "DELETE",
+          "path": "/api/v1/applications/{application_id}"
+        }
+      ],
+      "mcp": [
+        "application_delete"
+      ],
+      "dashboard": "Applications: delete attempt",
+      "notes": "Keeps the archived job and other attempts; removes owned contexts/documents and their transfers."
+    },
+    {
+      "id": "applications.history",
+      "group": "Applications and documents",
+      "operation": "Read immutable lifecycle history",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/applications/{application_id}/events"
+        }
+      ],
+      "mcp": [
+        "application_history"
+      ],
+      "dashboard": "Applications: history"
+    },
+    {
+      "id": "contexts.list",
+      "group": "Applications and documents",
+      "operation": "List/filter compact frozen-context metadata",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/contexts"
+        }
+      ],
+      "mcp": [
+        "contexts_list"
+      ],
+      "dashboard": "Applications: prepared contexts",
+      "notes": "application_id, q (job title/company), summary, limit, offset. Full payloads never appear in list rows."
+    },
+    {
+      "id": "contexts.read",
+      "group": "Applications and documents",
+      "operation": "Read full frozen context and signature",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/contexts/{context_id}"
+        }
+      ],
+      "mcp": [
+        "contexts_get"
+      ],
+      "dashboard": "Applications: context detail",
+      "notes": "Also MCP resource openings://contexts/{context_id}; contains exact evidence, approved claims, templates/assets and stored instructions."
+    },
+    {
+      "id": "contexts.create",
+      "group": "Applications and documents",
+      "operation": "Prepare an immutable context for external generation",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/contexts"
+        }
+      ],
+      "mcp": [
+        "application_prepare_context"
+      ],
+      "dashboard": "Applications: prepare context",
+      "notes": "Select template_ids/knowledge_ids/claim_ids and note; optional idempotency_key. Unapproved/out-of-scope claims cannot enter context."
+    },
+    {
+      "id": "documents.list",
+      "group": "Applications and documents",
+      "operation": "List/filter paginated revision summaries",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/documents"
+        }
+      ],
+      "mcp": [
+        "documents_list"
+      ],
+      "dashboard": "Applications: documents/history",
+      "notes": "application_id, kind, q (title), review_state, summary, limit, offset. summary=true returns file counts without content/files."
+    },
+    {
+      "id": "documents.read",
+      "group": "Applications and documents",
+      "operation": "Read exact revision content, chain number and files",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/documents/{document_id}"
+        }
+      ],
+      "mcp": [
+        "documents_get"
+      ],
+      "dashboard": "Applications: revision detail and preview"
+    },
+    {
+      "id": "documents.create",
+      "group": "Applications and documents",
+      "operation": "Save content as a new immutable revision",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/documents"
+        }
+      ],
+      "mcp": [
+        "documents_create"
+      ],
+      "dashboard": "Applications: add/edit content as a new revision",
+      "notes": "previous_id links earlier content and inherits its context only; files are never inherited. Evidence provenance and template limits remain validated."
+    },
+    {
+      "id": "documents.review",
+      "group": "Applications and documents",
+      "operation": "Approve the exact revision content/files",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/documents/{document_id}/review"
+        }
+      ],
+      "mcp": [
+        "documents_review"
+      ],
+      "dashboard": "Applications: Approve revision",
+      "notes": "expected_review_state detects concurrent review changes. Approval blocks all further file uploads."
+    },
+    {
+      "id": "documents.delete",
+      "group": "Applications and documents",
+      "operation": "Delete an entire revision and its files",
+      "rest": [
+        {
+          "method": "DELETE",
+          "path": "/api/v1/documents/{document_id}"
+        }
+      ],
+      "mcp": [
+        "documents_delete"
+      ],
+      "dashboard": "Applications: delete revision",
+      "notes": "Other revisions remain; deleting a parent clears its child previous_id."
+    },
+    {
+      "id": "files.list",
+      "group": "Applications and documents",
+      "operation": "List/filter paginated file metadata",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/files"
+        }
+      ],
+      "mcp": [
+        "files_list"
+      ],
+      "dashboard": "Career/Templates/Applications/Inbox: assets and files",
+      "notes": "owner_type with optional owner_id, q (name), media_type, application_id (contexts/documents), summary, limit, offset; no bytes."
+    },
+    {
+      "id": "files.read",
+      "group": "Applications and documents",
+      "operation": "Read immutable file metadata and content URL",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/files/{file_id}"
+        }
+      ],
+      "mcp": [
+        "files_get"
+      ],
+      "dashboard": "Career/Templates/Applications/Inbox: file details"
+    },
+    {
+      "id": "files.upload",
+      "group": "Applications and documents",
+      "operation": "Upload exact raw bytes to a mutable owner",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/files/uploads"
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v1/transfers"
+        }
+      ],
+      "mcp": [
+        "files_reserve_upload"
+      ],
+      "dashboard": "Career/Templates/Applications/Inbox: upload file",
+      "notes": "MCP reserves a scoped HTTP PUT grant, then the caller sends raw bytes; UI performs the same transfer. Size/SHA-256/PDF checks apply; no base64 tool input."
+    },
+    {
+      "id": "files.download",
+      "group": "Applications and documents",
+      "operation": "Download/preview exact file bytes",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/files/{file_id}/content"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/files/{file_id}/download"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/transfers"
+        }
+      ],
+      "mcp": [
+        "files_reserve_download"
+      ],
+      "dashboard": "Career/Templates/Applications/Inbox: preview/download",
+      "notes": "MCP returns a scoped HTTP GET grant; UI may use its authenticated content URL. Context copies preserve exact blob bytes."
+    },
+    {
+      "id": "files.delete",
+      "group": "Applications and documents",
+      "operation": "Delete a live knowledge/template/job asset",
+      "rest": [
+        {
+          "method": "DELETE",
+          "path": "/api/v1/files/{file_id}"
+        }
+      ],
+      "mcp": [
+        "files_delete"
+      ],
+      "dashboard": "Career/Templates/Inbox: remove asset",
+      "notes": "Context/document file associations are immutable; delete a whole document revision or create another one."
+    },
+    {
+      "id": "export.records",
+      "group": "Workspace access and portability",
+      "operation": "Download portable JSON records without file bytes",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/export"
+        }
+      ],
+      "mcp": [
+        "workspace_export"
+      ],
+      "dashboard": "Settings: export records",
+      "notes": "MCP obtains scoped HTTP download. Secrets are omitted; use SQLite backup for exact documents/assets."
+    },
+    {
+      "id": "backup.download",
+      "group": "Workspace access and portability",
+      "operation": "Download a consistent SQLite backup including bytes",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/backup"
+        }
+      ],
+      "mcp": [
+        "workspace_backup"
+      ],
+      "dashboard": "Settings: download backup",
+      "notes": "MCP obtains a short-lived scoped HTTP grant; bytes stay outside the tool response."
+    },
+    {
+      "id": "backup.restore",
+      "group": "Workspace access and portability",
+      "operation": "Replace workspace data from a SQLite backup",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/backup/restore"
+        }
+      ],
+      "mcp": [
+        "workspace_restore_upload"
+      ],
+      "dashboard": "Settings: restore backup",
+      "notes": "MCP obtains a scoped raw HTTP upload grant. Validated restore preserves installation authentication; no arbitrary SQL endpoint."
+    },
+    {
+      "id": "tokens.list",
+      "group": "Workspace access and portability",
+      "operation": "List owner API token metadata",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/tokens"
+        }
+      ],
+      "mcp": [
+        "tokens_list"
+      ],
+      "dashboard": "Settings: agent tokens",
+      "notes": "Token secrets are not returned after creation."
+    },
+    {
+      "id": "tokens.create",
+      "group": "Workspace access and portability",
+      "operation": "Create a named owner API token",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/tokens"
+        }
+      ],
+      "mcp": [
+        "token_create"
+      ],
+      "dashboard": "Settings: create agent token",
+      "notes": "Secret is returned once and has owner-level authority."
+    },
+    {
+      "id": "tokens.revoke",
+      "group": "Workspace access and portability",
+      "operation": "Revoke an owner API token",
+      "rest": [
+        {
+          "method": "DELETE",
+          "path": "/api/v1/tokens/{token_id}"
+        }
+      ],
+      "mcp": [
+        "token_revoke"
+      ],
+      "dashboard": "Settings: revoke agent token",
+      "notes": "May revoke the caller token; subsequent requests require another valid credential."
+    },
+    {
+      "id": "password.update",
+      "group": "Workspace access and portability",
+      "operation": "Change owner password and rotate owner sessions",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/auth/password"
+        }
+      ],
+      "mcp": [
+        "owner_password_update"
+      ],
+      "dashboard": "Settings: change password",
+      "notes": "Retains API tokens; cookie caller must log in again."
+    }
+  ],
+  "exceptions": [
+    {
+      "id": "auth.bootstrap_session",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/auth/session"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/auth/setup"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/auth/login"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/auth/logout"
+        }
+      ],
+      "mcp": [],
+      "dashboard": "Initial setup, login and logout",
+      "reason": "Credential bootstrap and browser session transport precede authenticated domain tools; MCP uses bearer authentication."
+    },
+    {
+      "id": "health.deployment",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/health"
+        }
+      ],
+      "mcp": [],
+      "dashboard": "Settings diagnostics where applicable",
+      "reason": "Deployment liveness and service installation/startup are transport or operator concerns, not domain CRUD."
+    },
+    {
+      "id": "mcp.transport",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/mcp/"
+        },
+        {
+          "method": "GET",
+          "path": "/mcp/"
+        },
+        {
+          "method": "DELETE",
+          "path": "/mcp/"
+        }
+      ],
+      "mcp": [],
+      "dashboard": null,
+      "reason": "MCP initialization/discovery/session/resource transport is protocol infrastructure; no simulated dashboard button or MCP wrapper is required."
+    },
+    {
+      "id": "reference.examples",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/examples"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/examples/{name}"
+        }
+      ],
+      "mcp": [],
+      "dashboard": "Career/Templates: download synthetic examples",
+      "reason": "Shipped static reference files are convenience downloads, not private workspace records; agents may use REST or repository examples."
+    },
+    {
+      "id": "immutable.records",
+      "rest": [],
+      "mcp": [],
+      "dashboard": "Read context/history; create new revisions or delete the owning attempt",
+      "reason": "Frozen contexts and lifecycle history have no arbitrary PATCH/DELETE. Document content changes create revisions; approved revisions stay immutable. Context deletion is scoped to deleting the owning application/job."
+    },
+    {
+      "id": "binary.transfers",
+      "rest": [
+        {
+          "method": "PUT",
+          "path": "/api/v1/transfers"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/transfers"
+        }
+      ],
+      "mcp": [
+        "files_reserve_upload",
+        "files_reserve_download"
+      ],
+      "dashboard": "Upload/download controls",
+      "reason": "Logical file actions are equivalent across interfaces; raw HTTP bytes use scoped grants rather than base64 MCP payloads. Backup/export use their own scoped operational grants."
+    }
+  ]
+}

@@ -73,7 +73,7 @@ class UploadReservation(Input):
     owner_id: str
     name: str = Field(min_length=1, max_length=500)
     media_type: str = Field(default="application/octet-stream", min_length=1, max_length=200)
-    size: int = Field(gt=0)
+    size: int = Field(gt=0, strict=True)
     sha256: str | None = Field(default=None, pattern=r"^[a-fA-F0-9]{64}$")
 
     @field_validator("name")
@@ -165,10 +165,18 @@ class DocumentService:
                 )
             )
             if selected_templates:
-                templates = [
-                    _get(conn, "templates", template_id, "Template")
-                    for template_id in selected_templates
-                ]
+                selected = {
+                    row["id"]: dict(row)
+                    for row in conn.execute(
+                        "SELECT * FROM templates WHERE id IN ("
+                        + ",".join("?" for _ in selected_templates)
+                        + ")",
+                        selected_templates,
+                    )
+                }
+                if len(selected) != len(selected_templates):
+                    missing("Template")
+                templates = [selected[template_id] for template_id in selected_templates]
             else:
                 templates = [
                     dict(row)
@@ -191,28 +199,33 @@ class DocumentService:
                 ("knowledge", [row["id"] for row in knowledge]),
                 ("template", [row["id"] for row in templates]),
             ]:
-                for owner_id in identifiers:
-                    column = OWNER_COLUMNS[owner_type]
-                    for raw in conn.execute(
-                        f"SELECT * FROM files WHERE {column}=? ORDER BY name,id", (owner_id,)
-                    ).fetchall():
-                        original = dict(raw)
-                        copied_id = new_id()
-                        copied_name = f"{owner_type}/{owner_id}/{original['name']}"
-                        assets.append(
-                            {
-                                "id": copied_id,
-                                "sha256": original["sha256"],
-                                "name": original["name"],
-                                "path": copied_name,
-                                "media_type": original["media_type"],
-                                "size": original["size"],
-                                "owner_type": owner_type,
-                                "owner_id": owner_id,
-                                "original_file_id": original["id"],
-                                "url": f"/api/v1/files/{copied_id}/content",
-                            }
-                        )
+                if not identifiers:
+                    continue
+                column = OWNER_COLUMNS[owner_type]
+                for raw in conn.execute(
+                    f"SELECT * FROM files WHERE {column} IN ("
+                    + ",".join("?" for _ in identifiers)
+                    + f") ORDER BY {column},name,id",
+                    identifiers,
+                ):
+                    original = dict(raw)
+                    owner_id = original[column]
+                    copied_id = new_id()
+                    copied_name = f"{owner_type}/{owner_id}/{original['name']}"
+                    assets.append(
+                        {
+                            "id": copied_id,
+                            "sha256": original["sha256"],
+                            "name": original["name"],
+                            "path": copied_name,
+                            "media_type": original["media_type"],
+                            "size": original["size"],
+                            "owner_type": owner_type,
+                            "owner_id": owner_id,
+                            "original_file_id": original["id"],
+                            "url": f"/api/v1/files/{copied_id}/content",
+                        }
+                    )
             snapshot = {
                 "request": request,
                 "profile": {**DEFAULT_PROFILE, **profile["data"], "version": profile["version"]},
@@ -277,14 +290,34 @@ class DocumentService:
             missing("Application context")
         return self._context_record(row)
 
-    def list_contexts(self, application_id: str = "", limit: int = 100, offset: int = 0) -> dict:
-        """List immutable preparation contexts for an application without loading their full payloads."""
+    def list_contexts(
+        self,
+        application_id: str = "",
+        limit: int = 100,
+        offset: int = 0,
+        summary: bool = False,
+        q: str = "",
+    ) -> dict:
+        """List frozen contexts without payloads. Search the associated job's title/company; summary=true includes file/document counts."""
         _page(limit, offset)
-        clause, params = (
-            (" WHERE application_id=?", [application_id]) if application_id else ("", [])
-        )
+        where, params = [], []
+        if application_id:
+            where.append("application_id=?")
+            params.append(application_id)
+        if q:
+            where.append(
+                "EXISTS(SELECT 1 FROM applications a JOIN jobs j ON j.id=a.job_id WHERE a.id=contexts.application_id AND (j.title LIKE ? OR j.company LIKE ?))"
+            )
+            params.extend([f"%{q}%", f"%{q}%"])
+        clause = " WHERE " + " AND ".join(where) if where else ""
+        columns = "id,application_id,signature,created_at"
+        if summary:
+            columns += (
+                ",(SELECT COUNT(*) FROM files WHERE context_id=contexts.id) AS file_count"
+                ",(SELECT COUNT(*) FROM documents WHERE context_id=contexts.id) AS document_count"
+            )
         rows = self.db.all(
-            f"SELECT id,application_id,signature,created_at FROM contexts{clause} ORDER BY created_at DESC,id LIMIT ? OFFSET ?",
+            f"SELECT {columns} FROM contexts{clause} ORDER BY created_at DESC,id LIMIT ? OFFSET ?",
             (*params, limit, offset),
         )
         return {
@@ -452,32 +485,68 @@ class DocumentService:
                 )
         return self.get_document(document_id)
 
-    def _document_record(self, row):
-        result = decode_record(row, ["content"])
-        previous = result["previous_id"]
-        number = 1
-        while previous and number < 10000:
-            parent = self.db.one("SELECT previous_id FROM documents WHERE id=?", (previous,))
-            if not parent:
-                break
-            previous = parent["previous_id"]
-            number += 1
-        result["revision_number"] = number
-        result["version"] = 1
-        result["files"] = self.list_files("document", result["id"])["items"]
-        return result
+    def _document_records(self, rows, *, summary=False):
+        if not rows:
+            return []
+        ids = [row["id"] for row in rows]
+        placeholders = ",".join("?" for _ in ids)
+        # Resolve every revision chain and file association for this page in two
+        # bounded queries rather than one query per document, parent and file list.
+        revisions = {
+            row["id"]: row["n"]
+            for row in self.db.all(
+                "WITH RECURSIVE lineage(id,previous_id,n) AS ("
+                f"SELECT id,previous_id,1 FROM documents WHERE id IN ({placeholders}) "
+                "UNION ALL SELECT lineage.id,d.previous_id,lineage.n+1 "
+                "FROM lineage JOIN documents d ON d.id=lineage.previous_id WHERE lineage.n<10000) "
+                "SELECT id,MAX(n) AS n FROM lineage GROUP BY id",
+                ids,
+            )
+        }
+        files = {record_id: [] for record_id in ids}
+        if summary:
+            counts = {
+                row["document_id"]: row["n"]
+                for row in self.db.all(
+                    f"SELECT document_id,COUNT(*) AS n FROM files WHERE document_id IN ({placeholders}) GROUP BY document_id",
+                    ids,
+                )
+            }
+        else:
+            for row in self.db.all(
+                f"SELECT * FROM files WHERE document_id IN ({placeholders}) ORDER BY created_at,name,id",
+                ids,
+            ):
+                files[row["document_id"]].append(self._file_record(row))
+        items = []
+        for row in rows:
+            result = dict(row) if summary else decode_record(row, ["content"])
+            result.update(revision_number=revisions[result["id"]], version=1)
+            if summary:
+                result["file_count"] = counts.get(result["id"], 0)
+            else:
+                result["files"] = files[result["id"]]
+            items.append(result)
+        return items
 
     def get_document(self, document_id: str) -> dict:
         """Read a document revision, review state and attached file metadata."""
         row = self.db.one("SELECT * FROM documents WHERE id=?", (document_id,))
         if not row:
             missing("Document revision")
-        return self._document_record(row)
+        return self._document_records([row])[0]
 
     def list_documents(
-        self, application_id: str = "", kind: str = "", limit: int = 100, offset: int = 0
+        self,
+        application_id: str = "",
+        kind: str = "",
+        limit: int = 100,
+        offset: int = 0,
+        summary: bool = False,
+        q: str = "",
+        review_state: Literal["draft", "approved"] | None = None,
     ) -> dict:
-        """List document revisions and exact file associations, optionally filtered by application/kind."""
+        """List revisions by application/kind/review state/title. summary=true omits structured content and file entries; retrieve a revision for exact content/files."""
         _page(limit, offset)
         where, params = [], []
         if application_id:
@@ -486,13 +555,26 @@ class DocumentService:
         if kind:
             where.append("kind=?")
             params.append(kind)
+        if review_state is not None:
+            if review_state not in {"draft", "approved"}:
+                raise DomainError(422, "review_state", "Use draft or approved review state.")
+            where.append("review_state=?")
+            params.append(review_state)
+        if q:
+            where.append("title LIKE ?")
+            params.append(f"%{q}%")
         clause = " WHERE " + " AND ".join(where) if where else ""
+        columns = (
+            "id,application_id,context_id,kind,title,previous_id,review_state,created_at"
+            if summary
+            else "*"
+        )
         rows = self.db.all(
-            f"SELECT * FROM documents{clause} ORDER BY created_at DESC,id LIMIT ? OFFSET ?",
+            f"SELECT {columns} FROM documents{clause} ORDER BY created_at DESC,id LIMIT ? OFFSET ?",
             (*params, limit, offset),
         )
         return {
-            "items": [self._document_record(row) for row in rows],
+            "items": self._document_records(rows, summary=summary),
             "total": self.db.one(f"SELECT COUNT(*) AS n FROM documents{clause}", params)["n"],
         }
 
@@ -581,19 +663,36 @@ class DocumentService:
         owner_id: str = "",
         limit: int = 100,
         offset: int = 0,
+        summary: bool = False,
+        q: str = "",
+        media_type: str = "",
+        application_id: str = "",
     ) -> dict:
-        """List file metadata by owner. Fetch bytes through a scoped transfer or authenticated content URL."""
+        """List file metadata by owner, name/media type or application context/revisions. Metadata is always compact, including with summary=true; fetch bytes through a scoped HTTP transfer."""
         _page(limit, offset)
-        if bool(owner_type) != bool(owner_id):
-            raise DomainError(
-                422, "file_owner", "Provide both owner_type and owner_id when filtering files."
-            )
+        if owner_id and not owner_type:
+            raise DomainError(422, "file_owner", "Provide owner_type when filtering by owner_id.")
+        where, params = [], []
         if owner_type:
             if owner_type not in OWNER_COLUMNS:
                 raise DomainError(422, "owner_type", "Unsupported file owner type.")
-            clause, params = f" WHERE {OWNER_COLUMNS[owner_type]}=?", [owner_id]
-        else:
-            clause, params = "", []
+            if owner_id:
+                where.append(f"{OWNER_COLUMNS[owner_type]}=?")
+                params.append(owner_id)
+            else:
+                where.append(f"{OWNER_COLUMNS[owner_type]} IS NOT NULL")
+        if q:
+            where.append("name LIKE ?")
+            params.append(f"%{q}%")
+        if media_type:
+            where.append("media_type=?")
+            params.append(media_type)
+        if application_id:
+            where.append(
+                "(document_id IN (SELECT id FROM documents WHERE application_id=?) OR context_id IN (SELECT id FROM contexts WHERE application_id=?))"
+            )
+            params.extend([application_id, application_id])
+        clause = " WHERE " + " AND ".join(where) if where else ""
         rows = self.db.all(
             f"SELECT * FROM files{clause} ORDER BY created_at,name,id LIMIT ? OFFSET ?",
             (*params, limit, offset),
@@ -807,8 +906,14 @@ class DocumentService:
 
 def register_api(router, documents: DocumentService):
     @router.get("/contexts")
-    def list_contexts(application_id: str = "", limit: int = 100, offset: int = 0):
-        return documents.list_contexts(application_id, limit, offset)
+    def list_contexts(
+        application_id: str = "",
+        limit: int = 100,
+        offset: int = 0,
+        summary: bool = False,
+        q: str = "",
+    ):
+        return documents.list_contexts(application_id, limit, offset, summary, q)
 
     @router.post("/contexts", status_code=201)
     def prepare_context(value: ContextCreate):
@@ -819,8 +924,18 @@ def register_api(router, documents: DocumentService):
         return documents.get_context(context_id)
 
     @router.get("/documents")
-    def list_documents(application_id: str = "", kind: str = "", limit: int = 100, offset: int = 0):
-        return documents.list_documents(application_id, kind, limit, offset)
+    def list_documents(
+        application_id: str = "",
+        kind: str = "",
+        limit: int = 100,
+        offset: int = 0,
+        summary: bool = False,
+        q: str = "",
+        review_state: Literal["draft", "approved"] | None = None,
+    ):
+        return documents.list_documents(
+            application_id, kind, limit, offset, summary, q, review_state
+        )
 
     @router.post("/documents", status_code=201)
     def create_document(value: DocumentCreate):
@@ -840,9 +955,18 @@ def register_api(router, documents: DocumentService):
 
     @router.get("/files")
     def list_files(
-        owner_type: OwnerType | None = None, owner_id: str = "", limit: int = 100, offset: int = 0
+        owner_type: OwnerType | None = None,
+        owner_id: str = "",
+        limit: int = 100,
+        offset: int = 0,
+        summary: bool = False,
+        q: str = "",
+        media_type: str = "",
+        application_id: str = "",
     ):
-        return documents.list_files(owner_type, owner_id, limit, offset)
+        return documents.list_files(
+            owner_type, owner_id, limit, offset, summary, q, media_type, application_id
+        )
 
     @router.post("/files/uploads", status_code=201)
     def reserve_upload(value: UploadReservation):
@@ -891,17 +1015,14 @@ def register_mcp(mcp, documents: DocumentService):
         ("files_reserve_download", documents.reserve_download),
         ("files_delete", documents.delete_file),
     ]:
-        read_only = name.endswith(("_get", "_list")) or name in {
-            "career_get_profile",
-            "career_preview_import",
-            "instructions_get",
-        }
+        read_only = name.endswith(("_get", "_list"))
         mcp.add_tool(
             handler,
             name=name,
             annotations=ToolAnnotations(
                 readOnlyHint=read_only,
                 destructiveHint=name.endswith("_delete"),
+                idempotentHint=read_only or name in {"documents_review", "documents_create"},
                 openWorldHint=False,
             ),
         )
