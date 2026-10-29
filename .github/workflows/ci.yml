@@ -115,7 +115,7 @@ jobs:
           for name in subprocess.check_output(['git', 'ls-files', 'backend/openings'], text=True).splitlines():
               path = Path(name)
               assert installed[str(path.relative_to('backend/openings'))] == hashlib.sha256(path.read_bytes()).hexdigest(), name
-          assert installed['operation-inventory.json'] == hashlib.sha256(Path('docs/next/operation-inventory.json').read_bytes()).hexdigest()
+          assert installed['operation-inventory.json'] == hashlib.sha256(Path('backend/openings/operation-inventory.json').read_bytes()).hexdigest()
           PY
           curl --silent --fail http://127.0.0.1:18080/ --output /tmp/openings-index.html
           python -c "assert '<div id=\"root\"></div>' in open('/tmp/openings-index.html').read()"

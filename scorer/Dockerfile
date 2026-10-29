@@ -1,4 +1,12 @@
 FROM python:3.12-slim-bookworm
+ARG VERSION=0.5.0
+ARG VCS_REF=unknown
+LABEL org.opencontainers.image.title="Openings CPU scorer" \
+      org.opencontainers.image.description="Optional local CPU classification for Openings" \
+      org.opencontainers.image.source="https://github.com/VincenzoImp/openings" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}"
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 USE_TF=0 HF_HOME=/cache/huggingface OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1
 WORKDIR /app
 RUN pip install --no-cache-dir 'torch==2.15.0+cpu' --index-url https://download.pytorch.org/whl/cpu

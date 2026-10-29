@@ -2,7 +2,7 @@ name: openings
 
 services:
   openings:
-    image: ${OPENINGS_IMAGE:-openings:local}
+    image: ${OPENINGS_IMAGE:-docker.io/vincenzoimp/openings:0.5.0}
     build:
       context: .
       dockerfile: Dockerfile
@@ -25,7 +25,7 @@ services:
   # Starting this profile does not enable scoring. Configure it in Settings.
   scorer:
     profiles: [local]
-    image: ${OPENINGS_SCORER_IMAGE:-openings-scorer:local}
+    image: ${OPENINGS_SCORER_IMAGE:-docker.io/vincenzoimp/openings:scorer-0.5.0}
     build:
       context: .
       dockerfile: scorer/Dockerfile

@@ -35,7 +35,7 @@ def main():
             assert name in package.namelist(), f"Missing package resource: {name}"
         expected = json.loads(package.read("openings/operation-inventory.json"))
         assert expected == json.loads(
-            (repository / "docs/next/operation-inventory.json").read_text()
+            (repository / "backend/openings/operation-inventory.json").read_text()
         )
     with tempfile.TemporaryDirectory(prefix="openings-installed-") as directory:
         target = Path(directory) / "site-packages"

@@ -282,8 +282,6 @@ def create_app(database=None, start_worker=True):
 
     def capabilities() -> dict:
         path = Path(__file__).with_name("operation-inventory.json")
-        if not path.is_file():
-            path = Path(__file__).resolve().parents[2] / "docs/next/operation-inventory.json"
         return json.loads(path.read_text())
 
     router.add_api_route("/capabilities", capabilities, methods=["GET"])

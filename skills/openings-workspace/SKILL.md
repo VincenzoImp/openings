@@ -63,8 +63,8 @@ preserves individual settings. Relevant
 profile/rubric/model edits mark scores outdated; they do not trigger a full rescore.
 Use explicit selected/outdated rescoring when requested. Scores are advisory.
 
-Job triage is Inbox / Saved / Dismissed. Dismiss retains history and suppresses
-reimport. Forget permanently deletes job-owned history/files/identities and lets
+Job triage is Inbox / Saved / Dismissed. Dismiss retains history and keeps the
+job remembered during acquisition. Forget permanently deletes job-owned history/files/identities and lets
 future acquisition create a new job. Use the action the user requested.
 Applications are independent attempts: Draft / Applied / Interview / Offer /
 Closed, with a closing outcome. Do not infer a sent application from documents.
@@ -72,7 +72,8 @@ Closed, with a closing outcome. Do not infer a sent application from documents.
 Use `workspace_export` for readable JSON records without bytes. Use scoped
 `workspace_backup` and `workspace_restore_upload` transfers for portable
 SQLite backups when requested. Restore replaces workspace data and preserves the
-receiving installation's authentication. Treat a restore as a deliberate action.
+receiving installation's authentication and recent provider request windows/cooldowns.
+Treat a restore as a deliberate action.
 
 For scripting, read `/api/openapi.json` and use authenticated `/api/v1` operations.
 Reuse contexts, idempotency keys and optimistic versions. Omit unchanged nonnullable

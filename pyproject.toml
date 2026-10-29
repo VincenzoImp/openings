@@ -21,15 +21,11 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["backend/openings"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"docs/next/operation-inventory.json" = "openings/operation-inventory.json"
-
 [tool.uv]
 cache-keys = [
   { file = "pyproject.toml" },
   { file = "README.md" },
   { file = "backend/openings/**/*" },
-  { file = "docs/next/operation-inventory.json" },
 ]
 
 [dependency-groups]

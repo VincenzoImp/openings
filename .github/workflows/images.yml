@@ -10,7 +10,7 @@ on:
         required: true
         type: string
       publish:
-        description: 'Publish versioned core and scorer images to GHCR'
+        description: 'Publish versioned core and scorer images to Docker Hub'
         type: boolean
         default: false
 
@@ -36,7 +36,7 @@ jobs:
         name: Validate explicit release version
         env:
           REQUESTED_VERSION: ${{ inputs.version || github.ref_name }}
-          REPOSITORY: ${{ github.repository }}
+          DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE || github.repository_owner }}
         run: |
           python - <<'PY'
           import os, re, tomllib
@@ -44,9 +44,9 @@ jobs:
           actual = tomllib.load(open('pyproject.toml', 'rb'))['project']['version']
           if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?', requested) or requested != actual:
               raise SystemExit('The explicit release version must match pyproject.toml.')
-          base = 'ghcr.io/' + os.environ['REPOSITORY'].lower()
+          base = 'docker.io/' + os.environ['DOCKERHUB_NAMESPACE'].lower() + '/openings'
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write(f'version={requested}\ncore={base}:{requested}\nscorer={base}-scorer:{requested}\n')
+              output.write(f'version={requested}\ncore={base}:{requested}\nscorer={base}:scorer-{requested}\n')
           PY
 
   checks:
@@ -59,7 +59,6 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
-      packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -70,9 +69,9 @@ jobs:
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Publish model-free core
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -81,6 +80,10 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ needs.version.outputs.core }}
+          annotations: |
+            index:org.opencontainers.image.description=Job collection, career knowledge and application tracking with dashboard, REST and MCP
+            index:org.opencontainers.image.source=https://github.com/VincenzoImp/openings
+            index:org.opencontainers.image.licenses=MIT
           build-args: |
             VERSION=${{ needs.version.outputs.version }}
             VCS_REF=${{ github.sha }}
@@ -96,5 +99,12 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ needs.version.outputs.scorer }}
+          annotations: |
+            index:org.opencontainers.image.description=Optional CPU classification service for Openings
+            index:org.opencontainers.image.source=https://github.com/VincenzoImp/openings
+            index:org.opencontainers.image.licenses=MIT
+          build-args: |
+            VERSION=${{ needs.version.outputs.version }}
+            VCS_REF=${{ github.sha }}
           cache-from: type=gha,scope=scorer-release
           cache-to: type=gha,mode=max,scope=scorer-release

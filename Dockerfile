@@ -13,7 +13,6 @@ WORKDIR /app
 ENV UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 COPY pyproject.toml uv.lock README.md ./
 COPY backend/ ./backend/
-COPY docs/next/operation-inventory.json ./docs/next/operation-inventory.json
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-editable
 
 FROM python:3.12-slim-bookworm AS runtime

@@ -34,8 +34,5 @@ tmp
 .vscode
 .claude
 docs/**
-!docs/next/
-!docs/next/operation-inventory.json
-experiments
 backend/tests
 skills
