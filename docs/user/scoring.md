@@ -55,6 +55,13 @@ use remote mode; collection, documents and tracking continue independently.
 The [scorer implementation notes](../../scorer/README.md) describe its exact
 service subset.
 
+A field test on an Intel Celeron N3450 without AVX encountered an illegal
+instruction in MKL cosine dispatch. That installation works with scorer environment
+`MKL_ENABLE_INSTRUCTIONS=SSE4_2`, set through a local Compose override before
+starting the scorer. This is an [Intel-supported instruction cap](https://www.intel.com/content/www/us/en/docs/onemkl/developer-guide-linux/2026-0/instruction-set-specific-dispatch-on-intel-archs.html);
+leave automatic selection on other hardware and verify the actual model with the
+connection test.
+
 A reference measurement on Linux ARM64 with 2 CPUs / 4 GiB and no swap processed
 an untruncated 1885-token classification in about 9 seconds. The conservative sum
 of core/scorer cgroup peaks was about 2.90 GiB, including filesystem cache, with no
