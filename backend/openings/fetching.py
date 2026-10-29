@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from collections import deque
 from html import unescape
 from urllib.parse import quote, urlsplit
 
@@ -46,19 +47,23 @@ def ats_endpoint(url):
 
 def structured_posting(body):
     soup = BeautifulSoup(body, "html.parser")
-    candidates = []
+    candidates = deque()
     for script in soup.find_all("script", type="application/ld+json"):
         try:
             candidates.append(json.loads(script.string or script.get_text()))
         except (ValueError, TypeError):
             continue
     while candidates:
-        node = candidates.pop(0)
+        node = candidates.popleft()
         if isinstance(node, list):
             candidates.extend(node)
         elif isinstance(node, dict):
             kind = node.get("@type", [])
-            if kind == "JobPosting" or isinstance(kind, list) and "JobPosting" in kind:
+            if (
+                kind in ("JobPosting", "https://schema.org/JobPosting")
+                or isinstance(kind, list)
+                and "JobPosting" in kind
+            ):
                 description = text_content(node.get("description"))
                 if not description.strip():
                     continue
@@ -162,6 +167,14 @@ async def read_posting(url, discovery):
                 else structured_posting(body)
             )
             if result.get("posting", "").strip():
+                for field, maximum in (
+                    ("title", 400),
+                    ("company", 300),
+                    ("location", 500),
+                    ("posting", 200_000),
+                ):
+                    if field in result:
+                        result[field] = str(result[field] or "")[:maximum]
                 return result
         except DomainError as error:
             if error.status == 429 or "budget" in error.code or "cooldown" in error.code:

@@ -93,3 +93,20 @@ main merge, deployment, release tag or image publication was performed.
 ## Final integration authorized
 
 The user authorized the final proposal: broad searches and company feeds together; logical Dashboard/REST/MCP parity; provider budgets; correctness/performance and UI improvements. Target0.5.0 chosen over1.0 for the still-prestable rewrite. F0 contracts established; collection, frontend and career/document tasks will run independently. No production or main-branch mutation.
+
+
+Final integration checkpoint: shared archive/API contracts and career/document
+summary operations are integrated.37 focused backend checks pass; frontend
+production build passes. Collection preview verified6 complete jobs over7 HTTP
+requests across LinkedIn, Indeed and Glassdoor. These bounded observations do
+not establish a guaranteed provider rate limit. Runtime parity, final browser
+walkthroughs and Linux resource/CI checks remain pending.
+
+
+Collection and dashboard integration now pass49 focused backend checks and50
+practical browser flows. All84 logical operations resolve on REST and MCP; all
+API domain routes are included in the inventory. Root corrected an additional
+restore issue: restoring an older backup retains recent provider request windows
+and the later cooldown, while restoring saved policies. This prevents a restore
+from accidentally resetting external request safeguards. Final packaging, UI
+polish, actual external-agent regression and combined Linux proof remain.

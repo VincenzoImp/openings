@@ -2,7 +2,7 @@
   "updated": "2026-10-29",
   "branch": "codex/openings-next",
   "base_commit": "1deea6624da8474229b606b07ec669e6e75ae0f9",
-  "phase": "final_integration_contracts",
+  "phase": "final_integration_validation",
   "production_rewrite_started": true,
   "production_data_accessed": false,
   "production_deployed": false,
@@ -37,9 +37,14 @@
     "M5.2",
     "M5.3",
     "M5.4",
-    "M5.1"
+    "M5.1",
+    "F0",
+    "F1.archive",
+    "F3.career",
+    "F1.acquisition",
+    "F2.shared_services"
   ],
-  "next_task": "F1/F2/F3 parallel implementation after contract checkpoint",
+  "next_task": "Integrate final browser/collector polish and packaging; run installed-wheel, external-agent, Linux resources and native CI",
   "release_gates": [
     "Core/remote-scoring installation passes practical UI/REST/MCP/backup checks within 2 CPU / 4 GiB",
     "Bundled local preset passes whole-stack startup/steady target measurements; publish advisory-score and truncation limitations",
@@ -116,14 +121,14 @@
   "feasibility_ready": true,
   "review_checkpoint": "9bfd6d7",
   "active_goal": "Openings0.5.0 final integration",
-  "parallel_work": {},
-  "latest_implementation_check": "31 invariant cases pass; frontend build/audit and core runtime audit clean; 21 production Docker workflow checks; real external Codex+Tectonic+MCP document workflow; final Linux1913-token whole-stack2CPU/4GiB resource proof passes",
+  "parallel_work": {
+    "collection": "final_collection: collectors/budgets/worker; integration imminent",
+    "frontend": "final_ui: UI committed; practical browser QA fixes in progress",
+    "release": "final_career: packaging/docs/skill/Linux2CPU4GiB verification"
+  },
+  "latest_implementation_check": "49 focused tests pass; all84 advertised operations resolve on84 MCPtools/95 RESTroutes with no unlisted API domain operations.50 practical browser workflows pass; provider annotation polish and final packaging/resources pending.",
   "release_gate_results": {
-    "dashboard_rest_mcp_and_portable_restore": "passed production workflows",
-    "local_scoring_cpu_and_memory": "passed Linux ARM2CPU/4GiB whole-stack1913tokens,noOOM",
-    "external_agent_documents": "passed actual Codex CLI + skill + MCP + externalTectonic + exact uploads",
-    "core_linux_images": "passed native amd64 and arm64 CI",
-    "dependency_audits": "core runtime and frontend clean"
+    "baseline": "Previous rewrite gates passed; final integration must rerun affected gates."
   },
   "pull_request": "https://github.com/VincenzoImp/openings/pull/52",
   "validated_code_commit": "5e63b036c75fd29308bab92e51dea610fcd7d55b",
@@ -139,7 +144,7 @@
   "known_limits": [
     "Indicative English classifier can misunderstand qualifications/language; never an eligibility guarantee.",
     "Low-power x86 full-model speed varies; Linux ARM resource evidence and separate non-AVX runtime probe are documented.",
-    "Major rewrite uses only fresh1.0 databases; no old-database import or schema compatibility."
+    "Major rewrite uses only fresh rewrite databases; no old-database import or schema compatibility."
   ],
   "integration_authorized": true,
   "release_ready": false,

@@ -254,7 +254,9 @@ def test_http_validates_answers_dates_and_rotation_preserves_tokens(tmp_path):
         client.headers["Authorization"] = "Bearer " + token["token"]
         assert client.get("/api/v1/capabilities").json()["version"] == "0.5.0"
         assert client.get("/api/v1/tokens").json()["items"][0]["last_used_at"]
-        assert client.get("/api/v1/export").json()["providers"] == []
+        exported = client.get("/api/v1/export").json()
+        assert "providers" in exported
+        assert all(isinstance(provider["policy"], dict) for provider in exported["providers"])
 
 
 @pytest.mark.asyncio
@@ -303,3 +305,34 @@ async def test_url_extraction_does_not_score_challenge_or_generic_html():
     structured = b'<script type="application/ld+json">{"@graph":[{"@type":"JobPosting","title":"Engineer","hiringOrganization":{"name":"Synthetic"},"description":"<p>Build Python tools.</p>"}]}</script>'
     result = await complete_input(value, Source(structured))
     assert result.posting == "Build Python tools." and result.company == "Synthetic"
+
+
+def test_restore_keeps_provider_requests_and_future_cooldown(workspace, tmp_path):
+    import json
+    from datetime import datetime, timedelta, timezone
+    from openings.discovery import DiscoveryService
+    from openings.operations import restore_database
+
+    discovery = DiscoveryService(workspace)
+    provider = discovery.providers.get("linkedin")
+    workspace.db.backup(tmp_path / "before-requests.sqlite")
+    deadline = (datetime.now(timezone.utc) + timedelta(minutes=20)).isoformat(
+        timespec="microseconds"
+    )
+    workspace.db.execute(
+        "UPDATE providers SET runtime=? WHERE id='linkedin'",
+        (
+            json.dumps(
+                {
+                    "events": [datetime.now(timezone.utc).timestamp()],
+                    "cooldown_until": deadline,
+                    "total_requests": 1,
+                }
+            ),
+        ),
+    )
+    restore_database(workspace, tmp_path / "before-requests.sqlite")
+    restored = discovery.providers.get("linkedin")
+    assert restored["runtime"]["cooldown_until"] == deadline
+    assert restored["runtime"]["requests_day"] == 1
+    assert restored["policy"] == provider["policy"]

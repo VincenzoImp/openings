@@ -588,8 +588,8 @@ class Workspace:
             conditions.append("j.company=?")
             args.append(company)
         if q.strip():
-            conditions.append("(j.title LIKE ? OR j.company LIKE ?)")
-            args.extend(["%" + q.strip() + "%"] * 2)
+            conditions.append("(j.title LIKE ? OR j.company LIKE ? OR app.note LIKE ?)")
+            args.extend(["%" + q.strip() + "%"] * 3)
         where = " WHERE " + " AND ".join(conditions) if conditions else ""
         base = " FROM applications app JOIN jobs j ON j.id=app.job_id" + self._job_join()
         order = {

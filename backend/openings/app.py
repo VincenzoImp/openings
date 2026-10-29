@@ -268,7 +268,7 @@ def create_app(database=None, start_worker=True):
         response.delete_cookie(COOKIE, path="/")
         return response
 
-    def capabilities():
+    def capabilities() -> dict:
         path = Path(__file__).with_name("operation-inventory.json")
         if not path.is_file():
             path = Path(__file__).resolve().parents[2] / "docs/next/operation-inventory.json"
