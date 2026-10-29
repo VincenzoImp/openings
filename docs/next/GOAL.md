@@ -1,70 +1,37 @@
-# Openings 1.0 execution brief
+# Openings0.5.0 final integration
 
-## Completion checkpoint
+## Resume
 
-The frozen implementation is complete and validated. PR 52 is ready for owner review; STATE.json contains the exact tested code revision and CI/evidence links. No additional feature work is planned. Merge, version tagging and image publication remain explicit owner release actions.
+User explicitly approved autonomous implementation of the final review proposals.
+A new persistent goal is active; no token budget. Work in openings-next on
+codex/openings-next, existing PR52. Read STATE.json, CONTRACTS.md, OPERATIONS.md,
+PLAN.md and WORKLOG.md. The previous completed1.0-labelled rewrite is the baseline,
+not the current delivery status. Version is0.5.0: substantial rewrite before stable
+public API/data-format guarantees; API namespace /api/v1 is independent.
 
-## Start and resume
+## Deliver
 
-The user authorized production implementation. A persistent goal is active for
-this objective and checkout. Reuse it on resume rather than creating another.
-No token budget was requested.
+Broad saved searches (JobSpy1.4.1) AND selected company ATS/feed monitoring, typed
+SQLite configuration, real shared per-provider HTTP budgets/cooldowns and fair queue
+work. Dashboard/REST/MCP must cover every domain operation meaningfully, including
+CRUD/metadata, filters/bulk, sources/policies/tasks, scoring, context/documents/files,
+export/backup and owner access. Transport/bootstrap/deployment differences are
+explicit, not simulated parity. Correct the reviewed failures and simplify list
+queries/payloads/refresh. Adapt desktop/mobile UI, protect dirty edits, restore useful
+bulk/filter/navigation and real funnel period controls. Keep user data private and
+all shipped content English/synthetic.
 
-Work on `codex/openings-next`. Read `README.md`, `STATE.json`, `PRODUCT.md`,
-`DESIGN.md` and `PLAN.md` in this directory. STATE.json is the current checkpoint;
-PLAN.md defines tasks and acceptance. After a restart/compaction, inspect state
-and Git/worktree status and continue the recorded next task. Do not restart the
-research or infer completion from a screenshot, prototype or passing unit suite.
+One SQLite/core, optional one Laya local/remote scorer. CV/letter/answers are generated
+and TeX compiled by external agents only. No legacy import, internal generation,
+semantic/OpenSearch, browser crawler default, paid keys, email/calendar or submission.
 
-## Objective
+## Execution and completion
 
-Deliver a complete, release-ready **Openings 1.0** as a fresh implementation:
-an English self-hosted job-search workspace, portable SQLite including files,
-shared dashboard/REST/MCP operations, career knowledge/templates/instructions,
-manual and scheduled company-feed ingestion, optional local/remote AI scoring,
-deliberate rescoring, application tracking, external-agent document preparation
-and uploads, list/Kanban/Sankey views, Docker setup and consistent backup/restore.
-
-The frozen feature set is in PRODUCT.md; complete it rather than deferring core
-features into an unspecified later release. No legacy importer/schema compatibility,
-empirical scoring, internal AI generation/chat/login, server TeX, email/calendar,
-portal submission or semantic-search/embedding stack. External agents compile
-PDFs and upload PDF plus sources; guidance and knowledge remain stored in SQLite.
-Use old projects and experiments as references, not the production scaffold.
-
-## Execution
-
-Begin **M1.1**: fresh scaffold, minimal initial SQLite schema/version and shared
-DTO/service contracts. Agree shared contracts before parallel implementation.
-The root agent owns integration, schema/API decisions, scope and final checks.
-Delegate independent frontend, source/scoring and career/MCP/document tasks to
-focused agents in separate task branches/worktrees. Avoid simultaneous ownership
-of schema, lockfiles and shared contracts. Merge useful vertical slices promptly.
-
-Use a few meaningful commits per coherent increment, not one per edit. Issues/PRs
-are optional coordination aids. Do not create administrative work that delays a
-working flow. Keep temporary worktrees/branches free of unintegrated changes
-before removing them.
-
-After meaningful batches: exercise the implemented flow, note defects, fix them,
-review scope/time/resource drift, and update PLAN.md/STATE.json with the next task.
-Use a small defect list with concrete reproduction and status. Routine corrections
-do not need new user approval; request missing information only when necessary.
-
-## Evidence and completion
-
-Prefer real UI/REST/MCP/external-agent walkthroughs plus a few data-invariant
-tests. No coverage target or exhaustive test-per-function work. Check dedupe,
-state preservation, forget/late results, frozen context, exact file revisions
-and online backup/restore. Test desktop/mobile and inspect actual screens.
-
-Scoring is advisory. The measured Laya English preset uses one question,
-`max_len=2048`, two threads and one checkpoint; it still makes known language/
-qualification mistakes. Preserve off/remote modes and detect truncation. Measure
-the actual core plus scorer under 2 CPU / 4 GiB before claiming target support.
-
-Completion requires every agreed feature working through its intended surfaces,
-a practical external-agent PDF/source round trip, fresh Docker installation,
-portable restore, resource evidence, concise English docs and a clean releasable
-branch. Do not mark the goal complete while required work remains. Record actual
-limitations honestly; production tests cannot be replaced by preflight probes.
+Root owns contracts/schema/shared archive/integration; isolated agents own collection,
+frontend and career/documents. Follow PLAN and file ownership. Use practical UI/REST/
+MCP/portal/file/restore proofs and a few invariants;31 old cases are only a baseline.
+Do not mark complete until provider gates, all logical surfaces, reviewed correctness,
+actual desktop/mobile and combined Linux2CPU/4GiB collector/scorer behavior plus native
+image startup work. Record concrete limitations. Use a few coherent commits and
+clean temporary task branches/worktrees/VMs. Deliver a tested release-ready PR52 and
+synthetic local demo; do not merge, tag, publish images or deploy production yet.

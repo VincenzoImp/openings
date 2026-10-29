@@ -2,7 +2,7 @@
   "updated": "2026-10-29",
   "branch": "codex/openings-next",
   "base_commit": "1deea6624da8474229b606b07ec669e6e75ae0f9",
-  "phase": "release_ready",
+  "phase": "final_integration_contracts",
   "production_rewrite_started": true,
   "production_data_accessed": false,
   "production_deployed": false,
@@ -39,7 +39,7 @@
     "M5.4",
     "M5.1"
   ],
-  "next_task": "Owner review of PR52; merge and publish version1.0.0 when chosen. No implementation tasks remain.",
+  "next_task": "F1/F2/F3 parallel implementation after contract checkpoint",
   "release_gates": [
     "Core/remote-scoring installation passes practical UI/REST/MCP/backup checks within 2 CPU / 4 GiB",
     "Bundled local preset passes whole-stack startup/steady target measurements; publish advisory-score and truncation limitations",
@@ -67,7 +67,7 @@
       "closed"
     ],
     "permanent_delete": "forget all job-owned records and identities; no suppression tombstone; future acquisition is new",
-    "company_watch": "first-class company ATS sources; URL detection, preview, filters, schedules, pause and run-now through UI/REST/MCP",
+    "company_watch": "Selected company ATS/feed sources plus broad saved portal searches; typed SQLite config and provider budgets through all three interfaces.",
     "visual_reference": "Dossier throughout; original components with warm surfaces, editorial typography and prominent document previews",
     "complexity": "one SQLite, one application service and one bounded worker; optional local/remote scorer; no generative agent runtime or TeX compiler",
     "templates": "user imports LaTeX; synthetic examples included",
@@ -93,9 +93,13 @@
       "embedded provider/agent login",
       "server TeX compilation"
     ],
-    "release_scope": "frozen complete Openings 1.0; no planned later feature phase"
+    "release_scope": "User-approved final review integration; both global saved searches and company sources, logical Dashboard/REST/MCP parity, reviewed correctness/performance and UX fixes."
   },
-  "not_yet_verified": [],
+  "not_yet_verified": [
+    "New collector/HTTP budgets and persisted cooldown",
+    "Final operation parity, compact list and dirty-form behavior",
+    "Combined new acquisition/scorer Linux resources and final native CI"
+  ],
   "latest_probe": {
     "dashboard": "evidence/dashboard-smoke.json: 33 browser preview checks pass",
     "interfaces": "evidence/mcp-file-probe.json: 15 live MCP/file/backup checks pass",
@@ -106,29 +110,13 @@
     "architecture": "Native GitHub CI40932161181 passed backend/frontend/audits and both Linux core architecture builds+runtime smoke"
   },
   "production_authorized": true,
-  "release_target": "1.0.0",
+  "release_target": "0.5.0",
   "goal_brief": "docs/next/GOAL.md",
   "entry_point": "docs/next/README.md",
   "feasibility_ready": true,
   "review_checkpoint": "9bfd6d7",
-  "active_goal": "Openings 1.0 complete frozen implementation",
-  "parallel_work": {
-    "frontend": {
-      "branch": "codex/openings-ui",
-      "scope": "frontend/",
-      "status": "integrated and validated"
-    },
-    "discovery": {
-      "branch": "codex/openings-discovery",
-      "scope": "discovery.py, worker.py, scorer/",
-      "status": "integrated and validated"
-    },
-    "career": {
-      "branch": "codex/openings-career",
-      "scope": "career.py, documents.py, examples/",
-      "status": "integrated and validated"
-    }
-  },
+  "active_goal": "Openings0.5.0 final integration",
+  "parallel_work": {},
   "latest_implementation_check": "31 invariant cases pass; frontend build/audit and core runtime audit clean; 21 production Docker workflow checks; real external Codex+Tectonic+MCP document workflow; final Linux1913-token whole-stack2CPU/4GiB resource proof passes",
   "release_gate_results": {
     "dashboard_rest_mcp_and_portable_restore": "passed production workflows",
@@ -152,5 +140,8 @@
     "Indicative English classifier can misunderstand qualifications/language; never an eligibility guarantee.",
     "Low-power x86 full-model speed varies; Linux ARM resource evidence and separate non-AVX runtime probe are documented.",
     "Major rewrite uses only fresh1.0 databases; no old-database import or schema compatibility."
-  ]
+  ],
+  "integration_authorized": true,
+  "release_ready": false,
+  "revision_baseline": "ed57110"
 }

@@ -116,4 +116,17 @@ CREATE TABLE IF NOT EXISTS tasks (
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS tasks_due ON tasks(state,next_run_at);
+CREATE TABLE IF NOT EXISTS providers (
+ id TEXT PRIMARY KEY, policy TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(policy)),
+ runtime TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(runtime)), version INTEGER NOT NULL DEFAULT 1,
+ updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS applications_job ON applications(job_id);
+CREATE INDEX IF NOT EXISTS applications_status ON applications(status,updated_at);
+CREATE INDEX IF NOT EXISTS documents_app ON documents(application_id,created_at);
+CREATE INDEX IF NOT EXISTS contexts_app ON contexts(application_id,created_at);
+CREATE INDEX IF NOT EXISTS files_document ON files(document_id);
+CREATE INDEX IF NOT EXISTS files_template ON files(template_id);
+CREATE INDEX IF NOT EXISTS files_knowledge ON files(knowledge_id);
+CREATE INDEX IF NOT EXISTS claims_knowledge ON claims(knowledge_id);
 PRAGMA user_version=1;

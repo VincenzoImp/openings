@@ -1,0 +1,486 @@
+{
+  "purpose": "Bounded actual public-board JobSpy1.4.1 probe; no application code or user data changes",
+  "timestamp": "2026-10-29T18:55:01.153027+00:00",
+  "platform": "macOS-27.0.1-arm64-arm-64bit",
+  "python": "3.12.13",
+  "provenance": {
+    "package": "python-jobspy",
+    "version": "1.4.1",
+    "requires_python": ">=3.10",
+    "distribution_files": [
+      {
+        "filename": "python_jobspy-1.4.1-py3-none-any.whl",
+        "sha256": "8b5ace6c3d19612868d739673d4fcdb8f6f8b428984d44174668dc7ed0599cea",
+        "url": "https://files.pythonhosted.org/packages/99/3e/87d79b04f946da7c8d2ee84add5098cf88e6b32d373df6ff384ccff5cbf5/python_jobspy-1.4.1-py3-none-any.whl"
+      },
+      {
+        "filename": "python_jobspy-1.4.1.tar.gz",
+        "sha256": "602693102e4f60485ef681207386dd9eaf7a4a13914a566a9483cc2a421a98ef",
+        "url": "https://files.pythonhosted.org/packages/c8/a6/ea349edcc556b992bb454f54345f19823f2ec41fac28c96d09dfbca06177/python_jobspy-1.4.1.tar.gz"
+      }
+    ],
+    "github_head": "68b88d6909a2342ad75fbb945c4204a3a7ed6665",
+    "github_date": "2026-10-27T15:30:40Z"
+  },
+  "wheel_hash_verified": true,
+  "supplied_accounts": false,
+  "supplied_proxies": false,
+  "captcha_automation": false,
+  "per_portal_deadline_seconds": 180,
+  "attempts": [
+    {
+      "portal": "linkedin",
+      "started_at": "2026-10-29T18:55:01.387099+00:00",
+      "params": {
+        "site_name": [
+          "linkedin"
+        ],
+        "search_term": "backend engineer",
+        "location": "Switzerland",
+        "country_indeed": "Switzerland",
+        "results_wanted": 3,
+        "hours_old": 72,
+        "fetch_description": true,
+        "description_format": "plain",
+        "verbose": 2,
+        "proxies": null
+      },
+      "import_seconds": 0.198,
+      "result_count": 3,
+      "dataframe_attrs": {
+        "errors": {},
+        "warnings": {}
+      },
+      "python_warnings": [],
+      "rows": [
+        {
+          "site": "linkedin",
+          "id": "li-4484904429",
+          "title": "Software Engineer (m/f/d)",
+          "company": "MF Group AG",
+          "job_url": "https://www.linkedin.com/jobs/view/4484904429",
+          "job_url_direct": null,
+          "location": "Chiasso, Ticino, Switzerland",
+          "date_posted": "2026-10-29",
+          "job_type": "fulltime",
+          "is_remote": false,
+          "salary_source": null,
+          "interval": null,
+          "min_amount": null,
+          "max_amount": null,
+          "currency": null,
+          "description_present": true,
+          "description_characters": 4941
+        },
+        {
+          "site": "linkedin",
+          "id": "li-4475574213",
+          "title": "Software Engineer - Payments (Java / Spring Boot)",
+          "company": "Worldline",
+          "job_url": "https://www.linkedin.com/jobs/view/4475574213",
+          "job_url_direct": null,
+          "location": "Zurich, Switzerland",
+          "date_posted": "2026-10-27",
+          "job_type": "fulltime",
+          "is_remote": false,
+          "salary_source": null,
+          "interval": null,
+          "min_amount": null,
+          "max_amount": null,
+          "currency": null,
+          "description_present": true,
+          "description_characters": 4627
+        },
+        {
+          "site": "linkedin",
+          "id": "li-4483298980",
+          "title": "Staff Backend Software Engineer",
+          "company": "Jobgether",
+          "job_url": "https://www.linkedin.com/jobs/view/4483298980",
+          "job_url_direct": null,
+          "location": "Switzerland",
+          "date_posted": "2026-10-27",
+          "job_type": "fulltime",
+          "is_remote": false,
+          "salary_source": null,
+          "interval": null,
+          "min_amount": null,
+          "max_amount": null,
+          "currency": null,
+          "description_present": true,
+          "description_characters": 6375
+        }
+      ],
+      "outcome": "results",
+      "wall_seconds": 2.917,
+      "peak_rss_bytes_mac": 110428160,
+      "process_exit_code": 0,
+      "total_process_seconds": 3.166,
+      "diagnostics": "INFO:jobspy.linkedin:search page: 1\nINFO:jobspy.linkedin:finished scraping\n"
+    },
+    {
+      "portal": "indeed",
+      "started_at": "2026-10-29T18:55:04.540530+00:00",
+      "params": {
+        "site_name": [
+          "indeed"
+        ],
+        "search_term": "backend engineer",
+        "location": "Switzerland",
+        "country_indeed": "Switzerland",
+        "results_wanted": 3,
+        "hours_old": 72,
+        "fetch_description": true,
+        "description_format": "plain",
+        "verbose": 2,
+        "proxies": null
+      },
+      "import_seconds": 0.188,
+      "result_count": 3,
+      "dataframe_attrs": {
+        "errors": {},
+        "warnings": {}
+      },
+      "python_warnings": [],
+      "rows": [
+        {
+          "site": "indeed",
+          "id": "in-5fbb639384f12dcd",
+          "title": "Avaloq Engineer – Java Backend & Kafka Integration 100%",
+          "company": "Callista Group AG",
+          "job_url": "https://ch.indeed.com/viewjob?jk=5fbb639384f12dcd",
+          "job_url_direct": "https://callista.recruitee.com/l/de/o/avaloq-engineer-java-backend-kafka-integration-100?source=Indeed",
+          "location": "Zürich, ZH, Switzerland",
+          "date_posted": "2026-10-29",
+          "job_type": "fulltime",
+          "is_remote": false,
+          "salary_source": null,
+          "interval": null,
+          "min_amount": null,
+          "max_amount": null,
+          "currency": null,
+          "description_present": true,
+          "description_characters": 2152
+        },
+        {
+          "site": "indeed",
+          "id": "in-63684b0eb413c2d7",
+          "title": "Team Lead - Invoices",
+          "company": "BLP Digital AG",
+          "job_url": "https://ch.indeed.com/viewjob?jk=63684b0eb413c2d7",
+          "job_url_direct": "https://jobs.ashbyhq.com/blp-digital/375492b6-3db5-4a9f-b78b-204c62b4d8ae?utm_source=NLvXVB5JkP",
+          "location": "Zürich, ZH, Switzerland",
+          "date_posted": "2026-10-29",
+          "job_type": "fulltime",
+          "is_remote": false,
+          "salary_source": null,
+          "interval": null,
+          "min_amount": null,
+          "max_amount": null,
+          "currency": null,
+          "description_present": true,
+          "description_characters": 6086
+        },
+        {
+          "site": "indeed",
+          "id": "in-8322d209477ec5d1",
+          "title": "Software Engineer",
+          "company": "NIRLAB AG (part of 908 Devices Inc.)",
+          "job_url": "https://ch.indeed.com/viewjob?jk=8322d209477ec5d1",
+          "job_url_direct": "https://join.com/companies/nirlab/16881420-software-engineer?pid=a13795120131dbe48464",
+          "location": "Lausanne, VD, Switzerland",
+          "date_posted": "2026-10-29",
+          "job_type": null,
+          "is_remote": false,
+          "salary_source": null,
+          "interval": null,
+          "min_amount": null,
+          "max_amount": null,
+          "currency": null,
+          "description_present": true,
+          "description_characters": 3861
+        }
+      ],
+      "outcome": "results",
+      "wall_seconds": 0.386,
+      "peak_rss_bytes_mac": 100827136,
+      "process_exit_code": 0,
+      "total_process_seconds": 0.642,
+      "diagnostics": "INFO:jobspy.indeed:search page: 1\nINFO:jobspy.indeed:finished scraping\n"
+    },
+    {
+      "portal": "glassdoor",
+      "started_at": "2026-10-29T18:55:05.184458+00:00",
+      "params": {
+        "site_name": [
+          "glassdoor"
+        ],
+        "search_term": "backend engineer",
+        "location": "Switzerland",
+        "country_indeed": "Switzerland",
+        "results_wanted": 3,
+        "hours_old": 72,
+        "fetch_description": true,
+        "description_format": "plain",
+        "verbose": 2,
+        "proxies": null
+      },
+      "import_seconds": 0.19,
+      "result_count": 3,
+      "dataframe_attrs": {
+        "errors": {},
+        "warnings": {}
+      },
+      "python_warnings": [],
+      "rows": [
+        {
+          "site": "glassdoor",
+          "id": "gd-1010310495546",
+          "title": "Software Engineer",
+          "company": "NIRLAB AG (part of 908 Devices Inc.)",
+          "job_url": "https://de.glassdoor.ch/job-listing/j?jl=1010310495546",
+          "job_url_direct": null,
+          "location": "Lausanne, Switzerland",
+          "date_posted": "2026-10-29",
+          "job_type": "temporary",
+          "is_remote": false,
+          "salary_source": null,
+          "interval": null,
+          "min_amount": null,
+          "max_amount": null,
+          "currency": null,
+          "description_present": true,
+          "description_characters": 3861
+        },
+        {
+          "site": "glassdoor",
+          "id": "gd-1010307872414",
+          "title": "Fullstack Software Engineer Web 80–100 %",
+          "company": "Abraxas Informatik AG",
+          "job_url": "https://de.glassdoor.ch/job-listing/j?jl=1010307872414",
+          "job_url_direct": null,
+          "location": "Switzerland",
+          "date_posted": "2026-10-27",
+          "job_type": "fulltime, temporary",
+          "is_remote": false,
+          "salary_source": null,
+          "interval": null,
+          "min_amount": null,
+          "max_amount": null,
+          "currency": null,
+          "description_present": true,
+          "description_characters": 2393
+        },
+        {
+          "site": "glassdoor",
+          "id": "gd-1010307941161",
+          "title": "Senior Angular Frontend Engineer",
+          "company": "AKROS",
+          "job_url": "https://de.glassdoor.ch/job-listing/j?jl=1010307941161",
+          "job_url_direct": null,
+          "location": "Bern, Switzerland",
+          "date_posted": "2026-10-27",
+          "job_type": null,
+          "is_remote": false,
+          "salary_source": null,
+          "interval": null,
+          "min_amount": null,
+          "max_amount": null,
+          "currency": null,
+          "description_present": true,
+          "description_characters": 3927
+        }
+      ],
+      "outcome": "results",
+      "wall_seconds": 1.445,
+      "peak_rss_bytes_mac": 99237888,
+      "process_exit_code": 0,
+      "total_process_seconds": 1.71,
+      "diagnostics": "INFO:jobspy.glassdoor:search page: 1\nINFO:jobspy.glassdoor:finished scraping\n"
+    },
+    {
+      "portal": "google",
+      "started_at": "2026-10-29T18:55:06.893896+00:00",
+      "params": {
+        "site_name": [
+          "google"
+        ],
+        "search_term": "backend engineer",
+        "location": "Switzerland",
+        "country_indeed": "Switzerland",
+        "results_wanted": 3,
+        "hours_old": 72,
+        "fetch_description": true,
+        "description_format": "plain",
+        "verbose": 2,
+        "proxies": null,
+        "google_search_term": "\"backend engineer\" Switzerland jobs posted last 3 days"
+      },
+      "import_seconds": 0.189,
+      "result_count": 0,
+      "dataframe_attrs": {
+        "errors": {
+          "google": "no job data returned"
+        },
+        "warnings": {}
+      },
+      "python_warnings": [],
+      "rows": [],
+      "outcome": "error_reported",
+      "wall_seconds": 0.458,
+      "peak_rss_bytes_mac": 98516992,
+      "process_exit_code": 0,
+      "total_process_seconds": 0.732,
+      "diagnostics": "ERROR:jobspy.google:no job data returned\nINFO:jobspy.google:finished scraping\n"
+    },
+    {
+      "portal": "google",
+      "started_at": "2026-10-29T18:55:53.344424+00:00",
+      "params": {
+        "site_name": [
+          "google"
+        ],
+        "search_term": "software engineer",
+        "location": "Zurich, Switzerland",
+        "country_indeed": "Switzerland",
+        "results_wanted": 3,
+        "hours_old": 72,
+        "fetch_description": true,
+        "description_format": "plain",
+        "verbose": 2,
+        "proxies": null,
+        "google_search_term": "software engineer Zurich Switzerland jobs"
+      },
+      "import_seconds": 0.199,
+      "result_count": 0,
+      "dataframe_attrs": {
+        "errors": {
+          "google": "no job data returned"
+        },
+        "warnings": {}
+      },
+      "python_warnings": [],
+      "rows": [],
+      "outcome": "error_reported",
+      "network_trace": [
+        {
+          "url": "https://www.google.com/search?q=software+engineer+Zurich+Switzerland+jobs&udm=8",
+          "status": 200,
+          "body_characters": 93921,
+          "title": "Google Search",
+          "markers": {
+            "unusual traffic": false,
+            "recaptcha": false,
+            "consent.google.com": false,
+            "Before you continue": false,
+            "data-async-fc": false,
+            "jobposting": false,
+            "No jobs found": false
+          }
+        }
+      ],
+      "wall_seconds": 0.466,
+      "peak_rss_bytes_mac": 98385920,
+      "fallback": true,
+      "diagnostics": "ERROR:jobspy.google:no job data returned\nINFO:jobspy.google:finished scraping\n"
+    }
+  ],
+  "dependencies": [
+    "annotated-types==0.8.0",
+    "beautifulsoup4==4.15.0",
+    "certifi==2026.10.23",
+    "cffi==2.1.1",
+    "charset-normalizer==3.5.2",
+    "curl-cffi==0.17.0",
+    "idna==3.20",
+    "markdownify==1.2.3",
+    "numpy==2.5.4",
+    "pandas==3.1.0",
+    "pycparser==3.12",
+    "pydantic==2.14.2",
+    "pydantic-core==2.50.2",
+    "python-dateutil==3.0.0",
+    "python-jobspy==1.4.1",
+    "requests==2.34.2",
+    "six==1.17.0",
+    "soupsieve==3.0.4",
+    "typing-extensions==4.16.0",
+    "typing-inspection==0.4.4",
+    "tzdata==2026.6",
+    "urllib3==2.8.0"
+  ],
+  "summary": {
+    "working_in_this_probe": [
+      "linkedin",
+      "indeed",
+      "glassdoor"
+    ],
+    "working_job_count": 9,
+    "description_present_count": 9,
+    "description_character_range": [
+      2152,
+      6375
+    ],
+    "structured_salary_present_count": 0,
+    "google": "Both calls returned no parseable job data; traced fallback HTTP200 without CAPTCHA/consent markers. Not proof of zero matching jobs or a confirmed block.",
+    "quality_observations": [
+      "Board search is broad: Glassdoor returned a Senior Angular Frontend Engineer result for the backend engineer query.",
+      "The same NIRLAB posting had job_type unknown on Indeed and temporary on Glassdoor. Preserve source provenance instead of assuming consistent fields.",
+      "All returned is_remote values were false; their semantic correctness was not independently established."
+    ],
+    "limits": [
+      "One small serial probe from one machine/network with three requested results per portal; not a reliability or rate-limit benchmark.",
+      "Google alone received one fallback query to diagnose the empty/error response.",
+      "Description field presence and length are measured; no raw job descriptions are retained.",
+      "Memory figures are MacARM process high-water RSS, not Linux Docker or embedded-device proof."
+    ],
+    "sources": [
+      "https://pypi.org/project/python-jobspy/1.4.1/",
+      "https://github.com/speedyapply/JobSpy/blob/68b88d6909a2342ad75fbb945c4204a3a7ed6665/README.md",
+      "https://github.com/speedyapply/JobSpy/blob/68b88d6909a2342ad75fbb945c4204a3a7ed6665/jobspy/google/__init__.py"
+    ]
+  },
+  "legacy_comparison": {
+    "original_requirement": "python-jobspy>=1.1.80,<2.0.0",
+    "original_locked_version": "1.1.82",
+    "latest_tested_version": "1.4.1",
+    "bounds_note": "The original <2.0 bound permits 1.4.1; the old lock preserves its older release. Updating a version range is not enough without re-resolving and testing the lock.",
+    "legacy_additional_bounds": [
+      "pandas>=2.0.0,<3.0.0",
+      "requests>=2.31.0,<3.0.0"
+    ],
+    "tested_dependencies_note": "This clean environment resolved pandas 3.1.0 / numpy 2.5.4 / curl-cffi 0.17.0. Therefore this live result does not establish compatibility with legacy dependency overrides or the pandas<3 bound. Latest JobSpy no longer declares the old pinned-numpy/old-markdownify constraints referenced by legacy pyproject comments.",
+    "api_note": "fetch_description=True is the current cross-board flag; linkedin_fetch_description remains deprecated-compatible until 2.0. DataFrame attrs errors/warnings distinguish provider failure from a clean empty result."
+  },
+  "memory_summary": {
+    "peak_rss_mib_range": [
+      93.8,
+      105.3
+    ],
+    "scope": "Mac ARM process high-water RSS, three requested jobs per portal; not Linux/cgroup/embedded proof",
+    "import_seconds_measured_per_fresh_child": [
+      0.198,
+      0.188,
+      0.19,
+      0.189,
+      0.199
+    ],
+    "initial_inspection_command_seconds": 7.009,
+    "cold_import_note": "The initial inspect/signature command took 7.009 seconds total after install; it was not an instrumented cold-import-only measurement. Subsequent fresh-child imports measured 0.188–0.199 seconds with warm filesystem cache.",
+    "total_process_seconds_first_queries": {
+      "linkedin": 3.166,
+      "indeed": 0.642,
+      "glassdoor": 1.71,
+      "google": 0.732
+    }
+  },
+  "google_failure_classification": {
+    "library_error_recorded": true,
+    "error": "no job data returned",
+    "fallback_http_status": 200,
+    "confirmed_http_block": false,
+    "classification": "provider_unavailable_or_response_incompatible",
+    "not_interpretable_as_zero_matching_jobs": true,
+    "upstream_readme_states_google_currently_unavailable": true
+  }
+}

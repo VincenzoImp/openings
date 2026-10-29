@@ -89,3 +89,7 @@ its data is synthetic and outside Git. PR 52 is the review entry point. Task
 worktrees/branches and the isolated Linux VM/tools/cache have been removed.
 No implementation defects remain open from the acceptance walkthroughs. No
 main merge, deployment, release tag or image publication was performed.
+
+## Final integration authorized
+
+The user authorized the final proposal: broad searches and company feeds together; logical Dashboard/REST/MCP parity; provider budgets; correctness/performance and UI improvements. Target0.5.0 chosen over1.0 for the still-prestable rewrite. F0 contracts established; collection, frontend and career/document tasks will run independently. No production or main-branch mutation.

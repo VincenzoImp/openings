@@ -1,3 +1,9 @@
+# Final integration in progress
+
+User authorized the final review integration. Target **Openings0.5.0**. Start with
+STATE.json, GOAL.md, CONTRACTS.md and PLAN.md. Previous completed delivery below is
+historical; do not infer that the current integration is finished.
+
 # Openings next
 
 A fresh implementation on branch `codex/openings-next`, based on `1deea662`.
