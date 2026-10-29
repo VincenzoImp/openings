@@ -107,5 +107,15 @@ jobs:
             http://127.0.0.1:18080/api/v1/capabilities --output /tmp/openings-capabilities.json
           python -c "import json; p=json.load(open('/tmp/openings-capabilities.json')); assert p['version']=='0.5.0' and len(p['operations'])>=84"
           docker exec openings-ci python -c "from pathlib import Path; import openings; assert Path(openings.__file__).with_name('operation-inventory.json').is_file()"
+          docker exec openings-ci python -c "from pathlib import Path; import hashlib,json,openings; p=Path(openings.__file__).parent; print(json.dumps({str(f.relative_to(p)):hashlib.sha256(f.read_bytes()).hexdigest() for f in p.rglob('*') if f.is_file() and '__pycache__' not in f.parts}))" > /tmp/openings-package-hashes.json
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, subprocess
+          installed = json.load(open('/tmp/openings-package-hashes.json'))
+          for name in subprocess.check_output(['git', 'ls-files', 'backend/openings'], text=True).splitlines():
+              path = Path(name)
+              assert installed[str(path.relative_to('backend/openings'))] == hashlib.sha256(path.read_bytes()).hexdigest(), name
+          assert installed['operation-inventory.json'] == hashlib.sha256(Path('docs/next/operation-inventory.json').read_bytes()).hexdigest()
+          PY
           curl --silent --fail http://127.0.0.1:18080/ --output /tmp/openings-index.html
           python -c "assert '<div id=\"root\"></div>' in open('/tmp/openings-index.html').read()"

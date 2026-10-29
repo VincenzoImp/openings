@@ -16,7 +16,16 @@ def main():
     parser.add_argument("--uv", default="uv")
     args = parser.parse_args()
     wheel = args.wheel.resolve()
+    repository = Path(__file__).resolve().parents[1]
+    tracked = subprocess.check_output(
+        ["git", "ls-files", "-z", "backend/openings"], cwd=repository, text=True
+    ).split("\0")
     with zipfile.ZipFile(wheel) as package:
+        for name in filter(None, tracked):
+            member = Path(name).relative_to("backend").as_posix()
+            assert package.read(member) == (repository / name).read_bytes(), (
+                f"Stale package: {name}"
+            )
         for name in (
             "openings/schema.sql",
             "openings/operation-inventory.json",
@@ -25,6 +34,9 @@ def main():
         ):
             assert name in package.namelist(), f"Missing package resource: {name}"
         expected = json.loads(package.read("openings/operation-inventory.json"))
+        assert expected == json.loads(
+            (repository / "docs/next/operation-inventory.json").read_text()
+        )
     with tempfile.TemporaryDirectory(prefix="openings-installed-") as directory:
         target = Path(directory) / "site-packages"
         subprocess.run(
@@ -77,6 +89,7 @@ with TestClient(app) as client:
             raise RuntimeError(completed.stderr)
         result = json.loads(completed.stdout)
         assert result["operation_count"] == len(expected["operations"])
+        result["source_files_verified"] = len(list(filter(None, tracked)))
         print(json.dumps(result, indent=2))
 
 
