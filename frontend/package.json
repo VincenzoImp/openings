@@ -11,16 +11,16 @@
     "format:check": "prettier --check src index.html vite.config.ts"
   },
   "dependencies": {
+    "lucide-react": "0.468.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8",
-    "lucide-react": "0.468.0"
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.2.0",
+    "prettier": "3.9.6",
     "typescript": "5.9.3",
-    "vite": "7.3.6",
-    "prettier": "3.9.6"
+    "vite": "7.3.7"
   }
 }

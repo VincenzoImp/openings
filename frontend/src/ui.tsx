@@ -40,6 +40,7 @@ import {
   ExternalLink,
   AlertCircle,
 } from "lucide-react";
+import { Notification } from "./state";
 const icons = {
   overview: LayoutDashboard,
   inbox: Inbox,
@@ -341,6 +342,7 @@ export function Dialog({
         {children}
       </div>
       {footer && <div className="drawerfoot">{footer}</div>}
+      <Notification inDialog />
     </dialog>
   );
 }

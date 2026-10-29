@@ -90,7 +90,15 @@ function ProfileForm() {
       .split("\n")
       .map((s) => s.trim())
       .filter(Boolean)
-      .map((url) => ({ label: "Website", url }));
+      .map(
+        (url) =>
+          data.links.find(
+            (item) =>
+              typeof item === "object" &&
+              item !== null &&
+              (item as { url?: string }).url === url,
+          ) || { label: "Website", url },
+      );
     await mutate(
       () => api("/career/profile", "PATCH", version(data, body)),
       "Profile saved. Relevant changes mark scores outdated without running inference.",

@@ -16,6 +16,8 @@ interface Store {
     message?: string,
   ) => Promise<boolean>;
   notify: (message: string, error?: boolean) => void;
+  toast: { message: string; error: boolean } | null;
+  dismiss: () => void;
 }
 const Context = createContext<Store | null>(null);
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
@@ -58,25 +60,34 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   );
   return (
     <Context.Provider
-      value={{ revision, refresh, pending: pending > 0, mutate, notify }}
+      value={{
+        revision,
+        refresh,
+        pending: pending > 0,
+        mutate,
+        notify,
+        toast,
+        dismiss: () => setToast(null),
+      }}
     >
       {children}
-      {toast && (
-        <div
-          className={`app-toast ${toast.error ? "error" : ""}`}
-          role={toast.error ? "alert" : "status"}
-        >
-          {toast.message}
-          <button
-            aria-label="Dismiss notification"
-            onClick={() => setToast(null)}
-          >
-            ×
-          </button>
-        </div>
-      )}
+      <Notification />
     </Context.Provider>
   );
+}
+export function Notification({ inDialog = false }: { inDialog?: boolean }) {
+  const { toast, dismiss } = useWorkspace();
+  return toast ? (
+    <div
+      className={`app-toast ${inDialog ? "dialog-toast" : ""} ${toast.error ? "error" : ""}`}
+      role={toast.error ? "alert" : "status"}
+    >
+      {toast.message}
+      <button aria-label="Dismiss notification" onClick={dismiss}>
+        ×
+      </button>
+    </div>
+  ) : null;
 }
 export function useWorkspace() {
   const value = useContext(Context);

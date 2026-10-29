@@ -31,8 +31,9 @@ import {
 } from "../ui";
 const stages: Stage[] = ["draft", "applied", "interview", "offer", "closed"];
 export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
+  const [offset, setOffset] = useState(0);
   const resource = useResource<ListResult<Application>>(
-    "/applications?limit=500",
+    `/applications?limit=200&offset=${offset}`,
     { items: [], total: 0 },
   );
   const { mutate, pending } = useWorkspace();
@@ -80,7 +81,12 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
         <ErrorBox message={resource.error} retry={resource.reload} />
       )}
       <div className="boardcaption">
-        <span>{resource.data.total} application attempts</span>
+        <span>
+          {resource.data.total} application attempts
+          {resource.data.total > 200
+            ? ` · Showing ${offset + 1}–${Math.min(offset + 200, resource.data.total)}`
+            : ""}
+        </span>
         <span>Move a card between stages, or open it to edit.</span>
       </div>
       {resource.loading && !resource.data.items.length ? (
@@ -196,6 +202,22 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
           </table>
         </div>
       )}
+      {resource.data.total > 200 && (
+        <div className="actions form-actions">
+          <Button
+            disabled={offset === 0 || resource.loading}
+            onClick={() => setOffset(Math.max(0, offset - 200))}
+          >
+            Previous
+          </Button>
+          <Button
+            disabled={offset + 200 >= resource.data.total || resource.loading}
+            onClick={() => setOffset(offset + 200)}
+          >
+            Next
+          </Button>
+        </div>
+      )}
       <p className="hint">
         Creating or uploading documents does not mark an application as sent.
         Record the stage when it actually changes.
@@ -215,6 +237,7 @@ function DocumentEditor({
   const { mutate, pending } = useWorkspace();
   const [file, setFile] = useState<File | null>(null),
     [createdId, setCreatedId] = useState<string | null>(null);
+  const structured = previous && typeof previous.content.text !== "string";
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -225,9 +248,11 @@ function DocumentEditor({
           application_id: application.id,
           context_id: previous?.context_id || null,
           previous_id: previous?.id || null,
-          kind: form.get("kind"),
+          kind: previous?.kind || form.get("kind"),
           title: form.get("title"),
-          content: { text: form.get("text") },
+          content: structured
+            ? JSON.parse(String(form.get("text")))
+            : { text: form.get("text") },
         });
         id = doc.id;
         setCreatedId(id);
@@ -251,7 +276,7 @@ function DocumentEditor({
             <select
               name="kind"
               defaultValue={previous?.kind || "resume"}
-              disabled={!!createdId}
+              disabled={!!createdId || !!previous}
             >
               <option value="resume">CV</option>
               <option value="cover_letter">Cover letter</option>
@@ -270,13 +295,17 @@ function DocumentEditor({
           </Field>
         </div>
         <Field
-          label="Content"
+          label={structured ? "Structured content (JSON)" : "Content"}
           hint="Changing content creates a revision. A PDF is attached only when you upload it."
         >
           <textarea
             name="text"
             rows={9}
-            defaultValue={String(previous?.content.text || "")}
+            defaultValue={
+              structured
+                ? JSON.stringify(previous.content, null, 2)
+                : String(previous?.content.text || "")
+            }
             disabled={!!createdId}
           />
         </Field>
@@ -349,6 +378,7 @@ function DocumentCard({
             ownerId={document.id}
             immutable
             preview
+            readOnly={document.review_state === "approved"}
           />
           <div className="actions form-actions">
             <Button icon="edit" onClick={() => setEdit(true)}>
@@ -614,7 +644,6 @@ export function ApplicationDrawer({
                           <select
                             name={q.id}
                             defaultValue={String(app.answers[q.id] ?? "")}
-                            required={q.required}
                           >
                             <option value="">Select an answer</option>
                             {q.options.map((o) => (
@@ -631,7 +660,6 @@ export function ApplicationDrawer({
                                   ? "false"
                                   : ""
                             }
-                            required={q.required}
                           >
                             <option value="">Select an answer</option>
                             <option value="true">Yes</option>
@@ -642,7 +670,6 @@ export function ApplicationDrawer({
                             type="number"
                             name={q.id}
                             defaultValue={String(app.answers[q.id] ?? "")}
-                            required={q.required}
                           />
                         ) : (
                           <textarea
@@ -650,7 +677,6 @@ export function ApplicationDrawer({
                             rows={4}
                             defaultValue={String(app.answers[q.id] ?? "")}
                             maxLength={q.max_length}
-                            required={q.required}
                           />
                         )}
                       </Field>
@@ -709,7 +735,10 @@ export function ApplicationDrawer({
                     </select>
                   </Field>
                 )}
-                <Field label="Application notes">
+                <Field
+                  label="Application notes & writing guidance"
+                  hint="Included in your agent's frozen application context."
+                >
                   <textarea name="note" rows={9} defaultValue={app.note} />
                 </Field>
                 <Button variant="primary" disabled={pending}>

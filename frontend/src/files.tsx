@@ -14,11 +14,13 @@ export function FileManager({
   ownerId,
   immutable = false,
   preview = false,
+  readOnly = false,
 }: {
   ownerType: string;
   ownerId: string;
   immutable?: boolean;
   preview?: boolean;
+  readOnly?: boolean;
 }) {
   const { data, error, reload } = useResource<ListResult<WorkspaceFile>>(
     `/files?owner_type=${ownerType}&owner_id=${ownerId}`,
@@ -94,19 +96,21 @@ export function FileManager({
           </div>
         ))}
       </div>
-      <label className={`btn upload-button ${pending ? "disabled" : ""}`}>
-        <Icon name="upload" />
-        {data.items.length ? "Attach another file" : "Upload a file"}
-        <input
-          className="filepick"
-          type="file"
-          disabled={pending}
-          onChange={(e) => {
-            void upload(e.target.files?.[0]);
-            e.target.value = "";
-          }}
-        />
-      </label>
+      {!readOnly && (
+        <label className={`btn upload-button ${pending ? "disabled" : ""}`}>
+          <Icon name="upload" />
+          {data.items.length ? "Attach another file" : "Upload a file"}
+          <input
+            className="filepick"
+            type="file"
+            disabled={pending}
+            onChange={(e) => {
+              void upload(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </label>
+      )}
       {pdf && (
         <iframe
           title="PDF document preview"

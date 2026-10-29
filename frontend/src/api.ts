@@ -211,12 +211,23 @@ export async function api<T>(
     window.dispatchEvent(new Event("openings:unauthorized"));
   if (!response.ok) {
     const error = value.error;
+    const fields = Array.isArray(error?.details)
+      ? error.details
+          .slice(0, 3)
+          .map((detail: { field?: unknown[]; message?: string }) => {
+            const field = detail.field
+              ?.filter((part) => part !== "body" && part !== "query")
+              .join(".");
+            return `${field ? field + ": " : ""}${detail.message || "Invalid value."}`;
+          })
+          .join(" ")
+      : "";
     throw new ApiError(
-      typeof error === "string"
+      (typeof error === "string"
         ? error
         : error?.message ||
-            value.detail ||
-            `Request failed (${response.status})`,
+          value.detail ||
+          `Request failed (${response.status})`) + (fields ? " " + fields : ""),
       response.status,
       error?.code,
     );

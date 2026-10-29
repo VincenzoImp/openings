@@ -213,7 +213,7 @@ function SourceEditor({
       name: f.get("name"),
       url: f.get("url"),
       kind: f.get("kind"),
-      config: { board: f.get("board") || undefined },
+      config: { ...source?.config, board: f.get("board") || undefined },
       enabled: f.get("enabled") === "on",
       filters: {
         titles: String(f.get("titles") || "")
@@ -246,7 +246,13 @@ function SourceEditor({
         onClose();
     } else
       await mutate(async () => {
-        const result = await api<Preview>("/sources/preview", "POST", body);
+        const result = await api<Preview>("/sources/preview", "POST", {
+          url: body.url,
+          kind: body.kind,
+          config: body.config,
+          name: body.name,
+          filters: body.filters,
+        });
         setPreview(result);
         setDraft({
           ...body,

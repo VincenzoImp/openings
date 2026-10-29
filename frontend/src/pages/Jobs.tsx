@@ -10,6 +10,7 @@ import {
   type Triage,
 } from "../api";
 import { useResource, useWorkspace } from "../state";
+import { FileManager } from "../files";
 import {
   Avatar,
   Button,
@@ -96,7 +97,7 @@ export function JobsPage({
   const [triage, setTriage] = useState<Triage>("inbox"),
     [query, setQuery] = useState(""),
     [company, setCompany] = useState(""),
-    [sort, setSort] = useState("created_at"),
+    [sort, setSort] = useState("newest"),
     [offset, setOffset] = useState(0);
   const params = new URLSearchParams({
     triage,
@@ -153,7 +154,7 @@ export function JobsPage({
           value={sort}
           onChange={(e) => change(() => setSort(e.target.value))}
         >
-          <option value="created_at">Newest first</option>
+          <option value="newest">Newest first</option>
           <option value="score">Highest fit</option>
           <option value="company">Company A–Z</option>
         </select>
@@ -263,7 +264,8 @@ export function JobDrawer({
     });
   const { mutate, pending } = useWorkspace();
   const [tab, setTab] = useState("posting"),
-    [forget, setForget] = useState(false);
+    [forget, setForget] = useState(false),
+    [merging, setMerging] = useState(false);
   const job = resource.data;
   async function triage(value: Triage) {
     if (job)
@@ -368,6 +370,7 @@ export function JobDrawer({
               items={[
                 { id: "posting", label: "Posting" },
                 { id: "notes", label: "Notes", count: notes.data.total },
+                { id: "files", label: "Files" },
                 { id: "edit", label: "Edit details" },
               ]}
               value={tab}
@@ -409,6 +412,28 @@ export function JobDrawer({
                     Original posting
                   </a>
                 )}
+                <div className="actions form-actions">
+                  <Button
+                    icon="refresh"
+                    disabled={pending || !job.posting}
+                    onClick={() =>
+                      mutate(
+                        () =>
+                          api("/scoring/rescore", "POST", {
+                            job_ids: [id],
+                            outdated_only: false,
+                            limit: 1,
+                          }),
+                        "Fit assessment queued. Check Settings activity for progress.",
+                      )
+                    }
+                  >
+                    Update fit score
+                  </Button>
+                  <Button onClick={() => setMerging(true)}>
+                    Merge duplicate
+                  </Button>
+                </div>
                 {job.posting ? (
                   <div className="posting">{job.posting}</div>
                 ) : (
@@ -435,8 +460,7 @@ export function JobDrawer({
                           disabled={pending}
                           onClick={() =>
                             mutate(
-                              () =>
-                                api(`/jobs/${id}/notes/${note.id}`, "DELETE"),
+                              () => api(`/notes/${note.id}`, "DELETE"),
                               "Note removed.",
                             )
                           }
@@ -465,6 +489,8 @@ export function JobDrawer({
                   </Button>
                 </form>
               </>
+            ) : tab === "files" ? (
+              <FileManager ownerType="job" ownerId={id} preview />
             ) : (
               <form onSubmit={edit} key={job.version}>
                 <div className="stack">
@@ -493,6 +519,13 @@ export function JobDrawer({
           </>
         )}
       </Dialog>
+      {merging && job && (
+        <MergeJob
+          job={job}
+          onClose={() => setMerging(false)}
+          onMerged={onClose}
+        />
+      )}
       {forget && (
         <Dialog title="Forget this job?" onClose={() => setForget(false)}>
           <p className="modal-intro">
@@ -522,5 +555,84 @@ export function JobDrawer({
         </Dialog>
       )}
     </>
+  );
+}
+function MergeJob({
+  job,
+  onClose,
+  onMerged,
+}: {
+  job: Job;
+  onClose: () => void;
+  onMerged: () => void;
+}) {
+  const [query, setQuery] = useState(job.title),
+    [selected, setSelected] = useState("");
+  const candidates = useResource<ListResult<Job>>(
+    `/jobs?limit=100&q=${encodeURIComponent(query)}`,
+    blankJobs,
+  );
+  const { mutate, pending } = useWorkspace();
+  const target = candidates.data.items.find((item) => item.id === selected);
+  return (
+    <Dialog title="Merge a verified duplicate." onClose={onClose}>
+      <p className="modal-intro">
+        Move this job's postings, notes and application history into the record
+        you choose. The selected job remains in your workspace.
+      </p>
+      <Field label="Find the job to keep">
+        <input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setSelected("");
+          }}
+        />
+      </Field>
+      {candidates.error && (
+        <ErrorBox message={candidates.error} retry={candidates.reload} />
+      )}
+      <Field label="Keep this job">
+        <select value={selected} onChange={(e) => setSelected(e.target.value)}>
+          <option value="">Choose a matching record</option>
+          {candidates.data.items
+            .filter((item) => item.id !== job.id)
+            .map((item) => (
+              <option value={item.id} key={item.id}>
+                {item.company} · {item.title} · {date(item.created_at)}
+              </option>
+            ))}
+        </select>
+      </Field>
+      <p className="hint">
+        Only merge records you have checked. This removes the duplicate record.
+      </p>
+      <div className="actions form-actions">
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          variant="primary"
+          disabled={pending || !target}
+          onClick={async () => {
+            if (
+              target &&
+              (await mutate(
+                () =>
+                  api(`/jobs/${job.id}/merge`, "POST", {
+                    target_id: target.id,
+                    expected_version: job.version,
+                    target_version: target.version,
+                  }),
+                "Duplicate merged. History is kept in the selected job.",
+              ))
+            ) {
+              onClose();
+              onMerged();
+            }
+          }}
+        >
+          Merge into selected job
+        </Button>
+      </div>
+    </Dialog>
   );
 }
