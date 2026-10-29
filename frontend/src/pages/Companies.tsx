@@ -28,10 +28,14 @@ interface Preview {
   total: number;
 }
 export default function CompaniesPage() {
-  const resource = useResource<ListResult<Source>>("/sources", {
-    items: [],
-    total: 0,
-  });
+  const resource = useResource<ListResult<Source>>(
+    "/sources",
+    {
+      items: [],
+      total: 0,
+    },
+    true,
+  );
   const { mutate, pending } = useWorkspace();
   const [editing, setEditing] = useState<Source | "new" | null>(null),
     [removing, setRemoving] = useState<Source | null>(null);

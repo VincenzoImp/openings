@@ -204,10 +204,14 @@ function ProfileForm() {
   );
 }
 function KnowledgePage() {
-  const resource = useResource<ListResult<Knowledge>>("/career/knowledge", {
-    items: [],
-    total: 0,
-  });
+  const resource = useResource<ListResult<Knowledge>>(
+    "/career/knowledge",
+    {
+      items: [],
+      total: 0,
+    },
+    true,
+  );
   const { mutate, pending } = useWorkspace();
   const [editing, setEditing] = useState<Knowledge | "new" | null>(null),
     [importing, setImporting] = useState(false),
@@ -316,7 +320,11 @@ function KnowledgePage() {
               onClick={async () => {
                 if (
                   await mutate(
-                    () => api(`/career/knowledge/${removing.id}`, "DELETE"),
+                    () =>
+                      api(
+                        `/career/knowledge/${removing.id}?expected_version=${removing.version}`,
+                        "DELETE",
+                      ),
                     "Knowledge entry removed.",
                   )
                 )
@@ -556,14 +564,22 @@ function KnowledgeImport({ onClose }: { onClose: () => void }) {
   );
 }
 function ClaimsPage() {
-  const resource = useResource<ListResult<Claim>>("/career/claims", {
-      items: [],
-      total: 0,
-    }),
-    knowledge = useResource<ListResult<Knowledge>>("/career/knowledge", {
-      items: [],
-      total: 0,
-    });
+  const resource = useResource<ListResult<Claim>>(
+      "/career/claims",
+      {
+        items: [],
+        total: 0,
+      },
+      true,
+    ),
+    knowledge = useResource<ListResult<Knowledge>>(
+      "/career/knowledge",
+      {
+        items: [],
+        total: 0,
+      },
+      true,
+    );
   const { mutate, pending } = useWorkspace();
   const [editing, setEditing] = useState<Claim | "new" | null>(null);
   return (
@@ -638,7 +654,11 @@ function ClaimsPage() {
                 disabled={pending}
                 onClick={() =>
                   mutate(
-                    () => api(`/career/claims/${claim.id}`, "DELETE"),
+                    () =>
+                      api(
+                        `/career/claims/${claim.id}?expected_version=${claim.version}`,
+                        "DELETE",
+                      ),
                     "Claim removed.",
                   )
                 }

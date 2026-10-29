@@ -25,6 +25,7 @@ export function FileManager({
   const { data, error, reload } = useResource<ListResult<WorkspaceFile>>(
     `/files?owner_type=${ownerType}&owner_id=${ownerId}`,
     { items: [], total: 0 },
+    true,
   );
   const { mutate, pending, notify } = useWorkspace();
   const [pdf, setPdf] = useState<string | null>(null);

@@ -427,15 +427,20 @@ export function ApplicationDrawer({
     documents = useResource<ListResult<Document>>(
       `/documents?application_id=${id}`,
       { items: [], total: 0 },
+      true,
     ),
     events = useResource<ListResult<Activity>>(`/applications/${id}/events`, {
       items: [],
       total: 0,
     }),
-    templates = useResource<ListResult<Template>>("/templates", {
-      items: [],
-      total: 0,
-    });
+    templates = useResource<ListResult<Template>>(
+      "/templates",
+      {
+        items: [],
+        total: 0,
+      },
+      true,
+    );
   const { mutate, pending } = useWorkspace();
   const [tab, setTab] = useState("documents"),
     [add, setAdd] = useState(false),

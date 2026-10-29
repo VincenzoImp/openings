@@ -20,10 +20,14 @@ import {
   Tabs,
 } from "../ui";
 export default function TemplatesPage() {
-  const resource = useResource<ListResult<Template>>("/templates", {
-      items: [],
-      total: 0,
-    }),
+  const resource = useResource<ListResult<Template>>(
+      "/templates",
+      {
+        items: [],
+        total: 0,
+      },
+      true,
+    ),
     instructions = useResource<Instructions>("/instructions", {
       general: "",
       version: 1,
@@ -314,7 +318,11 @@ export default function TemplatesPage() {
               onClick={async () => {
                 if (
                   await mutate(
-                    () => api(`/templates/${template.id}`, "DELETE"),
+                    () =>
+                      api(
+                        `/templates/${template.id}?expected_version=${template.version}`,
+                        "DELETE",
+                      ),
                     "Template removed.",
                   )
                 ) {

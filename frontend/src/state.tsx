@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { api } from "./api";
+import { api, type ListResult } from "./api";
 interface Store {
   revision: number;
   refresh: () => void;
@@ -94,7 +94,43 @@ export function useWorkspace() {
   if (!value) throw Error("Missing workspace provider");
   return value;
 }
-export function useResource<T>(path: string | null, initial: T) {
+async function readResource<T>(
+  path: string,
+  signal: AbortSignal,
+  allPages: boolean,
+): Promise<T> {
+  if (!allPages) return api<T>(path, "GET", undefined, signal);
+  const [base, search = ""] = path.split("?");
+  const params = new URLSearchParams(search);
+  params.set("limit", "200");
+  params.set("offset", "0");
+  const result = await api<ListResult<unknown>>(
+    `${base}?${params}`,
+    "GET",
+    undefined,
+    signal,
+  );
+  let offset = result.items.length;
+  while (offset < result.total) {
+    params.set("offset", String(offset));
+    const page = await api<ListResult<unknown>>(
+      `${base}?${params}`,
+      "GET",
+      undefined,
+      signal,
+    );
+    if (!page.items.length) break;
+    result.items.push(...page.items);
+    result.total = page.total;
+    offset += page.items.length;
+  }
+  return result as T;
+}
+export function useResource<T>(
+  path: string | null,
+  initial: T,
+  allPages = false,
+) {
   const { revision } = useWorkspace();
   const [data, setData] = useState(initial),
     [loading, setLoading] = useState(Boolean(path)),
@@ -108,7 +144,7 @@ export function useResource<T>(path: string | null, initial: T) {
     const abort = new AbortController();
     setLoading(true);
     setError(null);
-    api<T>(path, "GET", undefined, abort.signal)
+    readResource<T>(path, abort.signal, allPages)
       .then(setData)
       .catch((e) => {
         if (!abort.signal.aborted)
@@ -120,7 +156,7 @@ export function useResource<T>(path: string | null, initial: T) {
         if (!abort.signal.aborted) setLoading(false);
       });
     return () => abort.abort();
-  }, [path, revision, local]);
+  }, [path, revision, local, allPages]);
   return {
     data,
     loading,
