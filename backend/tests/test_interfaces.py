@@ -38,3 +38,7 @@ async def test_operation_inventory_covers_runtime_interfaces(tmp_path):
         assert exception["reason"]
         advertised.update((item["method"], route_path(item["path"])) for item in exception["rest"])
     assert not {route for route in routes - advertised if route[1].startswith("/api/v1")}
+    assert set(tools) == {
+        name for operation in inventory["operations"] for name in operation["mcp"]
+    }
+    assert all(tool.annotations is not None for tool in tools.values())

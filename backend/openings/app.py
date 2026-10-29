@@ -60,7 +60,19 @@ def redact_secrets(value):
             key: redact_secrets(item)
             for key, item in value.items()
             if key.lower().replace("-", "_")
-            not in {"api_key", "apikey", "password", "token", "secret", "authorization", "cookie"}
+            not in {
+                "api_key",
+                "apikey",
+                "app_key",
+                "access_token",
+                "api_token",
+                "client_secret",
+                "password",
+                "token",
+                "secret",
+                "authorization",
+                "cookie",
+            }
         }
     if isinstance(value, list):
         return [redact_secrets(item) for item in value]

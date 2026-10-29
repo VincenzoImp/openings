@@ -254,9 +254,24 @@ def test_http_validates_answers_dates_and_rotation_preserves_tokens(tmp_path):
         client.headers["Authorization"] = "Bearer " + token["token"]
         assert client.get("/api/v1/capabilities").json()["version"] == "0.5.0"
         assert client.get("/api/v1/tokens").json()["items"][0]["last_used_at"]
+        source = client.post(
+            "/api/v1/sources",
+            json={
+                "name": "Synthetic API source",
+                "kind": "adzuna",
+                "config": {
+                    "query": "engineer",
+                    "app_id": "synthetic",
+                    "app_key": "synthetic-secret",
+                },
+            },
+        )
+        assert source.status_code == 201
         exported = client.get("/api/v1/export").json()
         assert "providers" in exported
         assert all(isinstance(provider["policy"], dict) for provider in exported["providers"])
+        assert exported["sources"][0]["config"]["query"] == "engineer"
+        assert "synthetic-secret" not in str(exported)
 
 
 @pytest.mark.asyncio
