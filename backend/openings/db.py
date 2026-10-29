@@ -16,6 +16,15 @@ class Database:
         self.lock = threading.RLock()
         with self.connect() as conn:
             version = conn.execute("PRAGMA user_version").fetchone()[0]
+            existing_tables = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            ).fetchall()
+            if version == 0 and existing_tables:
+                raise DomainError(
+                    400,
+                    "schema_version",
+                    "Use an empty database or an Openings 1.0 workspace. Existing unrelated databases are not modified.",
+                )
             if version not in (0, 1):
                 raise DomainError(400, "schema_version", "Unsupported workspace database version.")
             conn.execute("PRAGMA journal_mode=WAL")

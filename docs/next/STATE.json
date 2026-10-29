@@ -38,7 +38,7 @@
     "M5.3",
     "M5.4"
   ],
-  "next_task": "Check final GitHub CI (amd64/arm64 core builds), then clean task worktrees and deliver the release-ready branch",
+  "next_task": "Final native Linux amd64/arm64 CI, then delivery; all functional workflows validated",
   "release_gates": [
     "Core/remote-scoring installation passes practical UI/REST/MCP/backup checks within 2 CPU / 4 GiB",
     "Bundled local preset passes whole-stack startup/steady target measurements; publish advisory-score and truncation limitations",
@@ -103,7 +103,8 @@
     "scoring": "evidence/long-context-resource-probe.json: 1920 actual tokens, no truncation, 2.39s, 2.60GiB Mac peak",
     "qualification": "Production workflows verified; GitHub architecture checks pending; no deployment or release publication performed",
     "target_runtime": "evidence/non-avx-runtime-probe.json: non-AVX target CPU import and FP32 kernels passed, temporary environment removed",
-    "production_resources": "evidence/production-linux-resources.json: final production images,1913tokens,~2.80GiB conservative combined cgroup peak, noOOM within2CPU/4GiB VM"
+    "production_resources": "evidence/production-linux-resources.json: final production images,1913tokens,~2.80GiB conservative combined cgroup peak, noOOM within2CPU/4GiB VM",
+    "architecture": "Push CI40931295907 passed both core architectures; PR emulatedARM hit startupdeadline, so final pipeline uses native ubuntu-24.04-arm runners and is rechecked"
   },
   "production_authorized": true,
   "release_target": "1.0.0",
@@ -129,5 +130,5 @@
       "status": "integrated and validated"
     }
   },
-  "latest_implementation_check": "30 invariant cases pass; frontend build/audit and core runtime audit clean; 21 production Docker workflow checks; real external Codex+Tectonic+MCP document workflow; final Linux1913-token whole-stack2CPU/4GiB resource proof passes"
+  "latest_implementation_check": "31 invariant cases pass; frontend build/audit and core runtime audit clean; 21 production Docker workflow checks; real external Codex+Tectonic+MCP document workflow; final Linux1913-token whole-stack2CPU/4GiB resource proof passes"
 }

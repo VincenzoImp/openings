@@ -156,3 +156,17 @@ def test_merge_preserves_scores_as_outdated_and_cancels_old_work(workspace):
     merged = workspace.merge_jobs(source["id"], target["id"], source["version"], target["version"])
     assert merged["score"] == 80 and merged["score_outdated"]
     assert workspace.db.one("SELECT state FROM tasks WHERE id='old-work'")["state"] == "cancelled"
+
+
+def test_unrelated_database_is_rejected_without_modification(tmp_path):
+    path = tmp_path / "unrelated.sqlite"
+    with sqlite3.connect(path) as conn:
+        conn.execute("CREATE TABLE jobs (old_field TEXT)")
+        conn.execute("INSERT INTO jobs VALUES ('retained')")
+    with pytest.raises(DomainError):
+        Workspace(path)
+    with sqlite3.connect(path) as conn:
+        assert conn.execute("SELECT old_field FROM jobs").fetchone()[0] == "retained"
+        assert (
+            conn.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0] == 1
+        )

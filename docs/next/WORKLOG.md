@@ -56,16 +56,16 @@ Remaining release checks: actual model-driven agent session using the shipped sk
 
 ## Release candidate validation
 
-All functional areas are integrated.30 invariant cases pass; frontend build/audit
+All functional areas are integrated. 31 invariant cases pass; frontend build/audit
 and locked core runtime audit are clean. Actual external Codex skill workflow
 created tailored CV/letter/answers, compiled and inspected two one-page PDFs,
 verified four exact PDF/source transfers, and preserved draft status/review.
 
-Production Docker checks passed21cases including206-record export and restore
+Production Docker checks passed 21 cases including 206-record export and restore
 on an independent empty installation with exact document bytes and distinct
-owner authentication. Final core+scorer images ran in a2CPU/4GiB/no-swap Linux
-ARM VM:1913tokens untruncated, core responsive, conservative combined cgroup
-peaks~2.80GiB, noOOM, local disable releases model child. Overlong inputs fail
+owner authentication. Final core+scorer images ran in a 2 CPU / 4 GiB / no-swap Linux
+ARM VM: 1913 tokens untruncated, core responsive, conservative combined cgroup
+peaks ~2.80 GiB, no OOM, local disable releases model child. Overlong inputs fail
 without replacing the previous score. API/MCP scoring controls and real ATS
 collection also passed. Final UI checks cover desktop/mobile layout, real PDF
 preview, Kanban/Sankey counts, nested modal keys, >200-record archives and
@@ -75,3 +75,7 @@ MCP metadata; known certifi vulnerability fixed in locked dependencies.
 Remaining: final GitHub CI builds for both core architectures, task-worktree
 cleanup and delivery. No deployed instance, personal data, main branch, release
 tag or published image has been changed.
+
+Initialization also rejects an unrelated nonempty database before writing any schema; existing data remains untouched. No legacy conversion is attempted.
+
+Push CI passed both architectures. The parallel PR run exposed an emulation-dependent ARM startup timeout under the half-CPU smoke budget; the final CI matrix uses native Linux ARM and x86 runners, retaining the same runtime limits. Final native checks are pending.
