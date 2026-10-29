@@ -46,6 +46,19 @@ export function Funnel({ steps }: { steps: FunnelStep[] }) {
   const accepted = steps.reduce((n, s) => n + (s.outcomes.accepted || 0), 0),
     nodes = [...steps, { stage: "accepted", count: accepted, outcomes: {} }],
     unit = Math.min(22, 155 / Math.max(1, steps[0].count)),
+    height = Math.max(
+      390,
+      ...steps.map(
+        (step) =>
+          282 +
+          Object.entries(step.outcomes)
+            .filter(([key, count]) => key !== "accepted" && count > 0)
+            .reduce(
+              (sum, [, count]) => sum + Math.max(count * unit, 18) + 18,
+              0,
+            ),
+      ),
+    ),
     width = 1100,
     x = (i: number) => 48 + (i * (width - 110)) / (nodes.length - 1),
     y = 112;
@@ -53,7 +66,7 @@ export function Funnel({ steps }: { steps: FunnelStep[] }) {
     <>
       <div className="funnel-wrap">
         <svg
-          viewBox={`0 0 ${width} 390`}
+          viewBox={`0 0 ${width} ${height}`}
           role="img"
           aria-label={`Application journey: ${steps.map((s) => `${s.count} ${labels[s.stage] || s.stage}`).join(", ")}, ${accepted} accepted.`}
           className="funnel-svg"
@@ -61,10 +74,17 @@ export function Funnel({ steps }: { steps: FunnelStep[] }) {
           <title>Application journey based on recorded history</title>
           {nodes.map((node, i) => (
             <g key={node.stage}>
-              <text x={x(i)} y={48} fill="currentColor" fontSize="14">
+              <text
+                className="node-label"
+                x={x(i)}
+                y={48}
+                fill="currentColor"
+                fontSize="14"
+              >
                 {labels[node.stage] || node.stage}
               </text>
               <text
+                className="node-count"
                 x={x(i)}
                 y={79}
                 fill="currentColor"
@@ -88,7 +108,8 @@ export function Funnel({ steps }: { steps: FunnelStep[] }) {
               stops = Object.entries(step.outcomes).filter(
                 ([key, count]) => key !== "accepted" && count > 0,
               );
-            let offset = next * unit;
+            let offset = next * unit,
+              sinkY = 270;
             return (
               <g key={step.stage}>
                 {next > 0 && (
@@ -98,11 +119,12 @@ export function Funnel({ steps }: { steps: FunnelStep[] }) {
                     opacity=".28"
                   />
                 )}
-                {stops.map(([key, count], n) => {
+                {stops.map(([key, count]) => {
                   const from = y + offset,
                     h = count * unit;
                   offset += h;
-                  const dest = 270 + n * 41;
+                  const dest = sinkY;
+                  sinkY += Math.max(h, 18) + 18;
                   return (
                     <g key={key}>
                       <path
@@ -134,6 +156,9 @@ export function Funnel({ steps }: { steps: FunnelStep[] }) {
           })}
         </svg>
       </div>
+      <p className="funnel-scroll-hint">
+        Scroll horizontally to explore the full journey.
+      </p>
       <div className="funnel-legend">
         {nodes.map((n) => (
           <span key={n.stage}>

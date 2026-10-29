@@ -178,7 +178,11 @@ export function JobsPage({
                     {job.company || "Unknown company"}
                     <span>·</span>
                     {job.source ||
-                      String(job.metadata.source || "Saved posting")}
+                      String(
+                        job.metadata.source ||
+                          job.metadata.ats ||
+                          "Saved posting",
+                      )}
                     {!job.posting && (
                       <span className="tag amber">Needs text</span>
                     )}

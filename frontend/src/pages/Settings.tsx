@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import {
   api,
   binary,
+  copyText,
   date,
   version,
   type ListResult,
@@ -119,8 +120,14 @@ function ScoringSettings() {
       timeout_seconds: Number(f.get("timeout_seconds")) || 120,
       periodic_rescore: {
         enabled: periodic,
-        minutes: Number(f.get("periodic_minutes")) || 1440,
-        batch_size: Number(f.get("batch_size")) || 50,
+        minutes:
+          Number(
+            f.get("periodic_minutes") ?? resource.data.periodic_rescore.minutes,
+          ) || 1440,
+        batch_size:
+          Number(
+            f.get("batch_size") ?? resource.data.periodic_rescore.batch_size,
+          ) || 50,
       },
     };
     if (f.get("api_key")) body.api_key = f.get("api_key");
@@ -227,7 +234,7 @@ function ScoringSettings() {
               name="max_len"
               type="number"
               min={256}
-              max={32768}
+              max={8192}
               defaultValue={resource.data.max_len}
             />
           </Field>
@@ -303,7 +310,8 @@ function ScoringSettings() {
               <input
                 name="periodic_minutes"
                 type="number"
-                min={15}
+                min={60}
+                max={43200}
                 defaultValue={resource.data.periodic_rescore.minutes}
               />
             </Field>
@@ -312,7 +320,7 @@ function ScoringSettings() {
                 name="batch_size"
                 type="number"
                 min={1}
-                max={1000}
+                max={200}
                 defaultValue={resource.data.periodic_rescore.batch_size}
               />
             </Field>
@@ -378,7 +386,7 @@ function ScoringSettings() {
                 type="number"
                 defaultValue={50}
                 min={1}
-                max={1000}
+                max={200}
               />
             </Field>
             <div className="actions form-actions">
@@ -430,8 +438,7 @@ function AgentSettings() {
               className="iconbtn"
               aria-label="Copy MCP endpoint"
               onClick={() =>
-                navigator.clipboard
-                  .writeText(endpoint)
+                copyText(endpoint)
                   .then(() => notify("MCP endpoint copied."))
                   .catch(() => notify("Copy the endpoint shown above."))
               }
@@ -519,8 +526,7 @@ function AgentSettings() {
               <Button
                 icon="copy"
                 onClick={() =>
-                  navigator.clipboard
-                    .writeText(token)
+                  copyText(token)
                     .then(() => notify("Token copied."))
                     .catch(() => notify("Select and copy the token manually."))
                 }
@@ -567,7 +573,9 @@ function TaskSettings() {
         <ErrorBox message={resource.error} retry={resource.reload} />
       )}
       <div className="task-list">
-        {resource.data.items.length ? (
+        {resource.loading && !resource.data.items.length ? (
+          <Loading />
+        ) : resource.data.items.length ? (
           resource.data.items.map((task) => (
             <article className="task-entry" key={task.id}>
               <div className="sectiontitle">
@@ -702,8 +710,8 @@ function RestoreDialog({ onClose }: { onClose: () => void }) {
     <Dialog title="Restore this workspace?" onClose={onClose}>
       <p className="modal-intro">
         The selected backup will replace current workspace data. Download a
-        backup first if you want to keep the current state. You may need to sign
-        in again afterward.
+        backup first if you want to keep the current state. This installation's
+        owner password and access tokens are preserved.
       </p>
       <Field label="SQLite backup">
         <input

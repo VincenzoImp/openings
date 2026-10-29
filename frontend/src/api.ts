@@ -339,3 +339,16 @@ export function newId() {
     `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
   );
 }
+export async function copyText(value: string) {
+  if (navigator.clipboard?.writeText)
+    return navigator.clipboard.writeText(value);
+  const input = document.createElement("textarea");
+  input.value = value;
+  input.style.position = "fixed";
+  input.style.opacity = "0";
+  document.body.append(input);
+  input.select();
+  const copied = document.execCommand("copy");
+  input.remove();
+  if (!copied) throw new Error("Select and copy the displayed text manually.");
+}

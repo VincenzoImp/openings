@@ -158,12 +158,36 @@ export function Tabs({
   label: string;
 }) {
   return (
-    <div className="tabs" role="tablist" aria-label={label}>
+    <div
+      className="tabs"
+      role="tablist"
+      aria-label={label}
+      onKeyDown={(event) => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key))
+          return;
+        event.preventDefault();
+        const current = items.findIndex((item) => item.id === value);
+        const next =
+          event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? items.length - 1
+              : (current +
+                  (event.key === "ArrowRight" ? 1 : -1) +
+                  items.length) %
+                items.length;
+        onChange(items[next].id);
+        event.currentTarget
+          .querySelectorAll<HTMLButtonElement>("[role=tab]")
+          [next]?.focus();
+      }}
+    >
       {items.map((item) => (
         <button
           type="button"
           role="tab"
           aria-selected={item.id === value}
+          tabIndex={item.id === value ? 0 : -1}
           className={`tab ${item.id === value ? "active" : ""}`}
           key={item.id}
           onClick={() => onChange(item.id)}
@@ -313,6 +337,7 @@ export function Dialog({
       aria-labelledby={id}
       onCancel={(e) => {
         e.preventDefault();
+        e.stopPropagation();
         onClose();
       }}
       onClick={(e) => {

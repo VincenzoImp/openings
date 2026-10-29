@@ -380,7 +380,11 @@ function KnowledgeEditor({
               <option value="experience">Experience</option>
               <option value="project">Project</option>
               <option value="course">Course</option>
+              <option value="education">Education</option>
+              <option value="skill">Skill</option>
+              <option value="language">Language</option>
               <option value="fact">Fact</option>
+              <option value="other">Other</option>
             </select>
           </Field>
           <Field label="Dates">

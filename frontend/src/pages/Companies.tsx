@@ -402,6 +402,7 @@ function SourceEditor({
                 name="minutes"
                 type="number"
                 min={15}
+                max={43200}
                 defaultValue={Number(source?.schedule.minutes || 1440)}
               />
             </Field>
