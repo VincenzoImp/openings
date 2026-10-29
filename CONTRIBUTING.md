@@ -1,86 +1,83 @@
 # Contributing
 
-Openings is a Python package with a React dashboard, shipped as one Docker
-image. Keep changes small and tested, and keep the three surfaces (dashboard,
-REST, MCP) consistent by routing every write through the application service.
-
-## Setup
-
-```bash
-git clone https://github.com/VincenzoImp/openings.git
-cd openings
-uv sync --locked
-npm --prefix frontend install
-npx --prefix frontend playwright install chromium
-cp config/settings.example.yaml settings.yaml
-```
+Read the [architecture](docs/developer/architecture.md) and relevant
+[user guide](docs/user/getting-started.md) before changing behavior. Keep shared
+services useful through the dashboard, REST and MCP. Code, UI and documentation
+are English; public examples/screenshots contain synthetic data only.
 
 ## Run locally
 
+Requires Python 3.12+, Node 24 and [uv](https://docs.astral.sh/uv/).
+
 ```bash
-export OPENINGS_DATA_DIR=./data OPENINGS_CONFIG=./settings.yaml
-uv run openings run          # one collection
-uv run openings scheduler    # keep collecting
-uv run openings web          # dashboard, /api and /mcp on :8501
-npm --prefix frontend run dev  # dashboard with hot reload, proxied to :8501
+uv sync --locked --python 3.12
+npm --prefix frontend ci
+npm --prefix frontend run build
+uv run openings --database data/development.sqlite
 ```
 
-Docker from the local checkout:
+Open `http://127.0.0.1:8080`. For frontend hot reload, run
+`npm --prefix frontend run dev` separately; Vite proxies `/api` and `/mcp` to the
+backend. Never commit development databases or credentials.
+
+To build Docker images locally, give them local names:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+OPENINGS_IMAGE=openings:local docker compose up -d --build
+# Include the optional scorer:
+OPENINGS_IMAGE=openings:local OPENINGS_SCORER_IMAGE=openings-scorer:local \
+  docker compose --profile local up -d --build
 ```
 
-## Quality bar
-
-CI runs exactly this; run it before opening a pull request:
+## Verify a change
 
 ```bash
-uv run pre-commit run --all-files
-uv run mypy src/openings
-uv run pytest --cov=openings --cov-fail-under=80
-npm --prefix frontend run quality
+uv run ruff check backend
+uv run pytest
+npm --prefix frontend run build
+npm --prefix frontend run format:check
 npm --prefix frontend audit --audit-level=moderate
-npm --prefix frontend run build && npm --prefix frontend run test:e2e
 docker compose config
-sh docker/smoke.sh
 ```
 
-## Screenshots
+Use focused invariant checks and complete user workflows. For dashboard changes,
+check populated lists, desktop/mobile layouts, keyboard access, unsaved edits and
+loading/error states. For data changes, check versions, deletion/cancellation,
+frozen contexts, exact revision/file associations and backup consistency.
+
+The manual MCP/file/backup driver requires an external Tectonic executable:
 
 ```bash
-npm --prefix frontend run build && npm --prefix frontend run screenshots
+uv run python backend/tests/agent_roundtrip.py --tectonic /path/to/tectonic
 ```
 
-Starts a throwaway server, seeds a fictional archive and rewrites
-`docs/images/*.png`. Never take documentation screenshots of a real database.
+## Project layout
 
-## Layout
+| Path | Purpose |
+|---|---|
+| `backend/openings` | Shared SQLite services, REST, MCP, collection, worker and authentication |
+| `frontend` | React dashboard calling REST |
+| `scorer` | Optional separate CPU classifier, never imported by the core |
+| `examples` | Synthetic career data and LaTeX templates |
+| `skills/openings-workspace` | Optional external-agent workflow guidance |
+| `docs/user` | Setup, workflow and operator guides |
+| `docs/developer` | Architecture and extension boundaries |
 
-```text
-src/openings/              package: config, models, runtime, scoring, pipeline, embeddings
-src/openings/db/           SQLite behind the JobDatabase facade
-src/openings/sources/      jobspy, ats/{greenhouse,lever,ashby,smartrecruiters,workday,joincom,workable,rippling,bamboohr,oracle,personio,recruitee,breezy}, rss, adzuna, manual
-src/openings/application/  the service every surface calls; attachments and bundles on disk
-src/openings/web/          FastAPI app: /api routes, /mcp tools, token gate, static dashboard
-src/openings/defaults/     packaged copy of config/settings.example.yaml
-frontend/                  dashboard (React, Vite, Tailwind, TanStack); e2e/ holds Playwright
-config/                    the annotated example configuration
-tests/                     pytest suite, including integration, docs and packaging guards
-docs/user, docs/developer  operator and contributor documentation
-docker/                    entrypoint and smoke test
-```
+`uv.lock` and `frontend/package-lock.json` are authoritative. Keep personal data,
+model caches, deployment files, one-off importers and development work notes out of
+the public tree. Preserve upstream notices for vendored code.
 
-## Rules
+## Releases
 
-- `uv.lock` and `frontend/package-lock.json` are the dependency sources of
-  truth.
-- No generated state in Git: no databases, builds, attachments, models or
-  logs.
-- Behaviour changes come with tests. `tests/test_docs.py` guards the docs
-  against drift, `tests/test_settings_reference.py` keeps the packaged
-  example identical to `config/settings.example.yaml`.
-- Nothing in code, defaults or docs assumes a country, language, currency or
-  board. Those are user configuration.
-- No compatibility layers for earlier products or earlier data formats; data
-  moves through explicit scripts outside the product.
+CI checks backend/frontend, dependency audits, an installed wheel and native Linux
+amd64/arm64 core images. Container smoke checks authentication, nonroot startup
+and packaged source/resource hashes.
+
+The release workflow publishes versioned core/scorer images to Docker Hub for a pushed
+`vX.Y.Z` tag, or a manual run with **publish** enabled. The requested version must
+match `pyproject.toml`; publication waits for CI. The versioned tags are
+`vincenzoimp/openings:X.Y.Z` and `vincenzoimp/openings:scorer-X.Y.Z`. Branch/PR
+checks do not publish.
+Before a release, review the changelog and a practical collection → application →
+external-agent documents → review → backup/restore workflow. Hardware claims need
+actual resource measurements, not just a successful image build.

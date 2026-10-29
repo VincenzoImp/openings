@@ -1,0 +1,16 @@
+{
+  "knowledge": [
+    {
+      "kind": "experience",
+      "title": "Backend engineer — Example Cloud",
+      "narrative": "Built Python APIs and asynchronous workers for a small developer platform. Added request tracing and revised core endpoints, reducing p95 latency by 20%. Documented the rollout and helped four colleagues operate the services.",
+      "metadata": {"start": "2021-01", "end": null, "skills": ["Python", "SQL", "APIs"]}
+    },
+    {
+      "kind": "project",
+      "title": "Reliable deployment workflow",
+      "narrative": "Designed a typed deployment workflow with health checks and rollback. Reduced the manual deployment procedure from nine steps to three and made release status visible to the team.",
+      "metadata": {"year": 2023, "skills": ["TypeScript", "Docker", "Linux"]}
+    }
+  ]
+}

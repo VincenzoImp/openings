@@ -1,104 +1,82 @@
-# Operations
+# Backup and operations
 
-## Health
+## Portable backup
 
-```bash
-docker compose exec scheduler openings healthcheck
-curl -s http://127.0.0.1:8501/health
-```
-
-The health check parses the configuration, opens the database and verifies
-the data directories. `/health` also reports the embeddings state. The `runs`
-table (Runs view, `GET /api/runs`, `list_runs`) answers "did the last
-collection work": per-source task counts, rows and errors, and whether a run
-is still open. `GET /api/sources` joins the last run to each configured
-source.
-
-## Logs
+Use **Settings → Workspace → Backup**, authenticated `GET /api/v1/backup`, or the MCP
+`workspace_backup` download grant. These create a consistent SQLite snapshot while
+the service runs, including PDF/source bytes, templates, career data, job history
+and settings. The optional model cache is disposable and is not in the backup.
 
 ```bash
-docker compose logs -f scheduler
-docker compose logs -f web
+curl --fail "$OPENINGS_URL/api/v1/backup" \
+  -H "Authorization: Bearer $OPENINGS_TOKEN" \
+  --output openings-backup.sqlite
 ```
 
-The application log is `/data/logs/openings.log`, rotated by size according to
-the `logging` section, with timestamps in `logging.timezone`.
+Keep backups private: they contain personal information and stored credentials.
+The database is not encrypted. A JSON export is useful for reading records, but
+omits binary file contents and is not a restorable backup. Download it through
+Settings, `GET /api/v1/export`, or the scoped `workspace_export` MCP grant. Use the backup action rather than copying a live `.sqlite` file with an active WAL journal.
 
-## Backups
+## Restore or move hosts
 
-State is `settings.yaml` on the host plus the `openings-data` volume. The
-database and the attachments directory belong together: attachment rows point
-at files under `/data/attachments/<job_id>/`.
+On the destination host, install Openings 0.5.0, set its owner password, then restore
+through Settings or `POST /api/v1/backup/restore` with the raw SQLite body. Restore
+checks the schema, database integrity and foreign keys before replacement. It
+preserves the destination installation's owner credentials/API tokens, clears
+pending transfer grants and recovers interrupted tasks. Provider policy settings are
+restored, while recent HTTP window events and later cooldowns already recorded on
+the destination are conservatively retained; restoring an older backup does not
+reset request quotas. Reload the dashboard.
 
 ```bash
-docker compose exec scheduler python -c \
-  "import sqlite3; sqlite3.connect('/data/db/openings.db').backup(sqlite3.connect('/data/db/openings.backup.db'))"
-docker run --rm -v openings-data:/data -v "$PWD":/backup alpine \
-  tar czf /backup/openings-data.tgz -C /data db attachments
+curl --fail "$OPENINGS_URL/api/v1/backup/restore" \
+  -H "Authorization: Bearer $OPENINGS_TOKEN" \
+  -H 'Content-Type: application/vnd.sqlite3' \
+  --data-binary @openings-backup.sqlite
 ```
 
-The sentence model under `/data/models` is disposable: delete it and the next
-process downloads it again. Embeddings live in the database and are rebuilt
-for any job that lacks one when `embeddings.backfill_on_startup` is on.
+The default restore limit is 512 MiB; configure `OPENINGS_MAX_RESTORE_MB` before
+uploading a larger backup. Allow disk space for the upload and rollback snapshot.
+Enabled sources and scoring settings come from the restored workspace; inspect
+those when moving to different hardware or endpoints. `.env` remains host-local.
 
-One job's whole application (posting, notes, answers, timeline and files) can
-also be taken out as a zip: `GET /api/jobs/{job_id}/bundle.zip` or the
-"Download bundle" button.
-
-## Rescoring
-
-`openings run` and `openings scheduler` rescore the archive against
-`settings.yaml` at startup, so a scoring edit reaches the stored jobs the next
-time one of them starts. `openings web` does not: restarting only the web
-container after a scoring edit changes no scores. To do it on demand, or to see
-what an edit would do before it does it:
+## Service lifecycle
 
 ```bash
-docker compose exec scheduler openings rescore --dry-run
-docker compose exec scheduler openings rescore
+docker compose ps
+docker compose logs --tail=100 openings
+docker compose restart openings
+docker compose down
 ```
 
-Both report how many jobs would change or did change, with the score
-distribution before and after and how many rows sit at or above
-`save_threshold` and `notify_threshold`. `--dry-run` writes nothing. A
-configuration error is reported on stdout and exits non-zero instead of
-touching the database. Blacklisted jobs are not rescored.
+`down` keeps named volumes. **`down --volumes` deletes the workspace**, including
+all uploaded documents; use it only when intentionally discarding the installation.
+To change installation environment settings, use `docker compose up -d` so the
+container is recreated. Editing `OPENINGS_PASSWORD` does not reset an existing owner.
 
-## Retention
+Tasks show failures, cancellation and explicit retry. Source/scorer failures do
+not discard acquired jobs. Relevant profile/settings edits mark scores outdated;
+periodic rescoring is optional and off by default. The global automatic collection
+switch preserves source settings; explicit manual runs still honor provider budgets.
+Disable scoring when you want inference to stop.
 
-Retention only ever touches jobs in status `new`. `scoring.save_threshold`
-removes low scores on every run and `retention.max_age_days` removes rows not
-seen for that long. Every job you shortlisted, applied to, otherwise moved or
-blacklisted is protected. `GET /api/cleanup/preview` (System view,
-`preview_cleanup`) shows what a cleanup would do before it runs, and the
-score and staleness deletions accept `dry_run`.
+## Access controls
 
-## Blacklist
+Settings supports named owner tokens, independent token revocation and owner password
+changes. A password change rotates browser sessions and retains existing API tokens;
+log in again after changing it in the dashboard. Revoking the token used by an agent
+ends that token’s access on its next request.
 
-Blacklisting is a status, not a deletion: the job keeps its notes, files and
-timeline, leaves every list and export, and is never refreshed or re-created
-by a run. Restore it from System › Blacklist, `POST /api/blacklist/remove` or
-`unblacklist_jobs`; it goes back to the status it held before.
+## Troubleshooting
 
-## Concurrency
+| Symptom | Check |
+|---|---|
+| MCP rejects a host or download points to the wrong machine | Set `OPENINGS_PUBLIC_URL` to the client's reachable origin and recreate the container. |
+| URL import has incomplete text | Paste the full posting; login/JavaScript pages may not expose readable HTML. |
+| Upload fails | Exact byte size, 20 MiB limit, grant expiry, safe relative name and draft revision state. |
+| Edit returns 409 | Reload the current version, then reapply the intended change. |
+| Scorer times out or is killed | Inspect scorer logs/resource limits, allow cold startup, or use off/remote mode. |
+| Core cannot create SQLite | Ensure `/data` is writable by UID/GID 10001. |
 
-The scheduler writes collected rows, the web process writes state changes,
-and both embed what they write. SQLite in WAL mode with the application's
-connection lock covers this single-user setup. Do not run two schedulers
-against one data directory. The web process picks up edits to
-`settings.yaml` without a restart.
-
-## Recovery
-
-Compose creates `settings.yaml` as a directory when the host file is missing
-at first start:
-
-```bash
-rm -rf settings.yaml
-cp config/settings.example.yaml settings.yaml
-docker compose up -d
-```
-
-A configuration error stops the container at boot with the offending key in
-the log. `openings healthcheck` reproduces it outside the scheduler. A run
-left open by a crash is closed as failed when the next process starts.
+For development commands and release gates, see [Contributing](../../CONTRIBUTING.md).

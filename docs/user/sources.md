@@ -1,239 +1,95 @@
-# Sources
+# Saved searches and company feeds
 
-Every source produces the same job object (title, company, location, URL,
-description as markdown, posting date, type, remote flag, level, salary
-fields, company URL, the raw payload). Scoring, deduplication, the blacklist
-and notifications are shared.
+**Collection** has Saved searches and Companies tabs. Both save typed sources in
+SQLite and use the same queue and provider budgets. New sources start paused.
+Preview a source, review the results/diagnostics, then enable its interval or daily
+schedule with an IANA timezone. Run now queues work for an individually paused
+source; it still respects provider policy. Bulk controls enable, pause, run or delete
+selected sources. Deleting a source retains its archived jobs.
 
-A posting is identified by its URL (LinkedIn, Indeed, Glassdoor, Google and
-the ATS feeds reduce to `board:id`; other URLs keep host, path and their
-identifying query parameters) or, failing that, by `source:external_id`. A
-job is the opening behind one or more postings: the same URL refreshes its
-job; an unknown URL whose title, company and location match a job seen on
-another source can become a second posting of that job, provided known
-requisition keys do not conflict; anything else is a new
-job. Two different postings from the same source stay two jobs, even with the
-same title, and `merge_jobs` folds them together when you decide they are
-one.
+## What decides which jobs arrive?
 
-Google's legacy and current careers URLs share the numeric requisition ID.
-Workday URLs with a final requisition token use tenant plus requisition ID,
-independent of locale, city and title slug. Collector refreshes never change
-an existing job's status: withdrawn stays archived and blacklisted stays
-blocked. A genuinely different requisition is a new opportunity. Manual
-additions with a URL or external ID require an exact posting-key match to
-update an existing record; title/company/location alone cannot overwrite an
-earlier application. Use explicit `merge_jobs` after reviewing ambiguous
-cross-board reposts, rather than assuming every identical title is one job.
+| Input | Search criteria | Where to configure |
+|---|---|---|
+| Saved search | One query, location, country and explicit portal selection | Collection → Saved searches |
+| Company watch | A selected ATS board/feed; optional title and location filters | Collection → Companies |
+| Manual job | The specific URL or posting you provide | Inbox → Add job |
 
-Employment types are folded into one vocabulary whatever the board calls
-them: `fulltime`, `parttime`, `contract`, `internship`, `temporary`,
-`volunteer`, else `other`.
+For example, save `backend engineer` in `Zurich, Switzerland` with LinkedIn and
+Indeed selected. Create another saved search for `platform engineer` or another
+location. Career preferences guide optional fit classification; the saved query
+controls what is requested from a portal. Company sources read the chosen board
+and apply their configured filters.
 
-Runs record per-source counts and failures (`Runs` view, `GET /api/runs`,
-`list_runs`). One failing task never aborts the others.
+## Saved searches
 
-## Job boards (`sources.jobspy`)
+The pinned JobSpy 1.4.1 integration searches LinkedIn, Indeed and Glassdoor.
+Save one explicit query and location with a country and provider selection.
+Create another source for a different query/location. Results, age window, remote/job type and description fetching are
+bounded settings. Country/provider capabilities vary. Google is explicitly unsupported.
 
-[JobSpy](https://github.com/speedyapply/JobSpy) scrapes public board search
-pages: LinkedIn, Indeed, Glassdoor, Google Jobs, ZipRecruiter, Bayt, Naukri,
-BDJobs. Boards rate-limit; the defaults (one site, three workers, four
-seconds between LinkedIn calls) are conservative. Budget a run as
-`queries x locations x job_types` requests and check the duration in Runs.
-Google Jobs answers HTTP 429 to most unauthenticated clients.
+For REST/MCP, a `jobspy` source uses a configuration such as:
 
-## Company feeds (`sources.companies`)
-
-Applicant tracking systems with a public JSON feed. No key, complete
-descriptions, exact locations. Find the slug in the company's careers URL:
-
-| ATS | `ats:` value | Careers URL | Feed used |
-|-----|--------------|-------------|-----------|
-| Greenhouse | `greenhouse` | `boards.greenhouse.io/<slug>` (or `job-boards.greenhouse.io/<slug>`) | `boards-api.greenhouse.io/v1/boards/<slug>/jobs?content=true` |
-| Lever | `lever` | `jobs.lever.co/<slug>` | `api.lever.co/v0/postings/<slug>?mode=json` |
-| Ashby | `ashby` | `jobs.ashbyhq.com/<slug>` | `api.ashbyhq.com/posting-api/job-board/<slug>` |
-| SmartRecruiters | `smartrecruiters` | `careers.smartrecruiters.com/<Company>` | `api.smartrecruiters.com/v1/companies/<Company>/postings` |
-| Workday | `workday` | `<host>.myworkdayjobs.com/<site>` | `POST <host>/wday/cxs/<tenant>/<site>/jobs` |
-| join.com | `joincom` | `join.com/companies/<slug>` | the page's own `__NEXT_DATA__` payload |
-| Workable | `workable` | `apply.workable.com/<slug>` | `apply.workable.com/api/v1/widget/accounts/<slug>?details=true` |
-| Rippling | `rippling` | `ats.rippling.com/<slug>/jobs` | `api.rippling.com/platform/api/ats/v1/board/<slug>/jobs` |
-| BambooHR | `bamboohr` | `<slug>.bamboohr.com/careers` | `<slug>.bamboohr.com/careers/list` |
-| Oracle Cloud Recruiting | `oracle` | `<host>/hcmUI/CandidateExperience/.../sites/<site>` | `<host>/hcmRestApi/.../recruitingCEJobRequisitions` |
-| Personio | `personio` | `<slug>.jobs.personio.de` | `<slug>.jobs.personio.de/xml` |
-| Recruitee | `recruitee` | `<slug>.recruitee.com` | `<slug>.recruitee.com/api/offers/` |
-| BreezyHR | `breezy` | `<slug>.breezy.hr` | `<slug>.breezy.hr/json` |
-
-Companies whose careers site is built on one of these but served from their
-own domain still work: open a posting, look at the network requests or the
-"apply" link for the ATS domain and slug.
-
-Five of these need more than a bare slug or carry a caveat worth knowing.
-
-**Workday** and **Oracle Cloud Recruiting** take the whole board address,
-`host/site` (for example `abb.wd3.myworkdayjobs.com/External_Career_Page` or
-`eipb.fa.em2.oraclecloud.com/CX_5`), because the tenant, the datacenter and the
-site name vary independently; copy it from the careers URL. Both refuse a slug
-without a site rather than guessing at one.
-
-**join.com** publishes no documented API, so its adapter reads the JSON the
-page ships to the browser. That is a scrape: it fails loudly if join.com
-changes its page shape, rather than silently returning nothing.
-
-**Personio**'s feed is public but must be switched on by the employer
-(Settings > Recruiting > Career page). A tenant that never enabled it answers
-with the career site's HTML, which surfaces as `response is not XML`. Personio
-also rate-limits non-browser clients aggressively; an occasional `HTTP 429` in
-the run summary is the board throttling, not a broken adapter.
-
-**BreezyHR** publishes no description anywhere public: the feed carries none and
-the posting page is client-rendered. Its postings arrive with title, company,
-location, salary and URL but no body, so they are scored on the title alone.
-`save_threshold` is global rather than per board, so a Breezy posting
-competes on its title alone against everything else: expect to lose them
-unless the title carries the score by itself.
-
-### Finding companies to add
-
-No ATS publishes a directory of its customers, so every list is
-community-scraped. These are the ones worth starting from:
-
-- [kalil0321/ats-scrapers](https://github.com/kalil0321/ats-scrapers) —
-  `ats-companies/*.csv`, one file per ATS with name, slug and URL. The widest
-  coverage. The files this tool can read are `join_com.csv` (23.5k),
-  `greenhouse.csv` (6k), `bamboohr.csv` (5.6k), `workable.csv` (4.8k),
-  `workday.csv` (3.5k), `ashby.csv` (3.4k), `smartrecruiters.csv` (2.7k),
-  `lever.csv` (2.4k), `oracle.csv` (1.3k) and `rippling.csv` (1.9k). The rest
-  of the directory (`icims`, `jazzhr`, `paycom`, `paylocity`) is for systems
-  with no adapter here; screening those costs time and buys nothing.
-- [Feashliaa/job-board-aggregator](https://github.com/Feashliaa/job-board-aggregator)
-  — `data/*_companies.json` for Greenhouse, Ashby, Lever and Workday, refreshed
-  daily by CI, plus the postings themselves.
-- [blakegrudzien/find-jobs](https://github.com/blakegrudzien/find-jobs) — four
-  plain `companies_*.txt` slug lists, small and easy to diff.
-
-A slug list is a starting point, not an answer. Slugs go stale as companies
-change ATS or close their board, and of those that still answer only a small
-fraction post anywhere near you: screening 15,862 slugs from these lists in
-September 2026 left 9,606 reachable boards and 150 posting in Switzerland at
-all. Screen a list once, offline, against the locations you would accept, and
-configure what survives. Adding boards wholesale is the wrong move in any case:
-companies are fetched sequentially each run, so the list is a decision about
-where you would work, not a dump of everything that exists.
-
-To screen a list, ask each board the same question you would ask by hand. Every
-feed in the table above is a plain GET except Workday, so one request per slug
-answers "does this board exist, and does it post where I live":
-
-```bash
-# Greenhouse, and the same shape for the other GET feeds in the table
-curl -s "https://boards-api.greenhouse.io/v1/boards/<slug>/jobs" |
-  jq -r '.jobs[] | "\(.location.name)\t\(.title)"' | grep -i zurich
-
-# Ashby
-curl -s "https://api.ashbyhq.com/posting-api/job-board/<slug>" |
-  jq -r '.jobs[] | "\(.location)\t\(.title)"'
-
-# Workday needs a POST, and the slug is host/site
-curl -s -X POST "https://<host>/wday/cxs/<tenant>/<site>/jobs" \
-  -H 'Content-Type: application/json' \
-  -d '{"appliedFacets":{},"limit":20,"offset":0,"searchText":""}' |
-  jq -r '.jobPostings[] | "\(.locationsText)\t\(.title)"'
+```json
+{
+  "query": "backend engineer",
+  "location": "New York, NY",
+  "country": "usa",
+  "providers": ["linkedin", "indeed"],
+  "results_wanted": 20,
+  "hours_old": 72,
+  "is_remote": false,
+  "job_type": null,
+  "fetch_description": true
+}
 ```
 
-Match on location, not on the company name: a board with no posting near you
-today is a board that will cost a request every run and return nothing.
+Preview saves no jobs. It returns a request estimate and per-provider diagnostics;
+redirects/errors can require extra attempts, so actual limits always apply. A saved
+multi-provider search queues one task per provider, allowing other sources to progress.
+JobCloud supports regional jobs.ch/jobup.ch search through an undocumented endpoint.
+Adzuna is optional, disabled by default and requires owner-supplied credentials; its
+results contain snippets. The release requires no paid credentials.
 
-Probe a feed before adding it:
+## Company and feed sources
 
-```bash
-curl -s 'https://boards-api.greenhouse.io/v1/boards/<slug>/jobs' | head -c 300
-```
+Supported source kinds include Greenhouse, Lever, Ashby, Recruitee, Personio,
+Workable, Breezy, SmartRecruiters, BambooHR, Rippling, Workday, Oracle, join.com
+and RSS/Atom. Paste a board/feed URL, preview and correct the typed configuration
+if necessary. Some platforms use undocumented public endpoints that can change.
+Breezy/snippet-only results can remain incomplete. Missing RSS locations stay unknown.
+An error or blocked page is reported rather than treated as an empty successful search.
 
-`locations` and `titles` are lists of substrings matched case-insensitively
-against the posting's location and title; omit them to keep everything. A
-posting without a location passes the location filter and lets scoring
-decide. Postings older than `max_age_days` (or `sources.feed_max_age_days`)
-by their own date are dropped, so long-lived boards do not flood the Inbox
-with evergreen roles. SmartRecruiters listings are filtered before their details are
-fetched, and details are fetched only for postings not already stored, so a
-narrow list keeps the run short.
+## Provider safeguards and tasks
 
-iCIMS, SAP SuccessFactors, JazzHR, Jobvite, Teamtailor, softgarden and other
-JavaScript-rendered careers pages are not supported: they publish no machine-
-readable feed, and a per-vendor scraper of themed markup breaks silently rather
-than loudly. Add those postings by hand or through an agent.
+Settings lists each provider's capability/version, policy and read-only runtime.
+The same persisted gate counts every HTTP attempt across preview, manual imports,
+scheduled sources, redirects and supported vendor detail requests. Configure enabled
+state, minimum spacing and hourly/daily/per-run caps. Retry-After seconds/date causes
+a durable cooldown; restart, pause and older-backup restore do not reset recent usage.
+Deferred tasks release the collection lane rather than sleeping for long periods.
 
-## JobCloud (`sources.jobcloud`)
+The global automatic collection switch preserves individual settings. It stops
+scheduled acquisition while explicit manual work remains available under the same
+provider limits. Tasks show source/job labels, progress/errors and cancel/retry controls.
+Collection can progress while the independent inference lane handles one score request.
 
-JobCloud runs several regional job boards from one engine, so the host is
-configuration rather than a constant: `www.jobs.ch` and `www.jobup.ch` are the
-same API, and a second configured source costs no code. The search is public
-and needs no key.
+These are local safeguards, not platform quota or access guarantees. A portal may
+block public requests or change its pages. Do not interpret an empty/failed search
+as proof that no jobs exist. Use the source diagnostics and manual input when needed.
 
-```yaml
-sources:
-  jobcloud:
-    enabled: true
-    host: "www.jobs.ch"
-    queries: ["software engineer", "data engineer"]
-    locations: ["Zurich", "Bern"]
-    rows: 20           # the board rejects a larger page with HTTP 422
-    max_pages: 3       # pages per query and location
-    max_details: 100   # per-posting description fetches per run
-```
+## Manual input and state
 
-The search returns a truncated preview, so the full copy needs one extra
-request per posting; `max_details` caps that, and postings are deduplicated
-across queries before any detail is fetched. `rows`, `max_pages` and
-`max_details` are clamped in code as well: the board has thousands of result
-pages and a generous setting should not become thousands of requests, and
-`rows` above 20 is refused by the API itself with HTTP 422 rather than
-truncated, so asking for more collects nothing at all.
+Add job accepts a URL, pasted posting or structured fields. All interfaces and
+collectors share the same deduplicated ingestion path. URL extraction supports
+recognized ATS APIs and JobPosting JSON-LD. Generic, login, challenge and JavaScript
+pages remain incomplete when full text cannot be established; paste the description.
+There is no server browser crawler. Incomplete jobs are retained and excluded from
+useful scoring until corrected.
 
-### The language line
-
-Where JobCloud reports a language requirement structurally, the adapter
-prepends one canonical line to the description:
-
-```
-Required languages: German (level 3), English (level 2)
-```
-
-The level is whatever the board reported; no scale is invented and no
-judgement is made about whether a requirement disqualifies you. That is a
-scoring decision, so match the line from your own configuration:
-
-```yaml
-scoring:
-  keywords:
-    language_required:
-      terms: ["required languages: german"]
-      match_in: ["description"]
-```
-
-Matching a field the employer filled in is far more reliable than hunting for
-phrasings in free text, which is the usual way this goes wrong.
-
-## Feeds (`sources.feeds`)
-
-Any RSS or Atom feed. Title, link, description or content, publication date
-and, when present, `company`/`author` and `location` fields are read. Many
-boards, universities and public bodies publish one. `titles` keeps a broad
-feed to the roles you want.
-
-## Adzuna (`sources.adzuna`)
-
-A keyed search API covering about twenty countries
-([developer.adzuna.com](https://developer.adzuna.com)). Descriptions are
-snippets, so scores are lower than for other sources of the same posting;
-tune `weights` or the thresholds with that in mind. Set `app_id` and
-`app_key` through environment variables.
-
-## By hand (`manual`)
-
-`POST /api/jobs`, the MCP tool `add_job`, or the dashboard's "Add posting"
-create a job from digested fields. It is scored with the live configuration,
-lands in the given status (default `shortlisted`, so retention never removes
-it) and is refused if the job is blacklisted. A URL that is already known
-updates that job's posting fields instead of creating a second one. The
-source is recorded as `manual` unless the caller names another.
+Repeated identities preserve triage, corrections and application history. Distinct
+URLs need verified identity or an explicit Merge before they become one job.
+Inbox/Saved/Dismissed triage is separate from Draft/Applied/Interview/Offer/Closed
+application progress. Dismissed jobs stay remembered; Forget deletes all job-owned
+records/identities and permits later acquisition as new. Reapplications are independent
+attempts. Saving documents never records an actual submission.

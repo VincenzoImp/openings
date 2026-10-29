@@ -2,272 +2,120 @@ name: CI
 
 on:
   push:
-    branches: [main]
-    paths-ignore:
-      - "README.md"
-      - "CHANGELOG.md"
-      - "CONTRIBUTING.md"
-      - "LICENSE"
+    branches: ['**']
   pull_request:
-    branches: [main]
-    paths-ignore:
-      - "README.md"
-      - "CHANGELOG.md"
-      - "CONTRIBUTING.md"
-      - "LICENSE"
   workflow_dispatch:
+  workflow_call:
 
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
-# Least privilege: CI only needs to read the repo.
 permissions:
   contents: read
 
-env:
-  UV_VERSION: "0.11.6"
-  UV_TORCH_BACKEND: cpu
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  quality:
-    runs-on: ubuntu-latest
+  backend:
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          python-version: "3.12"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v8.0.0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          version: ${{ env.UV_VERSION }}
+          version: '0.11.6'
+          python-version: '3.12'
           enable-cache: true
-          cache-dependency-glob: |
-            pyproject.toml
-            uv.lock
-          cache-suffix: quality
+      - run: uv sync --locked
+      - run: uv run ruff check backend
+      - run: uv run pytest
+      - name: Smoke installed wheel and packaged resources
+        run: |
+          uv build --wheel --out-dir /tmp/openings-wheel
+          uv run python scripts/check_package.py /tmp/openings-wheel/openings-0.5.0-py3-none-any.whl
+      - name: Audit locked runtime dependencies
+        run: |
+          uv export --locked --no-dev --no-emit-project --no-hashes --output-file /tmp/openings-requirements.txt
+          uvx --from pip-audit==2.10.1 pip-audit --requirement /tmp/openings-requirements.txt --no-deps --disable-pip
 
-      - name: Sync dependencies
-        run: uv sync --locked
+  frontend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm --prefix frontend ci
+      - run: npm --prefix frontend run build
+      - run: npm --prefix frontend audit --audit-level=moderate
 
-      - name: Run pre-commit hooks
-        run: uv run pre-commit run --all-files
-
-      - name: Type check with mypy
-        run: uv run mypy src/openings --ignore-missing-imports
-
-  test:
-    runs-on: ubuntu-latest
+  container:
+    needs: [backend, frontend]
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13"]
-
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v8.0.0
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          cache-dependency-glob: |
-            pyproject.toml
-            uv.lock
-          cache-suffix: py${{ matrix.python-version }}-ci
-
-      - name: Sync dependencies
-        run: uv sync --locked
-
-      - name: Run tests with coverage
-        if: matrix.python-version == '3.12'
-        run: uv run pytest --cov=openings --cov-report=xml --cov-fail-under=80
-
-      - name: Run tests
-        if: matrix.python-version != '3.12'
-        run: uv run pytest
-
-      - name: Upload coverage
-        if: matrix.python-version == '3.12'
-        uses: actions/upload-artifact@v6
-        with:
-          name: coverage-report
-          path: coverage.xml
-
-  frontend:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Quality gate (lint, format, typecheck, test, build)
-        run: npm run quality
-
-      - name: Audit frontend dependencies
-        run: npm audit --audit-level=moderate
-
-  e2e:
-    # Playwright drives the built dashboard against a real `openings web`
-    # (temporary data directory, no network sources) on desktop, phone and
-    # tablet viewports, in light and dark, with axe on every view.
-    runs-on: ubuntu-latest
-    needs: [frontend]
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v8.0.0
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          cache-dependency-glob: |
-            pyproject.toml
-            uv.lock
-          cache-suffix: e2e
-
-      - name: Sync dependencies
-        run: uv sync --locked
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Install Playwright browser
-        working-directory: frontend
-        run: npx playwright install --with-deps chromium
-
-      - name: Build the dashboard
-        working-directory: frontend
-        run: npm run build
-
-      - name: Run the end-to-end suite
-        working-directory: frontend
-        run: npm run test:e2e
-
-      - name: Upload Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v6
-        with:
-          name: playwright-report
-          path: |
-            frontend/playwright-report
-            frontend/test-results
-          retention-days: 7
-
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v8.0.0
-        with:
-          version: ${{ env.UV_VERSION }}
-          enable-cache: true
-          cache-dependency-glob: |
-            pyproject.toml
-            uv.lock
-          cache-suffix: security
-
-      - name: Export runtime requirements
-        run: |
-          mkdir -p .tmp
-          uv export --frozen --no-dev --no-emit-project --output-file .tmp/requirements-audit.txt
-
-      - name: Security audit
-        run: |
-          # --no-deps: the export is fully pinned and uv's dependency overrides
-          # (numpy, markdownify) are not something pip can re-resolve.
-          uvx --python 3.12 --from 'pip-audit==2.9.0' pip-audit --no-deps --disable-pip -r .tmp/requirements-audit.txt
-
-  docker:
-    # Runs on PRs and on push to main so a direct push (skipping a PR) still
-    # validates the image build, healthcheck, compose topology, and web smoke.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build Docker image
-        uses: docker/build-push-action@v7
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Validate Compose
+        run: docker compose --profile local config --quiet
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
+          platforms: linux/${{ matrix.arch }}
           load: true
-          tags: openings:test
-          cache-from: type=gha,scope=ci-docker
-          cache-to: type=gha,scope=ci-docker,mode=max
-          provenance: false
-          sbom: false
-
-      - name: Test health check
+          push: false
+          tags: openings:ci
+          cache-from: type=gha,scope=core-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=core-${{ matrix.arch }}
+      - name: Smoke the nonroot empty workspace
+        shell: bash
         run: |
-          docker run --rm \
-            -v "$PWD/config/settings.example.yaml:/data/config/settings.yaml:ro" \
-            openings:test openings healthcheck
-
-      - name: Validate Compose topology
-        run: |
-          cp config/settings.example.yaml settings.yaml
-          docker compose config
-          docker compose -f docker-compose.yml -f docker-compose.dev.yml config
-
-      - name: Smoke web container
-        run: |
-          docker rm -f openings-web-smoke || true
-          docker run --rm -d \
-            --name openings-web-smoke \
-            -p 18501:8501 \
-            -v "$PWD/config/settings.example.yaml:/data/config/settings.yaml:ro" \
-            openings:test openings web
-          trap 'docker rm -f openings-web-smoke' EXIT
-          for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:18501/health; then
-              break
-            fi
+          set -euo pipefail
+          docker volume create openings-ci
+          trap 'docker logs openings-ci; docker rm -f openings-ci; docker volume rm openings-ci' EXIT
+          docker run -d --name openings-ci --init --cpus=0.5 --memory=512m \
+            --platform linux/${{ matrix.arch }} \
+            --publish 127.0.0.1:18080:8080 --mount source=openings-ci,target=/data openings:ci
+          for attempt in {1..60}; do
+            if curl --silent --fail http://127.0.0.1:18080/health > /tmp/openings-health.json; then break; fi
             sleep 1
           done
-          curl -fsS http://127.0.0.1:18501/api/jobs
-          curl -fsS http://127.0.0.1:18501/ >/tmp/openings-index.html
-          grep -q '<div id="root"></div>' /tmp/openings-index.html
-
-      - name: End-to-end smoke (REST and MCP against the built image)
-        run: SKIP_BUILD=1 IMAGE=openings:test PORT=18652 sh docker/smoke.sh
+          curl --silent --fail http://127.0.0.1:18080/health
+          test "$(docker exec openings-ci id -u)" = 10001
+          docker exec openings-ci test -f /data/openings.sqlite
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18080/api/v1/career/profile)" = 401
+          curl --silent --fail http://127.0.0.1:18080/api/v1/auth/setup \
+            --header 'Content-Type: application/json' --cookie-jar /tmp/openings-cookie \
+            --data '{"password":"synthetic-ci-password"}' --output /tmp/openings-session.json
+          curl --silent --fail --cookie /tmp/openings-cookie \
+            http://127.0.0.1:18080/api/v1/career/profile --output /tmp/openings-profile.json
+          python -c "import json; p=json.load(open('/tmp/openings-profile.json')); assert p['name']=='' and p['version']>=1"
+          curl --silent --fail --cookie /tmp/openings-cookie \
+            http://127.0.0.1:18080/api/v1/capabilities --output /tmp/openings-capabilities.json
+          python -c "import json; p=json.load(open('/tmp/openings-capabilities.json')); assert p['version']=='0.5.0' and len(p['operations'])>=84"
+          docker exec openings-ci python -c "from pathlib import Path; import openings; assert Path(openings.__file__).with_name('operation-inventory.json').is_file()"
+          docker exec openings-ci python -c "from pathlib import Path; import hashlib,json,openings; p=Path(openings.__file__).parent; print(json.dumps({str(f.relative_to(p)):hashlib.sha256(f.read_bytes()).hexdigest() for f in p.rglob('*') if f.is_file() and '__pycache__' not in f.parts}))" > /tmp/openings-package-hashes.json
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, subprocess
+          installed = json.load(open('/tmp/openings-package-hashes.json'))
+          for name in subprocess.check_output(['git', 'ls-files', 'backend/openings'], text=True).splitlines():
+              path = Path(name)
+              assert installed[str(path.relative_to('backend/openings'))] == hashlib.sha256(path.read_bytes()).hexdigest(), name
+          assert installed['operation-inventory.json'] == hashlib.sha256(Path('backend/openings/operation-inventory.json').read_bytes()).hexdigest()
+          PY
+          curl --silent --fail http://127.0.0.1:18080/ --output /tmp/openings-index.html
+          python -c "assert '<div id=\"root\"></div>' in open('/tmp/openings-index.html').read()"
