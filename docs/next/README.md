@@ -1,51 +1,44 @@
-# Final integration in progress
+# Openings 0.5.0 integration
 
-User authorized the final review integration. Target **Openings0.5.0**. Start with
-STATE.json, GOAL.md, CONTRACTS.md and PLAN.md. Previous completed delivery below is
-historical; do not infer that the current integration is finished.
+Openings is a fresh Python/FastAPI, React and SQLite implementation on
+`codex/openings-next`. The final user-approved integration adds broad saved searches,
+company feeds, shared provider budgets and logical Dashboard/REST/MCP parity.
+[PR 52](https://github.com/VincenzoImp/openings/pull/52) is the review entry point.
+[STATE.json](STATE.json) and [GOAL.md](GOAL.md) determine the current completion
+status; historical baseline evidence does not establish that new release gates pass.
 
-# Openings next
-
-A fresh implementation on branch `codex/openings-next`, based on `1deea662`.
-Old Openings and Dossier are references, not the new application scaffold.
-Production implementation was authorized; follow STATE.json for the current task.
-
-The app owns career knowledge, company watch, collection, optional scoring,
-application tracking and documents. Dashboard serves people, REST serves scripts,
-MCP serves external agents. All share one service and one portable SQLite database.
-
-**Ship all UI, code, comments, documentation, examples and release material in
-English.** Users may keep their own content in any language.
+The app stores career evidence, claims, templates/assets/instructions, jobs,
+application attempts, frozen contexts and exact document/file revisions in one
+portable SQLite database. External agents generate documents and compile TeX.
+Optional local or remote scoring is classification only. Target deployment is
+Docker with 2 CPU cores / 4 GiB combined, including the optional local scorer.
 
 ## Read in order
 
-1. [Feature map, switches and delivery steps](PRODUCT.md)
+1. [Product scope and switches](PRODUCT.md)
 2. [Workflow and data rules](DESIGN.md)
 3. [Optional scoring and external agents](AI.md)
-4. [Implementation and practical verification](PLAN.md)
-5. [Measured feasibility](FEASIBILITY.md) and [research](RESEARCH.md)
-6. [Handoff state](STATE.json)
-7. [Self-contained execution brief](GOAL.md)
-8. [Current findings and defects](WORKLOG.md)
+4. [Final integration contracts](CONTRACTS.md) and [operation matrix](OPERATIONS.md)
+5. [Execution plan](PLAN.md), [handoff state](STATE.json) and [current findings](WORKLOG.md)
+6. [Measured feasibility](FEASIBILITY.md) and [research decisions](RESEARCH.md)
 
-## Current decisions
+## Current boundaries
 
-- Fresh codebase on this branch; no legacy compatibility or data importer.
-- Dossier is the visual reference, including Kanban and a Sankey application funnel.
-- URL/text/structured manual ingestion and scheduled company feeds share one path.
-- Job triage: Inbox / Saved / Dismissed. Forget permanently removes job-owned data.
-- Scoring is optional, local or remote. Profile/rubric/model edits mark results outdated without launching mass inference.
-- External agents read knowledge/templates/rules, prepare documents, compile externally and upload PDF plus sources.
-- No internal generative model, generation button, auto-drafting, agent login or server TeX compiler in the first release.
-- Target: 2 CPU cores / 4 GiB, Docker-first, heavy scoring service optional.
+- One shared domain implementation, paginated summaries and separate detail reads.
+- Explicit saved query/location searches plus selected company ATS/feed sources;
+  previews, manual runs and schedules share persisted per-HTTP provider limits.
+- Inbox / Saved / Dismissed job triage; independent application attempts and history.
+  Forget deletes job-owned data and permits later rediscovery.
+- Profile/rubric/model changes mark scores outdated; mass rescoring stays explicit.
+- External document generation/compilation, frozen evidence and exact file ownership.
+  No internal chat/generative endpoint, server TeX, portal submission or email/calendar.
+- No legacy importer or compatibility layer. Version 0.5.0 precedes stable public
+  API and data-format guarantees; `/api/v1` is an independent route namespace.
+- English shipped material and synthetic public examples only; user content may
+  use another language. No production deployment, image publication or main merge.
 
-The optional [agent skill](../../skills/openings-workspace/SKILL.md) passed an actual external Codex workflow against the production MCP server. It is supplied in the repository, not installed into user accounts. MCP remains usable without it.
-
-Implementation complete. [PR 52](https://github.com/VincenzoImp/openings/pull/52) is the review entry point. Native Linux amd64/arm64 CI and production workflows pass; STATE.json records evidence and remaining owner release actions.
-`experiments/next` contains historical feasibility probes, not production modules.
-Use a few invariant tests and real dashboard/API/MCP/agent walkthroughs; no
-coverage target. Update PLAN.md and STATE.json after each usable increment.
-
-Release target: **Openings 1.0**. Descriptor: **Your job search workspace**.
-Scope is complete for this release; there is no planned feature-expansion phase.
-The [interactive dashboard preview](preview/index.html) uses synthetic browser-only data.
+The repository [agent skill](../../skills/openings-workspace/SKILL.md) is optional
+workflow guidance. MCP is usable without it. Actual external Codex/Tectonic and
+Linux measurements are recorded under `evidence/`, with dates and limitations.
+The browser-only [design preview](preview/index.html) and `experiments/next` are
+historical references; the production dashboard is `frontend/`.

@@ -15,8 +15,8 @@ No Python, Node, AI account or TeX installation is needed on the host.
    default and adjust general/per-template writing instructions. Synthetic
    `examples/career.json`, `examples/resume.tex` and `examples/cover-letter.tex`
    are available as starting examples.
-4. Add an offer in **Inbox**, or preview a company in **Companies** before enabling
-   its schedule. Scoring remains off until configured separately.
+4. Add an offer in **Inbox**, or configure a saved search or company feed in **Collection**
+   and preview it before enabling its schedule. Scoring remains off until configured separately.
 5. Create an application and connect an [external agent](agents.md), or upload
    documents manually. Review files before recording an application as Applied.
 
@@ -75,5 +75,6 @@ The health endpoint checks the core and SQLite. An idle scorer is healthy before
 its model has loaded. Do not treat health alone as a model-quality check.
 
 For upgrades, take a [backup](operations.md), update the checkout and run
-`docker compose up -d --build`. This release accepts only Openings 1.0 databases;
-there is no migration from the previous product.
+`docker compose up -d --build`. This rewrite starts with a fresh workspace;
+there is no migration from the previous product. The version is 0.5.0 because
+stable public API/data-format compatibility is not yet promised.

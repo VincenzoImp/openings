@@ -15,8 +15,11 @@ or Codex owns inference and uses its own configured account/provider.
 MCP is the interface; the [agent skill](../../skills/openings-workspace/SKILL.md)
 teaches this workflow. Scripts can use the same operations through REST.
 No generative endpoint, provider login, subscription token, agent SDK or embedded
-CLI worker is needed in Openings. The confirmed first release has no server-side
-TeX compiler. An actual external Codex CLI session read the shipped skill and frozen context, tailored CV/letter/answers, compiled both one-page PDFs, uploaded exact PDF/source bytes and retained draft state. See [production evidence](evidence/external-codex-workflow.json).
+CLI worker is needed in Openings. The confirmed release has no server-side TeX compiler. The baseline external Codex
+CLI check read the shipped skill and frozen context, tailored CV/letter/answers,
+compiled both one-page PDFs, uploaded exact PDF/source bytes and retained draft
+state. See [baseline evidence](evidence/external-codex-workflow.json); final integration
+checks are recorded separately.
 
 Dossier's internal provider calls and Claude connector remain useful research,
 not requirements to reproduce. See [research](RESEARCH.md).
@@ -60,6 +63,10 @@ changing its loaded model. Do not compare confidence thresholds across providers
 or treat the requested model string as proof of the checkpoint used.
 The local HTTP probe returned the generic name `laya-rl-agent`; also retain the
 configured checkpoint/revision and available server metadata for provenance.
+
+The scoring criteria array and rubric are editable through all interfaces. Changes
+mark scores outdated without launching mass inference. Collection and scheduling
+progress independently of the single inference lane.
 
 Test connection must run a small actual score request, validate its response
 and report the returned model before enabling a provider. Pin the bundled

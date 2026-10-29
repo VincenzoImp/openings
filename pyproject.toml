@@ -21,6 +21,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["backend/openings"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"docs/next/operation-inventory.json" = "openings/operation-inventory.json"
+
 [dependency-groups]
 dev = ["pytest==9.0.3", "pytest-asyncio==1.4.0", "ruff==0.15.10"]
 

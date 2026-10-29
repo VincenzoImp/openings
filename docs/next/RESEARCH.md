@@ -1,7 +1,9 @@
 # Research notes
 
 Inspected local source; exact revisions are in [repositories.json](evidence/repositories.json).
-Third-party source was not copied into the proposed implementation.
+Most integrations are narrow service clients. The bounded JobSpy 1.4.1 subset is
+vendored with its MIT license and [patch/provenance notes](../../backend/openings/_vendor/jobspy/PROVENANCE.md);
+its explicit per-instance transport is wired to persisted HTTP budgets.
 
 | Project | Approach | Decision |
 |---|---|---|
@@ -31,7 +33,9 @@ claim, not enough to rank models for production. Do not transfer vendor GPU
 latency, memory claims or general benchmark scores onto a low-power CPU.
 
 The user prioritizes low RAM and CPU. Laya English is now the measured baseline
-over jevos, not a passed production selection. Avoid a multi-checkpoint router.
+over jevos. Baseline whole-stack Linux measurements passed, while final integration
+measurements remain separate evidence; score quality is still advisory. Avoid a
+multi-checkpoint router.
 The author's [multilingual card](https://huggingface.co/convaiinnovations/laya-multilingual)
 reports a smaller 322M model but also weak ordinal scores; size alone does not
 establish suitability. Validate long job/profile inputs before shipping.

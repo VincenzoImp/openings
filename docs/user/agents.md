@@ -19,7 +19,7 @@ CV/letter PDFs, sources and live form answers from synthetic stored evidence.
 
 ## Working sequence
 
-1. Call `workspace_info`, `career_get_profile`, `knowledge_list`, `claims_list`,
+1. Call `workspace_info`, `capabilities_get`, `career_get_profile`, `knowledge_list`, `claims_list`,
    `templates_list` and `instructions_get` as needed. Detailed narratives explain
    the facts; approved claims are reusable wording, not the only allowed wording.
 2. Find or ingest the job with `jobs_search`, `job_get` or `job_ingest`. A manual
@@ -38,8 +38,11 @@ CV/letter PDFs, sources and live form answers from synthetic stored evidence.
 7. Leave reviewable drafts. Approve only when asked, and record Applied only after
    actual submission. Portals and sending are outside Openings.
 
-Bound service tools generally wrap DTO fields in a `value` object. Discover the
-schema rather than assuming every tool takes flat arguments. For example:
+Discover actual input schemas. `jobs_search`, `applications_list` and `overview_get`
+accept an optional `value` DTO: for example, `jobs_search({"value":{"q":"Python",
+"triage":"saved","limit":20}})`. Career lists keep flat filters and offer
+`summary=true`; fetch detail records before generating from evidence/templates.
+Mutating service tools also commonly wrap fields in `value`. For example:
 
 ```json
 {
@@ -69,7 +72,8 @@ schema rather than assuming every tool takes flat arguments. For example:
 
 REST supports the same workflow when scripting is more convenient. See the
 [API guide](api.md) for transfers and optimistic updates. `workspace_backup` and
-`workspace_restore_upload` return short-lived operational transfer instructions;
+`workspace_restore_upload` and `workspace_export` return short-lived operational
+transfer instructions;
 restore replaces workspace data and should be deliberate.
 
 Your chosen agent/provider supplies generation and compilation. An existing

@@ -1,12 +1,14 @@
 # Openings
 
-**Your job search workspace.** Collect offers from companies you choose, keep
+**Your job search workspace.** Collect offers through saved searches and company feeds, keep
 career evidence and templates, and track each application with its exact documents.
 One portable SQLite database stores the workspace, including PDF and source files.
 
 ![Openings application journey](docs/images/overview.png)
 
-- **Inbox:** add a URL, paste a posting, or collect scheduled company feeds.
+- **Inbox:** search/filter offers, import URL/text, and save, dismiss or rescore selections.
+- **Collection:** saved LinkedIn/Indeed/Glassdoor searches and selected ATS/feed sources,
+  with shared provider HTTP budgets and pause controls.
 - **Career:** edit your profile, detailed experience, approved claims and supporting files.
 - **Templates:** keep multiple LaTeX templates, assets and editable writing instructions.
 - **Applications:** independent attempts, list/Kanban, document revisions, PDF previews
@@ -40,7 +42,8 @@ optional local scoring and first use.
 
 ## Daily workflow
 
-1. Preview and enable the companies you want to watch, or add an offer manually.
+1. Preview a saved search or company feed in Collection, choose its schedule and
+   enable it. Each search has one explicit query/location. Add individual offers manually.
 2. Save or dismiss offers. Dismiss keeps their history; **Forget** permanently removes it.
 3. Create a draft application. An MCP agent reads a frozen context containing your
    profile, evidence, instructions, selected templates and questions.
@@ -51,18 +54,21 @@ optional local scoring and first use.
 
 ## Guides
 
-[Setup](docs/user/getting-started.md) · [Company sources](docs/user/sources.md) ·
+[Setup](docs/user/getting-started.md) · [Searches and sources](docs/user/sources.md) ·
 [Scoring](docs/user/scoring.md) · [REST API](docs/user/api.md) ·
 [Agents and MCP](docs/user/agents.md) · [Backup and operations](docs/user/operations.md)
 
 [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changes](CHANGELOG.md)
 
-Openings 1.0 is a fresh implementation. Older Openings databases and configuration
+Openings 0.5.0 is a substantial rewrite before stable API/data-format guarantees. Older Openings databases and configuration
 are not supported. Gmail, Calendar, portal submission and semantic search are
 outside this release. The optional classifier is advisory and can make mistakes.
 
 The Compose resource budget is 2 CPU cores / 4 GiB combined with local scoring;
-core-only or remote scoring avoids loading a model on this machine. Hardware and
+core-only or remote scoring avoids loading a model on this machine. Provider budgets
+limit actual requests across previews, manual runs and schedules; they cannot guarantee
+portal access or platform quotas. Blocked or unsupported pages need pasted text.
+No browser crawler runs in the server. Hardware and
 context limits are described in the [scoring guide](docs/user/scoring.md).
 
 [MIT](LICENSE).

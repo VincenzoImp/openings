@@ -27,24 +27,40 @@ Paste the posting when extraction cannot obtain the complete text.
 
 | Area | Routes under `/api/v1` |
 |---|---|
-| Archive | `GET/POST /jobs`, `GET/PATCH/DELETE /jobs/{id}`, `POST /jobs/{id}/triage`, `/merge`, `GET/POST /jobs/{id}/notes` |
-| Applications | `GET/POST /applications`, `GET/PATCH /applications/{id}`, `GET /applications/{id}/events` |
+| Archive | `GET/POST /jobs`, `POST /jobs/bulk`, `GET/PATCH/DELETE /jobs/{id}`, `POST /jobs/{id}/triage`, `/merge`, `GET/POST /jobs/{id}/notes` |
+| Notes | `GET/PATCH/DELETE /notes/{id}` plus job-owned list/create routes |
+| Applications | `GET/POST /applications`, `GET/PATCH/DELETE /applications/{id}`, `GET /applications/{id}/events` |
 | Career | `GET/PATCH /career/profile`, CRUD `/career/knowledge` and `/career/claims`, `POST /career/import/preview` then `/career/import` |
 | Templates/guidance | CRUD `/templates`, `GET/PATCH /instructions` |
-| Collection | CRUD `/sources`, `POST /sources/preview`, `POST /sources/{id}/run` |
-| Scoring/tasks | `GET/PATCH /scoring`, `POST /scoring/test`, `/scoring/rescore`, `GET /scoring/context/{job_id}`, `GET /tasks`, `POST /tasks/{id}/cancel` or `/retry` |
+| Collection | `GET/PATCH /collection`, `GET /providers`, `PATCH /providers/{id}`, CRUD `/sources`, preview/run and `/sources/bulk` |
+| Scoring/tasks | `GET/PATCH /scoring`, `POST /scoring/test`, `/scoring/rescore`, `GET /scoring/context/{job_id}`, `GET /tasks`, `GET /tasks/{id}`, `POST /tasks/{id}/cancel` or `/retry` |
 | Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `POST /documents/{id}/review` |
 | Files | `GET /files`, `GET/DELETE /files/{id}`, `GET /files/{id}/content`, `POST /files/uploads`, `POST /files/{id}/download` |
-| Operations | `GET /workspace`, `/overview`, `/export`, `/backup`; `POST /backup/restore`; token management `/tokens` |
+| Operations | `GET /workspace`, `/capabilities`, `/overview`, `/export`, `/backup`; `POST /backup/restore`; `/tokens`; `POST /auth/password` |
 
 List routes return `{items,total}` and accept bounded `limit`/`offset` where
-applicable. Versioned changes include the last read `expected_version`.
+applicable. Job/application rows are compact: request a detail record before using
+full posting, questions or answers. Career/claims/templates/documents offer
+`summary=true` for bounded previews/counts without narratives, metadata, TeX or
+structured content. Context lists never return payloads; files contain metadata only.
+Versioned changes include the last read `expected_version`.
 A conflict returns HTTP 409; reload before editing again. A typical error is
 `{"error":{"code":"conflict","message":"…","details":null}}`.
 
 For triage use `{"expected_version":3,"triage":"saved"}`. Application status
 changes use `PATCH /applications/{id}` with its version and a status/outcome.
 `DELETE /jobs/{id}` means permanent Forget, including its documents/history.
+`DELETE /applications/{id}` removes one attempt and its contexts/documents/files
+while preserving the job and other attempts. Frozen contexts and approved revisions
+have no mutable content interface; create a new revision/context as appropriate.
+
+The authenticated `/capabilities` inventory maps all logical operations to REST,
+MCP and dashboard locations, with explicit bootstrap/transport exceptions. Lists
+support server filters; `/jobs/bulk` and `/sources/bulk` accept at most 200 versioned
+items and return per-item outcomes. Application `stage_counts` span all matching
+attempts, independent of pagination. Overview accepts `since`/`until` for the
+submitted-attempt cohort. Career nonnullable PATCH fields reject explicit null:
+omit unchanged fields, or clear text/lists/objects with empty values.
 
 ## Document and byte flow
 

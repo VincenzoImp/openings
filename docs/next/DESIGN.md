@@ -11,15 +11,18 @@ Dashboard calls REST. REST and MCP validate typed inputs and invoke the same
 operations: jobs/search/triage, profile/evidence/claims, templates/assets/prompts,
 sources/schedules, scoring/rescoring, application history, context preparation,
 files/revisions, export and backup/restore. Include manual and batch operations.
-MCP describes actual tools/resources; REST publishes OpenAPI. Lists are paginated;
-files are fetched separately. No live database-file writes or SQL API.
+MCP describes actual tools/resources; REST publishes OpenAPI. The operation matrix
+and `/capabilities` describe logical parity and explicit bootstrap/transport
+exceptions. Lists are paginated; career/document lists offer `summary=true` without
+large narratives/TeX/context content. Files are fetched separately. No live database-file writes or SQL API.
 
-Use a modular monolith, one bounded worker and optional scoring service.
+Use a modular monolith, one bounded worker with independent collection and inference lanes, and an optional
+scoring service. Only one inference request runs at a time.
 SQLite owns persistent data; no Redis, vector database, agent SDK or workflow
 platform is needed. Authentication/session/API-token boundaries apply equally
 to REST and MCP. The skill is optional workflow guidance, not business logic.
 
-## Ingestion and companies
+## Ingestion, saved searches and companies
 
 Dashboard Add job, REST, MCP and collectors invoke one ingestion operation.
 Accept URL, pasted posting text or structured fields. URL import tries supported
@@ -37,11 +40,21 @@ edits; unchanged effective content triggers no inference. New/materially changed
 complete, non-dismissed jobs are scored if enabled. Scoring failure never rolls
 back acquisition. Source failure neither erases jobs nor proves they are closed.
 
-Companies: add → paste career/ATS URL → identify supported board → preview →
-save/enable. Allow correcting the board ID, role/location filters, schedule,
-pause and Run now. Show last success/errors. Implement fresh narrow clients,
-starting with Greenhouse, Lever and Ashby, using verified protocols and old
-code as references. Unsupported sites use explicit setup or manual import.
+Collection has Saved searches and Companies tabs. Each JobSpy 1.4.1 search stores
+one query/location and an explicit LinkedIn/Indeed/Glassdoor provider selection;
+Google is reported unsupported. Company/feed clients use typed narrow configuration.
+Preview before saving/enabling, edit the schedule and use individual/global pause
+or bounded bulk actions. New sources start paused.
+
+Provider policy and runtime persist in SQLite. Every actual HTTP attempt, including
+redirects and vendor detail requests, shares minimum spacing, hourly/daily/run caps
+and Retry-After cooldown across previews/manual/scheduled work. Cooldowns defer
+queue work rather than sleeping in the shared worker. Conservative runtime windows
+survive restart and restore; restoring older data cannot reset a destination’s recent
+HTTP usage. Budgets are local safeguards, not platform quota or access guarantees.
+Generic/challenge HTML never becomes a complete URL import automatically: recognized
+ATS APIs or valid JobPosting JSON-LD can provide full content; otherwise retain an
+incomplete record and ask for pasted text. No server browser fallback runs.
 
 ## State and deletion
 

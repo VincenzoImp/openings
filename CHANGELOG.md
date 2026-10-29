@@ -1,12 +1,13 @@
 # Changelog
 
-## 1.0.0
+## 0.5.0
 
 A fresh job-search workspace with one portable SQLite database and shared
 English dashboard, REST and MCP interfaces. Previous Openings configuration and
 databases are not compatible; this release starts a new workspace.
 
-- Manual and scheduled Greenhouse/Lever/Ashby/RSS ingestion, explicit company watch,
+- Saved LinkedIn/Indeed/Glassdoor searches through pinned JobSpy 1.4.1, selected
+  company ATS/feed monitoring, shared per-request provider limits/cooldowns,
   deduplication, corrections, text search and reversible triage.
 - Detailed career evidence, approved claims, template packages/assets/defaults and
   editable general/template/application instructions.
@@ -16,6 +17,8 @@ databases are not compatible; this release starts a new workspace.
   preparation contexts and exact document/PDF/source revisions.
 - External-agent workflow with scoped byte transfers, manual review, owner auth,
   revocable API tokens and consistent SQLite backup/restore.
+- Compact paginated lists, archive/source bulk actions, explicit task controls,
+  provider policies, agent tokens, password updates and scoped JSON export.
 - Docker core with no model runtime, optional local scorer and Linux amd64/arm64
   image build workflow.
 

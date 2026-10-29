@@ -109,7 +109,7 @@ Profile `links` is a list of string-valued objects and `metadata` is a finite JS
 |---|---|---|---|
 | Download portable JSON records without file bytes<br>MCP obtains scoped HTTP download. Secrets are omitted; use SQLite backup for exact documents/assets. | `GET /export` | `workspace_export` | Settings: export records |
 | Download a consistent SQLite backup including bytes<br>MCP obtains a short-lived scoped HTTP grant; bytes stay outside the tool response. | `GET /backup` | `workspace_backup` | Settings: download backup |
-| Replace workspace data from a SQLite backup<br>MCP obtains a scoped raw HTTP upload grant. Validated restore preserves installation authentication; no arbitrary SQL endpoint. | `POST /backup/restore` | `workspace_restore_upload` | Settings: restore backup |
+| Replace workspace data from a SQLite backup<br>MCP obtains a scoped raw HTTP upload grant. Validated restore preserves installation authentication and recent provider HTTP windows/later cooldowns; saved policies restore. No arbitrary SQL endpoint. | `POST /backup/restore` | `workspace_restore_upload` | Settings: restore backup |
 | List owner API token metadata<br>Token secrets are not returned after creation. | `GET /tokens` | `tokens_list` | Settings: agent tokens |
 | Create a named owner API token<br>Secret is returned once and has owner-level authority. | `POST /tokens` | `token_create` | Settings: create agent token |
 | Revoke an owner API token<br>May revoke the caller token; subsequent requests require another valid credential. | `DELETE /tokens/{token_id}` | `token_revoke` | Settings: revoke agent token |

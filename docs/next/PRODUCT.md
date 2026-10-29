@@ -1,7 +1,8 @@
 # Product scope
 
-Frozen release scope, 2026-10-29: **Openings 1.0**. Features are planned, not
-production-implemented. This is a fresh codebase on an Openings branch, with no
+Release scope, 2026-10-29: **Openings 0.5.0**. These domains are implemented;
+[STATE.json](STATE.json) records final integration and release verification. This is
+a substantial rewrite before stable API/data-format guarantees, with no
 legacy compatibility or importer. All shipped material is in English.
 
 ## Features by layer
@@ -12,19 +13,22 @@ legacy compatibility or importer. All shipped material is in English.
 | Application service | Validated ingestion, deduplication, corrections, lifecycle, context snapshots, document versions, exports and backup. One implementation for all interfaces. |
 | REST | Authenticated, paginated operations and file transfer for scripts; actual contract documented with OpenAPI. No raw SQL. |
 | MCP | The same capabilities for an external agent, including knowledge/template/prompt edits, job management, application context and document/file submission. Self-describing tools/resources. |
-| Dashboard | Dossier-inspired Inbox/table/detail, Add job, Companies, Career, Templates, Applications Kanban/list, document preview/history, Sankey funnel and Settings/activity. Manual work calls REST. |
-| Worker | Configured collection, normalization/storage, optional scoring and deliberate rescoring; bounded work, pause and useful errors. |
+| Dashboard | Dossier-inspired Inbox/table/detail, Add job, Collection, Career, Templates, Applications Kanban/list, document preview/history, Sankey funnel and Settings/activity. Manual work calls REST. |
+| Worker | Saved searches/company feeds with persisted provider budgets, normalization/storage, optional scoring and deliberate rescoring; bounded work, pause and useful errors. |
 | Optional scorer | One bundled local model or a compatible endpoint elsewhere, with URL/model/credential settings. Independent of the core. |
 | External agent | Read stored knowledge/rules/templates, write CV/letter/form answers, compile externally and save drafts/files using MCP or REST. |
 | Optional skill | Teach the workflow and state rules. It supplies guidance, not missing product capabilities. |
 
-## Features by delivery step
+## Original implementation milestones
+
+These milestones describe the delivered baseline. The current final integration
+phases and acceptance gates are in [PLAN.md](PLAN.md).
 
 | Step | Usable increment |
 |---|---|
 | M1: archive | Fresh scaffold; SQLite/files/backup; URL/text/structured ingestion; text search/filters; triage, notes and application states; working REST/MCP; English UI shell and initial Kanban. |
 | M2: career workspace | Profile and detailed experiences/projects/courses, evidence/claims, multiple LaTeX template packages/defaults/assets, editable general/template/application instructions. |
-| M3: collection and scoring | Watched companies, verified ATS/feed clients, schedules/run-now/pause, optional local/remote AI scoring, editable rubric, outdated indicators and selected/batch rescoring. |
+| M3: collection and scoring | Saved portal searches and watched companies, typed ATS/feed clients, provider HTTP policies, schedules/run-now/pause, optional local/remote AI scoring, editable rubric, outdated indicators and selected/batch rescoring. |
 | M4: agent workflow and reporting | Frozen application context, structured answers, PDF/source uploads and revisions, review/download, a working agent skill, and Sankey funnel from recorded application history. |
 | M5: release | Docker setup, restore on another host, resource measurements, practical walkthroughs and concise English release docs. |
 
@@ -32,7 +36,7 @@ legacy compatibility or importer. All shipped material is in English.
 
 | Control | Behavior |
 |---|---|
-| Automatic collection | Off until sources are configured. Each source has enable/pause, schedule and Run now. |
+| Automatic collection | New sources start paused. A global pause preserves individual enable/schedule settings; manual runs retain provider limits. |
 | AI scoring | Off until configured. Select bundled local preset or remote URL/model. Off preserves jobs/results and stops new inference. |
 | Periodic rescoring | Off. Explicit selected/outdated rescoring remains available when scoring is configured. |
 | Search | Text search/filters are included and need no model. Semantic search is outside this release; no placeholder switch or embedding dependency. |
@@ -60,11 +64,11 @@ confirmed choice. Kanban and Sankey are included.
 | Overview | Submitted-attempt counts, Sankey journey, items needing attention and recent activity. |
 | Inbox | Search/filter offers, full posting, URL/text import, save/dismiss/restore, notes and score freshness. |
 | Applications | Kanban/list, progress/outcomes, PDF/source/answer versions, review, upload and download. |
-| Companies | Supported ATS/feed setup, preview, enable/pause/schedule and collection health. |
+| Collection | Saved searches and Companies tabs; typed setup, bounded preview, schedules, bulk actions and provider health. |
 | Career | Profile/preferences, detailed evidence, reusable claims and supporting files. |
 | Templates | Packages/assets/defaults, general writing instructions and per-template append. |
-| Settings | Local/remote/off scoring, rubric, deliberate rescoring, access tokens, backup/restore and diagnostics. |
+| Settings | Collection pause/provider budgets, scoring criteria, explicit rescoring, task controls, access tokens/password, export and backup/restore. |
 
 See the [interactive design preview](preview/index.html): navigation and manual
-interactions with synthetic browser data, not a production backend. No later
-feature phase is promised; M1–M5 deliver the complete agreed release.
+interactions with synthetic browser data, not a production backend. The preview is a historical design reference; the production frontend and final
+operation matrix determine actual controls. No later feature-expansion phase is promised.

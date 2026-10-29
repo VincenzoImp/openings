@@ -1268,7 +1268,7 @@
         "workspace_restore_upload"
       ],
       "dashboard": "Settings: restore backup",
-      "notes": "MCP obtains a scoped raw HTTP upload grant. Validated restore preserves installation authentication; no arbitrary SQL endpoint."
+      "notes": "MCP obtains a scoped raw HTTP upload grant. Validated restore preserves installation authentication; no arbitrary SQL endpoint. Recent destination provider HTTP usage and later cooldowns survive older-backup restore; saved policy settings are restored."
     },
     {
       "id": "tokens.list",

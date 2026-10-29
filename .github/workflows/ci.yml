@@ -29,6 +29,10 @@ jobs:
       - run: uv sync --locked
       - run: uv run ruff check backend
       - run: uv run pytest
+      - name: Smoke installed wheel and packaged resources
+        run: |
+          uv build --wheel --out-dir /tmp/openings-wheel
+          uv run python scripts/check_package.py /tmp/openings-wheel/openings-0.5.0-py3-none-any.whl
       - name: Audit locked runtime dependencies
         run: |
           uv export --locked --no-dev --no-emit-project --no-hashes --output-file /tmp/openings-requirements.txt
@@ -99,5 +103,9 @@ jobs:
           curl --silent --fail --cookie /tmp/openings-cookie \
             http://127.0.0.1:18080/api/v1/career/profile --output /tmp/openings-profile.json
           python -c "import json; p=json.load(open('/tmp/openings-profile.json')); assert p['name']=='' and p['version']>=1"
+          curl --silent --fail --cookie /tmp/openings-cookie \
+            http://127.0.0.1:18080/api/v1/capabilities --output /tmp/openings-capabilities.json
+          python -c "import json; p=json.load(open('/tmp/openings-capabilities.json')); assert p['version']=='0.5.0' and len(p['operations'])>=84"
+          docker exec openings-ci python -c "from pathlib import Path; import openings; assert Path(openings.__file__).with_name('operation-inventory.json').is_file()"
           curl --silent --fail http://127.0.0.1:18080/ --output /tmp/openings-index.html
           python -c "assert '<div id=\"root\"></div>' in open('/tmp/openings-index.html').read()"

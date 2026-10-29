@@ -1,6 +1,6 @@
 # Contributing
 
-Openings 1.0 is a fresh Python/React application. Keep dashboard, REST and MCP
+Openings 0.5.0 is a fresh Python/React application. Keep dashboard, REST and MCP
 operations on shared application services. Public examples and screenshots must
 contain synthetic data only. Code, UI and repository documentation are English.
 
