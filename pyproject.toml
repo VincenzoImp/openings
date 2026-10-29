@@ -1,12 +1,13 @@
 [project]
 name = "openings"
-version = "1.0.0"
+version = "0.5.0"
 description = "A portable, agent-friendly job-search workspace."
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
 dependencies = [
   "fastapi==0.162.0", "uvicorn==0.54.0", "mcp==1.30.0",
+  "requests==2.34.2", "beautifulsoup4==4.15.0", "curl-cffi==0.17.0", "markdownify==1.2.3",
   "httpx==0.28.1", "python-multipart==0.0.32", "itsdangerous==2.2.0",
 ]
 

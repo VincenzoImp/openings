@@ -16,6 +16,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import Field
 from starlette.background import BackgroundTask
@@ -51,6 +52,19 @@ class PasswordInput(Input):
 
 class TokenInput(Input):
     name: str = Field(min_length=1, max_length=100)
+
+
+def redact_secrets(value):
+    if isinstance(value, dict):
+        return {
+            key: redact_secrets(item)
+            for key, item in value.items()
+            if key.lower().replace("-", "_")
+            not in {"api_key", "apikey", "password", "token", "secret", "authorization", "cookie"}
+        }
+    if isinstance(value, list):
+        return [redact_secrets(item) for item in value]
+    return value
 
 
 def error_response(error):
@@ -127,11 +141,15 @@ def create_app(database=None, start_worker=True):
                 "/api/v1/transfers",
             }
             if path.startswith("/api/v1/") and path not in public:
-                if path in {"/api/v1/backup", "/api/v1/backup/restore"} and request.headers.get(
-                    "x-operational-token"
-                ):
+                if path in {
+                    "/api/v1/backup",
+                    "/api/v1/backup/restore",
+                    "/api/v1/export",
+                } and request.headers.get("x-operational-token"):
                     operation = (
-                        "backup"
+                        "export"
+                        if path == "/api/v1/export" and request.method == "GET"
+                        else "backup"
                         if path == "/api/v1/backup" and request.method == "GET"
                         else "restore"
                         if path.endswith("/restore") and request.method == "POST"
@@ -244,6 +262,48 @@ def create_app(database=None, start_worker=True):
         response.delete_cookie(COOKIE, path="/")
         return response
 
+    @router.post("/auth/password")
+    def change_password(value: PasswordInput):
+        response = JSONResponse(auth.change_password(value.password))
+        response.delete_cookie(COOKIE, path="/")
+        return response
+
+    def capabilities():
+        path = Path(__file__).with_name("operation-inventory.json")
+        if not path.is_file():
+            path = Path(__file__).resolve().parents[2] / "docs/next/operation-inventory.json"
+        return json.loads(path.read_text())
+
+    router.add_api_route("/capabilities", capabilities, methods=["GET"])
+
+    mcp.tool(
+        name="capabilities_get",
+        description="Read the logical operation matrix, REST routes, MCP tools and dashboard locations.",
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False),
+    )(capabilities)
+
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+    )
+    def tokens_list() -> dict:
+        """List installation API/MCP token metadata; stored token secrets are never returned."""
+        return auth.list_tokens()
+
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
+    def token_create(value: TokenInput) -> dict:
+        """Create a named API/MCP token. Save its secret; it is returned only once."""
+        return auth.create_token(value.name)
+
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
+    def token_revoke(token_id: str) -> dict:
+        """Revoke an API/MCP token, including the current token if selected."""
+        return auth.revoke_token(token_id)
+
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
+    def owner_password_update(value: PasswordInput) -> dict:
+        """Change the owner password and invalidate all browser sessions; API/MCP tokens remain valid."""
+        return auth.change_password(value.password)
+
     @router.get("/tokens")
     def tokens():
         return auth.list_tokens()
@@ -341,6 +401,7 @@ def create_app(database=None, start_worker=True):
                 "documents": ["content"],
                 "sources": ["config", "schedule"],
                 "assessments": ["payload"],
+                "providers": ["policy", "runtime"],
             }
             tables = [
                 "jobs",
@@ -356,6 +417,7 @@ def create_app(database=None, start_worker=True):
                 "files",
                 "sources",
                 "assessments",
+                "providers",
             ]
             yield '{"format":"openings-records-v1","files_include_bytes":false'
             with workspace.db.connect() as conn:
@@ -368,19 +430,16 @@ def create_app(database=None, start_worker=True):
                         for key in json_fields.get(table, []):
                             item[key] = json.loads(item[key])
                         if table == "sources":
-                            for key in ("api_key", "password", "token"):
-                                item["config"].pop(key, None)
+                            item["config"] = redact_secrets(item["config"])
                         yield ("" if first else ",") + json.dumps(item, ensure_ascii=False)
                         first = False
                     yield "]"
                 settings = {}
                 for row in conn.execute(
-                    "SELECT key,data FROM settings WHERE key IN ('profile','instructions','scoring')"
+                    "SELECT key,data FROM settings WHERE key IN ('profile','instructions','scoring','collection')"
                 ):
                     data = json.loads(row["data"])
-                    if row["key"] == "scoring":
-                        data.pop("api_key", None)
-                    settings[row["key"]] = data
+                    settings[row["key"]] = redact_secrets(data)
                 yield ',"settings":' + json.dumps(settings, ensure_ascii=False) + "}"
 
         return StreamingResponse(
@@ -389,7 +448,21 @@ def create_app(database=None, start_worker=True):
             headers={"Content-Disposition": 'attachment; filename="openings-export.json"'},
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+    )
+    def workspace_export() -> dict:
+        """Reserve a redacted JSON records export. File bytes and installation authentication are excluded; use backup for a full snapshot."""
+        return {
+            "url": "/api/v1/export",
+            "method": "GET",
+            "headers": {"X-Operational-Token": auth.operation_ticket("export")},
+            "expires_in": 120,
+        }
+
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+    )
     def workspace_backup() -> dict:
         """Reserve a scoped HTTP download of a consistent SQLite backup, including file bytes."""
         return {
@@ -399,7 +472,7 @@ def create_app(database=None, start_worker=True):
             "expires_in": 120,
         }
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
     def workspace_restore_upload() -> dict:
         """Reserve a scoped raw SQLite upload that replaces workspace data; installation authentication stays unchanged."""
         return {

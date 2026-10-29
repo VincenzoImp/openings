@@ -170,3 +170,136 @@ def test_unrelated_database_is_rejected_without_modification(tmp_path):
         assert (
             conn.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0] == 1
         )
+
+
+def test_compact_filters_bulk_conflicts_and_attempt_delete(workspace):
+    from openings.models import JobQuery
+
+    first = job(
+        workspace,
+        posting="Detailed Python work. " * 2000,
+        metadata={"source": "linkedin", "is_remote": True, "job_type": "fulltime"},
+    )
+    other = job(workspace, url="https://jobs.lever.co/example/second", company="Other")
+    workspace.update_job(other["id"], {"expected_version": 1, "location": "London"})
+    query = JobQuery(
+        remote=True, source="linkedin", job_type="fulltime", created_since="2026-01-01"
+    )
+    page = workspace.list_jobs(**query.model_dump())
+    assert page["total"] == 1 and page["items"][0]["complete"]
+    assert "posting" not in page["items"][0] and len(page["items"][0]["posting_preview"]) == 240
+    result = workspace.bulk_jobs(
+        {
+            "action": "saved",
+            "items": [
+                {"id": first["id"], "expected_version": 1},
+                {"id": other["id"], "expected_version": 1},
+            ],
+        }
+    )
+    assert result["succeeded"] == result["failed"] == 1
+    assert result["items"][1]["error"]["status"] == 409
+    attempt = workspace.create_application({"job_id": first["id"]})
+    retained = workspace.create_application({"job_id": first["id"]})
+    note = workspace.add_note(first["id"], {"body": "Original", "application_id": retained["id"]})
+    workspace.update_note(note["id"], {"expected_version": 1, "body": "Edited"})
+    workspace.delete_application(attempt["id"], attempt["version"])
+    assert workspace.get_application(retained["id"])
+    assert workspace.get_note(note["id"])["body"] == "Edited"
+    summary = workspace.list_applications(limit=1)
+    assert summary["stage_counts"]["draft"] == 1 and "questions" not in summary["items"][0]
+
+
+def test_http_validates_answers_dates_and_rotation_preserves_tokens(tmp_path):
+    app = create_app(tmp_path / "validation.sqlite", start_worker=False)
+    with TestClient(app) as client:
+        owner = client.post("/api/v1/auth/setup", json={"password": "synthetic-password"}).json()
+        client.headers["X-CSRF-Token"] = owner["csrf_token"]
+        token = client.post("/api/v1/tokens", json={"name": "automation"}).json()
+        created = client.post("/api/v1/jobs", json={"posting": "Role details"}).json()
+        attempt = client.post(
+            "/api/v1/applications",
+            json={
+                "job_id": created["id"],
+                "questions": [{"id": "years", "label": "Years", "type": "number"}],
+            },
+        ).json()
+        for patch in (
+            {"questions": None},
+            {"answers": None},
+            {"answers": {"years": True}},
+            {"applied_at": "yesterday"},
+        ):
+            assert (
+                client.patch(
+                    "/api/v1/applications/" + attempt["id"], json={"expected_version": 1, **patch}
+                ).status_code
+                == 422
+            )
+        assert (
+            client.patch(
+                "/api/v1/applications/" + attempt["id"],
+                json={"expected_version": 1, "answers": {"years": 4}},
+            ).status_code
+            == 200
+        )
+        assert client.get("/api/v1/jobs?created_since=not-a-date").status_code == 422
+        assert (
+            client.post(
+                "/api/v1/auth/password", json={"password": "replacement-password"}
+            ).status_code
+            == 200
+        )
+        assert client.get("/api/v1/jobs").status_code == 401
+        client.headers["Authorization"] = "Bearer " + token["token"]
+        assert client.get("/api/v1/capabilities").json()["version"] == "0.5.0"
+        assert client.get("/api/v1/tokens").json()["items"][0]["last_used_at"]
+        assert client.get("/api/v1/export").json()["providers"] == []
+
+
+@pytest.mark.asyncio
+async def test_scoped_export_and_auth_mcp_are_available(tmp_path):
+    app = create_app(tmp_path / "operations.sqlite", start_worker=False)
+    app.state.auth.setup("synthetic-password")
+    names = {tool.name for tool in await app.state.mcp.list_tools()}
+    assert {
+        "tokens_list",
+        "token_create",
+        "token_revoke",
+        "owner_password_update",
+        "capabilities_get",
+        "workspace_export",
+        "jobs_bulk",
+        "application_delete",
+    } <= names
+    grant = app.state.auth.operation_ticket("export")
+    with TestClient(app) as client:
+        response = client.get("/api/v1/export", headers={"X-Operational-Token": grant})
+        assert response.status_code == 200
+        assert "auth" not in response.json()["settings"]
+        assert (
+            client.get("/api/v1/backup", headers={"X-Operational-Token": grant}).status_code == 403
+        )
+
+
+@pytest.mark.asyncio
+async def test_url_extraction_does_not_score_challenge_or_generic_html():
+    from openings.fetching import complete_input
+    from openings.models import JobInput
+
+    class Source:
+        def __init__(self, body):
+            self.body = body
+
+        def fetch_bytes(self, *args, **kwargs):
+            return self.body
+
+    value = JobInput(url="https://example.org/jobs/1")
+    challenge = (
+        b"<html><title>Verify you are human</title><p>" + b"Security page " * 50 + b"</p></html>"
+    )
+    result = await complete_input(value, Source(challenge))
+    assert not result.posting and result.metadata["extraction"] == "needs_text"
+    structured = b'<script type="application/ld+json">{"@graph":[{"@type":"JobPosting","title":"Engineer","hiringOrganization":{"name":"Synthetic"},"description":"<p>Build Python tools.</p>"}]}</script>'
+    result = await complete_input(value, Source(structured))
+    assert result.posting == "Build Python tools." and result.company == "Synthetic"

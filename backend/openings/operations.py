@@ -12,7 +12,7 @@ from .errors import DomainError
 def restore_database(workspace, source_path):
     with sqlite3.connect(source_path) as source:
         if source.execute("PRAGMA user_version").fetchone()[0] != 1:
-            raise DomainError(422, "backup_version", "Select an Openings 1.0 database backup.")
+            raise DomainError(422, "backup_version", "Select a database backup from this Openings schema.")
         if (
             source.execute("PRAGMA quick_check").fetchone()[0] != "ok"
             or source.execute("PRAGMA foreign_key_check").fetchall()

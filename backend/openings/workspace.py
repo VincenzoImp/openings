@@ -1,6 +1,7 @@
 """Core archive operations, shared by the dashboard, REST and MCP."""
 
 import hashlib
+import math
 import json
 import re
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -8,7 +9,15 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from .common import check_version, new_id, now
 from .db import Database, decode_record, encode
 from .errors import DomainError, conflict, missing
-from .models import ApplicationInput, ApplicationPatch, JobInput, JobPatch, NoteInput
+from .models import (
+    ApplicationInput,
+    ApplicationPatch,
+    JobInput,
+    JobPatch,
+    NoteInput,
+    NotePatch,
+    JobBulk,
+)
 
 
 def normalize_url(url):
@@ -116,23 +125,90 @@ class Workspace:
         else:
             self.db.execute(sql, args)
 
+    @staticmethod
+    def _revisions(connection):
+        values = {
+            row["key"]: json.loads(row["data"])
+            for row in connection.execute(
+                "SELECT key,data FROM settings WHERE key IN ('scoring_profile_revision','scoring_config_revision')"
+            )
+        }
+        return int(values.get("scoring_profile_revision", 0)), int(
+            values.get("scoring_config_revision", 0)
+        )
+
+    @staticmethod
+    def _job_join():
+        return " LEFT JOIN assessments a ON a.id=(SELECT id FROM assessments WHERE job_id=j.id ORDER BY created_at DESC,id DESC LIMIT 1) "
+
+    @staticmethod
+    def _job_columns(revisions):
+        columns = [
+            f"j.{key} AS j_{key}"
+            for key in (
+                "id",
+                "title",
+                "company",
+                "location",
+                "url",
+                "triage",
+                "availability",
+                "metadata",
+                "content_version",
+                "version",
+                "created_at",
+                "updated_at",
+            )
+        ]
+        profile, config = revisions
+        columns += [
+            "substr(j.posting,1,240) AS j_posting_preview",
+            "length(trim(j.posting))>0 AS j_complete",
+            "a.score AS j_score",
+            f"(a.id IS NOT NULL AND (a.job_version!=j.content_version OR a.profile_version!={profile} OR a.config_version!={config})) AS j_score_outdated",
+        ]
+        return ",".join(columns)
+
+    @staticmethod
+    def _compact_job(row):
+        result = {key[2:]: value for key, value in dict(row).items() if key.startswith("j_")}
+        result["metadata"] = json.loads(result["metadata"])
+        result["complete"] = bool(result["complete"])
+        result["score_outdated"] = bool(result["score_outdated"])
+        result["source"] = (
+            result["metadata"].get("source") or result["metadata"].get("ats") or "manual"
+        )
+        for field in ("is_remote", "job_type", "salary", "date_posted", "workplace_type"):
+            if field in result["metadata"]:
+                result[field] = result["metadata"][field]
+        return result
+
     def _job(self, row):
         if not row:
             missing("Job")
         row = decode_record(row, ("metadata", "overrides"))
-        score = self.db.one(
-            "SELECT * FROM assessments WHERE job_id=? ORDER BY created_at DESC LIMIT 1",
-            (row["id"],),
-        )
+        with self.db.connect() as connection:
+            raw = connection.execute(
+                "SELECT * FROM assessments WHERE job_id=? ORDER BY created_at DESC,id DESC LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            score = dict(raw) if raw else None
+            profile, config = self._revisions(connection)
+            row["postings"] = [
+                dict(posting)
+                for posting in connection.execute(
+                    "SELECT id,source_id,identity,url,first_seen_at,last_seen_at FROM postings WHERE job_id=? ORDER BY first_seen_at",
+                    (row["id"],),
+                )
+            ]
         row["assessment"] = decode_record(score, ("payload",))
         row["score"] = score["score"] if score else None
         row["score_outdated"] = bool(
             score
             and (
                 score["job_version"] != row["content_version"]
-                or score["profile_version"] != self.scoring_profile_version()
-                or score["config_version"]
-                != int(self.get_settings("scoring_config_revision", 0)["data"])
+                or score["profile_version"] != profile
+                or score["config_version"] != config
             )
         )
         row["complete"] = bool(row["posting"].strip())
@@ -141,37 +217,146 @@ class Workspace:
     def get_job(self, job_id):
         return self._job(self.db.one("SELECT * FROM jobs WHERE id=?", (job_id,)))
 
-    def list_jobs(self, q="", triage=None, company=None, limit=50, offset=0, sort="newest"):
-        limit, offset = min(max(int(limit), 1), 200), max(int(offset), 0)
+    @staticmethod
+    def _job_filters(
+        q="",
+        triage=None,
+        company=None,
+        location=None,
+        source=None,
+        remote=None,
+        job_type=None,
+        score_min=None,
+        score_max=None,
+        score_state="all",
+        created_since=None,
+        created_until=None,
+        revisions=(0, 0),
+    ):
         conditions, args = [], []
         if triage:
-            conditions.append("triage=?")
+            if triage not in ("inbox", "saved", "dismissed"):
+                raise DomainError(422, "triage", "Choose inbox, saved or dismissed.")
+            conditions.append("j.triage=?")
             args.append(triage)
         if company:
-            conditions.append("company=?")
+            conditions.append("j.company=?")
             args.append(company)
-        if q.strip():
-            terms = re.findall(r"\w+", q)
-            if terms:
-                conditions.append("rowid IN (SELECT rowid FROM jobs_fts WHERE jobs_fts MATCH ?)")
-                args.append(" AND ".join('"' + term + '"*' for term in terms[:15]))
-        where = " WHERE " + " AND ".join(conditions) if conditions else ""
-        total = self.db.one("SELECT count(*) AS n FROM jobs" + where, args)["n"]
-        order = {
-            "oldest": "created_at ASC",
-            "company": "company,title",
-            "title": "title",
-            "score": "(SELECT score FROM assessments WHERE job_id=jobs.id ORDER BY created_at DESC LIMIT 1) DESC",
-            "fit": "(SELECT score FROM assessments WHERE job_id=jobs.id ORDER BY created_at DESC LIMIT 1) DESC",
-        }.get(sort, "created_at DESC")
-        items = [
-            self._job(r)
-            for r in self.db.all(
-                "SELECT * FROM jobs" + where + " ORDER BY " + order + " LIMIT ? OFFSET ?",
-                [*args, limit, offset],
+        if location:
+            conditions.append("j.location LIKE ?")
+            args.append("%" + location + "%")
+        source_sql = "coalesce(json_extract(j.metadata,'$.source'),json_extract(j.metadata,'$.ats'),'manual')"
+        if source:
+            conditions.append(source_sql + "=?")
+            args.append(source)
+        if remote is not None:
+            conditions.append("json_extract(j.metadata,'$.is_remote')=?")
+            args.append(int(remote))
+        if job_type:
+            conditions.append("json_extract(j.metadata,'$.job_type')=?")
+            args.append(job_type)
+        for value, operator in ((score_min, ">="), (score_max, "<=")):
+            if value is not None:
+                if not 0 <= value <= 100:
+                    raise DomainError(422, "score_range", "Score bounds must be between 0 and 100.")
+                conditions.append("a.score" + operator + "?")
+                args.append(value)
+        profile, config = revisions
+        stale = f"(a.job_version!=j.content_version OR a.profile_version!={profile} OR a.config_version!={config})"
+        if score_state == "unscored":
+            conditions.append("a.id IS NULL")
+        elif score_state in ("current", "outdated"):
+            conditions.append(
+                "a.id IS NOT NULL AND " + (stale if score_state == "outdated" else "NOT " + stale)
             )
-        ]
-        return {"items": items, "total": total}
+        elif score_state != "all":
+            raise DomainError(422, "score_state", "Choose all, current, outdated or unscored.")
+        for value, operator in ((created_since, ">="), (created_until, "<=")):
+            if value:
+                conditions.append("j.created_at" + operator + "?")
+                args.append(value)
+        terms = re.findall(r"\w+", q)
+        if terms:
+            conditions.append("j.rowid IN (SELECT rowid FROM jobs_fts WHERE jobs_fts MATCH ?)")
+            args.append(" AND ".join('"' + term + '"*' for term in terms[:15]))
+        return (" WHERE " + " AND ".join(conditions)) if conditions else "", args
+
+    def list_jobs(
+        self,
+        q="",
+        triage=None,
+        company=None,
+        limit=50,
+        offset=0,
+        sort="newest",
+        location=None,
+        source=None,
+        remote=None,
+        job_type=None,
+        score_min=None,
+        score_max=None,
+        score_state="all",
+        created_since=None,
+        created_until=None,
+    ):
+        limit, offset = min(max(int(limit), 1), 200), max(int(offset), 0)
+        with self.db.connect() as connection:
+            revisions = self._revisions(connection)
+            where, args = self._job_filters(
+                q,
+                triage,
+                company,
+                location,
+                source,
+                remote,
+                job_type,
+                score_min,
+                score_max,
+                score_state,
+                created_since,
+                created_until,
+                revisions,
+            )
+            base = " FROM jobs j" + self._job_join()
+            order = {
+                "oldest": "j.created_at ASC",
+                "company": "j.company,j.title",
+                "title": "j.title",
+                "score": "a.score DESC",
+                "fit": "a.score DESC",
+            }.get(sort, "j.created_at DESC")
+            rows = connection.execute(
+                "SELECT "
+                + self._job_columns(revisions)
+                + base
+                + where
+                + " ORDER BY "
+                + order
+                + ",j.id LIMIT ? OFFSET ?",
+                (*args, limit, offset),
+            ).fetchall()
+            total = connection.execute("SELECT count(*)" + base + where, args).fetchone()[0]
+            facets = {}
+            for name, expression in (
+                ("companies", "j.company"),
+                ("locations", "j.location"),
+                (
+                    "sources",
+                    "coalesce(json_extract(j.metadata,'$.source'),json_extract(j.metadata,'$.ats'),'manual')",
+                ),
+                ("job_types", "json_extract(j.metadata,'$.job_type')"),
+            ):
+                facet_rows = connection.execute(
+                    "SELECT DISTINCT "
+                    + expression
+                    + " value"
+                    + base
+                    + where
+                    + " ORDER BY value LIMIT 200",
+                    args,
+                )
+                facets[name] = [r[0] for r in facet_rows if r[0] not in (None, "")]
+        return {"items": [self._compact_job(row) for row in rows], "total": total, "facets": facets}
 
     def ingest_job(self, value):
         value = value if isinstance(value, JobInput) else JobInput.model_validate(value)
@@ -385,15 +570,151 @@ class Workspace:
         )["n"]
         return row
 
-    def list_applications(self, status=None, limit=100, offset=0):
-        where, args = (" WHERE status=?", [status]) if status else ("", [])
-        rows = self.db.all(
-            "SELECT id FROM applications" + where + " ORDER BY updated_at DESC LIMIT ? OFFSET ?",
-            (*args, min(max(limit, 1), 200), max(offset, 0)),
-        )
+    def list_applications(
+        self, status=None, limit=100, offset=0, q="", outcome=None, company=None, sort="updated"
+    ):
+        conditions, args = [], []
+        if status:
+            if status not in ("draft", "applied", "interview", "offer", "closed"):
+                raise DomainError(422, "application_status", "Choose a valid application stage.")
+            conditions.append("app.status=?")
+            args.append(status)
+        if outcome:
+            if outcome not in ("accepted", "rejected", "not_pursued"):
+                raise DomainError(422, "application_outcome", "Choose a valid application outcome.")
+            conditions.append("app.outcome=?")
+            args.append(outcome)
+        if company:
+            conditions.append("j.company=?")
+            args.append(company)
+        if q.strip():
+            conditions.append("(j.title LIKE ? OR j.company LIKE ?)")
+            args.extend(["%" + q.strip() + "%"] * 2)
+        where = " WHERE " + " AND ".join(conditions) if conditions else ""
+        base = " FROM applications app JOIN jobs j ON j.id=app.job_id" + self._job_join()
+        order = {
+            "newest": "app.created_at DESC",
+            "oldest": "app.created_at ASC",
+            "company": "j.company,j.title",
+            "stage": "app.status,app.updated_at DESC",
+            "applied": "app.applied_at DESC",
+        }.get(sort, "app.updated_at DESC")
+        with self.db.connect() as connection:
+            projection = "app.id,app.job_id,app.status,app.outcome,app.version,app.applied_at,app.created_at,app.updated_at,"
+            projection += (
+                "(SELECT count(*) FROM documents WHERE application_id=app.id) AS documents_count,"
+            )
+            projection += self._job_columns(self._revisions(connection))
+            rows = connection.execute(
+                "SELECT "
+                + projection
+                + base
+                + where
+                + " ORDER BY "
+                + order
+                + ",app.id LIMIT ? OFFSET ?",
+                (*args, min(max(int(limit), 1), 200), max(int(offset), 0)),
+            ).fetchall()
+            total = connection.execute("SELECT count(*)" + base + where, args).fetchone()[0]
+            counts = {stage: 0 for stage in ("draft", "applied", "interview", "offer", "closed")}
+            for row in connection.execute(
+                "SELECT app.status,count(*) n" + base + where + " GROUP BY app.status", args
+            ):
+                counts[row["status"]] = row["n"]
+        items = []
+        for raw in rows:
+            item = {key: value for key, value in dict(raw).items() if not key.startswith("j_")}
+            item["job"] = self._compact_job(raw)
+            items.append(item)
+        return {"items": items, "total": total, "stage_counts": counts}
+
+    def delete_application(self, application_id, expected_version=None):
+        with self.db.transaction() as connection:
+            row = connection.execute(
+                "SELECT * FROM applications WHERE id=?", (application_id,)
+            ).fetchone()
+            check_version(row, expected_version)
+            owned = "SELECT id FROM documents WHERE application_id=? UNION SELECT id FROM contexts WHERE application_id=?"
+            owned_files = "SELECT id FROM files WHERE document_id IN (SELECT id FROM documents WHERE application_id=?) OR context_id IN (SELECT id FROM contexts WHERE application_id=?)"
+            connection.execute(
+                "DELETE FROM transfer_grants WHERE json_extract(payload,'$.owner_id') IN ("
+                + owned
+                + ") OR json_extract(payload,'$.file_id') IN ("
+                + owned_files
+                + ")",
+                (application_id,) * 4,
+            )
+            connection.execute("DELETE FROM applications WHERE id=?", (application_id,))
+            connection.execute("DELETE FROM blobs WHERE sha256 NOT IN (SELECT sha256 FROM files)")
+            self.event(
+                "application_deleted",
+                row["job_id"],
+                payload={"application_id": application_id},
+                conn=connection,
+            )
+        return {"deleted": True, "id": application_id}
+
+    def get_note(self, note_id):
+        row = self.db.one("SELECT * FROM notes WHERE id=?", (note_id,))
+        if not row:
+            missing("Note")
+        return row
+
+    def update_note(self, note_id, value):
+        value = value if isinstance(value, NotePatch) else NotePatch.model_validate(value)
+        with self.db.transaction() as connection:
+            row = connection.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
+            check_version(row, value.expected_version)
+            if row["body"] != value.body:
+                connection.execute(
+                    "UPDATE notes SET body=?,version=version+1,updated_at=? WHERE id=?",
+                    (value.body, now(), note_id),
+                )
+        return self.get_note(note_id)
+
+    def bulk_jobs(self, value):
+        value = value if isinstance(value, JobBulk) else JobBulk.model_validate(value)
+        results = []
+        for item in value.items:
+            try:
+                with self.db.lock:
+                    row = self.db.one("SELECT id,version FROM jobs WHERE id=?", (item.id,))
+                    check_version(row, item.expected_version)
+                    if value.action == "forget":
+                        self.forget_job(item.id)
+                        result = {"deleted": True}
+                    elif value.action == "rescore":
+                        if self.discovery is None:
+                            raise DomainError(
+                                409, "scoring_unavailable", "Scoring is not configured."
+                            )
+                        from .discovery import RescoreRequest
+
+                        result = self.discovery.queue_rescore(
+                            RescoreRequest(job_ids=[item.id], outdated_only=False, limit=1)
+                        )
+                    else:
+                        updated = self.set_triage(item.id, value.action, item.expected_version)
+                        result = {"triage": updated["triage"], "version": updated["version"]}
+                results.append({"id": item.id, "ok": True, "result": result})
+            except DomainError as error:
+                results.append(
+                    {
+                        "id": item.id,
+                        "ok": False,
+                        "error": {
+                            "code": error.code,
+                            "message": error.message,
+                            "status": error.status,
+                        },
+                    }
+                )
+        succeeded = sum(item["ok"] for item in results)
         return {
-            "items": [self.get_application(r["id"]) for r in rows],
-            "total": self.db.one("SELECT count(*) n FROM applications" + where, args)["n"],
+            "items": results,
+            "total": len(results),
+            "succeeded": succeeded,
+            "failed": len(results) - succeeded,
         }
 
     def create_application(self, value):
@@ -415,6 +736,7 @@ class Workspace:
                     if old["job_id"] != value.job_id:
                         conflict("This idempotency key already belongs to another job.")
                     return self.get_application(old["id"])
+            self.validate_answers([q.model_dump() for q in value.questions], {})
             record_id, stamp = new_id(), now()
             c.execute(
                 "INSERT INTO applications(id,job_id,note,questions,created_at,updated_at,idempotency_key) VALUES(?,?,?,?,?,?,?)",
@@ -494,13 +816,30 @@ class Workspace:
 
     @staticmethod
     def validate_answers(questions, answers):
+        if not isinstance(questions, list) or not isinstance(answers, dict):
+            raise DomainError(
+                422, "answer_state", "Questions must be an array and answers an object."
+            )
         by_id = {q["id"]: q for q in questions}
+        if len(by_id) != len(questions):
+            raise DomainError(422, "question_id", "Question IDs must be unique.")
         for key, answer in answers.items():
             if key not in by_id:
                 raise DomainError(
                     422, "answer_question", "An answer references an unknown question."
                 )
             question = by_id[key]
+            if answer is None:
+                continue
+            kind = question.get("type", "text")
+            if kind == "number" and (
+                isinstance(answer, bool)
+                or not isinstance(answer, (int, float))
+                or not math.isfinite(answer)
+            ):
+                raise DomainError(422, "answer_number", "A numeric answer must be a finite number.")
+            if kind == "text" and not isinstance(answer, str):
+                raise DomainError(422, "answer_text", "A text answer must be text.")
             if question.get("max_length") and len(str(answer)) > question["max_length"]:
                 raise DomainError(
                     422, "answer_length", f"Answer exceeds the limit for {question['label']}."
@@ -521,10 +860,18 @@ class Workspace:
         ]
         return {"items": rows, "total": len(rows)}
 
-    def overview(self, since=None):
+    def overview(self, since=None, until=None):
+        conditions, bounds = [], []
+        for value, operator in ((since, ">="), (until, "<=")):
+            if value:
+                conditions.append("coalesce(applied_at,created_at)" + operator + "?")
+                bounds.append(value)
+        cohort = "SELECT id FROM applications" + (
+            " WHERE " + " AND ".join(conditions) if conditions else ""
+        )
         apps = self.db.all(
-            "SELECT * FROM applications" + (" WHERE created_at>=?" if since else ""),
-            (since,) if since else (),
+            "SELECT id,status,outcome,applied_at FROM applications WHERE id IN (" + cohort + ")",
+            bounds,
         )
         stages = ["applied", "interview", "offer"]
         funnel = [
@@ -537,7 +884,8 @@ class Workspace:
         ]
         observed_by_app = {}
         for event in self.db.all(
-            "SELECT application_id,payload FROM events WHERE application_id IS NOT NULL"
+            "SELECT application_id,payload FROM events WHERE application_id IN (" + cohort + ")",
+            bounds,
         ):
             observed_by_app.setdefault(event["application_id"], set()).add(
                 json.loads(event["payload"]).get("to")

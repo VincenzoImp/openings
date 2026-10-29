@@ -49,6 +49,17 @@ class Auth:
                 "auth", {"password_hash": password_hash(password), "secret": secrets.token_hex(32)}
             )
 
+    def change_password(self, password):
+        if not 10 <= len(password) <= 1024:
+            raise DomainError(422, "password_length", "Use a password of at least 10 characters.")
+        with self.workspace.db.lock:
+            if not self.configured():
+                raise DomainError(409, "not_configured", "Set up the workspace owner first.")
+            self.workspace.set_settings(
+                "auth", {"password_hash": password_hash(password), "secret": secrets.token_hex(32)}
+            )
+        return {"updated": True, "sign_in_required": True, "api_tokens_preserved": True}
+
     def serializer(self):
         data = self.workspace.get_settings("auth")["data"]
         return URLSafeTimedSerializer(data.get("secret", "unconfigured"), salt="openings-owner-v1")
@@ -76,7 +87,16 @@ class Auth:
         if not header.startswith("Bearer "):
             return False
         token_hash = hashlib.sha256(header[7:].encode()).hexdigest()
-        row = self.workspace.db.one("SELECT id FROM api_tokens WHERE token_hash=?", (token_hash,))
+        row = self.workspace.db.one(
+            "SELECT id,last_used_at FROM api_tokens WHERE token_hash=?", (token_hash,)
+        )
+        if row:
+            stamp = now()
+            # Record useful usage metadata without a write on every agent request.
+            if not row["last_used_at"] or row["last_used_at"][:13] != stamp[:13]:
+                self.workspace.db.execute(
+                    "UPDATE api_tokens SET last_used_at=? WHERE id=?", (stamp, row["id"])
+                )
         return bool(row)
 
     def authorize(self, request, mcp=False):

@@ -124,8 +124,10 @@ CREATE TABLE IF NOT EXISTS providers (
 CREATE INDEX IF NOT EXISTS applications_job ON applications(job_id);
 CREATE INDEX IF NOT EXISTS applications_status ON applications(status,updated_at);
 CREATE INDEX IF NOT EXISTS documents_app ON documents(application_id,created_at);
+CREATE INDEX IF NOT EXISTS documents_context ON documents(context_id);
 CREATE INDEX IF NOT EXISTS contexts_app ON contexts(application_id,created_at);
 CREATE INDEX IF NOT EXISTS files_document ON files(document_id);
+CREATE INDEX IF NOT EXISTS files_context ON files(context_id);
 CREATE INDEX IF NOT EXISTS files_template ON files(template_id);
 CREATE INDEX IF NOT EXISTS files_knowledge ON files(knowledge_id);
 CREATE INDEX IF NOT EXISTS claims_knowledge ON claims(knowledge_id);

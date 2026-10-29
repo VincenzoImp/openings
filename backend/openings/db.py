@@ -23,7 +23,7 @@ class Database:
                 raise DomainError(
                     400,
                     "schema_version",
-                    "Use an empty database or an Openings 1.0 workspace. Existing unrelated databases are not modified.",
+                    "Use an empty database or a compatible Openings workspace. Existing unrelated databases are not modified.",
                 )
             if version not in (0, 1):
                 raise DomainError(400, "schema_version", "Unsupported workspace database version.")

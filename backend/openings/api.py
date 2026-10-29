@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Query, Request
+from typing import Annotated
+from . import __version__
 from mcp.server.fastmcp import Context
 from mcp.types import ToolAnnotations
 import os
@@ -11,6 +13,11 @@ from .models import (
     MergeInput,
     NoteInput,
     TriageInput,
+    JobQuery,
+    ApplicationQuery,
+    PeriodQuery,
+    JobBulk,
+    NotePatch,
 )
 
 
@@ -20,49 +27,34 @@ def register_core(router: APIRouter, workspace):
         return {
             "origin": os.environ.get("OPENINGS_PUBLIC_URL", str(request.base_url)).rstrip("/"),
             "name": "Openings",
-            "version": "1.0.0",
+            "version": __version__,
             "api_base": "/api/v1",
             "mcp_endpoint": "/mcp",
             "single_owner": True,
         }
 
     @router.get("/overview")
-    def overview(since: str | None = None):
-        return workspace.overview(since)
+    def overview(value: Annotated[PeriodQuery, Query()]):
+        return workspace.overview(**value.model_dump())
 
     @router.get("/jobs")
-    def jobs(
-        q: str = "",
-        triage: str | None = None,
-        company: str | None = None,
-        limit: int = Query(50, ge=1, le=200),
-        offset: int = Query(0, ge=0),
-        sort: str = "newest",
-    ):
-        return workspace.list_jobs(q, triage, company, limit, offset, sort)
+    def jobs(value: Annotated[JobQuery, Query()]):
+        return workspace.list_jobs(**value.model_dump())
+
+    @router.post("/jobs/bulk")
+    def bulk_jobs(value: JobBulk):
+        return workspace.bulk_jobs(value)
 
     @router.post("/jobs")
     async def ingest(value: JobInput):
-        if value.url and not value.posting:
-            from .fetching import read_posting
+        from .fetching import complete_input
 
-            extracted = await read_posting(value.url)
-            updates = {
-                key: item
-                for key, item in extracted.items()
-                if key in {"title", "posting"} and not getattr(value, key)
-            }
-            value = value.model_copy(update=updates)
+        value = await complete_input(value, workspace.discovery)
         return workspace.ingest_job(value)
 
     @router.get("/jobs/{job_id}")
     def get_job(job_id: str):
-        result = workspace.get_job(job_id)
-        result["postings"] = workspace.db.all(
-            "SELECT id,source_id,identity,url,first_seen_at,last_seen_at FROM postings WHERE job_id=?",
-            (job_id,),
-        )
-        return result
+        return workspace.get_job(job_id)
 
     @router.patch("/jobs/{job_id}")
     def edit_job(job_id: str, value: JobPatch):
@@ -95,12 +87,20 @@ def register_core(router: APIRouter, workspace):
         return workspace.delete_note(note_id)
 
     @router.get("/applications")
-    def applications(
-        status: str | None = None,
-        limit: int = Query(100, ge=1, le=200),
-        offset: int = Query(0, ge=0),
-    ):
-        return workspace.list_applications(status, limit, offset)
+    def applications(value: Annotated[ApplicationQuery, Query()]):
+        return workspace.list_applications(**value.model_dump())
+
+    @router.get("/notes/{note_id}")
+    def get_note(note_id: str):
+        return workspace.get_note(note_id)
+
+    @router.patch("/notes/{note_id}")
+    def edit_note(note_id: str, value: NotePatch):
+        return workspace.update_note(note_id, value)
+
+    @router.delete("/applications/{application_id}")
+    def delete_application(application_id: str, expected_version: int | None = None):
+        return workspace.delete_application(application_id, expected_version)
 
     @router.post("/applications")
     def create_application(value: ApplicationInput):
@@ -129,23 +129,21 @@ def register_core_mcp(mcp, workspace):
         )
         return {
             "name": "Openings",
-            "version": "1.0.0",
+            "version": __version__,
             "origin": origin,
             "api_base": "/api/v1",
             "workflow": "Read career, templates and stored instructions; prepare a frozen context; write and compile externally; submit document revisions and PDF/source files; track progress explicitly.",
         }
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
-    def jobs_search(
-        q: str = "",
-        triage: str | None = None,
-        company: str | None = None,
-        limit: int = 50,
-        offset: int = 0,
-        sort: str = "newest",
-    ) -> dict:
-        """Search the portable job archive; scores are indicative and may be outdated."""
-        return workspace.list_jobs(q, triage, company, limit, offset, sort)
+    def jobs_search(value: JobQuery | None = None) -> dict:
+        """Search compact paginated job summaries with location/source/remote/date/score filters. Read job_get for full content."""
+        return workspace.list_jobs(**(value or JobQuery()).model_dump())
+
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
+    def jobs_bulk(value: JobBulk) -> dict:
+        """Apply saved/dismissed/inbox/forget/rescore to at most 200 explicit job IDs/versions, with per-item results. Forget is permanent."""
+        return workspace.bulk_jobs(value)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def job_get(job_id: str) -> dict:
@@ -155,17 +153,9 @@ def register_core_mcp(mcp, workspace):
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     async def job_ingest(value: JobInput) -> dict:
         """Add a URL, pasted text or structured job. Duplicate identities preserve history."""
-        if value.url and not value.posting:
-            from .fetching import read_posting
+        from .fetching import complete_input
 
-            extracted = await read_posting(value.url)
-            value = value.model_copy(
-                update={
-                    k: v
-                    for k, v in extracted.items()
-                    if k in {"title", "posting"} and not getattr(value, k)
-                }
-            )
+        value = await complete_input(value, workspace.discovery)
         return workspace.ingest_job(value)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
@@ -206,9 +196,24 @@ def register_core_mcp(mcp, workspace):
         return workspace.delete_note(note_id)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
-    def applications_list(status: str | None = None, limit: int = 100, offset: int = 0) -> dict:
-        """List independent application attempts, including drafts and closed outcomes."""
-        return workspace.list_applications(status, limit, offset)
+    def applications_list(value: ApplicationQuery | None = None) -> dict:
+        """Read paginated application summaries and stage totals independent of page, with query/stage/outcome/company filters."""
+        return workspace.list_applications(**(value or ApplicationQuery()).model_dump())
+
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
+    def application_delete(application_id: str, expected_version: int | None = None) -> dict:
+        """Delete one attempt and its owned documents/history, retaining the archived job and other attempts."""
+        return workspace.delete_application(application_id, expected_version)
+
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
+    def note_get(note_id: str) -> dict:
+        """Read one editable note with its optimistic version."""
+        return workspace.get_note(note_id)
+
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
+    def note_update(note_id: str, value: NotePatch) -> dict:
+        """Edit a retained note without deleting/recreating it, using its current version."""
+        return workspace.update_note(note_id, value)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def application_get(application_id: str) -> dict:
@@ -231,6 +236,6 @@ def register_core_mcp(mcp, workspace):
         return workspace.application_events(application_id)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
-    def overview_get(since: str | None = None) -> dict:
+    def overview_get(value: PeriodQuery | None = None) -> dict:
         """Read funnel counts and activity from recorded application history."""
-        return workspace.overview(since)
+        return workspace.overview(**(value or PeriodQuery()).model_dump())
