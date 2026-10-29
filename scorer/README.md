@@ -34,6 +34,10 @@ from the official PyTorch index.
 releases the child process after active work settles; cached weights remain on
 disk. Selecting an unserved model does not download additional checkpoints.
 
+The [scoring guide](../docs/user/scoring.md#limits) includes a tested MKL
+instruction cap for the Intel Celeron N3450. Keep that workaround local to
+hardware that needs it.
+
 Scores are advisory, with possible language/qualification errors. The
 [user scoring guide](../docs/user/scoring.md) covers freshness, remote mode and
 whole-deployment resource limits. A compatible scorer can run on another machine,
