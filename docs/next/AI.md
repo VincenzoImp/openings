@@ -32,7 +32,7 @@ not requirements to reproduce. See [research](RESEARCH.md).
 Working local preset: Laya English, revision
 `55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851`, 421M ModernBERT-large + decision heads.
 Short probes used a sampled peak 2.57 GiB, versus 3.6–4.8 GiB observed RSS for
-jevos. The 512-token default is configurable. Complete ~963-token sequences fit
+jevos. The upstream 512-token default is configurable; the bundled service defaults to 2048. Complete ~963-token sequences fit
 at 1024 without truncation; a near-capacity 1920-token sequence at 2048 took
 2.39 s with a 2.60-GiB loading peak on this Mac/two-thread run. The bounded local
 preset is therefore **2048 tokens, one question/checkpoint/request**. It makes

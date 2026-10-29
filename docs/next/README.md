@@ -35,7 +35,7 @@ English.** Users may keep their own content in any language.
 
 The optional [agent skill](../../skills/openings-workspace/SKILL.md) passed an actual external Codex workflow against the production MCP server. It is supplied in the repository, not installed into user accounts. MCP remains usable without it.
 
-Current task: **M4.4 / M5**, external-agent and release validation. The fresh backend, dashboard, collection and scoring services are integrated.
+Implementation complete. [PR 52](https://github.com/VincenzoImp/openings/pull/52) is the review entry point. Native Linux amd64/arm64 CI and production workflows pass; STATE.json records evidence and remaining owner release actions.
 `experiments/next` contains historical feasibility probes, not production modules.
 Use a few invariant tests and real dashboard/API/MCP/agent walkthroughs; no
 coverage target. Update PLAN.md and STATE.json after each usable increment.

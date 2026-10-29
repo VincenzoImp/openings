@@ -1,5 +1,9 @@
 # Openings 1.0 execution brief
 
+## Completion checkpoint
+
+The frozen implementation is complete and validated. PR 52 is ready for owner review; STATE.json contains the exact tested code revision and CI/evidence links. No additional feature work is planned. Merge, version tagging and image publication remain explicit owner release actions.
+
 ## Start and resume
 
 The user authorized production implementation. A persistent goal is active for

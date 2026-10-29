@@ -79,3 +79,13 @@ tag or published image has been changed.
 Initialization also rejects an unrelated nonempty database before writing any schema; existing data remains untouched. No legacy conversion is attempted.
 
 Push CI passed both architectures. The parallel PR run exposed an emulation-dependent ARM startup timeout under the half-CPU smoke budget; the final CI matrix uses native Linux ARM and x86 runners, retaining the same runtime limits. Final native checks are pending.
+
+## Delivery
+
+Native CI 40932161181 passes backend/frontend/audits and actual Linux amd64/arm64
+core image startup. 31 focused cases pass. Final integrated local preview was
+checked on desktop and 390px mobile with no JavaScript errors or page overflow;
+its data is synthetic and outside Git. PR 52 is the review entry point. Task
+worktrees/branches and the isolated Linux VM/tools/cache have been removed.
+No implementation defects remain open from the acceptance walkthroughs. No
+main merge, deployment, release tag or image publication was performed.

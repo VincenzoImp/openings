@@ -2,7 +2,7 @@
   "updated": "2026-10-29",
   "branch": "codex/openings-next",
   "base_commit": "1deea6624da8474229b606b07ec669e6e75ae0f9",
-  "phase": "release_candidate_validation",
+  "phase": "release_ready",
   "production_rewrite_started": true,
   "production_data_accessed": false,
   "production_deployed": false,
@@ -36,9 +36,10 @@
     "M4.5",
     "M5.2",
     "M5.3",
-    "M5.4"
+    "M5.4",
+    "M5.1"
   ],
-  "next_task": "Final native Linux amd64/arm64 CI, then delivery; all functional workflows validated",
+  "next_task": "Owner review of PR52; merge and publish version1.0.0 when chosen. No implementation tasks remain.",
   "release_gates": [
     "Core/remote-scoring installation passes practical UI/REST/MCP/backup checks within 2 CPU / 4 GiB",
     "Bundled local preset passes whole-stack startup/steady target measurements; publish advisory-score and truncation limitations",
@@ -94,17 +95,15 @@
     ],
     "release_scope": "frozen complete Openings 1.0; no planned later feature phase"
   },
-  "not_yet_verified": [
-    "Final GitHub CI Linux amd64/arm64 core image builds"
-  ],
+  "not_yet_verified": [],
   "latest_probe": {
     "dashboard": "evidence/dashboard-smoke.json: 33 browser preview checks pass",
     "interfaces": "evidence/mcp-file-probe.json: 15 live MCP/file/backup checks pass",
     "scoring": "evidence/long-context-resource-probe.json: 1920 actual tokens, no truncation, 2.39s, 2.60GiB Mac peak",
-    "qualification": "Production workflows verified; GitHub architecture checks pending; no deployment or release publication performed",
+    "qualification": "Production release candidate verified; no deployment, main merge, version tag or image publication performed.",
     "target_runtime": "evidence/non-avx-runtime-probe.json: non-AVX target CPU import and FP32 kernels passed, temporary environment removed",
     "production_resources": "evidence/production-linux-resources.json: final production images,1913tokens,~2.80GiB conservative combined cgroup peak, noOOM within2CPU/4GiB VM",
-    "architecture": "Push CI40931295907 passed both core architectures; PR emulatedARM hit startupdeadline, so final pipeline uses native ubuntu-24.04-arm runners and is rechecked"
+    "architecture": "Native GitHub CI40932161181 passed backend/frontend/audits and both Linux core architecture builds+runtime smoke"
   },
   "production_authorized": true,
   "release_target": "1.0.0",
@@ -130,5 +129,28 @@
       "status": "integrated and validated"
     }
   },
-  "latest_implementation_check": "31 invariant cases pass; frontend build/audit and core runtime audit clean; 21 production Docker workflow checks; real external Codex+Tectonic+MCP document workflow; final Linux1913-token whole-stack2CPU/4GiB resource proof passes"
+  "latest_implementation_check": "31 invariant cases pass; frontend build/audit and core runtime audit clean; 21 production Docker workflow checks; real external Codex+Tectonic+MCP document workflow; final Linux1913-token whole-stack2CPU/4GiB resource proof passes",
+  "release_gate_results": {
+    "dashboard_rest_mcp_and_portable_restore": "passed production workflows",
+    "local_scoring_cpu_and_memory": "passed Linux ARM2CPU/4GiB whole-stack1913tokens,noOOM",
+    "external_agent_documents": "passed actual Codex CLI + skill + MCP + externalTectonic + exact uploads",
+    "core_linux_images": "passed native amd64 and arm64 CI",
+    "dependency_audits": "core runtime and frontend clean"
+  },
+  "pull_request": "https://github.com/VincenzoImp/openings/pull/52",
+  "validated_code_commit": "5e63b036c75fd29308bab92e51dea610fcd7d55b",
+  "ci_url": "https://github.com/VincenzoImp/openings/actions/runs/40932161181",
+  "release_published": false,
+  "workspace_cleanup": "Temporary task worktrees/branches, Linux VM/container data and temporary VM tools removed. Original references remain unchanged.",
+  "local_preview": {
+    "url": "http://127.0.0.1:18800",
+    "database": "data/development.sqlite",
+    "data": "synthetic only; excluded from Git",
+    "scoring": "disabled"
+  },
+  "known_limits": [
+    "Indicative English classifier can misunderstand qualifications/language; never an eligibility guarantee.",
+    "Low-power x86 full-model speed varies; Linux ARM resource evidence and separate non-AVX runtime probe are documented.",
+    "Major rewrite uses only fresh1.0 databases; no old-database import or schema compatibility."
+  ]
 }

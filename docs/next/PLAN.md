@@ -1,6 +1,6 @@
 # Delivery plan
 
-Current scope: [PRODUCT.md](PRODUCT.md). Next task **M4.4 / M5**. Production implementation is authorized and in progress. Update this file and STATE.json after each usable increment with
+Current scope: [PRODUCT.md](PRODUCT.md). All implementation milestones are complete. Next action: owner review of PR 52. Production implementation is authorized and in progress. Update this file and STATE.json after each usable increment with
 what works, a concise check/result, remaining issues and the exact next task.
 
 ## R0: completed research
@@ -95,7 +95,7 @@ prepares CV/letter/answers, compiles externally, uploads files and returns a
 reviewable draft. A human edits/reviews/downloads it and records progress. Verify
 reapplication, unknown imported history and attempt counts in Kanban/Sankey.
 
-## M5: install, migrate and release
+## M5: install, validate and release
 
 - **M5.1:** published pinned amd64/arm64 core image, optional scorer, simple Docker
   setup and guided profile/source/MCP configuration. Start with scoring disabled.
@@ -158,3 +158,15 @@ Remove temporary worktrees only after their useful work is integrated.
 ## Integrated implementation checkpoint
 
 M1, M2, M3.1–M3.4 and M4.1–M4.3 are integrated. Practical checks: 18 data-invariant tests, 13 live HTTP/MCP/external-Tectonic/file/backup checks, 68 discovered MCP tools, real Ashby collection and browser workflows across career/templates/documents/auth/restore. Direct Draft → Interview/Offer now establishes submitted status for funnel counts; no fictional intermediate history events are written. Next: validate the actual skill with an external model-driven agent, finish dashboard inspection, then fresh Docker installation and measured whole-stack resources.
+
+## Delivery checkpoint
+
+M1–M5 implementation and release-candidate validation are complete. Native CI
+passed backend, frontend, audits, and actual amd64/arm64 core image startup at
+commit 5e63b03. 31 focused cases and the production walkthrough evidence are
+recorded in STATE.json and FEASIBILITY.md. Temporary task branches/worktrees
+and the isolated Linux VM are removed; the original reference clones remain clean.
+
+PR 52 contains the reviewable implementation. Publishing is gated by an explicit
+version tag/manual release action; no main merge, deployment or release/image
+publication has been performed. There is no additional planned feature phase.
