@@ -159,8 +159,28 @@ export function Tabs({
   onChange: (id: string) => void;
   label: string;
 }) {
+  const tabs = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const revealSelected = () => {
+      const container = tabs.current;
+      const selected = container?.querySelector<HTMLElement>(
+        "[aria-selected=true]",
+      );
+      if (!container || !selected) return;
+      const frame = container.getBoundingClientRect();
+      const target = selected.getBoundingClientRect();
+      if (target.left < frame.left)
+        container.scrollLeft -= frame.left - target.left;
+      else if (target.right > frame.right)
+        container.scrollLeft += target.right - frame.right;
+    };
+    revealSelected();
+    window.addEventListener("resize", revealSelected);
+    return () => window.removeEventListener("resize", revealSelected);
+  }, [value]);
   return (
     <div
+      ref={tabs}
       className="tabs"
       role="tablist"
       aria-label={label}
