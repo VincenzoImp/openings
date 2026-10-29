@@ -18,8 +18,10 @@ No generative endpoint, provider login, subscription token, agent SDK or embedde
 CLI worker is needed in Openings. The confirmed release has no server-side TeX compiler. The baseline external Codex
 CLI check read the shipped skill and frozen context, tailored CV/letter/answers,
 compiled both one-page PDFs, uploaded exact PDF/source bytes and retained draft
-state. See [baseline evidence](evidence/external-codex-workflow.json); final integration
-checks are recorded separately.
+state. The [final external Codex check](evidence/final-external-codex-workflow.json)
+repeated that workflow with the updated skill and current search DTOs against
+installed Linux Docker MCP. The [final combined Linux check](evidence/final-linux-resources.json)
+records acquisition during inference, exact restore and resource limits.
 
 Dossier's internal provider calls and Claude connector remain useful research,
 not requirements to reproduce. See [research](RESEARCH.md).

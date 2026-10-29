@@ -14,8 +14,9 @@ The optional repository skill is
 [`skills/openings-workspace/SKILL.md`](../../skills/openings-workspace/SKILL.md).
 Install it using your agent's skill mechanism if desired. MCP remains usable
 without it: discover actual tools/resources and their typed input schemas.
-The supplied skill was verified with an external Codex session producing tailored
-CV/letter PDFs, sources and live form answers from synthetic stored evidence.
+The updated skill was verified with an [actual external Codex CLI session](../next/evidence/final-external-codex-workflow.json)
+against installed Linux Docker MCP: tailored one-page CV/letter PDFs, exact source
+uploads, live form answers and the current search DTOs, using synthetic evidence.
 
 ## Working sequence
 

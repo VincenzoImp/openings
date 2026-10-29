@@ -1,0 +1,103 @@
+{
+  "purpose": "Final installed Linux Docker combined acquisition/local-scoring/resource/restore verification",
+  "checked_at": "2026-10-29T20:01:47.914337+00:00",
+  "source_revision": "fcd4520",
+  "platform": "Ubuntu 26.04.1 Linux ARM64, Lima 2.2.1 VZ",
+  "vm_cpus": 2,
+  "vm_memory_bytes": 4086218752,
+  "swap_bytes": 0,
+  "version": "0.5.0",
+  "images": {
+    "openings-final-openings-1": {
+      "id": "sha256:ca00b4e39ee7f507840887b9408c5fbd6e3dd16786b9bad2c861a80356730941",
+      "cpu_nanos": 500000000,
+      "memory_limit": 536870912,
+      "oom_killed": false
+    },
+    "openings-final-scorer-1": {
+      "id": "sha256:c9d7546922634617fb55384950e1ac406f56e79f77dc4611901179fc451f2eae",
+      "cpu_nanos": 1500000000,
+      "memory_limit": 3758096384,
+      "oom_killed": false
+    }
+  },
+  "metrics": {
+    "openings-final-openings-1": {
+      "memory.current": "106803200",
+      "memory.peak": "107773952",
+      "memory.max": "536870912",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "cpu.max": "50000 100000"
+    },
+    "openings-final-scorer-1": {
+      "memory.current": "299515904",
+      "memory.peak": "3010424832",
+      "memory.max": "3758096384",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 2",
+      "cpu.max": "150000 100000"
+    }
+  },
+  "peak_sum_bytes": 3118198784,
+  "peak_sum_gib": 2.904,
+  "sample_count": 27,
+  "sampled_peak_combined_bytes": 2979852288,
+  "usage": {
+    "input_tokens": 1885,
+    "output_tokens": 0,
+    "state_tokens": 1762,
+    "state_tokens_dropped": 0,
+    "truncated": false,
+    "truncated_questions": []
+  },
+  "inference_seconds": 9.063,
+  "collection_provider": "recruitee",
+  "collection_requests": 1,
+  "collection_http_status": 200,
+  "collection_task_result": {
+    "received": 1,
+    "created": 1,
+    "existing": 0,
+    "invalid": 0,
+    "capped": null
+  },
+  "core_response_seconds": {
+    "max": 0.018,
+    "median": 0.008,
+    "samples": 54
+  },
+  "restore_backup_bytes": 327680,
+  "restored_agent_files": 4,
+  "scorer_final_health": {
+    "status": "idle",
+    "device": "cpu",
+    "threads": 2,
+    "max_len": 2048,
+    "model": "convaiinnovations/laya",
+    "revision": "55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851",
+    "last_error": null
+  },
+  "disable_drain_seconds": 5.219,
+  "checks": {
+    "installed_capabilities_84": true,
+    "provider_registry_21": true,
+    "score_task_observed_running": true,
+    "collection_finished_during_inference": true,
+    "collection_succeeded": true,
+    "near_full_context_untruncated": true,
+    "core_responsive_while_scoring": true,
+    "bounded_single_public_collection_request": true,
+    "disable_releases_model_after_inflight_drain": true,
+    "older_restore_preserves_http_window": true,
+    "restore_keeps_installation_token": true,
+    "restore_exact_agent_document_bytes": true,
+    "restore_keeps_draft_application": true,
+    "peak_sum_under_4gib": true,
+    "no_oom": true,
+    "restart_keeps_workspace_and_token": true,
+    "restart_keeps_request_window": true
+  },
+  "all_passed": true,
+  "qualification": "Real public acquisition was one bounded listing HTTP request; no job narratives or personal data are included in this evidence. Sum of cgroup peaks is conservative and includes filesystem cache. Native amd64 CI is separate; ARM throughput is not an x86 promise.",
+  "final_inventory_image_smoke": "final-linux-image-smoke.json",
+  "source_contents": "Final b430a4e integration plus fcd4520 package-cache correction; backend package hashes verified in final-linux-image-smoke.json."
+}

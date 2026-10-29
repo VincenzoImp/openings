@@ -1,0 +1,12 @@
+{
+  "checked_at": "2026-10-29T20:04:11.881743+00:00",
+  "checks": {
+    "temporary_lima_vm_deleted": true,
+    "temporary_container_and_model_volumes_removed": true,
+    "downloaded_lima_and_source_tools_removed": true,
+    "created_ubuntu_image_cache_removed": true,
+    "main_synthetic_preview_preserved": true
+  },
+  "all_passed": true,
+  "scope": "Only temporary verification VM, its Docker images/volumes, downloaded Lima tools, test artifacts and the image cache entry created in this task were removed. Shared uv/Node/browser tools and the main port18800 preview were preserved."
+}
