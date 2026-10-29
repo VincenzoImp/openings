@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.11.6'
+          python-version: '3.12'
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run ruff check backend
+      - run: uv run pytest
+      - name: Audit locked runtime dependencies
+        run: |
+          uv export --locked --no-dev --no-emit-project --no-hashes --output-file /tmp/openings-requirements.txt
+          uvx --from pip-audit==2.10.1 pip-audit --requirement /tmp/openings-requirements.txt --no-deps --disable-pip
+
+  frontend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm --prefix frontend ci
+      - run: npm --prefix frontend run build
+      - run: npm --prefix frontend audit --audit-level=moderate
+
+  container:
+    needs: [backend, frontend]
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          platforms: arm64
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Validate Compose
+        run: docker compose --profile local config --quiet
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          push: false
+          tags: openings:ci
+          cache-from: type=gha,scope=core-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=core-${{ matrix.arch }}
+      - name: Smoke the nonroot empty workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker volume create openings-ci
+          trap 'docker logs openings-ci; docker rm -f openings-ci; docker volume rm openings-ci' EXIT
+          docker run -d --name openings-ci --init --cpus=0.5 --memory=512m \
+            --platform linux/${{ matrix.arch }} \
+            --publish 127.0.0.1:18080:8080 --mount source=openings-ci,target=/data openings:ci
+          for attempt in {1..60}; do
+            if curl --silent --fail http://127.0.0.1:18080/health > /tmp/openings-health.json; then break; fi
+            sleep 1
+          done
+          curl --silent --fail http://127.0.0.1:18080/health
+          test "$(docker exec openings-ci id -u)" = 10001
+          docker exec openings-ci test -f /data/openings.sqlite
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18080/api/v1/career/profile)" = 401
+          curl --silent --fail http://127.0.0.1:18080/api/v1/auth/setup \
+            --header 'Content-Type: application/json' --cookie-jar /tmp/openings-cookie \
+            --data '{"password":"synthetic-ci-password"}' --output /tmp/openings-session.json
+          curl --silent --fail --cookie /tmp/openings-cookie \
+            http://127.0.0.1:18080/api/v1/career/profile --output /tmp/openings-profile.json
+          python -c "import json; p=json.load(open('/tmp/openings-profile.json')); assert p['name']=='' and p['version']>=1"
+          curl --silent --fail http://127.0.0.1:18080/ --output /tmp/openings-index.html
+          python -c "assert '<div id=\"root\"></div>' in open('/tmp/openings-index.html').read()"

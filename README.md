@@ -1,183 +1,66 @@
 # Openings
 
-[![CI](https://github.com/VincenzoImp/openings/actions/workflows/ci.yml/badge.svg)](https://github.com/VincenzoImp/openings/actions/workflows/ci.yml)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Docker](https://img.shields.io/badge/docker-vincenzoimp%2Fopenings-brightgreen.svg)](https://hub.docker.com/r/vincenzoimp/openings)
+**Your job search workspace.** Collect offers from companies you choose, keep
+career evidence and templates, and track each application with its exact documents.
+One portable SQLite database stores the workspace, including PDF and source files.
 
-A job crawler, archive and application tracker you run yourself, operable by
-you and by your AI agents through the same API.
+- **Inbox:** add a URL, paste a posting, or collect scheduled company feeds.
+- **Career:** edit your profile, detailed experience, approved claims and supporting files.
+- **Templates:** keep multiple LaTeX templates, assets and editable writing instructions.
+- **Applications:** independent attempts, list/Kanban, document revisions, PDF previews
+  and a funnel based on recorded progress.
+- **Optional scoring:** a separate CPU model or compatible remote service. Disabled
+  by default; profile edits mark old scores outdated without launching a mass rescore.
+- **Three interfaces:** dashboard for manual work, REST for scripts, MCP for external agents.
 
-![The Inbox: new postings ranked by your own scoring](docs/images/inbox-light.png)
+An external agent uses your stored knowledge and templates to prepare CVs, letters
+and form answers, compiles files on its own machine, then uploads the results.
+Openings includes no generative AI subscription, internal chat or server TeX compiler.
 
-## Why
+## Install
 
-Job boards forget what you saw, spreadsheets forget what you sent, and the
-CV you tailored for a role ends up in a folder nobody opens again. Openings
-keeps all of it in one local database: every posting it collected, every
-status change with its date, every note, form answer, CV and cover letter
-attached to the job it belongs to. It is built for one person, runs in two
-containers on your own machine, and never sends your data anywhere.
-
-- **Collect** from job boards (through [JobSpy](https://github.com/speedyapply/JobSpy)),
-  company career pages on thirteen applicant tracking systems (Greenhouse,
-  Lever, Ashby, SmartRecruiters, Workday, join.com, Workable, Rippling,
-  BambooHR, Oracle Cloud Recruiting, Personio, Recruitee, BreezyHR), regional
-  boards on JobCloud (jobs.ch, jobup.ch), RSS feeds and the Adzuna API. Anything the crawler cannot see, you or an
-  agent add by hand. No ATS publishes a directory of its customers, so
-  [docs/user/sources.md](docs/user/sources.md#finding-companies-to-add) lists
-  the community-maintained slug lists worth screening for the companies near
-  you.
-- **Rank** with keyword categories and signed weights you write yourself;
-  every job shows which categories matched and why it scored what it did.
-- **Track** one status per job from `new` to `offer`, with a timeline. A job
-  is the opening, not the advert: the same role seen on two boards is one job
-  with two postings. Blacklisting hides, never deletes, and can be undone.
-- **Archive** the application itself next to the posting, and take it out
-  again as one zip.
-- **Search by meaning** with a small sentence model that runs locally.
-- **Automate** through a REST API and an MCP server with the same tools the
-  dashboard uses, so an agent can triage the inbox, attach a tailored CV and
-  record an application while you watch the pipeline.
-
-**The YAML owns intake and scoring; the database owns state.** A job's status
-is never derived from configuration.
-
-## Quick start
+Requires Docker Engine/Desktop with Compose v2.
 
 ```bash
-git clone https://github.com/VincenzoImp/openings.git && cd openings
-cp config/settings.example.yaml settings.yaml   # edit locations, queries, scoring
-docker compose up -d
-open http://127.0.0.1:8501
+git clone https://github.com/VincenzoImp/openings.git
+cd openings
+cp .env.example .env
+docker compose up -d --build
 ```
 
-Those four lines get it running. Deciding what to put in `settings.yaml` is the
-part that takes thought, and
-**[Getting started](docs/user/getting-started.md)** walks through it: how to
-write a scoring configuration that works, and how to find the employers worth
-watching.
+Open **http://127.0.0.1:8080** and set the owner password. Start with Career and
+Templates, add a job, then create an application. Synthetic examples are included;
+your personal information belongs in the running workspace, never in the repository.
 
-One process serves the dashboard at `/`, the REST API at `/api` and the MCP
-endpoint at `/mcp`. Ports bind to `127.0.0.1` by default.
+The default installation runs one model-free container. Collection starts only
+for enabled sources. [Setup](docs/user/getting-started.md) covers LAN access,
+optional local scoring and first use.
 
-## A look around
+## Daily workflow
 
-| | |
-|---|---|
-| ![Pipeline](docs/images/pipeline-light.png) | ![Job page](docs/images/application-dark.png) |
-| The Pipeline: one column per status, cards move with the keyboard, by dragging or from a menu. | The application: files with inline previews, form answers, notes, one zip for everything. |
+1. Preview and enable the companies you want to watch, or add an offer manually.
+2. Save or dismiss offers. Dismiss keeps their history; **Forget** permanently removes it.
+3. Create a draft application. An MCP agent reads a frozen context containing your
+   profile, evidence, instructions, selected templates and questions.
+4. Review the generated content and uploaded PDF/source files. Revisions keep exact
+   file associations; a changed source never silently inherits an older PDF.
+5. Record Applied, Interview, Offer or Closed yourself or through your agent.
+   Saving documents does not send an application or mark it applied.
 
-The dashboard works on a phone as well as a desk, in light and dark. More
-in [Dashboard](docs/user/dashboard.md).
+## Guides
 
-## Agents
+[Setup](docs/user/getting-started.md) · [Company sources](docs/user/sources.md) ·
+[Scoring](docs/user/scoring.md) · [REST API](docs/user/api.md) ·
+[Agents and MCP](docs/user/agents.md) · [Backup and operations](docs/user/operations.md)
 
-Point an MCP client at `http://127.0.0.1:8501/mcp` (streamable HTTP):
+[Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changes](CHANGELOG.md)
 
-```json
-{ "mcpServers": { "openings": { "type": "http", "url": "http://127.0.0.1:8501/mcp" } } }
-```
+Openings 1.0 is a fresh implementation. Older Openings databases and configuration
+are not supported. Gmail, Calendar, portal submission and semantic search are
+outside this release. The optional classifier is advisory and can make mistakes.
 
-A typical session: `list_jobs(statuses=["new"], min_score=40)` to triage,
-`blacklist_jobs` for the noise, `get_job` for the posting and its score
-breakdown, `add_attachment` with the tailored CV, `add_note` with the form
-answers, `set_status(..., "applied", note="sent through the careers page")`.
-For a posting the crawler never saw, `add_job` with the digested fields. The
-full tool list is in [MCP server](docs/user/mcp.md).
-
-## Configuration
-
-Everything about *what* to collect and *how* to rank it lives in
-`settings.yaml`. The [annotated example](config/settings.example.yaml) is the
-reference; unknown keys fail at boot and secrets can be written as
-`$ENV_VAR`.
-
-```yaml
-sources:
-  jobspy:
-    sites: [linkedin]
-    locations: ["Berlin, Germany", "Remote"]
-    queries:
-      core: ["backend engineer", "platform engineer"]
-  companies:
-    - { name: Example, ats: greenhouse, slug: example, titles: [engineer] }
-scoring:
-  save_threshold: 20
-  notify_threshold: 60
-  weights: { role: 25, stack: 15, language_required: -60 }
-  keywords:
-    role: ["backend engineer", "platform engineer"]
-    stack: ["python", "go", "postgresql"]
-    language_required: ["fluent german", "deutsch erforderlich"]
-```
-
-See [Configuration](docs/user/configuration.md) and
-[Sources](docs/user/sources.md).
-
-## Commands
-
-| Command | Role |
-|---------|------|
-| `openings scheduler` | collect on the configured interval (container default) |
-| `openings run` | collect once and exit |
-| `openings web` | dashboard, REST API and MCP endpoint on port 8501 |
-| `openings healthcheck` | verify config, database and directories |
-| `openings rescore` | rescore every stored job against the current configuration (`--dry-run` to preview) |
-
-## What it does not do
-
-It does not apply to anything for you, and it never will: it collects, ranks
-and remembers, and the sending stays yours. It is built for one person rather
-than a team, so there are no accounts and no permissions. It reads boards that
-publish a machine-readable feed and deliberately does not scrape
-JavaScript-rendered careers pages, because a scraper of themed markup breaks
-silently and a silent source is worse than a missing one.
-
-## Documentation
-
-**Start here**
-
-- [Getting started](docs/user/getting-started.md) — clone to collecting, including
-  how to write a scoring configuration and how to find employers to watch
-
-**Configure**
-
-- [Configuration](docs/user/configuration.md) — every key, section by section
-- [Sources](docs/user/sources.md) — the thirteen ATS, the board sources, and
-  [where to find company slugs](docs/user/sources.md#finding-companies-to-add)
-
-**Operate**
-
-- [Docker deployment](docs/user/docker.md)
-- [Operations](docs/user/operations.md) — backups, retention, rescoring, recovery
-- [Dashboard](docs/user/dashboard.md)
-
-**Reference**
-
-- [REST API](docs/user/api.md)
-- [MCP server](docs/user/mcp.md)
-- [Architecture](docs/developer/architecture.md)
-- [Testing](docs/developer/testing.md)
-- [Release process](docs/developer/release.md)
-- [Changelog](CHANGELOG.md) — read it before upgrading
-- [Security policy](SECURITY.md)
-
-## Development
-
-```bash
-uv sync
-npm --prefix frontend install
-cp config/settings.example.yaml settings.yaml
-OPENINGS_DATA_DIR=./data OPENINGS_CONFIG=./settings.yaml uv run openings web
-uv run pytest
-npm --prefix frontend run quality
-npm --prefix frontend run test:e2e
-```
-
-See [CONTRIBUTING](CONTRIBUTING.md). Openings is a personal tool that grew
-into a small product; issues and pull requests are welcome.
-
-## License
+The Compose resource budget is 2 CPU cores / 4 GiB combined with local scoring;
+core-only or remote scoring avoids loading a model on this machine. Hardware and
+context limits are described in the [scoring guide](docs/user/scoring.md).
 
 [MIT](LICENSE).

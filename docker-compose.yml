@@ -1,56 +1,51 @@
 name: openings
 
-# Two containers, one image, one data volume.
-#
-#   scheduler  -> `openings scheduler`  collects on the configured interval
-#   web        -> `openings web`        dashboard, REST API, MCP endpoint
-#
-# settings.yaml is bind-mounted read-only from the host so it can be edited
-# with any editor; edit it and `docker compose restart`. Everything else
-# (database, attachments, vector index, logs) lives in the named volume.
-#
-# Both containers run as an unprivileged user (UID 1000). The web port binds to
-# localhost by default; set OPENINGS_WEB_BIND=0.0.0.0 in .env only on a trusted
-# network.
+services:
+  openings:
+    image: ${OPENINGS_IMAGE:-openings:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${OPENINGS_BIND:-127.0.0.1}:${OPENINGS_PORT:-8080}:8080"
+    environment:
+      OPENINGS_PUBLIC_URL: ${OPENINGS_PUBLIC_URL:-http://127.0.0.1:8080}
+      OPENINGS_PASSWORD: ${OPENINGS_PASSWORD:-}
+      OPENINGS_MAX_RESTORE_MB: ${OPENINGS_MAX_RESTORE_MB:-512}
+    volumes:
+      - workspace:/data
+    cpus: 0.5
+    mem_limit: 512m
+    pids_limit: 128
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
 
-networks:
-  default:
-    name: openings
-    enable_ipv6: false
+  # Starting this profile does not enable scoring. Configure it in Settings.
+  scorer:
+    profiles: [local]
+    image: ${OPENINGS_SCORER_IMAGE:-openings-scorer:local}
+    build:
+      context: .
+      dockerfile: scorer/Dockerfile
+    init: true
+    restart: unless-stopped
+    environment:
+      SCORER_API_KEY: ${SCORER_API_KEY:-}
+      SCORER_THREADS: 2
+      SCORER_MAX_CONTEXT: 2048
+      SCORER_IDLE_UNLOAD: 120
+      SCORER_REQUEST_TIMEOUT: 600
+    volumes:
+      - model-cache:/cache
+    cpus: 1.5
+    mem_limit: 3584m
+    pids_limit: 128
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # No host port: the core reaches http://scorer:8000 on the Compose network.
 
 volumes:
-  openings-data:
-    name: openings-data
-
-services:
-  scheduler:
-    image: vincenzoimp/openings:latest
-    container_name: openings-scheduler
-    restart: unless-stopped
-    command: ["openings", "scheduler"]
-    dns:
-      - 1.1.1.1
-      - 8.8.8.8
-    env_file:
-      - path: .env
-        required: false
-    volumes:
-      - openings-data:/data
-      - ./settings.yaml:/data/config/settings.yaml:ro
-
-  web:
-    image: vincenzoimp/openings:latest
-    container_name: openings-web
-    restart: unless-stopped
-    command: ["openings", "web"]
-    dns:
-      - 1.1.1.1
-      - 8.8.8.8
-    ports:
-      - "${OPENINGS_WEB_BIND:-127.0.0.1}:${OPENINGS_WEB_PORT:-8501}:8501"
-    env_file:
-      - path: .env
-        required: false
-    volumes:
-      - openings-data:/data
-      - ./settings.yaml:/data/config/settings.yaml:ro
+  workspace:
+  model-cache:
