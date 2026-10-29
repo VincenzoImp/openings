@@ -3,6 +3,8 @@
 The core app never imports PyTorch. This optional service loads one pinned Laya
 English checkpoint on the first score request, uses at most two CPU threads and
 accepts one ordinal question at a time. It downloads no model until requested.
+The image uses the verified versions in `constraints.txt`; PyTorch uses its
+separately pinned CPU wheel from the official PyTorch index.
 
 It implements the text/JSON `POST /v1/systemone` score subset used by Openings,
 not every feature of TypeSafe's API. Set Openings' provider to `laya`, model to

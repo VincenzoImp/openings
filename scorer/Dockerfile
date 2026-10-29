@@ -3,7 +3,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 USE_TF=0 HF_HOME=/cache/hugging
 WORKDIR /app
 RUN pip install --no-cache-dir 'torch==2.15.0+cpu' --index-url https://download.pytorch.org/whl/cpu
 COPY scorer/requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt && useradd --create-home --uid 1000 scorer && mkdir -p /cache/huggingface && chown -R scorer:scorer /cache /app
+COPY scorer/constraints.txt /app/constraints.txt
+RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt && useradd --create-home --uid 1000 scorer && mkdir -p /cache/huggingface && chown -R scorer:scorer /cache /app
 COPY --chown=scorer:scorer scorer/app.py /app/app.py
 USER scorer
 EXPOSE 8000
