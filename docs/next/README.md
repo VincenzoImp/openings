@@ -33,8 +33,7 @@ English.** Users may keep their own content in any language.
 - No internal generative model, generation button, auto-drafting, agent login or server TeX compiler in the first release.
 - Target: 2 CPU cores / 4 GiB, Docker-first, heavy scoring service optional.
 
-The [skill draft](../../skills/openings-workspace/SKILL.md) is not installed or
-validated against a production MCP server. MCP must remain usable without it.
+The optional [agent skill](../../skills/openings-workspace/SKILL.md) passed an actual external Codex workflow against the production MCP server. It is supplied in the repository, not installed into user accounts. MCP remains usable without it.
 
 Current task: **M4.4 / M5**, external-agent and release validation. The fresh backend, dashboard, collection and scoring services are integrated.
 `experiments/next` contains historical feasibility probes, not production modules.

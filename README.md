@@ -4,6 +4,8 @@
 career evidence and templates, and track each application with its exact documents.
 One portable SQLite database stores the workspace, including PDF and source files.
 
+![Openings application journey](docs/images/overview.png)
+
 - **Inbox:** add a URL, paste a posting, or collect scheduled company feeds.
 - **Career:** edit your profile, detailed experience, approved claims and supporting files.
 - **Templates:** keep multiple LaTeX templates, assets and editable writing instructions.

@@ -152,7 +152,7 @@ def register_core_mcp(mcp, workspace):
         """Read full job text, metadata, versions and assessment provenance."""
         return workspace.get_job(job_id)
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     async def job_ingest(value: JobInput) -> dict:
         """Add a URL, pasted text or structured job. Duplicate identities preserve history."""
         if value.url and not value.posting:
@@ -168,22 +168,22 @@ def register_core_mcp(mcp, workspace):
             )
         return workspace.ingest_job(value)
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     def job_update(job_id: str, value: JobPatch) -> dict:
         """Correct job fields using the version returned by job_get."""
         return workspace.update_job(job_id, value)
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     def job_triage(job_id: str, value: TriageInput) -> dict:
         """Set inbox/saved/dismissed. Dismissed jobs remain remembered and excluded from scoring."""
         return workspace.set_triage(job_id, value.triage, value.expected_version)
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
     def job_forget(job_id: str) -> dict:
         """Permanently delete a job and its application/file history. Future acquisition is new."""
         return workspace.forget_job(job_id)
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
     def job_merge(job_id: str, value: MergeInput) -> dict:
         """Explicitly merge verified duplicate jobs, preserving postings, applications and notes."""
         return workspace.merge_jobs(
@@ -195,12 +195,12 @@ def register_core_mcp(mcp, workspace):
         """Read notes retained with a job."""
         return workspace.list_notes(job_id)
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     def note_add(job_id: str, value: NoteInput) -> dict:
         """Store a note, optionally associated with a particular application attempt."""
         return workspace.add_note(job_id, value)
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
     def note_delete(note_id: str) -> dict:
         """Remove an individual note."""
         return workspace.delete_note(note_id)
@@ -215,12 +215,12 @@ def register_core_mcp(mcp, workspace):
         """Read a single application and its job."""
         return workspace.get_application(application_id)
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     def application_create(value: ApplicationInput) -> dict:
         """Create a draft attempt. This never sends an application or generates documents."""
         return workspace.create_application(value)
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     def application_update(application_id: str, value: ApplicationPatch) -> dict:
         """Record progress/questions/answers explicitly; editing documents never marks sent."""
         return workspace.update_application(application_id, value)

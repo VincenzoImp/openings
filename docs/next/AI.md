@@ -12,12 +12,11 @@ or Codex owns inference and uses its own configured account/provider.
 4. Upload PDF, sources and structured content against that context.
 5. Review/export in the dashboard; update application progress explicitly.
 
-MCP is the interface; the [skill draft](../../skills/openings-workspace/SKILL.md)
+MCP is the interface; the [agent skill](../../skills/openings-workspace/SKILL.md)
 teaches this workflow. Scripts can use the same operations through REST.
 No generative endpoint, provider login, subscription token, agent SDK or embedded
 CLI worker is needed in Openings. The confirmed first release has no server-side
-TeX compiler. External compilation was already demonstrated with synthetic data;
-the complete production MCP round trip remains untested.
+TeX compiler. An actual external Codex CLI session read the shipped skill and frozen context, tailored CV/letter/answers, compiled both one-page PDFs, uploaded exact PDF/source bytes and retained draft state. See [production evidence](evidence/external-codex-workflow.json).
 
 Dossier's internal provider calls and Claude connector remain useful research,
 not requirements to reproduce. See [research](RESEARCH.md).
@@ -37,8 +36,7 @@ jevos. The 512-token default is configurable. Complete ~963-token sequences fit
 at 1024 without truncation; a near-capacity 1920-token sequence at 2048 took
 2.39 s with a 2.60-GiB loading peak on this Mac/two-thread run. The bounded local
 preset is therefore **2048 tokens, one question/checkpoint/request**. It makes
-known language/qualification mistakes and remains advisory. Whole-stack target
-measurements are still required. See [raw measurements](FEASIBILITY.md).
+known language/qualification mistakes and remains advisory. Whole-stack Linux ARM measurements now pass in an isolated 2-CPU/4-GiB VM. See [production measurements](FEASIBILITY.md#production-release-validation). Low-power x86 throughput remains hardware-dependent.
 
 Users can host a stronger compatible model elsewhere. Choosing a model ID means
 selecting what that server provides; it does not make arbitrary weights compatible.

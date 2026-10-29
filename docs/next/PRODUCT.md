@@ -38,7 +38,7 @@ legacy compatibility or importer. All shipped material is in English.
 | Search | Text search/filters are included and need no model. Semantic search is outside this release; no placeholder switch or embedding dependency. |
 
 One model is loaded once locally. The local working preset is Laya English,
-chosen for lower measured RAM/latency than jevos, not yet production-validated.
+chosen for lower measured RAM/latency than jevos and verified in the production CPU service within the Linux resource budget.
 Users with stronger hardware may select another compatible hosted model;
 changing a model name selects what that endpoint serves, not arbitrary core downloads.
 

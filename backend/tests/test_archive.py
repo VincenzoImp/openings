@@ -140,3 +140,19 @@ def test_http_owner_csrf_and_revocable_tokens(tmp_path):
             ).status_code
             == 401
         )
+
+
+def test_merge_preserves_scores_as_outdated_and_cancels_old_work(workspace):
+    source = job(workspace)
+    target = job(workspace, url="https://jobs.lever.co/example/duplicate")
+    workspace.db.execute(
+        "INSERT INTO assessments(id,job_id,signature,profile_version,job_version,config_version,score,model,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+        ("old-score", source["id"], "source-signature", 0, 2, 0, 80, "synthetic", now()),
+    )
+    workspace.db.execute(
+        "INSERT INTO tasks(id,kind,job_id,state,next_run_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+        ("old-work", "score", source["id"], "running", now(), now(), now()),
+    )
+    merged = workspace.merge_jobs(source["id"], target["id"], source["version"], target["version"])
+    assert merged["score"] == 80 and merged["score_outdated"]
+    assert workspace.db.one("SELECT state FROM tasks WHERE id='old-work'")["state"] == "cancelled"

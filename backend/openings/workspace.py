@@ -329,13 +329,25 @@ class Workspace:
                 check_version(
                     c.execute("SELECT * FROM jobs WHERE id=?", (record_id,)).fetchone(), version
                 )
+            next_content = c.execute(
+                "SELECT max(v)+1 FROM (SELECT content_version v FROM jobs WHERE id IN (?,?) UNION ALL SELECT job_version v FROM assessments WHERE job_id IN (?,?))",
+                (source_id, target_id, source_id, target_id),
+            ).fetchone()[0]
+            c.execute(
+                "UPDATE tasks SET state='cancelled',updated_at=? WHERE job_id IN (?,?) AND state IN ('queued','running')",
+                (now(), source_id, target_id),
+            )
+            c.execute(
+                "UPDATE transfer_grants SET payload=json_set(payload,'$.job_id',?,'$.owner_id',CASE WHEN json_extract(payload,'$.owner_type')='job' THEN ? ELSE json_extract(payload,'$.owner_id') END) WHERE json_extract(payload,'$.job_id')=?",
+                (target_id, target_id, source_id),
+            )
             for table in ("postings", "applications", "events", "notes", "assessments", "tasks"):
                 c.execute(f"UPDATE {table} SET job_id=? WHERE job_id=?", (target_id, source_id))
             c.execute("UPDATE files SET job_id=? WHERE job_id=?", (target_id, source_id))
             c.execute("DELETE FROM jobs WHERE id=?", (source_id,))
             c.execute(
-                "UPDATE jobs SET version=version+1,content_version=content_version+1,updated_at=? WHERE id=?",
-                (now(), target_id),
+                "UPDATE jobs SET version=version+1,content_version=?,updated_at=? WHERE id=?",
+                (next_content, now(), target_id),
             )
             self.event("jobs_merged", target_id, payload={"previous_id": source_id}, conn=c)
         return self.get_job(target_id)
@@ -449,7 +461,10 @@ class Workspace:
             )
             self.validate_answers(questions, answers)
             if (
-                status in {"applied", "interview", "offer"}
+                (
+                    status in {"applied", "interview", "offer"}
+                    or (status == "closed" and changes["outcome"] == "accepted")
+                )
                 and not row["applied_at"]
                 and "applied_at" not in changes
             ):
@@ -532,6 +547,8 @@ class Workspace:
             observed = set(observed_by_app.get(app["id"], ()))
             if app["applied_at"]:
                 observed.add("applied")
+            if app["outcome"] == "accepted":
+                observed.add("offer")
             if "applied" not in observed:
                 continue
             sent += 1

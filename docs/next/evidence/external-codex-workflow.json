@@ -1,0 +1,65 @@
+{
+  "exit_code": 0,
+  "application_status": "draft",
+  "answers": {
+    "performance": "At Example Cloud, I added request tracing and revised core endpoints in Python APIs for a small developer platform, reducing API p95 latency by 20%. I documented the rollout and helped four colleagues operate the services."
+  },
+  "documents": [
+    {
+      "id": "1430adec58264a7d945ca048b33079de",
+      "kind": "resume",
+      "review_state": "draft"
+    },
+    {
+      "id": "d835e65bcb3d494184497418ce7869b9",
+      "kind": "cover_letter",
+      "review_state": "draft"
+    },
+    {
+      "id": "51194207cb7f4dfc9f78839a45f5dbbb",
+      "kind": "answers",
+      "review_state": "draft"
+    }
+  ],
+  "files": [
+    {
+      "name": "resume.pdf",
+      "size": 16773,
+      "media_type": "application/pdf"
+    },
+    {
+      "name": "resume.tex",
+      "size": 1484,
+      "media_type": "application/x-tex"
+    },
+    {
+      "name": "cover_letter.pdf",
+      "size": 12943,
+      "media_type": "application/pdf"
+    },
+    {
+      "name": "cover_letter.tex",
+      "size": 1545,
+      "media_type": "application/x-tex"
+    }
+  ],
+  "purpose": "Actual external Codex CLI session using the shipped skill and live production MCP; synthetic evidence only",
+  "codex_cli_version": "0.165.0",
+  "external_compiler": "Tectonic0.17.0",
+  "checks": {
+    "resume_and_cover_letter_compiled": true,
+    "answers_saved_to_application": true,
+    "draft_status_retained": true,
+    "all_documents_draft": true,
+    "external_agent_exit_success": true
+  },
+  "validation": {
+    "resume_pages": 1,
+    "cover_letter_pages": 1,
+    "all_transfer_sha256_and_bytes_verified": true,
+    "answer_characters": 222,
+    "answer_max_length": 500,
+    "extracted_text_inspected": true,
+    "missing_employment_end_date_visibly_flagged": true
+  }
+}

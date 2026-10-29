@@ -53,3 +53,25 @@ then exercise real MCP transport and frontend bindings. M1 is not yet complete.
 Fresh archive/auth, career/templates/documents, seven-area React dashboard, ATS/feed collection, persisted worker and optional scorer are integrated. 18 invariant tests and 13 real HTTP/MCP/Tectonic/file/backup checks pass (68 typed tools). Actual browser flows cover profile/evidence/claims/templates, frozen contexts, immutable document revisions, PDF uploads, approval, owner tokens and portable restore; live Ashby preview/run collected 32 jobs. Root fixed scoped backup/restore, full streaming record export, direct-stage funnel counts and cross-job idempotency misuse.
 
 Remaining release checks: actual model-driven agent session using the shipped skill, Docker install/restore and 2 CPU / 4 GiB whole-stack resource measurements, final integrated desktop/mobile inspection. No personal data or deployed installation was modified.
+
+## Release candidate validation
+
+All functional areas are integrated.30 invariant cases pass; frontend build/audit
+and locked core runtime audit are clean. Actual external Codex skill workflow
+created tailored CV/letter/answers, compiled and inspected two one-page PDFs,
+verified four exact PDF/source transfers, and preserved draft status/review.
+
+Production Docker checks passed21cases including206-record export and restore
+on an independent empty installation with exact document bytes and distinct
+owner authentication. Final core+scorer images ran in a2CPU/4GiB/no-swap Linux
+ARM VM:1913tokens untruncated, core responsive, conservative combined cgroup
+peaks~2.80GiB, noOOM, local disable releases model child. Overlong inputs fail
+without replacing the previous score. API/MCP scoring controls and real ATS
+collection also passed. Final UI checks cover desktop/mobile layout, real PDF
+preview, Kanban/Sankey counts, nested modal keys, >200-record archives and
+versioned deletes. Root corrected merge freshness/cancellation and non-destructive
+MCP metadata; known certifi vulnerability fixed in locked dependencies.
+
+Remaining: final GitHub CI builds for both core architectures, task-worktree
+cleanup and delivery. No deployed instance, personal data, main branch, release
+tag or published image has been changed.

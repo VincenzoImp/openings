@@ -53,3 +53,9 @@ use remote mode; collection, documents and tracking continue independently.
 
 The [scorer implementation notes](../../scorer/README.md) describe its exact
 service subset. Release resource evidence lives in `docs/next/evidence/`.
+
+The release check used an isolated Linux ARM64 VM with 2 CPUs / 4 GiB and no swap.
+An untruncated 1913-token classification finished in about 9 seconds; the sum
+of core/scorer cgroup peaks was about 2.80 GiB, including filesystem cache, with
+no OOM. Core traffic stayed responsive. Disabling local scoring released the
+model process. This is a measured reference, not a low-power x86 speed promise.

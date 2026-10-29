@@ -168,3 +168,36 @@ throughput. Linux amd64/arm64 CPU wheels were also verified in the official
 index; use CPU-only wheels in a glibc-based image, keeping model dependencies
 out of the core. [Package check](evidence/cpu-package-check.json),
 [official installation guidance](https://pytorch.org/get-started/locally/).
+
+## Production release validation
+
+The actual production images ran together inside a clean Linux ARM64 VM with
+2 CPUs, 4 GiB RAM and no swap. Compose enforced core 0.5 CPU / 512 MiB plus
+scorer 1.5 CPU / 3584 MiB. An untruncated 1913-token request completed while the
+core remained responsive. The sum of each container's measured cgroup memory
+peaks was about 2.80 GiB, including charged filesystem cache; neither container
+reported an OOM. These are measured container peaks, not an RSS estimate.
+Disabling local scoring terminated the model child; remaining memory includes
+reclaimable model-file cache. Low-power x86 throughput is not established by
+this ARM virtual-machine measurement. The separate non-AVX kernel probe above
+remains the target-CPU compatibility evidence.
+
+The application/scorer images were rebuilt from final sources and restarted
+with persisted data. A separate empty installation restored 206 jobs and exact
+document bytes while retaining its own owner and rejecting the originating
+installation's token. The 21 Docker workflow checks also covered concurrent
+dedupe, optimistic edits, dismiss/forget, scoped transfers, a full export beyond
+200 records, MCP origin and invalid restore handling.
+
+An actual external Codex CLI session read the shipped skill and frozen context,
+wrote tailored CV/letter/answers, compiled both PDFs externally, checked page
+count/text, verified four uploaded/downloaded files by SHA-256, and left all
+review/status fields in draft. Browser checks exercised the seven production
+screens, populated Kanban/Sankey, actual PDF preview, modal keyboard behavior,
+versioned deletion and archives beyond200 records on desktop/390px mobile.
+
+Evidence: [Linux resources](evidence/production-linux-resources.json),
+[context/overflow handling](evidence/production-context-limits.json),
+[Docker workflow](evidence/production-docker-workflow.json),
+[external Codex](evidence/external-codex-workflow.json),
+[production MCP transport](evidence/production-agent-roundtrip.json).

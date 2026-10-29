@@ -2,7 +2,7 @@
   "updated": "2026-10-29",
   "branch": "codex/openings-next",
   "base_commit": "1deea6624da8474229b606b07ec669e6e75ae0f9",
-  "phase": "integration_and_release_validation",
+  "phase": "release_candidate_validation",
   "production_rewrite_started": true,
   "production_data_accessed": false,
   "production_deployed": false,
@@ -29,9 +29,16 @@
     "M3.4",
     "M4.1",
     "M4.2",
-    "M4.3"
+    "M4.3",
+    "R0.6",
+    "M3.5",
+    "M4.4",
+    "M4.5",
+    "M5.2",
+    "M5.3",
+    "M5.4"
   ],
-  "next_task": "M4.4 and M5: actual external agent, Docker installation and resource validation",
+  "next_task": "Check final GitHub CI (amd64/arm64 core builds), then clean task worktrees and deliver the release-ready branch",
   "release_gates": [
     "Core/remote-scoring installation passes practical UI/REST/MCP/backup checks within 2 CPU / 4 GiB",
     "Bundled local preset passes whole-stack startup/steady target measurements; publish advisory-score and truncation limitations",
@@ -74,7 +81,7 @@
     "scoring_configuration": "base URL, explicit served model and optional API key; validate needed score contract; no universal protocol compatibility claim",
     "semantic_search": "outside frozen release; built-in text search/filters only",
     "dashboard": "Dossier-inspired English manual interface, Inbox, Companies, Career, Templates, Applications list/Kanban, file previews/history and Sankey funnel",
-    "agent_skill": "optional repository skill draft; discover actual MCP tools/resources and use stored context/rules; not installed or production-validated",
+    "agent_skill": "Supplied optional skill validated against actual external Codex CLI and production MCP; no user-account installation performed",
     "verification": "few data-invariant tests plus hands-on UI/REST/MCP/external-agent workflows; no coverage target",
     "out_of_scope": [
       "Gmail",
@@ -88,16 +95,15 @@
     "release_scope": "frozen complete Openings 1.0; no planned later feature phase"
   },
   "not_yet_verified": [
-    "Model-driven external Codex workflow against the shipped skill",
-    "Fresh Docker/Linux ARM and x86 installation, restore and whole-stack resource envelope",
-    "Final desktop/mobile inspection of all seven integrated dashboard areas"
+    "Final GitHub CI Linux amd64/arm64 core image builds"
   ],
   "latest_probe": {
     "dashboard": "evidence/dashboard-smoke.json: 33 browser preview checks pass",
     "interfaces": "evidence/mcp-file-probe.json: 15 live MCP/file/backup checks pass",
     "scoring": "evidence/long-context-resource-probe.json: 1920 actual tokens, no truncation, 2.39s, 2.60GiB Mac peak",
-    "qualification": "preflight proofs and design preview; not a production application or target deployment",
-    "target_runtime": "evidence/non-avx-runtime-probe.json: non-AVX target CPU import and FP32 kernels passed, temporary environment removed"
+    "qualification": "Production workflows verified; GitHub architecture checks pending; no deployment or release publication performed",
+    "target_runtime": "evidence/non-avx-runtime-probe.json: non-AVX target CPU import and FP32 kernels passed, temporary environment removed",
+    "production_resources": "evidence/production-linux-resources.json: final production images,1913tokens,~2.80GiB conservative combined cgroup peak, noOOM within2CPU/4GiB VM"
   },
   "production_authorized": true,
   "release_target": "1.0.0",
@@ -110,18 +116,18 @@
     "frontend": {
       "branch": "codex/openings-ui",
       "scope": "frontend/",
-      "status": "integrated; final browser QA"
+      "status": "integrated and validated"
     },
     "discovery": {
       "branch": "codex/openings-discovery",
       "scope": "discovery.py, worker.py, scorer/",
-      "status": "integrated; isolated Linux validation"
+      "status": "integrated and validated"
     },
     "career": {
       "branch": "codex/openings-career",
       "scope": "career.py, documents.py, examples/",
-      "status": "integrated; release packaging"
+      "status": "integrated and validated"
     }
   },
-  "latest_implementation_check": "18 invariant tests and 13 real HTTP/MCP/external Tectonic/file/backup checks pass; 68 MCP tools; real public Ashby collection and dashboard profile/template/document/restore flows verified"
+  "latest_implementation_check": "30 invariant cases pass; frontend build/audit and core runtime audit clean; 21 production Docker workflow checks; real external Codex+Tectonic+MCP document workflow; final Linux1913-token whole-stack2CPU/4GiB resource proof passes"
 }
