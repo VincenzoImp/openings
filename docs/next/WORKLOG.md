@@ -34,3 +34,16 @@ being implemented and are explicit release acceptance, not hidden promises.
 Next task after go: M1.1. Read STATE.json and GOAL.md; no new feature discovery
 or legacy-refactor pass is needed. Add concise entries here at meaningful
 integration checkpoints, not for every edit.
+
+## M1 foundation started
+
+User authorized execution; persistent goal active. Fresh backend/schema/auth and
+shared archive DTO/services replaced the old backend/config/tests. REST and
+MCP core operations share the service; no old application dependencies remain.
+Core HTTP smoke plus seven data-invariant checks pass (dedupe/corrections,
+material-content versions, optimistic edits, independent attempts, forget and
+exact-byte online backup, owner/CSRF/token boundaries). Frontend, discovery and
+career/documents build independently against this shared contract.
+
+Next root work: complete operational backup/restore and integrate peer domains;
+then exercise real MCP transport and frontend bindings. M1 is not yet complete.

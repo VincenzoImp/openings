@@ -2,8 +2,8 @@
   "updated": "2026-10-29",
   "branch": "codex/openings-next",
   "base_commit": "1deea6624da8474229b606b07ec669e6e75ae0f9",
-  "phase": "ready_for_user_start",
-  "production_rewrite_started": false,
+  "phase": "parallel_implementation",
+  "production_rewrite_started": true,
   "production_data_accessed": false,
   "production_deployed": false,
   "completed": [
@@ -14,9 +14,10 @@
     "R0.5",
     "R0.7",
     "R0.8",
-    "R0.9"
+    "R0.9",
+    "M1.1"
   ],
-  "next_task": "M1.1",
+  "next_task": "M1.2",
   "release_gates": [
     "Core/remote-scoring installation passes practical UI/REST/MCP/backup checks within 2 CPU / 4 GiB",
     "Bundled local preset passes whole-stack startup/steady target measurements; publish advisory-score and truncation limitations",
@@ -84,10 +85,29 @@
     "qualification": "preflight proofs and design preview; not a production application or target deployment",
     "target_runtime": "evidence/non-avx-runtime-probe.json: non-AVX target CPU import and FP32 kernels passed, temporary environment removed"
   },
-  "production_authorized": false,
+  "production_authorized": true,
   "release_target": "1.0.0",
   "goal_brief": "docs/next/GOAL.md",
   "entry_point": "docs/next/README.md",
   "feasibility_ready": true,
-  "review_checkpoint": "one local planning/feasibility commit; no active persistent goal until user start"
+  "review_checkpoint": "9bfd6d7",
+  "active_goal": "Openings 1.0 complete frozen implementation",
+  "parallel_work": {
+    "frontend": {
+      "branch": "codex/openings-ui",
+      "scope": "frontend/",
+      "status": "building"
+    },
+    "discovery": {
+      "branch": "codex/openings-discovery",
+      "scope": "discovery.py, worker.py, scorer/",
+      "status": "practical checks"
+    },
+    "career": {
+      "branch": "codex/openings-career",
+      "scope": "career.py, documents.py, examples/",
+      "status": "practical checks"
+    }
+  },
+  "latest_implementation_check": "Core archive/auth/CSRF/application/backup practical HTTP smoke and 7 data-invariant tests pass"
 }

@@ -2,10 +2,9 @@
 
 ## Start and resume
 
-This is a prepared execution brief. Production implementation awaits the user's
-explicit start signal. When that signal arrives, create the requested persistent
-goal using this objective and the actual checkout path; reuse an existing active
-goal rather than creating another. No token budget was requested.
+The user authorized production implementation. A persistent goal is active for
+this objective and checkout. Reuse it on resume rather than creating another.
+No token budget was requested.
 
 Work on `codex/openings-next`. Read `README.md`, `STATE.json`, `PRODUCT.md`,
 `DESIGN.md` and `PLAN.md` in this directory. STATE.json is the current checkpoint;

@@ -2,7 +2,7 @@
 
 A fresh implementation on branch `codex/openings-next`, based on `1deea662`.
 Old Openings and Dossier are references, not the new application scaffold.
-Production implementation awaits the user's explicit start signal.
+Production implementation was authorized; follow STATE.json for the current task.
 
 The app owns career knowledge, company watch, collection, optional scoring,
 application tracking and documents. Dashboard serves people, REST serves scripts,
@@ -36,7 +36,7 @@ English.** Users may keep their own content in any language.
 The [skill draft](../../skills/openings-workspace/SKILL.md) is not installed or
 validated against a production MCP server. MCP must remain usable without it.
 
-Next task after the start signal: **M1.1**, a fresh scaffold and minimal initial schema.
+Initial implementation task: **M1.1**, a fresh scaffold and minimal initial schema.
 `experiments/next` contains historical feasibility probes, not production modules.
 Use a few invariant tests and real dashboard/API/MCP/agent walkthroughs; no
 coverage target. Update PLAN.md and STATE.json after each usable increment.

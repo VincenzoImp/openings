@@ -1,7 +1,6 @@
 # Delivery plan
 
-Current scope: [PRODUCT.md](PRODUCT.md). Next task **M1.1**. Production work has
-not started. Update this file and STATE.json after each usable increment with
+Current scope: [PRODUCT.md](PRODUCT.md). Next task **M1.1**. Production implementation is authorized and in progress. Update this file and STATE.json after each usable increment with
 what works, a concise check/result, remaining issues and the exact next task.
 
 ## R0: completed research

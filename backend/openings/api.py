@@ -1,0 +1,227 @@
+from fastapi import APIRouter, Query
+
+from .models import (
+    ApplicationInput,
+    ApplicationPatch,
+    JobInput,
+    JobPatch,
+    MergeInput,
+    NoteInput,
+    TriageInput,
+)
+
+
+def register_core(router: APIRouter, workspace):
+    @router.get("/workspace")
+    def info():
+        return {
+            "name": "Openings",
+            "version": "1.0.0",
+            "api_base": "/api/v1",
+            "mcp_endpoint": "/mcp",
+            "single_owner": True,
+        }
+
+    @router.get("/overview")
+    def overview(since: str | None = None):
+        return workspace.overview(since)
+
+    @router.get("/jobs")
+    def jobs(
+        q: str = "",
+        triage: str | None = None,
+        company: str | None = None,
+        limit: int = Query(50, ge=1, le=200),
+        offset: int = Query(0, ge=0),
+        sort: str = "newest",
+    ):
+        return workspace.list_jobs(q, triage, company, limit, offset, sort)
+
+    @router.post("/jobs")
+    async def ingest(value: JobInput):
+        if value.url and not value.posting:
+            from .fetching import read_posting
+
+            extracted = await read_posting(value.url)
+            updates = {
+                key: item
+                for key, item in extracted.items()
+                if key in {"title", "posting"} and not getattr(value, key)
+            }
+            value = value.model_copy(update=updates)
+        return workspace.ingest_job(value)
+
+    @router.get("/jobs/{job_id}")
+    def get_job(job_id: str):
+        result = workspace.get_job(job_id)
+        result["postings"] = workspace.db.all(
+            "SELECT id,source_id,identity,url,first_seen_at,last_seen_at FROM postings WHERE job_id=?",
+            (job_id,),
+        )
+        return result
+
+    @router.patch("/jobs/{job_id}")
+    def edit_job(job_id: str, value: JobPatch):
+        return workspace.update_job(job_id, value)
+
+    @router.post("/jobs/{job_id}/triage")
+    def triage(job_id: str, value: TriageInput):
+        return workspace.set_triage(job_id, value.triage, value.expected_version)
+
+    @router.post("/jobs/{job_id}/merge")
+    def merge(job_id: str, value: MergeInput):
+        return workspace.merge_jobs(
+            job_id, value.target_id, value.expected_version, value.target_version
+        )
+
+    @router.delete("/jobs/{job_id}")
+    def forget(job_id: str):
+        return workspace.forget_job(job_id)
+
+    @router.get("/jobs/{job_id}/notes")
+    def notes(job_id: str):
+        return workspace.list_notes(job_id)
+
+    @router.post("/jobs/{job_id}/notes")
+    def note(job_id: str, value: NoteInput):
+        return workspace.add_note(job_id, value)
+
+    @router.delete("/notes/{note_id}")
+    def remove_note(note_id: str):
+        return workspace.delete_note(note_id)
+
+    @router.get("/applications")
+    def applications(
+        status: str | None = None,
+        limit: int = Query(100, ge=1, le=200),
+        offset: int = Query(0, ge=0),
+    ):
+        return workspace.list_applications(status, limit, offset)
+
+    @router.post("/applications")
+    def create_application(value: ApplicationInput):
+        return workspace.create_application(value)
+
+    @router.get("/applications/{application_id}")
+    def get_application(application_id: str):
+        return workspace.get_application(application_id)
+
+    @router.patch("/applications/{application_id}")
+    def edit_application(application_id: str, value: ApplicationPatch):
+        return workspace.update_application(application_id, value)
+
+    @router.get("/applications/{application_id}/events")
+    def events(application_id: str):
+        return workspace.application_events(application_id)
+
+
+def register_core_mcp(mcp, workspace):
+    @mcp.tool()
+    def workspace_info() -> dict:
+        """Read workspace capabilities. Use REST transfer grants for file bytes."""
+        return {
+            "name": "Openings",
+            "version": "1.0.0",
+            "api_base": "/api/v1",
+            "workflow": "Read career, templates and stored instructions; prepare a frozen context; write and compile externally; submit document revisions and PDF/source files; track progress explicitly.",
+        }
+
+    @mcp.tool()
+    def jobs_search(
+        q: str = "",
+        triage: str | None = None,
+        company: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        sort: str = "newest",
+    ) -> dict:
+        """Search the portable job archive; scores are indicative and may be outdated."""
+        return workspace.list_jobs(q, triage, company, limit, offset, sort)
+
+    @mcp.tool()
+    def job_get(job_id: str) -> dict:
+        """Read full job text, metadata, versions and assessment provenance."""
+        return workspace.get_job(job_id)
+
+    @mcp.tool()
+    async def job_ingest(value: JobInput) -> dict:
+        """Add a URL, pasted text or structured job. Duplicate identities preserve history."""
+        if value.url and not value.posting:
+            from .fetching import read_posting
+
+            extracted = await read_posting(value.url)
+            value = value.model_copy(
+                update={
+                    k: v
+                    for k, v in extracted.items()
+                    if k in {"title", "posting"} and not getattr(value, k)
+                }
+            )
+        return workspace.ingest_job(value)
+
+    @mcp.tool()
+    def job_update(job_id: str, value: JobPatch) -> dict:
+        """Correct job fields using the version returned by job_get."""
+        return workspace.update_job(job_id, value)
+
+    @mcp.tool()
+    def job_triage(job_id: str, value: TriageInput) -> dict:
+        """Set inbox/saved/dismissed. Dismissed jobs remain remembered and excluded from scoring."""
+        return workspace.set_triage(job_id, value.triage, value.expected_version)
+
+    @mcp.tool()
+    def job_forget(job_id: str) -> dict:
+        """Permanently delete a job and its application/file history. Future acquisition is new."""
+        return workspace.forget_job(job_id)
+
+    @mcp.tool()
+    def job_merge(job_id: str, value: MergeInput) -> dict:
+        """Explicitly merge verified duplicate jobs, preserving postings, applications and notes."""
+        return workspace.merge_jobs(
+            job_id, value.target_id, value.expected_version, value.target_version
+        )
+
+    @mcp.tool()
+    def notes_list(job_id: str) -> dict:
+        """Read notes retained with a job."""
+        return workspace.list_notes(job_id)
+
+    @mcp.tool()
+    def note_add(job_id: str, value: NoteInput) -> dict:
+        """Store a note, optionally associated with a particular application attempt."""
+        return workspace.add_note(job_id, value)
+
+    @mcp.tool()
+    def note_delete(note_id: str) -> dict:
+        """Remove an individual note."""
+        return workspace.delete_note(note_id)
+
+    @mcp.tool()
+    def applications_list(status: str | None = None, limit: int = 100, offset: int = 0) -> dict:
+        """List independent application attempts, including drafts and closed outcomes."""
+        return workspace.list_applications(status, limit, offset)
+
+    @mcp.tool()
+    def application_get(application_id: str) -> dict:
+        """Read a single application and its job."""
+        return workspace.get_application(application_id)
+
+    @mcp.tool()
+    def application_create(value: ApplicationInput) -> dict:
+        """Create a draft attempt. This never sends an application or generates documents."""
+        return workspace.create_application(value)
+
+    @mcp.tool()
+    def application_update(application_id: str, value: ApplicationPatch) -> dict:
+        """Record progress/questions/answers explicitly; editing documents never marks sent."""
+        return workspace.update_application(application_id, value)
+
+    @mcp.tool()
+    def application_history(application_id: str) -> dict:
+        """Read the recorded lifecycle events of an attempt."""
+        return workspace.application_events(application_id)
+
+    @mcp.tool()
+    def overview_get(since: str | None = None) -> dict:
+        """Read funnel counts and activity from recorded application history."""
+        return workspace.overview(since)
