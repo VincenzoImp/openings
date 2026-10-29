@@ -1,6 +1,6 @@
 {
   "format": "openings-operation-inventory-v1",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "status": "verified-logical-operation-map",
   "api_prefix": "/api/v1",
   "operations": [

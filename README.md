@@ -71,7 +71,7 @@ Document generation and LaTeX compilation run in your external agent. Openings
 tracks the work; sending applications and automating portals stay outside the app.
 There is no built-in AI subscription, chat, server browser or TeX compiler.
 
-Version **0.5.0** is a substantial rewrite. Previous databases/configuration are
+Version **0.5** is a substantial rewrite. Previous databases/configuration are
 not compatible, and stable API/data-format compatibility is not yet promised.
 The default core loads no model; the optional local-scoring deployment has a
 combined **2 CPU / 4 GiB** Compose budget. See the [hardware notes](docs/user/scoring.md).
