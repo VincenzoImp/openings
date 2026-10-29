@@ -7,8 +7,8 @@ import {
   type ListResult,
   type WorkspaceFile,
 } from "./api";
-import { useResource, useWorkspace } from "./state";
-import { Button, ErrorBox, Icon } from "./ui";
+import { useDebounce, useResource, useWorkspace } from "./state";
+import { Button, Dialog, ErrorBox, Field, Icon, Pagination } from "./ui";
 export function FileManager({
   ownerType,
   ownerId,
@@ -22,10 +22,13 @@ export function FileManager({
   preview?: boolean;
   readOnly?: boolean;
 }) {
+  const [query, setQuery] = useState(""),
+    [offset, setOffset] = useState(0),
+    [inspecting, setInspecting] = useState<WorkspaceFile | null>(null);
+  const debounced = useDebounce(query);
   const { data, error, reload } = useResource<ListResult<WorkspaceFile>>(
-    `/files?owner_type=${ownerType}&owner_id=${ownerId}`,
+    `/files?owner_type=${ownerType}&owner_id=${ownerId}&limit=20&offset=${offset}&q=${encodeURIComponent(debounced)}`,
     { items: [], total: 0 },
-    true,
   );
   const { mutate, pending, notify } = useWorkspace();
   const [pdf, setPdf] = useState<string | null>(null);
@@ -57,12 +60,33 @@ export function FileManager({
   return (
     <>
       {error && <ErrorBox message={error} retry={reload} />}
+      {(data.total > 5 || query) && (
+        <Field label="Find a file">
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setOffset(0);
+            }}
+            placeholder="Search file names"
+          />
+        </Field>
+      )}
       <div className="document-files">
         {data.items.map((file) => (
           <div className="documentrow" key={file.id}>
             <Icon name="file" />
             <div className="doccopy">
-              <strong>{file.name}</strong>
+              <button
+                className="table-link"
+                onClick={() =>
+                  api<WorkspaceFile>(`/files/${file.id}`)
+                    .then(setInspecting)
+                    .catch((e) => notify(e.message, true))
+                }
+              >
+                <strong>{file.name}</strong>
+              </button>
               <small>
                 {Math.max(1, Math.round(file.size / 1024))} KB ·{" "}
                 {date(file.created_at)}
@@ -97,6 +121,48 @@ export function FileManager({
           </div>
         ))}
       </div>
+      {data.total > 20 && (
+        <Pagination
+          offset={offset}
+          total={data.total}
+          limit={20}
+          onChange={setOffset}
+        />
+      )}
+      {inspecting && (
+        <Dialog title={inspecting.name} onClose={() => setInspecting(null)}>
+          <dl className="detailfacts">
+            <div>
+              <dt>Media type</dt>
+              <dd>{inspecting.media_type}</dd>
+            </div>
+            <div>
+              <dt>Size</dt>
+              <dd>{inspecting.size.toLocaleString()} bytes</dd>
+            </div>
+            <div>
+              <dt>Added</dt>
+              <dd>{date(inspecting.created_at)}</dd>
+            </div>
+            <div className="full">
+              <dt>SHA-256</dt>
+              <dd className="hash-value">
+                {inspecting.sha256 || "Not available"}
+              </dd>
+            </div>
+          </dl>
+          <Button
+            icon="download"
+            onClick={() =>
+              fileUrl(inspecting)
+                .then((url) => window.open(url, "_blank", "noopener"))
+                .catch((e) => notify(e.message, true))
+            }
+          >
+            Download file
+          </Button>
+        </Dialog>
+      )}
       {!readOnly && (
         <label className={`btn upload-button ${pending ? "disabled" : ""}`}>
           <Icon name="upload" />

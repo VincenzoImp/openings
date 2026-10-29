@@ -2,13 +2,23 @@ import { useEffect, useState, type FormEvent } from "react";
 import {
   api,
   version,
+  jsonValue,
   type Instructions,
   type ListResult,
   type Template,
 } from "../api";
 import { FileManager } from "../files";
-import { useResource, useWorkspace } from "../state";
 import {
+  confirmLeave,
+  useDebounce,
+  useResource,
+  useUrlFilters,
+  useUrlState,
+  useWorkspace,
+} from "../state";
+import {
+  AdvancedJson,
+  Pagination,
   Button,
   Dialog,
   Empty,
@@ -20,29 +30,30 @@ import {
   Tabs,
 } from "../ui";
 export default function TemplatesPage() {
+  const [filters, setFilters] = useUrlFilters({ q: "", kind: "", offset: "0" });
+  const query = useDebounce(filters.q);
   const resource = useResource<ListResult<Template>>(
-      "/templates",
+      `/templates?summary=true&limit=30&offset=${filters.offset}&q=${encodeURIComponent(query)}&kind=${filters.kind}`,
       {
         items: [],
         total: 0,
       },
-      true,
     ),
     instructions = useResource<Instructions>("/instructions", {
       general: "",
       version: 1,
     });
   const { mutate, pending } = useWorkspace();
-  const [selected, setSelected] = useState<string | null>(null),
-    [tab, setTab] = useState("instructions"),
-    [creating, setCreating] = useState(false),
+  const [selected, setSelected] = useUrlState("template", "");
+  const [tab, setTab] = useUrlState("section", "instructions");
+  const [creating, setCreating] = useState(false),
     [removing, setRemoving] = useState(false);
-  const template =
-    resource.data.items.find((t) => t.id === selected) ||
-    resource.data.items[0];
-  useEffect(() => {
-    if (template) setSelected(template.id);
-  }, [template?.id]);
+  const templateId = selected || resource.data.items[0]?.id;
+  const detail = useResource<Template | null>(
+    templateId ? `/templates/${templateId}` : null,
+    null,
+  );
+  const template = detail.data?.id === templateId ? detail.data : null;
   async function saveInstructions(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -62,13 +73,14 @@ export default function TemplatesPage() {
     const f = new FormData(e.currentTarget),
       body = {
         name: f.get("name"),
+        kind: f.get("kind"),
         is_default: f.get("is_default") === "on",
         ...(tab === "source"
           ? { tex: f.get("tex") }
           : {
               guidance: f.get("guidance"),
               rules: {
-                ...template.rules,
+                ...jsonValue(f, "rules", template.rules),
                 max_bullet_chars:
                   Number(f.get("max_bullet_chars")) || undefined,
                 max_pages: Number(f.get("max_pages")) || undefined,
@@ -94,6 +106,26 @@ export default function TemplatesPage() {
       {resource.error && (
         <ErrorBox message={resource.error} retry={resource.reload} />
       )}
+      <div className="toolbar">
+        <div className="search">
+          <Icon name="search" />
+          <input
+            aria-label="Search templates"
+            placeholder="Find a template"
+            value={filters.q}
+            onChange={(e) => setFilters({ q: e.target.value, offset: "0" })}
+          />
+        </div>
+        <select
+          aria-label="Template kind"
+          value={filters.kind}
+          onChange={(e) => setFilters({ kind: e.target.value, offset: "0" })}
+        >
+          <option value="">All document types</option>
+          <option value="resume">CV</option>
+          <option value="cover_letter">Cover letter</option>
+        </select>
+      </div>
       <section className="card sectioncard global-instructions">
         <div className="sectiontitle">
           <div>
@@ -125,7 +157,7 @@ export default function TemplatesPage() {
           </form>
         )}
       </section>
-      {resource.loading ? (
+      {resource.loading || (templateId && !template && !detail.error) ? (
         <Loading />
       ) : !template ? (
         <section className="card form-section">
@@ -148,7 +180,9 @@ export default function TemplatesPage() {
               <button
                 key={item.id}
                 className={`template-option ${template.id === item.id ? "active" : ""}`}
-                onClick={() => setSelected(item.id)}
+                onClick={() => {
+                  if (confirmLeave()) setSelected(item.id);
+                }}
               >
                 <div className="template-banner">
                   <span className="mini-page">
@@ -211,6 +245,12 @@ export default function TemplatesPage() {
                 onSubmit={saveTemplate}
                 key={`${template.id}-${template.version}-${tab}`}
               >
+                <Field label="Document type">
+                  <select name="kind" defaultValue={template.kind}>
+                    <option value="resume">CV</option>
+                    <option value="cover_letter">Cover letter</option>
+                  </select>
+                </Field>
                 <Field label="Template name">
                   <input name="name" defaultValue={template.name} required />
                 </Field>
@@ -244,7 +284,7 @@ export default function TemplatesPage() {
                         <input
                           name="max_bullet_chars"
                           type="number"
-                          min={1}
+                          min={20}
                           max={5000}
                           defaultValue={template.rules.max_bullet_chars || ""}
                         />
@@ -254,7 +294,7 @@ export default function TemplatesPage() {
                           name="max_pages"
                           type="number"
                           min={1}
-                          max={20}
+                          max={30}
                           defaultValue={template.rules.max_pages || ""}
                         />
                       </Field>
@@ -268,6 +308,11 @@ export default function TemplatesPage() {
                         />
                       </Field>
                     </div>
+                    <AdvancedJson
+                      name="rules"
+                      label="Additional template rules"
+                      value={template.rules}
+                    />
                   </>
                 )}
                 <label className="checkline">
@@ -291,6 +336,16 @@ export default function TemplatesPage() {
             )}
           </section>
         </div>
+      )}
+      <Pagination
+        offset={Number(filters.offset) || 0}
+        total={resource.data.total}
+        onChange={(offset) => {
+          if (confirmLeave()) setFilters({ offset: String(offset) });
+        }}
+      />
+      {detail.error && (
+        <ErrorBox message={detail.error} retry={detail.reload} />
       )}
       {creating && (
         <CreateTemplate
@@ -327,7 +382,7 @@ export default function TemplatesPage() {
                   )
                 ) {
                   setRemoving(false);
-                  setSelected(null);
+                  setSelected("");
                 }
               }}
             >

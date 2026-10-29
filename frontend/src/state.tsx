@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -41,7 +42,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setPending((n) => n + 1);
       try {
         await action();
-        refresh();
+        clearSubmittedForm();
         notify(message);
         return true;
       } catch (error) {
@@ -56,7 +57,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         setPending((n) => n - 1);
       }
     },
-    [notify, refresh],
+    [notify],
   );
   return (
     <Context.Provider
@@ -132,6 +133,17 @@ export function useResource<T>(
   allPages = false,
 ) {
   const { revision } = useWorkspace();
+  const [changed, setChanged] = useState(0);
+  useEffect(() => {
+    const listener = (event: Event) => {
+      if (path && affected(path, (event as CustomEvent<string>).detail))
+        setChanged((n) => n + 1);
+    };
+    window.addEventListener("openings:changed", listener);
+    return () => window.removeEventListener("openings:changed", listener);
+  }, [path]);
+  const loaded = useRef(false);
+  const previousPath = useRef(path);
   const [data, setData] = useState(initial),
     [loading, setLoading] = useState(Boolean(path)),
     [error, setError] = useState<string | null>(null),
@@ -141,11 +153,18 @@ export function useResource<T>(
       setLoading(false);
       return;
     }
+    if (previousPath.current !== path) {
+      previousPath.current = path;
+      loaded.current = false;
+    }
     const abort = new AbortController();
-    setLoading(true);
+    if (!loaded.current) setLoading(true);
     setError(null);
     readResource<T>(path, abort.signal, allPages)
-      .then(setData)
+      .then((value) => {
+        if (!loaded.current || !hasDirtyForms()) setData(value);
+        loaded.current = true;
+      })
       .catch((e) => {
         if (!abort.signal.aborted)
           setError(
@@ -156,7 +175,7 @@ export function useResource<T>(
         if (!abort.signal.aborted) setLoading(false);
       });
     return () => abort.abort();
-  }, [path, revision, local, allPages]);
+  }, [path, revision, local, allPages, changed]);
   return {
     data,
     loading,
@@ -164,4 +183,157 @@ export function useResource<T>(
     reload: () => setLocal((n) => n + 1),
     setData,
   };
+}
+
+function affected(read: string, changed: string) {
+  const scope = (value: string) =>
+    value.split("?")[0].split("/").filter(Boolean)[0];
+  const a = scope(read),
+    b = scope(changed);
+  if (a === b) return true;
+  if (a === "overview")
+    return ["jobs", "applications", "scoring", "sources"].includes(b);
+  if (a === "jobs") return ["scoring", "notes"].includes(b);
+  if (a === "applications") return ["contexts", "documents"].includes(b);
+  if (
+    a === "sources" ||
+    a === "providers" ||
+    a === "collection" ||
+    a === "tasks"
+  )
+    return ["sources", "providers", "collection", "tasks"].includes(b);
+  return false;
+}
+let submittedForm: HTMLFormElement | null = null;
+export function hasDirtyForms(scope: ParentNode = document) {
+  return !!scope.querySelector("form[data-dirty=true]");
+}
+export function confirmLeave(scope: ParentNode = document) {
+  if (!hasDirtyForms(scope)) return true;
+  if (!window.confirm("You have unsaved changes. Leave and discard them?"))
+    return false;
+  scope
+    .querySelectorAll<HTMLFormElement>("form[data-dirty=true]")
+    .forEach((form) => {
+      form.dataset.dirty = "false";
+    });
+  return true;
+}
+function clearSubmittedForm() {
+  if (submittedForm) submittedForm.dataset.dirty = "false";
+  submittedForm = null;
+}
+export function useFormProtection() {
+  useEffect(() => {
+    const mark = (event: Event) => {
+      const target = event.target as HTMLElement;
+      const form = target.closest("form");
+      if (form && !form.hasAttribute("data-filter-form"))
+        form.dataset.dirty = "true";
+    };
+    const click = (event: Event) => {
+      const target = event.target as HTMLElement;
+      if (target.closest("[data-dirty-control]")) mark(event);
+      const button = target.closest("button");
+      const scope = button?.closest("dialog") || document;
+      if (button?.textContent?.trim() === "Cancel" && !confirmLeave(scope)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    const submit = (event: Event) => {
+      submittedForm = event.target as HTMLFormElement;
+    };
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (hasDirtyForms()) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    document.addEventListener("input", mark, true);
+    document.addEventListener("change", mark, true);
+    document.addEventListener("submit", submit, true);
+    document.addEventListener("click", click, true);
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => {
+      document.removeEventListener("input", mark, true);
+      document.removeEventListener("change", mark, true);
+      document.removeEventListener("submit", submit, true);
+      document.removeEventListener("click", click, true);
+      window.removeEventListener("beforeunload", beforeUnload);
+    };
+  }, []);
+}
+export function useUrlState(key: string, initial: string) {
+  const read = () =>
+    (new URLSearchParams(location.hash.split("?")[1] || "").get(key) ??
+      initial) as string;
+  const [value, setValue] = useState<string>(read);
+  useEffect(() => {
+    const sync = () => setValue(read());
+    window.addEventListener("hashchange", sync);
+    window.addEventListener("popstate", sync);
+    return () => {
+      window.removeEventListener("hashchange", sync);
+      window.removeEventListener("popstate", sync);
+    };
+  }, [key]);
+  const update = (next: string) => {
+    const [page, query = ""] = location.hash.split("?");
+    const params = new URLSearchParams(query);
+    if (next === initial || !next) params.delete(key);
+    else params.set(key, next);
+    history.replaceState(
+      null,
+      "",
+      `${page || "#overview"}${params.size ? "?" + params : ""}`,
+    );
+    setValue(next);
+  };
+  return [value, update] as const;
+}
+export function useDebounce<T>(value: T, delay = 300) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
+export function useUrlFilters(defaults: Record<string, string>) {
+  const read = () => {
+    const p = new URLSearchParams(location.hash.split("?")[1] || "");
+    return Object.fromEntries(
+      Object.entries(defaults).map(([key, value]) => [
+        key,
+        p.get(key) ?? value,
+      ]),
+    );
+  };
+  const [values, setValues] = useState<Record<string, string>>(read);
+  useEffect(() => {
+    const sync = () => setValues(read());
+    window.addEventListener("hashchange", sync);
+    window.addEventListener("popstate", sync);
+    return () => {
+      window.removeEventListener("hashchange", sync);
+      window.removeEventListener("popstate", sync);
+    };
+  }, []);
+  const update = (patch: Record<string, string>) => {
+    const next = { ...values, ...patch };
+    const [page, query = ""] = location.hash.split("?");
+    const params = new URLSearchParams(query);
+    Object.entries(next).forEach(([key, value]) => {
+      if (!value || value === defaults[key]) params.delete(key);
+      else params.set(key, value);
+    });
+    history.replaceState(
+      null,
+      "",
+      `${page || "#overview"}${params.size ? "?" + params : ""}`,
+    );
+    setValues(next);
+  };
+  return [values, update] as const;
 }

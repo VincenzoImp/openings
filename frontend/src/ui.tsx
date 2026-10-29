@@ -40,7 +40,7 @@ import {
   ExternalLink,
   AlertCircle,
 } from "lucide-react";
-import { Notification } from "./state";
+import { Notification, confirmLeave } from "./state";
 const icons = {
   overview: LayoutDashboard,
   inbox: Inbox,
@@ -176,6 +176,7 @@ export function Tabs({
                   (event.key === "ArrowRight" ? 1 : -1) +
                   items.length) %
                 items.length;
+        if (!confirmLeave()) return;
         onChange(items[next].id);
         event.currentTarget
           .querySelectorAll<HTMLButtonElement>("[role=tab]")
@@ -190,7 +191,9 @@ export function Tabs({
           tabIndex={item.id === value ? 0 : -1}
           className={`tab ${item.id === value ? "active" : ""}`}
           key={item.id}
-          onClick={() => onChange(item.id)}
+          onClick={() => {
+            if (item.id === value || confirmLeave()) onChange(item.id);
+          }}
         >
           {item.label}
           {item.count !== undefined && (
@@ -296,6 +299,7 @@ export function Switch({
   return (
     <button
       type="button"
+      data-dirty-control="true"
       role="switch"
       className="switch"
       aria-label={label}
@@ -318,6 +322,9 @@ export function Dialog({
   drawer?: boolean;
   footer?: ReactNode;
 }) {
+  const close = () => {
+    if (!ref.current || confirmLeave(ref.current)) onClose();
+  };
   const ref = useRef<HTMLDialogElement>(null),
     id = useId();
   useEffect(() => {
@@ -338,7 +345,7 @@ export function Dialog({
       onCancel={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        onClose();
+        close();
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
@@ -349,7 +356,7 @@ export function Dialog({
             e.clientY < r.top ||
             e.clientY > r.bottom
           )
-            onClose();
+            close();
         }
       }}
     >
@@ -357,7 +364,7 @@ export function Dialog({
         <button
           className="iconbtn close"
           aria-label="Close dialog"
-          onClick={onClose}
+          onClick={close}
         >
           <Icon name="close" />
         </button>
@@ -378,3 +385,91 @@ export const stageLabels = {
   offer: "Offer",
   closed: "Closed",
 };
+
+export function AdvancedJson({
+  name,
+  label = "Metadata",
+  value = {},
+  array = false,
+}: {
+  name: string;
+  label?: string;
+  value?: unknown;
+  array?: boolean;
+}) {
+  return (
+    <details className="advanced-json">
+      <summary>Advanced · {label}</summary>
+      <Field
+        label={`${label} JSON`}
+        hint={
+          array
+            ? "A JSON array. Existing custom values are preserved."
+            : "A JSON object. Existing custom values are preserved."
+        }
+      >
+        <textarea
+          className="source-editor"
+          name={name}
+          rows={5}
+          defaultValue={JSON.stringify(value, null, 2)}
+          onChange={(event) => {
+            try {
+              const parsed = JSON.parse(event.target.value);
+              if (
+                array
+                  ? !Array.isArray(parsed)
+                  : typeof parsed !== "object" ||
+                    parsed === null ||
+                    Array.isArray(parsed)
+              )
+                throw Error();
+              event.target.setCustomValidity("");
+            } catch {
+              event.target.setCustomValidity(
+                `Enter a valid JSON ${array ? "array" : "object"}.`,
+              );
+            }
+          }}
+        />
+      </Field>
+    </details>
+  );
+}
+export function Pagination({
+  offset,
+  total,
+  limit = 30,
+  onChange,
+}: {
+  offset: number;
+  total: number;
+  limit?: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="list-footer">
+      <span>
+        {total
+          ? `${offset + 1}–${Math.min(offset + limit, total)} of ${total}`
+          : "0 results"}
+      </span>
+      <div className="actions">
+        <Button
+          className="small"
+          disabled={!offset}
+          onClick={() => onChange(Math.max(0, offset - limit))}
+        >
+          Previous
+        </Button>
+        <Button
+          className="small"
+          disabled={offset + limit >= total}
+          onClick={() => onChange(offset + limit)}
+        >
+          Next
+        </Button>
+      </div>
+    </div>
+  );
+}

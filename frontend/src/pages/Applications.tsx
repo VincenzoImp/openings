@@ -4,6 +4,10 @@ import {
   date,
   download,
   newId,
+  jsonValue,
+  type Json,
+  type Claim,
+  type Knowledge,
   uploadFile,
   version,
   type Activity,
@@ -15,8 +19,17 @@ import {
   type Template,
 } from "../api";
 import { FileManager } from "../files";
-import { useResource, useWorkspace } from "../state";
 import {
+  confirmLeave,
+  useDebounce,
+  useResource,
+  useUrlFilters,
+  useUrlState,
+  useWorkspace,
+} from "../state";
+import {
+  AdvancedJson,
+  Pagination,
   Avatar,
   Button,
   Dialog,
@@ -31,13 +44,31 @@ import {
 } from "../ui";
 const stages: Stage[] = ["draft", "applied", "interview", "offer", "closed"];
 export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
-  const [offset, setOffset] = useState(0);
+  const [filters, setFilters] = useUrlFilters({
+    q: "",
+    status: "",
+    outcome: "",
+    sort: "updated",
+    offset: "0",
+    view: "board",
+  });
+  const query = useDebounce(filters.q),
+    offset = Number(filters.offset) || 0,
+    limit = 50;
+  const params = new URLSearchParams({
+    ...filters,
+    q: query,
+    limit: String(limit),
+  });
+  params.delete("view");
+  Object.entries(filters).forEach(([key, value]) => {
+    if (!value) params.delete(key);
+  });
   const resource = useResource<ListResult<Application>>(
-    `/applications?limit=200&offset=${offset}`,
+    `/applications?${params}`,
     { items: [], total: 0 },
   );
   const { mutate, pending } = useWorkspace();
-  const [view, setView] = useState("board");
   async function move(id: string, status: Stage) {
     const app = resource.data.items.find((a) => a.id === id);
     if (app && app.status !== status)
@@ -61,51 +92,85 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
         description="Documents, conversations and decisions — each in its place."
       >
         <div className="segmented" aria-label="Application view">
-          <Button
-            variant={view === "board" ? "selected" : ""}
-            icon="board"
-            onClick={() => setView("board")}
-          >
-            Board
-          </Button>
-          <Button
-            variant={view === "list" ? "selected" : ""}
-            icon="list"
-            onClick={() => setView("list")}
-          >
-            List
-          </Button>
+          {["board", "list"].map((view) => (
+            <Button
+              key={view}
+              variant={filters.view === view ? "selected" : ""}
+              icon={view === "board" ? "board" : "list"}
+              onClick={() => setFilters({ view })}
+            >
+              {view === "board" ? "Board" : "List"}
+            </Button>
+          ))}
         </div>
       </Heading>
+      <div className="toolbar application-filters">
+        <div className="search">
+          <Icon name="search" />
+          <input
+            aria-label="Search applications"
+            placeholder="Search company, role or notes"
+            value={filters.q}
+            onChange={(e) => setFilters({ q: e.target.value, offset: "0" })}
+          />
+        </div>
+        <select
+          aria-label="Filter application stage"
+          value={filters.status}
+          onChange={(e) => setFilters({ status: e.target.value, offset: "0" })}
+        >
+          <option value="">All stages</option>
+          {stages.map((stage) => (
+            <option key={stage} value={stage}>
+              {stageLabels[stage]}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Filter application outcome"
+          value={filters.outcome}
+          onChange={(e) => setFilters({ outcome: e.target.value, offset: "0" })}
+        >
+          <option value="">All outcomes</option>
+          <option value="accepted">Accepted</option>
+          <option value="rejected">Not selected</option>
+          <option value="not_pursued">Not pursued</option>
+        </select>
+        <select
+          aria-label="Sort applications"
+          value={filters.sort}
+          onChange={(e) => setFilters({ sort: e.target.value, offset: "0" })}
+        >
+          <option value="updated">Recently updated</option>
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="company">Company A–Z</option>
+        </select>
+      </div>
       {resource.error && (
         <ErrorBox message={resource.error} retry={resource.reload} />
       )}
       <div className="boardcaption">
-        <span>
-          {resource.data.total} application attempts
-          {resource.data.total > 200
-            ? ` · Showing ${offset + 1}–${Math.min(offset + 200, resource.data.total)}`
-            : ""}
-        </span>
-        <span>Move a card between stages, or open it to edit.</span>
+        <span>{resource.data.total} application attempts</span>
+        <span>Open a card, drag it, or use its stage menu.</span>
       </div>
       {resource.loading && !resource.data.items.length ? (
         <Loading />
       ) : !resource.data.items.length ? (
         <section className="card">
           <Empty
-            title="Make room for your next move."
+            title="No applications in this view."
             action={
-              <Button onClick={() => (location.hash = "inbox")} icon="inbox">
+              <a href="#inbox" className="btn">
                 Browse opportunities
-              </Button>
+              </a>
             }
           >
-            Save a job in your inbox, then create an application to collect its
-            documents and progress here.
+            Try another filter, or create an application from a job in your
+            inbox.
           </Empty>
         </section>
-      ) : view === "board" ? (
+      ) : filters.view === "board" ? (
         <div className="kanban">
           {stages.map((stage) => (
             <section
@@ -125,42 +190,58 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                   {stageLabels[stage]}
                 </span>
                 <span>
-                  {resource.data.items.filter((a) => a.status === stage).length}
+                  {resource.data.stage_counts?.[stage] ??
+                    resource.data.items.filter((a) => a.status === stage)
+                      .length}
                 </span>
               </header>
               {resource.data.items
                 .filter((a) => a.status === stage)
                 .map((app) => (
-                  <button
+                  <article
                     className="application-card"
                     key={app.id}
                     draggable={!pending}
                     onDragStart={(e) =>
                       e.dataTransfer.setData("text/plain", app.id)
                     }
-                    onClick={() => onOpen(app.id)}
                   >
-                    <div className="companyline">
-                      <Avatar name={app.job?.company || "Company"} />
-                      <span>{app.job?.company || "Company"}</span>
-                    </div>
-                    <strong>{app.job?.title || "Application"}</strong>
-                    {app.outcome && (
-                      <span className="tag neutral outcome">
-                        {app.outcome === "accepted"
-                          ? "Accepted"
-                          : app.outcome === "rejected"
-                            ? "Not selected"
-                            : "Not pursued"}
-                      </span>
-                    )}
-                    <footer>
-                      <span>
-                        <Icon name="file" /> Open workspace
-                      </span>
-                      <time>{date(app.updated_at || app.created_at)}</time>
-                    </footer>
-                  </button>
+                    <button
+                      className="application-open"
+                      onClick={() => onOpen(app.id)}
+                    >
+                      <div className="companyline">
+                        <Avatar name={app.job?.company || "Company"} />
+                        <span>{app.job?.company || "Company"}</span>
+                      </div>
+                      <strong>{app.job?.title || "Application"}</strong>
+                      {app.outcome && (
+                        <span className="tag neutral outcome">
+                          {app.outcome.replaceAll("_", " ")}
+                        </span>
+                      )}
+                      <footer>
+                        <span>
+                          <Icon name="file" />
+                          Open workspace
+                        </span>
+                        <time>{date(app.updated_at || app.created_at)}</time>
+                      </footer>
+                    </button>
+                    <select
+                      className="card-stage"
+                      aria-label={`Move ${app.job?.title || "application"} to stage`}
+                      disabled={pending}
+                      value={app.status}
+                      onChange={(e) => move(app.id, e.target.value as Stage)}
+                    >
+                      {stages.map((s) => (
+                        <option key={s} value={s}>
+                          {stageLabels[s]}
+                        </option>
+                      ))}
+                    </select>
+                  </article>
                 ))}
             </section>
           ))}
@@ -189,10 +270,18 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                     </button>
                   </td>
                   <td>
-                    <span className="status-label">
-                      <i className={`dot ${app.status}`} />
-                      {stageLabels[app.status]}
-                    </span>
+                    <select
+                      aria-label={`Stage for ${app.job?.title || "application"}`}
+                      value={app.status}
+                      disabled={pending}
+                      onChange={(e) => move(app.id, e.target.value as Stage)}
+                    >
+                      {stages.map((s) => (
+                        <option key={s} value={s}>
+                          {stageLabels[s]}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td>{app.outcome?.replaceAll("_", " ") || "—"}</td>
                   <td>{date(app.updated_at)}</td>
@@ -202,29 +291,20 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
           </table>
         </div>
       )}
-      {resource.data.total > 200 && (
-        <div className="actions form-actions">
-          <Button
-            disabled={offset === 0 || resource.loading}
-            onClick={() => setOffset(Math.max(0, offset - 200))}
-          >
-            Previous
-          </Button>
-          <Button
-            disabled={offset + 200 >= resource.data.total || resource.loading}
-            onClick={() => setOffset(offset + 200)}
-          >
-            Next
-          </Button>
-        </div>
-      )}
+      <Pagination
+        offset={offset}
+        total={resource.data.total}
+        limit={limit}
+        onChange={(offset) => setFilters({ offset: String(offset) })}
+      />
       <p className="hint">
-        Creating or uploading documents does not mark an application as sent.
-        Record the stage when it actually changes.
+        Column totals include every matching attempt across pages. Record stage
+        changes when they happen.
       </p>
     </>
   );
 }
+
 function DocumentEditor({
   application,
   previous,
@@ -237,7 +317,13 @@ function DocumentEditor({
   const { mutate, pending } = useWorkspace();
   const [file, setFile] = useState<File | null>(null),
     [createdId, setCreatedId] = useState<string | null>(null);
-  const structured = previous && typeof previous.content.text !== "string";
+  const [structured, setStructured] = useState(
+    !!previous && typeof previous.content.text !== "string",
+  );
+  const contexts = useResource<ListResult<Json>>(
+    `/contexts?application_id=${application.id}`,
+    { items: [], total: 0 },
+  );
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -246,7 +332,7 @@ function DocumentEditor({
       if (!id) {
         const doc = await api<Document>("/documents", "POST", {
           application_id: application.id,
-          context_id: previous?.context_id || null,
+          context_id: previous?.context_id || form.get("context_id") || null,
           previous_id: previous?.id || null,
           kind: previous?.kind || form.get("kind"),
           title: form.get("title"),
@@ -294,16 +380,50 @@ function DocumentEditor({
             />
           </Field>
         </div>
+        {!previous && (
+          <Field label="Frozen context">
+            <select name="context_id">
+              <option value="">No frozen context</option>
+              {contexts.data.items.map((context) => (
+                <option key={String(context.id)} value={String(context.id)}>
+                  {date(String(context.created_at))} ·{" "}
+                  {String(context.id).slice(0, 8)}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        <label className="checkline">
+          <input
+            type="checkbox"
+            checked={structured}
+            onChange={(e) => setStructured(e.target.checked)}
+          />
+          Use structured JSON content
+        </label>
         <Field
           label={structured ? "Structured content (JSON)" : "Content"}
           hint="Changing content creates a revision. A PDF is attached only when you upload it."
         >
           <textarea
+            key={String(structured)}
             name="text"
             rows={9}
+            onChange={(e) => {
+              if (structured) {
+                try {
+                  const v = JSON.parse(e.target.value);
+                  if (typeof v !== "object" || v === null || Array.isArray(v))
+                    throw Error();
+                  e.target.setCustomValidity("");
+                } catch {
+                  e.target.setCustomValidity("Enter a valid JSON object.");
+                }
+              }
+            }}
             defaultValue={
               structured
-                ? JSON.stringify(previous.content, null, 2)
+                ? JSON.stringify(previous?.content || {}, null, 2)
                 : String(previous?.content.text || "")
             }
             disabled={!!createdId}
@@ -333,7 +453,7 @@ function DocumentEditor({
   );
 }
 function DocumentCard({
-  document,
+  document: summary,
   application,
 }: {
   document: Document;
@@ -341,7 +461,13 @@ function DocumentCard({
 }) {
   const { mutate, pending } = useWorkspace();
   const [expanded, setExpanded] = useState(false),
-    [edit, setEdit] = useState(false);
+    [edit, setEdit] = useState(false),
+    [removing, setRemoving] = useState(false);
+  const detail = useResource<Document | null>(
+    expanded ? `/documents/${summary.id}` : null,
+    null,
+  );
+  const document = detail.data || summary;
   return (
     <article className="document-card">
       <header>
@@ -364,47 +490,83 @@ function DocumentCard({
           <Icon name={expanded ? "close" : "file"} />
         </button>
       </header>
-      {expanded && (
-        <>
-          <div className="document-text">
-            {typeof document.content.text === "string" ? (
-              document.content.text
-            ) : (
-              <pre>{JSON.stringify(document.content, null, 2)}</pre>
-            )}
-          </div>
-          <FileManager
-            ownerType="document"
-            ownerId={document.id}
-            immutable
-            preview
-            readOnly={document.review_state === "approved"}
-          />
-          <div className="actions form-actions">
-            <Button icon="edit" onClick={() => setEdit(true)}>
-              New revision
-            </Button>
-            {document.review_state !== "approved" && (
-              <Button
-                variant="primary"
-                icon="check"
-                disabled={pending}
-                onClick={() =>
-                  mutate(
-                    () =>
-                      api(`/documents/${document.id}/review`, "POST", {
-                        review_state: "approved",
-                        expected_review_state: document.review_state,
-                      }),
-                    "Document approved.",
-                  )
-                }
-              >
-                Approve this revision
+      {expanded &&
+        (detail.loading || !detail.data ? (
+          <Loading />
+        ) : (
+          <>
+            <div className="document-text">
+              {typeof document.content.text === "string" ? (
+                document.content.text
+              ) : (
+                <pre>{JSON.stringify(document.content, null, 2)}</pre>
+              )}
+            </div>
+            <FileManager
+              ownerType="document"
+              ownerId={document.id}
+              immutable
+              preview
+              readOnly={document.review_state === "approved"}
+            />
+            <div className="actions form-actions">
+              <Button icon="edit" onClick={() => setEdit(true)}>
+                New revision
               </Button>
-            )}
+              <Button
+                icon="trash"
+                variant="danger"
+                onClick={() => setRemoving(true)}
+              >
+                Delete revision
+              </Button>
+              {document.review_state !== "approved" && (
+                <Button
+                  variant="primary"
+                  icon="check"
+                  disabled={pending}
+                  onClick={() =>
+                    mutate(
+                      () =>
+                        api(`/documents/${document.id}/review`, "POST", {
+                          review_state: "approved",
+                          expected_review_state: document.review_state,
+                        }),
+                      "Document approved.",
+                    )
+                  }
+                >
+                  Approve this revision
+                </Button>
+              )}
+            </div>
+          </>
+        ))}
+      {removing && (
+        <Dialog
+          title="Delete this document revision?"
+          onClose={() => setRemoving(false)}
+        >
+          <p className="modal-intro">
+            Remove this revision and its files. Other revisions and the
+            application are kept.
+          </p>
+          <div className="actions form-actions">
+            <Button onClick={() => setRemoving(false)}>Keep revision</Button>
+            <Button
+              variant="danger-fill"
+              disabled={pending}
+              onClick={() =>
+                mutate(
+                  () => api(`/documents/${document.id}`, "DELETE"),
+                  "Document revision removed.",
+                )
+              }
+            >
+              Delete revision
+            </Button>
           </div>
-        </>
+        </Dialog>
       )}
       {edit && (
         <DocumentEditor
@@ -423,30 +585,42 @@ export function ApplicationDrawer({
   id: string;
   onClose: () => void;
 }) {
+  const [documentFilters, setDocumentFilters] = useUrlFilters({
+    doc_q: "",
+    doc_kind: "",
+    doc_review: "",
+    doc_offset: "0",
+  });
+  const documentQuery = useDebounce(documentFilters.doc_q);
   const resource = useResource<Application | null>(`/applications/${id}`, null),
     documents = useResource<ListResult<Document>>(
-      `/documents?application_id=${id}`,
+      `/documents?application_id=${id}&summary=true&limit=20&offset=${documentFilters.doc_offset}&q=${encodeURIComponent(documentQuery)}&kind=${documentFilters.doc_kind}&review_state=${documentFilters.doc_review}`,
       { items: [], total: 0 },
-      true,
     ),
     events = useResource<ListResult<Activity>>(`/applications/${id}/events`, {
       items: [],
       total: 0,
     }),
     templates = useResource<ListResult<Template>>(
-      "/templates",
+      "/templates?summary=true",
       {
         items: [],
         total: 0,
       },
       true,
     );
-  const { mutate, pending } = useWorkspace();
-  const [tab, setTab] = useState("documents"),
-    [add, setAdd] = useState(false),
-    [contextTemplate, setContextTemplate] = useState("");
+  const { mutate, pending, notify } = useWorkspace();
+  const [tab, setTab] = useUrlState("detail", "documents");
+  const [add, setAdd] = useState(false),
+    [contextOpen, setContextOpen] = useState(false),
+    [removing, setRemoving] = useState(false);
+  const contexts = useResource<ListResult<Json>>(
+    `/contexts?application_id=${id}`,
+    { items: [], total: 0 },
+  );
   const app = resource.data;
   async function stage(status: Stage) {
+    if (!confirmLeave()) return;
     if (app)
       await mutate(
         () =>
@@ -482,39 +656,32 @@ export function ApplicationDrawer({
     e.preventDefault();
     if (!app) return;
     const form = new FormData(e.currentTarget),
-      answers = Object.fromEntries(
-        app.questions
-          .map((q) => {
-            const raw = String(form.get(q.id) || "");
-            return [
-              q.id,
-              q.type === "boolean"
-                ? raw === ""
-                  ? ""
-                  : raw === "true"
-                : q.type === "number"
-                  ? raw === ""
-                    ? ""
-                    : Number(raw)
-                  : raw,
-            ];
-          })
-          .filter(([, value]) => value !== ""),
-      );
+      answers =
+        form.get("structured_answers") === "on"
+          ? jsonValue(form, "answers", {})
+          : Object.fromEntries(
+              app.questions
+                .map((q) => {
+                  const raw = String(form.get(q.id) || "");
+                  return [
+                    q.id,
+                    q.type === "boolean"
+                      ? raw === ""
+                        ? ""
+                        : raw === "true"
+                      : q.type === "number"
+                        ? raw === ""
+                          ? ""
+                          : Number(raw)
+                        : raw,
+                  ];
+                })
+                .filter(([, value]) => value !== ""),
+            );
     await mutate(
       () => api(`/applications/${id}`, "PATCH", version(app, { answers })),
       "Draft answers saved.",
     );
-  }
-  async function exportContext() {
-    await mutate(async () => {
-      const result = await api<Record<string, unknown>>("/contexts", "POST", {
-        application_id: id,
-        template_id: contextTemplate || undefined,
-        idempotency_key: newId(),
-      });
-      download("application-context.json", JSON.stringify(result, null, 2));
-    }, "Frozen context exported for your agent.");
   }
   return (
     <>
@@ -588,32 +755,119 @@ export function ApplicationDrawer({
                     after external compilation.
                   </p>
                   <div className="actions">
-                    <select
-                      aria-label="Template for context"
-                      value={contextTemplate}
-                      onChange={(e) => setContextTemplate(e.target.value)}
-                    >
-                      <option value="">Default template</option>
-                      {templates.data.items.map((t) => (
-                        <option value={t.id} key={t.id}>
-                          {t.name}
-                        </option>
-                      ))}
-                    </select>
                     <Button
                       icon="download"
                       disabled={pending}
-                      onClick={exportContext}
+                      onClick={() => setContextOpen(true)}
                     >
-                      Export context
+                      Prepare context
                     </Button>
                   </div>
+                  {!!contexts.data.items.length && (
+                    <details className="context-history">
+                      <summary>Saved contexts · {contexts.data.total}</summary>
+                      {contexts.data.items.map((context) => (
+                        <div className="settingrow" key={String(context.id)}>
+                          <div>
+                            <strong>{date(String(context.created_at))}</strong>
+                            <p>
+                              Frozen snapshot · {String(context.id).slice(0, 8)}
+                            </p>
+                          </div>
+                          <Button
+                            className="small"
+                            icon="download"
+                            onClick={async () => {
+                              try {
+                                const data = await api<Json>(
+                                  `/contexts/${context.id}`,
+                                );
+                                download(
+                                  `context-${context.id}.json`,
+                                  JSON.stringify(data, null, 2),
+                                );
+                              } catch (error) {
+                                notify(
+                                  error instanceof Error
+                                    ? error.message
+                                    : "Download failed.",
+                                  true,
+                                );
+                              }
+                            }}
+                          >
+                            Download
+                          </Button>
+                        </div>
+                      ))}
+                      <details className="context-files">
+                        <summary>Files in frozen contexts</summary>
+                        {contexts.data.items.map((context) => (
+                          <section key={String(context.id)}>
+                            <h3>
+                              {date(String(context.created_at))} ·{" "}
+                              {String(context.id).slice(0, 8)}
+                            </h3>
+                            <FileManager
+                              ownerType="context"
+                              ownerId={String(context.id)}
+                              immutable
+                              readOnly
+                            />
+                          </section>
+                        ))}
+                      </details>
+                    </details>
+                  )}
                 </section>
                 <div className="sectiontitle">
                   <h3>Documents and revisions</h3>
                   <Button icon="plus" onClick={() => setAdd(true)}>
                     Add document
                   </Button>
+                </div>
+                <div className="document-filters">
+                  <input
+                    aria-label="Search documents"
+                    placeholder="Search documents"
+                    value={documentFilters.doc_q}
+                    onChange={(e) =>
+                      setDocumentFilters({
+                        doc_q: e.target.value,
+                        doc_offset: "0",
+                      })
+                    }
+                  />
+                  <select
+                    aria-label="Document kind"
+                    value={documentFilters.doc_kind}
+                    onChange={(e) =>
+                      setDocumentFilters({
+                        doc_kind: e.target.value,
+                        doc_offset: "0",
+                      })
+                    }
+                  >
+                    <option value="">All types</option>
+                    <option value="resume">CV</option>
+                    <option value="cover_letter">Cover letter</option>
+                    <option value="answers">Form answers</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <select
+                    aria-label="Document review state"
+                    value={documentFilters.doc_review}
+                    onChange={(e) =>
+                      setDocumentFilters({
+                        doc_review: e.target.value,
+                        doc_offset: "0",
+                      })
+                    }
+                  >
+                    <option value="">All revisions</option>
+                    <option value="draft">Draft</option>
+                    <option value="approved">Approved</option>
+                  </select>
                 </div>
                 {documents.data.items.length ? (
                   documents.data.items.map((d) => (
@@ -625,6 +879,14 @@ export function ApplicationDrawer({
                     your external agent.
                   </Empty>
                 )}
+                <Pagination
+                  offset={Number(documentFilters.doc_offset) || 0}
+                  total={documents.data.total}
+                  limit={20}
+                  onChange={(offset) =>
+                    setDocumentFilters({ doc_offset: String(offset) })
+                  }
+                />
               </>
             ) : tab === "answers" ? (
               <>
@@ -686,6 +948,15 @@ export function ApplicationDrawer({
                         )}
                       </Field>
                     ))}
+                    <label className="checkline">
+                      <input type="checkbox" name="structured_answers" />
+                      Use advanced structured answers below
+                    </label>
+                    <AdvancedJson
+                      name="answers"
+                      label="Structured answers"
+                      value={app.answers}
+                    />
                     <Button variant="primary" disabled={pending}>
                       Save answers
                     </Button>
@@ -727,7 +998,7 @@ export function ApplicationDrawer({
                 </div>
               </>
             ) : (
-              <form onSubmit={saveDetails} key={app.version} className="stack">
+              <form onSubmit={saveDetails} key={app.id} className="stack">
                 {app.status === "closed" && (
                   <Field label="Outcome">
                     <select
@@ -749,11 +1020,61 @@ export function ApplicationDrawer({
                 <Button variant="primary" disabled={pending}>
                   Save details
                 </Button>
+                <Button
+                  type="button"
+                  icon="trash"
+                  variant="danger"
+                  onClick={() => setRemoving(true)}
+                >
+                  Delete this application
+                </Button>
               </form>
             )}
           </>
         )}
       </Dialog>
+      {app && contextOpen && (
+        <ContextBuilder
+          application={app}
+          templates={templates.data.items}
+          onClose={() => setContextOpen(false)}
+        />
+      )}
+      {app && removing && (
+        <Dialog
+          title="Delete this application attempt?"
+          onClose={() => setRemoving(false)}
+        >
+          <p className="modal-intro">
+            Remove this attempt, its history, frozen contexts, documents and
+            files. The job and its other application attempts are kept.
+          </p>
+          <div className="actions form-actions">
+            <Button onClick={() => setRemoving(false)}>Keep application</Button>
+            <Button
+              variant="danger-fill"
+              disabled={pending}
+              onClick={async () => {
+                if (
+                  await mutate(
+                    () =>
+                      api(
+                        `/applications/${id}?expected_version=${app.version}`,
+                        "DELETE",
+                      ),
+                    "Application attempt deleted.",
+                  )
+                ) {
+                  setRemoving(false);
+                  onClose();
+                }
+              }}
+            >
+              Delete attempt
+            </Button>
+          </div>
+        </Dialog>
+      )}
       {app && add && (
         <DocumentEditor application={app} onClose={() => setAdd(false)} />
       )}
@@ -927,5 +1248,143 @@ function QuestionEditor({ application }: { application: Application }) {
         </Dialog>
       )}
     </>
+  );
+}
+function ContextBuilder({
+  application,
+  templates,
+  onClose,
+}: {
+  application: Application;
+  templates: Template[];
+  onClose: () => void;
+}) {
+  const knowledge = useResource<ListResult<Knowledge>>(
+      "/career/knowledge?summary=true",
+      { items: [], total: 0 },
+      true,
+    ),
+    claims = useResource<ListResult<Claim>>(
+      "/career/claims?summary=true&approved=true",
+      { items: [], total: 0 },
+      true,
+    );
+  const { mutate, pending } = useWorkspace();
+  const [selectEvidence, setSelectEvidence] = useState(false),
+    [selectClaims, setSelectClaims] = useState(false),
+    [query, setQuery] = useState("");
+  return (
+    <Dialog title="Prepare a frozen context." onClose={onClose}>
+      <p className="modal-intro">
+        Choose the evidence and templates your external agent should use. Saved
+        snapshots retain the exact content and files from this moment.
+      </p>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const f = new FormData(e.currentTarget);
+          if (
+            await mutate(async () => {
+              const context = await api<Json>("/contexts", "POST", {
+                application_id: application.id,
+                template_ids: f.getAll("templates"),
+                ...(selectEvidence
+                  ? { knowledge_ids: f.getAll("knowledge") }
+                  : {}),
+                ...(selectClaims ? { claim_ids: f.getAll("claims") } : {}),
+                note: f.get("note"),
+                idempotency_key: newId(),
+              });
+              download(
+                `context-${context.id}.json`,
+                JSON.stringify(context, null, 2),
+              );
+            }, "Frozen context saved and downloaded.")
+          )
+            onClose();
+        }}
+      >
+        <fieldset className="selection-box">
+          <legend>Templates</legend>
+          <p className="hint">Leave empty to use your defaults.</p>
+          {templates.map((t) => (
+            <label className="checkline" key={t.id}>
+              <input type="checkbox" name="templates" value={t.id} />
+              {t.name} · {t.kind.replaceAll("_", " ")}
+            </label>
+          ))}
+        </fieldset>
+        <label className="checkline">
+          <input
+            type="checkbox"
+            checked={selectEvidence}
+            onChange={(e) => setSelectEvidence(e.target.checked)}
+          />
+          Choose specific career evidence
+        </label>
+        {selectEvidence && (
+          <fieldset className="selection-box">
+            <legend>Career evidence</legend>
+            <input
+              aria-label="Find evidence for context"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Find evidence"
+            />
+            {knowledge.data.items.map((k) => (
+              <label
+                className="checkline"
+                style={{
+                  display: k.title.toLowerCase().includes(query.toLowerCase())
+                    ? undefined
+                    : "none",
+                }}
+                key={k.id}
+              >
+                <input
+                  type="checkbox"
+                  name="knowledge"
+                  value={k.id}
+                  defaultChecked
+                />
+                {k.title}
+              </label>
+            ))}
+          </fieldset>
+        )}
+        <label className="checkline">
+          <input
+            type="checkbox"
+            checked={selectClaims}
+            onChange={(e) => setSelectClaims(e.target.checked)}
+          />
+          Choose specific approved claims
+        </label>
+        {selectClaims && (
+          <fieldset className="selection-box">
+            <legend>Approved claims</legend>
+            {claims.data.items.map((c) => (
+              <label className="checkline" key={c.id}>
+                <input
+                  type="checkbox"
+                  name="claims"
+                  value={c.id}
+                  defaultChecked
+                />
+                {c.text_preview || c.text}
+              </label>
+            ))}
+          </fieldset>
+        )}
+        <Field label="Instructions for this snapshot">
+          <textarea name="note" rows={4} />
+        </Field>
+        <div className="actions form-actions">
+          <Button variant="primary" disabled={pending}>
+            Save & download context
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }

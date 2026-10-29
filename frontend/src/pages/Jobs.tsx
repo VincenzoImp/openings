@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import {
   api,
   date,
+  jsonValue,
   version,
   type Application,
   type Job,
@@ -9,9 +10,18 @@ import {
   type Note,
   type Triage,
 } from "../api";
-import { useResource, useWorkspace } from "../state";
+import {
+  confirmLeave,
+  useDebounce,
+  useResource,
+  useUrlFilters,
+  useUrlState,
+  useWorkspace,
+} from "../state";
 import { FileManager } from "../files";
 import {
+  AdvancedJson,
+  Pagination,
   Avatar,
   Button,
   Dialog,
@@ -94,24 +104,64 @@ export function JobsPage({
   onAdd: () => void;
   onOpen: (id: string) => void;
 }) {
-  const [triage, setTriage] = useState<Triage>("inbox"),
-    [query, setQuery] = useState(""),
-    [company, setCompany] = useState(""),
-    [sort, setSort] = useState("newest"),
-    [offset, setOffset] = useState(0);
-  const params = new URLSearchParams({
-    triage,
-    q: query,
-    company,
-    sort,
-    limit: "50",
-    offset: String(offset),
+  const [filters, setFilters] = useUrlFilters({
+    triage: "inbox",
+    q: "",
+    company: "",
+    location: "",
+    source: "",
+    remote: "",
+    job_type: "",
+    score_min: "",
+    score_max: "",
+    score_state: "all",
+    created_since: "",
+    created_until: "",
+    sort: "newest",
+    offset: "0",
+  });
+  const query = useDebounce(filters.q),
+    offset = Number(filters.offset) || 0;
+  const params = new URLSearchParams({ ...filters, q: query, limit: "50" });
+  Object.entries(filters).forEach(([k, v]) => {
+    if (!v) params.delete(k);
   });
   const resource = useResource<ListResult<Job>>(`/jobs?${params}`, blankJobs);
-  const change = (fn: () => void) => {
-    fn();
-    setOffset(0);
-  };
+  const [selection, setSelection] = useState<Record<string, number>>({}),
+    [forget, setForget] = useState(false);
+  const { mutate, pending, notify } = useWorkspace();
+  const selected = Object.keys(selection),
+    change = (key: string, value: string) =>
+      setFilters({ [key]: value, offset: "0" });
+  const facets = resource.data.facets || {};
+  async function bulk(action: string) {
+    let result:
+      | {
+          succeeded?: number;
+          failed?: number;
+          items?: { error?: { message: string } }[];
+        }
+      | undefined;
+    if (
+      await mutate(async () => {
+        result = await api("/jobs/bulk", "POST", {
+          action,
+          items: selected.map((id) => ({
+            id,
+            expected_version: selection[id],
+          })),
+        });
+      }, "Selected opportunities updated.")
+    ) {
+      setSelection({});
+      setForget(false);
+      if (result?.failed)
+        notify(
+          `${result.succeeded || 0} completed; ${result.failed} failed. ${result.items?.find((item) => item.error)?.error?.message || "Refresh and retry."}`,
+          true,
+        );
+    }
+  }
   return (
     <>
       <Heading
@@ -124,8 +174,8 @@ export function JobsPage({
       </Heading>
       <Tabs
         label="Job triage"
-        value={triage}
-        onChange={(id) => change(() => setTriage(id as Triage))}
+        value={filters.triage}
+        onChange={(value) => change("triage", value)}
         items={[
           { id: "inbox", label: "To review" },
           { id: "saved", label: "Saved" },
@@ -138,36 +188,214 @@ export function JobsPage({
           <input
             aria-label="Search jobs"
             placeholder="Search jobs, companies or keywords"
-            value={query}
-            onChange={(e) => change(() => setQuery(e.target.value))}
+            value={filters.q}
+            onChange={(e) => change("q", e.target.value)}
           />
         </div>
-        <input
-          className="company-filter"
-          aria-label="Filter by company"
-          placeholder="Company"
-          value={company}
-          onChange={(e) => change(() => setCompany(e.target.value))}
-        />
         <select
           aria-label="Sort jobs"
-          value={sort}
-          onChange={(e) => change(() => setSort(e.target.value))}
+          value={filters.sort}
+          onChange={(e) => change("sort", e.target.value)}
         >
           <option value="newest">Newest first</option>
           <option value="score">Highest fit</option>
           <option value="company">Company A–Z</option>
         </select>
       </div>
+      <details
+        className="filter-panel"
+        open={Object.entries(filters).some(
+          ([k, v]) =>
+            !["triage", "q", "sort", "offset", "score_state"].includes(k) &&
+            !!v,
+        )}
+      >
+        <summary>
+          Filter opportunities{" "}
+          <span className="muted">
+            Location, source, work style, score & dates
+          </span>
+        </summary>
+        <div className="filter-grid">
+          {[
+            ["company", "Company", "companies"],
+            ["location", "Location", "locations"],
+            ["source", "Source", "sources"],
+            ["job_type", "Job type", "job_types"],
+          ].map(([key, label, facet]) => (
+            <Field label={label} key={key}>
+              <input
+                list={`facet-${key}`}
+                placeholder={`Any ${label.toLowerCase()}`}
+                value={filters[key]}
+                onChange={(e) => change(key, e.target.value)}
+              />
+              <datalist id={`facet-${key}`}>
+                {(facets[facet] || []).map((value) => (
+                  <option key={value} value={value} />
+                ))}
+              </datalist>
+            </Field>
+          ))}
+          <Field label="Work style">
+            <select
+              value={filters.remote}
+              onChange={(e) => change("remote", e.target.value)}
+            >
+              <option value="">Any work style</option>
+              <option value="true">Remote</option>
+              <option value="false">On site / hybrid</option>
+            </select>
+          </Field>
+          <Field label="Score freshness">
+            <select
+              value={filters.score_state}
+              onChange={(e) => change("score_state", e.target.value)}
+            >
+              {["all", "current", "outdated", "unscored"].map((v) => (
+                <option key={v} value={v}>
+                  {v[0].toUpperCase() + v.slice(1)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Minimum fit score">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={filters.score_min}
+              onChange={(e) => change("score_min", e.target.value)}
+            />
+          </Field>
+          <Field label="Maximum fit score">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={filters.score_max}
+              onChange={(e) => change("score_max", e.target.value)}
+            />
+          </Field>
+          <Field label="Saved from">
+            <input
+              type="date"
+              value={filters.created_since}
+              onChange={(e) => change("created_since", e.target.value)}
+            />
+          </Field>
+          <Field label="Saved through">
+            <input
+              type="date"
+              value={filters.created_until}
+              onChange={(e) => change("created_until", e.target.value)}
+            />
+          </Field>
+          <Button
+            className="small"
+            onClick={() =>
+              setFilters(
+                Object.fromEntries(
+                  Object.keys(filters)
+                    .filter((k) => k !== "triage")
+                    .map((k) => [
+                      k,
+                      k === "score_state"
+                        ? "all"
+                        : k === "sort"
+                          ? "newest"
+                          : k === "offset"
+                            ? "0"
+                            : "",
+                    ]),
+                ),
+              )
+            }
+          >
+            Clear filters
+          </Button>
+        </div>
+      </details>
+      {selected.length > 0 && (
+        <div className="bulkbar" aria-label="Selected opportunities">
+          <strong>{selected.length} selected</strong>
+          <Button disabled={pending} onClick={() => bulk("saved")}>
+            Save
+          </Button>
+          <Button disabled={pending} onClick={() => bulk("dismissed")}>
+            Dismiss
+          </Button>
+          <Button disabled={pending} onClick={() => bulk("inbox")}>
+            Restore
+          </Button>
+          <Button
+            disabled={pending}
+            icon="refresh"
+            onClick={() => bulk("rescore")}
+          >
+            Rescore
+          </Button>
+          <Button variant="danger" onClick={() => setForget(true)}>
+            Forget
+          </Button>
+          <button className="textbutton" onClick={() => setSelection({})}>
+            Clear
+          </button>
+        </div>
+      )}
       {resource.error && (
         <ErrorBox message={resource.error} retry={resource.reload} />
       )}
       <section className="card joblist" aria-label="Opportunities">
-        {resource.loading && resource.data.items.length === 0 ? (
+        {!!resource.data.items.length && (
+          <div className="selection-head">
+            <label className="checkline">
+              <input
+                type="checkbox"
+                aria-label="Select this page"
+                checked={resource.data.items.every(
+                  (j) => selection[j.id] !== undefined,
+                )}
+                onChange={(e) =>
+                  setSelection((current) => {
+                    const next = { ...current };
+                    resource.data.items.forEach((j) => {
+                      if (e.target.checked) next[j.id] = j.version;
+                      else delete next[j.id];
+                    });
+                    return next;
+                  })
+                }
+              />
+              Select this page
+            </label>
+            <span className="muted smalltext">
+              Up to 200 selected opportunities per action
+            </span>
+          </div>
+        )}
+        {resource.loading && !resource.data.items.length ? (
           <Loading />
         ) : resource.data.items.length ? (
           resource.data.items.map((job) => (
             <div className="jobrow" key={job.id}>
+              <input
+                className="row-select"
+                type="checkbox"
+                aria-label={`Select ${job.title}`}
+                checked={selection[job.id] !== undefined}
+                disabled={
+                  selection[job.id] === undefined && selected.length >= 200
+                }
+                onChange={(e) =>
+                  setSelection((current) => {
+                    const next = { ...current };
+                    if (e.target.checked) next[job.id] = job.version;
+                    else delete next[job.id];
+                    return next;
+                  })
+                }
+              />
               <button className="jobmain" onClick={() => onOpen(job.id)}>
                 <Avatar name={job.company} />
                 <div>
@@ -183,7 +411,7 @@ export function JobsPage({
                           job.metadata.ats ||
                           "Saved posting",
                       )}
-                    {!job.posting && (
+                    {job.complete === false && (
                       <span className="tag amber">Needs text</span>
                     )}
                   </div>
@@ -191,6 +419,7 @@ export function JobsPage({
               </button>
               <span className="location-col">
                 {job.location || "Location not specified"}
+                {job.remote && <small>Remote</small>}
               </span>
               <Score score={job.score} outdated={job.score_outdated} />
               <button
@@ -204,54 +433,52 @@ export function JobsPage({
           ))
         ) : (
           <Empty
-            title={
-              query || company
-                ? "No matching opportunities."
-                : triage === "dismissed"
-                  ? "Nothing set aside."
-                  : "Room for your next opportunity."
-            }
+            title="No opportunities in this view."
             action={
-              triage === "inbox" && !query && !company ? (
-                <Button icon="plus" onClick={onAdd}>
-                  Add a job
-                </Button>
-              ) : undefined
+              <Button onClick={onAdd} icon="plus">
+                Add a job
+              </Button>
             }
           >
-            {query || company
-              ? "Try a different search or company."
-              : triage === "dismissed"
-                ? "Dismissed jobs keep their history and can be restored here."
-                : "Add an offer you found, or follow companies to collect their open roles."}
+            Adjust your filters, add a posting, or save a search in Collection.
           </Empty>
         )}
       </section>
-      <div className="list-footer">
-        <span>
-          {resource.data.total}{" "}
-          {resource.data.total === 1 ? "opportunity" : "opportunities"}
-        </span>
-        <div className="actions">
-          {offset > 0 && (
+      <Pagination
+        offset={offset}
+        total={resource.data.total}
+        limit={50}
+        onChange={(value) => setFilters({ offset: String(value) })}
+      />
+      <p className="hint">
+        Fit scores are indicative. Changes are checked against each selected
+        record’s version.
+      </p>
+      {forget && (
+        <Dialog
+          title={`Forget ${selected.length} opportunities?`}
+          onClose={() => setForget(false)}
+        >
+          <p className="modal-intro">
+            Permanently remove selected jobs and their applications, notes and
+            documents. They can appear as new jobs if collected again.
+          </p>
+          <div className="actions form-actions">
+            <Button onClick={() => setForget(false)}>Keep jobs</Button>
             <Button
-              className="small"
-              onClick={() => setOffset(Math.max(0, offset - 50))}
+              variant="danger-fill"
+              disabled={pending}
+              onClick={() => bulk("forget")}
             >
-              Previous
+              Forget selected jobs
             </Button>
-          )}
-          {offset + 50 < resource.data.total && (
-            <Button className="small" onClick={() => setOffset(offset + 50)}>
-              Next
-            </Button>
-          )}
-          <span>Scores are indicative</span>
-        </div>
-      </div>
+          </div>
+        </Dialog>
+      )}
     </>
   );
 }
+
 export function JobDrawer({
   id,
   onClose,
@@ -266,12 +493,18 @@ export function JobDrawer({
       items: [],
       total: 0,
     });
-  const { mutate, pending } = useWorkspace();
-  const [tab, setTab] = useState("posting"),
-    [forget, setForget] = useState(false),
+  const { mutate, pending, notify } = useWorkspace();
+  const [tab, setTab] = useUrlState("detail", "posting");
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [scoringContext, setScoringContext] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
+  const [forget, setForget] = useState(false),
     [merging, setMerging] = useState(false);
   const job = resource.data;
   async function triage(value: Triage) {
+    if (!confirmLeave()) return;
     if (job)
       await mutate(
         () =>
@@ -291,7 +524,15 @@ export function JobDrawer({
     if (!job) return;
     const form = new FormData(e.currentTarget);
     await mutate(
-      () => api(`/jobs/${id}`, "PATCH", version(job, Object.fromEntries(form))),
+      () =>
+        api(
+          `/jobs/${id}`,
+          "PATCH",
+          version(job, {
+            ...Object.fromEntries(form),
+            metadata: jsonValue(form, "metadata"),
+          }),
+        ),
       "Job details saved.",
     );
   }
@@ -434,10 +675,42 @@ export function JobDrawer({
                   >
                     Update fit score
                   </Button>
+                  <Button
+                    onClick={() =>
+                      api<Record<string, unknown>>(`/scoring/context/${id}`)
+                        .then(setScoringContext)
+                        .catch((e) => notify(e.message, true))
+                    }
+                  >
+                    Inspect scoring context
+                  </Button>
                   <Button onClick={() => setMerging(true)}>
                     Merge duplicate
                   </Button>
                 </div>
+                {!!job.postings?.length && (
+                  <details className="provenance">
+                    <summary>
+                      Source provenance · {job.postings.length} postings
+                    </summary>
+                    {job.postings.map((p, i) => (
+                      <article key={i}>
+                        <strong>
+                          {String(
+                            p.source_name ||
+                              p.source_id ||
+                              p.provider ||
+                              "Saved posting",
+                          )}
+                        </strong>
+                        <p>{String(p.url || p.source_url || "")}</p>
+                        <small>
+                          {String(p.created_at || p.last_seen_at || "")}
+                        </small>
+                      </article>
+                    ))}
+                  </details>
+                )}
                 {job.posting ? (
                   <div className="posting">{job.posting}</div>
                 ) : (
@@ -458,6 +731,17 @@ export function JobDrawer({
                       <p>{note.body || note.text}</p>
                       <div className="section-footer">
                         <time>{date(note.created_at)}</time>
+                        <button
+                          className="iconbtn"
+                          aria-label="Edit note"
+                          onClick={() =>
+                            api<Note>(`/notes/${note.id}`)
+                              .then(setEditingNote)
+                              .catch((e) => notify(e.message, true))
+                          }
+                        >
+                          <Icon name="edit" />
+                        </button>
                         <button
                           className="iconbtn danger"
                           aria-label="Delete note"
@@ -496,7 +780,7 @@ export function JobDrawer({
             ) : tab === "files" ? (
               <FileManager ownerType="job" ownerId={id} preview />
             ) : (
-              <form onSubmit={edit} key={job.version}>
+              <form onSubmit={edit} key={job.id}>
                 <div className="stack">
                   <Field label="Role">
                     <input name="title" defaultValue={job.title} required />
@@ -507,6 +791,20 @@ export function JobDrawer({
                   <Field label="Location">
                     <input name="location" defaultValue={job.location} />
                   </Field>
+                  <Field label="Job URL">
+                    <input name="url" type="url" defaultValue={job.url} />
+                  </Field>
+                  <Field label="Availability">
+                    <select
+                      name="availability"
+                      defaultValue={job.availability || "unknown"}
+                    >
+                      <option value="unknown">Unknown</option>
+                      <option value="open">Open</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                  </Field>
+                  <AdvancedJson name="metadata" value={job.metadata} />
                   <Field label="Posting text">
                     <textarea
                       name="posting"
@@ -523,6 +821,52 @@ export function JobDrawer({
           </>
         )}
       </Dialog>
+      {scoringContext && (
+        <Dialog
+          title="Scoring context."
+          onClose={() => setScoringContext(null)}
+        >
+          <p className="modal-intro">
+            The compact profile, job text and score levels used by the optional
+            scorer.
+          </p>
+          <pre className="json-readout">
+            {JSON.stringify(scoringContext, null, 2)}
+          </pre>
+        </Dialog>
+      )}
+      {editingNote && (
+        <Dialog title="Edit your note." onClose={() => setEditingNote(null)}>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (
+                await mutate(
+                  () =>
+                    api(`/notes/${editingNote.id}`, "PATCH", {
+                      body: new FormData(e.currentTarget).get("body"),
+                      expected_version: editingNote.version,
+                    }),
+                  "Note updated.",
+                )
+              )
+                setEditingNote(null);
+            }}
+          >
+            <Field label="Note">
+              <textarea
+                name="body"
+                required
+                rows={6}
+                defaultValue={editingNote.body}
+              />
+            </Field>
+            <Button variant="primary" disabled={pending}>
+              Save note
+            </Button>
+          </form>
+        </Dialog>
+      )}
       {merging && job && (
         <MergeJob
           job={job}

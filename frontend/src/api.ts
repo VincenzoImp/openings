@@ -2,6 +2,8 @@ export type Json = Record<string, unknown>;
 export interface ListResult<T> {
   items: T[];
   total: number;
+  stage_counts?: Record<string, number>;
+  facets?: Record<string, string[]>;
 }
 export interface Versioned {
   id: string;
@@ -17,6 +19,11 @@ export interface Job extends Versioned {
   location: string;
   url: string;
   posting: string;
+  posting_preview?: string;
+  complete?: boolean;
+  remote?: boolean | null;
+  job_type?: string;
+  postings?: Json[];
   triage: Triage;
   score: number | null;
   score_outdated: boolean;
@@ -69,11 +76,14 @@ export interface Knowledge extends Versioned {
   kind: string;
   title: string;
   narrative: string;
+  narrative_preview?: string;
   metadata: Json;
 }
 export interface Claim extends Versioned {
   knowledge_id: string;
   text: string;
+  text_preview?: string;
+  knowledge_title?: string;
   approved: boolean;
   metadata: Json;
 }
@@ -112,11 +122,12 @@ export interface WorkspaceFile {
 export interface Source extends Versioned {
   name: string;
   kind: string;
-  config: Record<string, string>;
+  config: Json;
   url?: string;
   enabled: boolean;
   filters: Json;
   schedule: Json;
+  next_run_at?: string;
   last_run_at?: string;
   last_error?: string;
   last_result?: Json;
@@ -130,6 +141,7 @@ export interface Scoring {
   api_key?: string;
   api_key_set?: boolean;
   rubric: string;
+  criteria?: string[];
   periodic_rescore: { enabled: boolean; minutes: number; batch_size: number };
   max_len: number;
   timeout_seconds: number;
@@ -232,6 +244,18 @@ export async function api<T>(
       error?.code,
     );
   }
+  if (
+    !["GET", "HEAD"].includes(method) &&
+    !/\/(preview|test|download|uploads|auth)(\/|$)/.test(path)
+  ) {
+    setTimeout(
+      () =>
+        window.dispatchEvent(
+          new CustomEvent("openings:changed", { detail: path }),
+        ),
+      0,
+    );
+  }
   return value as T;
 }
 export function list<T>(path: string, signal?: AbortSignal) {
@@ -287,6 +311,9 @@ export async function uploadFile(
   });
   if (!response.ok)
     throw new ApiError("The file could not be uploaded.", response.status);
+  window.dispatchEvent(
+    new CustomEvent("openings:changed", { detail: "/files" }),
+  );
   return response.json().catch(() => ({}));
 }
 export async function fileUrl(file: WorkspaceFile) {
@@ -351,4 +378,25 @@ export async function copyText(value: string) {
   const copied = document.execCommand("copy");
   input.remove();
   if (!copied) throw new Error("Select and copy the displayed text manually.");
+}
+
+export function jsonValue(
+  form: FormData,
+  name: string,
+  fallback: unknown = {},
+) {
+  const raw = String(form.get(name) || "").trim();
+  return raw ? JSON.parse(raw) : fallback;
+}
+export function formatTime(value?: string) {
+  if (!value) return "Not scheduled";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.valueOf())
+    ? value
+    : parsed.toLocaleString("en", {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
 }

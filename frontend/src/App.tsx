@@ -6,7 +6,12 @@ import {
   type Profile,
   type Session,
 } from "./api";
-import { useResource, useWorkspace } from "./state";
+import {
+  confirmLeave,
+  useFormProtection,
+  useResource,
+  useWorkspace,
+} from "./state";
 import { Button, ErrorBox, Icon, Loading, type IconName } from "./ui";
 import OverviewPage from "./pages/Overview";
 import { AddJob, JobDrawer, JobsPage } from "./pages/Jobs";
@@ -19,7 +24,7 @@ const pages: { id: string; title: string; icon: IconName }[] = [
   { id: "overview", title: "Overview", icon: "overview" },
   { id: "inbox", title: "Inbox", icon: "inbox" },
   { id: "applications", title: "Applications", icon: "applications" },
-  { id: "companies", title: "Companies", icon: "companies" },
+  { id: "collection", title: "Collection", icon: "companies" },
   { id: "career", title: "Career", icon: "career" },
   { id: "templates", title: "Templates", icon: "templates" },
   { id: "settings", title: "Settings", icon: "settings" },
@@ -27,7 +32,8 @@ const pages: { id: string; title: string; icon: IconName }[] = [
 type Overlay =
   { kind: "add" } | { kind: "job" | "application"; id: string } | null;
 function readRoute() {
-  const hash = location.hash.slice(1).split("?")[0];
+  const raw = location.hash.slice(1).split("?")[0];
+  const hash = raw === "companies" ? "collection" : raw;
   return pages.some((p) => p.id === hash) ? hash : "overview";
 }
 export default function App() {
@@ -181,9 +187,17 @@ function Auth({
   );
 }
 function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
+  useFormProtection();
   const [route, setRoute] = useState(readRoute),
     [mobile, setMobile] = useState(false),
-    [overlay, setOverlay] = useState<Overlay>(null),
+    [overlay, setOverlay] = useState<Overlay>(() => {
+      const p = new URLSearchParams(location.hash.split("?")[1] || "");
+      return p.get("job")
+        ? { kind: "job", id: p.get("job")! }
+        : p.get("application")
+          ? { kind: "application", id: p.get("application")! }
+          : null;
+    }),
     [theme, setTheme] = useState(() => {
       try {
         return (
@@ -204,8 +218,19 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
     });
   useEffect(() => {
     const listener = () => {
+      if (!confirmLeave()) {
+        history.replaceState(null, "", `#${route}`);
+        return;
+      }
       setRoute(readRoute());
-      setOverlay(null);
+      const p = new URLSearchParams(location.hash.split("?")[1] || "");
+      setOverlay(
+        p.get("job")
+          ? { kind: "job", id: p.get("job")! }
+          : p.get("application")
+            ? { kind: "application", id: p.get("application")! }
+            : null,
+      );
       setMobile(false);
       window.scrollTo(0, 0);
     };
@@ -215,7 +240,7 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
       window.removeEventListener("hashchange", listener);
       window.removeEventListener("popstate", listener);
     };
-  }, []);
+  }, [route]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     try {
@@ -233,18 +258,39 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
     return () => document.removeEventListener("keydown", close);
   }, []);
   function navigate(id: string, next: Overlay = null) {
-    history.pushState(null, "", `#${id}`);
+    if (!confirmLeave()) return;
+    history.pushState(
+      null,
+      "",
+      `#${id}${next && next.kind !== "add" ? `?${next.kind}=${encodeURIComponent(next.id)}` : ""}`,
+    );
     setRoute(id);
     setOverlay(next);
     setMobile(false);
     window.scrollTo(0, 0);
   }
-  function openJob(id: string) {
-    setOverlay({ kind: "job", id });
+  function openObject(kind: "job" | "application", id: string) {
+    if (!confirmLeave()) return;
+    const [page, query = ""] = location.hash.split("?");
+    const params = new URLSearchParams(query);
+    params.delete("job");
+    params.delete("application");
+    params.set(kind, id);
+    history.pushState(null, "", `${page}?${params}`);
+    setOverlay({ kind, id });
   }
-  function openApp(id: string) {
-    setOverlay({ kind: "application", id });
+  function closeObject() {
+    if (!confirmLeave()) return;
+    const [page, query = ""] = location.hash.split("?");
+    const params = new URLSearchParams(query);
+    params.delete("job");
+    params.delete("application");
+    params.delete("detail");
+    history.replaceState(null, "", `${page}${params.size ? "?" + params : ""}`);
+    setOverlay(null);
   }
+  const openJob = (id: string) => openObject("job", id);
+  const openApp = (id: string) => openObject("application", id);
   const toggleTheme = () => setTheme((t) => (t === "light" ? "dark" : "light"));
   const name = profile.data.name || "Your workspace";
   return (
@@ -364,7 +410,7 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
               />
             ) : route === "applications" ? (
               <ApplicationsPage onOpen={openApp} />
-            ) : route === "companies" ? (
+            ) : route === "collection" ? (
               <CompaniesPage />
             ) : route === "career" ? (
               <CareerPage />
@@ -389,21 +435,21 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
       </div>
       {overlay?.kind === "add" && (
         <AddJob
-          onClose={() => setOverlay(null)}
+          onClose={closeObject}
           onCreated={(id) => navigate("inbox", { kind: "job", id })}
         />
       )}{" "}
       {overlay?.kind === "job" && (
         <JobDrawer
           id={overlay.id}
-          onClose={() => setOverlay(null)}
+          onClose={closeObject}
           onApplication={(id) =>
             navigate("applications", { kind: "application", id })
           }
         />
       )}{" "}
       {overlay?.kind === "application" && (
-        <ApplicationDrawer id={overlay.id} onClose={() => setOverlay(null)} />
+        <ApplicationDrawer id={overlay.id} onClose={closeObject} />
       )}
     </>
   );

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import {
   api,
   date,
+  jsonValue,
   version,
   type Claim,
   type Knowledge,
@@ -9,8 +10,16 @@ import {
   type Profile,
 } from "../api";
 import { FileManager } from "../files";
-import { useResource, useWorkspace } from "../state";
 import {
+  useDebounce,
+  useResource,
+  useUrlFilters,
+  useUrlState,
+  useWorkspace,
+} from "../state";
+import {
+  AdvancedJson,
+  Pagination,
   Button,
   Dialog,
   Empty,
@@ -36,7 +45,7 @@ const blankProfile: Profile = {
   version: 1,
 };
 export default function CareerPage() {
-  const [tab, setTab] = useState("profile");
+  const [tab, setTab] = useUrlState("section", "profile");
   return (
     <>
       <Heading
@@ -86,19 +95,8 @@ function ProfileForm() {
     const body: Record<string, unknown> = Object.fromEntries(
       fields.map((k) => [k, String(f.get(k) || "")]),
     );
-    body.links = String(f.get("links") || "")
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map(
-        (url) =>
-          data.links.find(
-            (item) =>
-              typeof item === "object" &&
-              item !== null &&
-              (item as { url?: string }).url === url,
-          ) || { label: "Website", url },
-      );
+    body.links = jsonValue(f, "links", []);
+    body.metadata = jsonValue(f, "metadata");
     await mutate(
       () => api("/career/profile", "PATCH", version(data, body)),
       "Profile saved. Relevant changes mark scores outdated without running inference.",
@@ -107,7 +105,7 @@ function ProfileForm() {
   if (loading) return <Loading />;
   if (error) return <ErrorBox message={error} retry={reload} />;
   return (
-    <form className="reading-width" onSubmit={save} key={data.version}>
+    <form className="profile-layout" onSubmit={save} key="profile">
       <section className="card sectioncard">
         <div className="sectiontitle">
           <div>
@@ -146,20 +144,12 @@ function ProfileForm() {
               placeholder="Backend engineer, platform engineer"
             />
           </Field>
-          <Field label="Links" className="full" hint="One full URL per line.">
-            <textarea
-              name="links"
-              rows={3}
-              defaultValue={data.links
-                .map((item) =>
-                  typeof item === "string"
-                    ? item
-                    : String((item as Record<string, unknown>).url || ""),
-                )
-                .filter(Boolean)
-                .join("\n")}
-            />
-          </Field>
+          <div className="full">
+            <ProfileLinks links={data.links} />
+          </div>
+          <div className="full">
+            <AdvancedJson name="metadata" value={data.metadata} />
+          </div>
           <Field label="Professional summary" className="full">
             <textarea name="summary" rows={5} defaultValue={data.summary} />
           </Field>
@@ -203,16 +193,83 @@ function ProfileForm() {
     </form>
   );
 }
+function ProfileLinks({ links }: { links: unknown[] }) {
+  const [items, setItems] = useState<Record<string, unknown>[]>(
+    links.map((item) =>
+      typeof item === "string"
+        ? { label: "Website", url: item }
+        : (item as Record<string, unknown>),
+    ),
+  );
+  return (
+    <fieldset className="profile-links">
+      <legend>Professional links</legend>
+      <input
+        type="hidden"
+        name="links"
+        value={JSON.stringify(items.filter((item) => item.url))}
+      />
+      {items.map((item, i) => (
+        <div className="link-editor" key={i}>
+          <input
+            aria-label={`Link ${i + 1} label`}
+            placeholder="LinkedIn, portfolio…"
+            value={String(item.label || "")}
+            onChange={(e) =>
+              setItems((rows) =>
+                rows.map((row, j) =>
+                  j === i ? { ...row, label: e.target.value } : row,
+                ),
+              )
+            }
+          />
+          <input
+            aria-label={`Link ${i + 1} URL`}
+            type="url"
+            placeholder="https://…"
+            value={String(item.url || "")}
+            onChange={(e) =>
+              setItems((rows) =>
+                rows.map((row, j) =>
+                  j === i ? { ...row, url: e.target.value } : row,
+                ),
+              )
+            }
+          />
+          <button
+            type="button"
+            data-dirty-control="true"
+            className="iconbtn danger"
+            aria-label={`Remove link ${i + 1}`}
+            onClick={() => setItems((rows) => rows.filter((_, j) => j !== i))}
+          >
+            <Icon name="close" />
+          </button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        data-dirty-control="true"
+        className="small"
+        icon="plus"
+        onClick={() => setItems((rows) => [...rows, { label: "", url: "" }])}
+      >
+        Add link
+      </Button>
+    </fieldset>
+  );
+}
 function KnowledgePage() {
+  const [filters, setFilters] = useUrlFilters({ q: "", kind: "", offset: "0" });
+  const query = useDebounce(filters.q);
   const resource = useResource<ListResult<Knowledge>>(
-    "/career/knowledge",
+    `/career/knowledge?summary=true&limit=30&offset=${filters.offset}&q=${encodeURIComponent(query)}&kind=${filters.kind}`,
     {
       items: [],
       total: 0,
     },
-    true,
   );
-  const { mutate, pending } = useWorkspace();
+  const { mutate, pending, notify } = useWorkspace();
   const [editing, setEditing] = useState<Knowledge | "new" | null>(null),
     [importing, setImporting] = useState(false),
     [removing, setRemoving] = useState<Knowledge | null>(null);
@@ -242,6 +299,38 @@ function KnowledgePage() {
       {resource.error && (
         <ErrorBox message={resource.error} retry={resource.reload} />
       )}
+      <div className="toolbar">
+        <div className="search">
+          <Icon name="search" />
+          <input
+            aria-label="Search career knowledge"
+            placeholder="Search your experience"
+            value={filters.q}
+            onChange={(e) => setFilters({ q: e.target.value, offset: "0" })}
+          />
+        </div>
+        <select
+          aria-label="Knowledge type"
+          value={filters.kind}
+          onChange={(e) => setFilters({ kind: e.target.value, offset: "0" })}
+        >
+          <option value="">All types</option>
+          {[
+            "experience",
+            "project",
+            "course",
+            "education",
+            "fact",
+            "skill",
+            "language",
+            "other",
+          ].map((kind) => (
+            <option key={kind} value={kind}>
+              {kind}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="knowledge-grid">
         {resource.loading ? (
           <Loading />
@@ -253,14 +342,18 @@ function KnowledgePage() {
                   <span className="eyebrow">{item.kind}</span>
                   <h3>{item.title}</h3>
                   <small className="muted">
-                    {String(item.metadata.dates || date(item.updated_at))}
+                    {String(item.metadata?.dates || date(item.updated_at))}
                   </small>
                 </div>
                 <div className="actions">
                   <button
                     className="iconbtn"
                     aria-label={`Edit ${item.title}`}
-                    onClick={() => setEditing(item)}
+                    onClick={() =>
+                      api<Knowledge>(`/career/knowledge/${item.id}`)
+                        .then(setEditing)
+                        .catch((e) => notify(e.message, true))
+                    }
                   >
                     <Icon name="edit" />
                   </button>
@@ -273,7 +366,9 @@ function KnowledgePage() {
                   </button>
                 </div>
               </div>
-              <p className="narrative">{item.narrative}</p>
+              <p className="narrative">
+                {item.narrative_preview || item.narrative}
+              </p>
               <details className="evidence-files">
                 <summary>Supporting files</summary>
                 <FileManager ownerType="knowledge" ownerId={item.id} />
@@ -296,6 +391,11 @@ function KnowledgePage() {
           </section>
         )}
       </div>
+      <Pagination
+        offset={Number(filters.offset) || 0}
+        total={resource.data.total}
+        onChange={(offset) => setFilters({ offset: String(offset) })}
+      />
       {editing && (
         <KnowledgeEditor
           record={editing === "new" ? undefined : editing}
@@ -355,7 +455,7 @@ function KnowledgeEditor({
       title: f.get("title"),
       narrative: f.get("narrative"),
       metadata: {
-        ...record?.metadata,
+        ...jsonValue(f, "metadata", record?.metadata || {}),
         dates: f.get("dates"),
         skills: String(f.get("skills") || "")
           .split(",")
@@ -427,6 +527,7 @@ function KnowledgeEditor({
             }
           />
         </Field>
+        <AdvancedJson name="metadata" value={record?.metadata || {}} />
         <div className="actions form-actions">
           <Button type="button" onClick={onClose}>
             Cancel
@@ -564,23 +665,29 @@ function KnowledgeImport({ onClose }: { onClose: () => void }) {
   );
 }
 function ClaimsPage() {
+  const [filters, setFilters] = useUrlFilters({
+    q: "",
+    approved: "",
+    knowledge_id: "",
+    offset: "0",
+  });
+  const query = useDebounce(filters.q);
   const resource = useResource<ListResult<Claim>>(
-      "/career/claims",
+      `/career/claims?summary=true&limit=30&offset=${filters.offset}&q=${encodeURIComponent(query)}${filters.approved ? `&approved=${filters.approved}` : ""}${filters.knowledge_id ? `&knowledge_id=${filters.knowledge_id}` : ""}`,
       {
         items: [],
         total: 0,
       },
-      true,
     ),
     knowledge = useResource<ListResult<Knowledge>>(
-      "/career/knowledge",
+      "/career/knowledge?summary=true",
       {
         items: [],
         total: 0,
       },
       true,
     );
-  const { mutate, pending } = useWorkspace();
+  const { mutate, pending, notify } = useWorkspace();
   const [editing, setEditing] = useState<Claim | "new" | null>(null);
   return (
     <>
@@ -604,6 +711,42 @@ function ClaimsPage() {
       {resource.error && (
         <ErrorBox message={resource.error} retry={resource.reload} />
       )}
+      <div className="toolbar">
+        <div className="search">
+          <Icon name="search" />
+          <input
+            aria-label="Search claims"
+            placeholder="Search statements"
+            value={filters.q}
+            onChange={(e) => setFilters({ q: e.target.value, offset: "0" })}
+          />
+        </div>
+        <select
+          aria-label="Claim approval"
+          value={filters.approved}
+          onChange={(e) =>
+            setFilters({ approved: e.target.value, offset: "0" })
+          }
+        >
+          <option value="">All claims</option>
+          <option value="true">Approved</option>
+          <option value="false">Draft</option>
+        </select>
+        <select
+          aria-label="Supporting knowledge filter"
+          value={filters.knowledge_id}
+          onChange={(e) =>
+            setFilters({ knowledge_id: e.target.value, offset: "0" })
+          }
+        >
+          <option value="">All evidence</option>
+          {knowledge.data.items.map((k) => (
+            <option key={k.id} value={k.id}>
+              {k.title}
+            </option>
+          ))}
+        </select>
+      </div>
       <section className="card">
         {resource.loading ? (
           <Loading />
@@ -632,10 +775,13 @@ function ClaimsPage() {
                 />
               </label>
               <div className="claimcopy">
-                <p>{claim.text}</p>
+                <p>{claim.text_preview || claim.text}</p>
                 <small>
-                  {knowledge.data.items.find((k) => k.id === claim.knowledge_id)
-                    ?.title || "Linked career evidence"}
+                  {claim.knowledge_title ||
+                    knowledge.data.items.find(
+                      (k) => k.id === claim.knowledge_id,
+                    )?.title ||
+                    "Linked career evidence"}
                 </small>
               </div>
               <span className={`tag ${claim.approved ? "green" : "neutral"}`}>
@@ -644,7 +790,11 @@ function ClaimsPage() {
               <button
                 className="iconbtn"
                 aria-label="Edit claim"
-                onClick={() => setEditing(claim)}
+                onClick={() =>
+                  api<Claim>(`/career/claims/${claim.id}`)
+                    .then(setEditing)
+                    .catch((e) => notify(e.message, true))
+                }
               >
                 <Icon name="edit" />
               </button>
@@ -674,6 +824,11 @@ function ClaimsPage() {
           </Empty>
         )}
       </section>
+      <Pagination
+        offset={Number(filters.offset) || 0}
+        total={resource.data.total}
+        onChange={(offset) => setFilters({ offset: String(offset) })}
+      />
       {editing && (
         <ClaimEditor
           record={editing === "new" ? undefined : editing}
@@ -701,6 +856,7 @@ function ClaimEditor({
         knowledge_id: f.get("knowledge_id"),
         text: f.get("text"),
         approved: f.get("approved") === "on",
+        metadata: jsonValue(f, "metadata", record?.metadata || {}),
       };
     if (
       await mutate(
@@ -737,6 +893,7 @@ function ClaimEditor({
         <Field label="Claim">
           <textarea name="text" rows={6} required defaultValue={record?.text} />
         </Field>
+        <AdvancedJson name="metadata" value={record?.metadata || {}} />
         <label className="checkline">
           <input
             type="checkbox"

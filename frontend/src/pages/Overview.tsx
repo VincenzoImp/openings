@@ -1,6 +1,7 @@
 import { date, type FunnelStep, type Overview } from "../api";
-import { useResource } from "../state";
+import { useResource, useUrlFilters } from "../state";
 import { Button, Empty, ErrorBox, Heading, Icon, Loading } from "../ui";
+import { Field } from "../ui";
 const initial: Overview = {
   sent: 0,
   interviews: 0,
@@ -204,8 +205,9 @@ export default function OverviewPage({
   onAdd: () => void;
   onNavigate: (page: string) => void;
 }) {
+  const [period, setPeriod] = useUrlFilters({ since: "", until: "" });
   const { data, loading, error, reload } = useResource<Overview>(
-    "/overview",
+    `/overview?${new URLSearchParams(Object.fromEntries(Object.entries(period).filter(([, value]) => !!value)))}`,
     initial,
   );
   const attention = [
@@ -251,7 +253,14 @@ export default function OverviewPage({
       {error && <ErrorBox message={error} retry={reload} />}
       <div className="stats">
         {[
-          [data.sent, "Applications sent", "All recorded attempts", "applied"],
+          [
+            data.sent,
+            "Applications sent",
+            period.since || period.until
+              ? "Selected submission period"
+              : "All recorded attempts",
+            "applied",
+          ],
           [
             data.interviews,
             "Reached interview",
@@ -284,7 +293,30 @@ export default function OverviewPage({
               Where submitted applications progressed, and where they stand now.
             </p>
           </div>
-          <span className="tag neutral">All time</span>
+          <div className="period-controls">
+            <Field label="Submitted from">
+              <input
+                type="date"
+                value={period.since}
+                max={period.until || undefined}
+                onChange={(e) => setPeriod({ since: e.target.value })}
+              />
+            </Field>
+            <Field label="Through">
+              <input
+                type="date"
+                value={period.until}
+                min={period.since || undefined}
+                onChange={(e) => setPeriod({ until: e.target.value })}
+              />
+            </Field>
+            <Button
+              className="small"
+              onClick={() => setPeriod({ since: "", until: "" })}
+            >
+              All time
+            </Button>
+          </div>
         </div>
         {loading ? <Loading /> : <Funnel steps={data.funnel} />}
       </section>
