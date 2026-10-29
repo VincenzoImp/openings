@@ -396,9 +396,12 @@ class Workspace:
                 conflict("Restore the dismissed job before preparing an application.")
             if value.idempotency_key:
                 old = c.execute(
-                    "SELECT id FROM applications WHERE idempotency_key=?", (value.idempotency_key,)
+                    "SELECT id,job_id FROM applications WHERE idempotency_key=?",
+                    (value.idempotency_key,),
                 ).fetchone()
                 if old:
+                    if old["job_id"] != value.job_id:
+                        conflict("This idempotency key already belongs to another job.")
                     return self.get_application(old["id"])
             record_id, stamp = new_id(), now()
             c.execute(
@@ -445,7 +448,11 @@ class Workspace:
                 else json.loads(row["answers"])
             )
             self.validate_answers(questions, answers)
-            if status == "applied" and not row["applied_at"] and "applied_at" not in changes:
+            if (
+                status in {"applied", "interview", "offer"}
+                and not row["applied_at"]
+                and "applied_at" not in changes
+            ):
                 changes["applied_at"] = now()
             actual = {}
             for key, val in changes.items():
@@ -513,10 +520,16 @@ class Workspace:
             }
             for s in stages
         ]
+        observed_by_app = {}
+        for event in self.db.all(
+            "SELECT application_id,payload FROM events WHERE application_id IS NOT NULL"
+        ):
+            observed_by_app.setdefault(event["application_id"], set()).add(
+                json.loads(event["payload"]).get("to")
+            )
         sent = 0
         for app in apps:
-            events = self.db.all("SELECT payload FROM events WHERE application_id=?", (app["id"],))
-            observed = {json.loads(e["payload"]).get("to") for e in events}
+            observed = set(observed_by_app.get(app["id"], ()))
             if app["applied_at"]:
                 observed.add("applied")
             if "applied" not in observed:
@@ -528,16 +541,25 @@ class Workspace:
                 funnel[i]["count"] += 1
             outcome = (app["outcome"] or "not_pursued") if app["status"] == "closed" else "waiting"
             funnel[highest]["outcomes"][outcome] += 1
-        jobs = [self._job(r) for r in self.db.all("SELECT * FROM jobs WHERE triage!='dismissed'")]
+        counts = self.db.one(
+            "SELECT count(*) n,coalesce(sum(triage='inbox'),0) inbox,coalesce(sum(length(trim(posting))=0),0) incomplete FROM jobs WHERE triage!='dismissed'"
+        )
+        outdated = self.db.one(
+            "SELECT count(*) n FROM jobs j JOIN assessments a ON a.id=(SELECT id FROM assessments WHERE job_id=j.id ORDER BY created_at DESC LIMIT 1) WHERE j.triage!='dismissed' AND (a.job_version!=j.content_version OR a.profile_version!=? OR a.config_version!=?)",
+            (
+                self.scoring_profile_version(),
+                int(self.get_settings("scoring_config_revision", 0)["data"]),
+            ),
+        )["n"]
         return {
             "sent": sent,
             "interviews": funnel[1]["count"],
             "offers": funnel[2]["count"],
             "active": sum(a["status"] not in {"draft", "closed"} for a in apps),
             "drafts": sum(a["status"] == "draft" for a in apps),
-            "inbox": sum(j["triage"] == "inbox" for j in jobs),
-            "outdated": sum(j["score_outdated"] for j in jobs),
-            "incomplete": sum(not j["complete"] for j in jobs),
+            "inbox": counts["inbox"],
+            "outdated": outdated,
+            "incomplete": counts["incomplete"],
             "funnel": funnel,
             "activity": [
                 decode_record(r, ("payload",))

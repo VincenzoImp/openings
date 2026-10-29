@@ -77,6 +77,14 @@ def test_attempts_and_recorded_funnel_are_separate_from_job_triage(workspace):
     second = workspace.create_application({"job_id": original["id"]})
     assert second["id"] != first["id"]
     assert workspace.list_applications()["total"] == 2
+    workspace.update_application(
+        second["id"], {"expected_version": second["version"], "status": "offer"}
+    )
+    assert workspace.overview()["sent"] == 2
+    assert workspace.overview()["offers"] == 1
+    other = job(workspace, url="https://jobs.lever.co/example/different-role")
+    with pytest.raises(DomainError):
+        workspace.create_application({"job_id": other["id"], "idempotency_key": "once"})
 
 
 def test_forget_cascades_owned_bytes_and_allows_fresh_acquisition(workspace):

@@ -1,0 +1,22 @@
+{
+  "purpose": "new production-module MCP/REST/external-compilation/file/backup round trip",
+  "checks": {
+    "rest_requires_owner": true,
+    "typed_module_discovery": true,
+    "context_resource": true,
+    "stored_instructions_in_context": true,
+    "external_compilation": true,
+    "exact_application.pdf": true,
+    "exact_application.tex": true,
+    "revision_has_no_inherited_pdf": true,
+    "files_do_not_mark_application_sent": true,
+    "backup_integrity": true,
+    "backup_foreign_keys": true,
+    "backup_exact_pdf": true,
+    "backup_context_and_revisions": true
+  },
+  "all_passed": true,
+  "pdf_bytes": 15612,
+  "tools_discovered": 68,
+  "standalone_registration": false
+}

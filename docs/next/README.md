@@ -36,7 +36,7 @@ English.** Users may keep their own content in any language.
 The [skill draft](../../skills/openings-workspace/SKILL.md) is not installed or
 validated against a production MCP server. MCP must remain usable without it.
 
-Initial implementation task: **M1.1**, a fresh scaffold and minimal initial schema.
+Current task: **M4.4 / M5**, external-agent and release validation. The fresh backend, dashboard, collection and scoring services are integrated.
 `experiments/next` contains historical feasibility probes, not production modules.
 Use a few invariant tests and real dashboard/API/MCP/agent walkthroughs; no
 coverage target. Update PLAN.md and STATE.json after each usable increment.

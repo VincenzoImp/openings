@@ -47,3 +47,9 @@ career/documents build independently against this shared contract.
 
 Next root work: complete operational backup/restore and integrate peer domains;
 then exercise real MCP transport and frontend bindings. M1 is not yet complete.
+
+## Production integration
+
+Fresh archive/auth, career/templates/documents, seven-area React dashboard, ATS/feed collection, persisted worker and optional scorer are integrated. 18 invariant tests and 13 real HTTP/MCP/Tectonic/file/backup checks pass (68 typed tools). Actual browser flows cover profile/evidence/claims/templates, frozen contexts, immutable document revisions, PDF uploads, approval, owner tokens and portable restore; live Ashby preview/run collected 32 jobs. Root fixed scoped backup/restore, full streaming record export, direct-stage funnel counts and cross-job idempotency misuse.
+
+Remaining release checks: actual model-driven agent session using the shipped skill, Docker install/restore and 2 CPU / 4 GiB whole-stack resource measurements, final integrated desktop/mobile inspection. No personal data or deployed installation was modified.

@@ -1,6 +1,6 @@
 # Delivery plan
 
-Current scope: [PRODUCT.md](PRODUCT.md). Next task **M1.1**. Production implementation is authorized and in progress. Update this file and STATE.json after each usable increment with
+Current scope: [PRODUCT.md](PRODUCT.md). Next task **M4.4 / M5**. Production implementation is authorized and in progress. Update this file and STATE.json after each usable increment with
 what works, a concise check/result, remaining issues and the exact next task.
 
 ## R0: completed research
@@ -28,7 +28,7 @@ verification. Do not hide that gate by shipping a different empirical score.
 
 ## M1: fresh foundation and archive
 
-- **M1.1 next:** replace the branch's production scaffold with fresh backend/UI
+- **M1.1 completed:** replace the branch's production scaffold with fresh backend/UI
   code, the smallest relational/typed-JSON initial schema and a schema version. Keep
   old projects available separately; do not build on experimental SQL blindly.
 - **M1.2:** SQLite files/hashes, consistent backup/restore and bounded transfers.
@@ -131,8 +131,7 @@ complete frozen release scope, not an MVP followed by planned feature additions.
 
 Fresh codebase on this branch; old implementations stay as separate references.
 Reuse knowledge of protocols/workflows, not the old configuration/scoring engine.
-No Dossier code copied into the MIT project. A single local planning/feasibility checkpoint preserves this review. Production
-implementation and publication await their authorized execution. Keep docs and state current.
+No Dossier code copied into the MIT project. A single local planning/feasibility checkpoint preserves this review. Production implementation is authorized and underway. Publication is a separate release action after validation. Keep docs and state current.
 
 ## Orchestration and checkpoints
 
@@ -155,3 +154,7 @@ At meaningful integration points, run the current workflow, record defects and
 fix them, review resource/scope/time drift, update state and continue. Do not run
 a long pipeline after every small edit or continue indefinitely without checking.
 Remove temporary worktrees only after their useful work is integrated.
+
+## Integrated implementation checkpoint
+
+M1, M2, M3.1–M3.4 and M4.1–M4.3 are integrated. Practical checks: 18 data-invariant tests, 13 live HTTP/MCP/external-Tectonic/file/backup checks, 68 discovered MCP tools, real Ashby collection and browser workflows across career/templates/documents/auth/restore. Direct Draft → Interview/Offer now establishes submitted status for funnel counts; no fictional intermediate history events are written. Next: validate the actual skill with an external model-driven agent, finish dashboard inspection, then fresh Docker installation and measured whole-stack resources.

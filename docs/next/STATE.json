@@ -2,7 +2,7 @@
   "updated": "2026-10-29",
   "branch": "codex/openings-next",
   "base_commit": "1deea6624da8474229b606b07ec669e6e75ae0f9",
-  "phase": "parallel_implementation",
+  "phase": "integration_and_release_validation",
   "production_rewrite_started": true,
   "production_data_accessed": false,
   "production_deployed": false,
@@ -15,9 +15,23 @@
     "R0.7",
     "R0.8",
     "R0.9",
-    "M1.1"
+    "M1.1",
+    "M1.2",
+    "M1.3",
+    "M1.4",
+    "M1.5",
+    "M2.1",
+    "M2.2",
+    "M2.3",
+    "M3.1",
+    "M3.2",
+    "M3.3",
+    "M3.4",
+    "M4.1",
+    "M4.2",
+    "M4.3"
   ],
-  "next_task": "M1.2",
+  "next_task": "M4.4 and M5: actual external agent, Docker installation and resource validation",
   "release_gates": [
     "Core/remote-scoring installation passes practical UI/REST/MCP/backup checks within 2 CPU / 4 GiB",
     "Bundled local preset passes whole-stack startup/steady target measurements; publish advisory-score and truncation limitations",
@@ -74,9 +88,9 @@
     "release_scope": "frozen complete Openings 1.0; no planned later feature phase"
   },
   "not_yet_verified": [
-    "Actual production UI/API/MCP/auth integration and external Codex/Claude workflow",
-    "Large-file/concurrency/restore interruption checks against implemented services",
-    "Docker/Linux/x86/ARM whole-stack startup and steady resource use"
+    "Model-driven external Codex workflow against the shipped skill",
+    "Fresh Docker/Linux ARM and x86 installation, restore and whole-stack resource envelope",
+    "Final desktop/mobile inspection of all seven integrated dashboard areas"
   ],
   "latest_probe": {
     "dashboard": "evidence/dashboard-smoke.json: 33 browser preview checks pass",
@@ -96,18 +110,18 @@
     "frontend": {
       "branch": "codex/openings-ui",
       "scope": "frontend/",
-      "status": "building"
+      "status": "integrated; final browser QA"
     },
     "discovery": {
       "branch": "codex/openings-discovery",
       "scope": "discovery.py, worker.py, scorer/",
-      "status": "practical checks"
+      "status": "integrated; isolated Linux validation"
     },
     "career": {
       "branch": "codex/openings-career",
       "scope": "career.py, documents.py, examples/",
-      "status": "practical checks"
+      "status": "integrated; release packaging"
     }
   },
-  "latest_implementation_check": "Core archive/auth/CSRF/application/backup practical HTTP smoke and 7 data-invariant tests pass"
+  "latest_implementation_check": "18 invariant tests and 13 real HTTP/MCP/external Tectonic/file/backup checks pass; 68 MCP tools; real public Ashby collection and dashboard profile/template/document/restore flows verified"
 }

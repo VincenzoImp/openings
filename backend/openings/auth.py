@@ -107,3 +107,16 @@ class Auth:
     def revoke_token(self, record_id):
         self.workspace.db.execute("DELETE FROM api_tokens WHERE id=?", (record_id,))
         return {"deleted": True}
+
+    def operation_ticket(self, operation):
+        return self.serializer().dumps({"operation": operation, "nonce": secrets.token_urlsafe(16)})
+
+    def authorize_operation(self, token, operation):
+        try:
+            value = self.serializer().loads(token, max_age=120)
+        except (BadSignature, SignatureExpired):
+            raise DomainError(
+                401, "transfer_expired", "The operation grant expired. Request another."
+            )
+        if value.get("operation") != operation:
+            raise DomainError(403, "transfer_scope", "This grant does not allow that operation.")

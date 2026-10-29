@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
+from mcp.server.fastmcp import Context
+from mcp.types import ToolAnnotations
+import os
 
 from .models import (
     ApplicationInput,
@@ -13,8 +16,9 @@ from .models import (
 
 def register_core(router: APIRouter, workspace):
     @router.get("/workspace")
-    def info():
+    def info(request: Request):
         return {
+            "origin": os.environ.get("OPENINGS_PUBLIC_URL", str(request.base_url)).rstrip("/"),
             "name": "Openings",
             "version": "1.0.0",
             "api_base": "/api/v1",
@@ -116,17 +120,22 @@ def register_core(router: APIRouter, workspace):
 
 
 def register_core_mcp(mcp, workspace):
-    @mcp.tool()
-    def workspace_info() -> dict:
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
+    def workspace_info(ctx: Context) -> dict:
         """Read workspace capabilities. Use REST transfer grants for file bytes."""
+        request = ctx.request_context.request
+        origin = os.environ.get("OPENINGS_PUBLIC_URL") or (
+            str(request.base_url).rstrip("/") if request else None
+        )
         return {
             "name": "Openings",
             "version": "1.0.0",
+            "origin": origin,
             "api_base": "/api/v1",
             "workflow": "Read career, templates and stored instructions; prepare a frozen context; write and compile externally; submit document revisions and PDF/source files; track progress explicitly.",
         }
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def jobs_search(
         q: str = "",
         triage: str | None = None,
@@ -138,7 +147,7 @@ def register_core_mcp(mcp, workspace):
         """Search the portable job archive; scores are indicative and may be outdated."""
         return workspace.list_jobs(q, triage, company, limit, offset, sort)
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def job_get(job_id: str) -> dict:
         """Read full job text, metadata, versions and assessment provenance."""
         return workspace.get_job(job_id)
@@ -181,7 +190,7 @@ def register_core_mcp(mcp, workspace):
             job_id, value.target_id, value.expected_version, value.target_version
         )
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def notes_list(job_id: str) -> dict:
         """Read notes retained with a job."""
         return workspace.list_notes(job_id)
@@ -196,12 +205,12 @@ def register_core_mcp(mcp, workspace):
         """Remove an individual note."""
         return workspace.delete_note(note_id)
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def applications_list(status: str | None = None, limit: int = 100, offset: int = 0) -> dict:
         """List independent application attempts, including drafts and closed outcomes."""
         return workspace.list_applications(status, limit, offset)
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def application_get(application_id: str) -> dict:
         """Read a single application and its job."""
         return workspace.get_application(application_id)
@@ -216,12 +225,12 @@ def register_core_mcp(mcp, workspace):
         """Record progress/questions/answers explicitly; editing documents never marks sent."""
         return workspace.update_application(application_id, value)
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def application_history(application_id: str) -> dict:
         """Read the recorded lifecycle events of an attempt."""
         return workspace.application_events(application_id)
 
-    @mcp.tool()
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def overview_get(since: str | None = None) -> dict:
         """Read funnel counts and activity from recorded application history."""
         return workspace.overview(since)

@@ -1,6 +1,7 @@
 """HTTP host for shared workspace REST, MCP and the compiled dashboard."""
 
 import asyncio
+import json
 import os
 import sqlite3
 import tempfile
@@ -12,7 +13,7 @@ from urllib.parse import urlsplit
 
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
@@ -22,8 +23,25 @@ from starlette.background import BackgroundTask
 from . import __version__
 from .api import register_core, register_core_mcp
 from .auth import COOKIE, MAX_AGE, Auth
+from .career import (
+    CareerService,
+    register_api as register_career_api,
+    register_mcp as register_career_mcp,
+)
+from .documents import (
+    DocumentService,
+    register_api as register_document_api,
+    register_mcp as register_document_mcp,
+)
 from .errors import DomainError
+from .discovery import (
+    DiscoveryService,
+    register_api as register_discovery_api,
+    register_mcp as register_discovery_mcp,
+)
+from .worker import Worker
 from .models import Input
+from .operations import restore_database
 from .workspace import Workspace
 
 
@@ -44,7 +62,13 @@ def error_response(error):
 
 def create_app(database=None, start_worker=True):
     workspace = Workspace(database or os.environ.get("OPENINGS_DATABASE", "data/openings.sqlite"))
+    workspace.maintenance = False
     auth = Auth(workspace)
+    career = CareerService(workspace)
+    documents = DocumentService(workspace)
+    discovery = DiscoveryService(workspace)
+    workspace.discovery = discovery
+    workspace.worker = Worker(workspace, discovery) if start_worker else None
     allowed_hosts = ["localhost:*", "127.0.0.1:*", "[::1]:*"]
     origins = ["http://localhost:*", "http://127.0.0.1:*", "http://[::1]:*"]
     public_url = os.environ.get("OPENINGS_PUBLIC_URL", "").rstrip("/")
@@ -61,11 +85,20 @@ def create_app(database=None, start_worker=True):
         ),
     )
     register_core_mcp(mcp, workspace)
+    register_career_mcp(mcp, career)
+    register_document_mcp(mcp, documents)
+    register_discovery_mcp(mcp, discovery)
 
     @asynccontextmanager
     async def lifespan(app):
         async with mcp.session_manager.run():
-            yield
+            if workspace.worker:
+                workspace.worker.start()
+            try:
+                yield
+            finally:
+                if workspace.worker:
+                    workspace.worker.stop()
 
     app = FastAPI(
         title="Openings",
@@ -75,6 +108,7 @@ def create_app(database=None, start_worker=True):
         openapi_url="/api/openapi.json",
     )
     app.state.workspace, app.state.auth, app.state.mcp = workspace, auth, mcp
+    app.state.career, app.state.documents, app.state.discovery = career, documents, discovery
     login_attempts = defaultdict(deque)
     semaphore = asyncio.Semaphore(24)
 
@@ -82,6 +116,10 @@ def create_app(database=None, start_worker=True):
     async def boundary(request: Request, call_next):
         try:
             path = request.url.path.rstrip("/")
+            if workspace.maintenance and path.startswith(("/api/v1", "/mcp")):
+                raise DomainError(
+                    503, "restoring", "A workspace restore is in progress. Retry shortly."
+                )
             public = {
                 "/api/v1/auth/session",
                 "/api/v1/auth/setup",
@@ -89,7 +127,19 @@ def create_app(database=None, start_worker=True):
                 "/api/v1/transfers",
             }
             if path.startswith("/api/v1/") and path not in public:
-                auth.authorize(request)
+                if path in {"/api/v1/backup", "/api/v1/backup/restore"} and request.headers.get(
+                    "x-operational-token"
+                ):
+                    operation = (
+                        "backup"
+                        if path == "/api/v1/backup" and request.method == "GET"
+                        else "restore"
+                        if path.endswith("/restore") and request.method == "POST"
+                        else "invalid"
+                    )
+                    auth.authorize_operation(request.headers["x-operational-token"], operation)
+                else:
+                    auth.authorize(request)
             if path.startswith("/mcp"):
                 auth.authorize(request, mcp=True)
             if path.startswith("/api/v1/auth/") and request.method == "POST" and path in public:
@@ -174,7 +224,7 @@ def create_app(database=None, start_worker=True):
             token,
             max_age=MAX_AGE,
             httponly=True,
-            secure=request.url.scheme == "https",
+            secure=request.url.scheme == "https" or public_url.startswith("https://"),
             samesite="strict",
             path="/",
         )
@@ -218,18 +268,154 @@ def create_app(database=None, start_worker=True):
             background=BackgroundTask(Path(name).unlink, missing_ok=True),
         )
 
+    @router.post("/backup/restore")
+    async def restore(request: Request):
+        handle, name = tempfile.mkstemp(suffix=".sqlite", prefix="openings-restore-")
+        count = 0
+        try:
+            with os.fdopen(handle, "wb") as upload:
+                async for chunk in request.stream():
+                    count += len(chunk)
+                    if count > int(os.environ.get("OPENINGS_MAX_RESTORE_MB", "512")) * 1024**2:
+                        raise DomainError(
+                            413,
+                            "backup_size",
+                            "The backup exceeds this installation's restore limit.",
+                        )
+                    upload.write(chunk)
+            with open(name, "rb") as check_file:
+                header = check_file.read(16)
+            if header != b"SQLite format 3\x00":
+                raise DomainError(422, "backup_format", "Select a SQLite database backup.")
+            workspace.maintenance = True
+            try:
+                return await asyncio.to_thread(restore_database, workspace, name)
+            except sqlite3.DatabaseError:
+                raise DomainError(422, "backup_format", "This database backup could not be read.")
+        finally:
+            workspace.maintenance = False
+            Path(name).unlink(missing_ok=True)
+
+    @router.get("/examples")
+    def examples():
+        names = ["career.json", "resume.tex", "cover-letter.tex"]
+        directory = Path(
+            os.environ.get("OPENINGS_EXAMPLES", Path(__file__).resolve().parents[2] / "examples")
+        )
+        return {
+            "items": [
+                {"name": name, "url": "/api/v1/examples/" + name}
+                for name in names
+                if (directory / name).is_file()
+            ]
+        }
+
+    @router.get("/examples/{name}")
+    def example_file(name: str):
+        if name not in {"career.json", "resume.tex", "cover-letter.tex"}:
+            raise DomainError(404, "not_found", "Example not found.")
+        path = (
+            Path(
+                os.environ.get(
+                    "OPENINGS_EXAMPLES", Path(__file__).resolve().parents[2] / "examples"
+                )
+            )
+            / name
+        )
+        if not path.is_file():
+            raise DomainError(404, "not_found", "Example not found.")
+        return FileResponse(path, filename=name)
+
     @router.get("/export")
     def export():
-        data = {
-            "version": __version__,
-            "jobs": workspace.list_jobs(limit=200),
-            "applications": workspace.list_applications(limit=200),
-        }
-        return JSONResponse(
-            data, headers={"Content-Disposition": 'attachment; filename="openings-export.json"'}
+        def records():
+            json_fields = {
+                "jobs": ["metadata", "overrides"],
+                "postings": ["payload"],
+                "applications": ["questions", "answers"],
+                "events": ["payload"],
+                "knowledge": ["metadata"],
+                "claims": ["metadata"],
+                "templates": ["rules"],
+                "contexts": ["payload"],
+                "documents": ["content"],
+                "sources": ["config", "schedule"],
+                "assessments": ["payload"],
+            }
+            tables = [
+                "jobs",
+                "postings",
+                "applications",
+                "notes",
+                "events",
+                "knowledge",
+                "claims",
+                "templates",
+                "contexts",
+                "documents",
+                "files",
+                "sources",
+                "assessments",
+            ]
+            yield '{"format":"openings-records-v1","files_include_bytes":false'
+            with workspace.db.connect() as conn:
+                conn.execute("BEGIN")
+                for table in tables:
+                    yield ',"' + table + '":['
+                    first = True
+                    for row in conn.execute("SELECT * FROM " + table):
+                        item = dict(row)
+                        for key in json_fields.get(table, []):
+                            item[key] = json.loads(item[key])
+                        if table == "sources":
+                            for key in ("api_key", "password", "token"):
+                                item["config"].pop(key, None)
+                        yield ("" if first else ",") + json.dumps(item, ensure_ascii=False)
+                        first = False
+                    yield "]"
+                settings = {}
+                for row in conn.execute(
+                    "SELECT key,data FROM settings WHERE key IN ('profile','instructions','scoring')"
+                ):
+                    data = json.loads(row["data"])
+                    if row["key"] == "scoring":
+                        data.pop("api_key", None)
+                    settings[row["key"]] = data
+                yield ',"settings":' + json.dumps(settings, ensure_ascii=False) + "}"
+
+        return StreamingResponse(
+            records(),
+            media_type="application/json",
+            headers={"Content-Disposition": 'attachment; filename="openings-export.json"'},
         )
 
+    @mcp.tool()
+    def workspace_backup() -> dict:
+        """Reserve a scoped HTTP download of a consistent SQLite backup, including file bytes."""
+        return {
+            "url": "/api/v1/backup",
+            "method": "GET",
+            "headers": {"X-Operational-Token": auth.operation_ticket("backup")},
+            "expires_in": 120,
+        }
+
+    @mcp.tool()
+    def workspace_restore_upload() -> dict:
+        """Reserve a scoped raw SQLite upload that replaces workspace data; installation authentication stays unchanged."""
+        return {
+            "url": "/api/v1/backup/restore",
+            "method": "POST",
+            "headers": {
+                "X-Operational-Token": auth.operation_ticket("restore"),
+                "Content-Type": "application/vnd.sqlite3",
+            },
+            "expires_in": 120,
+        }
+
     register_core(router, workspace)
+    register_career_api(router, career)
+    register_document_api(router, documents)
+    register_discovery_api(router, discovery)
     app.include_router(router)
     app.mount("/mcp", mcp.streamable_http_app())
 
