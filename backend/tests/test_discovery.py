@@ -121,6 +121,49 @@ def test_late_assessment_cannot_resurrect_forgotten_job(case, monkeypatch):
     assert not workspace.db.all("SELECT * FROM tasks")
 
 
+@pytest.mark.parametrize(
+    "initial_mode, updates, should_unload",
+    [
+        ("local", {"enabled": False}, True),
+        ("local", {"mode": "remote", "base_url": "https://remote.example"}, True),
+        ("local", {"provider": "systemone"}, True),
+        ("local", {"base_url": "http://other-local-scorer:8000"}, True),
+        ("local", {"base_url": "http://scorer:8000/v1"}, False),
+        ("local", {"timeout_seconds": 60}, False),
+        ("remote", {"enabled": False}, False),
+    ],
+)
+def test_leaving_local_scorer_releases_only_previously_owned_runtime(
+    case, monkeypatch, initial_mode, updates, should_unload
+):
+    workspace, service = case
+    current = service.get_scoring()
+    service.update_scoring(
+        ScoringWrite(
+            expected_version=current["version"],
+            mode=initial_mode,
+            provider="laya",
+            base_url="http://scorer:8000",
+        )
+    )
+    unloaded = []
+
+    def unload_old(config):
+        # Unload follows the successful settings commit and uses old credentials/URL.
+        saved = workspace.get_settings("scoring")["data"]
+        assert all(saved[key] == value for key, value in updates.items())
+        unloaded.append(config)
+
+    monkeypatch.setattr(service, "_unload_local", unload_old)
+    service.update_scoring(
+        ScoringWrite(expected_version=service.get_scoring()["version"], **updates)
+    )
+    assert len(unloaded) == int(should_unload)
+    if unloaded:
+        assert unloaded[0]["mode"] == "local"
+        assert unloaded[0]["base_url"] == "http://scorer:8000"
+
+
 def test_failed_replacement_keeps_previous_score_and_source_failure_is_isolated(case, monkeypatch):
     workspace, service = case
     job = workspace.ingest_job(

@@ -873,10 +873,14 @@ class DiscoveryService:
                     (stamp,),
                 )
         if (
-            old["enabled"]
-            and not config["enabled"]
-            and old["mode"] == "local"
+            old["mode"] == "local"
             and old["provider"] == "laya"
+            and (
+                (old["enabled"] and not config["enabled"])
+                or old["mode"] != config["mode"]
+                or old["provider"] != config["provider"]
+                or old["base_url"].removesuffix("/v1") != config["base_url"].removesuffix("/v1")
+            )
         ):
             self._unload_local(old)
         return self.get_scoring()
