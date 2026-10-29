@@ -307,6 +307,12 @@ def test_worker_restart_ignores_old_inflight_result(case, monkeypatch):
         assert entered.wait(3)
         worker.stop(timeout=0.01)
         worker.start()
+        # A restart invalidates the old lease, but cannot abort an HTTP inference.
+        # Its successor waits for that request; there is never overlapping inference.
+        time.sleep(0.1)
+        assert len(calls) == 1
+        assert workspace.get_job(job["id"])["score"] is None
+        release.set()
         deadline = time.monotonic() + 3
         while workspace.get_job(job["id"])["score"] is None and time.monotonic() < deadline:
             time.sleep(0.02)
