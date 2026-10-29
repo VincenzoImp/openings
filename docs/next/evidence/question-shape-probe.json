@@ -1,0 +1,377 @@
+{
+  "purpose": "development-only question shape comparison",
+  "model_revision": "55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851",
+  "max_len": 1024,
+  "questions": {
+    "fit": {
+      "type": "score",
+      "instructions": "Rate candidate suitability for this job. Read mandatory requirements, including the end of the posting. Explicitly missing mandatory qualifications must lower the rating, even when other skills fit.",
+      "criteria": [
+        "No match: unrelated profession, missing required license, or explicitly insufficient mandatory language level",
+        "Low match: core mandatory professional experience is missing",
+        "Partial match: some useful experience but an important requirement is missing or unknown",
+        "Strong match: mandatory core background is evidenced with only minor optional gaps",
+        "Very strong match: relevant professional experience and all stated mandatory qualifications are clearly evidenced"
+      ]
+    },
+    "mandatory_match": {
+      "type": "noul",
+      "instructions": "Does this candidate satisfy the job mandatory professional qualifications, technical experience and language level? If a mandatory qualification is explicitly absent or insufficient, answer false."
+    },
+    "language_match": {
+      "type": "noul",
+      "instructions": "Does the candidate meet the mandatory German language level in the posting? C1 satisfies C1; A1 is below C1."
+    }
+  },
+  "cases": [
+    {
+      "id": "backend_match",
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.8859,
+            "legend": {
+              "0": "No match: unrelated profession, missing required license, or explicitly insufficient mandatory language level",
+              "1": "Low match: core mandatory professional experience is missing",
+              "2": "Partial match: some useful experience but an important requirement is missing or unknown",
+              "3": "Strong match: mandatory core background is evidenced with only minor optional gaps",
+              "4": "Very strong match: relevant professional experience and all stated mandatory qualifications are clearly evidenced"
+            },
+            "probabilities": {
+              "0": 0.0444,
+              "1": 0.151,
+              "2": 0.1083,
+              "3": 0.2671,
+              "4": 0.4292
+            },
+            "confidence": 0.1425,
+            "answer_confidence": 0.4292,
+            "action": {
+              "act_probability": 1.0
+            }
+          },
+          "mandatory_match": {
+            "type": "noul",
+            "noul": 0.8026,
+            "confidence": 0.8026,
+            "answer_confidence": 0.8026,
+            "action": {
+              "act_probability": 1.0
+            }
+          },
+          "language_match": {
+            "type": "noul",
+            "noul": 0.7462,
+            "confidence": 0.7462,
+            "answer_confidence": 0.7462,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 2762,
+          "output_tokens": 0,
+          "state_tokens": 842,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 2.6253503329935484
+    },
+    {
+      "id": "backend_unrelated",
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 1.8278,
+            "legend": {
+              "0": "No match: unrelated profession, missing required license, or explicitly insufficient mandatory language level",
+              "1": "Low match: core mandatory professional experience is missing",
+              "2": "Partial match: some useful experience but an important requirement is missing or unknown",
+              "3": "Strong match: mandatory core background is evidenced with only minor optional gaps",
+              "4": "Very strong match: relevant professional experience and all stated mandatory qualifications are clearly evidenced"
+            },
+            "probabilities": {
+              "0": 0.2687,
+              "1": 0.2063,
+              "2": 0.1628,
+              "3": 0.1531,
+              "4": 0.2092
+            },
+            "confidence": 0.0128,
+            "answer_confidence": 0.2687,
+            "action": {
+              "act_probability": 1.0
+            }
+          },
+          "mandatory_match": {
+            "type": "noul",
+            "noul": 0.4158,
+            "confidence": 0.5842,
+            "answer_confidence": 0.5842,
+            "action": {
+              "act_probability": 1.0
+            }
+          },
+          "language_match": {
+            "type": "noul",
+            "noul": 0.4764,
+            "confidence": 0.5236,
+            "answer_confidence": 0.5236,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 2573,
+          "output_tokens": 0,
+          "state_tokens": 779,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 2.3737243749783374
+    },
+    {
+      "id": "nurse_match",
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 3.184,
+            "legend": {
+              "0": "No match: unrelated profession, missing required license, or explicitly insufficient mandatory language level",
+              "1": "Low match: core mandatory professional experience is missing",
+              "2": "Partial match: some useful experience but an important requirement is missing or unknown",
+              "3": "Strong match: mandatory core background is evidenced with only minor optional gaps",
+              "4": "Very strong match: relevant professional experience and all stated mandatory qualifications are clearly evidenced"
+            },
+            "probabilities": {
+              "0": 0.0316,
+              "1": 0.0819,
+              "2": 0.0696,
+              "3": 0.3048,
+              "4": 0.5122
+            },
+            "confidence": 0.2517,
+            "answer_confidence": 0.5122,
+            "action": {
+              "act_probability": 1.0
+            }
+          },
+          "mandatory_match": {
+            "type": "noul",
+            "noul": 0.8075,
+            "confidence": 0.8075,
+            "answer_confidence": 0.8075,
+            "action": {
+              "act_probability": 1.0
+            }
+          },
+          "language_match": {
+            "type": "noul",
+            "noul": 0.7186,
+            "confidence": 0.7186,
+            "answer_confidence": 0.7186,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 2513,
+          "output_tokens": 0,
+          "state_tokens": 759,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 2.2921531669562683
+    },
+    {
+      "id": "nurse_unrelated",
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.3064,
+            "legend": {
+              "0": "No match: unrelated profession, missing required license, or explicitly insufficient mandatory language level",
+              "1": "Low match: core mandatory professional experience is missing",
+              "2": "Partial match: some useful experience but an important requirement is missing or unknown",
+              "3": "Strong match: mandatory core background is evidenced with only minor optional gaps",
+              "4": "Very strong match: relevant professional experience and all stated mandatory qualifications are clearly evidenced"
+            },
+            "probabilities": {
+              "0": 0.1566,
+              "1": 0.1928,
+              "2": 0.1386,
+              "3": 0.2115,
+              "4": 0.3004
+            },
+            "confidence": 0.0236,
+            "answer_confidence": 0.3004,
+            "action": {
+              "act_probability": 1.0
+            }
+          },
+          "mandatory_match": {
+            "type": "noul",
+            "noul": 0.7076,
+            "confidence": 0.7076,
+            "answer_confidence": 0.7076,
+            "action": {
+              "act_probability": 1.0
+            }
+          },
+          "language_match": {
+            "type": "noul",
+            "noul": 0.6112,
+            "confidence": 0.6112,
+            "answer_confidence": 0.6112,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 2669,
+          "output_tokens": 0,
+          "state_tokens": 811,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 2.4343829170102254
+    },
+    {
+      "id": "german_tail_met",
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.8859,
+            "legend": {
+              "0": "No match: unrelated profession, missing required license, or explicitly insufficient mandatory language level",
+              "1": "Low match: core mandatory professional experience is missing",
+              "2": "Partial match: some useful experience but an important requirement is missing or unknown",
+              "3": "Strong match: mandatory core background is evidenced with only minor optional gaps",
+              "4": "Very strong match: relevant professional experience and all stated mandatory qualifications are clearly evidenced"
+            },
+            "probabilities": {
+              "0": 0.0444,
+              "1": 0.151,
+              "2": 0.1083,
+              "3": 0.2671,
+              "4": 0.4292
+            },
+            "confidence": 0.1425,
+            "answer_confidence": 0.4292,
+            "action": {
+              "act_probability": 1.0
+            }
+          },
+          "mandatory_match": {
+            "type": "noul",
+            "noul": 0.8026,
+            "confidence": 0.8026,
+            "answer_confidence": 0.8026,
+            "action": {
+              "act_probability": 1.0
+            }
+          },
+          "language_match": {
+            "type": "noul",
+            "noul": 0.7462,
+            "confidence": 0.7462,
+            "answer_confidence": 0.7462,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 2762,
+          "output_tokens": 0,
+          "state_tokens": 842,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 2.5540649999747984
+    },
+    {
+      "id": "german_tail_not_met",
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.939,
+            "legend": {
+              "0": "No match: unrelated profession, missing required license, or explicitly insufficient mandatory language level",
+              "1": "Low match: core mandatory professional experience is missing",
+              "2": "Partial match: some useful experience but an important requirement is missing or unknown",
+              "3": "Strong match: mandatory core background is evidenced with only minor optional gaps",
+              "4": "Very strong match: relevant professional experience and all stated mandatory qualifications are clearly evidenced"
+            },
+            "probabilities": {
+              "0": 0.0436,
+              "1": 0.1407,
+              "2": 0.0977,
+              "3": 0.269,
+              "4": 0.449
+            },
+            "confidence": 0.1596,
+            "answer_confidence": 0.449,
+            "action": {
+              "act_probability": 1.0
+            }
+          },
+          "mandatory_match": {
+            "type": "noul",
+            "noul": 0.8056,
+            "confidence": 0.8056,
+            "answer_confidence": 0.8056,
+            "action": {
+              "act_probability": 1.0
+            }
+          },
+          "language_match": {
+            "type": "noul",
+            "noul": 0.6732,
+            "confidence": 0.6732,
+            "answer_confidence": 0.6732,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 2789,
+          "output_tokens": 0,
+          "state_tokens": 851,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 2.6100978329777718
+    }
+  ],
+  "sampled_peak_rss_mib": 3041.671875
+}

@@ -1,0 +1,86 @@
+{
+  "purpose": "one near-full 2048-token resource-only synthetic request; no accuracy conclusion",
+  "host": {
+    "os": "Darwin",
+    "architecture": "arm64",
+    "device": "cpu",
+    "threads": 2
+  },
+  "model": "convaiinnovations/laya",
+  "revision": "55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851",
+  "laya": "0.4.17",
+  "torch": "2.15.0",
+  "max_len": 2048,
+  "head_max_len": 192,
+  "questions": {
+    "fit": {
+      "type": "score",
+      "instructions": "How well does this candidate match this job? Evaluate only stated career evidence and job requirements. Mandatory qualifications matter; missing or explicitly insufficient qualifications are gaps. Do not infer qualifications from unrelated experience.",
+      "criteria": [
+        "No relevant professional background for this role",
+        "Low fit; lacks core mandatory background or qualifications",
+        "Partial fit; meaningful overlap with important mandatory gaps",
+        "Strong fit; core background with minor gaps",
+        "Very strong fit; clear evidence for core experience and mandatory qualifications"
+      ]
+    }
+  },
+  "load_seconds": 1.5019580000080168,
+  "after_load_rss_mib": 1973.84375,
+  "state": "Candidate profile:\nCandidate profile. Alex Example is a backend software engineer with six years of professional experience. Since 2022 Alex has worked at Cedar Systems building Python services with FastAPI and Django, PostgreSQL data models and asynchronous workers. Previously Alex developed integrations and REST APIs at Northstar Tools. Project evidence includes improving query latency by 35 percent, designing idempotent event processing, supporting on-call incidents and reviewing security-sensitive changes. Alex writes unit and integration tests, uses Git, Docker and Linux, and documents architectural decisions. Alex has mentored two colleagues and collaborated with product managers. Education: BSc Computer Science. Desired next role: backend engineering with real product ownership, remote or hybrid work, and compensation above CHF 100000. English: C1. Work authorization: authorized to work in Switzerland. German: C1. No healthcare qualifications or clinical license.\n\nJob posting:\nJob: Senior Backend Engineer. Build production Python APIs and backend services. Required: at least five years of professional software engineering, Python, PostgreSQL, HTTP APIs, automated tests, Linux and collaborative code review. Responsibilities include designing reliable data flows, improving performance, resolving incidents and documenting design decisions. Experience with FastAPI or Django is useful. Salary CHF 110000 to 130000. Hybrid in Switzerland.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\n\nAdditional employer information for resource stress:\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process. How we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation. Your development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions. Working environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work. Application and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements. About Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process. How we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation. Your development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions. Working environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work. Application and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding\nMandatory requirement stated at the end of this posting: German at CEFR C1 or above is required because this engineer directly supports German-speaking hospital customers. A1 or A2 is insufficient. Swiss work authorization is required.",
+  "preflight_sequence_tokens": 1920,
+  "preflight_state_stats": {
+    "state_tokens": 1808,
+    "state_tokens_used": 1808,
+    "state_tokens_dropped": 0,
+    "truncated": false
+  },
+  "result": {
+    "model": "laya-rl-agent",
+    "answers": {
+      "fit": {
+        "type": "score",
+        "score": 2.5478,
+        "legend": {
+          "0": "No relevant professional background for this role",
+          "1": "Low fit; lacks core mandatory background or qualifications",
+          "2": "Partial fit; meaningful overlap with important mandatory gaps",
+          "3": "Strong fit; core background with minor gaps",
+          "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+        },
+        "probabilities": {
+          "0": 0.0782,
+          "1": 0.1817,
+          "2": 0.1599,
+          "3": 0.2746,
+          "4": 0.3056
+        },
+        "confidence": 0.0559,
+        "answer_confidence": 0.3056,
+        "action": {
+          "act_probability": 1.0
+        }
+      }
+    },
+    "usage": {
+      "input_tokens": 1920,
+      "output_tokens": 0,
+      "state_tokens": 1808,
+      "state_tokens_dropped": 0,
+      "truncated": false,
+      "truncated_questions": []
+    }
+  },
+  "elapsed_seconds": 2.3944376669824123,
+  "after_request_rss_mib": 2603.90625,
+  "summary": {
+    "actual_sequence_tokens": 1920,
+    "truncated": false,
+    "state_tokens_dropped": 0,
+    "load_peak_rss_mib": 2663.03125,
+    "request_peak_rss_mib": 2603.90625,
+    "total_sampled_peak_rss_mib": 2663.03125,
+    "elapsed_seconds": 2.3944376669824123,
+    "qualification": "Mac arm64, one model process and one request; no whole-stack/x86 guarantee"
+  }
+}

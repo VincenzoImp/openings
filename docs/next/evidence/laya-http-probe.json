@@ -1,0 +1,247 @@
+{
+  "purpose": "real local HTTP and ordinal-score smoke probe; not job-domain or target-device validation",
+  "model_revision": "55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851",
+  "host": {
+    "os": "darwin",
+    "device": "cpu",
+    "inference_threads": 2,
+    "architecture": "arm64"
+  },
+  "versions": {
+    "laya": "0.4.17",
+    "torch": "2.15.0",
+    "fastapi": "0.162.0",
+    "uvicorn": "0.54.0",
+    "httpx": "0.28.1"
+  },
+  "server_configuration": {
+    "USE_TF": "0",
+    "LAYA_HOST": "127.0.0.1",
+    "LAYA_DEVICE": "cpu",
+    "LAYA_THREADS": "2",
+    "LAYA_PRELOAD": "1",
+    "LAYA_MODELS": "english",
+    "LAYA_DEFAULT_MODEL": "english",
+    "LAYA_MAX_LOADED": "1",
+    "LAYA_AUTO_TASK": "0",
+    "LAYA_MAX_CONCURRENT": "1",
+    "LAYA_REVISION": "55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851"
+  },
+  "cases": [
+    {
+      "id": "direct",
+      "request": {
+        "model": "english",
+        "state": {
+          "profile": "Python backend engineer, five years building production Python APIs.",
+          "job": "Python backend engineer. Five years of Python experience and production API development required."
+        },
+        "questions": {
+          "fit": {
+            "type": "score",
+            "instructions": "How well does the candidate match the job based only on stated experience and skills?",
+            "criteria": [
+              "No relevant background for this role",
+              "Major gaps; only peripheral relevance",
+              "Some relevant skills but substantial gaps",
+              "Strong match with minor gaps",
+              "Direct match on core role and required skills"
+            ]
+          }
+        }
+      },
+      "response": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 3.6408,
+            "legend": {
+              "0": "No relevant background for this role",
+              "1": "Major gaps; only peripheral relevance",
+              "2": "Some relevant skills but substantial gaps",
+              "3": "Strong match with minor gaps",
+              "4": "Direct match on core role and required skills"
+            },
+            "probabilities": {
+              "0": 0.0099,
+              "1": 0.0171,
+              "2": 0.0818,
+              "3": 0.1047,
+              "4": 0.7864
+            },
+            "confidence": 0.5369,
+            "answer_confidence": 0.7864,
+            "action": {
+              "act_probability": 1.0
+            },
+            "x_jev_confidence": 0.7006
+          }
+        },
+        "usage": {
+          "input_tokens": 109,
+          "output_tokens": 0,
+          "state_tokens": 35,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        },
+        "routing": {
+          "model": "english",
+          "repo": "convaiinnovations/laya",
+          "reason": "explicit model='english'",
+          "detection": null,
+          "workflow": null
+        }
+      },
+      "elapsed_seconds": 0.1979109999956563,
+      "rss_mib": 2004.390625
+    },
+    {
+      "id": "partial",
+      "request": {
+        "model": "english",
+        "state": {
+          "profile": "Java backend engineer, five years building APIs; no Python experience.",
+          "job": "Python backend engineer. Five years of Python experience and production API development required."
+        },
+        "questions": {
+          "fit": {
+            "type": "score",
+            "instructions": "How well does the candidate match the job based only on stated experience and skills?",
+            "criteria": [
+              "No relevant background for this role",
+              "Major gaps; only peripheral relevance",
+              "Some relevant skills but substantial gaps",
+              "Strong match with minor gaps",
+              "Direct match on core role and required skills"
+            ]
+          }
+        }
+      },
+      "response": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 1.8768,
+            "legend": {
+              "0": "No relevant background for this role",
+              "1": "Major gaps; only peripheral relevance",
+              "2": "Some relevant skills but substantial gaps",
+              "3": "Strong match with minor gaps",
+              "4": "Direct match on core role and required skills"
+            },
+            "probabilities": {
+              "0": 0.1898,
+              "1": 0.3304,
+              "2": 0.113,
+              "3": 0.1469,
+              "4": 0.2199
+            },
+            "confidence": 0.0416,
+            "answer_confidence": 0.3304,
+            "action": {
+              "act_probability": 1.0
+            },
+            "x_jev_confidence": 0.0
+          }
+        },
+        "usage": {
+          "input_tokens": 111,
+          "output_tokens": 0,
+          "state_tokens": 37,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        },
+        "routing": {
+          "model": "english",
+          "repo": "convaiinnovations/laya",
+          "reason": "explicit model='english'",
+          "detection": null,
+          "workflow": null
+        }
+      },
+      "elapsed_seconds": 0.13119979202747345,
+      "rss_mib": 2005.953125
+    },
+    {
+      "id": "unrelated",
+      "request": {
+        "model": "english",
+        "state": {
+          "profile": "Restaurant chef, ten years cooking; has never programmed.",
+          "job": "Python backend engineer. Five years of Python experience and production API development required."
+        },
+        "questions": {
+          "fit": {
+            "type": "score",
+            "instructions": "How well does the candidate match the job based only on stated experience and skills?",
+            "criteria": [
+              "No relevant background for this role",
+              "Major gaps; only peripheral relevance",
+              "Some relevant skills but substantial gaps",
+              "Strong match with minor gaps",
+              "Direct match on core role and required skills"
+            ]
+          }
+        }
+      },
+      "response": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 1.659,
+            "legend": {
+              "0": "No relevant background for this role",
+              "1": "Major gaps; only peripheral relevance",
+              "2": "Some relevant skills but substantial gaps",
+              "3": "Strong match with minor gaps",
+              "4": "Direct match on core role and required skills"
+            },
+            "probabilities": {
+              "0": 0.2643,
+              "1": 0.2964,
+              "2": 0.1061,
+              "3": 0.1824,
+              "4": 0.1509
+            },
+            "confidence": 0.0396,
+            "answer_confidence": 0.2964,
+            "action": {
+              "act_probability": 1.0
+            },
+            "x_jev_confidence": 0.0102
+          }
+        },
+        "usage": {
+          "input_tokens": 110,
+          "output_tokens": 0,
+          "state_tokens": 36,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        },
+        "routing": {
+          "model": "english",
+          "repo": "convaiinnovations/laya",
+          "reason": "explicit model='english'",
+          "detection": null,
+          "workflow": null
+        }
+      },
+      "elapsed_seconds": 0.10965520900208503,
+      "rss_mib": 2005.953125
+    }
+  ],
+  "startup_seconds": 3.6081943750032224,
+  "unauthenticated_request_status": 401,
+  "summary": {
+    "http_score_contract_valid": true,
+    "sampled_peak_rss_mib": 2711.890625,
+    "median_seconds": 0.13119979202747345,
+    "qualification": "Three short synthetic examples over a real HTTP socket; no target-device or general accuracy conclusion"
+  }
+}

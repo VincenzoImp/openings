@@ -1,0 +1,48 @@
+{
+  "purpose": "interactive synthetic design preview, not production frontend verification",
+  "checks": [
+    "desktop_navigation_overview",
+    "desktop_navigation_inbox",
+    "desktop_navigation_applications",
+    "desktop_navigation_companies",
+    "desktop_navigation_career",
+    "desktop_navigation_templates",
+    "desktop_navigation_settings",
+    "inbox_search",
+    "manual_ingestion",
+    "duplicate_url_preserves_identity",
+    "note_saved",
+    "dismiss_preserves_job",
+    "restore_job",
+    "new_application_has_no_invented_pdf",
+    "new_application_is_draft",
+    "manual_stage_change",
+    "application_list",
+    "application_kanban",
+    "contact_edit_does_not_invalidate_scores",
+    "relevant_profile_edit_marks_old_scores",
+    "scoring_toggle",
+    "remote_scoring_mode",
+    "forget_removes_job_and_application",
+    "mobile_no_page_overflow_overview",
+    "mobile_no_page_overflow_inbox",
+    "mobile_no_page_overflow_applications",
+    "mobile_no_page_overflow_companies",
+    "mobile_no_page_overflow_career",
+    "mobile_no_page_overflow_templates",
+    "mobile_no_page_overflow_settings",
+    "mobile_navigation_opens",
+    "theme_toggle",
+    "no_javascript_errors"
+  ],
+  "errors": [],
+  "passed": 33,
+  "desktop": {
+    "width": 1440,
+    "height": 1000
+  },
+  "mobile": {
+    "width": 390,
+    "height": 844
+  }
+}

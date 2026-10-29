@@ -1,0 +1,93 @@
+{
+  "updated": "2026-10-29",
+  "branch": "codex/openings-next",
+  "base_commit": "1deea6624da8474229b606b07ec669e6e75ae0f9",
+  "phase": "ready_for_user_start",
+  "production_rewrite_started": false,
+  "production_data_accessed": false,
+  "production_deployed": false,
+  "completed": [
+    "R0.1",
+    "R0.2",
+    "R0.3",
+    "R0.4",
+    "R0.5",
+    "R0.7",
+    "R0.8",
+    "R0.9"
+  ],
+  "next_task": "M1.1",
+  "release_gates": [
+    "Core/remote-scoring installation passes practical UI/REST/MCP/backup checks within 2 CPU / 4 GiB",
+    "Bundled local preset passes whole-stack startup/steady target measurements; publish advisory-score and truncation limitations",
+    "External agent completes knowledge/template/context -> external compilation -> artifact submission -> review round trip"
+  ],
+  "confirmed": {
+    "public_repository_data": "synthetic only",
+    "storage": "SQLite including documents/templates/assets; disposable caches outside",
+    "generation": "external agents via MCP/REST only; instructions/templates stored in SQLite; no internal generative endpoint/button/auto-drafts",
+    "assessment": "optional AI-only fit score; disabled, bundled local or remote System One-compatible service; no empirical fallback",
+    "assessment_baseline": "Laya English pinned 55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851; one fit question, max_len=2048, one request/checkpoint, two threads; advisory with documented errors",
+    "resource_priority": "minimize measured whole-stack peak RAM, then latency/CPU; one checkpoint and one inference request at a time",
+    "ingestion": "URL, pasted text and structured jobs through dashboard/REST/MCP and collectors; one deduplicated pipeline",
+    "rescoring": "new/materially changed complete jobs automatic; profile/preferences/rubric/model edits only mark outdated; explicit batch or optional capped periodic rescore",
+    "job_triage": [
+      "inbox",
+      "saved",
+      "dismissed"
+    ],
+    "application_states": [
+      "draft",
+      "applied",
+      "interview",
+      "offer",
+      "closed"
+    ],
+    "permanent_delete": "forget all job-owned records and identities; no suppression tombstone; future acquisition is new",
+    "company_watch": "first-class company ATS sources; URL detection, preview, filters, schedules, pause and run-now through UI/REST/MCP",
+    "visual_reference": "Dossier throughout; original components with warm surfaces, editorial typography and prominent document previews",
+    "complexity": "one SQLite, one application service and one bounded worker; optional local/remote scorer; no generative agent runtime or TeX compiler",
+    "templates": "user imports LaTeX; synthetic examples included",
+    "initial_language_evaluation": "English",
+    "first_release": "career knowledge/templates/instructions, archive/collection, optional scoring, external-agent document workflow, review/tracking, Kanban/Sankey",
+    "later": [],
+    "installation": "Docker-first",
+    "working_name": "Openings",
+    "implementation": "fresh codebase on codex/openings-next; old projects references only; no legacy importer, migrations from old data or compatibility layer",
+    "release_language": "English UI, code, comments, documentation, examples and release material; user content may use other languages",
+    "compilation": "external agent compiles and uploads PDF plus sources; no server TeX compiler",
+    "scoring_configuration": "base URL, explicit served model and optional API key; validate needed score contract; no universal protocol compatibility claim",
+    "semantic_search": "outside frozen release; built-in text search/filters only",
+    "dashboard": "Dossier-inspired English manual interface, Inbox, Companies, Career, Templates, Applications list/Kanban, file previews/history and Sankey funnel",
+    "agent_skill": "optional repository skill draft; discover actual MCP tools/resources and use stored context/rules; not installed or production-validated",
+    "verification": "few data-invariant tests plus hands-on UI/REST/MCP/external-agent workflows; no coverage target",
+    "out_of_scope": [
+      "Gmail",
+      "Calendar",
+      "sending/portal automation",
+      "built-in AI chat",
+      "internal document generation",
+      "embedded provider/agent login",
+      "server TeX compilation"
+    ],
+    "release_scope": "frozen complete Openings 1.0; no planned later feature phase"
+  },
+  "not_yet_verified": [
+    "Actual production UI/API/MCP/auth integration and external Codex/Claude workflow",
+    "Large-file/concurrency/restore interruption checks against implemented services",
+    "Docker/Linux/x86/ARM whole-stack startup and steady resource use"
+  ],
+  "latest_probe": {
+    "dashboard": "evidence/dashboard-smoke.json: 33 browser preview checks pass",
+    "interfaces": "evidence/mcp-file-probe.json: 15 live MCP/file/backup checks pass",
+    "scoring": "evidence/long-context-resource-probe.json: 1920 actual tokens, no truncation, 2.39s, 2.60GiB Mac peak",
+    "qualification": "preflight proofs and design preview; not a production application or target deployment",
+    "target_runtime": "evidence/non-avx-runtime-probe.json: non-AVX target CPU import and FP32 kernels passed, temporary environment removed"
+  },
+  "production_authorized": false,
+  "release_target": "1.0.0",
+  "goal_brief": "docs/next/GOAL.md",
+  "entry_point": "docs/next/README.md",
+  "feasibility_ready": true,
+  "review_checkpoint": "one local planning/feasibility commit; no active persistent goal until user start"
+}

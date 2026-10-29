@@ -1,0 +1,979 @@
+{
+  "purpose": "realistic synthetic whole-job/profile ordinal scoring, not production validation",
+  "host": {
+    "os": "Darwin",
+    "architecture": "arm64",
+    "threads": 2,
+    "device": "cpu"
+  },
+  "model": "convaiinnovations/laya",
+  "revision": "55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851",
+  "laya": "0.4.17",
+  "torch": "2.15.0",
+  "questions": {
+    "fit": {
+      "type": "score",
+      "instructions": "How well does this candidate match this job? Evaluate only stated career evidence and job requirements. Mandatory qualifications matter; missing or explicitly insufficient qualifications are gaps. Do not infer qualifications from unrelated experience.",
+      "criteria": [
+        "No relevant professional background for this role",
+        "Low fit; lacks core mandatory background or qualifications",
+        "Partial fit; meaningful overlap with important mandatory gaps",
+        "Strong fit; core background with minor gaps",
+        "Very strong fit; clear evidence for core experience and mandatory qualifications"
+      ]
+    }
+  },
+  "cases": [
+    {
+      "id": "backend_match",
+      "max_len": 512,
+      "state": {
+        "candidate": "Candidate profile. Alex Example is a backend software engineer with six years of professional experience. Since 2022 Alex has worked at Cedar Systems building Python services with FastAPI and Django, PostgreSQL data models and asynchronous workers. Previously Alex developed integrations and REST APIs at Northstar Tools. Project evidence includes improving query latency by 35 percent, designing idempotent event processing, supporting on-call incidents and reviewing security-sensitive changes. Alex writes unit and integration tests, uses Git, Docker and Linux, and documents architectural decisions. Alex has mentored two colleagues and collaborated with product managers. Education: BSc Computer Science. Desired next role: backend engineering with real product ownership, remote or hybrid work, and compensation above CHF 100000. English: C1. Work authorization: authorized to work in Switzerland. German: C1. No healthcare qualifications or clinical license.",
+        "posting": "Job: Senior Backend Engineer. Build production Python APIs and backend services. Required: at least five years of professional software engineering, Python, PostgreSQL, HTTP APIs, automated tests, Linux and collaborative code review. Responsibilities include designing reliable data flows, improving performance, resolving incidents and documenting design decisions. Experience with FastAPI or Django is useful. Salary CHF 110000 to 130000. Hybrid in Switzerland.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirement stated at the end of this posting: German at CEFR C1 or above is required because this engineer directly supports German-speaking hospital customers. A1 or A2 is insufficient. Swiss work authorization is required."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.8437,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.0639,
+              "1": 0.1292,
+              "2": 0.1231,
+              "3": 0.2669,
+              "4": 0.4169
+            },
+            "confidence": 0.1206,
+            "answer_confidence": 0.4169,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 512,
+          "output_tokens": 0,
+          "state_tokens": 842,
+          "state_tokens_dropped": 442,
+          "truncated": true,
+          "truncated_questions": [
+            "fit"
+          ]
+        }
+      },
+      "elapsed_seconds": 0.4517963330144994,
+      "rss_mib": 2045.4375,
+      "sampled_request_peak_mib": 2041.921875
+    },
+    {
+      "id": "backend_unrelated",
+      "max_len": 512,
+      "state": {
+        "candidate": "Candidate profile. Jordan Example is a restaurant chef with ten years of experience in professional kitchens. Jordan manages menus, food safety, procurement, service quality, rosters and a team of cooks. Projects include reducing food waste by 25 percent and introducing a seasonal menu. Jordan has never programmed, built software services or used Python, databases or cloud infrastructure. Education: professional culinary diploma. English: C1. German: C1. Authorized to work in Switzerland. Desired role: senior culinary operations and kitchen leadership. No computer science or healthcare qualifications.",
+        "posting": "Job: Senior Backend Engineer. Build production Python APIs and backend services. Required: at least five years of professional software engineering, Python, PostgreSQL, HTTP APIs, automated tests, Linux and collaborative code review. Responsibilities include designing reliable data flows, improving performance, resolving incidents and documenting design decisions. Experience with FastAPI or Django is useful. Salary CHF 110000 to 130000. Hybrid in Switzerland.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirement stated at the end of this posting: German at CEFR C1 or above is required because this engineer directly supports German-speaking hospital customers. A1 or A2 is insufficient. Swiss work authorization is required."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.1147,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.1556,
+              "1": 0.2448,
+              "2": 0.1508,
+              "3": 0.2267,
+              "4": 0.222
+            },
+            "confidence": 0.0121,
+            "answer_confidence": 0.2448,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 512,
+          "output_tokens": 0,
+          "state_tokens": 779,
+          "state_tokens_dropped": 379,
+          "truncated": true,
+          "truncated_questions": [
+            "fit"
+          ]
+        }
+      },
+      "elapsed_seconds": 0.40552479203324765,
+      "rss_mib": 2045.4375,
+      "sampled_request_peak_mib": 2045.4375
+    },
+    {
+      "id": "nurse_match",
+      "max_len": 512,
+      "state": {
+        "candidate": "Candidate profile. Morgan Example is a registered nurse with seven years of adult inpatient clinical experience. Morgan holds a current Swiss recognized nursing license and a Bachelor of Nursing. Work includes administering medication, monitoring vital signs, patient assessment, coordinating discharge and documenting care plans in electronic clinical records. Morgan has trained junior nurses and supported multidisciplinary teams on medical and surgical wards. Morgan holds current basic life support certification, speaks German at C1 and English at B2, and is authorized to work in Switzerland. Desired next role: registered nurse on an adult inpatient ward, with rotating shifts acceptable. No professional software engineering or programming experience.",
+        "posting": "Job: Registered Nurse, Adult Inpatient Ward. Provide direct nursing care, medication administration, patient monitoring, care planning and multidisciplinary handovers. Required: recognized nursing qualification, current Swiss recognized nursing license, at least three years of clinical nursing experience and current basic life support certification. Work includes rotating shifts and careful communication with patients and families.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirements: German C1, current clinical nursing license and authorization to work in Switzerland. General hospital technology or software experience does not replace nursing qualifications."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 3.0581,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.0382,
+              "1": 0.0851,
+              "2": 0.0932,
+              "3": 0.3476,
+              "4": 0.436
+            },
+            "confidence": 0.2018,
+            "answer_confidence": 0.436,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 512,
+          "output_tokens": 0,
+          "state_tokens": 759,
+          "state_tokens_dropped": 359,
+          "truncated": true,
+          "truncated_questions": [
+            "fit"
+          ]
+        }
+      },
+      "elapsed_seconds": 0.40525466698454693,
+      "rss_mib": 2045.46875,
+      "sampled_request_peak_mib": 2045.46875
+    },
+    {
+      "id": "nurse_unrelated",
+      "max_len": 512,
+      "state": {
+        "candidate": "Candidate profile. Alex Example is a backend software engineer with six years of professional experience. Since 2022 Alex has worked at Cedar Systems building Python services with FastAPI and Django, PostgreSQL data models and asynchronous workers. Previously Alex developed integrations and REST APIs at Northstar Tools. Project evidence includes improving query latency by 35 percent, designing idempotent event processing, supporting on-call incidents and reviewing security-sensitive changes. Alex writes unit and integration tests, uses Git, Docker and Linux, and documents architectural decisions. Alex has mentored two colleagues and collaborated with product managers. Education: BSc Computer Science. Desired next role: backend engineering with real product ownership, remote or hybrid work, and compensation above CHF 100000. English: C1. Work authorization: authorized to work in Switzerland. German: C1. No healthcare qualifications or clinical license.",
+        "posting": "Job: Registered Nurse, Adult Inpatient Ward. Provide direct nursing care, medication administration, patient monitoring, care planning and multidisciplinary handovers. Required: recognized nursing qualification, current Swiss recognized nursing license, at least three years of clinical nursing experience and current basic life support certification. Work includes rotating shifts and careful communication with patients and families.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirements: German C1, current clinical nursing license and authorization to work in Switzerland. General hospital technology or software experience does not replace nursing qualifications."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.8239,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.064,
+              "1": 0.1325,
+              "2": 0.1119,
+              "3": 0.2984,
+              "4": 0.3931
+            },
+            "confidence": 0.1197,
+            "answer_confidence": 0.3931,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 512,
+          "output_tokens": 0,
+          "state_tokens": 811,
+          "state_tokens_dropped": 411,
+          "truncated": true,
+          "truncated_questions": [
+            "fit"
+          ]
+        }
+      },
+      "elapsed_seconds": 0.4049580830032937,
+      "rss_mib": 2045.5,
+      "sampled_request_peak_mib": 2045.5
+    },
+    {
+      "id": "german_tail_met",
+      "max_len": 512,
+      "state": {
+        "candidate": "Candidate profile. Alex Example is a backend software engineer with six years of professional experience. Since 2022 Alex has worked at Cedar Systems building Python services with FastAPI and Django, PostgreSQL data models and asynchronous workers. Previously Alex developed integrations and REST APIs at Northstar Tools. Project evidence includes improving query latency by 35 percent, designing idempotent event processing, supporting on-call incidents and reviewing security-sensitive changes. Alex writes unit and integration tests, uses Git, Docker and Linux, and documents architectural decisions. Alex has mentored two colleagues and collaborated with product managers. Education: BSc Computer Science. Desired next role: backend engineering with real product ownership, remote or hybrid work, and compensation above CHF 100000. English: C1. Work authorization: authorized to work in Switzerland. German: C1. No healthcare qualifications or clinical license.",
+        "posting": "Job: Senior Backend Engineer. Build production Python APIs and backend services. Required: at least five years of professional software engineering, Python, PostgreSQL, HTTP APIs, automated tests, Linux and collaborative code review. Responsibilities include designing reliable data flows, improving performance, resolving incidents and documenting design decisions. Experience with FastAPI or Django is useful. Salary CHF 110000 to 130000. Hybrid in Switzerland.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirement stated at the end of this posting: German at CEFR C1 or above is required because this engineer directly supports German-speaking hospital customers. A1 or A2 is insufficient. Swiss work authorization is required."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.8437,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.0639,
+              "1": 0.1292,
+              "2": 0.1231,
+              "3": 0.2669,
+              "4": 0.4169
+            },
+            "confidence": 0.1206,
+            "answer_confidence": 0.4169,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 512,
+          "output_tokens": 0,
+          "state_tokens": 842,
+          "state_tokens_dropped": 442,
+          "truncated": true,
+          "truncated_questions": [
+            "fit"
+          ]
+        }
+      },
+      "elapsed_seconds": 0.40526812500320375,
+      "rss_mib": 2045.5,
+      "sampled_request_peak_mib": 2045.5
+    },
+    {
+      "id": "german_tail_not_met",
+      "max_len": 512,
+      "state": {
+        "candidate": "Candidate profile. Alex Example is a backend software engineer with six years of professional experience. Since 2022 Alex has worked at Cedar Systems building Python services with FastAPI and Django, PostgreSQL data models and asynchronous workers. Previously Alex developed integrations and REST APIs at Northstar Tools. Project evidence includes improving query latency by 35 percent, designing idempotent event processing, supporting on-call incidents and reviewing security-sensitive changes. Alex writes unit and integration tests, uses Git, Docker and Linux, and documents architectural decisions. Alex has mentored two colleagues and collaborated with product managers. Education: BSc Computer Science. Desired next role: backend engineering with real product ownership, remote or hybrid work, and compensation above CHF 100000. English: C1. Work authorization: authorized to work in Switzerland. German: A1; beginner only, unable to work in German. No healthcare qualifications or clinical license.",
+        "posting": "Job: Senior Backend Engineer. Build production Python APIs and backend services. Required: at least five years of professional software engineering, Python, PostgreSQL, HTTP APIs, automated tests, Linux and collaborative code review. Responsibilities include designing reliable data flows, improving performance, resolving incidents and documenting design decisions. Experience with FastAPI or Django is useful. Salary CHF 110000 to 130000. Hybrid in Switzerland.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirement stated at the end of this posting: German at CEFR C1 or above is required because this engineer directly supports German-speaking hospital customers. A1 or A2 is insufficient. Swiss work authorization is required."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.9538,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.0577,
+              "1": 0.1086,
+              "2": 0.1099,
+              "3": 0.27,
+              "4": 0.4539
+            },
+            "confidence": 0.1548,
+            "answer_confidence": 0.4539,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 512,
+          "output_tokens": 0,
+          "state_tokens": 851,
+          "state_tokens_dropped": 451,
+          "truncated": true,
+          "truncated_questions": [
+            "fit"
+          ]
+        }
+      },
+      "elapsed_seconds": 0.40471958299167454,
+      "rss_mib": 2045.5,
+      "sampled_request_peak_mib": 2045.5
+    },
+    {
+      "id": "backend_match",
+      "max_len": 1024,
+      "state": {
+        "candidate": "Candidate profile. Alex Example is a backend software engineer with six years of professional experience. Since 2022 Alex has worked at Cedar Systems building Python services with FastAPI and Django, PostgreSQL data models and asynchronous workers. Previously Alex developed integrations and REST APIs at Northstar Tools. Project evidence includes improving query latency by 35 percent, designing idempotent event processing, supporting on-call incidents and reviewing security-sensitive changes. Alex writes unit and integration tests, uses Git, Docker and Linux, and documents architectural decisions. Alex has mentored two colleagues and collaborated with product managers. Education: BSc Computer Science. Desired next role: backend engineering with real product ownership, remote or hybrid work, and compensation above CHF 100000. English: C1. Work authorization: authorized to work in Switzerland. German: C1. No healthcare qualifications or clinical license.",
+        "posting": "Job: Senior Backend Engineer. Build production Python APIs and backend services. Required: at least five years of professional software engineering, Python, PostgreSQL, HTTP APIs, automated tests, Linux and collaborative code review. Responsibilities include designing reliable data flows, improving performance, resolving incidents and documenting design decisions. Experience with FastAPI or Django is useful. Salary CHF 110000 to 130000. Hybrid in Switzerland.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirement stated at the end of this posting: German at CEFR C1 or above is required because this engineer directly supports German-speaking hospital customers. A1 or A2 is insufficient. Swiss work authorization is required."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.8791,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.0555,
+              "1": 0.1244,
+              "2": 0.1184,
+              "3": 0.2888,
+              "4": 0.4129
+            },
+            "confidence": 0.1324,
+            "answer_confidence": 0.4129,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 954,
+          "output_tokens": 0,
+          "state_tokens": 842,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 0.8608429579762742,
+      "rss_mib": 2197.78125,
+      "sampled_request_peak_mib": 2197.78125
+    },
+    {
+      "id": "backend_unrelated",
+      "max_len": 1024,
+      "state": {
+        "candidate": "Candidate profile. Jordan Example is a restaurant chef with ten years of experience in professional kitchens. Jordan manages menus, food safety, procurement, service quality, rosters and a team of cooks. Projects include reducing food waste by 25 percent and introducing a seasonal menu. Jordan has never programmed, built software services or used Python, databases or cloud infrastructure. Education: professional culinary diploma. English: C1. German: C1. Authorized to work in Switzerland. Desired role: senior culinary operations and kitchen leadership. No computer science or healthcare qualifications.",
+        "posting": "Job: Senior Backend Engineer. Build production Python APIs and backend services. Required: at least five years of professional software engineering, Python, PostgreSQL, HTTP APIs, automated tests, Linux and collaborative code review. Responsibilities include designing reliable data flows, improving performance, resolving incidents and documenting design decisions. Experience with FastAPI or Django is useful. Salary CHF 110000 to 130000. Hybrid in Switzerland.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirement stated at the end of this posting: German at CEFR C1 or above is required because this engineer directly supports German-speaking hospital customers. A1 or A2 is insufficient. Swiss work authorization is required."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.1138,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.1764,
+              "1": 0.2281,
+              "2": 0.1469,
+              "3": 0.2023,
+              "4": 0.2463
+            },
+            "confidence": 0.01,
+            "answer_confidence": 0.2463,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 891,
+          "output_tokens": 0,
+          "state_tokens": 779,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 0.7712787089985795,
+      "rss_mib": 2197.828125,
+      "sampled_request_peak_mib": 2197.828125
+    },
+    {
+      "id": "nurse_match",
+      "max_len": 1024,
+      "state": {
+        "candidate": "Candidate profile. Morgan Example is a registered nurse with seven years of adult inpatient clinical experience. Morgan holds a current Swiss recognized nursing license and a Bachelor of Nursing. Work includes administering medication, monitoring vital signs, patient assessment, coordinating discharge and documenting care plans in electronic clinical records. Morgan has trained junior nurses and supported multidisciplinary teams on medical and surgical wards. Morgan holds current basic life support certification, speaks German at C1 and English at B2, and is authorized to work in Switzerland. Desired next role: registered nurse on an adult inpatient ward, with rotating shifts acceptable. No professional software engineering or programming experience.",
+        "posting": "Job: Registered Nurse, Adult Inpatient Ward. Provide direct nursing care, medication administration, patient monitoring, care planning and multidisciplinary handovers. Required: recognized nursing qualification, current Swiss recognized nursing license, at least three years of clinical nursing experience and current basic life support certification. Work includes rotating shifts and careful communication with patients and families.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirements: German C1, current clinical nursing license and authorization to work in Switzerland. General hospital technology or software experience does not replace nursing qualifications."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 3.0836,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.0399,
+              "1": 0.0856,
+              "2": 0.091,
+              "3": 0.3182,
+              "4": 0.4653
+            },
+            "confidence": 0.2064,
+            "answer_confidence": 0.4653,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 871,
+          "output_tokens": 0,
+          "state_tokens": 759,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 0.7603507919702679,
+      "rss_mib": 2197.796875,
+      "sampled_request_peak_mib": 2197.828125
+    },
+    {
+      "id": "nurse_unrelated",
+      "max_len": 1024,
+      "state": {
+        "candidate": "Candidate profile. Alex Example is a backend software engineer with six years of professional experience. Since 2022 Alex has worked at Cedar Systems building Python services with FastAPI and Django, PostgreSQL data models and asynchronous workers. Previously Alex developed integrations and REST APIs at Northstar Tools. Project evidence includes improving query latency by 35 percent, designing idempotent event processing, supporting on-call incidents and reviewing security-sensitive changes. Alex writes unit and integration tests, uses Git, Docker and Linux, and documents architectural decisions. Alex has mentored two colleagues and collaborated with product managers. Education: BSc Computer Science. Desired next role: backend engineering with real product ownership, remote or hybrid work, and compensation above CHF 100000. English: C1. Work authorization: authorized to work in Switzerland. German: C1. No healthcare qualifications or clinical license.",
+        "posting": "Job: Registered Nurse, Adult Inpatient Ward. Provide direct nursing care, medication administration, patient monitoring, care planning and multidisciplinary handovers. Required: recognized nursing qualification, current Swiss recognized nursing license, at least three years of clinical nursing experience and current basic life support certification. Work includes rotating shifts and careful communication with patients and families.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirements: German C1, current clinical nursing license and authorization to work in Switzerland. General hospital technology or software experience does not replace nursing qualifications."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.6051,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.0852,
+              "1": 0.1779,
+              "2": 0.1314,
+              "3": 0.2576,
+              "4": 0.3479
+            },
+            "confidence": 0.0678,
+            "answer_confidence": 0.3479,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 923,
+          "output_tokens": 0,
+          "state_tokens": 811,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 0.8123072090093046,
+      "rss_mib": 2197.796875,
+      "sampled_request_peak_mib": 2197.796875
+    },
+    {
+      "id": "german_tail_met",
+      "max_len": 1024,
+      "state": {
+        "candidate": "Candidate profile. Alex Example is a backend software engineer with six years of professional experience. Since 2022 Alex has worked at Cedar Systems building Python services with FastAPI and Django, PostgreSQL data models and asynchronous workers. Previously Alex developed integrations and REST APIs at Northstar Tools. Project evidence includes improving query latency by 35 percent, designing idempotent event processing, supporting on-call incidents and reviewing security-sensitive changes. Alex writes unit and integration tests, uses Git, Docker and Linux, and documents architectural decisions. Alex has mentored two colleagues and collaborated with product managers. Education: BSc Computer Science. Desired next role: backend engineering with real product ownership, remote or hybrid work, and compensation above CHF 100000. English: C1. Work authorization: authorized to work in Switzerland. German: C1. No healthcare qualifications or clinical license.",
+        "posting": "Job: Senior Backend Engineer. Build production Python APIs and backend services. Required: at least five years of professional software engineering, Python, PostgreSQL, HTTP APIs, automated tests, Linux and collaborative code review. Responsibilities include designing reliable data flows, improving performance, resolving incidents and documenting design decisions. Experience with FastAPI or Django is useful. Salary CHF 110000 to 130000. Hybrid in Switzerland.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirement stated at the end of this posting: German at CEFR C1 or above is required because this engineer directly supports German-speaking hospital customers. A1 or A2 is insufficient. Swiss work authorization is required."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.8791,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.0555,
+              "1": 0.1244,
+              "2": 0.1184,
+              "3": 0.2888,
+              "4": 0.4129
+            },
+            "confidence": 0.1324,
+            "answer_confidence": 0.4129,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 954,
+          "output_tokens": 0,
+          "state_tokens": 842,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 0.8482852499582805,
+      "rss_mib": 2197.796875,
+      "sampled_request_peak_mib": 2197.796875
+    },
+    {
+      "id": "german_tail_not_met",
+      "max_len": 1024,
+      "state": {
+        "candidate": "Candidate profile. Alex Example is a backend software engineer with six years of professional experience. Since 2022 Alex has worked at Cedar Systems building Python services with FastAPI and Django, PostgreSQL data models and asynchronous workers. Previously Alex developed integrations and REST APIs at Northstar Tools. Project evidence includes improving query latency by 35 percent, designing idempotent event processing, supporting on-call incidents and reviewing security-sensitive changes. Alex writes unit and integration tests, uses Git, Docker and Linux, and documents architectural decisions. Alex has mentored two colleagues and collaborated with product managers. Education: BSc Computer Science. Desired next role: backend engineering with real product ownership, remote or hybrid work, and compensation above CHF 100000. English: C1. Work authorization: authorized to work in Switzerland. German: A1; beginner only, unable to work in German. No healthcare qualifications or clinical license.",
+        "posting": "Job: Senior Backend Engineer. Build production Python APIs and backend services. Required: at least five years of professional software engineering, Python, PostgreSQL, HTTP APIs, automated tests, Linux and collaborative code review. Responsibilities include designing reliable data flows, improving performance, resolving incidents and documenting design decisions. Experience with FastAPI or Django is useful. Salary CHF 110000 to 130000. Hybrid in Switzerland.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirement stated at the end of this posting: German at CEFR C1 or above is required because this engineer directly supports German-speaking hospital customers. A1 or A2 is insufficient. Swiss work authorization is required."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.9407,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.0512,
+              "1": 0.116,
+              "2": 0.1071,
+              "3": 0.2924,
+              "4": 0.4333
+            },
+            "confidence": 0.153,
+            "answer_confidence": 0.4333,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 963,
+          "output_tokens": 0,
+          "state_tokens": 851,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 0.8753576249582693,
+      "rss_mib": 2348.78125,
+      "sampled_request_peak_mib": 2348.78125
+    },
+    {
+      "id": "backend_match",
+      "max_len": 2048,
+      "state": {
+        "candidate": "Candidate profile. Alex Example is a backend software engineer with six years of professional experience. Since 2022 Alex has worked at Cedar Systems building Python services with FastAPI and Django, PostgreSQL data models and asynchronous workers. Previously Alex developed integrations and REST APIs at Northstar Tools. Project evidence includes improving query latency by 35 percent, designing idempotent event processing, supporting on-call incidents and reviewing security-sensitive changes. Alex writes unit and integration tests, uses Git, Docker and Linux, and documents architectural decisions. Alex has mentored two colleagues and collaborated with product managers. Education: BSc Computer Science. Desired next role: backend engineering with real product ownership, remote or hybrid work, and compensation above CHF 100000. English: C1. Work authorization: authorized to work in Switzerland. German: C1. No healthcare qualifications or clinical license.",
+        "posting": "Job: Senior Backend Engineer. Build production Python APIs and backend services. Required: at least five years of professional software engineering, Python, PostgreSQL, HTTP APIs, automated tests, Linux and collaborative code review. Responsibilities include designing reliable data flows, improving performance, resolving incidents and documenting design decisions. Experience with FastAPI or Django is useful. Salary CHF 110000 to 130000. Hybrid in Switzerland.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirement stated at the end of this posting: German at CEFR C1 or above is required because this engineer directly supports German-speaking hospital customers. A1 or A2 is insufficient. Swiss work authorization is required."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.8791,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.0555,
+              "1": 0.1244,
+              "2": 0.1184,
+              "3": 0.2888,
+              "4": 0.4129
+            },
+            "confidence": 0.1324,
+            "answer_confidence": 0.4129,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 954,
+          "output_tokens": 0,
+          "state_tokens": 842,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 0.854289791022893,
+      "rss_mib": 2348.78125,
+      "sampled_request_peak_mib": 2348.78125
+    },
+    {
+      "id": "backend_unrelated",
+      "max_len": 2048,
+      "state": {
+        "candidate": "Candidate profile. Jordan Example is a restaurant chef with ten years of experience in professional kitchens. Jordan manages menus, food safety, procurement, service quality, rosters and a team of cooks. Projects include reducing food waste by 25 percent and introducing a seasonal menu. Jordan has never programmed, built software services or used Python, databases or cloud infrastructure. Education: professional culinary diploma. English: C1. German: C1. Authorized to work in Switzerland. Desired role: senior culinary operations and kitchen leadership. No computer science or healthcare qualifications.",
+        "posting": "Job: Senior Backend Engineer. Build production Python APIs and backend services. Required: at least five years of professional software engineering, Python, PostgreSQL, HTTP APIs, automated tests, Linux and collaborative code review. Responsibilities include designing reliable data flows, improving performance, resolving incidents and documenting design decisions. Experience with FastAPI or Django is useful. Salary CHF 110000 to 130000. Hybrid in Switzerland.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirement stated at the end of this posting: German at CEFR C1 or above is required because this engineer directly supports German-speaking hospital customers. A1 or A2 is insufficient. Swiss work authorization is required."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.1138,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.1764,
+              "1": 0.2281,
+              "2": 0.1469,
+              "3": 0.2023,
+              "4": 0.2463
+            },
+            "confidence": 0.01,
+            "answer_confidence": 0.2463,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 891,
+          "output_tokens": 0,
+          "state_tokens": 779,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 0.7717801249818876,
+      "rss_mib": 2348.78125,
+      "sampled_request_peak_mib": 2348.78125
+    },
+    {
+      "id": "nurse_match",
+      "max_len": 2048,
+      "state": {
+        "candidate": "Candidate profile. Morgan Example is a registered nurse with seven years of adult inpatient clinical experience. Morgan holds a current Swiss recognized nursing license and a Bachelor of Nursing. Work includes administering medication, monitoring vital signs, patient assessment, coordinating discharge and documenting care plans in electronic clinical records. Morgan has trained junior nurses and supported multidisciplinary teams on medical and surgical wards. Morgan holds current basic life support certification, speaks German at C1 and English at B2, and is authorized to work in Switzerland. Desired next role: registered nurse on an adult inpatient ward, with rotating shifts acceptable. No professional software engineering or programming experience.",
+        "posting": "Job: Registered Nurse, Adult Inpatient Ward. Provide direct nursing care, medication administration, patient monitoring, care planning and multidisciplinary handovers. Required: recognized nursing qualification, current Swiss recognized nursing license, at least three years of clinical nursing experience and current basic life support certification. Work includes rotating shifts and careful communication with patients and families.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirements: German C1, current clinical nursing license and authorization to work in Switzerland. General hospital technology or software experience does not replace nursing qualifications."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 3.0836,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.0399,
+              "1": 0.0856,
+              "2": 0.091,
+              "3": 0.3182,
+              "4": 0.4653
+            },
+            "confidence": 0.2064,
+            "answer_confidence": 0.4653,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 871,
+          "output_tokens": 0,
+          "state_tokens": 759,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 0.757285208965186,
+      "rss_mib": 2348.78125,
+      "sampled_request_peak_mib": 2348.78125
+    },
+    {
+      "id": "nurse_unrelated",
+      "max_len": 2048,
+      "state": {
+        "candidate": "Candidate profile. Alex Example is a backend software engineer with six years of professional experience. Since 2022 Alex has worked at Cedar Systems building Python services with FastAPI and Django, PostgreSQL data models and asynchronous workers. Previously Alex developed integrations and REST APIs at Northstar Tools. Project evidence includes improving query latency by 35 percent, designing idempotent event processing, supporting on-call incidents and reviewing security-sensitive changes. Alex writes unit and integration tests, uses Git, Docker and Linux, and documents architectural decisions. Alex has mentored two colleagues and collaborated with product managers. Education: BSc Computer Science. Desired next role: backend engineering with real product ownership, remote or hybrid work, and compensation above CHF 100000. English: C1. Work authorization: authorized to work in Switzerland. German: C1. No healthcare qualifications or clinical license.",
+        "posting": "Job: Registered Nurse, Adult Inpatient Ward. Provide direct nursing care, medication administration, patient monitoring, care planning and multidisciplinary handovers. Required: recognized nursing qualification, current Swiss recognized nursing license, at least three years of clinical nursing experience and current basic life support certification. Work includes rotating shifts and careful communication with patients and families.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirements: German C1, current clinical nursing license and authorization to work in Switzerland. General hospital technology or software experience does not replace nursing qualifications."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.6051,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.0852,
+              "1": 0.1779,
+              "2": 0.1314,
+              "3": 0.2576,
+              "4": 0.3479
+            },
+            "confidence": 0.0678,
+            "answer_confidence": 0.3479,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 923,
+          "output_tokens": 0,
+          "state_tokens": 811,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 0.8107754999655299,
+      "rss_mib": 2348.78125,
+      "sampled_request_peak_mib": 2348.78125
+    },
+    {
+      "id": "german_tail_met",
+      "max_len": 2048,
+      "state": {
+        "candidate": "Candidate profile. Alex Example is a backend software engineer with six years of professional experience. Since 2022 Alex has worked at Cedar Systems building Python services with FastAPI and Django, PostgreSQL data models and asynchronous workers. Previously Alex developed integrations and REST APIs at Northstar Tools. Project evidence includes improving query latency by 35 percent, designing idempotent event processing, supporting on-call incidents and reviewing security-sensitive changes. Alex writes unit and integration tests, uses Git, Docker and Linux, and documents architectural decisions. Alex has mentored two colleagues and collaborated with product managers. Education: BSc Computer Science. Desired next role: backend engineering with real product ownership, remote or hybrid work, and compensation above CHF 100000. English: C1. Work authorization: authorized to work in Switzerland. German: C1. No healthcare qualifications or clinical license.",
+        "posting": "Job: Senior Backend Engineer. Build production Python APIs and backend services. Required: at least five years of professional software engineering, Python, PostgreSQL, HTTP APIs, automated tests, Linux and collaborative code review. Responsibilities include designing reliable data flows, improving performance, resolving incidents and documenting design decisions. Experience with FastAPI or Django is useful. Salary CHF 110000 to 130000. Hybrid in Switzerland.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirement stated at the end of this posting: German at CEFR C1 or above is required because this engineer directly supports German-speaking hospital customers. A1 or A2 is insufficient. Swiss work authorization is required."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.8791,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.0555,
+              "1": 0.1244,
+              "2": 0.1184,
+              "3": 0.2888,
+              "4": 0.4129
+            },
+            "confidence": 0.1324,
+            "answer_confidence": 0.4129,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 954,
+          "output_tokens": 0,
+          "state_tokens": 842,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 0.8478884999640286,
+      "rss_mib": 2348.78125,
+      "sampled_request_peak_mib": 2348.78125
+    },
+    {
+      "id": "german_tail_not_met",
+      "max_len": 2048,
+      "state": {
+        "candidate": "Candidate profile. Alex Example is a backend software engineer with six years of professional experience. Since 2022 Alex has worked at Cedar Systems building Python services with FastAPI and Django, PostgreSQL data models and asynchronous workers. Previously Alex developed integrations and REST APIs at Northstar Tools. Project evidence includes improving query latency by 35 percent, designing idempotent event processing, supporting on-call incidents and reviewing security-sensitive changes. Alex writes unit and integration tests, uses Git, Docker and Linux, and documents architectural decisions. Alex has mentored two colleagues and collaborated with product managers. Education: BSc Computer Science. Desired next role: backend engineering with real product ownership, remote or hybrid work, and compensation above CHF 100000. English: C1. Work authorization: authorized to work in Switzerland. German: A1; beginner only, unable to work in German. No healthcare qualifications or clinical license.",
+        "posting": "Job: Senior Backend Engineer. Build production Python APIs and backend services. Required: at least five years of professional software engineering, Python, PostgreSQL, HTTP APIs, automated tests, Linux and collaborative code review. Responsibilities include designing reliable data flows, improving performance, resolving incidents and documenting design decisions. Experience with FastAPI or Django is useful. Salary CHF 110000 to 130000. Hybrid in Switzerland.\nAbout Cedar Health Systems. We build services used by care providers and hospital operations teams. Our purpose is to make information reliable and accessible while respecting privacy. We are a stable organization with long term customer relationships and teams working across several countries. We value careful communication, sound professional judgment, useful documentation and willingness to learn from incidents. People here work with colleagues from different disciplines and make decisions close to the problem. We expect respectful debate, clear ownership and pragmatic improvements rather than unnecessary process.\n\nHow we work. The team starts with the needs of the people who use our services. We discuss expected outcomes before selecting an implementation and review work with the appropriate colleagues. We prefer manageable changes and clear handovers. Written records help the next person understand the context. We regularly review what is working and make small adjustments. You will have time to understand existing practices, ask questions and propose improvements. Managers give regular feedback and support professional development. We make room for different working styles while maintaining reliable cooperation.\n\nYour development. During the first month you will meet the people you will work with, understand our routines and shadow experienced colleagues. Over the following months you will take responsibility for well-defined pieces of work. The team will help you learn our tools, terminology and standards. We offer training time and a yearly development conversation. You will be expected to share what you learn, identify risks early and ask for help when needed. We welcome experience from organizations of different sizes and people who can explain the reasoning behind their decisions.\n\nWorking environment and benefits. The position is full time and based in Switzerland, with hybrid arrangements where the work allows it. We offer a competitive salary, pension contributions, paid leave and support for continuing education. Our recruitment process includes an initial conversation, a role-specific discussion and an opportunity to meet future colleagues. Candidates will have time to ask questions about expectations, scheduling and the team. We assess applications fairly and can arrange reasonable adjustments. Please provide a clear account of relevant experience and practical examples of your work.\n\nApplication and hiring process. Applications are reviewed by the hiring manager and a colleague with relevant professional experience. We may ask for clarification about responsibilities or achievements rather than expecting a particular CV format. The process is intended to establish mutual understanding of the role and the environment. We do not require an unpaid project unrelated to the position. References may be requested at a later stage with the candidate's agreement. You will receive an update if the timeline changes. Before accepting an offer, candidates can discuss remaining questions about responsibilities, benefits and working arrangements.\nMandatory requirement stated at the end of this posting: German at CEFR C1 or above is required because this engineer directly supports German-speaking hospital customers. A1 or A2 is insufficient. Swiss work authorization is required."
+      },
+      "result": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "fit": {
+            "type": "score",
+            "score": 2.9407,
+            "legend": {
+              "0": "No relevant professional background for this role",
+              "1": "Low fit; lacks core mandatory background or qualifications",
+              "2": "Partial fit; meaningful overlap with important mandatory gaps",
+              "3": "Strong fit; core background with minor gaps",
+              "4": "Very strong fit; clear evidence for core experience and mandatory qualifications"
+            },
+            "probabilities": {
+              "0": 0.0512,
+              "1": 0.116,
+              "2": 0.1071,
+              "3": 0.2924,
+              "4": 0.4333
+            },
+            "confidence": 0.153,
+            "answer_confidence": 0.4333,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 963,
+          "output_tokens": 0,
+          "state_tokens": 851,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        }
+      },
+      "elapsed_seconds": 0.8653124590055086,
+      "rss_mib": 2348.78125,
+      "sampled_request_peak_mib": 2348.78125
+    }
+  ],
+  "load_seconds": 1.0823151250369847,
+  "config": {
+    "encoder": "answerdotai/ModernBERT-large",
+    "head_layers": 2,
+    "max_len": 512,
+    "head_max_len": 192,
+    "max_prefixes": 6,
+    "act_costs": {
+      "escalate": 0.5
+    },
+    "cost_wrong_act": 3.0,
+    "amp_dtype": "bf16",
+    "model_name": "rl-agent",
+    "temperature": [
+      1.6369030475616455,
+      1.2514300346374512,
+      1.983399510383606
+    ],
+    "temperature_by_options": {
+      "choice:3-5": 1.7601518630981445,
+      "choice:6-10": 1.0000158548355103,
+      "score:3-5": 1.2514300346374512,
+      "noul:2": 1.983399510383606,
+      "choice:11+": 0.10058280825614929,
+      "choice:2": 1.9063563346862793
+    },
+    "training": {
+      "updates": 7313,
+      "epochs_completed": 1,
+      "hours": 1.96,
+      "world_size": 1,
+      "fine_tuned_from_checkpoint": true
+    }
+  },
+  "summary": {
+    "sampled_peak_rss_mib": 2568.015625,
+    "by_limit": {
+      "512": {
+        "median_seconds": 0.40526139599387534,
+        "max_seconds": 0.4517963330144994,
+        "any_truncated": true,
+        "scores": {
+          "backend_match": 2.8437,
+          "backend_unrelated": 2.1147,
+          "nurse_match": 3.0581,
+          "nurse_unrelated": 2.8239,
+          "german_tail_met": 2.8437,
+          "german_tail_not_met": 2.9538
+        },
+        "comparisons": {
+          "backend_match_over_unrelated": true,
+          "nurse_match_over_unrelated": true,
+          "tail_c1_over_a1": false
+        }
+      },
+      "1024": {
+        "median_seconds": 0.8302962294837926,
+        "max_seconds": 0.8753576249582693,
+        "any_truncated": false,
+        "scores": {
+          "backend_match": 2.8791,
+          "backend_unrelated": 2.1138,
+          "nurse_match": 3.0836,
+          "nurse_unrelated": 2.6051,
+          "german_tail_met": 2.8791,
+          "german_tail_not_met": 2.9407
+        },
+        "comparisons": {
+          "backend_match_over_unrelated": true,
+          "nurse_match_over_unrelated": true,
+          "tail_c1_over_a1": false
+        }
+      },
+      "2048": {
+        "median_seconds": 0.8293319999647792,
+        "max_seconds": 0.8653124590055086,
+        "any_truncated": false,
+        "scores": {
+          "backend_match": 2.8791,
+          "backend_unrelated": 2.1138,
+          "nurse_match": 3.0836,
+          "nurse_unrelated": 2.6051,
+          "german_tail_met": 2.8791,
+          "german_tail_not_met": 2.9407
+        },
+        "comparisons": {
+          "backend_match_over_unrelated": true,
+          "nurse_match_over_unrelated": true,
+          "tail_c1_over_a1": false
+        }
+      }
+    }
+  }
+}

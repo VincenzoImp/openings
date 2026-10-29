@@ -1,0 +1,11 @@
+{
+  "release": "jevos-v5",
+  "checksums": {
+    "jev-linux-x64.tar.gz": "1ce77566405514ed2f20d64f8222cf9eba9b714d332f05f6296e0cad84dd7b04",
+    "jev-macos-arm64.tar.gz": "ba71df2da07d4bdf47c72771319b266347a0ae4732d0b74c8e9f227b646e7109",
+    "jev-windows-x64.zip": "6bbe5344aeb3beabf7b3fb50a459f6ba848e852d5ea192d945b97eed7db7f9eb",
+    "jevos-v5-openvino-int8.zip": "0a1159c31b9c2abc484af9c866cdcfe5279fdf592b368636625c5a795f970acc",
+    "jevos-v5-q4_k_m.gguf": "2bcfcccf0c1342b9e3239a4942e1f3601041db39e8552bf4d7c95e3cee9f1eb6",
+    "jevos-v5-q8_0.gguf": "f20f77d2d49c8863fe23a04c1bd237139182bdc97bd2dfc2275f48ad5e4091fa"
+  }
+}

@@ -1,0 +1,116 @@
+{
+  "purpose": "target non-AVX CPU runtime import/kernel smoke only, no model inference",
+  "host": {
+    "architecture": "x86_64",
+    "python": "3.13.5",
+    "isa": {
+      "sse4_2": true,
+      "avx": false,
+      "avx2": false,
+      "avx512f": false
+    }
+  },
+  "cpu_wheel": "https://download-r2.pytorch.org/whl/cpu/torch-2.15.0%2Bcpu-cp313-cp313-manylinux_2_28_x86_64.whl#sha256=0f6f69701b2d38ddc412364dfb92e2e13e74960d33fa3573b4930ced626e81c7",
+  "limits": {
+    "single_cpu_affinity": true,
+    "nice": 15,
+    "thread_environment": 1,
+    "rss_stop_mib": 650,
+    "install_wall_seconds": 150,
+    "operations_wall_seconds": 30
+  },
+  "cpu_capability_override": null,
+  "install": {
+    "exit_code": 0,
+    "seconds": 78.233,
+    "sampled_peak_rss_mib": 156.812,
+    "stopped_reason": null
+  },
+  "operations": {
+    "exit_code": 0,
+    "seconds": 5.02,
+    "sampled_peak_rss_mib": 227.16,
+    "stopped_reason": null
+  },
+  "operation_events": [
+    {
+      "stage": "import",
+      "torch": "2.15.0+cpu",
+      "cpu_capability": "DEFAULT",
+      "intraop_threads": 1
+    },
+    {
+      "stage": "matmul:start"
+    },
+    {
+      "stage": "matmul",
+      "shape": [
+        128,
+        128
+      ],
+      "finite": true,
+      "sum": 2097152.0
+    },
+    {
+      "stage": "sin:start"
+    },
+    {
+      "stage": "sin",
+      "shape": [
+        1024
+      ],
+      "finite": true,
+      "sum": 9.5367431640625e-07
+    },
+    {
+      "stage": "cos:start"
+    },
+    {
+      "stage": "cos",
+      "shape": [
+        1024
+      ],
+      "finite": true,
+      "sum": 47.13178253173828
+    },
+    {
+      "stage": "gelu:start"
+    },
+    {
+      "stage": "gelu",
+      "shape": [
+        1024
+      ],
+      "finite": true,
+      "sum": 683.922119140625
+    },
+    {
+      "stage": "layer_norm:start"
+    },
+    {
+      "stage": "layer_norm",
+      "shape": [
+        8,
+        32
+      ],
+      "finite": true,
+      "sum": 1.9073486328125e-06
+    },
+    {
+      "stage": "sdpa:start"
+    },
+    {
+      "stage": "sdpa",
+      "shape": [
+        1,
+        2,
+        64,
+        32
+      ],
+      "finite": true,
+      "sum": 4096.0
+    }
+  ],
+  "runtime_diagnostics": "<temporary-probe>/env/lib/python3.13/site-packages/torch/_subclasses/functional_tensor.py:377: UserWarning: Failed to initialize NumPy: No module named 'numpy' (Triggered internally at /__w/pytorch/pytorch/torch/csrc/utils/tensor_numpy.cpp:82.)\n  cpu = _conversion_method_template(device=torch.device(\"cpu\"))",
+  "temporary_directory_removed": true
+}

@@ -1,0 +1,14 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[margin=20mm]{geometry}
+\usepackage{hyperref}
+\pagestyle{empty}
+\begin{document}
+{\LARGE \VAR{name|tex}}\\
+\VAR{headline|tex}
+\section*{Selected experience}
+\begin{itemize}
+\BLOCK{for bullet in bullets}
+\item \VAR{bullet.text|tex}
+\BLOCK{endfor}
+\end{itemize}
+\end{document}

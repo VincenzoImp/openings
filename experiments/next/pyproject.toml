@@ -1,0 +1,20 @@
+[project]
+name = "openings-next-feasibility"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.135.3",
+  "mcp==1.30.0",
+  "pydantic==2.13.0",
+  "jinja2==3.1.6",
+  "httpx==0.28.1",
+  "pytest==9.0.3",
+  "pytest-asyncio==1.4.0",
+  "ruff==0.15.10",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["."]
