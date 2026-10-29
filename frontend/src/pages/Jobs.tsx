@@ -22,7 +22,6 @@ import { FileManager } from "../files";
 import {
   AdvancedJson,
   Pagination,
-  Avatar,
   Button,
   Dialog,
   Empty,
@@ -407,7 +406,6 @@ export function JobsPage({
                 }
               />
               <button className="jobmain" onClick={() => onOpen(job.id)}>
-                <Avatar name={job.company} />
                 <div>
                   <strong className="jobtitle">
                     {job.title || "Untitled opportunity"}
@@ -421,6 +419,21 @@ export function JobsPage({
                           job.metadata.ats ||
                           "Saved posting",
                       )}
+                    {job.job_type && (
+                      <>
+                        <span>·</span>
+                        <span>
+                          {job.job_type === "fulltime"
+                            ? "Full time"
+                            : job.job_type === "parttime"
+                              ? "Part time"
+                              : job.job_type}
+                        </span>
+                      </>
+                    )}
+                    <span className="mobile-job-location">
+                      {job.location || "Location not specified"}
+                    </span>
                     {job.complete === false && (
                       <span className="tag amber">Needs text</span>
                     )}
@@ -429,7 +442,11 @@ export function JobsPage({
               </button>
               <span className="location-col">
                 {job.location || "Location not specified"}
-                {job.is_remote && <small>Remote</small>}
+                {job.is_remote &&
+                  !job.location?.toLowerCase().includes("remote") && (
+                    <small>Remote</small>
+                  )}
+                <time>{date(job.date_posted || job.created_at)}</time>
               </span>
               <Score score={job.score} outdated={job.score_outdated} />
               <button
@@ -623,7 +640,6 @@ export function JobDrawer({
         ) : (
           <>
             <div className="jobmeta drawer-meta">
-              <Avatar name={job.company} />
               <span>
                 {job.company} · {job.location || "Location not specified"}
               </span>

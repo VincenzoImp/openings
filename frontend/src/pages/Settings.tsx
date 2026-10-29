@@ -948,6 +948,7 @@ function PasswordSettings() {
         </div>
       </div>
       <form
+        className="password-form"
         onSubmit={async (e) => {
           e.preventDefault();
           const f = new FormData(e.currentTarget);
@@ -983,9 +984,11 @@ function PasswordSettings() {
             autoComplete="new-password"
           />
         </Field>
-        <Button variant="primary" disabled={pending}>
-          Change password
-        </Button>
+        <div className="actions form-actions">
+          <Button type="submit" variant="primary" disabled={pending}>
+            Change password
+          </Button>
+        </div>
       </form>
       <div className="divider" />
       <p className="hint">Openings 0.5.0 · Your job search workspace</p>

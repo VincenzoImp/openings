@@ -12,7 +12,6 @@ import {
 import { confirmLeave, useResource, useUrlState, useWorkspace } from "../state";
 import {
   AdvancedJson,
-  Avatar,
   Button,
   Dialog,
   Empty,
@@ -162,6 +161,11 @@ export default function CompaniesPage() {
           },
         ]}
       />
+      <p className="collection-explainer">
+        {tab === "searches"
+          ? "Search only the keywords and locations you choose, on your selected job boards. Each saved search has its own schedule."
+          : "Monitor the companies and feeds you choose. Optional title and location filters narrow their listings."}
+      </p>
       <div className="collection-caption">
         <label className="checkline">
           <input
@@ -220,7 +224,11 @@ export default function CompaniesPage() {
                     )
                   }
                 />
-                <Avatar name={source.name} />
+                <span className="source-icon">
+                  <Icon
+                    name={source.kind === "jobspy" ? "search" : "companies"}
+                  />
+                </span>
                 <div>
                   <h3>{source.name}</h3>
                   <p>
@@ -503,7 +511,7 @@ function SourceEditor({
           <>
             <Field
               label="Search query"
-              hint="One query per saved search. Duplicate a search to try another location or query."
+              hint="Keywords sent to the selected job boards, for example backend engineer. Use a separate saved search for another query or location."
             >
               <input
                 name="query"

@@ -674,7 +674,7 @@ html[data-theme="dark"] .nav a.active {
   grid-template-columns: 38px minmax(180px, 1fr) 130px 85px 35px;
   align-items: center;
   gap: 13px;
-  padding: 21px 22px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--line);
   cursor: pointer;
 }
@@ -683,17 +683,6 @@ html[data-theme="dark"] .nav a.active {
 }
 .jobrow:hover {
   background: var(--hover);
-}
-.logo {
-  width: 36px;
-  height: 36px;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  font-family: Georgia, serif;
-  font-size: 18px;
-  border: 1px solid #00000008;
-  flex-shrink: 0;
 }
 .jobtitle {
   font-size: 12px;
@@ -846,12 +835,6 @@ html[data-theme="dark"] .nav a.active {
 .application-card:hover {
   border-color: var(--faint);
   transform: translateY(-1px);
-}
-.application-card .logo {
-  width: 27px;
-  height: 27px;
-  font-size: 14px;
-  border-radius: 6px;
 }
 .app-company {
   display: flex;
@@ -1355,11 +1338,6 @@ html[data-theme="dark"] .nav a.active {
   margin: 18px 0 8px;
   line-height: 1.2;
 }
-.drawerhead .logo {
-  width: 30px;
-  height: 30px;
-  font-size: 16px;
-}
 .drawercontent {
   padding: 24px 27px;
   overflow: auto;
@@ -1797,11 +1775,6 @@ html[data-theme="dark"] .nav a.active {
     gap: 11px;
     padding: 18px 15px;
   }
-  .jobrow .logo {
-    width: 32px;
-    height: 32px;
-    font-size: 17px;
-  }
   .jobrow .location-col,
   .jobrow > .iconbtn {
     display: none;
@@ -2076,7 +2049,7 @@ html[data-theme="dark"] {
   justify-content: flex-end;
 }
 .application-card {
-  padding: 18px 15px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -2086,8 +2059,8 @@ html[data-theme="dark"] {
   background: var(--card);
   border-radius: 9px;
   box-shadow: 0 1px 2px #24251f04;
-  margin-bottom: 12px;
-  min-height: 155px;
+  margin-bottom: 10px;
+  min-height: 0;
 }
 .application-card:hover {
   border-color: var(--accent);
@@ -2097,13 +2070,8 @@ html[data-theme="dark"] {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted);
-}
-.application-card .logo {
-  width: 29px;
-  height: 29px;
-  font-size: 16px;
 }
 .application-card > strong {
   font-size: 13px;
@@ -2114,8 +2082,7 @@ html[data-theme="dark"] {
   display: flex;
   justify-content: space-between;
   gap: 7px;
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
+  padding-top: 10px;
   color: var(--muted);
   font-size: 10px;
   margin-top: auto;
@@ -2320,11 +2287,6 @@ html[data-theme="dark"] {
   margin-bottom: 22px;
   font-size: 12px;
   line-height: 1.8;
-}
-.drawer-meta .logo {
-  width: 31px;
-  height: 31px;
-  font-size: 17px;
 }
 .drawercontent > .tabs {
   margin-bottom: 25px;
@@ -2832,11 +2794,6 @@ html[data-theme="dark"] {
   .jobmain {
     gap: 11px;
   }
-  .jobmain .logo {
-    width: 31px;
-    height: 31px;
-    font-size: 16px;
-  }
   .jobtitle {
     font-size: 13px;
   }
@@ -3295,6 +3252,65 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
 }
 .application-card {
   display: block;
+  position: relative;
+}
+.application-card.is-dragged {
+  opacity: 0.45;
+}
+.kanban.is-dragging .kanban-column {
+  outline: 1px dashed var(--line);
+}
+.application-card .companyline {
+  padding-right: 26px;
+  min-height: 22px;
+}
+.application-card .companyline > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.application-location {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stage-menu-trigger {
+  position: absolute;
+  right: 7px;
+  top: 7px;
+}
+.stage-menu-options {
+  position: fixed;
+  inset: auto;
+  width: 150px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px #24251f18;
+  padding: 6px;
+}
+.stage-menu-options > span {
+  display: block;
+  padding: 5px 8px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.stage-menu-options > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px;
+  font-size: 12px;
+  border-radius: 5px;
+}
+.stage-menu-options > button:hover:not(:disabled),
+.stage-menu-options > button:focus-visible {
+  background: var(--hover);
 }
 .application-open {
   display: block;
@@ -3305,14 +3321,13 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
 .application-open > strong {
   display: block;
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
-.card-stage {
-  font-size: 11px;
-  padding: 7px 9px;
-  margin-top: 12px;
-  background: var(--surface);
-}
+
 .json-readout {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -3580,4 +3595,42 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(120px, 0.6fr);
   gap: 12px;
+}
+
+/* Source icons describe the type; company branding is never fabricated. */
+.source-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--hover);
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.collection-explainer {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 12px 0 18px;
+  max-width: 800px;
+}
+.jobrow .location-col time {
+  display: block;
+  color: var(--faint);
+  font-size: 10px;
+  margin-top: 4px;
+}
+.mobile-job-location {
+  display: none;
+}
+@media (max-width: 950px) {
+  .jobmeta .mobile-job-location {
+    display: block;
+    flex-basis: 100%;
+  }
+}
+
+.password-form .form-actions {
+  justify-content: flex-end;
 }

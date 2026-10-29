@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import {
   api,
   date,
@@ -30,7 +30,6 @@ import {
 import {
   AdvancedJson,
   Pagination,
-  Avatar,
   Button,
   Dialog,
   Empty,
@@ -43,6 +42,66 @@ import {
   Tabs,
 } from "../ui";
 const stages: Stage[] = ["draft", "applied", "interview", "offer", "closed"];
+function StageMenu({
+  application,
+  pending,
+  onMove,
+}: {
+  application: Application;
+  pending: boolean;
+  onMove: (id: string, stage: Stage) => void;
+}) {
+  const trigger = useRef<HTMLButtonElement>(null);
+  const id = `move-${application.id}`;
+  return (
+    <>
+      <button
+        type="button"
+        ref={trigger}
+        className="iconbtn stage-menu-trigger"
+        popoverTarget={id}
+        aria-label={`Move ${application.job?.title || "application"} to stage`}
+        title="Move to stage"
+        disabled={pending}
+      >
+        <Icon name="more" />
+      </button>
+      <div
+        id={id}
+        popover="auto"
+        className="stage-menu-options"
+        role="group"
+        aria-label="Move to stage"
+        onToggle={(event) => {
+          const menu = event.currentTarget;
+          if (!menu.matches(":popover-open") || !trigger.current) return;
+          const anchor = trigger.current.getBoundingClientRect();
+          const bounds = menu.getBoundingClientRect();
+          menu.style.left = `${Math.max(8, Math.min(anchor.right - bounds.width, window.innerWidth - bounds.width - 8))}px`;
+          menu.style.top = `${Math.max(8, Math.min(anchor.bottom + 4, window.innerHeight - bounds.height - 8))}px`;
+        }}
+      >
+        <span>Move to</span>
+        {stages.map((stage) => (
+          <button
+            type="button"
+            key={stage}
+            disabled={pending || stage === application.status}
+            onClick={(event) => {
+              event.currentTarget
+                .closest<HTMLElement>("[popover]")
+                ?.hidePopover();
+              onMove(application.id, stage);
+            }}
+          >
+            {stageLabels[stage]}
+            {stage === application.status && <Icon name="check" />}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
 export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
   const [filters, setFilters] = useUrlFilters({
     q: "",
@@ -69,6 +128,7 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
     { items: [], total: 0 },
   );
   const { mutate, pending } = useWorkspace();
+  const [dragged, setDragged] = useState<string | null>(null);
   async function move(id: string, status: Stage) {
     const app = resource.data.items.find((a) => a.id === id);
     if (app && app.status !== status)
@@ -154,7 +214,7 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
       )}
       <div className="boardcaption">
         <span>{resource.data.total} application attempts</span>
-        <span>Open a card, drag it, or use its stage menu.</span>
+        <span>Open a card. Drag between columns or use its move menu.</span>
       </div>
       {resource.loading && !resource.data.items.length ? (
         <Loading />
@@ -173,13 +233,18 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
           </Empty>
         </section>
       ) : filters.view === "board" ? (
-        <div className="kanban">
+        <div className={`kanban ${dragged ? "is-dragging" : ""}`}>
           {stages.map((stage) => (
             <section
               className="kanban-column"
               key={stage}
               aria-label={`${stageLabels[stage]} applications`}
-              onDragOver={(e) => e.preventDefault()}
+              onDragOver={(e) => {
+                if (dragged) {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                }
+              }}
               onDrop={(e) => {
                 e.preventDefault();
                 if (!pending)
@@ -201,22 +266,29 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                 .filter((a) => a.status === stage)
                 .map((app) => (
                   <article
-                    className="application-card"
+                    className={`application-card ${dragged === app.id ? "is-dragged" : ""}`}
                     key={app.id}
                     draggable={!pending}
-                    onDragStart={(e) =>
-                      e.dataTransfer.setData("text/plain", app.id)
-                    }
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("text/plain", app.id);
+                      e.dataTransfer.effectAllowed = "move";
+                      setDragged(app.id);
+                    }}
+                    onDragEnd={() => setDragged(null)}
                   >
                     <button
                       className="application-open"
                       onClick={() => onOpen(app.id)}
                     >
                       <div className="companyline">
-                        <Avatar name={app.job?.company || "Company"} />
                         <span>{app.job?.company || "Company"}</span>
                       </div>
-                      <strong>{app.job?.title || "Application"}</strong>
+                      <strong title={app.job?.title}>
+                        {app.job?.title || "Application"}
+                      </strong>
+                      <span className="application-location">
+                        {app.job?.location || "Location not specified"}
+                      </span>
                       {app.outcome && (
                         <span className="tag neutral outcome">
                           {app.outcome.replaceAll("_", " ")}
@@ -224,25 +296,22 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                       )}
                       <footer>
                         <span>
-                          <Icon name="file" />
-                          Open workspace
+                          {!!app.documents_count && (
+                            <>
+                              <Icon name="file" />
+                              {app.documents_count} document
+                              {app.documents_count === 1 ? "" : "s"}
+                            </>
+                          )}
                         </span>
                         <time>{date(app.updated_at || app.created_at)}</time>
                       </footer>
                     </button>
-                    <select
-                      className="card-stage"
-                      aria-label={`Move ${app.job?.title || "application"} to stage`}
-                      disabled={pending}
-                      value={app.status}
-                      onChange={(e) => move(app.id, e.target.value as Stage)}
-                    >
-                      {stages.map((s) => (
-                        <option key={s} value={s}>
-                          {stageLabels[s]}
-                        </option>
-                      ))}
-                    </select>
+                    <StageMenu
+                      application={app}
+                      pending={pending}
+                      onMove={(id, stage) => void move(id, stage)}
+                    />
                   </article>
                 ))}
             </section>
@@ -771,7 +840,6 @@ export function ApplicationDrawer({
         ) : (
           <>
             <div className="jobmeta drawer-meta">
-              <Avatar name={app.job?.company || "Company"} />
               {app.job?.company} ·{" "}
               {app.job?.location || "Location not specified"}
             </div>

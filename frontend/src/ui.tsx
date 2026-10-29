@@ -39,6 +39,7 @@ import {
   Upload,
   ExternalLink,
   AlertCircle,
+  Ellipsis,
 } from "lucide-react";
 import { Notification, confirmLeave } from "./state";
 const icons = {
@@ -73,6 +74,7 @@ const icons = {
   upload: Upload,
   external: ExternalLink,
   error: AlertCircle,
+  more: Ellipsis,
 };
 export type IconName = keyof typeof icons;
 export function Icon({ name }: { name: IconName }) {
@@ -248,18 +250,6 @@ export function Loading() {
       <span className="spinner" />
       Loading workspace…
     </div>
-  );
-}
-export function Avatar({ name }: { name: string }) {
-  const colors = ["#dce6d9", "#e5dfd5", "#dfddea", "#dce5e9", "#e6e4d8"];
-  return (
-    <span
-      className="logo"
-      style={{ background: colors[(name.charCodeAt(0) || 0) % colors.length] }}
-      aria-hidden="true"
-    >
-      {name[0]?.toUpperCase() || "?"}
-    </span>
   );
 }
 export function Score({

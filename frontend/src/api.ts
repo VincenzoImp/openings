@@ -22,6 +22,7 @@ export interface Job extends Versioned {
   posting_preview?: string;
   complete?: boolean;
   is_remote?: boolean | null;
+  date_posted?: string;
   job_type?: string;
   postings?: Json[];
   triage: Triage;
@@ -57,6 +58,7 @@ export interface Application extends Versioned {
   answers: Record<string, unknown>;
   job?: Job;
   applied_at?: string;
+  documents_count?: number;
 }
 export interface Profile {
   name: string;
