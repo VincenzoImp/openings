@@ -1,118 +1,100 @@
 # Architecture
 
-## Modules
+Openings is a FastAPI application, React dashboard and SQLite workspace. An
+optional CPU scorer runs as a separate service. There is no agent runtime,
+browser crawler, Redis, vector store or TeX compiler in the core.
 
-```text
-openings/
-  config.py          settings.yaml -> typed dataclasses; strict keys; $ENV secrets
-  models.py          Job, JobStatus, Posting, Note, Attachment, Event, RunSummary;
-                     posting keys, identities, aware timestamps
-  text.py            text normalisation shared by scoring and sources
-  scoring.py         keyword scoring, explain_score, thresholds, post filter
-  db/                SQLite behind the JobDatabase facade
-    base.py          connection, WAL, row mapping, events
-    schema.py        tables and indexes
-    jobs.py          upsert, queries, status, merge, statistics, facets
-    postings.py      the postings of a job, lookups by posting key
-    material.py      labels, notes, attachments
-    events.py        timeline
-    embeddings.py    vectors as float32 blobs
-    runs.py          open, finish and list runs
-    retention.py     cleanup restricted to status new
-  embeddings.py      ONNX sentence model, embed on save, backfill, cosine search
-  runtime.py         one object per process: config (reloaded on change), db,
-                     attachments, embeddings, service
-  sources/           one module per source, all returning the canonical frame
-    base.py          CANONICAL_COLUMNS, HTTP helpers, html_to_markdown, to_date
-    jobspy.py        boards through JobSpy: throttling, retry, thread pool
-    ats/             thirteen ATS public feeds (greenhouse, lever, ashby,
-                     smartrecruiters, workday, joincom, workable, rippling,
-                     bamboohr, oracle, personio, recruitee, breezy)
-    jobcloud.py      a regional board search API, host-parameterized
-    rss.py           RSS and Atom through feedparser
-    adzuna.py        Adzuna search API (keyed, optional)
-    manual.py        add_job records
-    collect.py       collect_all: run every source, isolate failures, dedupe
-  pipeline.py        collect -> score -> partition -> upsert -> embed -> notify
-  scheduler.py       APScheduler loop, start-to-start intervals, retry, run-now
-  notifier.py        Telegram digest
-  application/       JobApplicationService, AttachmentStore, bundle, command types
-  web/               FastAPI app: api.py routes, mcp.py tools, token gate, dashboard
-  cli.py             openings {run, scheduler, web, rescore, healthcheck}
+```mermaid
+flowchart LR
+  Human[Dashboard] --> REST
+  Scripts --> REST
+  Agent[External agent] --> MCP
+  REST --> Services[Shared application services]
+  MCP --> Services
+  Services <--> DB[(SQLite + file bytes)]
+  Worker[Bounded worker] --> Services
+  Worker --> Sources[Public search / ATS / feeds]
+  Worker --> Scorer[Optional local or remote scorer]
 ```
 
-## Data flow
+## Code map
 
-1. `collect_all` runs the configured sources. Each source returns a
-   `SourceResult` with a DataFrame in the canonical shape plus per-task stats;
-   a failing task or company never aborts the run.
-2. `score_jobs` adds `relevance_score`; `partition_by_thresholds` splits rows
-   into save and notify sets.
-3. `JobDatabase.upsert_jobs` matches each row to a job: by posting key
-   (canonical URL or `source:external_id`), else by identity
-   (`sha256(title | company | location)`) against jobs seen on other sources,
-   else it inserts a new job with status `new` and an `ingested` event.
-   Known jobs get their posting fields and `last_seen` refreshed; a new
-   posting of a known job is recorded with a `posting` event. Blacklisted
-   jobs are skipped. **It never touches `status`.**
-4. New and refreshed jobs are embedded; new rows above the notify threshold
-   go to Telegram; the run row opened at the start is closed with its
-   statistics.
+| Location | Responsibility |
+|---|---|
+| `backend/openings/workspace.py` | Job identities, triage, notes, application attempts and reporting |
+| `backend/openings/career.py` | Profile, detailed evidence, claims, templates and instructions |
+| `backend/openings/documents.py` | Frozen contexts, document revisions and scoped file transfers |
+| `backend/openings/discovery.py` | Typed sources, schedules, scoring configuration and queue operations |
+| `backend/openings/collectors` | Narrow provider adapters and shared HTTP policy/runtime |
+| `backend/openings/worker.py` | Independent scheduling, acquisition and inference lanes |
+| `backend/openings/app.py`, `api.py` | Authentication, REST/MCP registration and dashboard hosting |
+| `backend/openings/schema.sql` | Relational ownership, SQLite indexes and JSON payloads |
+| `frontend/src` | Dashboard using REST; no duplicated domain decisions |
+| `scorer` | Optional isolated Laya/System One-compatible CPU classification service |
+| `skills/openings-workspace` | Optional external-agent workflow guidance |
 
-## Schema
+The [operation inventory](../../backend/openings/operation-inventory.json) is
+packaged with the app and served by authenticated `GET /api/v1/capabilities` and
+`capabilities_get`. OpenAPI at `/api/openapi.json` and discovered MCP schemas are
+authoritative for individual input fields. Read [REST](../user/api.md) and
+[agent](../user/agents.md) guides for usable examples.
 
-| Table | Holds |
-|-------|-------|
-| `jobs` | posting fields, `raw_json`, `identity`, `first_seen`, `last_seen`, `relevance_score`, `status`, `status_changed_at` |
-| `postings` | `(job_id, key, source, external_id, url, first_seen, last_seen)`; `key` is unique |
-| `job_labels` | `(job_id, label)` |
-| `notes` | `kind` (`note`, `qa`), `title`, `body`, `updated_at` |
-| `attachments` | `kind`, `filename`, `stored_name`, `sha256`, `size_bytes`, `note`; files under `attachments/<job_id>/` |
-| `events` | append-only timeline: `ingested`, `posting`, `status`, `label`, `note`, `attachment`, `updated`, `merged` |
-| `embeddings` | `(job_id, model, vector, updated_at)` |
-| `runs` | one row per collection with the per-source JSON; `finished_at` is null while open |
+## Data and workflow rules
 
-Foreign keys cascade from `jobs`; deleting a job removes its postings,
-labels, notes, attachment rows, events and embedding, and the service removes
-its files. Every timestamp is stored in UTC with an offset.
+- **Identity:** normalized URLs and known ATS identities deduplicate postings.
+  Title/company similarity alone never merges jobs. Explicit Merge retains history.
+- **Corrections:** source refreshes preserve user edits, triage and application
+  attempts. Unchanged content does not trigger another classification.
+- **Lifecycle:** Inbox/Saved/Dismissed is job triage. Draft/Applied/Interview/Offer/
+  Closed belongs to an independent application attempt. Uploading documents does
+  not mark an attempt submitted. Forget permanently removes job-owned records.
+- **Snapshots:** preparing a context freezes the job, career evidence, instructions,
+  questions, selected templates and exact assets. Later profile edits affect new
+  contexts. Changed document content creates a revision with its own uploaded files.
+- **Truth:** approved claims and narrative evidence guide an external agent;
+  reference/length validation does not establish factual accuracy. Review outputs.
+- **Concurrency:** typed inputs, optimistic versions, idempotency keys, foreign
+  keys and short transactions protect shared state. Run one application process
+  per workspace; database connections do not cross threads.
 
-## Invariants
+SQLite uses WAL and stores SHA-256-deduplicated BLOBs for attachments. Lists return
+compact paginated summaries; full postings, narratives, contexts and file bytes
+are separate reads. Backups use SQLite's online backup API. A restore preserves
+installation authentication and recent provider HTTP windows/later cooldowns.
+Model weights are a disposable cache outside the workspace.
 
-- A job id is `sha256(posting key)` when the first posting has one, else the
-  identity. `Job.from_row` applies the rule for every producer.
-- Retention SQL is restricted to `status = 'new'`; the protected set is
-  `PROTECTED_STATUSES` and is enforced in `db/`, not in callers.
-- Blacklisting is `set_status(blacklisted)`; `upsert_jobs` skips blacklisted
-  jobs in one statement, `add_job` refuses them, every list excludes them
-  unless asked, and `unblacklist_jobs` restores the status recorded in the
-  last status event.
-- Every surface calls `JobApplicationService`. Routes and tools only parse
-  input and serialize output. `/api` and `/mcp` share one token check.
-- Configuration is read through `Runtime.config()`, which reloads the file
-  when its modification time changes, and is never consulted to decide a
-  job's status.
-- Both processes may write the database and the embeddings; SQLite WAL and
-  the connection lock serialize them.
+## Acquisition and classification
 
-## Frontend
+A saved search has one explicit query/location and provider selection. Company
+sources watch selected ATS boards/feeds with optional title/location filters.
+Both use the same ingestion path as manually added jobs. New sources start paused.
 
-`frontend/src`:
+Every HTTP attempt uses the persisted provider gate: search, detail, preview,
+manual import and redirects. Policy includes minimum spacing, hourly/daily/run
+caps and Retry-After cooldown. Long waits defer tasks rather than occupying the
+collection lane. Failed/blocked responses remain visible; they are not successful
+empty results. Provider limits are local safeguards, not platform access guarantees.
 
-```text
-api/        client.ts (fetch, token, query building, downloads), types.ts
-app/        App, Shell, router (?view=&job=&...), HotkeyProvider + hotkeys registry,
-            theme, toast, confirm, ErrorBoundary, HelpDialog, TokenDialog
-components/ Button, Badge, Card, Table, Stat, Menu, Dialog, Field, FileDrop,
-            Kbd, MarkdownBody, ScoreBar, EmptyState
-features/   inbox, pipeline, companies, runs, system, job,
-            shared (queries, actions, JobList, LabelsEditor, dialogs, format, labels)
-styles.css  design tokens (@theme over CSS variables), dark variant, markdown
-```
+The scheduler, collector and inference lanes progress independently. A process/
+database guard serializes inference, including manual endpoint tests. Network-capable
+MCP tools run outside the event loop. Queued tasks have leases and cancellation;
+stale work cannot overwrite a current result. See [source configuration](../user/sources.md).
 
-Colours, radii and shadows are tokens; `[data-theme=dark]` overrides them and
-an inline script applies the stored preference before paint. State lives in
-TanStack Query; writes patch the cached lists optimistically and invalidate
-only what they can change. One hotkey registry with scopes (dialog > view >
-global) also generates the Help dialog. The built `dist/` is copied into the
-image at `/opt/openings/frontend` and served by `openings web`;
-`OPENINGS_FRONTEND_DIST` overrides the path.
+Scoring is optional and advisory. Relevant profile/config edits mark scores outdated
+without queuing the archive. New or materially changed complete jobs may be scored;
+explicit selected/outdated batches and optional capped periodic rescoring are separate.
+There is no empirical fallback. Model/provider details are in the [scoring guide](../user/scoring.md).
+
+## Extending the app
+
+Add behavior in the shared service before exposing it through REST, MCP and the
+manual dashboard. Update the operation inventory when adding an operation. Keep
+operator/bootstrap and raw-byte transport differences explicit.
+
+Provider adapters emit bounded structured postings and use the shared HTTP gate.
+Keep endpoint-specific parsing in the adapter, preserve partial successful results
+and canonical filter metadata, and test failed/empty/malformed responses. The
+[vendored JobSpy subset](../../backend/openings/_vendor/jobspy/PROVENANCE.md) records
+its pinned upstream source and local transport changes.
+
+Use the focused checks and manual workflow guidance in [Contributing](../../CONTRIBUTING.md).

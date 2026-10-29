@@ -1,0 +1,4 @@
+# Install the matching CPU-only torch wheel first; see Dockerfile.
+laya==0.4.17
+fastapi==0.135.3
+uvicorn==0.54.0
