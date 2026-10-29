@@ -1,0 +1,581 @@
+{
+  "review": "Independent source-to-control logical parity audit",
+  "reviewed_at": "2026-10-29T19:53:30.548381+00:00",
+  "inventory_version": "0.5.0",
+  "reviewed_operations": 84,
+  "logical_operations_with_actual_controls": 84,
+  "wholly_absent_logical_operations": [],
+  "claim_limit": "This attests meaningful source-level UI controls for all84 logical operations; it does not claim90 browser checks individually exercised all84 operations or every wire field.",
+  "operations": [
+    {
+      "id": "workspace.info",
+      "status": "actual_control_present",
+      "control_evidence": "Settings/Workspace identity and Service capabilities link"
+    },
+    {
+      "id": "workspace.capabilities",
+      "status": "actual_control_present",
+      "control_evidence": "Settings/Workspace identity and Service capabilities link"
+    },
+    {
+      "id": "overview.read",
+      "status": "actual_control_present",
+      "control_evidence": "Overview submitted-since/until inputs, period counts, journey chart and table"
+    },
+    {
+      "id": "jobs.list",
+      "status": "actual_control_present",
+      "control_evidence": "Inbox server filters, pagination, selection toolbar, Add job, job drawer/edit/provenance and merge/Forget confirmations"
+    },
+    {
+      "id": "jobs.read",
+      "status": "actual_control_present",
+      "control_evidence": "Inbox server filters, pagination, selection toolbar, Add job, job drawer/edit/provenance and merge/Forget confirmations"
+    },
+    {
+      "id": "jobs.create",
+      "status": "actual_control_present",
+      "control_evidence": "Inbox server filters, pagination, selection toolbar, Add job, job drawer/edit/provenance and merge/Forget confirmations"
+    },
+    {
+      "id": "jobs.update",
+      "status": "actual_control_present",
+      "control_evidence": "Inbox server filters, pagination, selection toolbar, Add job, job drawer/edit/provenance and merge/Forget confirmations"
+    },
+    {
+      "id": "jobs.triage",
+      "status": "actual_control_present",
+      "control_evidence": "Inbox server filters, pagination, selection toolbar, Add job, job drawer/edit/provenance and merge/Forget confirmations"
+    },
+    {
+      "id": "jobs.bulk",
+      "status": "actual_control_present",
+      "control_evidence": "Inbox server filters, pagination, selection toolbar, Add job, job drawer/edit/provenance and merge/Forget confirmations"
+    },
+    {
+      "id": "jobs.merge",
+      "status": "actual_control_present",
+      "control_evidence": "Inbox server filters, pagination, selection toolbar, Add job, job drawer/edit/provenance and merge/Forget confirmations"
+    },
+    {
+      "id": "jobs.delete",
+      "status": "actual_control_present",
+      "control_evidence": "Inbox server filters, pagination, selection toolbar, Add job, job drawer/edit/provenance and merge/Forget confirmations"
+    },
+    {
+      "id": "notes.list",
+      "status": "actual_control_present",
+      "control_evidence": "Job drawer Notes list/add/application association; GET-backed editor, Save note and Delete note"
+    },
+    {
+      "id": "notes.read",
+      "status": "actual_control_present",
+      "control_evidence": "Job drawer Notes list/add/application association; GET-backed editor, Save note and Delete note"
+    },
+    {
+      "id": "notes.create",
+      "status": "actual_control_present",
+      "control_evidence": "Job drawer Notes list/add/application association; GET-backed editor, Save note and Delete note"
+    },
+    {
+      "id": "notes.update",
+      "status": "actual_control_present",
+      "control_evidence": "Job drawer Notes list/add/application association; GET-backed editor, Save note and Delete note"
+    },
+    {
+      "id": "notes.delete",
+      "status": "actual_control_present",
+      "control_evidence": "Job drawer Notes list/add/application association; GET-backed editor, Save note and Delete note"
+    },
+    {
+      "id": "collection.read",
+      "status": "actual_control_present",
+      "control_evidence": "Collection/Settings global collection switch and running/queued/enabled source status"
+    },
+    {
+      "id": "collection.update",
+      "status": "actual_control_present",
+      "control_evidence": "Collection/Settings global collection switch and running/queued/enabled source status"
+    },
+    {
+      "id": "providers.list",
+      "status": "actual_control_present",
+      "control_evidence": "Settings/Collection provider cards, capabilities/cooldown/runtime and versioned limits dialog"
+    },
+    {
+      "id": "providers.update",
+      "status": "actual_control_present",
+      "control_evidence": "Settings/Collection provider cards, capabilities/cooldown/runtime and versioned limits dialog"
+    },
+    {
+      "id": "sources.list",
+      "status": "actual_control_present",
+      "control_evidence": "Collection Saved searches/Companies; source configuration, bounded Preview, schedule, switches, selected enable/pause/run/remove and task progress link"
+    },
+    {
+      "id": "sources.read",
+      "status": "actual_control_present",
+      "control_evidence": "Collection Saved searches/Companies; source configuration, bounded Preview, schedule, switches, selected enable/pause/run/remove and task progress link"
+    },
+    {
+      "id": "sources.preview",
+      "status": "actual_control_present",
+      "control_evidence": "Collection Saved searches/Companies; source configuration, bounded Preview, schedule, switches, selected enable/pause/run/remove and task progress link"
+    },
+    {
+      "id": "sources.create",
+      "status": "actual_control_present",
+      "control_evidence": "Collection Saved searches/Companies; source configuration, bounded Preview, schedule, switches, selected enable/pause/run/remove and task progress link"
+    },
+    {
+      "id": "sources.update",
+      "status": "actual_control_present",
+      "control_evidence": "Collection Saved searches/Companies; source configuration, bounded Preview, schedule, switches, selected enable/pause/run/remove and task progress link"
+    },
+    {
+      "id": "sources.delete",
+      "status": "actual_control_present",
+      "control_evidence": "Collection Saved searches/Companies; source configuration, bounded Preview, schedule, switches, selected enable/pause/run/remove and task progress link"
+    },
+    {
+      "id": "sources.run",
+      "status": "actual_control_present",
+      "control_evidence": "Collection Saved searches/Companies; source configuration, bounded Preview, schedule, switches, selected enable/pause/run/remove and task progress link"
+    },
+    {
+      "id": "sources.bulk",
+      "status": "actual_control_present",
+      "control_evidence": "Collection Saved searches/Companies; source configuration, bounded Preview, schedule, switches, selected enable/pause/run/remove and task progress link"
+    },
+    {
+      "id": "scoring.read",
+      "status": "actual_control_present",
+      "control_evidence": "Settings scorer enabled/local/remote/key/criteria/rubric forms, Test connection and bounded outdated rescore; Inbox selected rescore and exact scoring-context dialog"
+    },
+    {
+      "id": "scoring.update",
+      "status": "actual_control_present",
+      "control_evidence": "Settings scorer enabled/local/remote/key/criteria/rubric forms, Test connection and bounded outdated rescore; Inbox selected rescore and exact scoring-context dialog"
+    },
+    {
+      "id": "scoring.test",
+      "status": "actual_control_present",
+      "control_evidence": "Settings scorer enabled/local/remote/key/criteria/rubric forms, Test connection and bounded outdated rescore; Inbox selected rescore and exact scoring-context dialog"
+    },
+    {
+      "id": "scoring.context",
+      "status": "actual_control_present",
+      "control_evidence": "Settings scorer enabled/local/remote/key/criteria/rubric forms, Test connection and bounded outdated rescore; Inbox selected rescore and exact scoring-context dialog"
+    },
+    {
+      "id": "scoring.rescore",
+      "status": "actual_control_present",
+      "control_evidence": "Settings scorer enabled/local/remote/key/criteria/rubric forms, Test connection and bounded outdated rescore; Inbox selected rescore and exact scoring-context dialog"
+    },
+    {
+      "id": "tasks.list",
+      "status": "actual_control_present",
+      "control_evidence": "Settings Activity state/kind/source/job filters, pagination, GET details and Cancel/Retry controls"
+    },
+    {
+      "id": "tasks.read",
+      "status": "actual_control_present",
+      "control_evidence": "Settings Activity state/kind/source/job filters, pagination, GET details and Cancel/Retry controls"
+    },
+    {
+      "id": "tasks.cancel",
+      "status": "actual_control_present",
+      "control_evidence": "Settings Activity state/kind/source/job filters, pagination, GET details and Cancel/Retry controls"
+    },
+    {
+      "id": "tasks.retry",
+      "status": "actual_control_present",
+      "control_evidence": "Settings Activity state/kind/source/job filters, pagination, GET details and Cancel/Retry controls"
+    },
+    {
+      "id": "profile.read",
+      "status": "actual_control_present",
+      "control_evidence": "Career contact/preferences/scoring-summary form, add/edit/remove professional links and Advanced metadata"
+    },
+    {
+      "id": "profile.update",
+      "status": "actual_control_present",
+      "control_evidence": "Career contact/preferences/scoring-summary form, add/edit/remove professional links and Advanced metadata"
+    },
+    {
+      "id": "knowledge.list",
+      "status": "actual_control_present",
+      "control_evidence": "Career knowledge summary search/type filter/pagination, GET editor/all eight kinds/metadata, create/remove and evidence files"
+    },
+    {
+      "id": "knowledge.read",
+      "status": "actual_control_present",
+      "control_evidence": "Career knowledge summary search/type filter/pagination, GET editor/all eight kinds/metadata, create/remove and evidence files"
+    },
+    {
+      "id": "knowledge.create",
+      "status": "actual_control_present",
+      "control_evidence": "Career knowledge summary search/type filter/pagination, GET editor/all eight kinds/metadata, create/remove and evidence files"
+    },
+    {
+      "id": "knowledge.update",
+      "status": "actual_control_present",
+      "control_evidence": "Career knowledge summary search/type filter/pagination, GET editor/all eight kinds/metadata, create/remove and evidence files"
+    },
+    {
+      "id": "knowledge.delete",
+      "status": "actual_control_present",
+      "control_evidence": "Career knowledge summary search/type filter/pagination, GET editor/all eight kinds/metadata, create/remove and evidence files"
+    },
+    {
+      "id": "claims.list",
+      "status": "actual_control_present",
+      "control_evidence": "Career claims query/approval/evidence filters/pagination, GET editor, linked evidence, approval switch/metadata/create/remove"
+    },
+    {
+      "id": "claims.read",
+      "status": "actual_control_present",
+      "control_evidence": "Career claims query/approval/evidence filters/pagination, GET editor, linked evidence, approval switch/metadata/create/remove"
+    },
+    {
+      "id": "claims.create",
+      "status": "actual_control_present",
+      "control_evidence": "Career claims query/approval/evidence filters/pagination, GET editor, linked evidence, approval switch/metadata/create/remove"
+    },
+    {
+      "id": "claims.update",
+      "status": "actual_control_present",
+      "control_evidence": "Career claims query/approval/evidence filters/pagination, GET editor, linked evidence, approval switch/metadata/create/remove"
+    },
+    {
+      "id": "claims.delete",
+      "status": "actual_control_present",
+      "control_evidence": "Career claims query/approval/evidence filters/pagination, GET editor, linked evidence, approval switch/metadata/create/remove"
+    },
+    {
+      "id": "templates.list",
+      "status": "actual_control_present",
+      "control_evidence": "Template query/kind filters/pagination, GET detail, kind/name/source/guidance/rules/default/edit/create/remove and asset files"
+    },
+    {
+      "id": "templates.read",
+      "status": "actual_control_present",
+      "control_evidence": "Template query/kind filters/pagination, GET detail, kind/name/source/guidance/rules/default/edit/create/remove and asset files"
+    },
+    {
+      "id": "templates.create",
+      "status": "actual_control_present",
+      "control_evidence": "Template query/kind filters/pagination, GET detail, kind/name/source/guidance/rules/default/edit/create/remove and asset files"
+    },
+    {
+      "id": "templates.update",
+      "status": "actual_control_present",
+      "control_evidence": "Template query/kind filters/pagination, GET detail, kind/name/source/guidance/rules/default/edit/create/remove and asset files"
+    },
+    {
+      "id": "templates.delete",
+      "status": "actual_control_present",
+      "control_evidence": "Template query/kind filters/pagination, GET detail, kind/name/source/guidance/rules/default/edit/create/remove and asset files"
+    },
+    {
+      "id": "instructions.read",
+      "status": "actual_control_present",
+      "control_evidence": "Templates General document guidance read/save form"
+    },
+    {
+      "id": "instructions.update",
+      "status": "actual_control_present",
+      "control_evidence": "Templates General document guidance read/save form"
+    },
+    {
+      "id": "career.preview_import",
+      "status": "actual_control_present",
+      "control_evidence": "Career import text/JSON or file, preview/warnings and confirm import"
+    },
+    {
+      "id": "career.import",
+      "status": "actual_control_present",
+      "control_evidence": "Career import text/JSON or file, preview/warnings and confirm import"
+    },
+    {
+      "id": "applications.list",
+      "status": "actual_control_present",
+      "control_evidence": "Applications search/stage/outcome/sort/pagination and global counts, board drag or keyboard stage menu; job-created draft, detail/forms/answers/history and attempt-delete confirmation"
+    },
+    {
+      "id": "applications.read",
+      "status": "actual_control_present",
+      "control_evidence": "Applications search/stage/outcome/sort/pagination and global counts, board drag or keyboard stage menu; job-created draft, detail/forms/answers/history and attempt-delete confirmation"
+    },
+    {
+      "id": "applications.create",
+      "status": "actual_control_present",
+      "control_evidence": "Applications search/stage/outcome/sort/pagination and global counts, board drag or keyboard stage menu; job-created draft, detail/forms/answers/history and attempt-delete confirmation"
+    },
+    {
+      "id": "applications.update",
+      "status": "actual_control_present",
+      "control_evidence": "Applications search/stage/outcome/sort/pagination and global counts, board drag or keyboard stage menu; job-created draft, detail/forms/answers/history and attempt-delete confirmation"
+    },
+    {
+      "id": "applications.delete",
+      "status": "actual_control_present",
+      "control_evidence": "Applications search/stage/outcome/sort/pagination and global counts, board drag or keyboard stage menu; job-created draft, detail/forms/answers/history and attempt-delete confirmation"
+    },
+    {
+      "id": "applications.history",
+      "status": "actual_control_present",
+      "control_evidence": "Applications search/stage/outcome/sort/pagination and global counts, board drag or keyboard stage menu; job-created draft, detail/forms/answers/history and attempt-delete confirmation"
+    },
+    {
+      "id": "contexts.list",
+      "status": "actual_control_present",
+      "control_evidence": "Application Prepare context wizard with template/evidence/claim selection and note; saved context metadata and full snapshot/signature JSON download, immutable file downloads"
+    },
+    {
+      "id": "contexts.read",
+      "status": "actual_control_present",
+      "control_evidence": "Application Prepare context wizard with template/evidence/claim selection and note; saved context metadata and full snapshot/signature JSON download, immutable file downloads"
+    },
+    {
+      "id": "contexts.create",
+      "status": "actual_control_present",
+      "control_evidence": "Application Prepare context wizard with template/evidence/claim selection and note; saved context metadata and full snapshot/signature JSON download, immutable file downloads"
+    },
+    {
+      "id": "documents.list",
+      "status": "actual_control_present",
+      "control_evidence": "Application paginated document search/kind/review filters; GET exact content/files, text/JSON content editor, context selection/new revision, review and delete confirmation"
+    },
+    {
+      "id": "documents.read",
+      "status": "actual_control_present",
+      "control_evidence": "Application paginated document search/kind/review filters; GET exact content/files, text/JSON content editor, context selection/new revision, review and delete confirmation"
+    },
+    {
+      "id": "documents.create",
+      "status": "actual_control_present",
+      "control_evidence": "Application paginated document search/kind/review filters; GET exact content/files, text/JSON content editor, context selection/new revision, review and delete confirmation"
+    },
+    {
+      "id": "documents.review",
+      "status": "actual_control_present",
+      "control_evidence": "Application paginated document search/kind/review filters; GET exact content/files, text/JSON content editor, context selection/new revision, review and delete confirmation"
+    },
+    {
+      "id": "documents.delete",
+      "status": "actual_control_present",
+      "control_evidence": "Application paginated document search/kind/review filters; GET exact content/files, text/JSON content editor, context selection/new revision, review and delete confirmation"
+    },
+    {
+      "id": "files.list",
+      "status": "actual_control_present",
+      "control_evidence": "Scoped FileManager query/media filters/pagination, GET metadata/SHA inspector, upload grant with raw bytes, download/inline PDF preview, permitted live asset deletion"
+    },
+    {
+      "id": "files.read",
+      "status": "actual_control_present",
+      "control_evidence": "Scoped FileManager query/media filters/pagination, GET metadata/SHA inspector, upload grant with raw bytes, download/inline PDF preview, permitted live asset deletion"
+    },
+    {
+      "id": "files.upload",
+      "status": "actual_control_present",
+      "control_evidence": "Scoped FileManager query/media filters/pagination, GET metadata/SHA inspector, upload grant with raw bytes, download/inline PDF preview, permitted live asset deletion"
+    },
+    {
+      "id": "files.download",
+      "status": "actual_control_present",
+      "control_evidence": "Scoped FileManager query/media filters/pagination, GET metadata/SHA inspector, upload grant with raw bytes, download/inline PDF preview, permitted live asset deletion"
+    },
+    {
+      "id": "files.delete",
+      "status": "actual_control_present",
+      "control_evidence": "Scoped FileManager query/media filters/pagination, GET metadata/SHA inspector, upload grant with raw bytes, download/inline PDF preview, permitted live asset deletion"
+    },
+    {
+      "id": "export.records",
+      "status": "actual_control_present",
+      "control_evidence": "Settings Workspace Export records download"
+    },
+    {
+      "id": "backup.download",
+      "status": "actual_control_present",
+      "control_evidence": "Settings Workspace Download backup and guarded raw SQLite Restore"
+    },
+    {
+      "id": "backup.restore",
+      "status": "actual_control_present",
+      "control_evidence": "Settings Workspace Download backup and guarded raw SQLite Restore"
+    },
+    {
+      "id": "tokens.list",
+      "status": "actual_control_present",
+      "control_evidence": "Settings Agent access token list/create/one-time secret/revoke"
+    },
+    {
+      "id": "tokens.create",
+      "status": "actual_control_present",
+      "control_evidence": "Settings Agent access token list/create/one-time secret/revoke"
+    },
+    {
+      "id": "tokens.revoke",
+      "status": "actual_control_present",
+      "control_evidence": "Settings Agent access token list/create/one-time secret/revoke"
+    },
+    {
+      "id": "password.update",
+      "status": "actual_control_present",
+      "control_evidence": "Settings Owner access new/confirm password and session rotation"
+    }
+  ],
+  "explicit_exceptions": [
+    {
+      "id": "auth.bootstrap_session",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/auth/session"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/auth/setup"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/auth/login"
+        },
+        {
+          "method": "POST",
+          "path": "/api/v1/auth/logout"
+        }
+      ],
+      "mcp": [],
+      "dashboard": "Initial setup, login and logout",
+      "reason": "Credential bootstrap and browser session transport precede authenticated domain tools; MCP uses bearer authentication."
+    },
+    {
+      "id": "health.deployment",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/health"
+        }
+      ],
+      "mcp": [],
+      "dashboard": "Settings diagnostics where applicable",
+      "reason": "Deployment liveness and service installation/startup are transport or operator concerns, not domain CRUD."
+    },
+    {
+      "id": "mcp.transport",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/mcp/"
+        },
+        {
+          "method": "GET",
+          "path": "/mcp/"
+        },
+        {
+          "method": "DELETE",
+          "path": "/mcp/"
+        }
+      ],
+      "mcp": [],
+      "dashboard": null,
+      "reason": "MCP initialization/discovery/session/resource transport is protocol infrastructure; no simulated dashboard button or MCP wrapper is required."
+    },
+    {
+      "id": "reference.examples",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/examples"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/examples/{name}"
+        }
+      ],
+      "mcp": [],
+      "dashboard": "Career/Templates: download synthetic examples",
+      "reason": "Shipped static reference files are convenience downloads, not private workspace records; agents may use REST or repository examples."
+    },
+    {
+      "id": "immutable.records",
+      "rest": [],
+      "mcp": [],
+      "dashboard": "Read context/history; create new revisions or delete the owning attempt",
+      "reason": "Frozen contexts and lifecycle history have no arbitrary PATCH/DELETE. Document content changes create revisions; approved revisions stay immutable. Context deletion is scoped to deleting the owning application/job."
+    },
+    {
+      "id": "binary.transfers",
+      "rest": [
+        {
+          "method": "PUT",
+          "path": "/api/v1/transfers"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/transfers"
+        }
+      ],
+      "mcp": [
+        "files_reserve_upload",
+        "files_reserve_download"
+      ],
+      "dashboard": "Upload/download controls",
+      "reason": "Logical file actions are equivalent across interfaces; raw HTTP bytes use scoped grants rather than base64 MCP payloads. Backup/export use their own scoped operational grants."
+    }
+  ],
+  "logical_transport_equivalence": [
+    "Single-source Run once and Remove use sources/bulk with one versioned item; they perform the same source service operations.",
+    "Source configuration is read from full source list records; a separate sources/{id} request is unnecessary for the human operation.",
+    "Context detail/signature is downloaded as a complete frozen JSON snapshot instead of rendered as an editable form.",
+    "File upload/download use ordinary raw HTTP transfers; transport-grant mechanics are not separately exposed as forms.",
+    "Domain lists remain scoped to relevant job/application/knowledge/template navigation rather than an unstructured API console."
+  ],
+  "visual_review": {
+    "career1920": "Two meaningful desktop columns; professional links span the left card width; metadata occupies a separate full-width row.",
+    "collection390": "Single-column content; navigation stays hidden until opened; cards/actions remain inside viewport; no material positioning defect.",
+    "artifacts": [
+      "final-career-1920.png",
+      "final-collection-390.png",
+      "final-search-form390.png"
+    ]
+  },
+  "practical_evidence": [
+    "flows.json:29 domain checks",
+    "collection-flows.json:21 domain checks",
+    "access-flows.json:15 domain checks",
+    "final-browser.json:22 responsive/history checks",
+    "pending-form.json:3 pending-form checks",
+    "context-pagination-flows.json:13 affected context/revision/decimal checks on an actual105-snapshot attempt"
+  ],
+  "mutations_in_this_audit": "Parent-authorized narrow frontend fixes and synthetic18802 test data only; no portal requests and no main18800 data writes.",
+  "resolved_gaps": [
+    {
+      "id": "contexts_history_truncated",
+      "operations": [
+        "contexts.list",
+        "contexts.read",
+        "documents.create"
+      ],
+      "evidence": "ApplicationDrawer and DocumentEditor call /contexts with defaultlimit100 and no paging/allPages. Older snapshots cannot be selected/downloaded on attempts with>100contexts.",
+      "file": "frontend/src/pages/Applications.tsx",
+      "resolution": "Both saved-context history and document context chooser now request compact20-item pages. History offset is URL-preserved; controlled selected context ID/label survives paging to another page."
+    },
+    {
+      "id": "revision_number_not_visible",
+      "operations": [
+        "documents.read"
+      ],
+      "evidence": "DocumentCard displays title/date/review state but never revision_number. Same-title same-day revisions cannot be distinguished by their supplied chain number.",
+      "file": "frontend/src/pages/Applications.tsx",
+      "resolution": "Document cards/details show backend revision_number; revision editor states the prior revision number."
+    }
+  ],
+  "material_gaps": [],
+  "additional_numeric_parity": "Manual number-answer inputs use step=any; real3.75 value passed HTML validation and persisted as a numeric backend answer.",
+  "fix_commit": "1eceadf"
+}

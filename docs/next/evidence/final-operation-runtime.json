@@ -1,0 +1,8 @@
+{
+  "logical_operations": 84,
+  "mcp_tools": 84,
+  "rest_routes": 95,
+  "missing": [],
+  "uncovered_rest": [],
+  "tools_without_annotations": []
+}

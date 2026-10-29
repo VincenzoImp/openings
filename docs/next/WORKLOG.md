@@ -110,3 +110,13 @@ restore issue: restoring an older backup retains recent provider request windows
 and the later cooldown, while restoring saved policies. This prevents a restore
 from accidentally resetting external request safeguards. Final packaging, UI
 polish, actual external-agent regression and combined Linux proof remain.
+
+
+Final candidate:55 backend cases and103 practical browser checks pass, plus14
+main-preview layout checks. All84 logical operations have meaningful dashboard
+controls and resolve on84 MCPtools/95 RESTroutes; explicit transport exceptions
+remain. Older-context pagination, revision labels and finite decimal answers were
+verified with105 snapshots. Package/wheel capabilities work outside the checkout.
+An actual external Codex+skill+LinuxMCP+Tectonic round trip passes exact PDF/source
+checks. Linux2CPU/4GiB combined collection/inference proof is below3GiB withoutOOM;
+final evidence, nativeCI and environment cleanup are the remaining delivery work.

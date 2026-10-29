@@ -2,7 +2,7 @@
   "updated": "2026-10-29",
   "branch": "codex/openings-next",
   "base_commit": "1deea6624da8474229b606b07ec669e6e75ae0f9",
-  "phase": "final_integration_validation",
+  "phase": "final_release_validation",
   "production_rewrite_started": true,
   "production_data_accessed": false,
   "production_deployed": false,
@@ -42,9 +42,10 @@
     "F1.archive",
     "F3.career",
     "F1.acquisition",
-    "F2.shared_services"
+    "F2.shared_services",
+    "F3.dashboard"
   ],
-  "next_task": "Integrate final browser/collector polish and packaging; run installed-wheel, external-agent, Linux resources and native CI",
+  "next_task": "Record final Linux/external-agent evidence, require final native amd64/arm64 CI, clean isolated task environments and deliver PR52",
   "release_gates": [
     "Core/remote-scoring installation passes practical UI/REST/MCP/backup checks within 2 CPU / 4 GiB",
     "Bundled local preset passes whole-stack startup/steady target measurements; publish advisory-score and truncation limitations",
@@ -101,9 +102,8 @@
     "release_scope": "User-approved final review integration; both global saved searches and company sources, logical Dashboard/REST/MCP parity, reviewed correctness/performance and UX fixes."
   },
   "not_yet_verified": [
-    "New collector/HTTP budgets and persisted cooldown",
-    "Final operation parity, compact list and dirty-form behavior",
-    "Combined new acquisition/scorer Linux resources and final native CI"
+    "Final native amd64/arm64 CI for integrated release candidate",
+    "Final evidence handoff and temporary environment cleanup"
   ],
   "latest_probe": {
     "dashboard": "evidence/dashboard-smoke.json: 33 browser preview checks pass",
@@ -122,11 +122,9 @@
   "review_checkpoint": "9bfd6d7",
   "active_goal": "Openings0.5.0 final integration",
   "parallel_work": {
-    "collection": "final_collection: collectors/budgets/worker; integration imminent",
-    "frontend": "final_ui: UI committed; practical browser QA fixes in progress",
-    "release": "final_career: packaging/docs/skill/Linux2CPU4GiB verification"
+    "release": "final_career: Linux/external-agent evidence finalization"
   },
-  "latest_implementation_check": "49 focused tests pass; all84 advertised operations resolve on84 MCPtools/95 RESTroutes with no unlisted API domain operations.50 practical browser workflows pass; provider annotation polish and final packaging/resources pending.",
+  "latest_implementation_check": "55 backend cases, frontend build/format/audit, installed-wheel84operations,103 browser workflows plus14 main-preview checks pass. Linux combined2CPU/4GiB/noSwap proof passes~2.90GiB peak; sanitized evidence and nativeCI pending.",
   "release_gate_results": {
     "baseline": "Previous rewrite gates passed; final integration must rerun affected gates."
   },

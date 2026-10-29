@@ -1,0 +1,8 @@
+{
+  "provider": "greenhouse",
+  "http_attempts": 2,
+  "title_present": true,
+  "posting_characters": 8395,
+  "extraction": "greenhouse-api",
+  "archive_jobs": 0
+}

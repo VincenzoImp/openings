@@ -1,0 +1,180 @@
+{
+  "providers": [
+    {
+      "kind": "recruitee",
+      "board": "callista",
+      "jobs": 1,
+      "descriptions": 1,
+      "diagnostics": [
+        {
+          "provider": "recruitee",
+          "state": "ok",
+          "message": null,
+          "requests": 1,
+          "responses": [
+            {
+              "status": 200,
+              "retry_after": null
+            }
+          ],
+          "next_run_at": null
+        }
+      ],
+      "elapsed_seconds": 0.251
+    },
+    {
+      "kind": "personio",
+      "board": "personio",
+      "jobs": 0,
+      "descriptions": 0,
+      "diagnostics": [
+        {
+          "provider": "personio",
+          "state": "ok",
+          "message": null,
+          "requests": 1,
+          "responses": [
+            {
+              "status": 200,
+              "retry_after": null
+            }
+          ],
+          "next_run_at": null
+        }
+      ],
+      "elapsed_seconds": 0.406
+    },
+    {
+      "kind": "smartrecruiters",
+      "board": "CERN",
+      "jobs": 1,
+      "descriptions": 1,
+      "diagnostics": [
+        {
+          "provider": "smartrecruiters",
+          "state": "ok",
+          "message": null,
+          "requests": 2,
+          "responses": [
+            {
+              "status": 200,
+              "retry_after": null
+            },
+            {
+              "status": 200,
+              "retry_after": null
+            }
+          ],
+          "next_run_at": null
+        }
+      ],
+      "elapsed_seconds": 3.399
+    },
+    {
+      "kind": "jobcloud",
+      "board": "jobs.ch",
+      "jobs": 1,
+      "descriptions": 1,
+      "diagnostics": [
+        {
+          "provider": "jobcloud",
+          "state": "ok",
+          "message": null,
+          "requests": 4,
+          "responses": [
+            {
+              "status": 301,
+              "retry_after": null
+            },
+            {
+              "status": 200,
+              "retry_after": null
+            },
+            {
+              "status": 301,
+              "retry_after": null
+            },
+            {
+              "status": 200,
+              "retry_after": null
+            }
+          ],
+          "next_run_at": null
+        }
+      ],
+      "elapsed_seconds": 9.279
+    },
+    {
+      "kind": "workday",
+      "board": "abb.wd3.myworkdayjobs.com/External_Career_Page",
+      "jobs": 1,
+      "descriptions": 1,
+      "diagnostics": [
+        {
+          "provider": "workday",
+          "state": "ok",
+          "message": null,
+          "requests": 2,
+          "responses": [
+            {
+              "status": 200,
+              "retry_after": null
+            },
+            {
+              "status": 200,
+              "retry_after": null
+            }
+          ],
+          "next_run_at": null
+        }
+      ],
+      "elapsed_seconds": 3.533
+    },
+    {
+      "kind": "oracle",
+      "board": "eipb.fa.em2.oraclecloud.com/CX_5",
+      "jobs": 1,
+      "descriptions": 0,
+      "diagnostics": [
+        {
+          "provider": "oracle",
+          "state": "ok",
+          "message": null,
+          "requests": 1,
+          "responses": [
+            {
+              "status": 200,
+              "retry_after": null
+            }
+          ],
+          "next_run_at": null
+        }
+      ],
+      "elapsed_seconds": 0.947
+    },
+    {
+      "kind": "workable",
+      "board": "workable",
+      "jobs": 0,
+      "descriptions": 0,
+      "diagnostics": [
+        {
+          "provider": "workable",
+          "state": "error",
+          "message": "The source returned HTTP 404.",
+          "requests": 1,
+          "responses": [
+            {
+              "status": 404,
+              "retry_after": null
+            }
+          ],
+          "next_run_at": null
+        }
+      ],
+      "elapsed_seconds": 0.34
+    }
+  ],
+  "http_attempts": 12,
+  "archive_jobs": 0
+}
