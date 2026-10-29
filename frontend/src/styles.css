@@ -3550,3 +3550,34 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
     grid-column: 1/-1;
   }
 }
+.formgrid > .full {
+  grid-column: 1/-1;
+}
+.scoring-layout > .card {
+  height: auto;
+}
+.tabcount {
+  display: inline-flex;
+  margin-left: 7px;
+  font-size: 10px;
+  line-height: 1.6;
+  min-width: 18px;
+  justify-content: center;
+  background: var(--hover);
+  border-radius: 4px;
+  padding: 0 4px;
+  color: var(--muted);
+}
+@media (max-width: 850px) {
+  .sidebar {
+    visibility: hidden;
+  }
+  .sidebar.open {
+    visibility: visible;
+  }
+}
+.file-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 0.6fr);
+  gap: 12px;
+}

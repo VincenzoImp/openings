@@ -49,7 +49,10 @@ export function AddJob({
     const f = new FormData(event.currentTarget);
     let created: Job | undefined;
     const ok = await mutate(async () => {
-      created = await api<Job>("/jobs", "POST", Object.fromEntries(f));
+      created = await api<Job>("/jobs", "POST", {
+        ...Object.fromEntries(f),
+        metadata: jsonValue(f, "metadata"),
+      });
     }, "Opportunity saved.");
     if (ok && created) {
       onClose();
@@ -75,6 +78,10 @@ export function AddJob({
             <input name="company" placeholder="Company name" />
           </Field>
         </div>
+        <Field label="Location">
+          <input name="location" placeholder="Zurich, Switzerland" />
+        </Field>
+        <AdvancedJson name="metadata" label="Job metadata" />
         <Field
           label="Posting text"
           hint="Add a URL or paste the posting. If a page cannot be read, you can complete its text later."
@@ -198,6 +205,8 @@ export function JobsPage({
           onChange={(e) => change("sort", e.target.value)}
         >
           <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="title">Role A–Z</option>
           <option value="score">Highest fit</option>
           <option value="company">Company A–Z</option>
         </select>
@@ -360,7 +369,8 @@ export function JobsPage({
                   setSelection((current) => {
                     const next = { ...current };
                     resource.data.items.forEach((j) => {
-                      if (e.target.checked) next[j.id] = j.version;
+                      if (e.target.checked && Object.keys(next).length < 200)
+                        next[j.id] = j.version;
                       else delete next[j.id];
                     });
                     return next;
@@ -419,7 +429,7 @@ export function JobsPage({
               </button>
               <span className="location-col">
                 {job.location || "Location not specified"}
-                {job.remote && <small>Remote</small>}
+                {job.is_remote && <small>Remote</small>}
               </span>
               <Score score={job.score} outdated={job.score_outdated} />
               <button
@@ -503,6 +513,12 @@ export function JobDrawer({
   const [forget, setForget] = useState(false),
     [merging, setMerging] = useState(false);
   const job = resource.data;
+  const applications = useResource<ListResult<Application>>(
+    job && tab === "notes"
+      ? `/applications?company=${encodeURIComponent(job.company)}&limit=200`
+      : null,
+    { items: [], total: 0 },
+  );
   async function triage(value: Triage) {
     if (!confirmLeave()) return;
     if (job)
@@ -539,10 +555,12 @@ export function JobDrawer({
   async function addNote(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget,
-      body = new FormData(form).get("body");
+      values = new FormData(form),
+      body = values.get("body"),
+      application_id = values.get("application_id") || undefined;
     if (
       await mutate(
-        () => api(`/jobs/${id}/notes`, "POST", { body }),
+        () => api(`/jobs/${id}/notes`, "POST", { body, application_id }),
         "Note saved.",
       )
     )
@@ -768,6 +786,21 @@ export function JobDrawer({
                       placeholder="What stands out? Questions to ask?"
                     />
                   </Field>
+                  {applications.data.items.some((app) => app.job_id === id) && (
+                    <Field label="Link to an application (optional)">
+                      <select name="application_id">
+                        <option value="">Job note</option>
+                        {applications.data.items
+                          .filter((app) => app.job_id === id)
+                          .map((app) => (
+                            <option key={app.id} value={app.id}>
+                              {app.status} · {date(app.created_at)} ·{" "}
+                              {app.id.slice(0, 8)}
+                            </option>
+                          ))}
+                      </select>
+                    </Field>
+                  )}
                   <Button
                     variant="primary"
                     className="form-actions"

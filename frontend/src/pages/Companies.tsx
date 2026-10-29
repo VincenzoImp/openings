@@ -277,14 +277,21 @@ export default function CompaniesPage() {
                   <strong>{formatTime(source.next_run_at)}</strong>
                 </div>
               </div>
-              {source.last_result && (
+              {(source.last_counts || source.last_result) && (
                 <p className="smalltext muted">
-                  {Object.entries(source.last_result)
+                  {Object.entries(
+                    source.last_counts || source.last_result || {},
+                  )
                     .filter(([, value]) => typeof value === "number")
                     .map(
                       ([key, value]) => `${key.replaceAll("_", " ")}: ${value}`,
                     )
                     .join(" · ")}
+                </p>
+              )}
+              {source.last_outcome && (
+                <p className="smalltext muted">
+                  Last outcome: {source.last_outcome}
                 </p>
               )}
               {source.last_error && (
@@ -391,6 +398,7 @@ function SourceEditor({
 }) {
   const { mutate, pending, notify } = useWorkspace();
   const [preview, setPreview] = useState<Preview | null>(null),
+    [previewing, setPreviewing] = useState(false),
     [kind, setKind] = useState(source?.kind || (search ? "jobspy" : "auto"));
   function values(form: HTMLFormElement) {
     const f = new FormData(form),
@@ -455,12 +463,16 @@ function SourceEditor({
       onClose();
   }
   async function inspect(form: HTMLFormElement | null) {
-    if (!form || !form.reportValidity()) return;
+    if (!form || previewing || !form.reportValidity()) return;
+    setPreviewing(true);
     try {
-      setPreview(await api<Preview>("/sources/preview", "POST", values(form)));
+      const { enabled, schedule, ...body } = values(form);
+      setPreview(await api<Preview>("/sources/preview", "POST", body));
       notify("Preview complete. No jobs were saved.");
     } catch (error) {
       notify(error instanceof Error ? error.message : "Preview failed.", true);
+    } finally {
+      setPreviewing(false);
     }
   }
   const filters = (key: string) =>
@@ -508,7 +520,10 @@ function SourceEditor({
                   placeholder="Zurich, Switzerland"
                 />
               </Field>
-              <Field label="Country">
+              <Field
+                label="Country"
+                hint="Use an English country name, such as switzerland, usa or uk."
+              >
                 <input
                   name="country"
                   required
@@ -529,7 +544,13 @@ function SourceEditor({
                       (source?.config.providers as string[]) || ["indeed"]
                     ).includes(provider)}
                   />
-                  {provider[0].toUpperCase() + provider.slice(1)}
+                  {
+                    {
+                      linkedin: "LinkedIn",
+                      indeed: "Indeed",
+                      glassdoor: "Glassdoor",
+                    }[provider]
+                  }
                 </label>
               ))}
             </fieldset>
@@ -558,13 +579,20 @@ function SourceEditor({
                   defaultValue={String(source?.config.job_type || "")}
                 >
                   <option value="">Any type</option>
-                  {["fulltime", "parttime", "internship", "contract"].map(
-                    (k) => (
-                      <option key={k} value={k}>
-                        {k}
-                      </option>
-                    ),
-                  )}
+                  {[
+                    "fulltime",
+                    "parttime",
+                    "contract",
+                    "temporary",
+                    "internship",
+                    "perdiem",
+                    "other",
+                    "volunteer",
+                  ].map((k) => (
+                    <option key={k} value={k}>
+                      {k}
+                    </option>
+                  ))}
                 </select>
               </Field>
             </div>
@@ -663,16 +691,13 @@ function SourceEditor({
             />
           </Field>
         </div>
-        <AdvancedJson
-          name="config"
-          label="Provider configuration"
-          value={source?.config || {}}
-        />
-        <AdvancedJson
-          name="filters"
-          label="Additional filters"
-          value={source?.filters || {}}
-        />
+        {!search && (
+          <AdvancedJson
+            name="config"
+            label="Provider configuration"
+            value={source?.config || {}}
+          />
+        )}
         <label className="checkline">
           <input
             type="checkbox"
@@ -696,7 +721,9 @@ function SourceEditor({
                 className={d.state === "error" ? "source-error" : "smalltext"}
                 key={i}
               >
-                <b>{d.provider}</b> · {d.state} · {d.message}
+                <b>{d.provider}</b> · {d.state} ·{" "}
+                {d.message ||
+                  `${d.requests || 0} request${d.requests === 1 ? "" : "s"}`}
                 {d.next_run_at ? ` · ${formatTime(d.next_run_at)}` : ""}
               </p>
             ))}
@@ -724,12 +751,12 @@ function SourceEditor({
           <Button
             type="button"
             icon="play"
-            disabled={pending}
+            disabled={pending || previewing}
             onClick={(e) => inspect(e.currentTarget.form)}
           >
-            Preview
+            {previewing ? "Previewing…" : "Preview"}
           </Button>
-          <Button variant="primary" disabled={pending}>
+          <Button variant="primary" disabled={pending || previewing}>
             Save {search ? "search" : "source"}
           </Button>
         </div>
@@ -855,10 +882,13 @@ export function ProviderSettings() {
               <div>
                 <dt>Next allowed</dt>
                 <dd>
-                  {formatTime(
-                    provider.runtime.cooldown_until ||
-                      provider.runtime.next_allowed_at,
-                  )}
+                  {provider.runtime.cooldown_until ||
+                  provider.runtime.next_allowed_at
+                    ? formatTime(
+                        provider.runtime.cooldown_until ||
+                          provider.runtime.next_allowed_at,
+                      )
+                    : "Ready now"}
                 </dd>
               </div>
             </dl>

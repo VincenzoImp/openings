@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   api,
   setCsrf,
@@ -188,6 +188,7 @@ function Auth({
 }
 function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
   useFormProtection();
+  const lastRoute = useRef(location.hash);
   const [route, setRoute] = useState(readRoute),
     [mobile, setMobile] = useState(false),
     [overlay, setOverlay] = useState<Overlay>(() => {
@@ -218,10 +219,12 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
     });
   useEffect(() => {
     const listener = () => {
+      if (location.hash === lastRoute.current) return;
       if (!confirmLeave()) {
-        history.replaceState(null, "", `#${route}`);
+        history.replaceState(null, "", lastRoute.current || "#overview");
         return;
       }
+      lastRoute.current = location.hash;
       setRoute(readRoute());
       const p = new URLSearchParams(location.hash.split("?")[1] || "");
       setOverlay(
@@ -234,9 +237,14 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
       setMobile(false);
       window.scrollTo(0, 0);
     };
+    const remember = () => {
+      lastRoute.current = location.hash;
+    };
+    window.addEventListener("openings:url", remember);
     window.addEventListener("hashchange", listener);
     window.addEventListener("popstate", listener);
     return () => {
+      window.removeEventListener("openings:url", remember);
       window.removeEventListener("hashchange", listener);
       window.removeEventListener("popstate", listener);
     };
@@ -264,6 +272,7 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
       "",
       `#${id}${next && next.kind !== "add" ? `?${next.kind}=${encodeURIComponent(next.id)}` : ""}`,
     );
+    lastRoute.current = location.hash;
     setRoute(id);
     setOverlay(next);
     setMobile(false);
@@ -277,6 +286,7 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
     params.delete("application");
     params.set(kind, id);
     history.pushState(null, "", `${page}?${params}`);
+    lastRoute.current = location.hash;
     setOverlay({ kind, id });
   }
   function closeObject() {
@@ -287,6 +297,7 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
     params.delete("application");
     params.delete("detail");
     history.replaceState(null, "", `${page}${params.size ? "?" + params : ""}`);
+    lastRoute.current = location.hash;
     setOverlay(null);
   }
   const openJob = (id: string) => openObject("job", id);

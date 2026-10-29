@@ -21,7 +21,7 @@ export interface Job extends Versioned {
   posting: string;
   posting_preview?: string;
   complete?: boolean;
-  remote?: boolean | null;
+  is_remote?: boolean | null;
   job_type?: string;
   postings?: Json[];
   triage: Triage;
@@ -131,6 +131,9 @@ export interface Source extends Versioned {
   last_run_at?: string;
   last_error?: string;
   last_result?: Json;
+  last_outcome?: string;
+  last_counts?: Json;
+  last_task_id?: string;
 }
 export interface Scoring {
   enabled: boolean;
@@ -399,4 +402,15 @@ export function formatTime(value?: string) {
         hour: "2-digit",
         minute: "2-digit",
       });
+}
+
+export async function downloadWorkspaceFile(file: WorkspaceFile) {
+  const url = new URL(await fileUrl(file), location.origin);
+  url.searchParams.set("inline", "false");
+  const link = document.createElement("a");
+  link.href = url.toString();
+  link.download = file.name.split("/").pop() || file.name;
+  document.body.append(link);
+  link.click();
+  link.remove();
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   api,
   date,
+  downloadWorkspaceFile,
   fileUrl,
   uploadFile,
   type ListResult,
@@ -25,9 +26,10 @@ export function FileManager({
   const [query, setQuery] = useState(""),
     [offset, setOffset] = useState(0),
     [inspecting, setInspecting] = useState<WorkspaceFile | null>(null);
+  const [mediaType, setMediaType] = useState("");
   const debounced = useDebounce(query);
   const { data, error, reload } = useResource<ListResult<WorkspaceFile>>(
-    `/files?owner_type=${ownerType}&owner_id=${ownerId}&limit=20&offset=${offset}&q=${encodeURIComponent(debounced)}`,
+    `/files?owner_type=${ownerType}&owner_id=${ownerId}&limit=20&offset=${offset}&q=${encodeURIComponent(debounced)}${mediaType ? `&media_type=${encodeURIComponent(mediaType)}` : ""}`,
     { items: [], total: 0 },
   );
   const { mutate, pending, notify } = useWorkspace();
@@ -60,17 +62,35 @@ export function FileManager({
   return (
     <>
       {error && <ErrorBox message={error} retry={reload} />}
-      {(data.total > 5 || query) && (
-        <Field label="Find a file">
-          <input
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setOffset(0);
-            }}
-            placeholder="Search file names"
-          />
-        </Field>
+      {(data.total > 5 || query || mediaType) && (
+        <div className="file-filters">
+          <Field label="Find a file">
+            <input
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setOffset(0);
+              }}
+              placeholder="Search file names"
+            />
+          </Field>
+          <Field label="File type">
+            <select
+              value={mediaType}
+              onChange={(e) => {
+                setMediaType(e.target.value);
+                setOffset(0);
+              }}
+            >
+              <option value="">All types</option>
+              <option value="application/pdf">PDF</option>
+              <option value="text/plain">Plain text</option>
+              <option value="application/x-tex">LaTeX</option>
+              <option value="image/png">PNG image</option>
+              <option value="image/jpeg">JPEG image</option>
+            </select>
+          </Field>
+        </div>
       )}
       <div className="document-files">
         {data.items.map((file) => (
@@ -96,9 +116,9 @@ export function FileManager({
               className="iconbtn"
               aria-label={`Download ${file.name}`}
               onClick={() =>
-                fileUrl(file)
-                  .then((url) => window.open(url, "_blank", "noopener"))
-                  .catch((e) => notify(String(e), true))
+                downloadWorkspaceFile(file).catch((e) =>
+                  notify(String(e), true),
+                )
               }
             >
               <Icon name="download" />
@@ -154,9 +174,9 @@ export function FileManager({
           <Button
             icon="download"
             onClick={() =>
-              fileUrl(inspecting)
-                .then((url) => window.open(url, "_blank", "noopener"))
-                .catch((e) => notify(e.message, true))
+              downloadWorkspaceFile(inspecting).catch((e) =>
+                notify(e.message, true),
+              )
             }
           >
             Download file

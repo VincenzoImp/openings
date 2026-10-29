@@ -39,10 +39,21 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [toast]);
   const mutate = useCallback(
     async (action: () => Promise<unknown>, message = "Saved.") => {
+      const submitted = takeSubmittedForm();
+      const wasInert = submitted?.form.inert || false;
+      const focused = document.activeElement as HTMLElement | null;
+      if (submitted) {
+        submitted.form.inert = true;
+        submitted.form.setAttribute("aria-busy", "true");
+      }
       setPending((n) => n + 1);
       try {
         await action();
-        clearSubmittedForm();
+        if (
+          submitted &&
+          submitted.form.dataset.editRevision === submitted.revision
+        )
+          submitted.form.dataset.dirty = "false";
         notify(message);
         return true;
       } catch (error) {
@@ -54,7 +65,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         );
         return false;
       } finally {
+        if (submitted) {
+          submitted.form.inert = wasInert;
+          submitted.form.removeAttribute("aria-busy");
+        }
         setPending((n) => n - 1);
+        if (submitted && focused && submitted.form.contains(focused))
+          requestAnimationFrame(() => {
+            if (focused.isConnected) focused.focus({ preventScroll: true });
+          });
       }
     },
     [notify],
@@ -204,7 +223,12 @@ function affected(read: string, changed: string) {
     return ["sources", "providers", "collection", "tasks"].includes(b);
   return false;
 }
-let submittedForm: HTMLFormElement | null = null;
+let submittedForm: { form: HTMLFormElement; revision: string } | null = null;
+function takeSubmittedForm() {
+  const submitted = submittedForm;
+  submittedForm = null;
+  return submitted;
+}
 export function hasDirtyForms(scope: ParentNode = document) {
   return !!scope.querySelector("form[data-dirty=true]");
 }
@@ -219,17 +243,17 @@ export function confirmLeave(scope: ParentNode = document) {
     });
   return true;
 }
-function clearSubmittedForm() {
-  if (submittedForm) submittedForm.dataset.dirty = "false";
-  submittedForm = null;
-}
 export function useFormProtection() {
   useEffect(() => {
     const mark = (event: Event) => {
       const target = event.target as HTMLElement;
       const form = target.closest("form");
-      if (form && !form.hasAttribute("data-filter-form"))
+      if (form && !form.hasAttribute("data-filter-form")) {
         form.dataset.dirty = "true";
+        form.dataset.editRevision = String(
+          Number(form.dataset.editRevision || 0) + 1,
+        );
+      }
     };
     const click = (event: Event) => {
       const target = event.target as HTMLElement;
@@ -242,7 +266,18 @@ export function useFormProtection() {
       }
     };
     const submit = (event: Event) => {
-      submittedForm = event.target as HTMLFormElement;
+      const form = event.target as HTMLFormElement;
+      const submitted = { form, revision: form.dataset.editRevision || "0" };
+      submittedForm = submitted;
+      setTimeout(() => {
+        if (submittedForm === submitted) submittedForm = null;
+      }, 0);
+    };
+    const finishSubmit = () => {
+      const submitted = submittedForm;
+      queueMicrotask(() => {
+        if (submittedForm === submitted) submittedForm = null;
+      });
     };
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if (hasDirtyForms()) {
@@ -253,12 +288,14 @@ export function useFormProtection() {
     document.addEventListener("input", mark, true);
     document.addEventListener("change", mark, true);
     document.addEventListener("submit", submit, true);
+    document.addEventListener("submit", finishSubmit);
     document.addEventListener("click", click, true);
     window.addEventListener("beforeunload", beforeUnload);
     return () => {
       document.removeEventListener("input", mark, true);
       document.removeEventListener("change", mark, true);
       document.removeEventListener("submit", submit, true);
+      document.removeEventListener("submit", finishSubmit);
       document.removeEventListener("click", click, true);
       window.removeEventListener("beforeunload", beforeUnload);
     };
@@ -288,6 +325,7 @@ export function useUrlState(key: string, initial: string) {
       "",
       `${page || "#overview"}${params.size ? "?" + params : ""}`,
     );
+    window.dispatchEvent(new Event("openings:url"));
     setValue(next);
   };
   return [value, update] as const;
@@ -333,6 +371,7 @@ export function useUrlFilters(defaults: Record<string, string>) {
       "",
       `${page || "#overview"}${params.size ? "?" + params : ""}`,
     );
+    window.dispatchEvent(new Event("openings:url"));
     setValues(next);
   };
   return [values, update] as const;

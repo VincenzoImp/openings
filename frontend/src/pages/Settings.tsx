@@ -289,6 +289,17 @@ function ScoringSettings() {
               Remove the stored API key
             </label>
           )}
+          <div className="actions form-actions">
+            <Button
+              type="button"
+              icon="play"
+              disabled={pending}
+              onClick={(e) => test(e.currentTarget.form)}
+            >
+              Test connection
+            </Button>
+            {testing && <span className="smalltext">{testing}</span>}
+          </div>
         </section>
         <section className="card sectioncard">
           <h2 className="section-heading">Define a useful fit assessment.</h2>
@@ -298,6 +309,16 @@ function ScoringSettings() {
           >
             <textarea
               name="criteria"
+              onChange={(e) => {
+                const levels = e.target.value
+                  .split("\n")
+                  .filter((x) => x.trim());
+                e.target.setCustomValidity(
+                  levels.length >= 2 && levels.length <= 10
+                    ? ""
+                    : "Use 2–10 score levels, one per line.",
+                );
+              }}
               rows={6}
               required
               defaultValue={(resource.data.criteria || []).join("\n")}
@@ -313,17 +334,6 @@ function ScoringSettings() {
               defaultValue={resource.data.rubric}
             />
           </Field>
-          <div className="actions form-actions">
-            <Button
-              type="button"
-              icon="play"
-              disabled={pending}
-              onClick={(e) => test(e.currentTarget.form)}
-            >
-              Test connection
-            </Button>
-            {testing && <span className="smalltext">{testing}</span>}
-          </div>
           <div className="divider" />
           <div className="settingrow">
             <div>
@@ -778,6 +788,7 @@ function WorkspaceSettings({
 }) {
   const { mutate, pending, notify } = useWorkspace();
   const [restore, setRestore] = useState(false);
+  const workspace = useResource<Json>("/workspace", {});
   async function backup() {
     await mutate(async () => {
       const response = await binary("/backup", "GET");
@@ -795,7 +806,14 @@ function WorkspaceSettings({
     <div className="settings-grid">
       <section className="card sectioncard">
         <div className="sectiontitle">
-          <h2>Workspace.</h2>
+          <div>
+            <h2>Workspace.</h2>
+            <p>
+              {String(workspace.data.name || "Openings")}{" "}
+              {String(workspace.data.version || "0.5.0")} · Private, single
+              owner workspace
+            </p>
+          </div>
         </div>
         <div className="settingrow">
           <div>

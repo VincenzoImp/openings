@@ -145,6 +145,8 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
           <option value="company">Company A–Z</option>
+          <option value="stage">Stage</option>
+          <option value="applied">Submission date</option>
         </select>
       </div>
       {resource.error && (
@@ -317,6 +319,13 @@ function DocumentEditor({
   const { mutate, pending } = useWorkspace();
   const [file, setFile] = useState<File | null>(null),
     [createdId, setCreatedId] = useState<string | null>(null);
+  const [documentText, setDocumentText] = useState(
+    previous
+      ? typeof previous.content.text === "string"
+        ? previous.content.text
+        : JSON.stringify(previous.content, null, 2)
+      : "",
+  );
   const [structured, setStructured] = useState(
     !!previous && typeof previous.content.text !== "string",
   );
@@ -397,7 +406,18 @@ function DocumentEditor({
           <input
             type="checkbox"
             checked={structured}
-            onChange={(e) => setStructured(e.target.checked)}
+            onChange={(e) => {
+              const next = e.target.checked;
+              setDocumentText((value) => {
+                if (next) return JSON.stringify({ text: value }, null, 2);
+                try {
+                  return String(JSON.parse(value).text || value);
+                } catch {
+                  return value;
+                }
+              });
+              setStructured(next);
+            }}
           />
           Use structured JSON content
         </label>
@@ -410,6 +430,7 @@ function DocumentEditor({
             name="text"
             rows={9}
             onChange={(e) => {
+              setDocumentText(e.target.value);
               if (structured) {
                 try {
                   const v = JSON.parse(e.target.value);
@@ -421,11 +442,7 @@ function DocumentEditor({
                 }
               }
             }}
-            defaultValue={
-              structured
-                ? JSON.stringify(previous?.content || {}, null, 2)
-                : String(previous?.content.text || "")
-            }
+            value={documentText}
             disabled={!!createdId}
           />
         </Field>
@@ -594,7 +611,7 @@ export function ApplicationDrawer({
   const documentQuery = useDebounce(documentFilters.doc_q);
   const resource = useResource<Application | null>(`/applications/${id}`, null),
     documents = useResource<ListResult<Document>>(
-      `/documents?application_id=${id}&summary=true&limit=20&offset=${documentFilters.doc_offset}&q=${encodeURIComponent(documentQuery)}&kind=${documentFilters.doc_kind}&review_state=${documentFilters.doc_review}`,
+      `/documents?application_id=${id}&summary=true&limit=20&offset=${documentFilters.doc_offset}&q=${encodeURIComponent(documentQuery)}&kind=${documentFilters.doc_kind}${documentFilters.doc_review ? `&review_state=${documentFilters.doc_review}` : ""}`,
       { items: [], total: 0 },
     ),
     events = useResource<ListResult<Activity>>(`/applications/${id}/events`, {
@@ -615,7 +632,7 @@ export function ApplicationDrawer({
     [contextOpen, setContextOpen] = useState(false),
     [removing, setRemoving] = useState(false);
   const contexts = useResource<ListResult<Json>>(
-    `/contexts?application_id=${id}`,
+    `/contexts?application_id=${id}&summary=true`,
     { items: [], total: 0 },
   );
   const app = resource.data;
@@ -646,6 +663,13 @@ export function ApplicationDrawer({
           "PATCH",
           version(app, {
             note: form.get("note"),
+            ...(form.get("applied_at")
+              ? {
+                  applied_at: new Date(
+                    String(form.get("applied_at")) + "Z",
+                  ).toISOString(),
+                }
+              : {}),
             outcome: app.status === "closed" ? form.get("outcome") : null,
           }),
         ),
@@ -1011,6 +1035,16 @@ export function ApplicationDrawer({
                     </select>
                   </Field>
                 )}
+                <Field
+                  label="Submission time (UTC)"
+                  hint="Set this when recording a past submission. Stage changes record the current time by default."
+                >
+                  <input
+                    type="datetime-local"
+                    name="applied_at"
+                    defaultValue={app.applied_at?.slice(0, 16) || ""}
+                  />
+                </Field>
                 <Field
                   label="Application notes & writing guidance"
                   hint="Included in your agent's frozen application context."
