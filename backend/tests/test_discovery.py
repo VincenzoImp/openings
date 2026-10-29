@@ -1,0 +1,247 @@
+"""A few shared-service invariants for collection, assessment and task recovery."""
+
+from datetime import datetime, timezone
+
+import httpx
+import pytest
+
+from openings import discovery as module
+from openings.discovery import (
+    DiscoveryService,
+    RescoreRequest,
+    ScoringWrite,
+    SourceCreate,
+    next_due,
+    score_call,
+)
+from openings.errors import DomainError
+from openings.workspace import Workspace
+
+
+@pytest.fixture
+def case(tmp_path, monkeypatch):
+    workspace = Workspace(tmp_path / "workspace.sqlite")
+    service = DiscoveryService(workspace)
+    workspace.discovery = service
+    workspace.set_settings(
+        "profile",
+        {
+            "summary": "Python backend engineer, five years building APIs.",
+            "roles": "Backend engineer",
+            "preferences": "Remote roles",
+        },
+    )
+    workspace.bump_scoring_profile()
+    monkeypatch.setattr(
+        module,
+        "score_call",
+        lambda config, state: {
+            "score": 75.0,
+            "model": "synthetic-model",
+            "elapsed_seconds": 0.01,
+            "response": {
+                "model": "synthetic-model",
+                "answers": {"fit": {"type": "score", "score": 3.0}},
+                "usage": {"truncated": False},
+            },
+            "request": {"state": state},
+        },
+    )
+    service.update_scoring(
+        ScoringWrite(
+            expected_version=0,
+            enabled=True,
+            mode="remote",
+            provider="systemone",
+            base_url="https://model.example",
+            api_key="synthetic-key",
+        )
+    )
+    return workspace, service
+
+
+def run_next(service, owner="test-worker"):
+    task = service.claim_task(owner)
+    assert task is not None
+    service.run_task(task, owner)
+    return task
+
+
+def test_collection_and_scoring_preserve_identity_and_deliberate_freshness(case, monkeypatch):
+    workspace, service = case
+    source = service.create_source(
+        SourceCreate(name="Example Co", kind="greenhouse", config={"board": "example"})
+    )
+    posting = {
+        "title": "Backend engineer",
+        "company": "Example Co",
+        "posting": "Build Python APIs.",
+        "url": "https://boards.greenhouse.io/example/jobs/123",
+        "source_key": "greenhouse:example:123",
+        "raw": {"id": 123, "updated_at": "first"},
+    }
+    monkeypatch.setattr(module, "fetch_postings", lambda source: [posting])
+    service.queue_collection(source["id"])
+    run_next(service)
+    job = workspace.list_jobs()["items"][0]
+    run_next(service)
+    assert workspace.get_job(job["id"])["score"] == 75
+    assert not workspace.get_job(job["id"])["score_outdated"]
+    posting["raw"]["updated_at"] = "later timestamp only"
+    service.queue_collection(source["id"])
+    run_next(service)
+    assert workspace.list_jobs()["total"] == 1
+    assert service.claim_task("test-worker") is None
+    old_config = service.get_scoring()
+    assert "api_key" not in old_config and old_config["api_key_set"]
+    service.update_scoring(ScoringWrite(expected_version=old_config["version"], enabled=False))
+    assert not workspace.get_job(job["id"])["score_outdated"]
+    assert workspace.get_job(job["id"])["score"] == 75
+    workspace.bump_scoring_profile()
+    assert workspace.get_job(job["id"])["score_outdated"]
+    assert service.claim_task("test-worker") is None
+
+
+def test_late_assessment_cannot_resurrect_forgotten_job(case, monkeypatch):
+    workspace, service = case
+    job = workspace.ingest_job(
+        {"title": "Backend engineer", "company": "Example", "posting": "Build APIs"}
+    )
+    task = service.claim_task("test-worker")
+    assert task and task["job_id"] == job["id"]
+
+    def forget_then_answer(config, state):
+        workspace.forget_job(job["id"])
+        return {"score": 90, "model": "synthetic-model", "elapsed_seconds": 0, "response": {}}
+
+    monkeypatch.setattr(module, "score_call", forget_then_answer)
+    service.run_task(task, "test-worker")
+    assert workspace.list_jobs()["total"] == 0
+    assert not workspace.db.all("SELECT * FROM assessments")
+    assert not workspace.db.all("SELECT * FROM tasks")
+
+
+def test_failed_replacement_keeps_previous_score_and_source_failure_is_isolated(case, monkeypatch):
+    workspace, service = case
+    job = workspace.ingest_job(
+        {"title": "Engineer", "company": "Example", "posting": "Python API work"}
+    )
+    run_next(service)
+    workspace.bump_scoring_profile()
+    service.queue_rescore(RescoreRequest(job_ids=[job["id"]]))
+
+    def too_long(config, state):
+        raise DomainError(422, "context_too_long", "The context did not fit.")
+
+    monkeypatch.setattr(module, "score_call", too_long)
+    task = run_next(service)
+    assert service.get_task(task["id"])["state"] == "failed"
+    assert workspace.get_job(job["id"])["score"] == 75
+    assert workspace.get_job(job["id"])["score_outdated"]
+    first = service.create_source(
+        SourceCreate(name="Failing", kind="ashby", config={"board": "bad"})
+    )
+    second = service.create_source(
+        SourceCreate(name="Working", kind="ashby", config={"board": "good"})
+    )
+
+    def feed(source):
+        if source["id"] == first["id"]:
+            raise DomainError(502, "source_http", "The source returned HTTP 503.")
+        return [
+            {
+                "title": "API Engineer",
+                "company": "Working",
+                "posting": "Build reliable APIs.",
+                "url": "https://jobs.ashbyhq.com/good/example",
+                "source_key": "ashby:good:example",
+            }
+        ]
+
+    monkeypatch.setattr(module, "fetch_postings", feed)
+    service.queue_collection(first["id"])
+    service.queue_collection(second["id"])
+    run_next(service)
+    run_next(service)
+    assert service.get_source(first["id"])["last_error"]
+    assert service.get_source(second["id"])["last_error"] is None
+    assert workspace.list_jobs()["total"] == 2
+
+
+def test_daily_schedule_avoids_double_run_during_fall_back():
+    schedule = {"kind": "daily", "at": "02:30", "timezone": "Europe/Zurich"}
+    current = datetime(2026, 10, 25, 1, 45, tzinfo=timezone.utc)
+    previous = "2026-10-25T00:30:00+00:00"
+    assert next_due(schedule, previous, current).date().isoformat() == "2026-10-26"
+
+
+def test_score_protocol_rejects_truncated_and_nonfinite_results(monkeypatch):
+    original = httpx.Client
+
+    def transport(request):
+        return httpx.Response(
+            200,
+            json={
+                "model": "synthetic",
+                "answers": {"fit": {"type": "score", "score": 3}},
+                "usage": {"truncated": True},
+            },
+        )
+
+    monkeypatch.setattr(
+        module.httpx,
+        "Client",
+        lambda **kwargs: original(transport=httpx.MockTransport(transport), **kwargs),
+    )
+    with pytest.raises(DomainError, match="truncated"):
+        score_call(
+            {"base_url": "https://model.example", "provider": "systemone"}, {"job": "synthetic"}
+        )
+
+
+def test_worker_restart_ignores_old_inflight_result(case, monkeypatch):
+    import threading
+    import time
+
+    from openings.worker import Worker
+
+    workspace, service = case
+    entered, release = threading.Event(), threading.Event()
+    calls = []
+
+    def delayed_score(config, state):
+        calls.append(1)
+        first = len(calls) == 1
+        if first:
+            entered.set()
+            assert release.wait(5)
+        return {
+            "score": 95 if first else 65,
+            "model": "synthetic",
+            "elapsed_seconds": 0,
+            "response": {},
+        }
+
+    monkeypatch.setattr(module, "score_call", delayed_score)
+    job = workspace.ingest_job(
+        {"company": "Example", "title": "Engineer", "posting": "Build Python APIs"}
+    )
+    worker = Worker(workspace, service)
+    worker.start()
+    old_thread = worker.thread
+    try:
+        assert entered.wait(3)
+        worker.stop(timeout=0.01)
+        worker.start()
+        deadline = time.monotonic() + 3
+        while workspace.get_job(job["id"])["score"] is None and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert workspace.get_job(job["id"])["score"] == 65
+        release.set()
+        old_thread.join(timeout=2)
+        assert not old_thread.is_alive()
+        assert workspace.get_job(job["id"])["score"] == 65
+        assert len(workspace.db.all("SELECT * FROM assessments")) == 1
+    finally:
+        release.set()
+        worker.stop()
