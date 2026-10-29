@@ -130,9 +130,10 @@ def collect(config, provider, budget, *, preview=False):
                     "source": provider,
                     "collector": "jobspy",
                     "collector_version": "1.4.1",
-                    "remote": row.is_remote,
-                    "job_type": raw.get("job_type"),
-                    "published_at": raw.get("date_posted"),
+                    "is_remote": row.is_remote,
+                    "job_type": row.job_type[0].value if row.job_type else None,
+                    "job_types": [value.value for value in row.job_type] if row.job_type else [],
+                    "date_posted": raw.get("date_posted"),
                     "salary": {
                         key: raw[key]
                         for key in ("interval", "min_amount", "max_amount", "currency")

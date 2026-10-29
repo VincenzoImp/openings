@@ -69,6 +69,17 @@ def location(value):
     )
 
 
+def records(payload, key=None):
+    rows = payload.get(key) if isinstance(payload, dict) and key else payload
+    if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+        raise DomainError(
+            502,
+            "source_format",
+            "The source returned an unexpected listing shape; check its public feed and configuration.",
+        )
+    return rows
+
+
 def collect(source, request, text, *, known=None, preview=False, on_item=None):
     kind, config, name = source["kind"], source["config"], source["name"]
     board = config.get("board", "")
@@ -130,7 +141,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
     slug = quote(board, safe="")
     if kind == "recruitee":
         payload = get(f"https://{board}.recruitee.com/api/offers/")
-        for row in payload.get("offers", [])[:maximum]:
+        for row in records(payload, "offers")[:maximum]:
             add(
                 row,
                 row.get("id"),
@@ -171,7 +182,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             )
     elif kind == "workable":
         payload = get(f"https://apply.workable.com/api/v1/widget/accounts/{slug}?details=true")
-        for row in payload.get("jobs", [])[:maximum]:
+        for row in records(payload, "jobs")[:maximum]:
             add(
                 row,
                 row.get("shortcode"),
@@ -185,7 +196,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             )
     elif kind == "breezy":
         payload = get(f"https://{board}.breezy.hr/json?full=true")
-        for row in payload[:maximum]:
+        for row in records(payload)[:maximum]:
             place = row.get("location") or {}
             add(
                 row,
@@ -200,7 +211,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             )
     elif kind == "bamboohr":
         base = f"https://{board}.bamboohr.com"
-        for row in get(base + "/careers/list").get("result", [])[:maximum]:
+        for row in records(get(base + "/careers/list"), "result")[:maximum]:
             identity = row.get("id")
             full = (
                 detail(f"{kind}:{board}:{identity}", f"{base}/careers/{identity}/detail").get(
@@ -221,7 +232,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             )
     elif kind == "rippling":
         base = f"https://api.rippling.com/platform/api/ats/v1/board/{slug}/jobs"
-        for row in get(base)[:maximum]:
+        for row in records(get(base))[:maximum]:
             identity = row.get("uuid")
             full = detail(f"{kind}:{board}:{identity}", base + "/" + quote(str(identity), safe=""))
             description = full.get("description") or ""
@@ -239,8 +250,9 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
     elif kind == "smartrecruiters":
         base = f"https://api.smartrecruiters.com/v1/companies/{slug}/postings"
         for offset in range(0, min(maximum, 500), 100):
-            rows = get(base + "?" + urlencode({"limit": min(maximum, 100), "offset": offset})).get(
-                "content", []
+            rows = records(
+                get(base + "?" + urlencode({"limit": min(maximum, 100), "offset": offset})),
+                "content",
             )
             for row in rows[: maximum - len(items)]:
                 identity = row.get("id")
@@ -275,15 +287,18 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         tenant = host.split(".")[0]
         api, public = f"https://{host}/wday/cxs/{tenant}/{site}", f"https://{host}/{site}"
         for offset in range(0, min(maximum, 200), 20):
-            rows = get(
-                api + "/jobs",
-                body={
-                    "appliedFacets": {},
-                    "limit": min(maximum, 20),
-                    "offset": offset,
-                    "searchText": "",
-                },
-            ).get("jobPostings", [])
+            rows = records(
+                get(
+                    api + "/jobs",
+                    body={
+                        "appliedFacets": {},
+                        "limit": min(maximum, 20),
+                        "offset": offset,
+                        "searchText": "",
+                    },
+                ),
+                "jobPostings",
+            )
             for row in rows[: maximum - len(items)]:
                 path = row.get("externalPath") or ""
                 if not path.startswith("/job/") or ".." in path:
@@ -316,7 +331,8 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
                     }
                 )
             )
-            rows = (payload.get("items") or [{}])[0].get("requisitionList") or []
+            envelopes = records(payload, "items")
+            rows = records(envelopes[0], "requisitionList") if envelopes else []
             for row in rows[: maximum - len(items)]:
                 identity = row.get("Id")
                 full = detail(
@@ -373,7 +389,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
                     502, "source_format", "join.com returned unexpected embedded job data."
                 ) from error
 
-        for row in (state(base).get("jobs") or {}).get("items", [])[:maximum]:
+        for row in records(state(base).get("jobs"), "items")[:maximum]:
             identity = row.get("id")
             path = row.get("idParam")
             url = base + "/" + quote(path, safe="-") if path else ""
@@ -405,17 +421,20 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             count = min(maximum - len(items), 20)
             if count <= 0:
                 break
-            rows = get(
-                f"https://{host}/api/v1/public/search?"
-                + urlencode(
-                    {
-                        "query": config["query"],
-                        "location": config["location"],
-                        "rows": count,
-                        "page": page,
-                    }
-                )
-            ).get("documents", [])
+            rows = records(
+                get(
+                    f"https://{host}/api/v1/public/search?"
+                    + urlencode(
+                        {
+                            "query": config["query"],
+                            "location": config["location"],
+                            "rows": count,
+                            "page": page,
+                        }
+                    )
+                ),
+                "documents",
+            )
             for row in rows[:count]:
                 identity = row.get("job_id")
                 full = detail(
@@ -462,7 +481,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         payload = get(
             f"https://api.adzuna.com/v1/api/jobs/{config['country']}/search/1?" + urlencode(params)
         )
-        for row in payload.get("results", [])[:maximum]:
+        for row in records(payload, "results")[:maximum]:
             add(
                 row,
                 row.get("id"),

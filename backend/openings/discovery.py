@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, quote, urljoin, urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
+from mcp.types import ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from .common import check_version, decode_record, encode, missing, new_id, now
@@ -632,7 +633,7 @@ def fetch_postings(source: dict) -> list[dict]:
         )
     elif kind == "greenhouse":
         raw = _json(f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true")
-        for row in raw.get("jobs", []):
+        for row in company_collectors.records(raw, "jobs"):
             items.append(
                 {
                     "source_key": f"greenhouse:{board}:{row['id']}",
@@ -653,7 +654,7 @@ def fetch_postings(source: dict) -> list[dict]:
     elif kind == "lever":
         host = "api.eu.lever.co" if config.get("region") == "eu" else "api.lever.co"
         raw = _json(f"https://{host}/v0/postings/{slug}?mode=json")
-        for row in raw:
+        for row in company_collectors.records(raw):
             lists = [
                 f"{item.get('text', '')}\n{html_text(item.get('content', ''))}"
                 for item in row.get("lists", [])
@@ -691,7 +692,7 @@ def fetch_postings(source: dict) -> list[dict]:
         raw = _json(
             f"https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true"
         )
-        for row in raw.get("jobs", []):
+        for row in company_collectors.records(raw, "jobs"):
             if row.get("isListed") is False:
                 continue
             url = row.get("jobUrl", "")
@@ -1892,7 +1893,8 @@ class DiscoveryService:
             retryable = not isinstance(error, DomainError) or error.status >= 500
             retry = (deferred and not capped) or (retryable and task["attempts"] < 3)
             next_run = (
-                datetime.now(timezone.utc) + timedelta(seconds=15 * (4 ** (task["attempts"] - 1)))
+                datetime.now(timezone.utc)
+                + timedelta(seconds=min(3600, 15 * (4 ** min(max(task["attempts"] - 1, 0), 8))))
             ).isoformat(timespec="microseconds")
             if deferred:
                 next_run = error.next_run_at or (
@@ -2022,92 +2024,128 @@ def register_api(router, service: DiscoveryService):
 
 
 def register_mcp(mcp, service: DiscoveryService):
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+    )
     def collection_get() -> dict:
         """Read the global automatic collection switch, counts and next queued run."""
         return service.get_collection()
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)
+    )
     def collection_update(value: CollectionWrite) -> dict:
         """Pause/resume automatic collection with version protection; manual run remains available."""
         return service.update_collection(value)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+    )
     def providers_list() -> dict:
         """Read supported providers, editable HTTP safeguards and persisted window/cooldown diagnostics."""
         return service.list_providers()
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)
+    )
     def providers_update(provider_id: str, value: ProviderPatch) -> dict:
         """Edit a provider policy using its version. Runtime/cooldown are read-only and shared by all runs."""
         return service.update_provider(provider_id, value)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=True)
+    )
     def sources_bulk(value: SourceBulk) -> dict:
         """Enable, pause, run or delete up to 200 selected versioned sources; inspect each result/error."""
         return service.bulk_sources(value)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+    )
     def sources_list(limit: int = 100, offset: int = 0) -> dict:
         """List saved portal searches and selected company/feed sources, schedules and outcomes."""
         return service.list_sources(limit, offset)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+    )
     def sources_get(source_id: str) -> dict:
         """Read a source's complete editable configuration and version."""
         return service.get_source(source_id)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=True)
+    )
     def sources_preview(value: SourcePreview) -> dict:
         """Preview a saved-search/company/feed configuration without saving jobs; shared HTTP budgets apply."""
         return service.preview_source(value)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True)
+    )
     def sources_create(value: SourceCreate) -> dict:
         """Create one explicit saved query/location or company/feed source; individually paused by default."""
         return service.create_source(value)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True)
+    )
     def sources_update(source_id: str, value: SourcePatch) -> dict:
         """Update or pause a source with optimistic version protection."""
         return service.update_source(source_id, value)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=False)
+    )
     def sources_delete(source_id: str) -> dict:
         """Remove a source while retaining its archived jobs."""
         return service.delete_source(source_id)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True)
+    )
     def sources_run(source_id: str) -> dict:
         """Run one source now, even when automatic collection is paused. Portal providers get separate bounded tasks."""
         return service.queue_collection(source_id)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+    )
     def scoring_get() -> dict:
         """Read optional scorer configuration without revealing the API key."""
         return service.get_scoring()
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True)
+    )
     def scoring_update(value: ScoringWrite) -> dict:
         """Configure off/local/remote scoring. Changes never launch a full rescore."""
         return service.update_scoring(value)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=True)
+    )
     def scoring_test(value: ScoringWrite) -> dict:
         """Run a small real score request against a configured or draft endpoint."""
         return service.test_scoring(value)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+    )
     def scoring_context(job_id: str) -> dict:
         """Inspect the exact compact classification context and recorded omissions."""
         return service.assessment_context(job_id)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True)
+    )
     def scoring_rescore(value: RescoreRequest) -> dict:
         """Explicitly queue a bounded selected/outdated batch; never generates documents."""
         return service.queue_rescore(value)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+    )
     def tasks_list(
         limit: int = 50,
         offset: int = 0,
@@ -2119,17 +2157,23 @@ def register_mcp(mcp, service: DiscoveryService):
         """Filter collection/scoring work by state/kind/source/job, with readable labels and diagnostics."""
         return service.list_tasks(limit, offset, state, kind, source_id, job_id)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+    )
     def tasks_get(task_id: str) -> dict:
         """Read one task's inputs, result, HTTP diagnostics, lease and next run time."""
         return service.get_task(task_id)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)
+    )
     def tasks_cancel(task_id: str) -> dict:
         """Cancel queued/running work; already stored jobs and documents are kept."""
         return service.cancel_task(task_id)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True)
+    )
     def tasks_retry(task_id: str) -> dict:
         """Explicitly retry a failed/cancelled task with current inputs."""
         return service.retry_task(task_id)

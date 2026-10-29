@@ -356,3 +356,144 @@ def test_google_is_explicitly_unsupported_and_retry_after_is_not_guessed(collect
     assert caught.value.code == "unsupported_provider"
     assert retry_after("not a date", 1) is None
     assert retry_after("3", 1) == 4
+
+
+def test_actual_requests_and_curl_transports_bound_bodies_and_record_integer_status(collection):
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    from openings._vendor.jobspy.util import RequestsRotating, TLSRotating
+
+    _, service = collection
+    policy(service, "manual", min_interval_seconds=0)
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_GET(self):
+            content = b'{"ok":true}' if self.path == "/small" else b"x" * (8 * 1024 * 1024 + 1)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(content)))
+            self.end_headers()
+            try:
+                self.wfile.write(content)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+    try:
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        for session_class in (RequestsRotating, TLSRotating):
+            budget = service.http_budget("manual")
+            session = session_class()
+            session.transport = budget
+            try:
+                response = session.get(base + "/small")
+                assert response.json() == {"ok": True}
+                assert type(response.status_code) is int and response.status_code == 200
+                with pytest.raises(DomainError) as caught:
+                    session.get(base + "/large")
+                assert caught.value.code == "source_too_large"
+                assert budget.requests == 2
+                assert [row["status"] for row in budget.responses] == [200, 200]
+            finally:
+                session.close()
+        assert service.providers.get("manual")["runtime"]["total_requests"] == 4
+    finally:
+        server.shutdown()
+        server.server_close()
+        server_thread.join(timeout=1)
+
+
+def test_company_partial_rows_survive_detail_failure_and_keep_prior_metadata(
+    collection, monkeypatch
+):
+    workspace, service = collection
+    policy(service, "bamboohr", min_interval_seconds=0)
+    source = service.create_source(
+        SourceCreate(name="Example", kind="bamboohr", config={"board": "example"})
+    )
+    calls = []
+    original = httpx.Client
+
+    def send(request):
+        calls.append(str(request.url))
+        if request.url.path.endswith("/list"):
+            return httpx.Response(
+                200,
+                json={
+                    "result": [
+                        {"id": 1, "jobOpeningName": "API Engineer"},
+                        {"id": 2, "jobOpeningName": "Analyst"},
+                    ]
+                },
+            )
+        if "/1/" in request.url.path:
+            return httpx.Response(
+                200,
+                json={
+                    "result": {
+                        "jobOpening": {"description": "Build APIs", "datePosted": "2026-10-29"}
+                    }
+                },
+            )
+        return httpx.Response(429, headers={"Retry-After": "90"})
+
+    monkeypatch.setattr(
+        module.httpx,
+        "Client",
+        lambda **kwargs: original(transport=httpx.MockTransport(send), **kwargs),
+    )
+    queued = service.queue_collection(source["id"])
+    task = service.claim_task("worker", "collect")
+    service.run_task(task, "worker")
+    assert service.get_task(queued["id"])["state"] == "queued"
+    assert service.get_task(queued["id"])["result"]["created"] == 1
+    job = workspace.list_jobs()["items"][0]
+    assert job["date_posted"] == "2026-10-29"
+    assert workspace.get_job(job["id"])["posting"] == "Build APIs"
+    # Known-detail omission must not clear the previous date or body on refresh.
+    old = {"bamboohr:example:1": workspace.get_job(job["id"])["metadata"]}
+    rows = company.collect(
+        {"name": "Example", "kind": "bamboohr", "config": {"board": "example", "max_results": 1}},
+        lambda *args, **kwargs: json.dumps(
+            {"result": [{"id": 1, "jobOpeningName": "API Engineer"}]}
+        ).encode(),
+        module.html_text,
+        known=old,
+    )
+    refreshed = module.normalize_posting(rows[0])
+    assert refreshed["metadata"]["date_posted"] == "2026-10-29"
+    updated = workspace.ingest_job(refreshed)
+    assert updated["content_version"] == job["content_version"]
+
+
+def test_all_sources_use_canonical_filter_metadata_and_reject_invalid_query_counts(collection):
+    from pydantic import ValidationError
+
+    from openings.collectors.jobspy import JobSpyConfig
+
+    _, service = collection
+    row = module.normalize_posting(
+        {
+            "metadata": {
+                "remote": True,
+                "published_at": 1793270300000,
+                "job_type": ["full-time", "contract"],
+            }
+        }
+    )
+    assert row["metadata"]["is_remote"] is True
+    assert row["metadata"]["date_posted"] == "2026-10-29"
+    assert row["metadata"]["job_type"] == "fulltime"
+    assert row["metadata"]["job_types"] == ["fulltime", "contract"]
+    for count in (True, 1.2, "20", 100):
+        with pytest.raises(ValidationError):
+            JobSpyConfig(query="engineer", results_wanted=count)
+    auto = service.create_source(
+        SourceCreate(name="Example", url="https://jobs.ashbyhq.com/example")
+    )
+    assert auto["kind"] == "ashby" and auto["config"]["max_results"] == 100
