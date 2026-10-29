@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import html
 import ipaddress
@@ -25,6 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from .common import check_version, decode_record, encode, missing, new_id, now
 from .errors import DomainError
+from .worker import inference_guard
 from .collectors import company as company_collectors
 from .collectors import jobspy as jobspy_collector
 from .collectors.policy import ProviderBudget, ProviderDeferred, ProviderPatch, ProviderStore
@@ -114,6 +116,11 @@ class SourcePreview(Input):
 class SourceCreate(SourcePreview):
     enabled: bool = False
     schedule: Schedule = Field(default_factory=Schedule)
+
+
+class RSSConfig(Input):
+    url: str = Field(min_length=1, max_length=2000)
+    max_results: int = Field(default=100, ge=1, le=2000)
 
 
 class SourcePatch(Input):
@@ -515,6 +522,20 @@ def resolve_source(value: dict) -> dict:
             ) from error
     elif kind == "rss":
         url = url or config.get("url", "")
+        try:
+            config = RSSConfig.model_validate(
+                {
+                    **{key: val for key, val in config.items() if key not in ("url", "filters")},
+                    "url": url,
+                }
+            ).model_dump()
+        except ValidationError as error:
+            raise DomainError(
+                422,
+                "source_config",
+                "The RSS configuration is invalid.",
+                error.errors(include_url=False, include_context=False),
+            ) from error
         public_url(url)
     else:
         if not config.get("board") and url:
@@ -732,6 +753,12 @@ def fetch_postings(source: dict) -> list[dict]:
             root = ET.fromstring(body)
         except ET.ParseError as error:
             raise DomainError(502, "source_format", "The feed returned invalid XML.") from error
+        if root.tag not in (
+            "rss",
+            "{http://www.w3.org/2005/Atom}feed",
+            "{http://www.w3.org/1999/02/22-rdf-syntax-ns#}RDF",
+        ):
+            raise DomainError(502, "source_format", "The URL did not return an RSS or Atom feed.")
         for row in list(root.findall(".//item")) + list(
             root.findall("{http://www.w3.org/2005/Atom}entry")
         ):
@@ -884,6 +911,11 @@ class DiscoveryService:
         self.workspace = workspace
         self.db = workspace.db
         self.providers = ProviderStore(self.db)
+        self.inference_lock = inference_guard(self.db.path)
+
+    def _call_score(self, config, state):
+        with self.inference_lock:
+            return score_call(config, state)
 
     def http_budget(self, provider_id, run_id=None, active=None):
         """Shared per-request gate for collectors, previews and manual URL import."""
@@ -1239,6 +1271,11 @@ class DiscoveryService:
                     (source_id, provider),
                 ).fetchone()
                 if existing:
+                    if manual and not json.loads(existing["payload"]).get("manual"):
+                        connection.execute(
+                            "UPDATE tasks SET payload=json_set(payload,'$.manual',json('true')),updated_at=? WHERE id=?",
+                            (now(), existing["id"]),
+                        )
                     task_ids.append(existing["id"])
                     continue
                 task_id, stamp = new_id(), now()
@@ -1289,7 +1326,7 @@ class DiscoveryService:
 
     def test_scoring(self, value: ScoringWrite | None = None):
         _, config, _ = self._merge_scoring(value or ScoringWrite())
-        result = score_call(
+        result = self._call_score(
             config,
             {
                 "candidate": {"summary": "Backend engineer building Python APIs."},
@@ -1320,7 +1357,7 @@ class DiscoveryService:
         if config["enabled"] and (
             changed or not old["enabled"] or old["api_key"] != config["api_key"]
         ):
-            score_call(
+            self._call_score(
                 config,
                 {
                     "candidate": {"summary": "Backend engineer building Python APIs."},
@@ -1823,7 +1860,7 @@ class DiscoveryService:
                 "recovered": True,
             }
         started_at = now()
-        result = score_call(config, context["state"])
+        result = self._call_score(config, context["state"])
         payload = {
             "task_id": task["id"],
             "context": context,
@@ -2076,23 +2113,23 @@ def register_mcp(mcp, service: DiscoveryService):
     @mcp.tool(
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=True)
     )
-    def sources_preview(value: SourcePreview) -> dict:
+    async def sources_preview(value: SourcePreview) -> dict:
         """Preview a saved-search/company/feed configuration without saving jobs; shared HTTP budgets apply."""
-        return service.preview_source(value)
+        return await asyncio.to_thread(service.preview_source, value)
 
     @mcp.tool(
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True)
     )
-    def sources_create(value: SourceCreate) -> dict:
+    async def sources_create(value: SourceCreate) -> dict:
         """Create one explicit saved query/location or company/feed source; individually paused by default."""
-        return service.create_source(value)
+        return await asyncio.to_thread(service.create_source, value)
 
     @mcp.tool(
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True)
     )
-    def sources_update(source_id: str, value: SourcePatch) -> dict:
+    async def sources_update(source_id: str, value: SourcePatch) -> dict:
         """Update or pause a source with optimistic version protection."""
-        return service.update_source(source_id, value)
+        return await asyncio.to_thread(service.update_source, source_id, value)
 
     @mcp.tool(
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=False)
@@ -2118,16 +2155,16 @@ def register_mcp(mcp, service: DiscoveryService):
     @mcp.tool(
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True)
     )
-    def scoring_update(value: ScoringWrite) -> dict:
+    async def scoring_update(value: ScoringWrite) -> dict:
         """Configure off/local/remote scoring. Changes never launch a full rescore."""
-        return service.update_scoring(value)
+        return await asyncio.to_thread(service.update_scoring, value)
 
     @mcp.tool(
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=True)
     )
-    def scoring_test(value: ScoringWrite) -> dict:
+    async def scoring_test(value: ScoringWrite) -> dict:
         """Run a small real score request against a configured or draft endpoint."""
-        return service.test_scoring(value)
+        return await asyncio.to_thread(service.test_scoring, value)
 
     @mcp.tool(
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)

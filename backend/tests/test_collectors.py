@@ -1,6 +1,7 @@
 """Practical acquisition invariants: real transport seams, shared gates and queue fairness."""
 
 import json
+import asyncio
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -142,7 +143,7 @@ def test_provider_split_bulk_pause_and_explicit_manual_run(collection, monkeypat
     )
     scheduled = service.queue_collection(source["id"], manual=False)
     assert len(scheduled["task_ids"]) == 3
-    assert service.queue_collection(source["id"])["task_ids"] == scheduled["task_ids"]
+    assert service.queue_collection(source["id"], manual=False)["task_ids"] == scheduled["task_ids"]
     service.update_collection(CollectionWrite(enabled=False, expected_version=0))
     assert all(service.get_task(task)["state"] == "cancelled" for task in scheduled["task_ids"])
     service.schedule_due()
@@ -327,8 +328,8 @@ def test_collection_lane_progresses_during_a_slow_inference_and_queues_successor
         deadline = time.monotonic() + 2
         while (
             workspace.get_job(job["id"])["posting"] != "Build changed Python APIs"
-            and time.monotonic() < deadline
-        ):
+            or service.list_tasks(kind="score", state="queued")["total"] != 1
+        ) and time.monotonic() < deadline:
             time.sleep(0.01)
         assert workspace.get_job(job["id"])["posting"] == "Build changed Python APIs"
         assert service.list_tasks(kind="score", state="queued")["total"] == 1
@@ -497,3 +498,97 @@ def test_all_sources_use_canonical_filter_metadata_and_reject_invalid_query_coun
         SourceCreate(name="Example", url="https://jobs.ashbyhq.com/example")
     )
     assert auto["kind"] == "ashby" and auto["config"]["max_results"] == 100
+
+
+def test_run_now_promotes_scheduled_work_and_long_provider_pause_keeps_a_valid_next_run(collection):
+    workspace, service = collection
+    source = service.create_source(
+        SourceCreate(name="Example", kind="greenhouse", enabled=True, config={"board": "example"})
+    )
+    scheduled = service.queue_collection(source["id"], manual=False)
+    manual = service.queue_collection(source["id"])
+    assert manual["id"] == scheduled["id"] and manual["payload"]["manual"] is True
+    service.update_collection(CollectionWrite(expected_version=0, enabled=False))
+    assert service.get_task(manual["id"])["state"] == "queued"
+    policy(service, "greenhouse", enabled=False)
+    workspace.db.execute("UPDATE tasks SET attempts=999 WHERE id=?", (manual["id"],))
+    task = service.claim_task("worker", "collect")
+    service.run_task(task, "worker")
+    paused = service.get_task(manual["id"])
+    assert paused["state"] == "queued" and paused["next_run_at"] > module.now()
+    assert paused["attempts"] == 1000
+    assert service.providers.get("greenhouse")["runtime"]["total_requests"] == 0
+    policy(service, "greenhouse", enabled=True)
+    assert service.get_task(manual["id"])["next_run_at"] <= module.now()
+
+
+@pytest.mark.asyncio
+async def test_slow_mcp_preview_keeps_health_and_other_tools_responsive(tmp_path, monkeypatch):
+    from openings.app import create_app
+
+    app = create_app(tmp_path / "responsive.sqlite", start_worker=False)
+    entered, release = threading.Event(), threading.Event()
+
+    def slow_preview(value):
+        entered.set()
+        assert release.wait(3), "The event loop could not release the blocking preview."
+        return {"items": [], "total": 0, "preview_limit": 20, "diagnostics": []}
+
+    monkeypatch.setattr(app.state.discovery, "preview_source", slow_preview)
+    task = asyncio.create_task(
+        app.state.mcp.call_tool(
+            "sources_preview", {"value": {"kind": "rss", "url": "https://example.org/feed"}}
+        )
+    )
+    try:
+        assert await asyncio.wait_for(asyncio.to_thread(entered.wait, 1), timeout=2)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await asyncio.wait_for(client.get("/health"), timeout=0.5)
+        assert response.status_code == 200
+        await asyncio.wait_for(app.state.mcp.call_tool("collection_get", {}), timeout=0.5)
+        assert not task.done()
+    finally:
+        release.set()
+        await task
+
+
+def test_manual_score_checks_share_the_worker_inference_slot(collection, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    workspace, service = collection
+    workspace.set_settings("profile", {"summary": "Python engineer"})
+    workspace.set_settings("scoring", {"enabled": True})
+    entered, release = threading.Event(), threading.Event()
+    calls = []
+
+    def score(config, state):
+        calls.append(state["job"]["posting"])
+        if len(calls) == 1:
+            entered.set()
+            assert release.wait(3)
+        return {"score": 80, "model": "synthetic", "elapsed_seconds": 0, "response": {}}
+
+    monkeypatch.setattr(module, "score_call", score)
+    worker = Worker(workspace, service)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        manual = pool.submit(service.test_scoring)
+        try:
+            assert entered.wait(1)
+            job = workspace.ingest_job(
+                {"title": "Engineer", "company": "Example", "posting": "Queued job"}
+            )
+            worker.start()
+            time.sleep(0.1)
+            assert len(calls) == 1
+            release.set()
+            assert manual.result(timeout=2)["connected"]
+            deadline = time.monotonic() + 3
+            while workspace.get_job(job["id"])["score"] is None and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert calls == ["Build and maintain Python APIs.", "Queued job"]
+            assert workspace.get_job(job["id"])["score"] == 80
+        finally:
+            release.set()
+            worker.stop()

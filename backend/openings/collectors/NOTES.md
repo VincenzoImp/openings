@@ -18,6 +18,9 @@ details, and collection while one slow inference is running. Material job edits
 during inference queue one current successor. A stopped worker's stale result
 cannot overwrite a new assessment, and its in-flight inference completes before
 a successor begins. No additional model is loaded by a collection lane.
+Explicit score tests/configuration checks share the same inference slot.
+Network-capable MCP operations dispatch to threads; a held preview was verified
+concurrently with a successful HTTP health request and another MCP read.
 
 Additional company clients are narrow, bounded adaptations of verified endpoint
 shapes from the prior Openings reference. Undocumented join.com, Workday,
@@ -26,6 +29,18 @@ errors rather than successful empty results. Breezy has no public description,
 and Adzuna returns snippets and requires explicitly supplied credentials; its
 provider is disabled by default. Complete known company postings skip bounded
 detail requests while retaining prior metadata and posting content.
+
+A subsequent guarded live company batch used one result and at most one detail
+per source. Recruitee/callista, SmartRecruiters/CERN, JobCloud/jobs.ch and
+Workday/ABB each returned one job with its full posting. Oracle/CX_5 returned
+one listing with details intentionally disabled. Personio's own board returned
+a valid empty positions XML feed; the Workable self-board slug returned HTTP404,
+correctly reported as an error. Twelve actual attempts were counted, including
+two JobCloud301 redirects, against an estimate of ten before redirects. No
+automatic retries or saved jobs. The bounded curl body hook was separately
+reverified against Glassdoor: two jobs, full descriptions, three HTTP200s in
+7.085 seconds. Synthetic local HTTP servers verified both requests and curl
+reject an8MiB+1 response and retain exact integer response statuses/counts.
 
 Manual URL integration entry points:
 

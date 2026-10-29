@@ -12,6 +12,12 @@ INFERENCE_LOCKS = {}
 LOCKS_LOCK = threading.Lock()
 
 
+def inference_guard(database_path):
+    """One process/database inference slot, shared with explicit scorer tests."""
+    with LOCKS_LOCK:
+        return INFERENCE_LOCKS.setdefault(str(database_path), threading.RLock())
+
+
 class Worker:
     def __init__(self, workspace, discovery=None):
         self.workspace = workspace
@@ -20,10 +26,7 @@ class Worker:
         self.stopping = threading.Event()
         self.thread = None
         self.threads = []
-        with LOCKS_LOCK:
-            self.inference_lock = INFERENCE_LOCKS.setdefault(
-                str(workspace.db.path), threading.Lock()
-            )
+        self.inference_lock = inference_guard(workspace.db.path)
 
     def start(self):
         if self.thread and self.thread.is_alive() and not self.stopping.is_set():
