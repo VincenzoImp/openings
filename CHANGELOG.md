@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1
+
+- Restore join.com company listings and posting details for its current page data.
+- Keep source configuration and scheduling responsive with hundreds of saved searches.
+
 ## 0.5.0
 
 A fresh job-search workspace with one portable SQLite database and shared

@@ -1057,22 +1057,44 @@ class DiscoveryService:
         row = self.db.one("SELECT * FROM sources WHERE id=?", (source_id,))
         if row is None:
             missing("Source")
+        return self._source_records([row])[0]
+
+    def _source_records(self, rows):
+        if not rows:
+            return []
+        source_ids = [row["id"] for row in rows]
+        placeholders = ",".join("?" for _ in source_ids)
+        recent = {source_id: [] for source_id in source_ids}
+        for task in self.db.all(
+            "SELECT * FROM (SELECT id,source_id,state,result,next_run_at,error,created_at,json_extract(payload,'$.provider') AS provider,ROW_NUMBER() OVER (PARTITION BY source_id,json_extract(payload,'$.provider') ORDER BY created_at DESC,id DESC) AS position FROM tasks WHERE kind='collect' AND source_id IN ("
+            + placeholders
+            + ")) WHERE position=1 ORDER BY created_at DESC,id DESC",
+            source_ids,
+        ):
+            recent[task["source_id"]].append(task)
+        active = {
+            task["source_id"]: task["next_run_at"]
+            for task in self.db.all(
+                "SELECT source_id,MIN(next_run_at) AS next_run_at FROM tasks WHERE state IN ('queued','running') AND source_id IN ("
+                + placeholders
+                + ") GROUP BY source_id",
+                source_ids,
+            )
+        }
+        enabled = self.workspace.get_settings("collection", {"enabled": True})["data"] or {}
+        return [
+            self._source_record(row, recent[row["id"]], active.get(row["id"]), enabled)
+            for row in rows
+        ]
+
+    def _source_record(self, row, recent, active, enabled):
         row = decode_record(row, ("config", "schedule"))
         row["enabled"] = bool(row["enabled"])
         row["url"] = row["config"].get("url", "")
         row["filters"] = row["config"].get("filters", {"titles": [], "locations": []})
         providers = row["config"]["providers"] if row["kind"] == "jobspy" else [row["kind"]]
-        recent = self.db.all(
-            "SELECT id,state,result,next_run_at,error,json_extract(payload,'$.provider') AS provider FROM tasks t WHERE source_id=? AND kind='collect' AND id=(SELECT id FROM tasks latest WHERE latest.source_id=t.source_id AND latest.kind='collect' AND json_extract(latest.payload,'$.provider') IS json_extract(t.payload,'$.provider') ORDER BY latest.created_at DESC,latest.id DESC LIMIT 1) ORDER BY created_at DESC,id DESC",
-            (source_id,),
-        )
         recent = [task for task in recent if (task["provider"] or row["kind"]) in providers]
-        active = self.db.one(
-            "SELECT MIN(next_run_at) AS next_run_at FROM tasks WHERE source_id=? AND state IN ('queued','running')",
-            (source_id,),
-        )
-        enabled = self.workspace.get_settings("collection", {"enabled": True})["data"] or {}
-        row["next_run_at"] = active["next_run_at"] or (
+        row["next_run_at"] = active or (
             next_due(row["schedule"], row["last_run_at"]).isoformat(timespec="microseconds")
             if row["enabled"] and enabled.get("enabled", True)
             else None
@@ -1101,12 +1123,12 @@ class DiscoveryService:
         return row
 
     def list_sources(self, limit=100, offset=0):
-        ids = self.db.all(
-            "SELECT id FROM sources ORDER BY name,id LIMIT ? OFFSET ?",
+        rows = self.db.all(
+            "SELECT * FROM sources ORDER BY name,id LIMIT ? OFFSET ?",
             (min(max(limit, 1), 500), max(offset, 0)),
         )
         return {
-            "items": [self._source(row["id"]) for row in ids],
+            "items": self._source_records(rows),
             "total": self.db.one("SELECT COUNT(*) AS n FROM sources")["n"],
         }
 
@@ -1236,35 +1258,26 @@ class DiscoveryService:
         return {"deleted": True, "id": source_id}
 
     def queue_collection(self, source_id, *, manual=True, _stopping=None, expected_version=None):
-        source = self._source(source_id)
-        if not manual and (not source["enabled"] or not self.get_collection()["enabled"]):
-            return None
-        providers = (
-            source["config"]["providers"] if source["kind"] == "jobspy" else [source["kind"]]
-        )
         task_ids = []
         with self.db.transaction() as connection:
-            row = connection.execute(
-                "SELECT version FROM sources WHERE id=?", (source_id,)
-            ).fetchone()
+            row = connection.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchone()
             if row is None:
                 missing("Source")
             check_version(row, expected_version)
             if _stopping is not None and _stopping.is_set():
                 return None
             if not manual:
-                current = connection.execute(
-                    "SELECT enabled FROM sources WHERE id=?", (source_id,)
-                ).fetchone()
                 setting = connection.execute(
                     "SELECT data FROM settings WHERE key='collection'"
                 ).fetchone()
-                if (
-                    not current
-                    or not current["enabled"]
-                    or (setting and not json.loads(setting["data"]).get("enabled", True))
+                if not row["enabled"] or (
+                    setting and not json.loads(setting["data"]).get("enabled", True)
                 ):
                     return None
+            source = decode_record(row, ("config",))
+            providers = (
+                source["config"]["providers"] if source["kind"] == "jobspy" else [source["kind"]]
+            )
             for provider in providers:
                 existing = connection.execute(
                     "SELECT * FROM tasks WHERE source_id=? AND kind='collect' AND state IN ('queued','running') AND json_extract(payload,'$.provider')=? ORDER BY created_at LIMIT 1",
@@ -1694,7 +1707,9 @@ class DiscoveryService:
         moment = datetime.now(timezone.utc)
         for row in (
             self.db.all("SELECT * FROM sources WHERE enabled=1 ORDER BY created_at LIMIT 2000")
-            if self.get_collection()["enabled"]
+            if (self.workspace.get_settings("collection", {"enabled": True})["data"] or {}).get(
+                "enabled", True
+            )
             else []
         ):
             if stopping is not None and stopping.is_set():
