@@ -329,8 +329,11 @@ function DocumentEditor({
   const [structured, setStructured] = useState(
     !!previous && typeof previous.content.text !== "string",
   );
+  const [contextOffset, setContextOffset] = useState(0);
+  const [selectedContext, setSelectedContext] = useState("");
+  const [selectedContextLabel, setSelectedContextLabel] = useState("");
   const contexts = useResource<ListResult<Json>>(
-    `/contexts?application_id=${application.id}`,
+    `/contexts?application_id=${application.id}&summary=true&limit=20&offset=${contextOffset}`,
     { items: [], total: 0 },
   );
   async function submit(e: FormEvent<HTMLFormElement>) {
@@ -364,6 +367,9 @@ function DocumentEditor({
       <p className="modal-intro">
         Store externally prepared content, PDF and source files. Previous
         revisions stay unchanged.
+        {previous?.revision_number
+          ? ` Based on revision ${previous.revision_number}.`
+          : ""}
       </p>
       <form onSubmit={submit}>
         <div className="formgrid">
@@ -390,17 +396,52 @@ function DocumentEditor({
           </Field>
         </div>
         {!previous && (
-          <Field label="Frozen context">
-            <select name="context_id">
-              <option value="">No frozen context</option>
-              {contexts.data.items.map((context) => (
-                <option key={String(context.id)} value={String(context.id)}>
-                  {date(String(context.created_at))} ·{" "}
-                  {String(context.id).slice(0, 8)}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <section className="context-picker">
+            <Field
+              label="Frozen context"
+              hint="Choose an optional frozen snapshot. Your selection is kept while you browse pages."
+            >
+              <select
+                name="context_id"
+                disabled={!!createdId}
+                value={selectedContext}
+                onChange={(e) => {
+                  setSelectedContext(e.target.value);
+                  setSelectedContextLabel(
+                    e.target.selectedOptions[0]?.textContent || e.target.value,
+                  );
+                }}
+              >
+                <option value="">No frozen context</option>
+                {selectedContext &&
+                  !contexts.data.items.some(
+                    (context) => context.id === selectedContext,
+                  ) && (
+                    <option value={selectedContext}>
+                      {selectedContextLabel} · selected
+                    </option>
+                  )}
+                {contexts.data.items.map((context) => (
+                  <option key={String(context.id)} value={String(context.id)}>
+                    {date(String(context.created_at))} ·{" "}
+                    {String(context.id).slice(0, 8)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {contexts.error && (
+              <ErrorBox message={contexts.error} retry={contexts.reload} />
+            )}
+            {contexts.data.total > 20 && (
+              <Pagination
+                label="Context chooser pages"
+                offset={contextOffset}
+                total={contexts.data.total}
+                limit={20}
+                onChange={setContextOffset}
+              />
+            )}
+          </section>
         )}
         <label className="checkline">
           <input
@@ -492,6 +533,7 @@ function DocumentCard({
           <span className="eyebrow">{document.kind.replaceAll("_", " ")}</span>
           <h3>{document.title || "Untitled document"}</h3>
           <p>
+            Revision {document.revision_number || 1} ·{" "}
             {date(document.created_at)} ·{" "}
             {document.review_state === "approved"
               ? "Approved"
@@ -631,8 +673,9 @@ export function ApplicationDrawer({
   const [add, setAdd] = useState(false),
     [contextOpen, setContextOpen] = useState(false),
     [removing, setRemoving] = useState(false);
+  const [contextOffset, setContextOffset] = useUrlState("context_offset", "0");
   const contexts = useResource<ListResult<Json>>(
-    `/contexts?application_id=${id}&summary=true`,
+    `/contexts?application_id=${id}&summary=true&limit=20&offset=${Number(contextOffset) || 0}`,
     { items: [], total: 0 },
   );
   const app = resource.data;
@@ -824,6 +867,13 @@ export function ApplicationDrawer({
                           </Button>
                         </div>
                       ))}
+                      <Pagination
+                        label="Saved context pages"
+                        offset={Number(contextOffset) || 0}
+                        total={contexts.data.total}
+                        limit={20}
+                        onChange={(offset) => setContextOffset(String(offset))}
+                      />
                       <details className="context-files">
                         <summary>Files in frozen contexts</summary>
                         {contexts.data.items.map((context) => (
@@ -959,6 +1009,7 @@ export function ApplicationDrawer({
                         ) : q.type === "number" ? (
                           <input
                             type="number"
+                            step="any"
                             name={q.id}
                             defaultValue={String(app.answers[q.id] ?? "")}
                           />

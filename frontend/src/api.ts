@@ -107,6 +107,7 @@ export interface Document extends Versioned {
   content: Json;
   previous_id?: string;
   review_state: string;
+  revision_number?: number;
   files?: WorkspaceFile[];
 }
 export interface WorkspaceFile {

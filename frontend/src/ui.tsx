@@ -441,14 +441,16 @@ export function Pagination({
   total,
   limit = 30,
   onChange,
+  label = "Result pages",
 }: {
   offset: number;
   total: number;
   limit?: number;
   onChange: (value: number) => void;
+  label?: string;
 }) {
   return (
-    <div className="list-footer">
+    <div className="list-footer" role="navigation" aria-label={label}>
       <span>
         {total
           ? `${offset + 1}–${Math.min(offset + limit, total)} of ${total}`
@@ -456,6 +458,7 @@ export function Pagination({
       </span>
       <div className="actions">
         <Button
+          type="button"
           className="small"
           disabled={!offset}
           onClick={() => onChange(Math.max(0, offset - limit))}
@@ -463,6 +466,7 @@ export function Pagination({
           Previous
         </Button>
         <Button
+          type="button"
           className="small"
           disabled={offset + limit >= total}
           onClick={() => onChange(offset + limit)}
