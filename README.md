@@ -21,6 +21,13 @@ application documents and progress tracking, in one portable SQLite database.
 | **Controlled automation:** schedules, global pause, request budgets, cooldowns and visible task results. | **Application tracking:** list/Kanban, independent attempts and a funnel based on recorded progress. |
 | **Optional fit scoring:** a separate CPU classifier or compatible remote service. | **One portable archive:** SQLite stores records and file bytes; back up or move the workspace. |
 
+<details>
+<summary>See the application board</summary>
+
+![Compact application board with company, role, location, documents and recorded stages](docs/images/applications.png)
+
+</details>
+
 ### Your dashboard. Your scripts. Your agent.
 
 Use the **dashboard** by hand, the **REST API** for scripts, or **MCP** with your
