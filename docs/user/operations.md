@@ -2,7 +2,7 @@
 
 ## Portable backup
 
-Use **Settings → Backup**, authenticated `GET /api/v1/backup`, or the MCP
+Use **Settings → Workspace → Backup**, authenticated `GET /api/v1/backup`, or the MCP
 `workspace_backup` download grant. These create a consistent SQLite snapshot while
 the service runs, including PDF/source bytes, templates, career data, job history
 and settings. The optional model cache is disposable and is not in the backup.
@@ -16,8 +16,7 @@ curl --fail "$OPENINGS_URL/api/v1/backup" \
 Keep backups private: they contain personal information and stored credentials.
 The database is not encrypted. A JSON export is useful for reading records, but
 omits binary file contents and is not a restorable backup. Download it through
-Settings, `GET /api/v1/export`, or the scoped `workspace_export` MCP grant. Copying only the live
-`.sqlite` file while SQLite has a WAL journal is not a consistent backup method.
+Settings, `GET /api/v1/export`, or the scoped `workspace_export` MCP grant. Use the backup action rather than copying a live `.sqlite` file with an active WAL journal.
 
 ## Restore or move hosts
 

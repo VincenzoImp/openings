@@ -53,13 +53,11 @@ services also consume resources. If local scoring is impractical, keep it off or
 use remote mode; collection, documents and tracking continue independently.
 
 The [scorer implementation notes](../../scorer/README.md) describe its exact
-service subset. Release resource evidence lives in `docs/next/evidence/`.
+service subset.
 
-The [final integration check](../next/evidence/final-linux-resources.json) used an
-isolated Linux ARM64 VM with 2 CPUs / 4 GiB and no swap. An untruncated 1885-token
-classification finished in 9.06 seconds; the conservative sum of core/scorer cgroup
-peaks was 2.90 GiB, including filesystem cache, with no OOM. One bounded public
-collection finished during inference and 54 core responses took at most 18 ms.
-Disabling scoring released the model after an already-running request drained
-(5.22 seconds in that check). This is a measured reference, not a low-power x86
-speed promise.
+A reference measurement on Linux ARM64 with 2 CPUs / 4 GiB and no swap processed
+an untruncated 1885-token classification in about 9 seconds. The conservative sum
+of core/scorer cgroup peaks was about 2.90 GiB, including filesystem cache, with no
+OOM; acquisition and API requests continued during inference. This is a measured
+reference, not a low-power x86 speed guarantee. Disabling scoring lets an in-flight
+request drain before releasing the model.

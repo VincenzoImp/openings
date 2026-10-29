@@ -1,31 +1,45 @@
 # Setup
 
-Install Docker with Compose v2, then follow the README's clone/build commands.
-`docker compose up -d --build` builds the dashboard and core from the checkout.
-No Python, Node, AI account or TeX installation is needed on the host.
+Install Docker with Compose v2, then use the published images:
+
+```bash
+git clone https://github.com/VincenzoImp/openings.git
+cd openings
+cp .env.example .env
+docker compose pull
+docker compose up -d --no-build
+```
+
+Compose pins `vincenzoimp/openings:0.5.0` and the optional
+`vincenzoimp/openings:scorer-0.5.0`, for Linux amd64 and arm64. No Python, Node,
+AI account or TeX installation is needed on the host. To build images yourself,
+see [Contributing](../../CONTRIBUTING.md).
 
 ## First run
 
 1. Open `http://127.0.0.1:8080` and choose an owner password of at least 10 characters.
-   Alternatively set `OPENINGS_PASSWORD` in `.env` before the first start.
-2. In **Career**, enter your profile/preferences, then add detailed experience,
-   projects or courses. Approve reusable claims you want an agent to select.
-   Import accepts reviewed JSON or plain-text notes; it does not infer facts.
-3. In **Templates**, add a LaTeX template and optional supporting files. Set a
-   default and adjust general/per-template writing instructions. Synthetic
-   `examples/career.json`, `examples/resume.tex` and `examples/cover-letter.tex`
-   are available as starting examples.
-4. Add an offer in **Inbox**, or configure a saved search or company feed in **Collection**
-   and preview it before enabling its schedule. Scoring remains off until configured separately.
-5. Create an application and connect an [external agent](agents.md), or upload
-   documents manually. Review files before recording an application as Applied.
+   For unattended first setup, set `OPENINGS_PASSWORD` in `.env` before starting.
+2. In **Career**, enter your profile/preferences and detailed experience, projects
+   or courses. Approve reusable claims you want an agent to select. Import accepts
+   reviewed JSON or plain-text notes; it does not infer facts.
+3. In **Templates**, add a LaTeX template and optional assets, select defaults,
+   and edit general/per-template writing instructions. Synthetic starting examples
+   are included in `examples/` and available from the dashboard.
+4. In **Collection → Saved searches**, choose a query, location, country and
+   providers. In **Companies**, choose specific ATS boards/feeds, with optional
+   title/location filters. Preview, then enable the sources/schedules you want.
+   You can also add individual offers directly in **Inbox**.
+5. Create an application and connect an [external agent](agents.md), or prepare and
+   upload documents manually. Review the files before recording Applied.
 
-All changes are stored immediately in SQLite. No YAML application configuration
-is required. `.env` controls installation settings, not your career or sources.
+Career data, search settings and files live in SQLite and are editable through the
+dashboard, REST and MCP. No YAML application configuration is needed. `.env`
+controls the installation address, image selection and other host settings.
+New sources start paused; AI scoring is separately disabled until configured.
 
-## Another device on your LAN
+## LAN access
 
-Edit `.env`, substituting your server's actual address:
+Edit `.env`, substituting the address clients can reach:
 
 ```dotenv
 OPENINGS_BIND=0.0.0.0
@@ -33,37 +47,37 @@ OPENINGS_PORT=8080
 OPENINGS_PUBLIC_URL=http://192.168.1.50:8080
 ```
 
-Run `docker compose up -d` after edits. The public URL must match the origin used
-by agents: it controls MCP host checks and relative file-transfer links. Set the
-owner password before opening the binding to other devices. Use HTTPS through a
-trusted reverse proxy for access across untrusted networks.
+Run `docker compose up -d --no-build` after edits. The public URL controls MCP
+host checks and relative file-transfer links, so it must match the client origin.
+Set the owner password before opening access to other devices. Use HTTPS through
+a trusted reverse proxy across untrusted networks.
 
-The core binds inside the container on port 8080. `OPENINGS_PORT` in Compose
-changes only the host port; update `OPENINGS_PUBLIC_URL` when changing it.
+The core uses port 8080 inside its container. `OPENINGS_PORT` changes the host
+port; update `OPENINGS_PUBLIC_URL` to match.
 
-## Optional local scorer
+## Optional local scoring
 
 1. Set `SCORER_API_KEY` to a random secret in `.env`.
-2. Run `docker compose --profile local up -d --build`.
-3. In **Settings → Scoring**, select local/Laya, URL `http://scorer:8000`, model
+2. Run `docker compose --profile local pull`, then
+   `docker compose --profile local up -d --no-build`.
+3. In **Settings → AI scoring**, select local/Laya, URL `http://scorer:8000`, model
    `english`, context 2048 and the same API key. Use a 600-second timeout for a
    cold model start. Test the connection, then enable scoring.
 
 Starting the container does not enable scoring. The first test downloads the
 pinned model into the disposable `model-cache` volume and loads it on CPU.
-The service has no published host port. See [Scoring](scoring.md) for constraints
-and remote mode. Set scoring off before stopping it:
+The scorer has no published host port. See [Scoring](scoring.md) for hardware and
+remote mode. Turn scoring off before stopping it:
 
 ```bash
 docker compose --profile local stop scorer
 ```
 
-## Storage and startup checks
+## Storage and checks
 
-The `workspace` volume holds `/data/openings.sqlite` and SQLite's live journal
-files. It contains your profile, postings, templates, settings and document bytes.
-The core runs as UID/GID 10001; a bind-mounted `/data` directory must be writable
-by that identity. Use the default named volume for the simplest installation.
+The `workspace` volume holds `/data/openings.sqlite`, live journals and all stored
+file bytes. The core runs as UID/GID 10001; a bind-mounted `/data` directory must
+be writable by that identity. The default named volume handles this automatically.
 
 ```bash
 docker compose ps
@@ -71,10 +85,9 @@ docker compose logs --tail=100 openings
 curl --fail http://127.0.0.1:8080/health
 ```
 
-The health endpoint checks the core and SQLite. An idle scorer is healthy before
-its model has loaded. Do not treat health alone as a model-quality check.
+Health checks the core and SQLite. An idle scorer is healthy before loading a
+model. For upgrades, take a [backup](operations.md), update the checkout/image tags,
+then run `docker compose pull` and `docker compose up -d --no-build`.
 
-For upgrades, take a [backup](operations.md), update the checkout and run
-`docker compose up -d --build`. This rewrite starts with a fresh workspace;
-there is no migration from the previous product. The version is 0.5.0 because
-stable public API/data-format compatibility is not yet promised.
+Version 0.5.0 starts a new database format; earlier Openings data/configuration
+are not compatible. Stable public API/data-format compatibility is not yet promised.

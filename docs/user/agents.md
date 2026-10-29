@@ -14,9 +14,7 @@ The optional repository skill is
 [`skills/openings-workspace/SKILL.md`](../../skills/openings-workspace/SKILL.md).
 Install it using your agent's skill mechanism if desired. MCP remains usable
 without it: discover actual tools/resources and their typed input schemas.
-The updated skill was verified with an [actual external Codex CLI session](../next/evidence/final-external-codex-workflow.json)
-against installed Linux Docker MCP: tailored one-page CV/letter PDFs, exact source
-uploads, live form answers and the current search DTOs, using synthetic evidence.
+
 
 ## Working sequence
 
@@ -72,10 +70,9 @@ Mutating service tools also commonly wrap fields in `value`. For example:
   `scoring_rescore` when intended; classification never writes a CV.
 
 REST supports the same workflow when scripting is more convenient. See the
-[API guide](api.md) for transfers and optimistic updates. `workspace_backup` and
+[API guide](api.md) for transfers and optimistic updates. `workspace_backup`,
 `workspace_restore_upload` and `workspace_export` return short-lived operational
-transfer instructions;
-restore replaces workspace data and should be deliberate.
+transfer instructions. Restore replaces workspace data.
 
 Your chosen agent/provider supplies generation and compilation. An existing
 agent subscription may cover its own work; Openings neither includes nor logs

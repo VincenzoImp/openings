@@ -1,24 +1,40 @@
 # Optional CPU scorer
 
-The core app never imports PyTorch. This optional service loads one pinned Laya
-English checkpoint on the first score request, uses at most two CPU threads and
-accepts one ordinal question at a time. It downloads no model until requested.
-The image uses the verified versions in `constraints.txt`; PyTorch uses its
-separately pinned CPU wheel from the official PyTorch index.
+This separate service provides fit classification for Openings. The core and
+HTTP supervisor never import PyTorch; one child process loads the pinned Laya
+English model on demand. It uses at most two CPU threads and handles one ordinal
+question per request. No model is downloaded until a score is requested.
 
-It implements the text/JSON `POST /v1/systemone` score subset used by Openings,
-not every feature of TypeSafe's API. Set Openings' provider to `laya`, model to
-`english`, and the URL to this service. `SCORER_API_KEY` enables bearer auth.
-The core sends `max_len=2048`; truncated inputs are rejected rather than scored.
+## Connect
 
-Configuration: `SCORER_MODEL`, `SCORER_REVISION`, `SCORER_MAX_CONTEXT` (2048),
-`SCORER_THREADS` (maximum 2), `SCORER_IDLE_UNLOAD` (120 seconds),
-`SCORER_REQUEST_TIMEOUT` (600 seconds). Selecting an
-unserved model never downloads arbitrary additional checkpoints. Idle unloading
-or `POST /v1/unload` stops the single model process and releases its runtime memory;
-the disposable cache remains on disk. The HTTP process never imports PyTorch.
+Start the Compose `local` profile as described in [Setup](../docs/user/getting-started.md).
+In Openings, use provider `laya`, served model `english` and URL
+`http://scorer:8000`. Configure the same `SCORER_API_KEY` in the service and app.
+The service exposes `POST /v1/systemone`, the text/JSON score subset Openings uses;
+an arbitrary OpenAI chat endpoint is not compatible.
 
-Scores are advisory. Known language/qualification mistakes remain possible.
-Measured model-only Mac memory is not proof of a complete 4-GiB installation;
-see the root release measurements and limits. A stronger compatible scorer may
-run on another host, or scoring may remain disabled.
+The default context is 2048 tokens. Truncated inputs are rejected rather than
+silently presented as a complete assessment. Dependency versions are locked in
+`constraints.txt`; the image installs its separately pinned CPU PyTorch wheel
+from the official PyTorch index.
+
+## Configuration
+
+| Variable | Default |
+|---|---|
+| `SCORER_MODEL` | `convaiinnovations/laya` |
+| `SCORER_REVISION` | `55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851` |
+| `SCORER_MAX_CONTEXT` | `2048` |
+| `SCORER_THREADS` | `2`, bounded to 1–2 |
+| `SCORER_API_KEY` | Empty; set a key for bearer authentication |
+| `SCORER_IDLE_UNLOAD` | `120` seconds, minimum 15 |
+| `SCORER_REQUEST_TIMEOUT` | `600` seconds, bounded to 5–600 |
+
+`GET /health` reports idle/loaded state. Idle unloading or `POST /v1/unload`
+releases the child process after active work settles; cached weights remain on
+disk. Selecting an unserved model does not download additional checkpoints.
+
+Scores are advisory, with possible language/qualification errors. The
+[user scoring guide](../docs/user/scoring.md) covers freshness, remote mode and
+whole-deployment resource limits. A compatible scorer can run on another machine,
+or the application can run with scoring disabled.

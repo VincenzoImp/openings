@@ -7,12 +7,25 @@ schedule with an IANA timezone. Run now queues work for an individually paused
 source; it still respects provider policy. Bulk controls enable, pause, run or delete
 selected sources. Deleting a source retains its archived jobs.
 
+## What decides which jobs arrive?
+
+| Input | Search criteria | Where to configure |
+|---|---|---|
+| Saved search | One query, location, country and explicit portal selection | Collection → Saved searches |
+| Company watch | A selected ATS board/feed; optional title and location filters | Collection → Companies |
+| Manual job | The specific URL or posting you provide | Inbox → Add job |
+
+For example, save `backend engineer` in `Zurich, Switzerland` with LinkedIn and
+Indeed selected. Create another saved search for `platform engineer` or another
+location. Career preferences guide optional fit classification; the saved query
+controls what is requested from a portal. Company sources read the chosen board
+and apply their configured filters.
+
 ## Saved searches
 
 The pinned JobSpy 1.4.1 integration searches LinkedIn, Indeed and Glassdoor.
 Save one explicit query and location with a country and provider selection.
-Duplicate the source for another query/location; there is no implicit keyword/location
-Cartesian product. Results, age window, remote/job type and description fetching are
+Create another source for a different query/location. Results, age window, remote/job type and description fetching are
 bounded settings. Country/provider capabilities vary. Google is explicitly unsupported.
 
 For REST/MCP, a `jobspy` source uses a configuration such as:

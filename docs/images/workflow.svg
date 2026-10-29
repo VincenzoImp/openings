@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 280" role="img" aria-labelledby="title desc">
+  <title id="title">The Openings workflow</title>
+  <desc id="desc">Collect jobs, organize career context, prepare documents with an external AI agent, and track each application. Dashboard, REST and MCP access the same workspace.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M1 1 6 4 1 7" fill="none" stroke="#89917d" stroke-width="1.6"/></marker>
+  </defs>
+  <rect width="1120" height="280" rx="18" fill="#f5f4ed"/>
+  <text x="32" y="39" font-family="Georgia,serif" font-size="24" fill="#24271f">A complete workspace. Your agent does the last mile.</text>
+  <g font-family="system-ui,-apple-system,Segoe UI,sans-serif">
+    <g fill="#fffefa" stroke="#dedfd3">
+      <rect x="32" y="66" width="238" height="139" rx="12"/>
+      <rect x="304" y="66" width="238" height="139" rx="12"/>
+      <rect x="576" y="66" width="238" height="139" rx="12"/>
+      <rect x="848" y="66" width="238" height="139" rx="12"/>
+    </g>
+    <g fill="#eef0e5">
+      <circle cx="62" cy="96" r="14"/><circle cx="334" cy="96" r="14"/><circle cx="606" cy="96" r="14"/><circle cx="878" cy="96" r="14"/>
+    </g>
+    <g fill="#56654c" font-size="12" font-weight="600" text-anchor="middle">
+      <text x="62" y="100">01</text><text x="334" y="100">02</text><text x="606" y="100">03</text><text x="878" y="100">04</text>
+    </g>
+    <g fill="#24271f" font-size="20" font-weight="600">
+      <text x="49" y="139">Collect</text><text x="321" y="139">Organize</text><text x="593" y="139">Prepare</text><text x="865" y="139">Track</text>
+    </g>
+    <g fill="#62695c" font-size="13">
+      <text x="49" y="165">Saved searches, companies,</text><text x="49" y="184">or jobs you add yourself</text>
+      <text x="321" y="165">Profile, career evidence,</text><text x="321" y="184">templates and writing rules</text>
+      <text x="593" y="165">Your agent reads context,</text><text x="593" y="184">writes and compiles externally</text>
+      <text x="865" y="165">Review PDFs and answers;</text><text x="865" y="184">record application progress</text>
+    </g>
+    <g stroke="#89917d" stroke-width="1.6" marker-end="url(#arrow)"><path d="M278 136H295"/><path d="M550 136H567"/><path d="M822 136H839"/></g>
+    <text x="32" y="246" fill="#62695c" font-size="14">Dashboard for you</text><circle cx="210" cy="241" r="2" fill="#89917d"/>
+    <text x="233" y="246" fill="#62695c" font-size="14">REST for scripts</text><circle cx="390" cy="241" r="2" fill="#89917d"/>
+    <text x="413" y="246" fill="#62695c" font-size="14">MCP for your agent</text>
+    <text x="1085" y="246" text-anchor="end" fill="#56654c" font-size="13">One portable SQLite archive</text>
+  </g>
+</svg>

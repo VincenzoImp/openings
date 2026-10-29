@@ -1,16 +1,24 @@
-# Openings development
+# Working on Openings
 
-Read `docs/next/README.md`, `STATE.json`, `PRODUCT.md`, `PLAN.md` and `GOAL.md`
-inside `docs/next` before implementation. STATE.json identifies the current task
-and whether production execution has been authorized. Do not mistake experiments
-or the dashboard preview for production code.
+Read README.md, CONTRIBUTING.md and docs/developer/architecture.md before changing
+behavior. The running OpenAPI schema and MCP tools describe the current contract;
+backend/openings/operation-inventory.json maps logical operations across interfaces.
 
-Complete the user-authorized final integration for Openings 0.5.0. Read CONTRACTS.md and the current operation matrix; the prior rewrite is the baseline. No legacy compatibility/importer,
-internal generative AI, server TeX, email/calendar, or unplanned features. Ship
-English material and synthetic examples only. Dashboard/REST/MCP share services.
+- Keep business logic in shared services. Dashboard, REST and MCP must expose the
+  same useful operations, allowing documented authentication/transport differences.
+- Preserve version checks, context/document immutability, exact file ownership,
+  reversible dismissal and deliberate permanent deletion.
+- Keep SQLite portable and the core independent of model, browser and TeX runtimes.
+  Generation and compilation belong to an external agent.
+- Provider requests must use the shared persisted gate, including previews,
+  redirects and manual runs. Never bypass it with an unguarded HTTP client.
+- Ship English code/UI/docs and synthetic public fixtures. Keep databases,
+  credentials, personal documents and machine-specific deployment files out of Git.
+- Use focused invariant tests and practical complete workflows after meaningful
+  changes. Check populated desktop/mobile views for dashboard changes.
+- Prefer small, clear services and coherent commits. Parallel work should use
+  isolated worktrees and explicit file ownership; remove temporary work afterward.
 
-The user authorizes an orchestrator with focused subagents in isolated worktrees
-when work is independent. Assign file ownership; integrate shared contracts
-first. Use a few substantial commits and practical integration checks. Update
-handoff state and record unresolved defects after meaningful work batches. Keep
-temporary worktrees/branches clean. Respect the user's explicit start signal.
+Do not merge, publish artifacts or deploy an installation unless the current task
+explicitly authorizes that action. Keep release-specific work notes outside the
+public product tree.

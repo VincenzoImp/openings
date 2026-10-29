@@ -1,10 +1,11 @@
 # Contributing
 
-Openings 0.5.0 is a fresh Python/React application. Keep dashboard, REST and MCP
-operations on shared application services. Public examples and screenshots must
-contain synthetic data only. Code, UI and repository documentation are English.
+Read the [architecture](docs/developer/architecture.md) and relevant
+[user guide](docs/user/getting-started.md) before changing behavior. Keep shared
+services useful through the dashboard, REST and MCP. Code, UI and documentation
+are English; public examples/screenshots contain synthetic data only.
 
-## Development
+## Run locally
 
 Requires Python 3.12+, Node 24 and [uv](https://docs.astral.sh/uv/).
 
@@ -15,52 +16,68 @@ npm --prefix frontend run build
 uv run openings --database data/development.sqlite
 ```
 
-The app serves on `http://127.0.0.1:8080`. For frontend hot reload, run
-`npm --prefix frontend run dev` in another terminal; Vite proxies `/api` and `/mcp`
-to the backend. Keep development databases out of Git.
+Open `http://127.0.0.1:8080`. For frontend hot reload, run
+`npm --prefix frontend run dev` separately; Vite proxies `/api` and `/mcp` to the
+backend. Never commit development databases or credentials.
+
+To build Docker images locally, give them local names:
+
+```bash
+OPENINGS_IMAGE=openings:local docker compose up -d --build
+# Include the optional scorer:
+OPENINGS_IMAGE=openings:local OPENINGS_SCORER_IMAGE=openings-scorer:local \
+  docker compose --profile local up -d --build
+```
+
+## Verify a change
 
 ```bash
 uv run ruff check backend
 uv run pytest
 npm --prefix frontend run build
+npm --prefix frontend run format:check
 npm --prefix frontend audit --audit-level=moderate
 docker compose config
 ```
 
-Prefer a few meaningful invariant checks and practical UI/API/MCP walkthroughs
-over large implementation-mirroring suites. Exercise a complete user flow after a
-substantial change. The manual `backend/tests/agent_roundtrip.py` driver verifies
-real MCP/file/backup transport and requires an external Tectonic executable:
+Use focused invariant checks and complete user workflows. For dashboard changes,
+check populated lists, desktop/mobile layouts, keyboard access, unsaved edits and
+loading/error states. For data changes, check versions, deletion/cancellation,
+frozen contexts, exact revision/file associations and backup consistency.
+
+The manual MCP/file/backup driver requires an external Tectonic executable:
 
 ```bash
 uv run python backend/tests/agent_roundtrip.py --tectonic /path/to/tectonic
 ```
 
-## Layout and boundaries
+## Project layout
 
-| Path | Responsibility |
+| Path | Purpose |
 |---|---|
-| `backend/openings` | SQLite, shared services, REST, MCP, bounded worker and auth |
-| `frontend` | Manual dashboard using REST |
-| `scorer` | Optional separate CPU classification process; never imported by core |
-| `examples` | Synthetic career data and user-owned-template examples |
+| `backend/openings` | Shared SQLite services, REST, MCP, collection, worker and authentication |
+| `frontend` | React dashboard calling REST |
+| `scorer` | Optional separate CPU classifier, never imported by the core |
+| `examples` | Synthetic career data and LaTeX templates |
 | `skills/openings-workspace` | Optional external-agent workflow guidance |
-| `docs/user` | Installation and operator contracts |
-| `docs/next` | Implementation decisions, evidence and handoff state |
+| `docs/user` | Setup, workflow and operator guides |
+| `docs/developer` | Architecture and extension boundaries |
 
-`uv.lock` and `frontend/package-lock.json` are authoritative. No legacy compatibility
-layer, internal generative agent, server TeX, email/calendar or portal automation.
-Review evidence references, forget/cancellation behavior, frozen contexts, exact
-file revisions and backup consistency when relevant to a change.
+`uv.lock` and `frontend/package-lock.json` are authoritative. Keep personal data,
+model caches, deployment files, one-off importers and development work notes out of
+the public tree. Preserve upstream notices for vendored code.
 
-## CI and releases
+## Releases
 
-CI runs backend checks, frontend build/audit and core Docker builds for Linux
-amd64/arm64. Docker smoke checks an empty workspace and nonroot runtime. Optional
-scorer builds occur in the explicit image-release workflow.
+CI checks backend/frontend, dependency audits, an installed wheel and native Linux
+amd64/arm64 core images. Container smoke checks authentication, nonroot startup
+and packaged source/resource hashes.
 
-Image publication runs only for a pushed `vX.Y.Z` tag or a manual release workflow
-with **publish** enabled and a version matching `pyproject.toml`. It waits for CI,
-then pushes versioned core/scorer images to GHCR; ordinary branch/PR builds do not
-publish. Review practical integration/resource evidence and release notes before
-tagging. A successful image build alone is not a target-hardware validation.
+The release workflow publishes versioned core/scorer images to Docker Hub for a pushed
+`vX.Y.Z` tag, or a manual run with **publish** enabled. The requested version must
+match `pyproject.toml`; publication waits for CI. The versioned tags are
+`vincenzoimp/openings:X.Y.Z` and `vincenzoimp/openings:scorer-X.Y.Z`. Branch/PR
+checks do not publish.
+Before a release, review the changelog and a practical collection → application →
+external-agent documents → review → backup/restore workflow. Hardware claims need
+actual resource measurements, not just a successful image build.
