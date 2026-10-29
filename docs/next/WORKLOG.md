@@ -120,3 +120,18 @@ verified with105 snapshots. Package/wheel capabilities work outside the checkout
 An actual external Codex+skill+LinuxMCP+Tectonic round trip passes exact PDF/source
 checks. Linux2CPU/4GiB combined collection/inference proof is below3GiB withoutOOM;
 final evidence, nativeCI and environment cleanup are the remaining delivery work.
+
+
+## Final delivery
+
+All F0–F4 work is complete. 55 focused tests, 103 browser checks plus 14 preview
+checks, 17 final combined Linux checks and 12 installed-image/MCP checks pass.
+Native CI 40945282806 passes both architectures and audits. Installed artifacts
+match all 39 backend files plus the canonical inventory; explicit uv cache keys
+fix the stale externally included resource found by an incremental rebuild.
+Actual external Codex/skill/MCP/Tectonic artifacts retain exact bytes and drafts.
+The final Linux run records 1885 untruncated tokens and 2.904 GiB conservative peak
+without OOM; in-flight disable drains before model unload. All temporary task
+worktrees/branches, QA service/database and Linux VM/tools/model volumes were
+removed. Original references/main remain unchanged; synthetic 18800 demo retained.
+No production deployment, merge, tag or image publication was performed.

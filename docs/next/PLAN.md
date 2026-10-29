@@ -20,3 +20,10 @@ quota; practical proofs must catch real failures, not duplicate implementation.
 No user production data/instance or main branch is modified. Release publication
 remains an explicit action after a concrete verified candidate. Do not add semantic
 search, internal AI generation, browser crawling or unrelated features in this pass.
+
+## Completion
+
+All F0–F4 phases pass. STATE.json and evidence/final-*.json record exact results,
+source revisions and limitations. The user-facing delivery is PR 52 and the
+synthetic local preview. No implementation work remains; merge/publication and
+production deployment are separate owner actions.

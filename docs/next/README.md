@@ -4,8 +4,9 @@ Openings is a fresh Python/FastAPI, React and SQLite implementation on
 `codex/openings-next`. The final user-approved integration adds broad saved searches,
 company feeds, shared provider budgets and logical Dashboard/REST/MCP parity.
 [PR 52](https://github.com/VincenzoImp/openings/pull/52) is the review entry point.
-[STATE.json](STATE.json) and [GOAL.md](GOAL.md) determine the current completion
-status; historical baseline evidence does not establish that new release gates pass.
+Final integration is complete. [STATE.json](STATE.json), [GOAL.md](GOAL.md) and
+[evidence](evidence/) record the verified candidate and retained limitations;
+publication/deployment remain separate owner actions.
 
 The app stores career evidence, claims, templates/assets/instructions, jobs,
 application attempts, frozen contexts and exact document/file revisions in one

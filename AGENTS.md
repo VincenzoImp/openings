@@ -5,7 +5,7 @@ inside `docs/next` before implementation. STATE.json identifies the current task
 and whether production execution has been authorized. Do not mistake experiments
 or the dashboard preview for production code.
 
-Complete the user-authorized final integration for Openings0.5.0. Read CONTRACTS.md and the current operation matrix; the prior rewrite is the baseline. No legacy compatibility/importer,
+Complete the user-authorized final integration for Openings 0.5.0. Read CONTRACTS.md and the current operation matrix; the prior rewrite is the baseline. No legacy compatibility/importer,
 internal generative AI, server TeX, email/calendar, or unplanned features. Ship
 English material and synthetic examples only. Dashboard/REST/MCP share services.
 
