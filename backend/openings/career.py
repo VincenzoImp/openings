@@ -3,9 +3,18 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from .common import check_version, decode_record, encode, new_id, now
 from .errors import DomainError, conflict, missing
@@ -59,8 +68,8 @@ class Input(BaseModel):
 class NonNullUpdate(Input):
     @field_validator("*", mode="before")
     @classmethod
-    def reject_null(cls, value):
-        if value is None:
+    def reject_null(cls, value, info: ValidationInfo):
+        if value is None and info.field_name != "dates":
             raise ValueError(
                 "Omit unchanged fields; clear text with an empty string or use an empty list/object."
             )
@@ -83,22 +92,102 @@ class ProfileUpdate(NonNullUpdate):
 
 
 KnowledgeKind = Literal[
-    "experience", "project", "course", "education", "award", "publication",
-    "fact", "skill", "language", "other"
+    "experience",
+    "project",
+    "course",
+    "education",
+    "award",
+    "publication",
+    "fact",
+    "skill",
+    "language",
+    "other",
 ]
 
 
-class KnowledgeCreate(Input):
+class CareerDates(Input):
+    kind: Literal["single", "period"]
+    start: str
+    end: str | None = None
+    current: bool = False
+
+    @field_validator("start", "end")
+    @classmethod
+    def valid_partial_date(cls, value):
+        if value is not None and not re.fullmatch(
+            r"(?!0000)[0-9]{4}(?:-(?:0[1-9]|1[0-2]))?", value
+        ):
+            raise ValueError("Use a year (YYYY) or a year and month (YYYY-MM).")
+        return value
+
+    @model_validator(mode="after")
+    def valid_period(self):
+        if self.kind == "single":
+            if self.end is not None or self.current:
+                raise ValueError("A single date has no end date or Present flag.")
+        elif self.current == (self.end is not None):
+            raise ValueError("A period requires either an end date or Present, not both.")
+        elif self.end is not None:
+            # Compare the known bounds without assigning unknown months to stored dates.
+            start_min = self.start if len(self.start) == 7 else self.start + "-01"
+            end_max = self.end if len(self.end) == 7 else self.end + "-12"
+            if start_min > end_max:
+                raise ValueError("The end date precedes the start date.")
+        return self
+
+
+class KnowledgeFields(Input):
+    @field_validator("title", "organization", check_fields=False)
+    @classmethod
+    def clean_header(cls, value, info: ValidationInfo):
+        if value is not None:
+            value = value.strip()
+            if info.field_name == "title" and not value:
+                raise ValueError("Entry titles must not be blank.")
+        return value
+
+    @field_validator("metadata", check_fields=False)
+    @classmethod
+    def dedicated_fields(cls, value):
+        if value is not None and {"organization", "dates", "skills", "position"} & value.keys():
+            raise ValueError("Organization, dates, skills and position have dedicated fields.")
+        return value
+
+    @field_validator("skills", check_fields=False)
+    @classmethod
+    def normalized_skills(cls, value):
+        if value is None:
+            return value
+        result, seen = [], set()
+        for skill in value:
+            skill = skill.strip()
+            if not skill or len(skill) > 200:
+                raise ValueError("Use skill names containing 1–200 characters.")
+            if skill.casefold() not in seen:
+                result.append(skill)
+                seen.add(skill.casefold())
+        return result
+
+
+class KnowledgeCreate(KnowledgeFields):
     kind: KnowledgeKind = "experience"
     title: str = Field(min_length=1, max_length=300)
+    organization: str = Field(default="", max_length=300)
+    dates: CareerDates | None = None
+    skills: list[str] = Field(default_factory=list, max_length=200)
+    position: int | None = Field(default=None, ge=0, strict=True)
     narrative: str = Field(default="", max_length=100000)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class KnowledgeUpdate(NonNullUpdate):
+class KnowledgeUpdate(KnowledgeFields, NonNullUpdate):
     expected_version: int = Field(ge=1, strict=True)
     kind: KnowledgeKind | None = None
     title: str | None = Field(default=None, min_length=1, max_length=300)
+    organization: str | None = Field(default=None, max_length=300)
+    dates: CareerDates | None = None
+    skills: list[str] | None = Field(default=None, max_length=200)
+    position: int | None = Field(default=None, ge=0, strict=True)
     narrative: str | None = Field(default=None, max_length=100000)
     metadata: dict[str, Any] | None = None
 
@@ -107,6 +196,7 @@ class ClaimCreate(Input):
     knowledge_id: str
     text: str = Field(min_length=1, max_length=5000)
     approved: bool = False
+    position: int | None = Field(default=None, ge=0, strict=True)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -115,6 +205,7 @@ class ClaimUpdate(NonNullUpdate):
     knowledge_id: str | None = None
     text: str | None = Field(default=None, min_length=1, max_length=5000)
     approved: bool | None = None
+    position: int | None = Field(default=None, ge=0, strict=True)
     metadata: dict[str, Any] | None = None
 
 
@@ -180,7 +271,7 @@ def validate_rules(value):
 
 def values(value):
     if isinstance(value, BaseModel):
-        return value.model_dump(exclude_unset=True, exclude_none=True)
+        return value.model_dump(exclude_unset=True)
     return dict(value)
 
 
@@ -284,26 +375,30 @@ class CareerService:
         _page(limit, offset)
         where, params = [], []
         if q:
-            where.append("(title LIKE ? OR narrative LIKE ?)")
-            params += [f"%{q}%", f"%{q}%"]
+            where.append("(title LIKE ? OR organization LIKE ? OR narrative LIKE ?)")
+            params += [f"%{q}%"] * 3
         if kind:
             where.append("kind=?")
             params.append(kind)
         clause = " WHERE " + " AND ".join(where) if where else ""
         columns = (
-            "id,kind,title,version,created_at,updated_at,substr(narrative,1,240) AS narrative_preview,"
+            "id,kind,title,organization,dates,skills,position,version,created_at,updated_at,substr(narrative,1,240) AS narrative_preview,"
+            "(SELECT substr(text,1,240) FROM claims WHERE knowledge_id=knowledge.id ORDER BY position,created_at,id LIMIT 1) AS claim_preview,"
             "(SELECT COUNT(*) FROM claims WHERE knowledge_id=knowledge.id) AS claim_count,"
             "(SELECT COUNT(*) FROM files WHERE knowledge_id=knowledge.id) AS file_count"
             if summary
             else "*"
         )
         rows = self.db.all(
-            f"SELECT {columns} FROM knowledge{clause} ORDER BY created_at DESC,id LIMIT ? OFFSET ?",
+            f"SELECT {columns} FROM knowledge{clause} ORDER BY position,created_at,id LIMIT ? OFFSET ?",
             (*params, limit, offset),
         )
         total = self.db.one(f"SELECT COUNT(*) AS n FROM knowledge{clause}", params)["n"]
         return {
-            "items": rows if summary else [decode_record(row, ["metadata"]) for row in rows],
+            "items": [
+                decode_record(row, ["dates", "skills"] + ([] if summary else ["metadata"]))
+                for row in rows
+            ],
             "total": total,
         }
 
@@ -312,44 +407,76 @@ class CareerService:
         row = self.db.one("SELECT * FROM knowledge WHERE id=?", (knowledge_id,))
         if not row:
             missing("Career knowledge")
-        return decode_record(row, ["metadata"])
+        return decode_record(row, ["metadata", "dates", "skills"])
 
     def create_knowledge(self, value: KnowledgeCreate) -> dict:
         """Add detailed career evidence. Facts should come from the user, not a job posting."""
         record_id, timestamp = new_id(), now()
         with self.db.transaction() as conn:
-            conn.execute(
-                "INSERT INTO knowledge(id,kind,title,narrative,metadata,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
-                (
-                    record_id,
-                    value.kind,
-                    value.title,
-                    value.narrative,
-                    encode(value.metadata),
-                    timestamp,
-                    timestamp,
-                ),
-            )
+            self._insert_knowledge(conn, value, record_id, timestamp)
             _bump_scoring(conn)
         return self.get_knowledge(record_id)
 
+    @staticmethod
+    def _next_position(conn, table, knowledge_id=None):
+        if table == "claims":
+            row = conn.execute(
+                "SELECT MAX(position) FROM claims WHERE knowledge_id=?", (knowledge_id,)
+            ).fetchone()
+        else:
+            row = conn.execute("SELECT MAX(position) FROM knowledge").fetchone()
+        return (row[0] + 1) if row[0] is not None else 0
+
+    def _insert_knowledge(self, conn, value, record_id, timestamp):
+        position = (
+            value.position if value.position is not None else self._next_position(conn, "knowledge")
+        )
+        conn.execute(
+            "INSERT INTO knowledge(id,kind,title,organization,dates,skills,position,narrative,metadata,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                record_id,
+                value.kind,
+                value.title,
+                value.organization,
+                encode(value.dates.model_dump()) if value.dates is not None else None,
+                encode(value.skills),
+                position,
+                value.narrative,
+                encode(value.metadata),
+                timestamp,
+                timestamp,
+            ),
+        )
+
     def update_knowledge(self, knowledge_id: str, value: KnowledgeUpdate) -> dict:
-        """Revise career evidence using its current version; prior frozen application contexts remain unchanged."""
+        """Revise entry fields with version protection; dates=null clears dates, frozen contexts remain unchanged."""
         data = values(value)
         expected = data.pop("expected_version")
         with self.db.transaction() as conn:
             row = _get(conn, "knowledge", knowledge_id, "Career knowledge")
             check_version(row, expected)
-            previous = decode_record(row, ["metadata"])
+            previous = decode_record(row, ["metadata", "dates", "skills"])
             merged = {**previous, **data}
-            if any(
-                previous[key] != merged[key] for key in ["kind", "title", "narrative", "metadata"]
-            ):
+            fields = [
+                "kind",
+                "title",
+                "organization",
+                "dates",
+                "skills",
+                "position",
+                "narrative",
+                "metadata",
+            ]
+            if any(previous[key] != merged[key] for key in fields):
                 conn.execute(
-                    "UPDATE knowledge SET kind=?,title=?,narrative=?,metadata=?,version=version+1,updated_at=? WHERE id=?",
+                    "UPDATE knowledge SET kind=?,title=?,organization=?,dates=?,skills=?,position=?,narrative=?,metadata=?,version=version+1,updated_at=? WHERE id=?",
                     (
                         merged["kind"],
                         merged["title"],
+                        merged["organization"],
+                        encode(merged["dates"]) if merged["dates"] is not None else None,
+                        encode(merged["skills"]),
+                        merged["position"],
                         merged["narrative"],
                         encode(merged["metadata"]),
                         now(),
@@ -390,18 +517,19 @@ class CareerService:
             params.append(int(approved))
         if q:
             where.append(
-                "(text LIKE ? OR EXISTS(SELECT 1 FROM knowledge WHERE knowledge.id=claims.knowledge_id AND title LIKE ?))"
+                "(text LIKE ? OR EXISTS(SELECT 1 FROM knowledge WHERE knowledge.id=claims.knowledge_id AND (title LIKE ? OR organization LIKE ?)))"
             )
-            params.extend([f"%{q}%", f"%{q}%"])
+            params.extend([f"%{q}%"] * 3)
         clause = " WHERE " + " AND ".join(where) if where else ""
         columns = (
-            "id,knowledge_id,approved,version,created_at,updated_at,substr(text,1,240) AS text_preview,"
-            "(SELECT title FROM knowledge WHERE knowledge.id=claims.knowledge_id) AS knowledge_title"
+            "id,knowledge_id,approved,position,version,created_at,updated_at,substr(text,1,240) AS text_preview,"
+            "(SELECT title FROM knowledge WHERE knowledge.id=claims.knowledge_id) AS knowledge_title,"
+            "(SELECT organization FROM knowledge WHERE knowledge.id=claims.knowledge_id) AS knowledge_organization"
             if summary
             else "*"
         )
         rows = self.db.all(
-            f"SELECT {columns} FROM claims{clause} ORDER BY created_at DESC,id LIMIT ? OFFSET ?",
+            f"SELECT {columns} FROM claims{clause} ORDER BY position,created_at,id LIMIT ? OFFSET ?",
             (*params, limit, offset),
         )
         result = []
@@ -429,12 +557,15 @@ class CareerService:
         with self.db.transaction() as conn:
             _get(conn, "knowledge", value.knowledge_id, "Career knowledge")
             conn.execute(
-                "INSERT INTO claims(id,knowledge_id,text,approved,metadata,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+                "INSERT INTO claims(id,knowledge_id,text,approved,position,metadata,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
                 (
                     record_id,
                     value.knowledge_id,
                     value.text,
                     int(value.approved),
+                    value.position
+                    if value.position is not None
+                    else self._next_position(conn, "claims", value.knowledge_id),
                     encode(value.metadata),
                     timestamp,
                     timestamp,
@@ -454,16 +585,19 @@ class CareerService:
             previous["approved"] = bool(previous["approved"])
             merged = {**previous, **data}
             _get(conn, "knowledge", merged["knowledge_id"], "Career knowledge")
+            if previous["knowledge_id"] != merged["knowledge_id"] and "position" not in data:
+                merged["position"] = self._next_position(conn, "claims", merged["knowledge_id"])
             if any(
                 previous[key] != merged[key]
-                for key in ["knowledge_id", "text", "approved", "metadata"]
+                for key in ["knowledge_id", "text", "approved", "position", "metadata"]
             ):
                 conn.execute(
-                    "UPDATE claims SET knowledge_id=?,text=?,approved=?,metadata=?,version=version+1,updated_at=? WHERE id=?",
+                    "UPDATE claims SET knowledge_id=?,text=?,approved=?,position=?,metadata=?,version=version+1,updated_at=? WHERE id=?",
                     (
                         merged["knowledge_id"],
                         merged["text"],
                         int(merged["approved"]),
+                        merged["position"],
                         encode(merged["metadata"]),
                         now(),
                         claim_id,
@@ -496,7 +630,7 @@ class CareerService:
             params.append(kind)
         if q:
             where.append("(name LIKE ? OR guidance LIKE ?)")
-            params.extend([f"%{q}%", f"%{q}%"])
+            params.extend([f"%{q}%"] * 2)
         clause = " WHERE " + " AND ".join(where) if where else ""
         columns = (
             "id,name,kind,is_default,version,created_at,updated_at,"
@@ -702,18 +836,7 @@ class CareerService:
                 self._apply_profile(conn, profile_data, value.expected_profile_version)
             for item in value.knowledge:
                 record_id = new_id()
-                conn.execute(
-                    "INSERT INTO knowledge(id,kind,title,narrative,metadata,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
-                    (
-                        record_id,
-                        item.kind,
-                        item.title,
-                        item.narrative,
-                        encode(item.metadata),
-                        timestamp,
-                        timestamp,
-                    ),
-                )
+                self._insert_knowledge(conn, item, record_id, timestamp)
                 identifiers.append(record_id)
             if identifiers:
                 _bump_scoring(conn)

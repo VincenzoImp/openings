@@ -21,7 +21,7 @@ backup action to capture changes from an active WAL journal consistently.
 
 ## Restore or move hosts
 
-On the destination host, install Openings 0.7.0, set its owner password, then restore
+On the destination host, install Openings 0.8.0, set its owner password, then restore
 through Settings or `POST /api/v1/backup/restore` with the raw SQLite body. Restore
 accepts the current database format and checks integrity and foreign keys before
 replacement. It

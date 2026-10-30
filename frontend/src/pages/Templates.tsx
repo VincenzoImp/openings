@@ -195,14 +195,6 @@ export default function TemplatesPage() {
                   if (confirmLeave()) setSelected(item.id);
                 }}
               >
-                <div className="template-banner">
-                  <span className="mini-page">
-                    <span />
-                    <span />
-                    <span />
-                    <span />
-                  </span>
-                </div>
                 <strong>{item.name}</strong>
                 <small>
                   {item.kind === "resume" ? "CV" : "Cover letter"} · LaTeX ·

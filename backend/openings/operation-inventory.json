@@ -1,6 +1,6 @@
 {
   "format": "openings-operation-inventory-v1",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "status": "verified-logical-operation-map",
   "api_prefix": "/api/v1",
   "operations": [
@@ -611,7 +611,7 @@
     {
       "id": "knowledge.list",
       "group": "Career and templates",
-      "operation": "Search/filter paginated knowledge summaries",
+      "operation": "Search/filter paginated career entries summaries",
       "rest": [
         {
           "method": "GET",
@@ -621,13 +621,13 @@
       "mcp": [
         "knowledge_list"
       ],
-      "dashboard": "Career: evidence: list/search",
-      "notes": "q searches title/narrative; kind filters evidence type. summary=true omits narrative/metadata and includes 240-character preview plus claim/file counts. Detail-oriented default is preserved."
+      "dashboard": "Career: career entries: list/search",
+      "notes": "q searches title, organization and narrative; kind filters entry type. Summary includes structured headers, skill tags, position, a 240-character description preview and claim/file counts. Results follow position, created_at and id."
     },
     {
       "id": "knowledge.read",
       "group": "Career and templates",
-      "operation": "Read full knowledge",
+      "operation": "Read full career entries",
       "rest": [
         {
           "method": "GET",
@@ -637,13 +637,13 @@
       "mcp": [
         "knowledge_get"
       ],
-      "dashboard": "Career: evidence: detail",
-      "notes": "All eight kinds: experience, project, course, education, fact, skill, language, other. Narrative and arbitrary finite metadata are available in detail/edit."
+      "dashboard": "Career: career entries: detail",
+      "notes": "Kinds: experience, project, course, education, award, publication, fact, skill, language, other. Organization, nullable structured dates, skill tags and position are dedicated fields; descriptions are optional. Additional metadata excludes these reserved keys. Omitted creation position appends."
     },
     {
       "id": "knowledge.create",
       "group": "Career and templates",
-      "operation": "Create knowledge",
+      "operation": "Create career entries",
       "rest": [
         {
           "method": "POST",
@@ -653,13 +653,13 @@
       "mcp": [
         "knowledge_create"
       ],
-      "dashboard": "Career: evidence: add",
-      "notes": "All eight kinds: experience, project, course, education, fact, skill, language, other. Narrative and arbitrary finite metadata are available in detail/edit."
+      "dashboard": "Career: career entries: add",
+      "notes": "Kinds: experience, project, course, education, award, publication, fact, skill, language, other. Organization, nullable structured dates, skill tags and position are dedicated fields; descriptions are optional. Additional metadata excludes these reserved keys. Omitted creation position appends."
     },
     {
       "id": "knowledge.update",
       "group": "Career and templates",
-      "operation": "Edit knowledge with version protection",
+      "operation": "Edit career entries with version protection",
       "rest": [
         {
           "method": "PATCH",
@@ -669,13 +669,13 @@
       "mcp": [
         "knowledge_update"
       ],
-      "dashboard": "Career: evidence: edit and Advanced JSON",
-      "notes": "expected_version required. Omit unchanged fields; clear strings/lists/objects with empty values, never null."
+      "dashboard": "Career: career entries: edit and Advanced JSON",
+      "notes": "expected_version required. Omit unchanged fields; dates:null clears dates. Clear strings/lists/objects with empty values. Dedicated header fields cannot be repeated in metadata."
     },
     {
       "id": "knowledge.delete",
       "group": "Career and templates",
-      "operation": "Delete live knowledge",
+      "operation": "Delete live career entries",
       "rest": [
         {
           "method": "DELETE",
@@ -685,7 +685,7 @@
       "mcp": [
         "knowledge_delete"
       ],
-      "dashboard": "Career: evidence: remove",
+      "dashboard": "Career: career entries: remove",
       "notes": "expected_version required. Frozen contexts retain their exact copies; knowledge deletion also removes its live claims/assets."
     },
     {
@@ -702,7 +702,7 @@
         "claims_list"
       ],
       "dashboard": "Career: reusable claims: list/search",
-      "notes": "q searches claim text/evidence title; knowledge_id and approved filter provenance/review state. summary=true omits metadata and returns a 240-character text preview. Detail-oriented default is preserved."
+      "notes": "q searches claim text, entry title and organization; knowledge_id and approved filter the list. Summary includes owner title/organization, position and 240-character text preview. Entry detail reads full paginated claims."
     },
     {
       "id": "claims.read",
@@ -718,7 +718,7 @@
         "claims_get"
       ],
       "dashboard": "Career: reusable claims: detail",
-      "notes": "Claims retain knowledge_id provenance, approved flag and arbitrary finite metadata; new claims default unapproved."
+      "notes": "Claims retain knowledge_id, approved flag, explicit position and additional metadata. New claims default unapproved; omitted position appends within the entry."
     },
     {
       "id": "claims.create",
@@ -734,7 +734,7 @@
         "claims_create"
       ],
       "dashboard": "Career: reusable claims: add",
-      "notes": "Claims retain knowledge_id provenance, approved flag and arbitrary finite metadata; new claims default unapproved."
+      "notes": "Claims retain knowledge_id, approved flag, explicit position and additional metadata. New claims default unapproved; omitted position appends within the entry."
     },
     {
       "id": "claims.update",

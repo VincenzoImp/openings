@@ -473,7 +473,9 @@ export function JobsPage({
                       {job.location || "Location not specified"}
                     </span>
                     {job.complete === false && (
-                      <span className="tag amber">Needs text</span>
+                      <span className="tag amber posting-status">
+                        Needs text
+                      </span>
                     )}
                   </div>
                 </div>

@@ -60,7 +60,9 @@ support server filters; `/jobs/bulk` and `/sources/bulk` accept at most 200 vers
 items and return per-item outcomes. Application `stage_counts` span all matching
 attempts, independent of pagination. Overview accepts `since`/`until` for the
 submitted-attempt cohort. Career nonnullable PATCH fields reject explicit null:
-omit unchanged fields, or clear text/lists/objects with empty values.
+omit unchanged fields, or clear text/lists/objects with empty values. Entry dates
+are nullable; `dates: null` clears them. See [Career](career.md) for structured
+headers, partial dates, skills and ordering.
 
 ## Document and byte flow
 

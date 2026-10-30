@@ -130,8 +130,8 @@ class DocumentService:
             profile = _setting(conn, "profile", DEFAULT_PROFILE)
             instructions = _setting(conn, "instructions", {"general": DEFAULT_GUIDANCE})
             knowledge = [
-                decode_record(dict(row), ["metadata"])
-                for row in conn.execute("SELECT * FROM knowledge ORDER BY created_at,id")
+                decode_record(dict(row), ["metadata", "dates", "skills"])
+                for row in conn.execute("SELECT * FROM knowledge ORDER BY position,created_at,id")
             ]
             if value.knowledge_ids is not None:
                 requested = set(value.knowledge_ids)
@@ -144,7 +144,7 @@ class DocumentService:
             claims = [
                 decode_record(dict(row), ["metadata"])
                 for row in conn.execute(
-                    "SELECT * FROM claims WHERE approved=1 ORDER BY created_at,id"
+                    "SELECT * FROM claims WHERE approved=1 ORDER BY position,created_at,id"
                 )
                 if row["knowledge_id"] in knowledge_ids
             ]

@@ -14,7 +14,7 @@ files live in one portable SQLite database.
 
 | Find and organize | Prepare and follow through |
 |---|---|
-| **Saved searches:** choose keywords, location and LinkedIn, Indeed or Glassdoor. | **Career knowledge:** keep your profile, detailed experience, approved claims and evidence. |
+| **Saved searches:** choose keywords, location and LinkedIn, Indeed or Glassdoor. | **Career entries:** organize roles, education, publications, skills and reusable claims. |
 | **Company watch:** follow selected company ATS boards or RSS/Atom feeds. | **Your templates:** multiple LaTeX packages, assets, defaults and editable writing rules. |
 | **One inbox:** add a URL or posting yourself; search, filter, save, dismiss and update in bulk. | **Document revisions:** CVs, letters, form answers, PDF/source files and review history. |
 | **Controlled automation:** schedules, global pause, request budgets, cooldowns and visible task results. | **Application tracking:** list/Kanban, independent attempts and a funnel based on recorded progress. |
@@ -56,7 +56,7 @@ template, then save a search in **Collection** or add a job in **Inbox**. New so
 start paused; enable the schedules you want. No AI account is needed to collect,
 organize or track jobs. Optional scoring starts separately.
 
-[Setup and LAN access](docs/user/getting-started.md) · [Search configuration](docs/user/sources.md) · [Scoring](docs/user/scoring.md) · [Backup and restore](docs/user/operations.md)
+[Setup and LAN access](docs/user/getting-started.md) · [Career](docs/user/career.md) · [Search configuration](docs/user/sources.md) · [Scoring](docs/user/scoring.md) · [Backup and restore](docs/user/operations.md)
 
 To build from source instead, follow [Development](CONTRIBUTING.md).
 

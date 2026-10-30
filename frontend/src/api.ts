@@ -82,23 +82,36 @@ export interface Profile {
   metadata: Json;
   version: number;
 }
+export interface CareerDates {
+  kind: "single" | "period";
+  start: string;
+  end: string | null;
+  current: boolean;
+}
 export interface Knowledge extends Versioned {
   kind: KnowledgeKind;
   title: string;
   narrative: string;
   narrative_preview?: string;
+  claim_preview?: string;
+  organization: string;
+  dates: CareerDates | null;
+  skills: string[];
+  position: number;
+  claim_count?: number;
+  file_count?: number;
   metadata: Json;
 }
 export const knowledgeKinds = {
   experience: "Experience",
-  project: "Project",
-  course: "Course",
+  project: "Projects",
+  course: "Courses",
   education: "Education",
-  award: "Award",
-  publication: "Publication",
-  fact: "Fact",
-  skill: "Skill",
-  language: "Language",
+  award: "Awards",
+  publication: "Publications",
+  fact: "Facts",
+  skill: "Skills",
+  language: "Languages",
   other: "Other",
 } as const;
 export type KnowledgeKind = keyof typeof knowledgeKinds;
@@ -107,6 +120,8 @@ export interface Claim extends Versioned {
   text: string;
   text_preview?: string;
   knowledge_title?: string;
+  knowledge_organization?: string;
+  position: number;
   approved: boolean;
   metadata: Json;
 }
@@ -473,4 +488,33 @@ export async function downloadWorkspaceFile(file: WorkspaceFile) {
   document.body.append(link);
   link.click();
   link.remove();
+}
+
+export function careerEntryLabel(
+  entry: Pick<Knowledge, "title" | "organization">,
+) {
+  return [entry.title, entry.organization].filter(Boolean).join(" · ");
+}
+export function careerDates(dates: CareerDates | null | undefined) {
+  if (!dates) return "";
+  const monthNames = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  const format = (value: string) => {
+    const [year, month] = value.split("-");
+    return month ? `${monthNames[Number(month) - 1]} ${year}` : year;
+  };
+  if (dates.kind === "single") return format(dates.start);
+  return `${format(dates.start)} – ${dates.current ? "Present" : dates.end ? format(dates.end) : ""}`;
 }

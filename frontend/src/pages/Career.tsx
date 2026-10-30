@@ -1,11 +1,14 @@
 import { useState, type FormEvent } from "react";
 import {
   api,
-  date,
+  careerDates,
+  careerEntryLabel,
   jsonValue,
   knowledgeKinds,
   version,
+  type CareerDates,
   type Claim,
+  type KnowledgeKind,
   type Knowledge,
   type ListResult,
   type Profile,
@@ -60,7 +63,7 @@ export default function CareerPage() {
         onChange={setTab}
         items={[
           { id: "profile", label: "Profile & preferences" },
-          { id: "knowledge", label: "Career knowledge" },
+          { id: "knowledge", label: "Career entries" },
           { id: "claims", label: "Reusable claims" },
         ]}
       />
@@ -176,7 +179,7 @@ function ProfileForm() {
         </Field>
         <Field
           label="Compact scoring profile"
-          hint="A concise, factual overview for the optional scorer. Your external document agent can still read the detailed knowledge below."
+          hint="A concise, factual overview for the optional scorer. Your external document agent can still read the career entries."
         >
           <textarea
             name="scoring_summary"
@@ -265,23 +268,21 @@ function KnowledgePage() {
   const query = useDebounce(filters.q);
   const resource = useResource<ListResult<Knowledge>>(
     `/career/knowledge?summary=true&limit=30&offset=${filters.offset}&q=${encodeURIComponent(query)}&kind=${filters.kind}`,
-    {
-      items: [],
-      total: 0,
-    },
+    { items: [], total: 0 },
   );
-  const { mutate, pending, notify } = useWorkspace();
-  const [editing, setEditing] = useState<Knowledge | "new" | null>(null),
+  const { mutate, pending } = useWorkspace();
+  const [creating, setCreating] = useState(false),
+    [selected, setSelected] = useState<string | null>(null),
     [importing, setImporting] = useState(false),
     [removing, setRemoving] = useState<Knowledge | null>(null);
   return (
     <>
       <div className="sectiontitle">
         <div>
-          <h2>Career knowledge</h2>
+          <h2>Career entries</h2>
           <p>
-            Store experience, projects, courses, awards, publications and
-            supporting facts for application documents.
+            Organize your experience, education, projects and skills. Each entry
+            can hold reusable claims.
           </p>
         </div>
         <div className="actions">
@@ -291,9 +292,9 @@ function KnowledgePage() {
           <Button
             variant="primary"
             icon="plus"
-            onClick={() => setEditing("new")}
+            onClick={() => setCreating(true)}
           >
-            Add knowledge
+            Add entry
           </Button>
         </div>
       </div>
@@ -304,14 +305,14 @@ function KnowledgePage() {
         <div className="search">
           <Icon name="search" />
           <input
-            aria-label="Search career knowledge"
-            placeholder="Search career knowledge"
+            aria-label="Search career entries"
+            placeholder="Search titles, organizations or descriptions"
             value={filters.q}
             onChange={(e) => setFilters({ q: e.target.value, offset: "0" })}
           />
         </div>
         <select
-          aria-label="Knowledge type"
+          aria-label="Entry type"
           value={filters.kind}
           onChange={(e) => setFilters({ kind: e.target.value, offset: "0" })}
         >
@@ -323,66 +324,86 @@ function KnowledgePage() {
           ))}
         </select>
       </div>
-      <div className="knowledge-grid">
+      <div className="career-entry-list">
         {resource.loading ? (
           <Loading />
         ) : resource.data.items.length ? (
           resource.data.items.map((item) => (
-            <article className="card knowledge-card" key={item.id}>
-              <div className="knowledge-head">
-                <div>
-                  <span className="eyebrow">
-                    {knowledgeKinds[item.kind] || item.kind}
-                  </span>
-                  <h3>{item.title}</h3>
-                  <small className="muted">
-                    {String(item.metadata?.dates || date(item.updated_at))}
-                  </small>
-                </div>
-                <div className="actions">
+            <article className="card career-entry-card" key={item.id}>
+              <div className="career-entry-copy">
+                <span className="eyebrow">{knowledgeKinds[item.kind]}</span>
+                <h3>
                   <button
-                    className="iconbtn"
-                    aria-label={`Edit ${item.title}`}
-                    onClick={() =>
-                      api<Knowledge>(`/career/knowledge/${item.id}`)
-                        .then(setEditing)
-                        .catch((e) => notify(e.message, true))
-                    }
+                    type="button"
+                    className="career-entry-title"
+                    aria-label={`Open ${careerEntryLabel(item)}`}
+                    onClick={() => setSelected(item.id)}
                   >
-                    <Icon name="edit" />
+                    {item.title}
                   </button>
-                  <button
-                    className="iconbtn danger"
-                    aria-label={`Delete ${item.title}`}
-                    onClick={() => setRemoving(item)}
-                  >
-                    <Icon name="trash" />
-                  </button>
-                </div>
+                </h3>
+                {item.organization && (
+                  <p className="career-entry-organization">
+                    {item.organization}
+                  </p>
+                )}
+                {(item.narrative_preview?.trim() ||
+                  item.claim_preview?.trim()) && (
+                  <p className="career-entry-preview">
+                    {!item.narrative_preview?.trim() && (
+                      <span className="career-preview-label">Claim · </span>
+                    )}
+                    {item.narrative_preview?.trim() ||
+                      item.claim_preview?.trim()}
+                  </p>
+                )}
               </div>
-              <p className="narrative">
-                {item.narrative_preview || item.narrative}
-              </p>
-              <LazyDetails
-                className="evidence-files"
-                summary="Supporting files"
-              >
-                <FileManager ownerType="knowledge" ownerId={item.id} />
-              </LazyDetails>
+              <div className="career-entry-meta">
+                {item.dates && (
+                  <span className="career-entry-dates">
+                    {careerDates(item.dates)}
+                  </span>
+                )}
+                <small>
+                  {item.claim_count ?? 0}{" "}
+                  {(item.claim_count ?? 0) === 1 ? "claim" : "claims"}
+                  {item.file_count
+                    ? ` · ${item.file_count} ${item.file_count === 1 ? "file" : "files"}`
+                    : ""}
+                </small>
+              </div>
+              <div className="actions career-entry-actions">
+                <button
+                  type="button"
+                  className="iconbtn"
+                  aria-label={`Open details for ${careerEntryLabel(item)}`}
+                  onClick={() => setSelected(item.id)}
+                >
+                  <Icon name="arrow" />
+                </button>
+                <button
+                  type="button"
+                  className="iconbtn danger"
+                  aria-label={`Delete ${careerEntryLabel(item)}`}
+                  onClick={() => setRemoving(item)}
+                >
+                  <Icon name="trash" />
+                </button>
+              </div>
             </article>
           ))
         ) : (
           <section className="card">
             <Empty
-              title="No career knowledge in this view"
+              title="No career entries in this view"
               action={
-                <Button icon="plus" onClick={() => setEditing("new")}>
+                <Button icon="plus" onClick={() => setCreating(true)}>
                   Add your first entry
                 </Button>
               }
             >
-              Record projects, responsibilities, decisions and outcomes. Your
-              agent can turn this context into relevant application wording.
+              Add a title and any facts you know. Descriptions and claims can be
+              added later.
             </Empty>
           </section>
         )}
@@ -392,21 +413,28 @@ function KnowledgePage() {
         total={resource.data.total}
         onChange={(offset) => setFilters({ offset: String(offset) })}
       />
-      {editing && (
+      {creating && (
         <KnowledgeEditor
-          record={editing === "new" ? undefined : editing}
-          onClose={() => setEditing(null)}
+          onClose={() => setCreating(false)}
+          onSaved={(entry) => {
+            setCreating(false);
+            setSelected(entry.id);
+          }}
         />
-      )}{" "}
-      {importing && <KnowledgeImport onClose={() => setImporting(false)} />}{" "}
+      )}
+      {selected && (
+        <KnowledgeDetail id={selected} onClose={() => setSelected(null)} />
+      )}
+      {importing && <KnowledgeImport onClose={() => setImporting(false)} />}
       {removing && (
         <Dialog
-          title="Remove this knowledge entry?"
+          title="Remove this career entry?"
           onClose={() => setRemoving(null)}
         >
           <p className="modal-intro">
-            Remove {removing.title} from your current career record. Existing
-            application snapshots retain the evidence they used.
+            Remove {careerEntryLabel(removing)} and its claims from your current
+            career record. Existing application snapshots retain the content
+            they used.
           </p>
           <div className="actions form-actions">
             <Button onClick={() => setRemoving(null)}>Keep entry</Button>
@@ -421,7 +449,7 @@ function KnowledgePage() {
                         `/career/knowledge/${removing.id}?expected_version=${removing.version}`,
                         "DELETE",
                       ),
-                    "Knowledge entry removed.",
+                    "Career entry removed.",
                   )
                 )
                   setRemoving(null);
@@ -435,89 +463,236 @@ function KnowledgePage() {
     </>
   );
 }
+function KnowledgeDetail({ id, onClose }: { id: string; onClose: () => void }) {
+  const resource = useResource<Knowledge | null>(
+    `/career/knowledge/${id}`,
+    null,
+  );
+  const [editing, setEditing] = useState(false);
+  const entry = resource.data;
+  return (
+    <Dialog drawer title={entry?.title || "Career entry"} onClose={onClose}>
+      {resource.error ? (
+        <ErrorBox message={resource.error} retry={resource.reload} />
+      ) : resource.loading || !entry ? (
+        <Loading />
+      ) : (
+        <>
+          <div className="career-detail-header">
+            <div>
+              <span className="eyebrow">{knowledgeKinds[entry.kind]}</span>
+              {entry.organization && (
+                <p className="career-detail-organization">
+                  {entry.organization}
+                </p>
+              )}
+              {entry.dates && (
+                <p className="muted">{careerDates(entry.dates)}</p>
+              )}
+            </div>
+            <Button icon="edit" onClick={() => setEditing(true)}>
+              Edit details
+            </Button>
+          </div>
+          {!!entry.skills.length && (
+            <div className="career-skill-tags" aria-label="Entry skills">
+              {entry.skills.map((skill) => (
+                <span className="tag neutral" key={skill}>
+                  {skill}
+                </span>
+              ))}
+            </div>
+          )}
+          {entry.narrative && (
+            <section className="career-description">
+              <h3>Description</h3>
+              <p className="narrative">{entry.narrative}</p>
+            </section>
+          )}
+          <EntryClaims entry={entry} />
+          <LazyDetails className="evidence-files" summary="Supporting files">
+            <FileManager ownerType="knowledge" ownerId={entry.id} />
+          </LazyDetails>
+        </>
+      )}
+      {editing && entry && (
+        <KnowledgeEditor
+          record={entry}
+          onClose={() => setEditing(false)}
+          onSaved={(saved) => {
+            setEditing(false);
+            resource.setData(saved);
+            resource.reload();
+          }}
+        />
+      )}
+    </Dialog>
+  );
+}
+const entryLabels: Partial<Record<KnowledgeKind, [string, string]>> = {
+  experience: ["Job title", "Organization"],
+  education: ["Qualification", "Institution"],
+  award: ["Award", "Awarding organization"],
+  publication: ["Publication title", "Venue"],
+  project: ["Project title", "Organization"],
+  course: ["Course title", "Provider"],
+  skill: ["Group title", "Organization"],
+  language: ["Language or group", "Organization"],
+};
 function KnowledgeEditor({
   record,
   onClose,
+  onSaved,
 }: {
   record?: Knowledge;
   onClose: () => void;
+  onSaved: (record: Knowledge) => void;
 }) {
   const { mutate, pending } = useWorkspace();
+  const [kind, setKind] = useState<KnowledgeKind>(record?.kind || "experience");
+  const [mode, setMode] = useState<"none" | CareerDates["kind"]>(
+    record?.dates?.kind || "none",
+  );
+  const [current, setCurrent] = useState(record?.dates?.current || false);
+  const [start, setStart] = useState(dateParts(record?.dates?.start));
+  const [end, setEnd] = useState(dateParts(record?.dates?.end));
+  const labels = entryLabels[kind] || ["Title", "Organization"];
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
-    const body = {
-      kind: f.get("kind"),
-      title: f.get("title"),
-      narrative: f.get("narrative"),
-      metadata: {
-        ...jsonValue(f, "metadata", record?.metadata || {}),
-        dates: f.get("dates"),
+    const dates: CareerDates | null =
+      mode === "none"
+        ? null
+        : {
+            kind: mode,
+            start: dateValue(start),
+            end: mode === "period" && !current ? dateValue(end) : null,
+            current: mode === "period" && current,
+          };
+    let result: Knowledge | undefined;
+    const ok = await mutate(async () => {
+      const body = {
+        kind,
+        title: f.get("title"),
+        organization: f.get("organization"),
+        narrative: f.get("narrative"),
+        dates,
         skills: String(f.get("skills") || "")
           .split(",")
           .map((x) => x.trim())
           .filter(Boolean),
-      },
-    };
-    if (
-      await mutate(
-        () =>
-          api(
-            record ? `/career/knowledge/${record.id}` : "/career/knowledge",
-            record ? "PATCH" : "POST",
-            record ? version(record, body) : body,
-          ),
-        "Career knowledge saved.",
-      )
-    )
-      onClose();
+        ...(String(f.get("position") || "")
+          ? { position: Number(f.get("position")) }
+          : {}),
+        metadata: jsonValue(f, "metadata", record?.metadata || {}),
+      };
+      const saved = await api<Knowledge>(
+        record ? `/career/knowledge/${record.id}` : "/career/knowledge",
+        record ? "PATCH" : "POST",
+        record ? version(record, body) : body,
+      );
+      // The mutation clears the submitted form's dirty state before closing it.
+      result = saved;
+    }, "Career entry saved.");
+    if (ok && result) onSaved(result);
   }
   return (
     <Dialog
-      title={record ? "Edit career knowledge." : "Add career knowledge."}
+      title={record ? "Edit career entry" : "Add career entry"}
       onClose={onClose}
     >
       <form onSubmit={save}>
-        <div className="formgrid">
-          <Field label="Type">
-            <select name="kind" defaultValue={record?.kind || "experience"}>
-              {Object.entries(knowledgeKinds).map(([kind, label]) => (
-                <option key={kind} value={kind}>
-                  {label}
-                </option>
-              ))}
+        <Field label="Type">
+          <select
+            name="kind"
+            value={kind}
+            onChange={(e) => setKind(e.target.value as KnowledgeKind)}
+          >
+            {Object.entries(knowledgeKinds).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={labels[0]}>
+          <input
+            name="title"
+            required
+            maxLength={300}
+            defaultValue={record?.title}
+          />
+        </Field>
+        <Field label={`${labels[1]} (optional)`}>
+          <input
+            name="organization"
+            maxLength={300}
+            defaultValue={record?.organization}
+          />
+        </Field>
+        <fieldset className="career-date-fields">
+          <legend>Dates</legend>
+          <Field label="Date mode">
+            <select
+              name="date_mode"
+              value={mode}
+              onChange={(e) => setMode(e.target.value as typeof mode)}
+            >
+              <option value="none">No date</option>
+              <option value="single">Single date</option>
+              <option value="period">Period</option>
             </select>
           </Field>
-          <Field label="Dates">
-            <input
-              name="dates"
-              defaultValue={String(record?.metadata.dates || "")}
-              placeholder="2021 – present"
+          {mode !== "none" && (
+            <DatePart
+              label={mode === "single" ? "" : "Start"}
+              value={start}
+              onChange={setStart}
             />
-          </Field>
-        </div>
-        <Field label="Title / organization">
-          <input name="title" required defaultValue={record?.title} />
+          )}
+          {mode === "period" && (
+            <>
+              <label className="checkline">
+                <input
+                  name="current"
+                  type="checkbox"
+                  checked={current}
+                  onChange={(e) => setCurrent(e.target.checked)}
+                />
+                Present
+              </label>
+              {!current && (
+                <DatePart label="End" value={end} onChange={setEnd} />
+              )}
+            </>
+          )}
+        </fieldset>
+        <Field
+          label="Skills"
+          hint="Separate skill tags with commas. They describe this entry."
+        >
+          <input name="skills" defaultValue={record?.skills.join(", ")} />
         </Field>
         <Field
-          label="Detailed evidence"
-          hint="Record the facts, context and supporting details. Keep claims factual."
+          label="Description (optional)"
+          hint="Add supporting facts and context when you are ready. Reusable CV wording belongs in claims."
         >
           <textarea
             name="narrative"
-            rows={10}
-            required
+            rows={5}
             defaultValue={record?.narrative}
           />
         </Field>
-        <Field label="Skills" hint="Separate with commas.">
+        <Field
+          label="Order"
+          hint="Lower numbers appear first. Leave blank to append a new entry."
+        >
           <input
-            name="skills"
-            defaultValue={
-              Array.isArray(record?.metadata.skills)
-                ? record?.metadata.skills.join(", ")
-                : ""
-            }
+            name="position"
+            type="number"
+            min={0}
+            step={1}
+            defaultValue={record?.position}
           />
         </Field>
         <AdvancedJson name="metadata" value={record?.metadata || {}} />
@@ -526,11 +701,74 @@ function KnowledgeEditor({
             Cancel
           </Button>
           <Button variant="primary" disabled={pending}>
-            Save knowledge
+            Save entry
           </Button>
         </div>
       </form>
     </Dialog>
+  );
+}
+type DateParts = { year: string; month: string };
+function dateParts(value?: string | null): DateParts {
+  const [year = "", month = ""] = (value || "").split("-");
+  return { year, month };
+}
+function dateValue(value: DateParts) {
+  return value.year.padStart(4, "0") + (value.month ? `-${value.month}` : "");
+}
+function DatePart({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: DateParts;
+  onChange: (value: DateParts) => void;
+}) {
+  return (
+    <div className="career-date-parts">
+      <Field label={label ? `${label} year` : "Year"}>
+        <input
+          type="number"
+          name={`${label || "date"}_year`}
+          required
+          min={1}
+          max={9999}
+          step={1}
+          inputMode="numeric"
+          placeholder="2025"
+          value={value.year}
+          onChange={(e) => onChange({ ...value, year: e.target.value })}
+        />
+      </Field>
+      <Field label={label ? `${label} month` : "Month"}>
+        <select
+          name={`${label || "date"}_month`}
+          value={value.month}
+          onChange={(e) => onChange({ ...value, month: e.target.value })}
+        >
+          <option value="">Year only</option>
+          {[
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
+          ].map((name, i) => (
+            <option key={name} value={String(i + 1).padStart(2, "0")}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </Field>
+    </div>
   );
 }
 interface ImportPreview {
@@ -570,7 +808,7 @@ function KnowledgeImport({ onClose }: { onClose: () => void }) {
       onClose();
   }
   return (
-    <Dialog title="Import career knowledge." onClose={onClose}>
+    <Dialog title="Import career entries" onClose={onClose}>
       <p className="modal-intro">
         Preview text, Markdown or JSON before adding it. Profile fields are
         changed only after you confirm the preview.
@@ -643,10 +881,14 @@ function KnowledgeImport({ onClose }: { onClose: () => void }) {
                     : "Other"}
                 </span>
                 <h3>{entry.title}</h3>
-                <p>
-                  {entry.narrative?.slice(0, 180)}
-                  {(entry.narrative?.length || 0) > 180 ? "…" : ""}
-                </p>
+                {entry.organization && <p>{entry.organization}</p>}
+                {entry.dates && <small>{careerDates(entry.dates)}</small>}
+                {entry.narrative && (
+                  <p>
+                    {entry.narrative.slice(0, 180)}
+                    {entry.narrative.length > 180 ? "…" : ""}
+                  </p>
+                )}
               </article>
             ))}
           </div>
@@ -670,21 +912,14 @@ function ClaimsPage() {
   });
   const query = useDebounce(filters.q);
   const resource = useResource<ListResult<Claim>>(
-      `/career/claims?summary=true&limit=30&offset=${filters.offset}&q=${encodeURIComponent(query)}${filters.approved ? `&approved=${filters.approved}` : ""}${filters.knowledge_id ? `&knowledge_id=${filters.knowledge_id}` : ""}`,
-      {
-        items: [],
-        total: 0,
-      },
-    ),
-    knowledge = useResource<ListResult<Knowledge>>(
-      "/career/knowledge?summary=true",
-      {
-        items: [],
-        total: 0,
-      },
-      true,
-    );
-  const { mutate, pending, notify } = useWorkspace();
+    `/career/claims?summary=true&limit=30&offset=${filters.offset}&q=${encodeURIComponent(query)}${filters.approved ? `&approved=${filters.approved}` : ""}${filters.knowledge_id ? `&knowledge_id=${filters.knowledge_id}` : ""}`,
+    { items: [], total: 0 },
+  );
+  const knowledge = useResource<ListResult<Knowledge>>(
+    "/career/knowledge?summary=true",
+    { items: [], total: 0 },
+    true,
+  );
   const [editing, setEditing] = useState<Claim | "new" | null>(null);
   return (
     <>
@@ -692,28 +927,32 @@ function ClaimsPage() {
         <div>
           <h2>Reusable claims</h2>
           <p>
-            Approved claims are available for your agent to reuse. New wording
-            can still come from detailed knowledge.
+            Keep reusable wording linked to a career entry. Approve the content
+            you want your agent to use.
           </p>
         </div>
         <Button
           variant="primary"
           icon="plus"
+          disabled={
+            knowledge.loading ||
+            !!knowledge.error ||
+            !knowledge.data.items.length
+          }
           onClick={() => setEditing("new")}
-          disabled={!knowledge.data.items.length}
         >
           Add claim
         </Button>
       </div>
-      {resource.error && (
-        <ErrorBox message={resource.error} retry={resource.reload} />
+      {knowledge.error && (
+        <ErrorBox message={knowledge.error} retry={knowledge.reload} />
       )}
       <div className="toolbar">
         <div className="search">
           <Icon name="search" />
           <input
             aria-label="Search claims"
-            placeholder="Search statements"
+            placeholder="Search claims, titles or organizations"
             value={filters.q}
             onChange={(e) => setFilters({ q: e.target.value, offset: "0" })}
           />
@@ -730,21 +969,94 @@ function ClaimsPage() {
           <option value="false">Draft</option>
         </select>
         <select
-          aria-label="Supporting knowledge filter"
+          aria-label="Entry filter"
           value={filters.knowledge_id}
           onChange={(e) =>
             setFilters({ knowledge_id: e.target.value, offset: "0" })
           }
         >
-          <option value="">All evidence</option>
+          <option value="">All entries</option>
           {knowledge.data.items.map((k) => (
             <option key={k.id} value={k.id}>
-              {k.title}
+              {careerEntryLabel(k)}
             </option>
           ))}
         </select>
       </div>
-      <section className="card">
+      <ClaimList resource={resource} onEdit={setEditing} />
+      <Pagination
+        offset={Number(filters.offset) || 0}
+        total={resource.data.total}
+        onChange={(offset) => setFilters({ offset: String(offset) })}
+      />
+      {editing && (
+        <ClaimEditor
+          record={editing === "new" ? undefined : editing}
+          knowledge={knowledge.data.items}
+          onClose={() => setEditing(null)}
+        />
+      )}
+    </>
+  );
+}
+function EntryClaims({ entry }: { entry: Knowledge }) {
+  const [offset, setOffset] = useState(0),
+    [editing, setEditing] = useState<Claim | "new" | null>(null);
+  const resource = useResource<ListResult<Claim>>(
+    `/career/claims?knowledge_id=${entry.id}&limit=30&offset=${offset}`,
+    { items: [], total: 0 },
+  );
+  return (
+    <section className="career-entry-claims">
+      <div className="sectiontitle">
+        <div>
+          <h3>
+            Claims <span className="muted">({resource.data.total})</span>
+          </h3>
+          <p>Reusable wording for this entry.</p>
+        </div>
+        <Button icon="plus" onClick={() => setEditing("new")}>
+          Add claim
+        </Button>
+      </div>
+      <ClaimList resource={resource} onEdit={setEditing} entry={entry} />
+      {resource.data.total > 30 && (
+        <Pagination
+          offset={offset}
+          total={resource.data.total}
+          onChange={setOffset}
+        />
+      )}
+      {editing && (
+        <ClaimEditor
+          record={editing === "new" ? undefined : editing}
+          knowledge={[entry]}
+          fixedEntry={entry}
+          onClose={() => setEditing(null)}
+        />
+      )}
+    </section>
+  );
+}
+function ClaimList({
+  resource,
+  onEdit,
+  entry,
+}: {
+  resource: ReturnType<typeof useResource<ListResult<Claim>>>;
+  onEdit: (claim: Claim) => void;
+  entry?: Knowledge;
+}) {
+  const { mutate, pending, notify } = useWorkspace();
+  const [removing, setRemoving] = useState<Claim | null>(null);
+  return (
+    <>
+      {resource.error && (
+        <ErrorBox message={resource.error} retry={resource.reload} />
+      )}
+      <section
+        className={`card career-claims-list ${entry ? "entry-scoped-claims" : ""}`}
+      >
         {resource.loading ? (
           <Loading />
         ) : resource.data.items.length ? (
@@ -773,65 +1085,81 @@ function ClaimsPage() {
               </label>
               <div className="claimcopy">
                 <p>{claim.text_preview || claim.text}</p>
-                <small>
-                  {claim.knowledge_title ||
-                    knowledge.data.items.find(
-                      (k) => k.id === claim.knowledge_id,
-                    )?.title ||
-                    "Linked career evidence"}
-                </small>
+                {!entry && (
+                  <small>
+                    {[claim.knowledge_title, claim.knowledge_organization]
+                      .filter(Boolean)
+                      .join(" · ") || "Career entry"}
+                  </small>
+                )}
               </div>
               <span className={`tag ${claim.approved ? "green" : "neutral"}`}>
                 {claim.approved ? "Approved" : "Draft"}
               </span>
-              <button
-                className="iconbtn"
-                aria-label="Edit claim"
-                onClick={() =>
-                  api<Claim>(`/career/claims/${claim.id}`)
-                    .then(setEditing)
-                    .catch((e) => notify(e.message, true))
-                }
-              >
-                <Icon name="edit" />
-              </button>
-              <button
-                className="iconbtn danger"
-                aria-label="Delete claim"
-                disabled={pending}
-                onClick={() =>
-                  mutate(
-                    () =>
-                      api(
-                        `/career/claims/${claim.id}?expected_version=${claim.version}`,
-                        "DELETE",
-                      ),
-                    "Claim removed.",
-                  )
-                }
-              >
-                <Icon name="trash" />
-              </button>
+              <div className="actions claim-actions">
+                <button
+                  type="button"
+                  className="iconbtn"
+                  aria-label="Edit claim"
+                  onClick={() =>
+                    api<Claim>(`/career/claims/${claim.id}`)
+                      .then(onEdit)
+                      .catch((e) => notify(e.message, true))
+                  }
+                >
+                  <Icon name="edit" />
+                </button>
+                <button
+                  type="button"
+                  className="iconbtn danger"
+                  aria-label="Delete claim"
+                  disabled={pending}
+                  onClick={() => setRemoving(claim)}
+                >
+                  <Icon name="trash" />
+                </button>
+              </div>
             </article>
           ))
         ) : (
           <Empty title="No claims in this view">
-            Add detailed career knowledge first, then collect concise statements
-            you may want to reuse.
+            {entry
+              ? "Add a result, responsibility or skill list when you are ready."
+              : "Add claims to your career entries, then review them here."}
           </Empty>
         )}
       </section>
-      <Pagination
-        offset={Number(filters.offset) || 0}
-        total={resource.data.total}
-        onChange={(offset) => setFilters({ offset: String(offset) })}
-      />
-      {editing && (
-        <ClaimEditor
-          record={editing === "new" ? undefined : editing}
-          knowledge={knowledge.data.items}
-          onClose={() => setEditing(null)}
-        />
+      {removing && (
+        <Dialog title="Remove this claim?" onClose={() => setRemoving(null)}>
+          <p className="modal-intro">
+            {removing.text_preview || removing.text}
+          </p>
+          <p className="hint">
+            Existing application snapshots retain their copy.
+          </p>
+          <div className="actions form-actions">
+            <Button onClick={() => setRemoving(null)}>Keep claim</Button>
+            <Button
+              variant="danger-fill"
+              disabled={pending}
+              onClick={async () => {
+                if (
+                  await mutate(
+                    () =>
+                      api(
+                        `/career/claims/${removing.id}?expected_version=${removing.version}`,
+                        "DELETE",
+                      ),
+                    "Claim removed.",
+                  )
+                )
+                  setRemoving(null);
+              }}
+            >
+              Remove claim
+            </Button>
+          </div>
+        </Dialog>
       )}
     </>
   );
@@ -839,58 +1167,85 @@ function ClaimsPage() {
 function ClaimEditor({
   record,
   knowledge,
+  fixedEntry,
   onClose,
 }: {
   record?: Claim;
   knowledge: Knowledge[];
+  fixedEntry?: Knowledge;
   onClose: () => void;
 }) {
   const { mutate, pending } = useWorkspace();
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget),
-      body = {
-        knowledge_id: f.get("knowledge_id"),
-        text: f.get("text"),
-        approved: f.get("approved") === "on",
-        metadata: jsonValue(f, "metadata", record?.metadata || {}),
-      };
+    const f = new FormData(e.currentTarget);
     if (
-      await mutate(
-        () =>
-          api(
-            record ? `/career/claims/${record.id}` : "/career/claims",
-            record ? "PATCH" : "POST",
-            record ? version(record, body) : body,
-          ),
-        "Claim saved.",
-      )
+      await mutate(() => {
+        const body = {
+          knowledge_id: f.get("knowledge_id"),
+          text: f.get("text"),
+          approved: f.get("approved") === "on",
+          ...(String(f.get("position") || "")
+            ? { position: Number(f.get("position")) }
+            : {}),
+          metadata: jsonValue(f, "metadata", record?.metadata || {}),
+        };
+        return api(
+          record ? `/career/claims/${record.id}` : "/career/claims",
+          record ? "PATCH" : "POST",
+          record ? version(record, body) : body,
+        );
+      }, "Claim saved.")
     )
       onClose();
   }
   return (
     <Dialog
-      title={record ? "Edit a reusable claim." : "Add a reusable claim."}
+      title={record ? "Edit reusable claim" : "Add reusable claim"}
       onClose={onClose}
     >
       <form onSubmit={save}>
-        <Field label="Supporting knowledge">
-          <select
-            name="knowledge_id"
-            required
-            defaultValue={record?.knowledge_id}
-          >
-            {knowledge.map((k) => (
-              <option key={k.id} value={k.id}>
-                {k.title}
-              </option>
-            ))}
-          </select>
-        </Field>
+        {fixedEntry ? (
+          <>
+            <input type="hidden" name="knowledge_id" value={fixedEntry.id} />
+            <p className="modal-intro">{careerEntryLabel(fixedEntry)}</p>
+          </>
+        ) : (
+          <Field label="Career entry">
+            <select
+              name="knowledge_id"
+              required
+              defaultValue={record?.knowledge_id}
+            >
+              {knowledge.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {careerEntryLabel(k)}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
         <Field label="Claim">
-          <textarea name="text" rows={6} required defaultValue={record?.text} />
+          <textarea
+            name="text"
+            rows={6}
+            required
+            maxLength={5000}
+            defaultValue={record?.text}
+          />
         </Field>
-        <AdvancedJson name="metadata" value={record?.metadata || {}} />
+        <Field
+          label="Order"
+          hint="Lower numbers appear first within the entry. Leave blank to append a new claim."
+        >
+          <input
+            name="position"
+            type="number"
+            min={0}
+            step={1}
+            defaultValue={record?.position}
+          />
+        </Field>
         <label className="checkline">
           <input
             type="checkbox"
@@ -899,7 +1254,11 @@ function ClaimEditor({
           />
           I have reviewed and approved this claim
         </label>
+        <AdvancedJson name="metadata" value={record?.metadata || {}} />
         <div className="actions form-actions">
+          <Button type="button" onClick={onClose}>
+            Cancel
+          </Button>
           <Button variant="primary" disabled={pending}>
             Save claim
           </Button>
