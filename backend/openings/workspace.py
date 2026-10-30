@@ -232,6 +232,7 @@ class Workspace:
         created_since=None,
         created_until=None,
         revisions=(0, 0),
+        complete=None,
     ):
         conditions, args = [], []
         if triage:
@@ -252,6 +253,9 @@ class Workspace:
         if remote is not None:
             conditions.append("json_extract(j.metadata,'$.is_remote')=?")
             args.append(int(remote))
+        if complete is not None:
+            conditions.append("(length(trim(j.posting))>0)=?")
+            args.append(int(complete))
         if job_type:
             conditions.append("json_extract(j.metadata,'$.job_type')=?")
             args.append(job_type)
@@ -298,6 +302,7 @@ class Workspace:
         score_state="all",
         created_since=None,
         created_until=None,
+        complete=None,
     ):
         limit, offset = min(max(int(limit), 1), 200), max(int(offset), 0)
         with self.db.connect() as connection:
@@ -316,6 +321,7 @@ class Workspace:
                 created_since,
                 created_until,
                 revisions,
+                complete,
             )
             base = " FROM jobs j" + self._job_join()
             order = {
