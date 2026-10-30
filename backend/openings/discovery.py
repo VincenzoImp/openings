@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from .common import check_version, decode_record, encode, missing, new_id, now
 from .errors import DomainError
+from .posting import posting_complete_sql
 from .worker import inference_guard
 from .collectors import company as company_collectors
 from .collectors import jobspy as jobspy_collector
@@ -1510,7 +1511,7 @@ class DiscoveryService:
         if not config["enabled"]:
             return None
         job = self.workspace.get_job(job_id)
-        if job["triage"] == "dismissed" or not job["posting"].strip():
+        if job["triage"] == "dismissed" or not job["complete"]:
             return None
         context = self.assessment_context(job_id)
         if (
@@ -1584,7 +1585,9 @@ class DiscoveryService:
             ids = [
                 row["id"]
                 for row in self.db.all(
-                    "SELECT j.id FROM jobs j WHERE j.triage<>'dismissed' AND j.posting<>'' AND NOT EXISTS (SELECT 1 FROM assessments a WHERE a.job_id=j.id AND a.job_version=j.content_version AND a.profile_version=? AND a.config_version=?) ORDER BY j.created_at DESC LIMIT ?",
+                    "SELECT j.id FROM jobs j WHERE j.triage<>'dismissed' AND "
+                    + posting_complete_sql()
+                    + " AND NOT EXISTS (SELECT 1 FROM assessments a WHERE a.job_id=j.id AND a.job_version=j.content_version AND a.profile_version=? AND a.config_version=?) ORDER BY j.created_at DESC LIMIT ?",
                     (self.workspace.scoring_profile_version(), self._config_version(), value.limit),
                 )
             ]
@@ -1790,7 +1793,8 @@ class DiscoveryService:
         source["known"] = {
             row["source_key"]: json.loads(row["metadata"])
             for row in self.db.all(
-                "SELECT json_extract(p.payload,'$.source_key') AS source_key,j.metadata FROM postings p JOIN jobs j ON j.id=p.job_id WHERE p.source_id=? AND j.posting<>''",
+                "SELECT json_extract(p.payload,'$.source_key') AS source_key,j.metadata FROM postings p JOIN jobs j ON j.id=p.job_id WHERE p.source_id=? AND "
+                + posting_complete_sql(),
                 (source["id"],),
             )
             if row["source_key"]
@@ -1861,7 +1865,7 @@ class DiscoveryService:
             context = self._assessment_context(job["id"])
         if not config["enabled"]:
             return {"skipped": "scoring_disabled"}
-        if job["triage"] == "dismissed" or not job["posting"].strip():
+        if job["triage"] == "dismissed" or not job["complete"]:
             return {"skipped": "job_not_eligible_for_scoring"}
         previous = self.db.one(
             "SELECT id,score,model FROM assessments WHERE job_id=? AND json_extract(payload,'$.task_id')=? LIMIT 1",

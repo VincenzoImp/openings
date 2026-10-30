@@ -44,6 +44,59 @@ def policy(service, provider, **changes):
     )
 
 
+def test_jobcloud_template_body_and_partial_preview_remain_distinct():
+    source = {
+        "name": "Example search", "kind": "jobcloud",
+        "config": company.JobCloudConfig(query="engineer", max_details=1).model_dump(),
+    }
+    listing = {"documents": [
+        {"job_id": "full", "title": "Engineer", "preview": "Python, SQL"},
+        {"job_id": "partial", "title": "Engineer", "preview": "Keyword preview"},
+    ]}
+    calls = []
+
+    def request(url, **kwargs):
+        calls.append(url)
+        return json.dumps(
+            {"template_lead_text": "<p>About us</p>", "template_text": "<p>Build APIs.</p>"}
+            if url.endswith("/job/full") else listing
+        ).encode()
+
+    rows = company.collect(source, request, module.html_text)
+    assert "About us" in rows[0]["posting"] and "Build APIs." in rows[0]["posting"]
+    assert rows[0]["metadata"]["description_complete"] is True
+    assert rows[1]["posting"] == "Keyword preview"
+    assert rows[1]["metadata"]["description_complete"] is False
+    assert len(calls) == 2
+    calls.clear()
+    known = {"jobcloud:jobs.ch:full": rows[0]["metadata"]}
+    refreshed = company.collect(source, request, module.html_text, known=known)
+    assert refreshed[0]["posting"] == ""
+    assert refreshed[0]["metadata"]["description_complete"] is True
+    assert len(calls) == 2 and not any(url.endswith("/job/full") for url in calls)
+
+
+def test_only_complete_postings_skip_future_detail_requests(collection, monkeypatch):
+    workspace, service = collection
+    source = service.create_source(
+        SourceCreate(name="Example search", kind="jobcloud", config={"query": "engineer"})
+    )
+    for key, text, metadata in (
+        ("full", "Build APIs.", {}),
+        ("partial", "Python, SQL", {"description_complete": False}),
+        ("placeholder", "-", {}),
+    ):
+        workspace.ingest_job(
+            {"source_id": source["id"], "source_key": key, "posting": text, "metadata": metadata}
+        )
+    observed = {}
+    monkeypatch.setattr(module, "fetch_postings", lambda value: observed.update(value["known"]) or [])
+    service.queue_collection(source["id"])
+    task = service.claim_task("test-collector", kind="collect")
+    service.run_task(task, "test-collector")
+    assert set(observed) == {"full"}
+
+
 @pytest.mark.parametrize("header", ["120", "date"])
 def test_every_http_attempt_obeys_persisted_cooldown_and_windows(collection, monkeypatch, header):
     workspace, service = collection
