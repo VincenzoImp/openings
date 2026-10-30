@@ -77,8 +77,11 @@ omit unchanged fields, or clear text/lists/objects with empty values.
    bytes with its returned `method` and `headers`. This scoped transfer needs no
    owner bearer token. SHA-256 is always computed server-side. Files are limited
    to 20 MiB; grants expire after ten minutes.
-5. Review `POST /documents/{id}/review` with `{"review_state":"approved"}`.
-   Approved revisions reject added files. Changed content belongs in a new revision.
+5. Read the document and its files, then review `POST /documents/{id}/review` with
+   `{"review_state":"approved","expected_version":3}`, using the version just read.
+   An attachment change invalidates that version. Reload and review the current
+   files before retrying a conflict. Approved revisions reject added files.
+   Changed content belongs in a new revision.
 
 For direct downloads, authenticated `GET /files/{id}/content` supports PDF/image
 preview. External agents can reserve a scoped download via `POST /files/{id}/download`.

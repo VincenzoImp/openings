@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.0
+
+- Fit long postings into the scorer token budget, retain original text and show shortened input.
+- Preserve dismissed jobs across changed URLs and report conflicting source identities.
+- Refresh cached ATS descriptions within request caps; filter Greenhouse listings before loading details.
+- Require the current document version for approval, including concurrent attachment changes.
+- Protect dashboard drafts and refreshed edits; repair bulk selection and explicit closure outcomes.
+- Page source cards and load attachment lists when opened.
+- Reject redirects that would bypass another provider's request policy.
+
+Document approval now requires `expected_version`. Existing workspaces and compatible
+backups are upgraded to schema 2 while preserving records and files.
+
 ## 0.6.2
 
 - Display structured compensation ranges and preserve existing salary text.

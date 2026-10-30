@@ -41,8 +41,9 @@ authoritative for individual input fields. Read [REST](../user/api.md) and
 
 ## Data and workflow rules
 
-- **Identity:** normalized URLs and known ATS identities deduplicate postings.
-  Title/company similarity alone never merges jobs. Explicit Merge retains history.
+- **Identity:** normalized URLs and stable external keys resolve through retained
+  aliases. Conflicting identities require explicit Merge; title/company similarity
+  alone never merges jobs. Dismissal survives URL changes.
 - **Corrections:** source refreshes preserve user edits, triage and application
   attempts. Unchanged content does not trigger another classification.
 - **Lifecycle:** Inbox/Saved/Dismissed is job triage. Draft/Applied/Interview/Offer/
@@ -51,6 +52,8 @@ authoritative for individual input fields. Read [REST](../user/api.md) and
 - **Snapshots:** preparing a context freezes the job, career evidence, instructions,
   questions, selected templates and exact assets. Later profile edits affect new
   contexts. Changed document content creates a revision with its own uploaded files.
+  Attachment changes increment the document version; approval checks that version
+  so concurrent uploads cannot be approved unseen.
 - **Truth:** approved claims and narrative evidence guide an external agent;
   reference/length validation does not establish factual accuracy. Review outputs.
 - **Concurrency:** typed inputs, optimistic versions, idempotency keys, foreign
@@ -62,6 +65,8 @@ compact paginated summaries; full postings, narratives, contexts and file bytes
 are separate reads. Backups use SQLite's online backup API. A restore preserves
 installation authentication and recent provider HTTP windows/later cooldowns.
 Model weights are a disposable cache outside the workspace.
+Schema upgrades preserve existing records. Restore upgrades an older compatible
+backup on its temporary copy before replacing workspace data.
 
 ## Acquisition and classification
 
@@ -86,6 +91,8 @@ automatic rescoring of updates has a separate switch. Explicit selected/outdated
 batches and optional capped periodic rescoring are separate. Scores come from the
 configured classifier. Model/provider details are in the
 [scoring guide](../user/scoring.md).
+The core builds a lean scoring context; the isolated scorer uses its tokenizer to
+bound input and records any shortening. Full archive text remains available to agents.
 
 ## Extending the app
 
