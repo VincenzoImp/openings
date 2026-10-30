@@ -158,6 +158,7 @@ export interface Source extends Versioned {
   last_outcome?: string;
   last_counts?: Json;
   last_task_id?: string;
+  last_diagnostics?: { warnings?: string[] }[];
 }
 export interface Scoring {
   enabled: boolean;

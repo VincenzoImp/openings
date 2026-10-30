@@ -64,6 +64,8 @@ An error or blocked page is reported rather than treated as an empty successful 
 Detail requests respect each source's cap. Complete cached details become eligible
 for refresh after 24 hours; older unchecked entries are considered first. Greenhouse
 lists job metadata before requesting descriptions for matching roles.
+Listing and result caps can leave additional matches unseen. Source cards and task
+diagnostics report when a cap is reached.
 
 ## Provider safeguards and tasks
 

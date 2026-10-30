@@ -367,6 +367,16 @@ export default function CompaniesPage() {
                   {source.last_error}
                 </p>
               )}
+              {[
+                ...new Set(
+                  source.last_diagnostics?.flatMap((d) => d.warnings || []) ||
+                    [],
+                ),
+              ].map((warning) => (
+                <p className="hint" key={warning}>
+                  {warning}
+                </p>
+              ))}
               <div className="companyfoot">
                 <Button
                   className="small"

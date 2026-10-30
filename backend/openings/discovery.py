@@ -1626,8 +1626,10 @@ class DiscoveryService:
                     + assessment_context_version_sql()
                     + "=?) ORDER BY j.created_at DESC LIMIT ?",
                     (
-                        self.workspace.scoring_profile_version(), self._config_version(),
-                        CONTEXT_BUILDER_VERSION, value.limit,
+                        self.workspace.scoring_profile_version(),
+                        self._config_version(),
+                        CONTEXT_BUILDER_VERSION,
+                        value.limit,
                     ),
                 )
             ]
@@ -1913,12 +1915,19 @@ class DiscoveryService:
             for posting in postings:
                 store(posting)
         diagnostic = source.get("diagnostic") or budget.diagnostics()
-        for key in ("candidate_capped", "result_capped"):
+        for key, message in (
+            (
+                "candidate_capped",
+                "Only a bounded part of this board was inspected; additional matching jobs may exist.",
+            ),
+            (
+                "result_capped",
+                "More jobs match than this source's result limit. Increase the result limit or narrow its filters.",
+            ),
+        ):
             if source.get(key):
                 result[key] = True
-                diagnostic.setdefault("warnings", []).append(
-                    "The bounded listing or matching-result limit was reached; additional matching jobs may exist. Narrow the source filters or adjust its result limit."
-                )
+                diagnostic.setdefault("warnings", []).append(message)
         result["diagnostics"] = [diagnostic]
         if budget.blocked and getattr(budget.blocked, "code", None) != "provider_run_budget":
             # A portal may catch a transport exception while still returning a
