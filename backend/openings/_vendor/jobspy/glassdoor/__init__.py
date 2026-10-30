@@ -50,22 +50,30 @@ class Glassdoor(Scraper):
         try:
             self.base_url = f"https://{domains[country]}"
             self.session = create_session(
-                TLSRotating(scraper_input.proxies), scraper_input, headers,
+                TLSRotating(scraper_input.proxies),
+                scraper_input,
+                headers,
                 transport=self.transport,
             )
-            variables = self._search_variables()
+            variables = self.checkpoint.get("variables") or self._search_variables()
+            if variables is not None:
+                self.save_progress(variables=variables)
         except Exception as e:
             self.fail(str(e))
             return []
         if variables is None:
             return []
 
-        job_list: list[JobPost] = []
-        seen: set[int | None] = set()
-        page, skip = 1, scraper_input.offset
-        cursor: str | None = None
+        job_list = self.saved_jobs()
+        seen = set(self.checkpoint.get("seen", []))
+        page = self.checkpoint.get("page", 1)
+        skip = 0 if self.checkpoint.get("jobs") else scraper_input.offset
+        cursor = self.checkpoint.get("cursor")
 
-        while len(job_list) < scraper_input.results_wanted:
+        while (
+            not self.checkpoint.get("listing_complete")
+            and len(job_list) < scraper_input.results_wanted
+        ):
             self.log.info(f"search page: {page}")
             try:
                 response = self._graph(
@@ -107,23 +115,52 @@ class Glassdoor(Scraper):
                     if len(job_list) + len(page_jobs) >= scraper_input.results_wanted:
                         break
 
-            if scraper_input.fetch_description and page_jobs:
-                details = self._fetch_details([job.id for job in page_jobs if job.id])
-                page_jobs = [
-                    job.model_copy(update=details[job.id] if job.id in details else {})
-                    for job in page_jobs
-                ]
             job_list += page_jobs
-
-            if not cursor or len(seen) == seen_before:
-                break
+            finished = (
+                not cursor
+                or len(seen) == seen_before
+                or len(job_list) >= scraper_input.results_wanted
+            )
             page += 1
+            self.save_jobs(
+                job_list, seen=list(seen), cursor=cursor, page=page, listing_complete=finished
+            )
+            if finished:
+                break
 
+        attempts = self.checkpoint.setdefault("detail_attempts", {})
+        for index, job in enumerate(job_list):
+            cached = self.known_postings.get("glassdoor:" + str(job.id or job.job_url))
+            if cached:
+                job_list[index] = job.model_copy(update={"description": cached})
+        pending = (
+            [row for row in job_list if not row.description and attempts.get(row.id, 0) < 3]
+            if scraper_input.fetch_description
+            else []
+        )
+        for start in range(0, len(pending), details_per_request):
+            group = pending[start : start + details_per_request]
+            details = self._fetch_details([row.id for row in group if row.id])
+            if self.transport is not None and self.transport.blocked is not None:
+                break
+            for row in group:
+                attempts[row.id] = attempts.get(row.id, 0) + 1
+            job_list = [row.model_copy(update=details.get(row.id, {})) for row in job_list]
+            self.save_jobs(job_list)
+        remaining = (
+            sum(not row.description and attempts.get(row.id, 0) < 3 for row in job_list)
+            if scraper_input.fetch_description
+            else 0
+        )
+        self.save_jobs(
+            job_list,
+            pending_details=remaining,
+            complete=bool(self.checkpoint.get("listing_complete")) and remaining == 0,
+            unavailable_descriptions=sum(not row.description for row in job_list) - remaining,
+        )
         return job_list
 
-    def _graph(
-        self, operation: str, query: str, variables: dict[str, object]
-    ) -> Response:
+    def _graph(self, operation: str, query: str, variables: dict[str, object]) -> Response:
         return self.session.post(
             f"{self.base_url}/graph",
             json=[{"operationName": operation, "variables": variables, "query": query}],
@@ -173,9 +210,7 @@ class Glassdoor(Scraper):
             filters["remoteWorkType"] = 1
         if self.scraper_input.easy_apply:
             filters["applicationType"] = 1
-        return [
-            {"filterKey": key, "values": str(value)} for key, value in filters.items()
-        ]
+        return [{"filterKey": key, "values": str(value)} for key, value in filters.items()]
 
     def _process_job(self, raw: dict[str, object]) -> JobPost | None:
         job = JobView.model_validate(raw)
@@ -201,9 +236,7 @@ class Glassdoor(Scraper):
             title=job.jobTitleText,
             company=header.employerNameFromSearch,
             company_url=(
-                f"{self.base_url}/Overview/W-EI_IE{company_id}.htm"
-                if company_id
-                else None
+                f"{self.base_url}/Overview/W-EI_IE{company_id}.htm" if company_id else None
             ),
             company_logo=company.squareLogoUrl,
             location=self._parse_location(header, job.country),
@@ -257,9 +290,7 @@ class Glassdoor(Scraper):
                     details_alias % (job_id[3:], job_id[3:])
                     for job_id in job_ids[start : start + details_per_request]
                 )
-                response = self._graph(
-                    "JobDetails", f"query JobDetails {{{aliases}}}", {}
-                )
+                response = self._graph("JobDetails", f"query JobDetails {{{aliases}}}", {})
                 check_status(response)
                 for alias, view in response.json()[0]["data"].items():
                     if view:
