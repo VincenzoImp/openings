@@ -93,6 +93,7 @@ export interface Knowledge extends Versioned {
   title: string;
   narrative: string;
   narrative_preview?: string;
+  claim_preview?: string;
   organization: string;
   dates: CareerDates | null;
   skills: string[];

@@ -95,6 +95,18 @@ const kinds = [
   "jobcloud",
   "adzuna",
 ];
+function isSavedSearch(kind: string) {
+  return ["jobspy", "jobcloud", "adzuna"].includes(kind);
+}
+function searchProviders(source: Source) {
+  if (source.kind === "jobspy")
+    return (source.config.providers as string[]) || [];
+  return [
+    source.kind === "jobcloud"
+      ? String(source.config.host || "jobs.ch")
+      : "Adzuna",
+  ];
+}
 export default function CompaniesPage() {
   const resource = useResource<ListResult<Source>>(
     "/sources",
@@ -110,7 +122,7 @@ export default function CompaniesPage() {
   const { mutate, pending, notify } = useWorkspace();
   const matches = resource.data.items.filter(
     (s) =>
-      (tab === "searches") === (s.kind === "jobspy") &&
+      (tab === "searches") === isSavedSearch(s.kind) &&
       (!query ||
         [
           s.name,
@@ -187,13 +199,13 @@ export default function CompaniesPage() {
           {
             id: "searches",
             label: "Saved searches",
-            count: resource.data.items.filter((s) => s.kind === "jobspy")
+            count: resource.data.items.filter((s) => isSavedSearch(s.kind))
               .length,
           },
           {
             id: "companies",
             label: "Companies",
-            count: resource.data.items.filter((s) => s.kind !== "jobspy")
+            count: resource.data.items.filter((s) => !isSavedSearch(s.kind))
               .length,
           },
         ]}
@@ -285,14 +297,14 @@ export default function CompaniesPage() {
                 />
                 <span className="source-icon">
                   <Icon
-                    name={source.kind === "jobspy" ? "search" : "companies"}
+                    name={isSavedSearch(source.kind) ? "search" : "companies"}
                   />
                 </span>
                 <div>
                   <h3>{source.name}</h3>
                   <p>
-                    {source.kind === "jobspy"
-                      ? `${String(source.config.query || "")} · ${String(source.config.location || "Anywhere")}`
+                    {isSavedSearch(source.kind)
+                      ? `${String(source.config.query || "")} · ${String(source.config.location || source.config.country || "All locations")}`
                       : `${source.kind} · ${String(source.config.board || "Company board")}`}
                   </p>
                 </div>
@@ -313,9 +325,9 @@ export default function CompaniesPage() {
                   }
                 />
               </div>
-              {source.kind === "jobspy" && (
+              {isSavedSearch(source.kind) && (
                 <div className="provider-tags">
-                  {((source.config.providers as string[]) || []).map((p) => (
+                  {searchProviders(source).map((p) => (
                     <span className="tag neutral" key={p}>
                       {p}
                     </span>
@@ -456,7 +468,9 @@ export default function CompaniesPage() {
         <SourceEditor
           key={editing === "new" ? `new-${tab}` : editing.id}
           source={editing === "new" ? undefined : editing}
-          search={tab === "searches"}
+          search={
+            editing === "new" ? tab === "searches" : editing.kind === "jobspy"
+          }
           onClose={() => setEditing(null)}
         />
       )}
@@ -517,16 +531,26 @@ function SourceEditor({
             job_type: f.get("job_type") || null,
             fetch_description: f.get("fetch_description") === "on",
           }
-        : {
-            ...configuration,
-            ...(f.get("board") || Object.hasOwn(configuration, "board")
-              ? { board: String(f.get("board") || "") }
-              : {}),
-          };
+        : kind === "jobcloud" || kind === "adzuna"
+          ? {
+              ...configuration,
+              query: f.get("query"),
+              location: f.get("location"),
+              results_wanted: Number(f.get("results_wanted")),
+              ...(kind === "jobcloud"
+                ? { host: f.get("host") }
+                : { country: f.get("country") }),
+            }
+          : {
+              ...configuration,
+              ...(f.get("board") || Object.hasOwn(configuration, "board")
+                ? { board: String(f.get("board") || "") }
+                : {}),
+            };
     return {
       name: f.get("name"),
       kind,
-      url: kind === "jobspy" ? "" : f.get("url"),
+      url: isSavedSearch(kind) ? "" : f.get("url"),
       config,
       enabled: f.get("enabled") === "on",
       filters: {
@@ -593,12 +617,16 @@ function SourceEditor({
       onClose={onClose}
     >
       <form onSubmit={save}>
-        <Field label={search ? "Search name" : "Company / source name"}>
+        <Field
+          label={isSavedSearch(kind) ? "Search name" : "Company / source name"}
+        >
           <input
             name="name"
             required
             defaultValue={source?.name}
-            placeholder={search ? "My saved search" : "Company name"}
+            placeholder={
+              isSavedSearch(kind) ? "My saved search" : "Company name"
+            }
           />
         </Field>
         {search ? (
@@ -718,6 +746,55 @@ function SourceEditor({
               />
               Fetch full descriptions where supported
             </label>
+          </>
+        ) : kind === "jobcloud" || kind === "adzuna" ? (
+          <>
+            <Field label="Search query">
+              <input
+                name="query"
+                required
+                defaultValue={String(source?.config.query || "")}
+              />
+            </Field>
+            <Field label="Location">
+              <input
+                name="location"
+                defaultValue={String(source?.config.location || "")}
+                placeholder="City or region"
+              />
+            </Field>
+            <div className="formgrid">
+              {kind === "jobcloud" ? (
+                <Field label="Search provider">
+                  <select
+                    name="host"
+                    defaultValue={String(source?.config.host || "jobs.ch")}
+                  >
+                    <option value="jobs.ch">jobs.ch</option>
+                    <option value="jobup.ch">jobup.ch</option>
+                  </select>
+                </Field>
+              ) : (
+                <Field label="Country code">
+                  <input
+                    name="country"
+                    required
+                    pattern="[a-z]{2}"
+                    defaultValue={String(source?.config.country || "gb")}
+                  />
+                </Field>
+              )}
+              <Field label="Results per search">
+                <input
+                  name="results_wanted"
+                  type="number"
+                  required
+                  min={1}
+                  max={kind === "jobcloud" ? 40 : 50}
+                  defaultValue={Number(source?.config.results_wanted || 20)}
+                />
+              </Field>
+            </div>
           </>
         ) : (
           <>

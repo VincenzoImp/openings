@@ -347,6 +347,16 @@ function KnowledgePage() {
                     {item.organization}
                   </p>
                 )}
+                {(item.narrative_preview?.trim() ||
+                  item.claim_preview?.trim()) && (
+                  <p className="career-entry-preview">
+                    {!item.narrative_preview?.trim() && (
+                      <span className="career-preview-label">Claim · </span>
+                    )}
+                    {item.narrative_preview?.trim() ||
+                      item.claim_preview?.trim()}
+                  </p>
+                )}
               </div>
               <div className="career-entry-meta">
                 {item.dates && (

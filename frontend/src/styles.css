@@ -1069,34 +1069,6 @@ html[data-theme="dark"] .nav a.active {
 .template-option .tag {
   margin-top: 12px;
 }
-.template-banner {
-  height: 75px;
-  background: var(--hover);
-  border-radius: 4px;
-  margin-bottom: 13px;
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-}
-.mini-page {
-  height: 57px;
-  width: 43px;
-  background: var(--paper);
-  box-shadow: 0 1px 4px #0001;
-  padding: 9px 5px;
-  display: flex;
-  gap: 4px;
-  flex-direction: column;
-}
-.mini-line {
-  height: 2px;
-  background: var(--line);
-}
-.mini-line:first-child {
-  height: 3px;
-  width: 60%;
-  background: var(--muted);
-}
 .template-editor {
   overflow: hidden;
 }
@@ -1828,15 +1800,6 @@ html[data-theme="dark"] .nav a.active {
   .template-option .tag {
     font-size: 7px;
     padding: 2px 4px;
-  }
-  .template-banner {
-    height: 55px;
-    margin-bottom: 10px;
-  }
-  .mini-page {
-    height: 43px;
-    width: 32px;
-    padding: 7px 4px;
   }
   .paperpreview {
     padding: 20px 12px;
@@ -3664,7 +3627,24 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+.career-entry-preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+  margin-top: 8px;
+}
+.career-preview-label {
+  font-size: 11px;
+  font-weight: 550;
+}
 .career-entry-meta {
+  align-self: start;
+  padding-top: 22px;
   display: grid;
   gap: 5px;
   text-align: right;
@@ -3677,6 +3657,8 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
   font-size: 12px;
 }
 .career-entry-actions {
+  align-self: start;
+  margin-top: 17px;
   gap: 4px;
 }
 .career-detail-header {
@@ -3730,6 +3712,7 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
   line-height: 1.7;
 }
 .entry-scoped-claims .claimrow {
+  align-items: flex-start;
   padding: 16px 12px;
   gap: 10px;
 }
@@ -3772,6 +3755,7 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
     padding: 16px;
   }
   .career-entry-meta {
+    padding-top: 0;
     grid-column: 1;
     grid-row: 2;
     display: flex;
