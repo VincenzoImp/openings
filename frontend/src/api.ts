@@ -29,7 +29,7 @@ export interface Job extends Versioned {
   score: number | null;
   score_outdated: boolean;
   metadata: Json;
-  salary?: string;
+  salary?: string | Json | number;
   source?: string;
   availability?: string;
   notes?: Note[];
@@ -289,6 +289,40 @@ export function version<T extends { version: number }>(
 }
 export function text(value: unknown): string {
   return value == null ? "" : String(value);
+}
+export function formatSalary(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  const amount = (entry: unknown) =>
+    typeof entry === "number" && Number.isFinite(entry) ? entry : null;
+  if (typeof value === "number")
+    return amount(value)?.toLocaleString("en") ?? "";
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+  const salary = value as Json,
+    minimum = amount(salary.min_amount),
+    maximum = amount(salary.max_amount);
+  if (minimum === null && maximum === null) return "";
+  const currency =
+    typeof salary.currency === "string" ? salary.currency.trim() : "";
+  const money = (entry: number) =>
+    [currency, entry.toLocaleString("en")].filter(Boolean).join(" ");
+  const range =
+    minimum !== null && maximum !== null
+      ? minimum === maximum
+        ? money(minimum)
+        : `${money(minimum)}–${maximum.toLocaleString("en")}`
+      : minimum !== null
+        ? `From ${money(minimum)}`
+        : `Up to ${money(maximum!)}`;
+  const periods: Record<string, string> = {
+    hourly: "hour",
+    daily: "day",
+    weekly: "week",
+    monthly: "month",
+    yearly: "year",
+  };
+  const interval =
+    typeof salary.interval === "string" ? salary.interval.trim() : "";
+  return interval ? `${range} / ${periods[interval] || interval}` : range;
 }
 export function date(value?: string) {
   if (!value) return "Not yet";
