@@ -74,7 +74,7 @@ Version **0.5** uses a new workspace format; 0.4.x databases/configuration are
 not compatible. Stable API/data-format compatibility is not yet promised.
 The default core loads no model. Compose caps it at **0.5 CPU / 512 MiB**;
 the optional local scorer brings the combined cap to **2 CPU / 4 GiB**.
-These are container limits, not minimum host requirements. See
+Plan additional host resources for the operating system and Docker. See
 [deployment modes and resources](docs/user/getting-started.md#deployment-modes-and-resources).
 
 [Contributing](CONTRIBUTING.md) · [Architecture](docs/developer/architecture.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md) · [MIT license](LICENSE)

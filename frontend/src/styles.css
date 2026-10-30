@@ -3029,13 +3029,16 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
     display: block;
   }
 }
-/* Wider work areas keep related controls visible without a long narrow column. */
 .profile-layout,
 .settings-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 22px;
-  align-items: start;
+  align-items: stretch;
+}
+.profile-layout,
+.scoring-layout {
+  grid-template-columns: minmax(0, 1fr);
 }
 .profile-layout > .form-section,
 .settings-grid > .form-section {
@@ -3048,8 +3051,25 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
 .settings-content {
   max-width: none;
 }
-.scoring-layout > .card {
-  height: 100%;
+.scoring-actions {
+  position: sticky;
+  top: 12px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+.scoring-actions p {
+  margin: 4px 0 0;
+}
+.scoring-save-error {
+  min-width: 0;
 }
 .section-heading {
   margin-bottom: 22px;
@@ -3381,9 +3401,6 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
   color: var(--accent);
 }
 @media (min-width: 1650px) {
-  .profile-layout {
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  }
   .provider-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -3401,7 +3418,7 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
   .settings-grid .sectioncard {
     padding: 22px;
   }
-  .settings-grid .formgrid {
+  .settings-grid:not(.scoring-layout) .formgrid {
     grid-template-columns: 1fr;
   }
 }
@@ -3568,8 +3585,15 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
 .formgrid > .full {
   grid-column: 1/-1;
 }
-.scoring-layout > .card {
-  height: auto;
+@media (max-width: 700px) {
+  .scoring-actions {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 14px;
+  }
+  .scoring-actions .actions {
+    justify-content: flex-end;
+  }
 }
 .tabcount {
   display: inline-flex;
