@@ -214,22 +214,25 @@ export default function OverviewPage({
     {
       count: data.drafts,
       title: "application draft",
+      plural: "application drafts",
       description: "Review the documents and decide what comes next.",
-      route: "applications",
+      route: "applications?status=draft",
       icon: "file" as const,
     },
     {
       count: data.outdated,
       title: "score needing an update",
+      plural: "scores needing an update",
       description: "Your context changed. Nothing was rescored automatically.",
-      route: "inbox",
+      route: "inbox?triage=active&score_state=outdated",
       icon: "refresh" as const,
     },
     {
       count: data.incomplete,
       title: "job needing the full posting",
+      plural: "jobs needing the full posting",
       description: "Paste the text to complete the record.",
-      route: "inbox",
+      route: "inbox?triage=active&complete=false",
       icon: "inbox" as const,
     },
   ].filter((a) => a.count);
@@ -329,23 +332,18 @@ export default function OverviewPage({
           <div className="inner">
             {attention.length ? (
               attention.map((a) => (
-                <button
-                  className="taskrow"
-                  key={a.title}
-                  onClick={() => onNavigate(a.route)}
-                >
+                <a className="taskrow" key={a.title} href={`#${a.route}`}>
                   <span className="circle">
                     <Icon name={a.icon} />
                   </span>
                   <span className="taskcopy">
                     <strong>
-                      {a.count} {a.title}
-                      {a.count !== 1 ? "s" : ""}
+                      {a.count} {a.count === 1 ? a.title : a.plural}
                     </strong>
                     <small>{a.description}</small>
                   </span>
                   <Icon name="arrow" />
-                </button>
+                </a>
               ))
             ) : (
               <div className="quiet-state">

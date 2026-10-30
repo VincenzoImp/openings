@@ -78,7 +78,7 @@ export function AddJob({
           </Field>
         </div>
         <Field label="Location">
-          <input name="location" placeholder="Zurich, Switzerland" />
+          <input name="location" placeholder="City or region" />
         </Field>
         <AdvancedJson name="metadata" label="Job metadata" />
         <Field
@@ -121,6 +121,7 @@ export function JobsPage({
     score_min: "",
     score_max: "",
     score_state: "all",
+    complete: "",
     created_since: "",
     created_until: "",
     sort: "newest",
@@ -184,6 +185,7 @@ export function JobsPage({
         onChange={(value) => change("triage", value)}
         items={[
           { id: "inbox", label: "To review" },
+          { id: "active", label: "All active" },
           { id: "saved", label: "Saved" },
           { id: "dismissed", label: "Dismissed" },
         ]}
@@ -233,6 +235,7 @@ export function JobsPage({
           ].map(([key, label, facet]) => (
             <Field label={label} key={key}>
               <input
+                aria-label={label}
                 list={`facet-${key}`}
                 placeholder={`Any ${label.toLowerCase()}`}
                 value={filters[key]}
@@ -253,6 +256,16 @@ export function JobsPage({
               <option value="">Any work style</option>
               <option value="true">Remote</option>
               <option value="false">On site / hybrid</option>
+            </select>
+          </Field>
+          <Field label="Posting completeness">
+            <select
+              value={filters.complete}
+              onChange={(e) => change("complete", e.target.value)}
+            >
+              <option value="">All postings</option>
+              <option value="true">Full posting saved</option>
+              <option value="false">Needs posting text</option>
             </select>
           </Field>
           <Field label="Score freshness">
