@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import {
   api,
   date,
+  formatSalary,
   jsonValue,
   version,
   type Application,
@@ -712,8 +713,9 @@ export function JobDrawer({
                   <div>
                     <dt>Compensation</dt>
                     <dd>
-                      {job.salary ||
-                        String(job.metadata.salary || "Not specified")}
+                      {formatSalary(job.salary) ||
+                        formatSalary(job.metadata.salary) ||
+                        "Not specified"}
                     </dd>
                   </div>
                   <div>
