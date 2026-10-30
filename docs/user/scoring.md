@@ -1,6 +1,9 @@
 # Optional AI scoring
 
 Scoring classifies job fit. Document generation runs in your external agent.
+Scores use a continuous 0–100 scale, with higher values indicating stronger fit.
+The default five ordered levels guide the classifier; they are anchors rather
+than fixed score buckets. Numeric filters use the stored score, including decimals.
 The core works with scoring disabled; it has no keyword-based fallback score.
 Existing scores remain visible when you turn scoring off. An in-flight request may
 finish before the local model process releases its memory; no new inference is queued.
@@ -36,7 +39,11 @@ to document agents. The scoring-context view/API reports omitted details.
 Oversized inputs are rejected when the scorer reports truncation; they are not
 silently scored as complete.
 
-New or materially changed complete jobs are queued when scoring is enabled.
+New complete jobs are queued when scoring is enabled.
+**Automatic rescoring of changed postings** is on by default. Turn it off to
+automatically score only newly added jobs; existing results still become outdated
+when their inputs change. Manual and separately configured periodic rescoring
+remain available.
 Known partial previews and punctuation-only placeholders stay archived without
 scoring. Completing the posting through **Edit details**, REST or MCP makes it
 eligible and preserves the correction during source refreshes.
@@ -44,7 +51,15 @@ Relevant profile, rubric or model edits mark older results **Outdated** without
 enqueuing the whole archive. Contact/template edits do not require rescoring.
 Rescore selected jobs or request a bounded batch of unscored or outdated jobs.
 Periodic rescoring is separately disabled by default and has a configurable batch cap.
-Dismissed jobs are excluded. Failed requests remain visible in Tasks for retry.
+Model scoring excludes dismissed jobs. Failed requests remain visible in Tasks for retry.
+
+## Reviewed assessments
+
+Use **Record fit assessment** on a job to save a manual or external-agent review,
+including its source and reasoning. This works with local scoring disabled. The
+review is linked to the current profile/posting context; if either changes before
+you save, reload and review the updated context first. Saved reasoning and source
+remain visible with the assessment. REST and MCP expose the same operation.
 
 ## Score limitations
 

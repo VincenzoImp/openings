@@ -287,7 +287,8 @@ export function Score({
         <>
           <span className="score">
             <i className={`dot ${score >= 75 ? "" : "offer"}`} />
-            {Math.round(score)} <small>fit</small>
+            {score.toLocaleString("en", { maximumFractionDigits: 2 })}{" "}
+            <small>fit</small>
           </span>
           {outdated && <span className="tag amber">Outdated</span>}
         </>
