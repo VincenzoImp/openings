@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.2
 
 - Show saved scoring state and keep Save visible while editing; report skipped scoring requests.
 - Repair source edits, document refresh, context retry and application history in the dashboard.
