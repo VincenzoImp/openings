@@ -1,6 +1,12 @@
 # Optional AI scoring
 
 Scoring classifies job fit. Document generation runs in your external agent.
+
+Scores are numeric **0–100**, with higher values indicating better fit. The
+classifier compares the posting against ordered criteria and maps its continuous
+ordinal result onto that range. Filters use the stored numeric value. A score is
+an indicative fit assessment, not a probability of an offer.
+
 The core works with scoring disabled; it has no keyword-based fallback score.
 Existing scores remain visible when you turn scoring off. An in-flight request may
 finish before the local model process releases its memory; no new inference is queued.
@@ -49,21 +55,6 @@ enqueuing the whole archive. Contact/template edits do not require rescoring.
 Rescore selected jobs or request a bounded batch of unscored or outdated jobs.
 Periodic rescoring is separately disabled by default and has a configurable batch cap.
 Model scoring excludes dismissed jobs. Failed requests remain visible in Tasks for retry.
-
-## Record an external review
-
-Use **Record fit assessment** in a job's details to save a score, reviewer/source
-and reasoning. It works with local scoring disabled. An external agent can read
-`scoring_context` and submit `scoring_record_assessment`, or use
-`GET /api/v1/scoring/context/{job_id}` and `POST /api/v1/scoring/assessments`.
-The write requires the context signature; changed inputs require a fresh review.
-The saved assessment retains its context and cancels pending inference for that
-job. The job shows the reviewer and reasoning separately from model results.
-
-Scores are numeric **0–100**, with higher values indicating better fit. The
-classifier compares the posting against ordered criteria and maps its continuous
-ordinal result onto that range. Filters use the stored numeric value. A score is
-an indicative fit assessment, not a probability of an offer.
 
 ## Score limitations
 

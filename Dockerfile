@@ -16,7 +16,7 @@ COPY backend/ ./backend/
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-editable
 
 FROM python:3.12-slim-bookworm AS runtime
-ARG VERSION=0.6.0
+ARG VERSION=0.6.1
 ARG VCS_REF=unknown
 LABEL org.opencontainers.image.title="Openings" \
       org.opencontainers.image.description="Your job search workspace" \
