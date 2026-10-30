@@ -29,22 +29,41 @@ be served by that endpoint.
 
 ## Inputs and freshness
 
-The input combines your role/preferences, a compact career summary, selected
-career facts and the posting. Use the optional profile **Compact scoring profile**
-for a concise, user-authored classification profile; detailed evidence remains available
-to document agents. The scoring-context view/API reports omitted details.
+The input combines your role/preferences, career facts and the posting. When
+**Compact scoring profile** is filled in, it replaces detailed knowledge and claims
+for classification. Without it, selected career facts accompany your profile.
+Document agents retain access to the full archive. The scoring-context view/API
+reports omitted details.
 Oversized inputs are rejected when the scorer reports truncation; they are not
 silently scored as complete.
 
-New or materially changed complete jobs are queued when scoring is enabled.
+New complete jobs are queued when scoring is enabled. **Automatic rescoring of
+changed postings** is on by default; turn it off to score only previously unseen
+jobs automatically. Saving that switch does not queue or invalidate existing scores.
 Known partial previews and punctuation-only placeholders stay archived without
 scoring. Completing the posting through **Edit details**, REST or MCP makes it
-eligible and preserves the correction during source refreshes.
+eligible for explicit scoring, and for automatic scoring when update rescoring
+is enabled. Source refreshes preserve that correction.
 Relevant profile, rubric or model edits mark older results **Outdated** without
 enqueuing the whole archive. Contact/template edits do not require rescoring.
 Rescore selected jobs or request a bounded batch of unscored or outdated jobs.
 Periodic rescoring is separately disabled by default and has a configurable batch cap.
-Dismissed jobs are excluded. Failed requests remain visible in Tasks for retry.
+Model scoring excludes dismissed jobs. Failed requests remain visible in Tasks for retry.
+
+## Record an external review
+
+Use **Record fit assessment** in a job's details to save a score, reviewer/source
+and reasoning. It works with local scoring disabled. An external agent can read
+`scoring_context` and submit `scoring_record_assessment`, or use
+`GET /api/v1/scoring/context/{job_id}` and `POST /api/v1/scoring/assessments`.
+The write requires the context signature; changed inputs require a fresh review.
+The saved assessment retains its context and cancels pending inference for that
+job. The job shows the reviewer and reasoning separately from model results.
+
+Scores are numeric **0–100**, with higher values indicating better fit. The
+classifier compares the posting against ordered criteria and maps its continuous
+ordinal result onto that range. Filters use the stored numeric value. A score is
+an indicative fit assessment, not a probability of an offer.
 
 ## Score limitations
 

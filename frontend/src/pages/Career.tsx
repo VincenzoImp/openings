@@ -3,6 +3,7 @@ import {
   api,
   date,
   jsonValue,
+  knowledgeKinds,
   version,
   type Claim,
   type Knowledge,
@@ -278,8 +279,8 @@ function KnowledgePage() {
         <div>
           <h2>Career knowledge</h2>
           <p>
-            Store experience, projects, courses and supporting facts for
-            application documents.
+            Store experience, projects, courses, awards, publications and
+            supporting facts for application documents.
           </p>
         </div>
         <div className="actions">
@@ -303,7 +304,7 @@ function KnowledgePage() {
           <Icon name="search" />
           <input
             aria-label="Search career knowledge"
-            placeholder="Search your experience"
+            placeholder="Search career knowledge"
             value={filters.q}
             onChange={(e) => setFilters({ q: e.target.value, offset: "0" })}
           />
@@ -314,18 +315,9 @@ function KnowledgePage() {
           onChange={(e) => setFilters({ kind: e.target.value, offset: "0" })}
         >
           <option value="">All types</option>
-          {[
-            "experience",
-            "project",
-            "course",
-            "education",
-            "fact",
-            "skill",
-            "language",
-            "other",
-          ].map((kind) => (
+          {Object.entries(knowledgeKinds).map(([kind, label]) => (
             <option key={kind} value={kind}>
-              {kind}
+              {label}
             </option>
           ))}
         </select>
@@ -338,7 +330,9 @@ function KnowledgePage() {
             <article className="card knowledge-card" key={item.id}>
               <div className="knowledge-head">
                 <div>
-                  <span className="eyebrow">{item.kind}</span>
+                  <span className="eyebrow">
+                    {knowledgeKinds[item.kind] || item.kind}
+                  </span>
                   <h3>{item.title}</h3>
                   <small className="muted">
                     {String(item.metadata?.dates || date(item.updated_at))}
@@ -380,7 +374,7 @@ function KnowledgePage() {
               title="No career knowledge in this view"
               action={
                 <Button icon="plus" onClick={() => setEditing("new")}>
-                  Add your first experience
+                  Add your first entry
                 </Button>
               }
             >
@@ -484,14 +478,11 @@ function KnowledgeEditor({
         <div className="formgrid">
           <Field label="Type">
             <select name="kind" defaultValue={record?.kind || "experience"}>
-              <option value="experience">Experience</option>
-              <option value="project">Project</option>
-              <option value="course">Course</option>
-              <option value="education">Education</option>
-              <option value="skill">Skill</option>
-              <option value="language">Language</option>
-              <option value="fact">Fact</option>
-              <option value="other">Other</option>
+              {Object.entries(knowledgeKinds).map(([kind, label]) => (
+                <option key={kind} value={kind}>
+                  {label}
+                </option>
+              ))}
             </select>
           </Field>
           <Field label="Dates">
@@ -507,7 +498,7 @@ function KnowledgeEditor({
         </Field>
         <Field
           label="Detailed evidence"
-          hint="Describe what you did, decisions, results and useful context. Keep claims factual."
+          hint="Record the facts, context and supporting details. Keep claims factual."
         >
           <textarea
             name="narrative"
@@ -643,7 +634,11 @@ function KnowledgeImport({ onClose }: { onClose: () => void }) {
           <div className="import-preview">
             {preview.knowledge.map((entry, i) => (
               <article key={i}>
-                <span className="tag neutral">{entry.kind}</span>
+                <span className="tag neutral">
+                  {entry.kind
+                    ? knowledgeKinds[entry.kind] || entry.kind
+                    : "Other"}
+                </span>
                 <h3>{entry.title}</h3>
                 <p>
                   {entry.narrative?.slice(0, 180)}

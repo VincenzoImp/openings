@@ -3071,6 +3071,17 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
 .scoring-save-error {
   min-width: 0;
 }
+.review-provenance p {
+  margin: 5px 0 0;
+}
+.review-provenance > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.review-rationale {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .section-heading {
   margin-bottom: 22px;
 }

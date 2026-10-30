@@ -24,7 +24,16 @@ import httpx
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
-from .common import check_version, decode_record, encode, missing, new_id, now
+from .common import (
+    CONTEXT_BUILDER_VERSION,
+    assessment_context_version_sql,
+    check_version,
+    decode_record,
+    encode,
+    missing,
+    new_id,
+    now,
+)
 from .errors import DomainError
 from .posting import posting_complete_sql
 from .worker import inference_guard
@@ -164,6 +173,7 @@ class PeriodicRescore(Input):
 
 class ScoringConfig(Input):
     enabled: bool = False
+    auto_rescore_updates: bool = True
     mode: Literal["local", "remote"] = "local"
     provider: Literal["laya", "systemone"] = "laya"
     base_url: str = Field(default="http://scorer:8000", max_length=2000)
@@ -203,6 +213,7 @@ class ScoringConfig(Input):
 class ScoringWrite(Input):
     expected_version: int | None = Field(default=None, ge=0)
     enabled: bool | None = None
+    auto_rescore_updates: bool | None = None
     mode: Literal["local", "remote"] | None = None
     provider: Literal["laya", "systemone"] | None = None
     base_url: str | None = None
@@ -219,6 +230,21 @@ class RescoreRequest(Input):
     job_ids: list[str] = Field(default_factory=list, max_length=200)
     outdated_only: bool = True
     limit: int = Field(default=50, ge=1, le=200)
+
+
+class AssessmentCreate(Input):
+    job_id: str = Field(min_length=1)
+    expected_signature: str = Field(pattern=r"^[a-f0-9]{64}$")
+    score: float = Field(ge=0, le=100, allow_inf_nan=False)
+    source: str = Field(default="external-agent", min_length=1, max_length=200)
+    rationale: str = Field(min_length=1, max_length=8000)
+
+    @field_validator("source", "rationale")
+    @classmethod
+    def nonblank(cls, value):
+        if not value.strip():
+            raise ValueError("Provide a nonempty value.")
+        return value.strip()
 
 
 class TextParser(HTMLParser):
@@ -1440,14 +1466,17 @@ class DiscoveryService:
         profile = dict(career.get("profile") or {})
         for key in ("name", "email", "phone", "address", "links"):
             profile.pop(key, None)
-        if profile.get("scoring_summary"):
+        compact_summary = str(profile.get("scoring_summary") or "").strip()
+        if compact_summary:
             profile = {
-                "summary": profile["scoring_summary"],
+                "summary": compact_summary,
                 "roles": profile.get("roles", ""),
                 "preferences": profile.get("preferences", ""),
             }
         knowledge, omissions = [], []
         for entry in career.get("knowledge", []):
+            if compact_summary:
+                continue
             metadata = entry.get("metadata") or {}
             if isinstance(metadata, str):
                 metadata = json.loads(metadata)
@@ -1468,12 +1497,24 @@ class DiscoveryService:
                     }
                 )
             knowledge.append(record)
+        if compact_summary and career.get("knowledge"):
+            omissions.append(
+                {
+                    "field": "knowledge",
+                    "ids": [entry["id"] for entry in career["knowledge"]],
+                    "reason": "The explicit compact scoring profile replaces detailed career knowledge.",
+                }
+            )
         if career.get("claims"):
             omissions.append(
                 {
                     "field": "claims",
                     "ids": [claim["id"] for claim in career["claims"]],
-                    "reason": "Full reusable wording belongs to document preparation; scoring uses profile/facts and experience metadata.",
+                    "reason": (
+                        "The explicit compact scoring profile replaces detailed claim wording."
+                        if compact_summary
+                        else "Full reusable wording belongs to document preparation; scoring uses profile/facts and experience metadata."
+                    ),
                 }
             )
         config, _ = self._config()
@@ -1482,7 +1523,7 @@ class DiscoveryService:
             "job": job["content_version"],
             "profile": profile_version,
             "config": self._config_version(),
-            "context_builder": 1,
+            "context_builder": CONTEXT_BUILDER_VERSION,
         }
         state = {
             "candidate": {"profile": profile, "knowledge": knowledge},
@@ -1506,9 +1547,75 @@ class DiscoveryService:
             "provider": config["provider"],
         }
 
-    def enqueue_job(self, job_id, *, force=False, manual=False, _stopping=None):
+    def record_assessment(self, value: AssessmentCreate):
+        value = (
+            value if isinstance(value, AssessmentCreate) else AssessmentCreate.model_validate(value)
+        )
+        with self.db.transaction() as connection:
+            context = self._assessment_context(value.job_id)
+            if value.expected_signature != context["signature"]:
+                raise DomainError(
+                    409,
+                    "assessment_context_changed",
+                    "The scoring context changed. Read it again before recording a review.",
+                )
+            review_key = hashlib.sha256(
+                encode(
+                    {
+                        "signature": context["signature"],
+                        "score": value.score,
+                        "source": value.source,
+                        "rationale": value.rationale,
+                    }
+                ).encode()
+            ).hexdigest()
+            stamp = now()
+            connection.execute(
+                "UPDATE tasks SET state='cancelled',error=NULL,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE kind='score' AND job_id=? AND state IN ('queued','running')",
+                (stamp, value.job_id),
+            )
+            existing = connection.execute(
+                "SELECT * FROM assessments WHERE job_id=? AND json_extract(payload,'$.review_key')=? LIMIT 1",
+                (value.job_id, review_key),
+            ).fetchone()
+            if existing:
+                return decode_record(existing, ("payload",))
+            config, _ = self._config()
+            payload = {
+                "provider": "external_review",
+                "source": value.source,
+                "rationale": value.rationale,
+                "context": context,
+                "criteria": config["criteria"],
+                "rubric": config["rubric"],
+                "review_key": review_key,
+            }
+            assessment_id = new_id()
+            connection.execute(
+                "INSERT INTO assessments(id,job_id,signature,profile_version,job_version,config_version,score,model,payload,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (
+                    assessment_id,
+                    value.job_id,
+                    context["signature"],
+                    context["versions"]["profile"],
+                    context["versions"]["job"],
+                    context["versions"]["config"],
+                    value.score,
+                    value.source,
+                    encode(payload),
+                    stamp,
+                ),
+            )
+            return decode_record(
+                connection.execute("SELECT * FROM assessments WHERE id=?", (assessment_id,)).fetchone(),
+                ("payload",),
+            )
+
+    def enqueue_job(
+        self, job_id, *, force=False, manual=False, automatic_update=False, _stopping=None
+    ):
         config, _ = self._config()
-        if not config["enabled"]:
+        if not config["enabled"] or (automatic_update and not config["auto_rescore_updates"]):
             return None
         job = self.workspace.get_job(job_id)
         if job["triage"] == "dismissed" or not job["complete"]:
@@ -1537,8 +1644,10 @@ class DiscoveryService:
             if (
                 not force
                 and connection.execute(
-                    "SELECT 1 FROM assessments WHERE job_id=? AND signature=? LIMIT 1",
-                    (job_id, context["signature"]),
+                    "SELECT 1 FROM assessments a WHERE job_id=? AND signature=? AND "
+                    + assessment_context_version_sql()
+                    + "=? LIMIT 1",
+                    (job_id, context["signature"], CONTEXT_BUILDER_VERSION),
                 ).fetchone()
             ):
                 return None
@@ -1587,8 +1696,13 @@ class DiscoveryService:
                 for row in self.db.all(
                     "SELECT j.id FROM jobs j WHERE j.triage<>'dismissed' AND "
                     + posting_complete_sql()
-                    + " AND NOT EXISTS (SELECT 1 FROM assessments a WHERE a.job_id=j.id AND a.job_version=j.content_version AND a.profile_version=? AND a.config_version=?) ORDER BY j.created_at DESC LIMIT ?",
-                    (self.workspace.scoring_profile_version(), self._config_version(), value.limit),
+                    + " AND NOT EXISTS (SELECT 1 FROM assessments a WHERE a.job_id=j.id AND a.job_version=j.content_version AND a.profile_version=? AND a.config_version=? AND "
+                    + assessment_context_version_sql()
+                    + "=?) ORDER BY j.created_at DESC LIMIT ?",
+                    (
+                        self.workspace.scoring_profile_version(), self._config_version(),
+                        CONTEXT_BUILDER_VERSION, value.limit,
+                    ),
                 )
             ]
         queued, skipped = [], []
@@ -1868,8 +1982,10 @@ class DiscoveryService:
         if job["triage"] == "dismissed" or not job["complete"]:
             return {"skipped": "job_not_eligible_for_scoring"}
         previous = self.db.one(
-            "SELECT id,score,model FROM assessments WHERE job_id=? AND json_extract(payload,'$.task_id')=? LIMIT 1",
-            (job["id"], task["id"]),
+            "SELECT id,score,model FROM assessments a WHERE job_id=? AND json_extract(payload,'$.task_id')=? AND signature=? AND "
+            + assessment_context_version_sql()
+            + "=? LIMIT 1",
+            (job["id"], task["id"], context["signature"], CONTEXT_BUILDER_VERSION),
         )
         if previous:
             return {
@@ -2051,6 +2167,10 @@ def register_api(router, service: DiscoveryService):
     def scoring_rescore(value: RescoreRequest):
         return service.queue_rescore(value)
 
+    @router.post("/scoring/assessments")
+    def scoring_record(value: AssessmentCreate):
+        return service.record_assessment(value)
+
     @router.get("/scoring/context/{job_id}")
     def scoring_context(job_id: str):
         return service.assessment_context(job_id)
@@ -2198,6 +2318,13 @@ def register_mcp(mcp, service: DiscoveryService):
     def scoring_rescore(value: RescoreRequest) -> dict:
         """Explicitly queue a bounded selected/outdated batch; never generates documents."""
         return service.queue_rescore(value)
+
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)
+    )
+    def scoring_record_assessment(value: AssessmentCreate) -> dict:
+        """Record an external review against an exact context signature, without running inference."""
+        return service.record_assessment(value)
 
     @mcp.tool(
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)

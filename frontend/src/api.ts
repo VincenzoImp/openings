@@ -13,6 +13,18 @@ export interface Versioned {
 }
 export type Triage = "inbox" | "saved" | "dismissed";
 export type Stage = "draft" | "applied" | "interview" | "offer" | "closed";
+export interface FitAssessment {
+  id: string;
+  job_id: string;
+  score: number;
+  model: string;
+  created_at?: string;
+  payload: Json & { provider?: string; source?: string; rationale?: string };
+}
+export interface ScoringContext {
+  signature: string;
+  state: Json;
+}
 export interface Job extends Versioned {
   title: string;
   company: string;
@@ -28,6 +40,7 @@ export interface Job extends Versioned {
   triage: Triage;
   score: number | null;
   score_outdated: boolean;
+  assessment?: FitAssessment | null;
   metadata: Json;
   salary?: string;
   source?: string;
@@ -75,12 +88,25 @@ export interface Profile {
   version: number;
 }
 export interface Knowledge extends Versioned {
-  kind: string;
+  kind: KnowledgeKind;
   title: string;
   narrative: string;
   narrative_preview?: string;
   metadata: Json;
 }
+export const knowledgeKinds = {
+  experience: "Experience",
+  project: "Project",
+  course: "Course",
+  education: "Education",
+  award: "Award",
+  publication: "Publication",
+  fact: "Fact",
+  skill: "Skill",
+  language: "Language",
+  other: "Other",
+} as const;
+export type KnowledgeKind = keyof typeof knowledgeKinds;
 export interface Claim extends Versioned {
   knowledge_id: string;
   text: string;
@@ -140,6 +166,7 @@ export interface Source extends Versioned {
 }
 export interface Scoring {
   enabled: boolean;
+  auto_rescore_updates: boolean;
   mode: "local" | "remote";
   provider: "laya" | "systemone";
   base_url: string;

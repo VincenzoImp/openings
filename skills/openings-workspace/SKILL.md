@@ -63,6 +63,13 @@ preserves individual settings. Relevant
 profile/rubric/model edits mark scores outdated; they do not trigger a full rescore.
 Use explicit selected/outdated rescoring when requested. Scores are advisory.
 
+For an agent's own fit review, read `scoring_context`, judge the posting against
+the supplied evidence/preferences, then call `scoring_record_assessment` with
+its signature, a numeric 0–100 score, source and reasoning. This records an
+external review without model inference. Read changed inputs before retrying a
+signature conflict. Check `auto_rescore_updates` before assuming refreshed jobs
+will be scored automatically; explicit batches are separate.
+
 Job triage is Inbox / Saved / Dismissed. Dismiss retains history and keeps the
 job remembered during acquisition. Forget permanently deletes job-owned history/files/identities and lets
 future acquisition create a new job. Use the action the user requested.
