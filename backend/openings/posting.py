@@ -1,4 +1,4 @@
-"""Shared posting completeness rule for archive views and scoring eligibility."""
+"""Shared posting completeness and source-filter rules."""
 
 import json
 
@@ -16,3 +16,14 @@ def posting_complete(posting, metadata, overrides):
 
 def posting_complete_sql(alias="j"):
     return f"posting_complete({alias}.posting,{alias}.metadata,{alias}.overrides)"
+
+
+def matches_filters(item, filters):
+    return (
+        not filters.get("titles")
+        or any(term.casefold() in item["title"].casefold() for term in filters["titles"])
+    ) and (
+        not filters.get("locations")
+        or not item["location"].strip()
+        or any(term.casefold() in item["location"].casefold() for term in filters["locations"])
+    )

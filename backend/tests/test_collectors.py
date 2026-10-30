@@ -46,20 +46,24 @@ def policy(service, provider, **changes):
 
 def test_jobcloud_template_body_and_partial_preview_remain_distinct():
     source = {
-        "name": "Example search", "kind": "jobcloud",
+        "name": "Example search",
+        "kind": "jobcloud",
         "config": company.JobCloudConfig(query="engineer", max_details=1).model_dump(),
     }
-    listing = {"documents": [
-        {"job_id": "full", "title": "Engineer", "preview": "Python, SQL"},
-        {"job_id": "partial", "title": "Engineer", "preview": "Keyword preview"},
-    ]}
+    listing = {
+        "documents": [
+            {"job_id": "full", "title": "Engineer", "preview": "Python, SQL"},
+            {"job_id": "partial", "title": "Engineer", "preview": "Keyword preview"},
+        ]
+    }
     calls = []
 
     def request(url, **kwargs):
         calls.append(url)
         return json.dumps(
             {"template_lead_text": "<p>About us</p>", "template_text": "<p>Build APIs.</p>"}
-            if url.endswith("/job/full") else listing
+            if url.endswith("/job/full")
+            else listing
         ).encode()
 
     rows = company.collect(source, request, module.html_text)
@@ -70,13 +74,15 @@ def test_jobcloud_template_body_and_partial_preview_remain_distinct():
     assert len(calls) == 2
     calls.clear()
     known = {"jobcloud:jobs.ch:full": rows[0]["metadata"]}
+    source["detail_checked"] = {key: module.now() for key in known}
     refreshed = company.collect(source, request, module.html_text, known=known)
-    assert refreshed[0]["posting"] == ""
-    assert refreshed[0]["metadata"]["description_complete"] is True
+    full = next(item for item in refreshed if item["source_key"] == "jobcloud:jobs.ch:full")
+    assert full["posting"] == ""
+    assert full["metadata"]["description_complete"] is True
     assert len(calls) == 2 and not any(url.endswith("/job/full") for url in calls)
 
 
-def test_only_complete_postings_skip_future_detail_requests(collection, monkeypatch):
+def test_only_complete_postings_supply_preserved_body_metadata(collection, monkeypatch):
     workspace, service = collection
     source = service.create_source(
         SourceCreate(name="Example search", kind="jobcloud", config={"query": "engineer"})
@@ -87,14 +93,21 @@ def test_only_complete_postings_skip_future_detail_requests(collection, monkeypa
         ("placeholder", "-", {}),
     ):
         workspace.ingest_job(
-            {"source_id": source["id"], "source_key": key, "posting": text, "metadata": metadata}
+            {
+                "source_id": source["id"],
+                "source_key": "jobcloud:jobs.ch:" + key,
+                "posting": text,
+                "metadata": metadata,
+            }
         )
     observed = {}
-    monkeypatch.setattr(module, "fetch_postings", lambda value: observed.update(value["known"]) or [])
+    monkeypatch.setattr(
+        module, "fetch_postings", lambda value: observed.update(value["known"]) or []
+    )
     service.queue_collection(source["id"])
     task = service.claim_task("test-collector", kind="collect")
     service.run_task(task, "test-collector")
-    assert set(observed) == {"full"}
+    assert set(observed) == {"jobcloud:jobs.ch:full"}
 
 
 @pytest.mark.parametrize("header", ["120", "date"])
@@ -252,7 +265,8 @@ def test_preview_manual_and_worker_share_provider_gate(collection, monkeypatch):
     preview = service.preview_source(
         SourcePreview(name="Example", kind="greenhouse", config={"board": "example"})
     )
-    assert preview["total"] == 1 and preview["diagnostics"][0]["requests"] == 1
+    assert preview["total"] == 0 and preview["diagnostics"][0]["requests"] == 1
+    assert preview["diagnostics"][0]["state"] == "deferred"
     assert workspace.list_jobs()["total"] == 0
     source = service.create_source(
         SourceCreate(name="Example", kind="greenhouse", config={"board": "example"})
@@ -324,6 +338,9 @@ def test_narrow_company_clients_bound_details_and_preserve_missing_bodies():
     assert len(calls) == 2
     assert len(rows) == 2 and rows[0]["posting"] == "Build APIs" and not rows[1]["posting"]
     calls.clear()
+    source["detail_checked"] = {
+        key: module.now() for key in ("bamboohr:example:1", "bamboohr:example:2")
+    }
     company.collect(
         source, request, module.html_text, known={"bamboohr:example:1", "bamboohr:example:2"}
     )
@@ -512,7 +529,12 @@ def test_company_partial_rows_survive_detail_failure_and_keep_prior_metadata(
     # Known-detail omission must not clear the previous date or body on refresh.
     old = {"bamboohr:example:1": workspace.get_job(job["id"])["metadata"]}
     rows = company.collect(
-        {"name": "Example", "kind": "bamboohr", "config": {"board": "example", "max_results": 1}},
+        {
+            "name": "Example",
+            "kind": "bamboohr",
+            "config": {"board": "example", "max_results": 1},
+            "detail_checked": {"bamboohr:example:1": module.now()},
+        },
         lambda *args, **kwargs: json.dumps(
             {"result": [{"id": 1, "jobOpeningName": "API Engineer"}]}
         ).encode(),

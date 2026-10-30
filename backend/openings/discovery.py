@@ -35,11 +35,17 @@ from .common import (
     now,
 )
 from .errors import DomainError
-from .posting import posting_complete_sql
+from .posting import posting_complete_sql, matches_filters
 from .worker import inference_guard
 from .collectors import company as company_collectors
 from .collectors import jobspy as jobspy_collector
-from .collectors.policy import ProviderBudget, ProviderDeferred, ProviderPatch, ProviderStore
+from .collectors.policy import (
+    ProviderBudget,
+    ProviderDeferred,
+    ProviderPatch,
+    ProviderStore,
+    provider_for_url,
+)
 
 LOG = logging.getLogger(__name__)
 SourceKind = Literal[
@@ -297,40 +303,6 @@ def public_url(value: str) -> str:
             422, "private_url", "Collection URLs must resolve to public network addresses."
         )
     return value
-
-
-def provider_for_url(value: str) -> str:
-    """Choose the same provider gate for a known public board/posting host."""
-    host = (urlsplit(value).hostname or "").lower()
-    suffixes = {
-        "linkedin.com": "linkedin",
-        "indeed.com": "indeed",
-        "glassdoor.com": "glassdoor",
-        "greenhouse.io": "greenhouse",
-        "lever.co": "lever",
-        "ashbyhq.com": "ashby",
-        "recruitee.com": "recruitee",
-        "jobs.personio.de": "personio",
-        "workable.com": "workable",
-        "breezy.hr": "breezy",
-        "bamboohr.com": "bamboohr",
-        "smartrecruiters.com": "smartrecruiters",
-        "rippling.com": "rippling",
-        "myworkdayjobs.com": "workday",
-        "oraclecloud.com": "oracle",
-        "join.com": "joincom",
-        "jobs.ch": "jobcloud",
-        "jobup.ch": "jobcloud",
-        "adzuna.com": "adzuna",
-    }
-    return next(
-        (
-            provider
-            for suffix, provider in suffixes.items()
-            if host == suffix or host.endswith("." + suffix)
-        ),
-        "manual",
-    )
 
 
 def fetch_bytes(
@@ -624,17 +596,6 @@ def normalize_posting(item: dict) -> dict:
     return {**item, "metadata": metadata}
 
 
-def matches_filters(item, filters):
-    return (
-        not filters.get("titles")
-        or any(term.casefold() in item["title"].casefold() for term in filters["titles"])
-    ) and (
-        not filters.get("locations")
-        or not item["location"].strip()
-        or any(term.casefold() in item["location"].casefold() for term in filters["locations"])
-    )
-
-
 def fetch_postings(source: dict) -> list[dict]:
     config, kind = source["config"], source["kind"]
     name = source.get("name") or config.get("board") or "RSS source"
@@ -654,7 +615,7 @@ def fetch_postings(source: dict) -> list[dict]:
             preview=source.get("preview", False),
         )
         source["diagnostic"] = diagnostic
-    elif kind not in ("greenhouse", "lever", "ashby", "rss"):
+    elif kind not in ("lever", "ashby", "rss"):
         source["streamed"] = source.get("on_item") is not None
         items = company_collectors.collect(
             source,
@@ -664,26 +625,6 @@ def fetch_postings(source: dict) -> list[dict]:
             preview=source.get("preview", False),
             on_item=source.get("on_item"),
         )
-    elif kind == "greenhouse":
-        raw = _json(f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true")
-        for row in company_collectors.records(raw, "jobs"):
-            items.append(
-                {
-                    "source_key": f"greenhouse:{board}:{row['id']}",
-                    "title": row.get("title", "Untitled role"),
-                    "company": name,
-                    "location": (row.get("location") or {}).get("name", ""),
-                    "url": row.get("absolute_url", ""),
-                    "posting": html_text(row.get("content", "")),
-                    "metadata": {
-                        "ats": kind,
-                        "board": board,
-                        "external_id": str(row["id"]),
-                        "departments": row.get("departments", []),
-                    },
-                    "raw": row,
-                }
-            )
     elif kind == "lever":
         host = "api.eu.lever.co" if config.get("region") == "eu" else "api.lever.co"
         raw = _json(f"https://{host}/v0/postings/{slug}?mode=json")
@@ -1889,14 +1830,23 @@ class DiscoveryService:
         if provider not in allowed:
             return {"skipped": "source_provider_changed"}
         source["provider"] = provider
+        prefix = (
+            f"{source['kind']}:{source['config'].get('board') or source['config'].get('host', '')}:"
+        )
+        known_rows = self.db.all(
+            "SELECT i.identity,j.metadata,d.checked_at," + posting_complete_sql() + " AS complete "
+            "FROM job_identities i JOIN jobs j ON j.id=i.job_id "
+            "LEFT JOIN posting_details d ON d.identity=i.identity AND d.job_id=j.id "
+            "WHERE i.identity>=? AND i.identity<?",
+            (prefix, prefix + "\uffff"),
+        )
+        # Exact provider/board identities work across overlapping saved sources.
+        # Network freshness is separate from material job/scoring metadata.
         source["known"] = {
-            row["source_key"]: json.loads(row["metadata"])
-            for row in self.db.all(
-                "SELECT json_extract(p.payload,'$.source_key') AS source_key,j.metadata FROM postings p JOIN jobs j ON j.id=p.job_id WHERE p.source_id=? AND "
-                + posting_complete_sql(),
-                (source["id"],),
-            )
-            if row["source_key"]
+            row["identity"]: json.loads(row["metadata"]) for row in known_rows if row["complete"]
+        }
+        source["detail_checked"] = {
+            row["identity"]: row["checked_at"] for row in known_rows if row["checked_at"]
         }
         budget = self.http_budget(
             provider,
@@ -1918,10 +1868,25 @@ class DiscoveryService:
                 try:
                     saved = self.workspace.ingest_job(posting)
                 except (ValidationError, DomainError) as error:
+                    if isinstance(error, DomainError) and error.code == "identity_conflict":
+                        result["conflict_count"] = result.get("conflict_count", 0) + 1
+                        conflicts = result.setdefault("identity_conflicts", [])
+                        if len(conflicts) < 20:
+                            conflicts.append(
+                                {"source_key": posting.get("source_key"), **error.details}
+                            )
+                        return
                     if isinstance(error, DomainError) and error.status != 422:
                         raise
                     result["invalid"] += 1
                     return
+                checked_at = (source.get("detail_checks") or {}).get(posting.get("source_key"))
+                if checked_at:
+                    self.db.execute(
+                        "INSERT INTO posting_details(identity,job_id,checked_at) VALUES(?,?,?) "
+                        "ON CONFLICT(identity) DO UPDATE SET job_id=excluded.job_id,checked_at=excluded.checked_at",
+                        (posting["source_key"], saved["id"], checked_at),
+                    )
                 result["created"] += int(bool(saved.get("created")))
                 result["existing"] += int(not saved.get("created", False))
 
@@ -1947,7 +1912,14 @@ class DiscoveryService:
         if not source.get("streamed"):
             for posting in postings:
                 store(posting)
-        result["diagnostics"] = [source.get("diagnostic") or budget.diagnostics()]
+        diagnostic = source.get("diagnostic") or budget.diagnostics()
+        for key in ("candidate_capped", "result_capped"):
+            if source.get(key):
+                result[key] = True
+                diagnostic.setdefault("warnings", []).append(
+                    "The bounded listing or matching-result limit was reached; additional matching jobs may exist. Narrow the source filters or adjust its result limit."
+                )
+        result["diagnostics"] = [diagnostic]
         if budget.blocked and getattr(budget.blocked, "code", None) != "provider_run_budget":
             # A portal may catch a transport exception while still returning a
             # useful partial page. Preserve those jobs before deferring the task.
@@ -1955,6 +1927,14 @@ class DiscoveryService:
             raise budget.blocked
         if budget.blocked:
             result["capped"] = True
+        if source.get("collection_error"):
+            raise source["collection_error"]
+        if result.get("conflict_count"):
+            raise DomainError(
+                409,
+                "identity_conflict",
+                f"{result['conflict_count']} postings have conflicting archived identities. Other results were retained. Merge the verified duplicate jobs listed in this task's results, then retry.",
+            )
         return result
 
     def _score(self, task, owner):

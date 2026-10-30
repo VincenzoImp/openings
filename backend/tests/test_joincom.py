@@ -56,6 +56,7 @@ def test_joincom_embedded_pages_preserve_jobs_and_bound_detail_requests(state_ke
     assert rows[1]["title"] == "Analyst" and rows[1]["posting"] == ""
 
     calls.clear()
+    source["detail_checked"] = {row["source_key"]: company.now() for row in rows}
     company.collect(source, request, html_text, known={row["source_key"] for row in rows})
     assert calls == [base]
 

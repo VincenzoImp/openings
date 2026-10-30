@@ -177,6 +177,8 @@ async def read_posting(url, discovery):
                         result[field] = str(result[field] or "")[:maximum]
                 return result
         except DomainError as error:
+            if error.code == "provider_redirect":
+                return {"metadata": {"extraction": "needs_text", "extraction_error": error.message}}
             if error.status == 429 or "budget" in error.code or "cooldown" in error.code:
                 return {"metadata": {"extraction": "deferred", "extraction_error": error.message}}
         except (ValueError, TypeError, AttributeError):
