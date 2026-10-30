@@ -40,6 +40,7 @@ from .worker import inference_guard
 from .scheduling import Schedule, IntervalSchedule, schedule_adapter, next_due
 from .collectors import company as company_collectors
 from .collectors import jobspy as jobspy_collector
+from .collectors.catalog import COMPANY_ADAPTERS, COMPANY_KINDS
 from .collectors.policy import (
     ProviderBudget,
     ProviderDeferred,
@@ -49,24 +50,7 @@ from .collectors.policy import (
 )
 
 LOG = logging.getLogger(__name__)
-SourceKind = Literal[
-    "auto",
-    "jobspy",
-    "greenhouse",
-    "lever",
-    "ashby",
-    "rss",
-    "recruitee",
-    "personio",
-    "workable",
-    "breezy",
-    "smartrecruiters",
-    "bamboohr",
-    "rippling",
-    "workday",
-    "oracle",
-    "joincom",
-]
+SourceKind = Literal["auto", "jobspy", "rss", *COMPANY_KINDS]
 MAX_FEED_BYTES = 8 * 1024 * 1024
 HTTP_BUDGET: ContextVar[ProviderBudget | None] = ContextVar("collection_http_budget", default=None)
 DEFAULT_RUBRIC = (
@@ -391,7 +375,10 @@ def fetch_bytes(
                     response_context.__exit__(None, None, None)
     except httpx.HTTPStatusError as error:
         raise DomainError(
-            502, "source_http", f"The source returned HTTP {error.response.status_code}."
+            502,
+            "source_http",
+            f"The source returned HTTP {error.response.status_code}.",
+            {"http_status": error.response.status_code},
         ) from error
     except httpx.HTTPError as error:
         raise DomainError(
@@ -461,7 +448,10 @@ def detect_source(url: str) -> dict:
             "Paste a supported ATS board URL, select RSS, or configure the board identifier manually.",
         )
     validate_board(board, kind)
-    return {"kind": kind, "config": {"board": board, "region": region}, "url": url}
+    config = {"board": board}
+    if COMPANY_ADAPTERS[kind].region:
+        config["region"] = region
+    return {"kind": kind, "config": config, "url": url}
 
 
 def validate_board(board: str, kind=None):
@@ -550,9 +540,13 @@ def resolve_source(value: dict) -> dict:
         if config.get("region", "global") not in ("global", "eu"):
             raise DomainError(422, "invalid_region", "Lever region must be global or eu.")
         try:
-            config = company_collectors.BoardConfig.model_validate(
-                {key: val for key, val in config.items() if key not in ("url", "filters")}
-            ).model_dump()
+            config = (
+                company_collectors.config_model(kind)
+                .model_validate(
+                    {key: val for key, val in config.items() if key not in ("url", "filters")}
+                )
+                .model_dump()
+            )
         except ValidationError as error:
             raise DomainError(
                 422,
@@ -681,9 +675,21 @@ def fetch_postings(source: dict) -> list[dict]:
                 }
             )
     elif kind == "ashby":
-        raw = _json(
-            f"https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true"
-        )
+        try:
+            raw = _json(
+                f"https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true"
+            )
+        except DomainError as error:
+            if error.code == "source_http" and (error.details or {}).get("http_status") == 404:
+                raise DomainError(
+                    422,
+                    "ashby_board_unavailable",
+                    f"Ashby does not expose a public board for '{board}' (HTTP 404). "
+                    "Check the exact board URL and identifier. Disabled, removed or private "
+                    "boards require another public source or manual job entry.",
+                    {"http_status": 404, "board": board},
+                ) from error
+            raise
         for row in company_collectors.records(raw, "jobs"):
             if row.get("isListed") is False:
                 continue
@@ -1239,7 +1245,7 @@ class DiscoveryService:
                 if kind == "jobspy"
                 else RSSConfig
                 if kind == "rss"
-                else company_collectors.BoardConfig
+                else company_collectors.config_model(kind)
             )
             items.append(
                 {
@@ -1253,7 +1259,16 @@ class DiscoveryService:
                     "capabilities": {
                         "search": kind == "jobspy",
                         "lookback": kind == "jobspy",
-                        "details": kind not in ("rss", "ashby", "lever"),
+                        "details": kind == "jobspy"
+                        or (
+                            kind in COMPANY_ADAPTERS
+                            and COMPANY_ADAPTERS[kind].description_mode == "separate"
+                        ),
+                        "description_mode": "portal"
+                        if kind == "jobspy"
+                        else "inline"
+                        if kind == "rss"
+                        else COMPANY_ADAPTERS[kind].description_mode,
                     },
                 }
             )
@@ -1456,9 +1471,10 @@ class DiscoveryService:
             allowed_overrides = (
                 {"hours_old", "results_wanted"}
                 if source["kind"] == "jobspy"
-                else {"max_results"}
-                if source["kind"] == "rss"
                 else {"max_results", "max_details"}
+                if source["kind"] in COMPANY_ADAPTERS
+                and COMPANY_ADAPTERS[source["kind"]].description_mode == "separate"
+                else {"max_results"}
             )
             if set(options) - allowed_overrides:
                 raise DomainError(

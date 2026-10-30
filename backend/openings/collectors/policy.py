@@ -18,21 +18,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..common import check_version, encode, new_id, now
 from ..errors import DomainError, missing
 
-COMPANY_KINDS = (
-    "greenhouse",
-    "lever",
-    "ashby",
-    "recruitee",
-    "personio",
-    "workable",
-    "breezy",
-    "smartrecruiters",
-    "bamboohr",
-    "rippling",
-    "workday",
-    "oracle",
-    "joincom",
-)
+from .catalog import COMPANY_KINDS
+
 PROVIDERS = {
     **{
         kind: (
