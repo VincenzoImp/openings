@@ -394,8 +394,24 @@ class Workspace:
             else:
                 overrides = json.loads(prior["overrides"])
                 updates = {}
+                preserve_body = (
+                    not overrides.get("posting")
+                    and posting_complete(prior["posting"], prior["metadata"], prior["overrides"])
+                    and not posting_complete(value.posting, value.metadata, {})
+                )
                 for key in ("title", "company", "location", "url", "posting", "metadata"):
                     incoming = data[key]
+                    if preserve_body and key == "posting":
+                        incoming = prior["posting"]
+                    elif preserve_body and key == "metadata":
+                        # A failed detail refresh or a search preview cannot replace
+                        # an archived full body. Keep the incoming raw observation.
+                        incoming = dict(incoming)
+                        previous_metadata = json.loads(prior["metadata"])
+                        for field in ("description_complete", "description_status"):
+                            incoming.pop(field, None)
+                            if field in previous_metadata:
+                                incoming[field] = previous_metadata[field]
                     if (
                         key in overrides
                         or not incoming
@@ -448,7 +464,7 @@ class Workspace:
                 )
         result = self.get_job(job_id)
         result["created"] = prior is None
-        if changed and self.discovery is not None:
+        if (changed or result["initial_score_pending"]) and self.discovery is not None:
             self.discovery.enqueue_job(job_id, automatic_update=prior is not None)
         return result
 

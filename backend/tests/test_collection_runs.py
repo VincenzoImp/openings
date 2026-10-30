@@ -248,3 +248,68 @@ def test_rest_versions_overrides_and_schema_discovery(tmp_path):
         assert (
             client.post(f"/api/v1/collection/runs/{run_id}/cancel").json()["state"] == "cancelled"
         )
+
+
+def test_explicit_retry_preserves_progress_and_renews_error_allowance(collection, monkeypatch):
+    workspace, service = collection
+    source = make_source(service)
+    queued = service.queue_collection(source["id"])
+    workspace.db.execute(
+        "UPDATE tasks SET state='failed',attempts=3,result=?,payload=json_set(payload,'$.checkpoint',json(?),'$.observed_identities',json(?)) WHERE id=?",
+        (
+            module.encode({"created": 2, "failure_attempts": 3}),
+            module.encode({"page": 2}),
+            module.encode(["known"]),
+            queued["id"],
+        ),
+    )
+    public = service.get_task(queued["id"])
+    assert "checkpoint" not in public["payload"] and "observed_identities" not in public["payload"]
+    service.retry_task(queued["id"])
+    claimed = service.claim_task("worker", "collect")
+    assert claimed["attempts"] == 4 and claimed["payload"]["checkpoint"] == {"page": 2}
+    assert claimed["result"]["created"] == 2 and claimed["result"]["failure_attempts"] == 0
+    monkeypatch.setattr(
+        module,
+        "fetch_postings",
+        lambda source: (_ for _ in ()).throw(DomainError(502, "temporary", "Try later.")),
+    )
+    service.run_task(claimed, "worker")
+    assert service.get_task(queued["id"])["state"] == "queued"
+    assert service.get_task(queued["id"])["result"]["failure_attempts"] == 1
+
+
+@pytest.mark.parametrize("preview", ["", "Python and SQL preview"])
+def test_partial_refresh_keeps_complete_body_and_records_raw_observation(collection, preview):
+    workspace, _ = collection
+    source = {"url": "https://example.org/job", "title": "Engineer", "company": "Example"}
+    original = workspace.ingest_job(
+        {
+            **source,
+            "posting": "Build APIs and maintain production data systems.",
+            "metadata": {"description_complete": True, "description_status": "complete"},
+        }
+    )
+    refreshed = workspace.ingest_job(
+        {
+            **source,
+            "posting": preview,
+            "metadata": {"description_complete": False, "description_status": "pending"},
+        }
+    )
+    assert refreshed["complete"] and refreshed["posting"] == original["posting"]
+    assert refreshed["content_version"] == original["content_version"]
+    observation = workspace.db.one("SELECT payload FROM postings WHERE job_id=?", (original["id"],))
+    assert '"description_complete":false' in observation["payload"]
+
+
+def test_initial_score_can_wait_for_profile_without_rescoring_history(collection):
+    workspace, service = collection
+    workspace.set_settings("scoring", {"enabled": True, "auto_rescore_updates": False})
+    posting = {"url": "https://example.org/job", "posting": "Build APIs.", "title": "Engineer"}
+    job = workspace.ingest_job(posting)
+    assert job["initial_score_pending"] and service.list_tasks(kind="score")["total"] == 0
+    workspace.set_settings("profile", {"summary": "Backend engineer"})
+    refreshed = workspace.ingest_job(posting)
+    assert refreshed["content_version"] == job["content_version"]
+    assert service.list_tasks(kind="score", state="queued")["total"] == 1

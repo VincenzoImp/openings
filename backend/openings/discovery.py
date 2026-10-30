@@ -2015,8 +2015,16 @@ class DiscoveryService:
         if active:
             raise DomainError(409, "task_active", "Equivalent work is already queued or running.")
         self.db.execute(
-            "UPDATE tasks SET state='queued',attempts=CASE WHEN kind='score' THEN 0 ELSE attempts END,payload=?,next_run_at=?,lease_until=NULL,lease_owner=NULL,error=NULL,updated_at=? WHERE id=? AND state IN ('failed','cancelled')",
-            (encode(payload), now(), now(), task_id),
+            "UPDATE tasks SET state='queued',attempts=CASE WHEN kind='score' THEN 0 ELSE attempts END,payload=?,result=?,next_run_at=?,lease_until=NULL,lease_owner=NULL,error=NULL,updated_at=? WHERE id=? AND state IN ('failed','cancelled')",
+            (
+                encode(payload),
+                encode(
+                    {**task["result"], "failure_attempts": 0} if task["kind"] == "collect" else {}
+                ),
+                now(),
+                now(),
+                task_id,
+            ),
         )
         return self.get_task(task_id)
 
