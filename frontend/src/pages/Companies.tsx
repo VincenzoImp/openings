@@ -92,8 +92,6 @@ const kinds = [
   "workday",
   "oracle",
   "joincom",
-  "jobcloud",
-  "adzuna",
 ];
 function isSavedSearch(kind: string) {
   return ["jobspy", "jobcloud", "adzuna"].includes(kind);
@@ -539,7 +537,11 @@ function SourceEditor({
               results_wanted: Number(f.get("results_wanted")),
               ...(kind === "jobcloud"
                 ? { host: f.get("host") }
-                : { country: f.get("country") }),
+                : {
+                    country: f.get("country"),
+                    app_id: f.get("app_id"),
+                    app_key: f.get("app_key"),
+                  }),
             }
           : {
               ...configuration,
@@ -629,7 +631,32 @@ function SourceEditor({
             }
           />
         </Field>
-        {search ? (
+        {(search || isSavedSearch(kind)) && (
+          <Field
+            label="Search service"
+            hint={
+              source
+                ? "Add another search to use a different service."
+                : undefined
+            }
+          >
+            <select
+              value={kind}
+              disabled={!!source}
+              onChange={(e) => {
+                setKind(e.target.value);
+                setPreview(null);
+              }}
+            >
+              <option value="jobspy">
+                JobSpy · LinkedIn, Indeed, Glassdoor
+              </option>
+              <option value="jobcloud">JobCloud · jobs.ch, jobup.ch</option>
+              <option value="adzuna">Adzuna · API credentials required</option>
+            </select>
+          </Field>
+        )}
+        {kind === "jobspy" ? (
           <>
             <Field
               label="Search query"
@@ -763,6 +790,27 @@ function SourceEditor({
                 placeholder="City or region"
               />
             </Field>
+            {kind === "adzuna" && (
+              <div className="formgrid">
+                <Field label="Adzuna application ID">
+                  <input
+                    name="app_id"
+                    required
+                    autoComplete="off"
+                    defaultValue={String(source?.config.app_id || "")}
+                  />
+                </Field>
+                <Field label="Adzuna API key">
+                  <input
+                    name="app_key"
+                    type="password"
+                    required
+                    autoComplete="off"
+                    defaultValue={String(source?.config.app_key || "")}
+                  />
+                </Field>
+              </div>
+            )}
             <div className="formgrid">
               {kind === "jobcloud" ? (
                 <Field label="Search provider">

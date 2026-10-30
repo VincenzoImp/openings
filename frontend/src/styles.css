@@ -861,10 +861,12 @@ html[data-theme="dark"] .nav a.active {
 }
 .companygrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: 18px;
 }
 .companycard {
+  display: flex;
+  flex-direction: column;
   padding: 22px;
 }
 .companytop {
@@ -1514,9 +1516,6 @@ html[data-theme="dark"] .nav a.active {
   .topbar {
     padding: 0 28px;
   }
-  .companygrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .jobrow {
     grid-template-columns: 35px minmax(150px, 1fr) 95px 65px 30px;
     gap: 10px;
@@ -1741,7 +1740,7 @@ html[data-theme="dark"] .nav a.active {
     font-size: 9px;
     gap: 5px;
   }
-  .jobmeta .tag {
+  .jobmeta .tag:not(.posting-status) {
     display: none;
   }
   .scorebox {
@@ -1759,9 +1758,6 @@ html[data-theme="dark"] .nav a.active {
   }
   .list-footer {
     font-size: 9px;
-  }
-  .companygrid {
-    grid-template-columns: 1fr;
   }
   .companycard {
     padding: 20px;
@@ -2413,7 +2409,7 @@ html[data-theme="dark"] {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 23px;
+  margin-top: auto;
   padding-top: 17px;
   border-top: 1px solid var(--line);
   flex-wrap: wrap;
@@ -2674,9 +2670,6 @@ html[data-theme="dark"] {
   margin-top: 12px;
 }
 @media (max-width: 1150px) {
-  .companygrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .jobrow {
     grid-template-columns: minmax(0, 1fr) 115px 74px 30px;
     gap: 10px;
@@ -2706,9 +2699,6 @@ html[data-theme="dark"] {
   }
 }
 @media (max-width: 600px) {
-  .companygrid {
-    grid-template-columns: 1fr;
-  }
   .jobrow {
     grid-template-columns: minmax(0, 1fr) 70px;
     gap: 12px;
