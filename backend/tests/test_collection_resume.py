@@ -88,7 +88,7 @@ def test_linkedin_description_budget_resumes_metadata_checkpoint(tmp_path, monke
     calls = []
     cards = "".join(
         f'<div class="base-search-card" data-entity-urn="urn:li:jobPosting:{i}"><h3 class="base-search-card__title">Engineer</h3><h4 class="base-search-card__subtitle">Example</h4><span class="job-search-card__location">New York, NY</span></div>'
-        for i in range(5)
+        for i in range(15)
     )
 
     class Response:
@@ -106,7 +106,14 @@ def test_linkedin_description_budget_resumes_metadata_checkpoint(tmp_path, monke
             calls.append(url)
             return Response(
                 url,
-                cards
+                "".join(
+                    cards.split("</div>")[
+                        int(kwargs.get("params", {}).get("start", 0)) : int(
+                            kwargs.get("params", {}).get("start", 0)
+                        )
+                        + 10
+                    ]
+                )
                 if "seeMore" in url
                 else '<div class="show-more-less-html__markup">Build reliable software and APIs.</div>',
             )
@@ -118,14 +125,14 @@ def test_linkedin_description_budget_resumes_metadata_checkpoint(tmp_path, monke
         provider, "create_session", lambda *args, transport=None, **kwargs: Session(transport)
     )
     source = {"checkpoint": {}}
-    config = {"query": "engineer", "providers": ["linkedin"], "results_wanted": 5}
-    for batch in range(2):
+    config = {"query": "engineer", "providers": ["linkedin"], "results_wanted": 15}
+    for batch in range(6):
         rows, _ = jobspy.collect(
             config, "linkedin", ProviderBudget(store, "linkedin", f"batch-{batch}"), source=source
         )
     assert source["checkpoint"]["complete"]
-    assert len(rows) == 5 and all(row["posting"] for row in rows)
-    assert sum("seeMore" in url for url in calls) == 1 and len(calls) == 6
+    assert len(rows) == 15 and all(row["posting"] for row in rows)
+    assert sum("seeMore" in url for url in calls) == 2 and len(calls) == 17
 
 
 def test_remote_location_filter_does_not_expand_specific_geography():
@@ -138,3 +145,39 @@ def test_remote_location_filter_does_not_expand_specific_geography():
         {"title": "Engineer", "location": "Remote", "metadata": {"eligible_countries": ["Canada"]}},
         filters,
     )
+
+
+def test_workday_page_resume_reuses_prior_pages_after_provider_deferral():
+    from openings.collectors.policy import ProviderDeferred
+
+    calls, checkpoint = [], {}
+    blocked = True
+
+    def request(url, *, body=None, **kwargs):
+        nonlocal blocked
+        offset = body["offset"]
+        calls.append(offset)
+        if offset == 20 and blocked:
+            blocked = False
+            raise ProviderDeferred("workday", "provider_hour_budget")
+        rows = [
+            {"title": "Engineer", "externalPath": f"/job/{i}", "locationsText": "Canada"}
+            for i in range(offset, min(offset + 20, 21))
+        ]
+        return json.dumps({"jobPostings": rows}).encode()
+
+    source = {
+        "name": "Example",
+        "kind": "workday",
+        "config": {
+            "board": "example.wd1.myworkdayjobs.com/careers",
+            "max_candidates": 40,
+            "max_details": 0,
+        },
+        "checkpoint": checkpoint,
+    }
+    first = company.collect(source, request, html_text)
+    assert len(first) == 20 and not checkpoint["complete"]
+    final = company.collect(source, request, html_text)
+    assert len(final) == 21 and checkpoint["complete"]
+    assert calls == [0, 20, 20]

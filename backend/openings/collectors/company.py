@@ -127,6 +127,8 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         try:
             return json.loads(response(url, body=body))
         except (ValueError, UnicodeError) as error:
+            cache.pop(json.dumps([url, body], sort_keys=True), None)
+            save()
             raise DomainError(
                 502,
                 "source_format",
