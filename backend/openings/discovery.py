@@ -232,21 +232,6 @@ class RescoreRequest(Input):
     limit: int = Field(default=50, ge=1, le=200)
 
 
-class AssessmentCreate(Input):
-    job_id: str = Field(min_length=1)
-    expected_signature: str = Field(pattern=r"^[a-f0-9]{64}$")
-    score: float = Field(ge=0, le=100, allow_inf_nan=False)
-    source: str = Field(default="external-agent", min_length=1, max_length=200)
-    rationale: str = Field(min_length=1, max_length=8000)
-
-    @field_validator("source", "rationale")
-    @classmethod
-    def nonblank(cls, value):
-        if not value.strip():
-            raise ValueError("Provide a nonempty value.")
-        return value.strip()
-
-
 class TextParser(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
@@ -1547,70 +1532,6 @@ class DiscoveryService:
             "provider": config["provider"],
         }
 
-    def record_assessment(self, value: AssessmentCreate):
-        value = (
-            value if isinstance(value, AssessmentCreate) else AssessmentCreate.model_validate(value)
-        )
-        with self.db.transaction() as connection:
-            context = self._assessment_context(value.job_id)
-            if value.expected_signature != context["signature"]:
-                raise DomainError(
-                    409,
-                    "assessment_context_changed",
-                    "The scoring context changed. Read it again before recording a review.",
-                )
-            review_key = hashlib.sha256(
-                encode(
-                    {
-                        "signature": context["signature"],
-                        "score": value.score,
-                        "source": value.source,
-                        "rationale": value.rationale,
-                    }
-                ).encode()
-            ).hexdigest()
-            stamp = now()
-            connection.execute(
-                "UPDATE tasks SET state='cancelled',error=NULL,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE kind='score' AND job_id=? AND state IN ('queued','running')",
-                (stamp, value.job_id),
-            )
-            existing = connection.execute(
-                "SELECT * FROM assessments WHERE job_id=? AND json_extract(payload,'$.review_key')=? LIMIT 1",
-                (value.job_id, review_key),
-            ).fetchone()
-            if existing:
-                return decode_record(existing, ("payload",))
-            config, _ = self._config()
-            payload = {
-                "provider": "external_review",
-                "source": value.source,
-                "rationale": value.rationale,
-                "context": context,
-                "criteria": config["criteria"],
-                "rubric": config["rubric"],
-                "review_key": review_key,
-            }
-            assessment_id = new_id()
-            connection.execute(
-                "INSERT INTO assessments(id,job_id,signature,profile_version,job_version,config_version,score,model,payload,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                (
-                    assessment_id,
-                    value.job_id,
-                    context["signature"],
-                    context["versions"]["profile"],
-                    context["versions"]["job"],
-                    context["versions"]["config"],
-                    value.score,
-                    value.source,
-                    encode(payload),
-                    stamp,
-                ),
-            )
-            return decode_record(
-                connection.execute("SELECT * FROM assessments WHERE id=?", (assessment_id,)).fetchone(),
-                ("payload",),
-            )
-
     def enqueue_job(
         self, job_id, *, force=False, manual=False, automatic_update=False, _stopping=None
     ):
@@ -2167,10 +2088,6 @@ def register_api(router, service: DiscoveryService):
     def scoring_rescore(value: RescoreRequest):
         return service.queue_rescore(value)
 
-    @router.post("/scoring/assessments")
-    def scoring_record(value: AssessmentCreate):
-        return service.record_assessment(value)
-
     @router.get("/scoring/context/{job_id}")
     def scoring_context(job_id: str):
         return service.assessment_context(job_id)
@@ -2318,13 +2235,6 @@ def register_mcp(mcp, service: DiscoveryService):
     def scoring_rescore(value: RescoreRequest) -> dict:
         """Explicitly queue a bounded selected/outdated batch; never generates documents."""
         return service.queue_rescore(value)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)
-    )
-    def scoring_record_assessment(value: AssessmentCreate) -> dict:
-        """Record an external review against an exact context signature, without running inference."""
-        return service.record_assessment(value)
 
     @mcp.tool(
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)

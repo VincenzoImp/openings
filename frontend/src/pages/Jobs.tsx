@@ -1,7 +1,6 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import {
   api,
-  ApiError,
   date,
   jsonValue,
   version,
@@ -10,7 +9,6 @@ import {
   type ListResult,
   type Note,
   type Triage,
-  type ScoringContext,
 } from "../api";
 import {
   confirmLeave,
@@ -563,7 +561,7 @@ export function JobDrawer({
       items: [],
       total: 0,
     });
-  const { mutate, pending, notify, refresh } = useWorkspace();
+  const { mutate, pending, notify } = useWorkspace();
   const [tab, setTab] = useUrlState("detail", "posting");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [scoringContext, setScoringContext] = useState<Record<
@@ -571,8 +569,7 @@ export function JobDrawer({
     unknown
   > | null>(null);
   const [forget, setForget] = useState(false),
-    [merging, setMerging] = useState(false),
-    [reviewing, setReviewing] = useState(false);
+    [merging, setMerging] = useState(false);
   const job = resource.data;
   const applications = useResource<ListResult<Application>>(
     job && tab === "notes"
@@ -724,22 +721,6 @@ export function JobDrawer({
                     <dd>{date(job.created_at)}</dd>
                   </div>
                 </dl>
-                {job.assessment?.payload.provider === "external_review" && (
-                  <section className="note review-provenance">
-                    <Icon name="info" />
-                    <div>
-                      <strong>External fit review</strong>
-                      <p>
-                        {job.assessment.payload.source || job.assessment.model}
-                        {job.assessment.created_at &&
-                          ` · ${date(job.assessment.created_at)}`}
-                      </p>
-                      <p className="review-rationale">
-                        {job.assessment.payload.rationale}
-                      </p>
-                    </div>
-                  </section>
-                )}
                 {job.url && (
                   <a
                     className="btn small external-link"
@@ -752,9 +733,6 @@ export function JobDrawer({
                   </a>
                 )}
                 <div className="actions form-actions">
-                  <Button disabled={pending} onClick={() => setReviewing(true)}>
-                    Record fit assessment
-                  </Button>
                   <Button
                     icon="refresh"
                     disabled={pending || !job.posting}
@@ -938,16 +916,6 @@ export function JobDrawer({
           </>
         )}
       </Dialog>
-      {reviewing && job && (
-        <RecordAssessment
-          job={job}
-          onClose={() => setReviewing(false)}
-          onRecorded={() => {
-            setReviewing(false);
-            refresh();
-          }}
-        />
-      )}
       {scoringContext && (
         <Dialog
           title="Scoring context."
@@ -1030,167 +998,6 @@ export function JobDrawer({
         </Dialog>
       )}
     </>
-  );
-}
-function RecordAssessment({
-  job,
-  onClose,
-  onRecorded,
-}: {
-  job: Job;
-  onClose: () => void;
-  onRecorded: () => void;
-}) {
-  const { mutate, pending } = useWorkspace();
-  const [context, setContext] = useState<ScoringContext | null>(null),
-    [loading, setLoading] = useState(true),
-    [contextError, setContextError] = useState<string | null>(null),
-    [saveError, setSaveError] = useState<string | null>(null),
-    [conflict, setConflict] = useState(false),
-    [reload, setReload] = useState(0),
-    [inspect, setInspect] = useState(false);
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setContext(null);
-    setContextError(null);
-    setSaveError(null);
-    setConflict(false);
-    api<ScoringContext>(
-      `/scoring/context/${job.id}`,
-      "GET",
-      undefined,
-      controller.signal,
-    )
-      .then(setContext)
-      .catch((error) => {
-        if (!controller.signal.aborted)
-          setContextError(
-            error instanceof Error
-              ? error.message
-              : "Unable to load review context.",
-          );
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
-  }, [job.id, reload]);
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!context || loading || conflict || pending) return;
-    const fields = new FormData(event.currentTarget);
-    setSaveError(null);
-    const ok = await mutate(async () => {
-      try {
-        await api("/scoring/assessments", "POST", {
-          job_id: job.id,
-          expected_signature: context.signature,
-          score: Number(fields.get("score")),
-          source: fields.get("source"),
-          rationale: fields.get("rationale"),
-        });
-      } catch (error) {
-        setSaveError(
-          error instanceof Error
-            ? error.message
-            : "Assessment could not be saved.",
-        );
-        setConflict(error instanceof ApiError && error.status === 409);
-        throw error;
-      }
-    }, "Fit assessment recorded.");
-    if (ok) onRecorded();
-  }
-  const previous =
-    job.assessment?.payload.provider === "external_review"
-      ? job.assessment
-      : null;
-  return (
-    <Dialog title="Record fit assessment" onClose={onClose}>
-      <p className="modal-intro">
-        Save a reviewed score from 0 to 100, where higher means a stronger fit.
-        Keep the reasoning with the review. A local model is optional.
-      </p>
-      {loading && <Loading />}
-      {contextError && (
-        <ErrorBox
-          message={contextError}
-          retry={() => setReload((value) => value + 1)}
-        />
-      )}
-      <form onSubmit={save}>
-        <div className="formgrid">
-          <Field
-            label="Fit score"
-            hint="Any value from 0 to 100, including decimals."
-          >
-            <input
-              name="score"
-              type="number"
-              min={0}
-              max={100}
-              step="any"
-              required
-              defaultValue={job.score ?? ""}
-            />
-          </Field>
-          <Field label="Reviewer / source">
-            <input
-              name="source"
-              required
-              maxLength={200}
-              defaultValue={previous?.payload.source || "manual-review"}
-            />
-          </Field>
-        </div>
-        <Field label="Assessment reasoning">
-          <textarea
-            name="rationale"
-            rows={6}
-            required
-            maxLength={8000}
-            defaultValue={previous?.payload.rationale || ""}
-          />
-        </Field>
-        {saveError && <ErrorBox message={saveError} />}
-        {conflict && (
-          <Button
-            type="button"
-            disabled={pending}
-            onClick={() => {
-              setInspect(true);
-              setReload((value) => value + 1);
-            }}
-          >
-            Reload review context
-          </Button>
-        )}
-        {context && (
-          <details
-            className="provenance"
-            open={inspect}
-            onToggle={(event) => setInspect(event.currentTarget.open)}
-          >
-            <summary>Review current profile and posting</summary>
-            <pre className="json-readout">
-              {JSON.stringify(context.state, null, 2)}
-            </pre>
-          </details>
-        )}
-        <div className="actions form-actions">
-          <Button type="button" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            disabled={pending || loading || !context || conflict}
-          >
-            Save assessment
-          </Button>
-        </div>
-      </form>
-    </Dialog>
   );
 }
 function MergeJob({

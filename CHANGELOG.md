@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1
+
+- Remove manual fit assessments from the dashboard, REST and MCP.
+
 ## 0.6.0
 
 - Record external fit reviews with scores, reasoning and frozen context through the dashboard, REST and MCP.

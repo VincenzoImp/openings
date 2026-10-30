@@ -18,7 +18,7 @@ files live in one portable SQLite database.
 | **Company watch:** follow selected company ATS boards or RSS/Atom feeds. | **Your templates:** multiple LaTeX packages, assets, defaults and editable writing rules. |
 | **One inbox:** add a URL or posting yourself; search, filter, save, dismiss and update in bulk. | **Document revisions:** CVs, letters, form answers, PDF/source files and review history. |
 | **Controlled automation:** schedules, global pause, request budgets, cooldowns and visible task results. | **Application tracking:** list/Kanban, independent attempts and a funnel based on recorded progress. |
-| **Fit reviews:** record an assessment or enable an optional local/remote classifier. | **One portable archive:** SQLite stores records and file bytes; back up or move the workspace. |
+| **Optional fit scoring:** a separate CPU classifier or compatible remote service. | **One portable archive:** SQLite stores records and file bytes; back up or move the workspace. |
 
 <details>
 <summary>See the application board</summary>
