@@ -758,7 +758,7 @@ function ClaimsPage() {
                   type="checkbox"
                   checked={claim.approved}
                   disabled={pending}
-                  aria-label={`Approve claim: ${claim.text}`}
+                  aria-label={`Approve claim: ${claim.text_preview || claim.text}`}
                   onChange={(e) =>
                     mutate(
                       () =>
