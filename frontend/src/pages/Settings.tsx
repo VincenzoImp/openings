@@ -31,6 +31,7 @@ import {
 import { ProviderSettings } from "./Companies";
 const blankScoring: Scoring = {
   enabled: false,
+  auto_rescore_updates: true,
   mode: "local",
   provider: "laya",
   base_url: "http://scorer:8000",
@@ -109,6 +110,7 @@ function ScoringSettings() {
   const resource = useResource<Scoring>("/scoring", blankScoring);
   const { mutate, pending, notify } = useWorkspace();
   const [enabled, setEnabled] = useState(false),
+    [autoUpdates, setAutoUpdates] = useState(true),
     [mode, setMode] = useState("local"),
     [periodic, setPeriodic] = useState(false),
     [testing, setTesting] = useState<string | null>(null),
@@ -118,6 +120,7 @@ function ScoringSettings() {
     [rescore, setRescore] = useState(false);
   useEffect(() => {
     setEnabled(resource.data.enabled);
+    setAutoUpdates(resource.data.auto_rescore_updates ?? true);
     setMode(resource.data.mode);
     setPeriodic(resource.data.periodic_rescore.enabled);
     setDirty(false);
@@ -126,6 +129,7 @@ function ScoringSettings() {
     const f = new FormData(form);
     const body: Record<string, unknown> = {
       enabled,
+      auto_rescore_updates: autoUpdates,
       mode,
       provider: f.get("provider"),
       base_url: f.get("base_url"),
@@ -241,6 +245,7 @@ function ScoringSettings() {
                     ?.setCustomValidity("");
                 }
                 setEnabled(resource.data.enabled);
+                setAutoUpdates(resource.data.auto_rescore_updates ?? true);
                 setMode(resource.data.mode);
                 setPeriodic(resource.data.periodic_rescore.enabled);
                 setDirty(false);
@@ -409,6 +414,24 @@ function ScoringSettings() {
                 defaultValue={resource.data.rubric}
               />
             </Field>
+          </div>
+          <div className="divider" />
+          <div className="settingrow">
+            <div>
+              <h3>Rescore changed postings automatically</h3>
+              <p>
+                On by default. Turn this off to score only newly added jobs
+                automatically. Manual and periodic rescoring remain available.
+              </p>
+            </div>
+            <Switch
+              label="Automatic rescoring of changed postings"
+              checked={autoUpdates}
+              onChange={(value) => {
+                setAutoUpdates(value);
+                setDirty(true);
+              }}
+            />
           </div>
           <div className="divider" />
           <div className="settingrow">
@@ -909,7 +932,7 @@ function WorkspaceSettings({
             <h2>Workspace.</h2>
             <p>
               {String(workspace.data.name || "Openings")}{" "}
-              {String(workspace.data.version || "0.5.4")} · Private, single
+              {String(workspace.data.version || "0.6.0")} · Private, single
               owner workspace
             </p>
           </div>
@@ -1090,7 +1113,7 @@ function PasswordSettings() {
         </div>
       </form>
       <div className="divider" />
-      <p className="hint">Openings 0.5.4 · Your job search workspace</p>
+      <p className="hint">Openings 0.6.0 · Your job search workspace</p>
       <p className="hint">
         <a
           className="textbutton"

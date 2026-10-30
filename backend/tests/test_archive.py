@@ -322,7 +322,7 @@ def test_http_validates_answers_dates_and_rotation_preserves_tokens(tmp_path):
         )
         assert client.get("/api/v1/jobs").status_code == 401
         client.headers["Authorization"] = "Bearer " + token["token"]
-        assert client.get("/api/v1/capabilities").json()["version"] == "0.5.4"
+        assert client.get("/api/v1/capabilities").json()["version"] == "0.6.0"
         assert client.get("/api/v1/tokens").json()["items"][0]["last_used_at"]
         source = client.post(
             "/api/v1/sources",

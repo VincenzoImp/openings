@@ -10,8 +10,8 @@ docker compose pull
 docker compose up -d --no-build
 ```
 
-Compose pins `vincenzoimp/openings:0.5.4` and the optional
-`vincenzoimp/openings:scorer-0.5.4`, for Linux amd64 and arm64. No Python, Node,
+Compose pins `vincenzoimp/openings:0.6.0` and the optional
+`vincenzoimp/openings:scorer-0.6.0`, for Linux amd64 and arm64. No Python, Node,
 AI account or TeX installation is needed on the host. To build images yourself,
 see [Contributing](../../CONTRIBUTING.md).
 
@@ -33,9 +33,10 @@ scoring adds model download, cache and inference requirements; see
 
 1. Open `http://127.0.0.1:8080` and choose an owner password of at least 10 characters.
    For unattended first setup, set `OPENINGS_PASSWORD` in `.env` before starting.
-2. In **Career**, enter your profile/preferences and detailed experience, projects
-   or courses. Approve reusable claims you want an agent to select. Import accepts
-   reviewed JSON or plain-text notes; it does not infer facts.
+2. In **Career**, enter your profile/preferences and career evidence: experience,
+   education, projects, courses, awards or publications. Approve reusable claims
+   you want an agent to select. Import accepts reviewed JSON or plain-text notes;
+   it does not infer facts.
 3. In **Templates**, add a LaTeX template and optional assets, select defaults,
    and edit general/per-template writing instructions. Synthetic starting examples
    are included in `examples/` and available from the dashboard.

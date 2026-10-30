@@ -83,7 +83,8 @@ class ProfileUpdate(NonNullUpdate):
 
 
 KnowledgeKind = Literal[
-    "experience", "project", "course", "education", "fact", "skill", "language", "other"
+    "experience", "project", "course", "education", "award", "publication",
+    "fact", "skill", "language", "other"
 ]
 
 
@@ -307,7 +308,7 @@ class CareerService:
         }
 
     def get_knowledge(self, knowledge_id: str) -> dict:
-        """Read one detailed experience, project, course or factual evidence record."""
+        """Read one career evidence record with its full narrative and metadata."""
         row = self.db.one("SELECT * FROM knowledge WHERE id=?", (knowledge_id,))
         if not row:
             missing("Career knowledge")

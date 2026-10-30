@@ -6,7 +6,13 @@ import json
 import re
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from .common import check_version, new_id, now
+from .common import (
+    CONTEXT_BUILDER_VERSION,
+    assessment_context_version_sql,
+    check_version,
+    new_id,
+    now,
+)
 from .db import Database, decode_record, encode
 from .errors import DomainError, conflict, missing
 from .models import (
@@ -166,7 +172,7 @@ class Workspace:
             "substr(j.posting,1,240) AS j_posting_preview",
             posting_complete_sql() + " AS j_complete",
             "a.score AS j_score",
-            f"(a.id IS NOT NULL AND (a.job_version!=j.content_version OR a.profile_version!={profile} OR a.config_version!={config})) AS j_score_outdated",
+            f"(a.id IS NOT NULL AND (a.job_version!=j.content_version OR a.profile_version!={profile} OR a.config_version!={config} OR {assessment_context_version_sql()}!={CONTEXT_BUILDER_VERSION})) AS j_score_outdated",
         ]
         return ",".join(columns)
 
@@ -210,6 +216,9 @@ class Workspace:
                 score["job_version"] != row["content_version"]
                 or score["profile_version"] != profile
                 or score["config_version"] != config
+                or row["assessment"]["payload"].get("context", {}).get("versions", {}).get(
+                    "context_builder", 1
+                ) != CONTEXT_BUILDER_VERSION
             )
         )
         row["complete"] = posting_complete(row["posting"], row["metadata"], row["overrides"])
@@ -269,7 +278,7 @@ class Workspace:
                 conditions.append("a.score" + operator + "?")
                 args.append(value)
         profile, config = revisions
-        stale = f"(a.job_version!=j.content_version OR a.profile_version!={profile} OR a.config_version!={config})"
+        stale = f"(a.job_version!=j.content_version OR a.profile_version!={profile} OR a.config_version!={config} OR {assessment_context_version_sql()}!={CONTEXT_BUILDER_VERSION})"
         if score_state == "unscored":
             conditions.append("a.id IS NULL")
         elif score_state in ("current", "outdated"):
@@ -450,7 +459,7 @@ class Workspace:
         result = self.get_job(job_id)
         result["created"] = prior is None
         if changed and self.discovery is not None:
-            self.discovery.enqueue_job(job_id)
+            self.discovery.enqueue_job(job_id, automatic_update=prior is not None)
         return result
 
     def update_job(self, job_id, value):
@@ -480,7 +489,7 @@ class Workspace:
                 )
                 self.event("job_edited", job_id, payload={"fields": list(actual)}, conn=c)
         if actual and self.discovery:
-            self.discovery.enqueue_job(job_id)
+            self.discovery.enqueue_job(job_id, automatic_update=True)
         return self.get_job(job_id)
 
     def set_triage(self, job_id, triage, expected_version):
@@ -921,10 +930,13 @@ class Workspace:
             + "),0) incomplete FROM jobs j WHERE triage!='dismissed'"
         )
         outdated = self.db.one(
-            "SELECT count(*) n FROM jobs j JOIN assessments a ON a.id=(SELECT id FROM assessments WHERE job_id=j.id ORDER BY created_at DESC LIMIT 1) WHERE j.triage!='dismissed' AND (a.job_version!=j.content_version OR a.profile_version!=? OR a.config_version!=?)",
+            "SELECT count(*) n FROM jobs j JOIN assessments a ON a.id=(SELECT id FROM assessments WHERE job_id=j.id ORDER BY created_at DESC,id DESC LIMIT 1) WHERE j.triage!='dismissed' AND (a.job_version!=j.content_version OR a.profile_version!=? OR a.config_version!=? OR "
+            + assessment_context_version_sql()
+            + "!=?)",
             (
                 self.scoring_profile_version(),
                 int(self.get_settings("scoring_config_revision", 0)["data"]),
+                CONTEXT_BUILDER_VERSION,
             ),
         )["n"]
         return {
