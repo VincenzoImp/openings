@@ -1062,7 +1062,8 @@ function TaskSummary({ task }: { task: BackgroundTask }) {
           ["created", "New"],
           ["existing", "Already archived"],
           ["invalid", "Invalid"],
-          ["pending_descriptions", "Need text"],
+          ["pending_descriptions", "Pending text"],
+          ["unavailable_descriptions", "Text unavailable"],
         ]
           .filter(([key]) => typeof counts[key] === "number")
           .map(([key, label]) => `${label}: ${counts[key]}`)

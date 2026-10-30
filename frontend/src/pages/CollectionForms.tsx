@@ -108,13 +108,19 @@ export function RunProgress({
           ["created", "New"],
           ["existing", "Already archived"],
           ["invalid", "Invalid"],
-          ["pending_descriptions", "Need text"],
-        ].map(([key, label]) => (
-          <div key={key}>
-            <dt>{label}</dt>
-            <dd>{run.counts?.[key] || 0}</dd>
-          </div>
-        ))}
+          ["pending_descriptions", "Pending text"],
+          ["unavailable_descriptions", "Text unavailable"],
+        ]
+          .filter(
+            ([key]) =>
+              key !== "unavailable_descriptions" || !!run.counts?.[key],
+          )
+          .map(([key, label]) => (
+            <div key={key}>
+              <dt>{label}</dt>
+              <dd>{run.counts?.[key] || 0}</dd>
+            </div>
+          ))}
       </dl>
       {!compact && (
         <p className="smalltext muted">
