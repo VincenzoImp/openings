@@ -32,7 +32,7 @@ Paste the posting when extraction cannot obtain the complete text.
 | Applications | `GET/POST /applications`, `GET/PATCH/DELETE /applications/{id}`, `GET /applications/{id}/events` |
 | Career | `GET/PATCH /career/profile`, CRUD `/career/knowledge` and `/career/claims`, `POST /career/import/preview` then `/career/import` |
 | Templates/guidance | CRUD `/templates`, `GET/PATCH /instructions` |
-| Collection | `GET/PATCH /collection`, `GET /providers`, `PATCH /providers/{id}`, CRUD `/sources`, preview/run and `/sources/bulk` |
+| Collection | `GET/PATCH /collection`, `GET /providers`, `PATCH /providers/{id}`, CRUD `/sources`, `/sources/schemas`, preview/run, `/sources/bulk` and `/collection/runs` |
 | Scoring/tasks | `GET/PATCH /scoring`, `POST /scoring/test`, `/scoring/rescore`, `GET /scoring/context/{job_id}`, `GET /tasks`, `GET /tasks/{id}`, `POST /tasks/{id}/cancel` or `/retry` |
 | Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `POST /documents/{id}/review` |
 | Files | `GET /files`, `GET/DELETE /files/{id}`, `GET /files/{id}/content`, `POST /files/uploads`, `POST /files/{id}/download` |
@@ -63,6 +63,42 @@ submitted-attempt cohort. Career nonnullable PATCH fields reject explicit null:
 omit unchanged fields, or clear text/lists/objects with empty values. Entry dates
 are nullable; `dates: null` clears them. See [Career](career.md) for structured
 headers, partial dates, skills and ordering.
+
+## Collection recipes
+
+Read `GET /sources/schemas` for typed defaults and supported configuration fields.
+A source's service is fixed after creation. Read its current `version` before a
+PATCH, run or DELETE; include it as `expected_version` (a query parameter for
+DELETE). A 409 means the source changed since it was read.
+
+A one-off run leaves saved settings unchanged:
+
+```bash
+curl --fail "$OPENINGS_URL/api/v1/sources/SOURCE_ID/run" \
+  -H "Authorization: Bearer $OPENINGS_TOKEN" \
+  -H 'Content-Type: application/json' \
+  --data '{"expected_version":3,"overrides":{"hours_old":168,"results_wanted":50}}'
+```
+
+The returned run groups provider tasks and freezes the effective source settings.
+Read `/collection/runs/{id}` for cumulative counts and waiting/processing time;
+`POST /collection/runs/{id}/cancel` stops it. Later source edits affect new runs.
+
+For a shared schedule, send a compatible bulk patch:
+
+```json
+{
+  "action": "configure",
+  "items": [{"id": "SOURCE_ID", "expected_version": 3}],
+  "patch": {
+    "schedule": {"kind": "daily", "times": ["08:00", "16:00"], "timezone": "Europe/Berlin"}
+  }
+}
+```
+
+`POST /sources/bulk` returns per-source outcomes. Omitted configuration keys remain
+unchanged; inspect failures before retrying. [Collection](sources.md) defines the
+limits, defaults, run counters and provider safeguards.
 
 ## Document and byte flow
 
