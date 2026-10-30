@@ -147,6 +147,7 @@ class JobQuery(Input):
     location: str | None = Field(default=None, max_length=500)
     source: str | None = Field(default=None, max_length=300)
     remote: bool | None = None
+    complete: bool | None = None
     job_type: str | None = Field(default=None, max_length=100)
     score_min: float | None = Field(default=None, ge=0, le=100)
     score_max: float | None = Field(default=None, ge=0, le=100)

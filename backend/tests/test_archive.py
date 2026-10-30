@@ -1,4 +1,5 @@
 import hashlib
+import json
 import sqlite3
 
 import pytest
@@ -53,6 +54,31 @@ def test_stale_edit_is_rejected(workspace):
     with pytest.raises(DomainError) as error:
         workspace.update_job(original["id"], {"expected_version": 1, "title": "Lost edit"})
     assert error.value.status == 409
+
+
+@pytest.mark.asyncio
+async def test_completeness_filter_matches_overview_and_page_totals_on_rest_and_mcp(tmp_path):
+    app = create_app(tmp_path / "complete.sqlite", start_worker=False)
+    complete = job(app.state.workspace)
+    incomplete = job(
+        app.state.workspace,
+        url="https://jobs.lever.co/example/missing-text",
+        posting="   ",
+    )
+    with TestClient(app) as client:
+        client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
+        overview = client.get("/api/v1/overview").json()
+        missing = client.get("/api/v1/jobs?complete=false&limit=1").json()
+        assert missing["total"] == overview["incomplete"] == 1
+        assert missing["items"][0]["id"] == incomplete["id"]
+        assert not missing["items"][0]["complete"]
+        assert client.get("/api/v1/jobs?complete=false&offset=1").json()["items"] == []
+        present = client.get("/api/v1/jobs?complete=true").json()
+        assert present["total"] == 1 and present["items"][0]["id"] == complete["id"]
+        assert client.get("/api/v1/jobs?complete=invalid").status_code == 422
+    result = await app.state.mcp.call_tool("jobs_search", {"value": {"complete": False}})
+    structured = json.loads(result[0].text)
+    assert structured["total"] == 1 and structured["items"][0]["id"] == incomplete["id"]
 
 
 def test_attempts_and_recorded_funnel_are_separate_from_job_triage(workspace):
