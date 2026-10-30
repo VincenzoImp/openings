@@ -225,6 +225,10 @@ def create_app(database=None, start_worker=True):
                 request.headers.get("content-length", 0) or 0
             ) > 40 * 1024**2 and not path.endswith("/restore"):
                 raise DomainError(413, "request_size", "This request exceeds the upload limit.")
+            # Route the advertised URL directly to the mounted transport without a redirect.
+            if request.scope["path"] == "/mcp":
+                request.scope["path"] = "/mcp/"
+                request.scope["raw_path"] = request.scope.get("raw_path", b"/mcp") + b"/"
             async with semaphore:
                 response = await call_next(request)
             response.headers["X-Content-Type-Options"] = "nosniff"
