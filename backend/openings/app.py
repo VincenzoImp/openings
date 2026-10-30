@@ -86,6 +86,40 @@ def error_response(error):
     )
 
 
+class RecordsResponse(StreamingResponse):
+    """Prepare the SQLite snapshot on one thread before streaming file bytes."""
+
+    def __init__(self, records):
+        self.snapshot = tempfile.TemporaryFile()
+        try:
+            for record in records:
+                self.snapshot.write(record.encode("utf-8"))
+            size = self.snapshot.tell()
+            self.snapshot.seek(0)
+
+            def chunks():
+                while chunk := self.snapshot.read(64 * 1024):
+                    yield chunk
+
+            super().__init__(
+                chunks(),
+                media_type="application/json",
+                headers={
+                    "Content-Disposition": 'attachment; filename="openings-export.json"',
+                    "Content-Length": str(size),
+                },
+            )
+        except BaseException:
+            self.snapshot.close()
+            raise
+
+    async def __call__(self, scope, receive, send):
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            self.snapshot.close()
+
+
 def create_app(database=None, start_worker=True):
     workspace = Workspace(database or os.environ.get("OPENINGS_DATABASE", "data/openings.sqlite"))
     workspace.maintenance = False
@@ -452,11 +486,7 @@ def create_app(database=None, start_worker=True):
                     settings[row["key"]] = redact_secrets(data)
                 yield ',"settings":' + json.dumps(settings, ensure_ascii=False) + "}"
 
-        return StreamingResponse(
-            records(),
-            media_type="application/json",
-            headers={"Content-Disposition": 'attachment; filename="openings-export.json"'},
-        )
+        return RecordsResponse(records())
 
     @mcp.tool(
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)

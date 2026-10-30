@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.3
+
+- Exclude partial previews and punctuation-only placeholders from scoring; align completeness filters and counts.
+- Read JobCloud template descriptions and preserve complete postings during bounded source refreshes.
+- Export large archives as a consistent snapshot with complete JSON and bounded memory use.
+
 ## 0.5.2
 
 - Show saved scoring state and keep Save visible while editing; report skipped scoring requests.

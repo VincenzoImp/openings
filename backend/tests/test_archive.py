@@ -65,20 +65,44 @@ async def test_completeness_filter_matches_overview_and_page_totals_on_rest_and_
         url="https://jobs.lever.co/example/missing-text",
         posting="   ",
     )
+    preview = job(
+        app.state.workspace,
+        url="https://jobs.lever.co/example/preview",
+        posting="Python, SQL, cloud",
+        metadata={"description_complete": False},
+    )
+    placeholder = job(
+        app.state.workspace, url="https://jobs.lever.co/example/placeholder", posting=" — - … "
+    )
+    short = job(
+        app.state.workspace, url="https://jobs.lever.co/example/short", posting="Build APIs."
+    )
+    non_latin = job(
+        app.state.workspace, url="https://jobs.lever.co/example/non-latin", posting="開発者を募集"
+    )
+    missing_ids = {incomplete["id"], preview["id"], placeholder["id"]}
     with TestClient(app) as client:
         client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
         overview = client.get("/api/v1/overview").json()
         missing = client.get("/api/v1/jobs?complete=false&limit=1").json()
-        assert missing["total"] == overview["incomplete"] == 1
-        assert missing["items"][0]["id"] == incomplete["id"]
+        assert missing["total"] == overview["incomplete"] == 3
+        assert missing["items"][0]["id"] in missing_ids
         assert not missing["items"][0]["complete"]
-        assert client.get("/api/v1/jobs?complete=false&offset=1").json()["items"] == []
+        assert client.get("/api/v1/jobs?complete=false&offset=3").json()["items"] == []
         present = client.get("/api/v1/jobs?complete=true").json()
-        assert present["total"] == 1 and present["items"][0]["id"] == complete["id"]
+        assert present["total"] == 3
+        assert {row["id"] for row in present["items"]} == {
+            complete["id"], short["id"], non_latin["id"]
+        }
+        for item in (complete, incomplete, preview, placeholder, short, non_latin):
+            assert client.get(f"/api/v1/jobs/{item['id']}").json()["complete"] == (
+                item["id"] not in missing_ids
+            )
         assert client.get("/api/v1/jobs?complete=invalid").status_code == 422
     result = await app.state.mcp.call_tool("jobs_search", {"value": {"complete": False}})
     structured = json.loads(result[0].text)
-    assert structured["total"] == 1 and structured["items"][0]["id"] == incomplete["id"]
+    assert structured["total"] == 3
+    assert {row["id"] for row in structured["items"]} == missing_ids
 
 
 @pytest.mark.asyncio
@@ -298,7 +322,7 @@ def test_http_validates_answers_dates_and_rotation_preserves_tokens(tmp_path):
         )
         assert client.get("/api/v1/jobs").status_code == 401
         client.headers["Authorization"] = "Bearer " + token["token"]
-        assert client.get("/api/v1/capabilities").json()["version"] == "0.5.2"
+        assert client.get("/api/v1/capabilities").json()["version"] == "0.5.3"
         assert client.get("/api/v1/tokens").json()["items"][0]["last_used_at"]
         source = client.post(
             "/api/v1/sources",
