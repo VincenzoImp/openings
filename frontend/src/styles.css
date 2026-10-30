@@ -3784,3 +3784,172 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
     padding: 12px;
   }
 }
+
+/* Collection forms keep acquisition choices separate from schedules and HTTP policy. */
+.collection-form-section {
+  border-top: 1px solid var(--line);
+  padding: 20px 0 4px;
+  margin-top: 20px;
+}
+.collection-form-section:first-child {
+  border: 0;
+  padding-top: 0;
+  margin-top: 0;
+}
+.collection-form-section > h3 {
+  font-size: 15px;
+  margin-bottom: 16px;
+}
+.collection-form-section > .section-hint {
+  margin: -6px 0 18px;
+}
+.collection-form .formgrid {
+  align-items: start;
+}
+.collection-advanced {
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.collection-advanced > summary {
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+.collection-advanced .advanced-json {
+  margin-top: 0;
+}
+.daily-times {
+  margin: 18px 0;
+}
+.field-label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.time-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-bottom: 10px;
+}
+.time-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.time-input input {
+  max-width: 145px;
+}
+.run-progress {
+  margin: 15px 0;
+}
+.run-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.run-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+  margin: 14px 0;
+}
+.run-counts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.run-counts dt {
+  color: var(--muted);
+  font-size: 10px;
+}
+.run-counts dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.run-progress.compact .run-counts {
+  gap: 10px 16px;
+}
+.run-progress.compact .run-counts dd {
+  font-size: 13px;
+}
+.run-progress.compact .run-state .smalltext {
+  font-size: 10px;
+}
+.companycard .companyfoot {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.companycard .companyfacts {
+  margin-bottom: 0;
+}
+.companycard .run-progress {
+  margin-bottom: 0;
+}
+.companycard .companyfoot > a {
+  margin-left: auto;
+}
+.batch-errors {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.batch-errors ul {
+  padding-left: 18px;
+  margin: 10px 0;
+}
+.activity-filters {
+  padding: 18px 0;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.activity-filters .field select + input,
+.activity-filters .field input + select {
+  margin-top: 8px;
+}
+.task-summary {
+  margin: 10px 0;
+}
+.task-summary > p + p {
+  margin-top: 7px;
+}
+@media (max-width: 600px) {
+  .activity-filters {
+    grid-template-columns: 1fr;
+  }
+  .run-counts {
+    gap: 12px 18px;
+  }
+  .companycard .companyfoot > a {
+    margin-left: 0;
+  }
+  .time-inputs {
+    flex-direction: column;
+  }
+}
+.run-wait-reason {
+  margin-top: 9px;
+}
+@media (max-width: 600px) {
+  .companycard .companyfoot {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: center;
+  }
+  .companycard .companyfoot .btn {
+    padding-inline: 7px;
+  }
+  .companycard .companyfoot > a {
+    text-align: center;
+  }
+  .companycard .companyfoot > .iconbtn {
+    justify-self: end;
+  }
+}

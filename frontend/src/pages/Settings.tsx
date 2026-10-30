@@ -5,12 +5,18 @@ import {
   copyText,
   type Json,
   date,
+  formatTime,
+  type BackgroundTask,
+  type CollectionRun,
+  type Source,
+  type Job,
   version,
   type ListResult,
   type Scoring,
 } from "../api";
 import {
   useResource,
+  useDebounce,
   useUrlFilters,
   useUrlState,
   useWorkspace,
@@ -29,6 +35,7 @@ import {
   Tabs,
 } from "../ui";
 import { ProviderSettings } from "./Companies";
+import { RunProgress, duration } from "./CollectionForms";
 const blankScoring: Scoring = {
   enabled: false,
   auto_rescore_updates: true,
@@ -47,16 +54,6 @@ interface Token {
   name: string;
   created_at: string;
   last_used_at?: string;
-}
-interface Task {
-  id: string;
-  kind: string;
-  status?: string;
-  state?: string;
-  created_at: string;
-  updated_at?: string;
-  error?: string;
-  result?: Record<string, unknown>;
 }
 export default function SettingsPage({
   theme,
@@ -715,45 +712,87 @@ function TaskSettings() {
     source_id: "",
     job_id: "",
     offset: "0",
+    activity_view: "runs",
   });
-  const params = new URLSearchParams({ ...filters, limit: "30" });
-  Object.entries(filters).forEach(([key, value]) => {
-    if (!value) params.delete(key);
-  });
-  const resource = useResource<
-    ListResult<Task & { source_name?: string; job_title?: string }>
-  >(`/tasks?${params}`, { items: [], total: 0 });
+  const taskView = filters.activity_view === "tasks";
+  const [jobQuery, setJobQuery] = useState("");
+  const sources = useResource<ListResult<Source>>(
+    "/sources",
+    { items: [], total: 0 },
+    true,
+  );
+  const jobSearch = useDebounce(jobQuery);
+  const jobs = useResource<ListResult<Job>>(
+    taskView ? `/jobs?limit=100&q=${encodeURIComponent(jobSearch)}` : null,
+    { items: [], total: 0 },
+  );
+  const params = new URLSearchParams({ limit: "30", offset: filters.offset });
+  for (const key of [
+    "state",
+    "source_id",
+    ...(taskView ? ["kind", "job_id"] : []),
+  ])
+    if (filters[key]) params.set(key, filters[key]);
+  const resource = useResource<ListResult<BackgroundTask | CollectionRun>>(
+    `${taskView ? "/tasks" : "/collection/runs"}?${params}`,
+    { items: [], total: 0 },
+  );
   const { mutate, pending } = useWorkspace();
-  const [selected, setSelected] = useState<string | null>(null);
-  const detail = useResource<Json | null>(
-    selected ? `/tasks/${selected}` : null,
+  const [selected, setSelected] = useState<{ id: string; run: boolean } | null>(
     null,
   );
-  const active = resource.data.items.some((t) =>
-    ["queued", "running"].includes(t.status || t.state || ""),
+  const detail = useResource<BackgroundTask | CollectionRun | null>(
+    selected
+      ? `${selected.run ? "/collection/runs" : "/tasks"}/${selected.id}`
+      : null,
+    null,
+  );
+  const active = resource.data.items.some((item) =>
+    ["queued", "running"].includes(item.state),
   );
   useEffect(() => {
     if (!active) return;
     const timer = setInterval(resource.reload, 4000);
     return () => clearInterval(timer);
   }, [active]);
+  const detailActive =
+    detail.data && ["queued", "running"].includes(detail.data.state);
+  useEffect(() => {
+    if (!detailActive) return;
+    const timer = setInterval(detail.reload, 4000);
+    return () => clearInterval(timer);
+  }, [detailActive, selected?.id]);
   return (
     <>
       <section className="card sectioncard">
         <div className="sectiontitle">
           <div>
             <h2>Activity</h2>
-            <p>
-              Inspect collection and scoring work, including failures and retry
-              eligibility.
-            </p>
+            <p>Follow collection runs, provider waits and scoring tasks.</p>
           </div>
           <Button icon="refresh" onClick={resource.reload}>
             Refresh
           </Button>
         </div>
-        <div className="filter-grid">
-          <Field label="Task state">
+        <Tabs
+          label="Activity views"
+          value={taskView ? "tasks" : "runs"}
+          onChange={(value) =>
+            setFilters({
+              activity_view: value,
+              offset: "0",
+              state: "",
+              kind: "",
+              job_id: "",
+            })
+          }
+          items={[
+            { id: "runs", label: "Collection runs" },
+            { id: "tasks", label: "All tasks" },
+          ]}
+        />
+        <div className="filter-grid activity-filters">
+          <Field label="State">
             <select
               value={filters.state}
               onChange={(e) =>
@@ -763,41 +802,75 @@ function TaskSettings() {
               <option value="">All states</option>
               {["queued", "running", "succeeded", "failed", "cancelled"].map(
                 (value) => (
-                  <option key={value}>{value}</option>
+                  <option key={value} value={value}>
+                    {value === "queued" ? "Queued / waiting" : value}
+                  </option>
                 ),
               )}
             </select>
           </Field>
-          <Field label="Task kind">
+          <Field label="Source">
             <select
-              value={filters.kind}
-              onChange={(e) =>
-                setFilters({ kind: e.target.value, offset: "0" })
-              }
-            >
-              <option value="">All kinds</option>
-              <option value="collect">Collection</option>
-              <option value="score">Scoring</option>
-            </select>
-          </Field>
-          <Field label="Source ID">
-            <input
               value={filters.source_id}
               onChange={(e) =>
                 setFilters({ source_id: e.target.value, offset: "0" })
               }
-              placeholder="Any source"
-            />
+            >
+              <option value="">All sources</option>
+              {filters.source_id &&
+                !sources.data.items.some((s) => s.id === filters.source_id) && (
+                  <option value={filters.source_id}>Selected source</option>
+                )}
+              {sources.data.items.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
           </Field>
-          <Field label="Job ID">
-            <input
-              value={filters.job_id}
-              onChange={(e) =>
-                setFilters({ job_id: e.target.value, offset: "0" })
-              }
-              placeholder="Any job"
-            />
-          </Field>
+          {taskView && (
+            <>
+              <Field label="Task kind">
+                <select
+                  value={filters.kind}
+                  onChange={(e) =>
+                    setFilters({ kind: e.target.value, offset: "0" })
+                  }
+                >
+                  <option value="">All kinds</option>
+                  <option value="collect">Collection</option>
+                  <option value="score">Scoring</option>
+                </select>
+              </Field>
+              <Field label="Job">
+                <input
+                  type="search"
+                  aria-label="Find a job for activity"
+                  value={jobQuery}
+                  placeholder="Find a job by title or company"
+                  onChange={(e) => setJobQuery(e.target.value)}
+                />
+                <select
+                  aria-label="Filter activity by job"
+                  value={filters.job_id}
+                  onChange={(e) =>
+                    setFilters({ job_id: e.target.value, offset: "0" })
+                  }
+                >
+                  <option value="">All jobs</option>
+                  {filters.job_id &&
+                    !jobs.data.items.some((j) => j.id === filters.job_id) && (
+                      <option value={filters.job_id}>Selected job</option>
+                    )}
+                  {jobs.data.items.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.title} · {j.company}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </>
+          )}
         </div>
         {resource.error && (
           <ErrorBox message={resource.error} retry={resource.reload} />
@@ -806,74 +879,92 @@ function TaskSettings() {
           {resource.loading ? (
             <Loading />
           ) : resource.data.items.length ? (
-            resource.data.items.map((task) => (
-              <article className="task-entry" key={task.id}>
-                <div className="sectiontitle">
-                  <div>
-                    <button
-                      className="table-link"
-                      onClick={() => setSelected(task.id)}
-                    >
-                      <h3>
-                        {task.source_name ||
-                          task.job_title ||
-                          task.kind.replaceAll("_", " ")}
-                      </h3>
-                    </button>
-                    <p>
-                      {task.kind} · {date(task.created_at)}
-                    </p>
+            resource.data.items.map((item) => {
+              if (!taskView) {
+                const run = item as CollectionRun;
+                return (
+                  <article className="task-entry" key={run.id}>
+                    <div className="sectiontitle">
+                      <div>
+                        <button
+                          className="table-link"
+                          onClick={() => setSelected({ id: run.id, run: true })}
+                        >
+                          <h3>{run.source_name}</h3>
+                        </button>
+                        <p>
+                          {formatTime(run.created_at)} ·{" "}
+                          {run.task_ids?.length || run.tasks?.length || 0}{" "}
+                          provider tasks
+                        </p>
+                      </div>
+                      <span className="smalltext muted">
+                        {duration(run.total_seconds)}
+                      </span>
+                    </div>
+                    <RunProgress run={run} />
+                    <div className="actions">
+                      <Button
+                        className="small"
+                        onClick={() => setSelected({ id: run.id, run: true })}
+                      >
+                        Run details
+                      </Button>
+                      {["queued", "running"].includes(run.state) && (
+                        <Button
+                          className="small"
+                          disabled={pending}
+                          onClick={() =>
+                            mutate(
+                              () =>
+                                api(
+                                  `/collection/runs/${run.id}/cancel`,
+                                  "POST",
+                                ),
+                              "Current run stopped.",
+                            )
+                          }
+                        >
+                          Stop run
+                        </Button>
+                      )}
+                    </div>
+                  </article>
+                );
+              }
+              const task = item as BackgroundTask;
+              return (
+                <article className="task-entry" key={task.id}>
+                  <div className="sectiontitle">
+                    <div>
+                      <button
+                        className="table-link"
+                        onClick={() => setSelected({ id: task.id, run: false })}
+                      >
+                        <h3>
+                          {task.source_name || task.job_title || task.kind}
+                        </h3>
+                      </button>
+                      <p>
+                        {task.kind === "collect"
+                          ? String(task.payload?.provider || "Collection")
+                          : "Scoring"}{" "}
+                        · {formatTime(task.created_at)}
+                      </p>
+                    </div>
+                    <TaskState task={task} />
                   </div>
-                  <span className={`tag ${task.error ? "amber" : "neutral"}`}>
-                    {task.status || task.state}
-                  </span>
-                </div>
-                {task.error && <p className="source-error">{task.error}</p>}
-                <div className="actions">
-                  <Button
-                    className="small"
-                    onClick={() => setSelected(task.id)}
-                  >
-                    Details
-                  </Button>
-                  {["queued", "running"].includes(
-                    task.status || task.state || "",
-                  ) ? (
-                    <Button
-                      className="small"
-                      disabled={pending}
-                      onClick={() =>
-                        mutate(
-                          () => api(`/tasks/${task.id}/cancel`, "POST"),
-                          "Cancellation requested.",
-                        )
-                      }
-                    >
-                      Cancel task
-                    </Button>
-                  ) : ["failed", "cancelled"].includes(
-                      task.status || task.state || "",
-                    ) ? (
-                    <Button
-                      className="small"
-                      icon="refresh"
-                      disabled={pending}
-                      onClick={() =>
-                        mutate(
-                          () => api(`/tasks/${task.id}/retry`, "POST"),
-                          "Task retry queued.",
-                        )
-                      }
-                    >
-                      Retry
-                    </Button>
-                  ) : null}
-                </div>
-              </article>
-            ))
+                  <TaskSummary task={task} />
+                  <TaskActions
+                    task={task}
+                    onDetails={() => setSelected({ id: task.id, run: false })}
+                  />
+                </article>
+              );
+            })
           ) : (
             <Empty title="No activity in this view.">
-              Collection and scoring runs appear here with their results.
+              Runs and tasks appear here when collection or scoring starts.
             </Empty>
           )}
         </div>
@@ -884,19 +975,152 @@ function TaskSettings() {
         />
       </section>
       {selected && (
-        <Dialog title="Task details." onClose={() => setSelected(null)}>
+        <Dialog
+          title={selected.run ? "Collection run" : "Task details"}
+          onClose={() => setSelected(null)}
+        >
           {detail.error ? (
             <ErrorBox message={detail.error} retry={detail.reload} />
           ) : detail.data ? (
-            <pre className="json-readout">
-              {JSON.stringify(detail.data, null, 2)}
-            </pre>
+            <>
+              {selected.run ? (
+                <>
+                  <h3>{(detail.data as CollectionRun).source_name}</h3>
+                  <RunProgress run={detail.data as CollectionRun} />
+                  <p className="hint">
+                    Each provider resumes its saved progress. Found and already
+                    archived are observations; New counts unique archive
+                    records.
+                  </p>
+                  {(detail.data as CollectionRun).tasks?.map((task) => (
+                    <article className="task-entry" key={task.id}>
+                      <div className="sectiontitle">
+                        <h3>{String(task.payload?.provider || task.kind)}</h3>
+                        <TaskState task={task} />
+                      </div>
+                      <TaskSummary task={task} />
+                      <TaskActions task={task} />
+                    </article>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <h3>
+                    {(detail.data as BackgroundTask).source_name ||
+                      (detail.data as BackgroundTask).job_title ||
+                      (detail.data as BackgroundTask).kind}
+                  </h3>
+                  <TaskState task={detail.data as BackgroundTask} />
+                  <TaskSummary task={detail.data as BackgroundTask} />
+                  <TaskActions task={detail.data as BackgroundTask} />
+                </>
+              )}
+              <details className="collection-advanced">
+                <summary>Technical details and frozen settings</summary>
+                <pre className="json-readout">
+                  {JSON.stringify(detail.data, null, 2)}
+                </pre>
+              </details>
+            </>
           ) : (
             <Loading />
           )}
         </Dialog>
       )}
     </>
+  );
+}
+function TaskState({ task }: { task: BackgroundTask }) {
+  const waiting =
+    task.state === "queued" &&
+    !!task.next_run_at &&
+    new Date(task.next_run_at).valueOf() > Date.now();
+  return (
+    <span
+      className={`tag ${task.state === "failed" ? "amber" : task.state === "succeeded" ? "green" : "neutral"}`}
+    >
+      {waiting ? "Waiting" : task.state}
+    </span>
+  );
+}
+function TaskSummary({ task }: { task: BackgroundTask }) {
+  const waiting = task.state === "queued",
+    counts = task.result || {};
+  return (
+    <div className="task-summary">
+      {task.error && (
+        <p className={waiting ? "hint" : "source-error"}>{task.error}</p>
+      )}
+      {waiting && task.next_run_at && (
+        <p className="smalltext muted">
+          Next attempt {formatTime(task.next_run_at)}
+        </p>
+      )}
+      <p className="smalltext muted">
+        {[
+          ["received", "Found"],
+          ["created", "New"],
+          ["existing", "Already archived"],
+          ["invalid", "Invalid"],
+          ["pending_descriptions", "Need text"],
+        ]
+          .filter(([key]) => typeof counts[key] === "number")
+          .map(([key, label]) => `${label}: ${counts[key]}`)
+          .join(" · ")}
+      </p>
+      {task.kind === "score" && typeof counts.score === "number" && (
+        <p className="smalltext">Fit score: {counts.score}/100</p>
+      )}
+      {!!task.attempts && (
+        <p className="smalltext muted">{task.attempts} attempts</p>
+      )}
+    </div>
+  );
+}
+function TaskActions({
+  task,
+  onDetails,
+}: {
+  task: BackgroundTask;
+  onDetails?: () => void;
+}) {
+  const { mutate, pending } = useWorkspace();
+  return (
+    <div className="actions">
+      {onDetails && (
+        <Button className="small" onClick={onDetails}>
+          Details
+        </Button>
+      )}
+      {["queued", "running"].includes(task.state) ? (
+        <Button
+          className="small"
+          disabled={pending}
+          onClick={() =>
+            mutate(
+              () => api(`/tasks/${task.id}/cancel`, "POST"),
+              "Task stopped.",
+            )
+          }
+        >
+          Stop task
+        </Button>
+      ) : ["failed", "cancelled"].includes(task.state) ? (
+        <Button
+          className="small"
+          icon="refresh"
+          disabled={pending}
+          onClick={() =>
+            mutate(
+              () => api(`/tasks/${task.id}/retry`, "POST"),
+              "Task retry queued.",
+            )
+          }
+        >
+          Retry
+        </Button>
+      ) : null}
+    </div>
   );
 }
 function WorkspaceSettings({

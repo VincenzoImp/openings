@@ -1,16 +1,14 @@
-import { Fragment, useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import {
   api,
   date,
   formatTime,
-  jsonValue,
   version,
   type Json,
   type ListResult,
   type Source,
 } from "../api";
 import {
-  confirmLeave,
   selectRecords,
   useDebounce,
   useResource,
@@ -19,7 +17,6 @@ import {
   useWorkspace,
 } from "../state";
 import {
-  AdvancedJson,
   Button,
   Dialog,
   Empty,
@@ -32,21 +29,6 @@ import {
   Switch,
   Tabs,
 } from "../ui";
-interface Preview {
-  kind: string;
-  config: Json;
-  url: string;
-  items: { title: string; company?: string; location?: string }[];
-  total: number;
-  diagnostics?: {
-    provider: string;
-    state: string;
-    message: string;
-    requests?: number;
-    next_run_at?: string;
-  }[];
-  request_estimate?: { total: number };
-}
 interface Collection {
   enabled: boolean;
   version: number;
@@ -77,33 +59,18 @@ interface Provider {
     requests_day?: number;
   };
 }
-const kinds = [
-  "greenhouse",
-  "lever",
-  "ashby",
-  "rss",
-  "recruitee",
-  "personio",
-  "workable",
-  "breezy",
-  "smartrecruiters",
-  "bamboohr",
-  "rippling",
-  "workday",
-  "oracle",
-  "joincom",
-];
+import {
+  SourceEditor,
+  SourceBulkEditor,
+  RunOptionsDialog,
+  scheduleLabel,
+  RunProgress,
+} from "./CollectionForms";
 function isSavedSearch(kind: string) {
-  return ["jobspy", "jobcloud", "adzuna"].includes(kind);
+  return kind === "jobspy";
 }
 function searchProviders(source: Source) {
-  if (source.kind === "jobspy")
-    return (source.config.providers as string[]) || [];
-  return [
-    source.kind === "jobcloud"
-      ? String(source.config.host || "jobs.ch")
-      : "Adzuna",
-  ];
+  return (source.config.providers as string[]) || [];
 }
 export default function CompaniesPage() {
   const resource = useResource<ListResult<Source>>(
@@ -116,7 +83,12 @@ export default function CompaniesPage() {
   const query = useDebounce(filters.q).trim().toLowerCase();
   const [editing, setEditing] = useState<Source | "new" | null>(null),
     [selection, setSelection] = useState<Record<string, number>>({}),
-    [confirmDelete, setConfirmDelete] = useState<Source[] | null>(null);
+    [confirmDelete, setConfirmDelete] = useState<Source[] | null>(null),
+    [bulkEditing, setBulkEditing] = useState(false),
+    [runningOptions, setRunningOptions] = useState<Source[] | null>(null),
+    [batchErrors, setBatchErrors] = useState<{ id: string; message: string }[]>(
+      [],
+    );
   const { mutate, pending, notify } = useWorkspace();
   const matches = resource.data.items.filter(
     (s) =>
@@ -144,12 +116,12 @@ export default function CompaniesPage() {
   const chosen = resource.data.items
     .filter((s) => selection[s.id] !== undefined)
     .map((s) => ({ ...s, version: selection[s.id] }));
-  async function batch(action: string, items = chosen) {
+  async function batch(action: string, items = chosen, extra: Json = {}) {
     let result:
       | {
           succeeded: number;
           failed: number;
-          items: { error?: { message: string } }[];
+          items: { id: string; error?: { message: string } }[];
         }
       | undefined;
     const ok = await mutate(
@@ -157,20 +129,54 @@ export default function CompaniesPage() {
         result = await api("/sources/bulk", "POST", {
           action,
           items: items.map((s) => ({ id: s.id, expected_version: s.version })),
+          ...extra,
         });
       },
-      `Source ${action === "run" ? "runs queued" : action === "delete" ? "removed" : action === "enable" ? "enabled" : "paused"}.`,
+      action === "run"
+        ? "Collection runs queued."
+        : action === "configure"
+          ? "Collection settings saved."
+          : `Sources ${action === "delete" ? "removed" : action === "enable" ? "enabled" : "paused"}.`,
     );
-    if (ok) {
-      setSelection({});
-      setConfirmDelete(null);
-      if (result?.failed)
-        notify(
-          `${result.succeeded} completed; ${result.failed} failed. ${result.items.find((i) => i.error)?.error?.message || "Refresh and retry."}`,
-          true,
-        );
-    }
+    if (!ok || !result) return false;
+    const failures = result.items
+      .filter((item) => item.error)
+      .map((item) => ({ id: item.id, message: item.error!.message }));
+    setBatchErrors(failures);
+    if (action === "run" && failures.length)
+      setRunningOptions((current) =>
+        current
+          ? items.filter((source) =>
+              failures.some((error) => error.id === source.id),
+            )
+          : null,
+      );
+    setSelection((current) => {
+      const next = { ...current };
+      for (const item of result!.items) if (!item.error) delete next[item.id];
+      for (const item of failures) {
+        const selected = items.find((s) => s.id === item.id);
+        if (selected) next[item.id] = selected.version;
+      }
+      return next;
+    });
+    setConfirmDelete(null);
+    if (result.failed)
+      notify(
+        `${result.succeeded} completed; ${result.failed} failed. See the source errors below.`,
+        true,
+      );
+    return result.failed === 0;
   }
+  const collecting = resource.data.items.some(
+    (source) =>
+      source.last_run && ["queued", "running"].includes(source.last_run.state),
+  );
+  useEffect(() => {
+    if (!collecting) return;
+    const timer = setInterval(resource.reload, 5000);
+    return () => clearInterval(timer);
+  }, [collecting]);
   return (
     <>
       <Heading
@@ -262,6 +268,12 @@ export default function CompaniesPage() {
                   : "Pause"}
             </Button>
           ))}
+          <Button disabled={pending} onClick={() => setBulkEditing(true)}>
+            Configure
+          </Button>
+          <Button disabled={pending} onClick={() => setRunningOptions(chosen)}>
+            Run with options
+          </Button>
           <Button variant="danger" onClick={() => setConfirmDelete(chosen)}>
             Remove
           </Button>
@@ -272,6 +284,40 @@ export default function CompaniesPage() {
       )}
       {resource.error && (
         <ErrorBox message={resource.error} retry={resource.reload} />
+      )}
+      {!!batchErrors.length && (
+        <div className="batch-errors" role="alert">
+          <strong>Some sources need attention</strong>
+          <ul>
+            {batchErrors.map((error) => (
+              <li key={error.id}>
+                <b>
+                  {resource.data.items.find((s) => s.id === error.id)?.name ||
+                    error.id}
+                </b>
+                : {error.message}
+              </li>
+            ))}
+          </ul>
+          <Button
+            className="small"
+            onClick={() => {
+              setSelection((current) =>
+                Object.fromEntries(
+                  Object.keys(current).map((id) => [
+                    id,
+                    resource.data.items.find((s) => s.id === id)?.version ||
+                      current[id],
+                  ]),
+                ),
+              );
+              setBatchErrors([]);
+              resource.reload();
+            }}
+          >
+            Use current versions
+          </Button>
+        </div>
       )}
       <div className="companygrid">
         {resource.loading && !resource.data.items.length ? (
@@ -339,11 +385,7 @@ export default function CompaniesPage() {
                 </div>
                 <div>
                   <span>Schedule</span>
-                  <strong>
-                    {source.schedule.kind === "daily"
-                      ? `Daily ${String(source.schedule.at || "07:00")}`
-                      : `Every ${Number(source.schedule.minutes || 1440) / 60} hours`}
-                  </strong>
+                  <strong>{scheduleLabel(source.schedule)}</strong>
                 </div>
                 <div>
                   <span>Last run</span>
@@ -354,29 +396,16 @@ export default function CompaniesPage() {
                   <strong>{formatTime(source.next_run_at)}</strong>
                 </div>
               </div>
-              {(source.last_counts || source.last_result) && (
-                <p className="smalltext muted">
-                  {Object.entries(
-                    source.last_counts || source.last_result || {},
-                  )
-                    .filter(([, value]) => typeof value === "number")
-                    .map(
-                      ([key, value]) => `${key.replaceAll("_", " ")}: ${value}`,
-                    )
-                    .join(" · ")}
-                </p>
-              )}
-              {source.last_outcome && (
-                <p className="smalltext muted">
-                  Last outcome: {source.last_outcome}
-                </p>
-              )}
-              {source.last_error && (
-                <p className="source-error">
-                  <Icon name="error" />
-                  {source.last_error}
-                </p>
-              )}
+              {source.last_run && <RunProgress run={source.last_run} compact />}
+              {source.last_error &&
+                !["queued", "running"].includes(
+                  source.last_run?.state || "",
+                ) && (
+                  <p className="source-error">
+                    <Icon name="error" />
+                    {source.last_error}
+                  </p>
+                )}
               {[
                 ...new Set(
                   source.last_diagnostics?.flatMap((d) => d.warnings || []) ||
@@ -403,12 +432,38 @@ export default function CompaniesPage() {
                 >
                   Run once
                 </Button>
+                <Button
+                  className="small"
+                  disabled={pending}
+                  onClick={() => setRunningOptions([source])}
+                >
+                  Options
+                </Button>
                 <a
                   className="textbutton smalltext"
                   href={`#settings?section=activity&source_id=${source.id}`}
                 >
                   Progress
                 </a>
+                {source.last_run &&
+                  ["queued", "running"].includes(source.last_run.state) && (
+                    <Button
+                      className="small"
+                      disabled={pending}
+                      onClick={() =>
+                        mutate(
+                          () =>
+                            api(
+                              `/collection/runs/${source.last_run!.id}/cancel`,
+                              "POST",
+                            ),
+                          "Current run stopped.",
+                        )
+                      }
+                    >
+                      Stop run
+                    </Button>
+                  )}
                 <button
                   className="iconbtn danger"
                   aria-label={`Remove ${source.name}`}
@@ -472,6 +527,20 @@ export default function CompaniesPage() {
           onClose={() => setEditing(null)}
         />
       )}
+      {bulkEditing && chosen.length > 0 && (
+        <SourceBulkEditor
+          sources={chosen}
+          onClose={() => setBulkEditing(false)}
+          onSave={(patch) => batch("configure", chosen, { patch })}
+        />
+      )}
+      {!!runningOptions?.length && (
+        <RunOptionsDialog
+          sources={runningOptions}
+          onClose={() => setRunningOptions(null)}
+          onRun={(overrides) => batch("run", runningOptions, { overrides })}
+        />
+      )}
       {confirmDelete && (
         <Dialog
           title={`Remove ${confirmDelete.length === 1 ? confirmDelete[0].name : `${confirmDelete.length} sources`}?`}
@@ -494,509 +563,6 @@ export default function CompaniesPage() {
         </Dialog>
       )}
     </>
-  );
-}
-function SourceEditor({
-  source,
-  search,
-  onClose,
-}: {
-  source?: Source;
-  search: boolean;
-  onClose: () => void;
-}) {
-  const { mutate, pending, notify } = useWorkspace();
-  const [preview, setPreview] = useState<Preview | null>(null),
-    [previewing, setPreviewing] = useState(false),
-    [kind, setKind] = useState(source?.kind || (search ? "jobspy" : "auto")),
-    [scheduleKind, setScheduleKind] = useState(
-      String(source?.schedule.kind || "interval"),
-    );
-  function values(form: HTMLFormElement) {
-    const f = new FormData(form),
-      configuration = jsonValue(f, "config", source?.config || {}) as Json;
-    const config =
-      kind === "jobspy"
-        ? {
-            ...configuration,
-            query: f.get("query"),
-            location: f.get("location"),
-            country: f.get("country"),
-            providers: f.getAll("providers"),
-            results_wanted: Number(f.get("results_wanted")),
-            hours_old: Number(f.get("hours_old")),
-            is_remote: f.get("is_remote") === "on",
-            job_type: f.get("job_type") || null,
-            fetch_description: f.get("fetch_description") === "on",
-          }
-        : kind === "jobcloud" || kind === "adzuna"
-          ? {
-              ...configuration,
-              query: f.get("query"),
-              location: f.get("location"),
-              results_wanted: Number(f.get("results_wanted")),
-              ...(kind === "jobcloud"
-                ? { host: f.get("host") }
-                : {
-                    country: f.get("country"),
-                    app_id: f.get("app_id"),
-                    app_key: f.get("app_key"),
-                  }),
-            }
-          : {
-              ...configuration,
-              ...(f.get("board") || Object.hasOwn(configuration, "board")
-                ? { board: String(f.get("board") || "") }
-                : {}),
-            };
-    return {
-      name: f.get("name"),
-      kind,
-      url: isSavedSearch(kind) ? "" : f.get("url"),
-      config,
-      enabled: f.get("enabled") === "on",
-      filters: {
-        ...jsonValue(f, "filters", source?.filters || {}),
-        titles: String(f.get("titles") || "")
-          .split(",")
-          .map((x) => x.trim())
-          .filter(Boolean),
-        locations: String(f.get("locations") || "")
-          .split(",")
-          .map((x) => x.trim())
-          .filter(Boolean),
-      },
-      schedule: {
-        kind: f.get("schedule_kind"),
-        minutes: Number(f.get("minutes") || source?.schedule.minutes || 1440),
-        at: f.get("at") || source?.schedule.at || "07:00",
-        timezone: f.get("timezone"),
-      },
-    };
-  }
-  async function save(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const body = values(e.currentTarget);
-    if (
-      await mutate(
-        () =>
-          api(
-            source ? `/sources/${source.id}` : "/sources",
-            source ? "PATCH" : "POST",
-            source ? version(source, body) : body,
-          ),
-        "Collection source saved.",
-      )
-    )
-      onClose();
-  }
-  async function inspect(form: HTMLFormElement | null) {
-    if (!form || previewing || !form.reportValidity()) return;
-    setPreviewing(true);
-    try {
-      const { enabled, schedule, ...body } = values(form);
-      setPreview(await api<Preview>("/sources/preview", "POST", body));
-      notify("Preview complete. No jobs were saved.");
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "Preview failed.", true);
-    } finally {
-      setPreviewing(false);
-    }
-  }
-  const filters = (key: string) =>
-    Array.isArray(source?.filters[key])
-      ? (source.filters[key] as string[]).join(", ")
-      : "";
-  return (
-    <Dialog
-      title={
-        source
-          ? "Configure collection."
-          : search
-            ? "Save a focused search."
-            : "Follow a company."
-      }
-      onClose={onClose}
-    >
-      <form onSubmit={save}>
-        <Field
-          label={isSavedSearch(kind) ? "Search name" : "Company / source name"}
-        >
-          <input
-            name="name"
-            required
-            defaultValue={source?.name}
-            placeholder={
-              isSavedSearch(kind) ? "My saved search" : "Company name"
-            }
-          />
-        </Field>
-        {(search || isSavedSearch(kind)) && (
-          <Field
-            label="Search service"
-            hint={
-              source
-                ? "Add another search to use a different service."
-                : undefined
-            }
-          >
-            <select
-              value={kind}
-              disabled={!!source}
-              onChange={(e) => {
-                setKind(e.target.value);
-                setPreview(null);
-              }}
-            >
-              <option value="jobspy">
-                JobSpy · LinkedIn, Indeed, Glassdoor
-              </option>
-              <option value="jobcloud">JobCloud · jobs.ch, jobup.ch</option>
-              <option value="adzuna">Adzuna · API credentials required</option>
-            </select>
-          </Field>
-        )}
-        <Fragment key={kind}>
-          {kind === "jobspy" ? (
-            <>
-              <Field
-                label="Search query"
-                hint="Keywords sent to the selected job boards, for example backend engineer. Use a separate saved search for another query or location."
-              >
-                <input
-                  name="query"
-                  required
-                  defaultValue={String(source?.config.query || "")}
-                  placeholder="Enter keywords"
-                />
-              </Field>
-              <div className="formgrid">
-                <Field label="Location">
-                  <input
-                    name="location"
-                    defaultValue={String(source?.config.location || "")}
-                    placeholder="City or region"
-                  />
-                </Field>
-                <Field
-                  label="Country"
-                  hint="Use an English country name, such as usa, uk or germany."
-                >
-                  <input
-                    name="country"
-                    required
-                    defaultValue={String(source?.config.country || "usa")}
-                    placeholder="usa"
-                  />
-                </Field>
-              </div>
-              <fieldset className="provider-choices">
-                <legend>Search providers</legend>
-                {["linkedin", "indeed", "glassdoor"].map((provider) => (
-                  <label className="checkline" key={provider}>
-                    <input
-                      type="checkbox"
-                      name="providers"
-                      value={provider}
-                      defaultChecked={(
-                        (source?.config.providers as string[]) || [
-                          "linkedin",
-                          "indeed",
-                          "glassdoor",
-                        ]
-                      ).includes(provider)}
-                    />
-                    {
-                      {
-                        linkedin: "LinkedIn",
-                        indeed: "Indeed",
-                        glassdoor: "Glassdoor",
-                      }[provider]
-                    }
-                  </label>
-                ))}
-              </fieldset>
-              <div className="formgrid">
-                <Field label="Results per provider">
-                  <input
-                    type="number"
-                    name="results_wanted"
-                    min={1}
-                    max={50}
-                    defaultValue={Number(source?.config.results_wanted || 20)}
-                  />
-                </Field>
-                <Field label="Posted within (hours)">
-                  <input
-                    type="number"
-                    name="hours_old"
-                    min={1}
-                    max={8760}
-                    defaultValue={Number(source?.config.hours_old || 72)}
-                  />
-                </Field>
-                <Field label="Job type">
-                  <select
-                    name="job_type"
-                    defaultValue={String(source?.config.job_type || "")}
-                  >
-                    <option value="">Any type</option>
-                    {[
-                      "fulltime",
-                      "parttime",
-                      "contract",
-                      "temporary",
-                      "internship",
-                      "perdiem",
-                      "other",
-                      "volunteer",
-                    ].map((k) => (
-                      <option key={k} value={k}>
-                        {k}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
-              <label className="checkline">
-                <input
-                  type="checkbox"
-                  name="is_remote"
-                  defaultChecked={!!source?.config.is_remote}
-                />
-                Remote roles only
-              </label>
-              <label className="checkline">
-                <input
-                  type="checkbox"
-                  name="fetch_description"
-                  defaultChecked={source?.config.fetch_description !== false}
-                />
-                Fetch full descriptions where supported
-              </label>
-            </>
-          ) : kind === "jobcloud" || kind === "adzuna" ? (
-            <>
-              <Field label="Search query">
-                <input
-                  name="query"
-                  required
-                  defaultValue={String(source?.config.query || "")}
-                />
-              </Field>
-              <Field label="Location">
-                <input
-                  name="location"
-                  defaultValue={String(source?.config.location || "")}
-                  placeholder="City or region"
-                />
-              </Field>
-              {kind === "adzuna" && (
-                <div className="formgrid">
-                  <Field label="Adzuna application ID">
-                    <input
-                      name="app_id"
-                      required
-                      autoComplete="off"
-                      defaultValue={String(source?.config.app_id || "")}
-                    />
-                  </Field>
-                  <Field label="Adzuna API key">
-                    <input
-                      name="app_key"
-                      type="password"
-                      required
-                      autoComplete="off"
-                      defaultValue={String(source?.config.app_key || "")}
-                    />
-                  </Field>
-                </div>
-              )}
-              <div className="formgrid">
-                {kind === "jobcloud" ? (
-                  <Field label="Search provider">
-                    <select
-                      name="host"
-                      defaultValue={String(source?.config.host || "jobs.ch")}
-                    >
-                      <option value="jobs.ch">jobs.ch</option>
-                      <option value="jobup.ch">jobup.ch</option>
-                    </select>
-                  </Field>
-                ) : (
-                  <Field label="Country code">
-                    <input
-                      name="country"
-                      required
-                      pattern="[a-z]{2}"
-                      defaultValue={String(source?.config.country || "gb")}
-                    />
-                  </Field>
-                )}
-                <Field label="Results per search">
-                  <input
-                    name="results_wanted"
-                    type="number"
-                    required
-                    min={1}
-                    max={kind === "jobcloud" ? 40 : 50}
-                    defaultValue={Number(source?.config.results_wanted || 20)}
-                  />
-                </Field>
-              </div>
-            </>
-          ) : (
-            <>
-              <Field label="Career / board URL">
-                <input
-                  type="url"
-                  name="url"
-                  required
-                  defaultValue={source?.url || ""}
-                  placeholder="https://jobs.lever.co/company"
-                />
-              </Field>
-              <div className="formgrid">
-                <Field label="Board type">
-                  <select
-                    value={kind}
-                    onChange={(e) => setKind(e.target.value)}
-                  >
-                    <option value="auto">Detect from URL</option>
-                    {kinds.map((k) => (
-                      <option key={k} value={k}>
-                        {k === "rss" ? "RSS feed" : k}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Board identifier (optional)">
-                  <input
-                    name="board"
-                    defaultValue={String(source?.config.board || "")}
-                  />
-                </Field>
-              </div>
-            </>
-          )}
-        </Fragment>
-        <div className="formgrid">
-          <Field label="Role filters" hint="Optional comma-separated words.">
-            <input name="titles" defaultValue={filters("titles")} />
-          </Field>
-          <Field
-            label="Location filters"
-            hint="Optional comma-separated locations."
-          >
-            <input name="locations" defaultValue={filters("locations")} />
-          </Field>
-          <Field label="Schedule">
-            <select
-              name="schedule_kind"
-              value={scheduleKind}
-              onChange={(e) => setScheduleKind(e.target.value)}
-            >
-              <option value="daily">At a daily time</option>
-              <option value="interval">At an interval</option>
-            </select>
-          </Field>
-          <Field label="Daily time">
-            <input
-              type="time"
-              name="at"
-              disabled={scheduleKind !== "daily"}
-              defaultValue={String(source?.schedule.at || "07:00")}
-            />
-          </Field>
-          <Field label="Timezone">
-            <input
-              name="timezone"
-              required
-              defaultValue={String(source?.schedule.timezone || "UTC")}
-            />
-          </Field>
-          <Field label="Interval in minutes">
-            <input
-              type="number"
-              name="minutes"
-              disabled={scheduleKind !== "interval"}
-              min={15}
-              max={43200}
-              defaultValue={Number(source?.schedule.minutes || 1440)}
-            />
-          </Field>
-        </div>
-        {!search && (
-          <AdvancedJson
-            name="config"
-            label="Provider configuration"
-            value={source?.config || {}}
-          />
-        )}
-        <label className="checkline">
-          <input
-            type="checkbox"
-            name="enabled"
-            defaultChecked={source?.enabled || false}
-          />
-          Enable automatic collection
-        </label>
-        <p className="hint">
-          Preview and Run once share provider request limits. New sources start
-          paused.
-        </p>
-        {preview && (
-          <section className="preview-result" aria-live="polite">
-            <h3>{preview.total} matching opportunities</h3>
-            {preview.request_estimate && (
-              <p>{preview.request_estimate.total} estimated requests</p>
-            )}
-            {preview.diagnostics?.map((d, i) => (
-              <p
-                className={d.state === "error" ? "source-error" : "smalltext"}
-                key={i}
-              >
-                <b>{d.provider}</b> · {d.state} ·{" "}
-                {d.message ||
-                  `${d.requests || 0} request${d.requests === 1 ? "" : "s"}`}
-                {d.next_run_at ? ` · ${formatTime(d.next_run_at)}` : ""}
-              </p>
-            ))}
-            <div className="source-preview">
-              {preview.items?.slice(0, 6).map((j, i) => (
-                <article key={i}>
-                  <strong>{j.title}</strong>
-                  <small>
-                    {j.company} · {j.location}
-                  </small>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-        <div className="actions form-actions">
-          <Button
-            type="button"
-            onClick={() => {
-              if (confirmLeave()) onClose();
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            icon="play"
-            disabled={pending || previewing}
-            onClick={(e) => inspect(e.currentTarget.form)}
-          >
-            {previewing ? "Previewing…" : "Preview"}
-          </Button>
-          <Button variant="primary" disabled={pending || previewing}>
-            Save {search ? "search" : "source"}
-          </Button>
-        </div>
-      </form>
-    </Dialog>
   );
 }
 export function CollectionControl({ compact = false }: { compact?: boolean }) {
@@ -1028,7 +594,7 @@ export function CollectionControl({ compact = false }: { compact?: boolean }) {
               {resource.data.running_tasks} running ·{" "}
               {resource.data.queued_tasks} queued
               {!compact &&
-                ". Pausing preserves each source’s settings. Manual runs still honor provider budgets."}
+                ". Pausing stops future automatic runs; work already queued continues. Stop a current run from its source or Activity."}
             </p>
           </div>
           <Switch
@@ -1108,7 +674,7 @@ export function ProviderSettings() {
                 </dd>
               </div>
               <div>
-                <dt>Per run / spacing</dt>
+                <dt>Per batch / spacing</dt>
                 <dd>
                   {provider.policy.max_requests_per_run} requests ·{" "}
                   {provider.policy.min_interval_seconds}s
@@ -1188,7 +754,7 @@ export function ProviderSettings() {
                 ["min_interval_seconds", "Minimum spacing (seconds)"],
                 ["max_requests_per_hour", "Maximum requests per hour"],
                 ["max_requests_per_day", "Maximum requests per day"],
-                ["max_requests_per_run", "Maximum requests per run"],
+                ["max_requests_per_run", "Maximum requests per batch"],
               ].map(([name, label]) => (
                 <Field key={name} label={label}>
                   <input
@@ -1196,6 +762,7 @@ export function ProviderSettings() {
                     type="number"
                     required
                     min={name === "min_interval_seconds" ? 0 : 1}
+                    step={name === "min_interval_seconds" ? 0.1 : 1}
                     max={
                       name === "min_interval_seconds"
                         ? 3600
