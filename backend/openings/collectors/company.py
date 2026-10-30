@@ -183,6 +183,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         elif len(posting) > 200000:
             metadata["description_complete"] = False
         elif posting:
+            unavailable.discard(key)
             metadata["description_complete"] = True
             metadata["description_status"] = "complete"
         items.append(

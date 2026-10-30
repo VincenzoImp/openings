@@ -173,6 +173,7 @@ def collect(config, provider, budget, *, preview=False, source=None):
         for item in items:
             source["on_item"](item)
     if scraper.checkpoint.get("complete"):
+        scraper.checkpoint["unavailable_descriptions"] = sum(not item["posting"] for item in items)
         scraper.checkpoint.pop("jobs", None)
         scraper.checkpoint.pop("detail_attempts", None)
         if scraper.on_checkpoint:

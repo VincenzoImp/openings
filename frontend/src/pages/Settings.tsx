@@ -1156,7 +1156,7 @@ function WorkspaceSettings({
             <h2>Workspace.</h2>
             <p>
               {String(workspace.data.name || "Openings")}{" "}
-              {String(workspace.data.version || "0.8.0")} · Private, single
+              {String(workspace.data.version || "0.9.0")} · Private, single
               owner workspace
             </p>
           </div>
@@ -1337,7 +1337,7 @@ function PasswordSettings() {
         </div>
       </form>
       <div className="divider" />
-      <p className="hint">Openings 0.8.0 · Your job search workspace</p>
+      <p className="hint">Openings 0.9.0 · Your job search workspace</p>
       <p className="hint">
         <a
           className="textbutton"
