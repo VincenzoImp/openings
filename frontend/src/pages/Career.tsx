@@ -993,7 +993,7 @@ function EntryClaims({ entry }: { entry: Knowledge }) {
   const [offset, setOffset] = useState(0),
     [editing, setEditing] = useState<Claim | "new" | null>(null);
   const resource = useResource<ListResult<Claim>>(
-    `/career/claims?summary=true&knowledge_id=${entry.id}&limit=30&offset=${offset}`,
+    `/career/claims?knowledge_id=${entry.id}&limit=30&offset=${offset}`,
     { items: [], total: 0 },
   );
   return (

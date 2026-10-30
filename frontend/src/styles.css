@@ -3753,6 +3753,9 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 14px;
 }
+.career-date-parts > .field + .field {
+  margin-top: 0;
+}
 .career-date-fields .field {
   min-width: 0;
 }
