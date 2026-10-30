@@ -15,6 +15,20 @@ Compose pins `vincenzoimp/openings:0.5.1` and the optional
 AI account or TeX installation is needed on the host. To build images yourself,
 see [Contributing](../../CONTRIBUTING.md).
 
+## Deployment modes and resources
+
+| Mode | Containers on this host | Combined Compose limits |
+|---|---|---|
+| Core only | `openings` | 0.5 CPU / 512 MiB |
+| Local scoring | `openings` and `scorer` | 2 CPU / 4 GiB |
+| Remote scoring | `openings`; a compatible scorer runs elsewhere | 0.5 CPU / 512 MiB, excluding the remote service |
+
+These are enforced container limits, not measured usage or minimum system
+requirements. The host also needs resources for its operating system, Docker and
+other services. A minimum host specification has not been established. Local
+scoring adds model download, cache and inference requirements; see
+[scoring resources and CPU compatibility](scoring.md#resources-and-cpu-compatibility).
+
 ## First run
 
 1. Open `http://127.0.0.1:8080` and choose an owner password of at least 10 characters.
@@ -44,9 +58,10 @@ Edit `.env`, substituting the address clients can reach:
 ```dotenv
 OPENINGS_BIND=0.0.0.0
 OPENINGS_PORT=8080
-OPENINGS_PUBLIC_URL=http://192.168.1.50:8080
+OPENINGS_PUBLIC_URL=http://openings.example:8080
 ```
 
+Replace `openings.example` with a hostname or LAN address your clients can reach.
 Run `docker compose up -d --no-build` after edits. The public URL controls MCP
 host checks and relative file-transfer links, so it must match the client origin.
 Set the owner password before opening access to other devices. Use HTTPS through
@@ -89,5 +104,6 @@ Health checks the core and SQLite. An idle scorer is healthy before loading a
 model. For upgrades, take a [backup](operations.md), update the checkout/image tags,
 then run `docker compose pull` and `docker compose up -d --no-build`.
 
-Version 0.5.0 introduced a new database format; 0.4.x data/configuration
-are not compatible. Patch releases in the 0.5 line share this workspace format. Stable public API/data-format compatibility is not yet promised.
+Version 0.5.0 introduced a new database format; 0.4.x data/configuration are not
+compatible. Patch releases in the 0.5 line share this workspace format. Stable
+public API/data-format compatibility is not yet promised.

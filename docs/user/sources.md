@@ -7,7 +7,7 @@ schedule with an IANA timezone. Run now queues work for an individually paused
 source; it still respects provider policy. Bulk controls enable, pause, run or delete
 selected sources. Deleting a source retains its archived jobs.
 
-## What decides which jobs arrive?
+## Source criteria
 
 | Input | Search criteria | Where to configure |
 |---|---|---|
@@ -15,7 +15,7 @@ selected sources. Deleting a source retains its archived jobs.
 | Company watch | A selected ATS board/feed; optional title and location filters | Collection → Companies |
 | Manual job | The specific URL or posting you provide | Inbox → Add job |
 
-For example, save `backend engineer` in `Zurich, Switzerland` with LinkedIn and
+For example, save `backend engineer` in `New York, NY` with LinkedIn and
 Indeed selected. Create another saved search for `platform engineer` or another
 location. Career preferences guide optional fit classification; the saved query
 controls what is requested from a portal. Company sources read the chosen board
@@ -25,8 +25,9 @@ and apply their configured filters.
 
 The pinned JobSpy 1.4.1 integration searches LinkedIn, Indeed and Glassdoor.
 Save one explicit query and location with a country and provider selection.
-Create another source for a different query/location. Results, age window, remote/job type and description fetching are
-bounded settings. Country/provider capabilities vary. Google is explicitly unsupported.
+Create another source for a different query/location. Result count, age window,
+remote/job type and description fetching are bounded settings. Country/provider
+capabilities vary. Google Jobs is unsupported.
 
 For REST/MCP, a `jobspy` source uses a configuration such as:
 
@@ -49,7 +50,7 @@ redirects/errors can require extra attempts, so actual limits always apply. A sa
 multi-provider search queues one task per provider, allowing other sources to progress.
 JobCloud supports regional jobs.ch/jobup.ch search through an undocumented endpoint.
 Adzuna is optional, disabled by default and requires owner-supplied credentials; its
-results contain snippets. The release requires no paid credentials.
+results contain snippets.
 
 ## Company and feed sources
 

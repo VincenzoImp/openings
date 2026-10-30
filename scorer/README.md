@@ -34,11 +34,9 @@ from the official PyTorch index.
 releases the child process after active work settles; cached weights remain on
 disk. Selecting an unserved model does not download additional checkpoints.
 
-The [scoring guide](../docs/user/scoring.md#limits) includes a tested MKL
-instruction cap for the Intel Celeron N3450. Keep that workaround local to
-hardware that needs it.
-
 Scores are advisory, with possible language/qualification errors. The
 [user scoring guide](../docs/user/scoring.md) covers freshness, remote mode and
-whole-deployment resource limits. A compatible scorer can run on another machine,
-or the application can run with scoring disabled.
+[resource limits and CPU compatibility](../docs/user/scoring.md#resources-and-cpu-compatibility).
+The default scorer cap is 1.5 CPU / 3584 MiB; the core adds 0.5 CPU / 512 MiB.
+These container limits do not establish minimum host requirements. A compatible
+scorer can run on another machine, or the application can run with scoring disabled.
