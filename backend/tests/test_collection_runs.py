@@ -313,3 +313,32 @@ def test_initial_score_can_wait_for_profile_without_rescoring_history(collection
     refreshed = workspace.ingest_job(posting)
     assert refreshed["content_version"] == job["content_version"]
     assert service.list_tasks(kind="score", state="queued")["total"] == 1
+
+
+def test_partial_filter_patch_preserves_other_terms_and_explicit_empty_clears(collection):
+    _, service = collection
+    source = service.create_source(
+        SourceCreate(
+            name="Example",
+            kind="greenhouse",
+            config={"board": "example"},
+            filters={"titles": ["engineer"], "locations": ["Canada"]},
+        )
+    )
+    changed = service.bulk_sources(
+        SourceBulk.model_validate(
+            {
+                "action": "configure",
+                "items": [{"id": source["id"], "expected_version": source["version"]}],
+                "patch": {"filters": {"titles": ["developer"]}},
+            }
+        )
+    )["items"][0]["result"]
+    assert changed["filters"] == {"titles": ["developer"], "locations": ["Canada"]}
+    cleared = service.update_source(
+        source["id"],
+        SourcePatch.model_validate(
+            {"expected_version": changed["version"], "filters": {"locations": []}}
+        ),
+    )
+    assert cleared["filters"] == {"titles": ["developer"], "locations": []}

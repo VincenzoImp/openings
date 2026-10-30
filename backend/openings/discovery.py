@@ -1380,6 +1380,8 @@ class DiscoveryService:
             )
         if "config" in updates:
             merged["config"] = {**old["config"], **updates["config"]}
+        if "filters" in updates:
+            merged["filters"] = {**old["filters"], **updates["filters"]}
         if not merged["name"].strip():
             raise DomainError(422, "source_name", "Give the company or feed a name.")
         if any(key in updates for key in ("url", "kind", "config", "filters")):
