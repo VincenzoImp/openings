@@ -56,6 +56,9 @@ authoritative for individual input fields. Read [REST](../user/api.md) and
   so concurrent uploads cannot be approved unseen.
 - **Truth:** approved claims and narrative evidence guide an external agent;
   reference/length validation does not establish factual accuracy. Review outputs.
+- **Career:** entries have structured organizations, nullable partial dates, skill
+  tags and ordering. Descriptions are optional; claims contain free reusable text.
+  Reserved structured fields are stored once, outside arbitrary metadata.
 - **Concurrency:** typed inputs, optimistic versions, idempotency keys, foreign
   keys and short transactions protect shared state. Run one application process
   per workspace; database connections do not cross threads.

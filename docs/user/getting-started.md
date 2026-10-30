@@ -10,8 +10,8 @@ docker compose pull
 docker compose up -d --no-build
 ```
 
-Compose pins `vincenzoimp/openings:0.7.0` and the optional
-`vincenzoimp/openings:scorer-0.7.0`, for Linux amd64 and arm64. No Python, Node,
+Compose pins `vincenzoimp/openings:0.8.0` and the optional
+`vincenzoimp/openings:scorer-0.8.0`, for Linux amd64 and arm64. No Python, Node,
 AI account or TeX installation is needed on the host. To build images yourself,
 see [Contributing](../../CONTRIBUTING.md).
 

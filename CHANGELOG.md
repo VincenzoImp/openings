@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.0
+
+- Separate career titles, organizations, partial dates, skill tags and ordering.
+- Support single dates, periods and Present without requiring descriptions.
+- Manage related claims from an entry and distinguish entries by organization.
+- Show career dates on cards and include organizations in career searches.
+- Preserve structured career facts and order in REST, MCP and frozen contexts.
+
+This release uses schema 3. Earlier database formats require separate conversion
+outside the application.
+
 ## 0.7.0
 
 - Fit long postings into the scorer token budget, retain original text and show shortened input.

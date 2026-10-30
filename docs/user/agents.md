@@ -20,6 +20,9 @@ without it: discover the tools/resources and their typed input schemas.
 1. Call `workspace_info`, `capabilities_get`, `career_get_profile`, `knowledge_list`, `claims_list`,
    `templates_list` and `instructions_get` as needed. Detailed narratives explain
    the facts; approved claims are reusable wording, not the only allowed wording.
+   [Career entries](career.md) separate titles, organizations, partial dates and
+   skill tags from optional descriptions and ordered claims. Empty descriptions
+   are valid. Templates determine the final document sections and layout.
 2. Find or ingest the job with `jobs_search`, `job_get` or `job_ingest`. You can
    add a posting manually without setting up collection.
 3. Create a draft attempt with `application_create`, including questions and
