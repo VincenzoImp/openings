@@ -373,7 +373,7 @@ class Workspace:
             stamp = now()
             if prior is None:
                 c.execute(
-                    "INSERT INTO jobs(id,title,company,location,url,posting,metadata,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO jobs(id,title,company,location,url,posting,metadata,initial_score_pending,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (
                         job_id,
                         title,
@@ -382,6 +382,7 @@ class Workspace:
                         url,
                         value.posting,
                         encode(value.metadata),
+                        int(bool(self.discovery and self.discovery.get_scoring()["enabled"])),
                         stamp,
                         stamp,
                     ),

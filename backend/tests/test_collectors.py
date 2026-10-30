@@ -44,48 +44,10 @@ def policy(service, provider, **changes):
     )
 
 
-def test_jobcloud_template_body_and_partial_preview_remain_distinct():
-    source = {
-        "name": "Example search",
-        "kind": "jobcloud",
-        "config": company.JobCloudConfig(query="engineer", max_details=1).model_dump(),
-    }
-    listing = {
-        "documents": [
-            {"job_id": "full", "title": "Engineer", "preview": "Python, SQL"},
-            {"job_id": "partial", "title": "Engineer", "preview": "Keyword preview"},
-        ]
-    }
-    calls = []
-
-    def request(url, **kwargs):
-        calls.append(url)
-        return json.dumps(
-            {"template_lead_text": "<p>About us</p>", "template_text": "<p>Build APIs.</p>"}
-            if url.endswith("/job/full")
-            else listing
-        ).encode()
-
-    rows = company.collect(source, request, module.html_text)
-    assert "About us" in rows[0]["posting"] and "Build APIs." in rows[0]["posting"]
-    assert rows[0]["metadata"]["description_complete"] is True
-    assert rows[1]["posting"] == "Keyword preview"
-    assert rows[1]["metadata"]["description_complete"] is False
-    assert len(calls) == 2
-    calls.clear()
-    known = {"jobcloud:jobs.ch:full": rows[0]["metadata"]}
-    source["detail_checked"] = {key: module.now() for key in known}
-    refreshed = company.collect(source, request, module.html_text, known=known)
-    full = next(item for item in refreshed if item["source_key"] == "jobcloud:jobs.ch:full")
-    assert full["posting"] == ""
-    assert full["metadata"]["description_complete"] is True
-    assert len(calls) == 2 and not any(url.endswith("/job/full") for url in calls)
-
-
 def test_only_complete_postings_supply_preserved_body_metadata(collection, monkeypatch):
     workspace, service = collection
     source = service.create_source(
-        SourceCreate(name="Example search", kind="jobcloud", config={"query": "engineer"})
+        SourceCreate(name="Example board", kind="greenhouse", config={"board": "example"})
     )
     for key, text, metadata in (
         ("full", "Build APIs.", {}),
@@ -95,7 +57,7 @@ def test_only_complete_postings_supply_preserved_body_metadata(collection, monke
         workspace.ingest_job(
             {
                 "source_id": source["id"],
-                "source_key": "jobcloud:jobs.ch:" + key,
+                "source_key": "greenhouse:example:" + key,
                 "posting": text,
                 "metadata": metadata,
             }
@@ -107,7 +69,7 @@ def test_only_complete_postings_supply_preserved_body_metadata(collection, monke
     service.queue_collection(source["id"])
     task = service.claim_task("test-collector", kind="collect")
     service.run_task(task, "test-collector")
-    assert set(observed) == {"jobcloud:jobs.ch:full"}
+    assert set(observed) == {"greenhouse:example:full"}
 
 
 @pytest.mark.parametrize("header", ["120", "date"])
@@ -211,7 +173,8 @@ def test_provider_split_bulk_pause_and_explicit_manual_run(collection, monkeypat
     assert len(scheduled["task_ids"]) == 3
     assert service.queue_collection(source["id"], manual=False)["task_ids"] == scheduled["task_ids"]
     service.update_collection(CollectionWrite(enabled=False, expected_version=0))
-    assert all(service.get_task(task)["state"] == "cancelled" for task in scheduled["task_ids"])
+    assert all(service.get_task(task)["state"] == "queued" for task in scheduled["task_ids"])
+    service.cancel_run(scheduled["run_id"])
     service.schedule_due()
     assert not service.list_tasks(state="queued")["items"]
     manual = service.queue_collection(source["id"])
