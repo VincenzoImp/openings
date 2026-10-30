@@ -517,22 +517,6 @@
       "dashboard": "Settings/Inbox: explicit rescore"
     },
     {
-      "id": "scoring.record",
-      "group": "Collection and scoring",
-      "operation": "Record an external assessment against an exact scoring context",
-      "rest": [
-        {
-          "method": "POST",
-          "path": "/api/v1/scoring/assessments"
-        }
-      ],
-      "mcp": [
-        "scoring_record_assessment"
-      ],
-      "dashboard": "Inbox: record an external assessment",
-      "notes": "Works with local scoring disabled. Signature conflicts require a fresh context; identical reviews are idempotent and cancel pending inference for the job."
-    },
-    {
       "id": "tasks.list",
       "group": "Collection and scoring",
       "operation": "List/filter paginated collection and scoring tasks",
