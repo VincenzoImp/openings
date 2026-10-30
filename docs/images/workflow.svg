@@ -5,7 +5,7 @@
     <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M1 1 6 4 1 7" fill="none" stroke="#89917d" stroke-width="1.6"/></marker>
   </defs>
   <rect width="1120" height="280" rx="18" fill="#f5f4ed"/>
-  <text x="32" y="39" font-family="Georgia,serif" font-size="24" fill="#24271f">A complete workspace. Your agent does the last mile.</text>
+  <text x="32" y="39" font-family="Georgia,serif" font-size="24" fill="#24271f">Collect jobs and prepare applications with your agent.</text>
   <g font-family="system-ui,-apple-system,Segoe UI,sans-serif">
     <g fill="#fffefa" stroke="#dedfd3">
       <rect x="32" y="66" width="238" height="139" rx="12"/>

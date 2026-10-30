@@ -65,7 +65,7 @@ export default function App() {
       <div className="auth-shell">
         <div className="auth-card">
           <Brand />
-          <h1>Your workspace is taking a moment.</h1>
+          <h1>Unable to load the workspace</h1>
           <ErrorBox message={error} retry={bootstrap} />
         </div>
       </div>
@@ -139,10 +139,10 @@ function Auth({
       <section className="auth-card">
         <Brand />
         <div className="eyebrow">Your job search workspace</div>
-        <h1>{configured ? "Welcome back." : "Room for your next chapter."}</h1>
+        <h1>{configured ? "Sign in to Openings" : "Set up your workspace"}</h1>
         <p>
           {configured
-            ? "Sign in to your private workspace."
+            ? "Enter your owner password to access your workspace."
             : "Create the owner password for this installation. Your profile, jobs and documents stay together in one workspace."}
         </p>
         {error && <ErrorBox message={error} />}
@@ -179,9 +179,7 @@ function Auth({
                 : "Create workspace"}
           </Button>
         </form>
-        <footer>
-          Knowledge, opportunities and the work you put into them.
-        </footer>
+        <footer>Jobs, career evidence and application documents.</footer>
       </section>
     </div>
   );
@@ -349,9 +347,9 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
           </nav>
           <div className="sidebar-bottom">
             <div className="sidebar-note">
-              <b>Your search, in one place.</b>
+              <b>Job search workspace</b>
               <br />
-              Knowledge, opportunities and the work you put into them.
+              Jobs, career evidence and application documents.
             </div>
             <div className="user">
               <span className="avatar">

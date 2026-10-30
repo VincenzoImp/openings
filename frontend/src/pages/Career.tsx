@@ -49,8 +49,8 @@ export default function CareerPage() {
   return (
     <>
       <Heading
-        title="Your experience, in full."
-        description="A useful record of what you have done, what you know and what you want next."
+        title="Career"
+        description="Store your profile, preferences, experience and reusable claims."
       />
       <Tabs
         label="Career sections"
@@ -109,10 +109,9 @@ function ProfileForm() {
       <section className="card sectioncard">
         <div className="sectiontitle">
           <div>
-            <h2>The essentials.</h2>
+            <h2>Profile and contact details</h2>
             <p>
-              Contact details and the professional story your agent can work
-              from.
+              Contact information and a summary for your application documents.
             </p>
           </div>
         </div>
@@ -158,10 +157,10 @@ function ProfileForm() {
       <section className="card sectioncard form-section">
         <div className="sectiontitle">
           <div>
-            <h2>What you are looking for.</h2>
+            <h2>Job preferences</h2>
             <p>
-              Preferences guide your search without replacing the full career
-              record.
+              These preferences guide optional fit scoring and application
+              preparation.
             </p>
           </div>
         </div>
@@ -277,10 +276,10 @@ function KnowledgePage() {
     <>
       <div className="sectiontitle">
         <div>
-          <h2>The detailed story.</h2>
+          <h2>Career knowledge</h2>
           <p>
-            Experiences, projects, courses and facts, with room for the context
-            behind each claim.
+            Store experience, projects, courses and supporting facts for
+            application documents.
           </p>
         </div>
         <div className="actions">
@@ -378,7 +377,7 @@ function KnowledgePage() {
         ) : (
           <section className="card">
             <Empty
-              title="Your experience deserves more than a bullet."
+              title="No career knowledge in this view"
               action={
                 <Button icon="plus" onClick={() => setEditing("new")}>
                   Add your first experience
@@ -693,7 +692,7 @@ function ClaimsPage() {
     <>
       <div className="sectiontitle">
         <div>
-          <h2>Useful statements, grounded in evidence.</h2>
+          <h2>Reusable claims</h2>
           <p>
             Approved claims are available for your agent to reuse. New wording
             can still come from detailed knowledge.
@@ -818,7 +817,7 @@ function ClaimsPage() {
             </article>
           ))
         ) : (
-          <Empty title="Build a useful set of claims.">
+          <Empty title="No claims in this view">
             Add detailed career knowledge first, then collect concise statements
             you may want to reuse.
           </Empty>
