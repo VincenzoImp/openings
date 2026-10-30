@@ -3953,3 +3953,34 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
     justify-self: end;
   }
 }
+.native-dialog.modal:has(.collection-form) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.native-dialog.modal:has(.collection-form) > .modalhead {
+  flex-shrink: 0;
+}
+.native-dialog.modal:has(.collection-form) > .modalcontent {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.collection-form > .form-actions {
+  position: sticky;
+  bottom: -1px;
+  z-index: 2;
+  background: var(--surface);
+  box-shadow: 0 -10px 0 var(--surface);
+  padding-bottom: 1px;
+}
+.collection-save-hint {
+  margin-right: auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+@media (max-width: 600px) {
+  .collection-save-hint {
+    width: 100%;
+  }
+}

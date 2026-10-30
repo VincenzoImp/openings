@@ -10,7 +10,7 @@ import {
   type ListResult,
   type Source,
 } from "../api";
-import { confirmLeave, useResource, useWorkspace } from "../state";
+import { useResource, useWorkspace } from "../state";
 import { AdvancedJson, Button, Dialog, Field } from "../ui";
 
 const boardKinds = [
@@ -190,6 +190,7 @@ export function ScheduleFields({ schedule }: { schedule?: Json }) {
                   {times.length > 1 && (
                     <button
                       type="button"
+                      data-dirty-control="true"
                       className="textbutton"
                       aria-label={`Remove daily time ${i + 1}`}
                       onClick={() =>
@@ -206,6 +207,7 @@ export function ScheduleFields({ schedule }: { schedule?: Json }) {
             </div>
             <Button
               type="button"
+              data-dirty-control="true"
               className="small"
               disabled={times.length >= 12}
               onClick={() =>
@@ -289,6 +291,12 @@ export function SourceEditor({
     source?.kind || (search ? "jobspy" : "auto"),
   );
   const editRevision = useRef(0);
+  const [edited, setEdited] = useState(false);
+  function markEdited() {
+    editRevision.current += 1;
+    setPreview(null);
+    setEdited(true);
+  }
   const [providers, setProviders] = useState<string[]>(
     (source?.config.providers as string[]) || [
       "linkedin",
@@ -398,9 +406,10 @@ export function SourceEditor({
       <form
         onSubmit={save}
         className="collection-form"
-        onChange={() => {
-          editRevision.current += 1;
-          setPreview(null);
+        onChange={markEdited}
+        onClick={(event) => {
+          if ((event.target as HTMLElement).closest("[data-dirty-control]"))
+            markEdited();
         }}
       >
         <Section title="What to collect">
@@ -771,12 +780,14 @@ export function SourceEditor({
           </section>
         )}
         <div className="actions form-actions">
-          <Button
-            type="button"
-            onClick={() => {
-              if (confirmLeave()) onClose();
-            }}
-          >
+          <span className="collection-save-hint" role="status">
+            {edited
+              ? "Unsaved changes"
+              : source
+                ? "Saved settings"
+                : "New source"}
+          </span>
+          <Button type="button" onClick={onClose}>
             Cancel
           </Button>
           <Button
