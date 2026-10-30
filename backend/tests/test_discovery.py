@@ -67,6 +67,81 @@ def run_next(service, owner="test-worker"):
     return task
 
 
+def test_partial_postings_stay_archived_without_entering_scoring_batches(case):
+    workspace, service = case
+    complete = workspace.ingest_job(
+        {"title": "Engineer", "company": "Example", "posting": "Build APIs."}
+    )
+    partial = [
+        workspace.ingest_job(
+            {"title": "Engineer", "company": "Example", "posting": text, "metadata": metadata}
+        )
+        for text, metadata in (
+            ("Python, SQL, cloud", {"description_complete": False}),
+            ("— - …", {}),
+        )
+    ]
+    tasks = service.list_tasks(kind="score")["items"]
+    assert len(tasks) == 1 and tasks[0]["job_id"] == complete["id"]
+    assert workspace.list_jobs()["total"] == 3
+    assert service.queue_rescore(
+        RescoreRequest(job_ids=[item["id"] for item in partial], outdated_only=False)
+    ) == {"queued": [], "skipped": [item["id"] for item in partial], "count": 0}
+    service.cancel_task(tasks[0]["id"])
+    config = service.get_scoring()
+    service.update_scoring(
+        ScoringWrite(
+            expected_version=config["version"],
+            periodic_rescore={"enabled": True, "minutes": 1440, "batch_size": 1},
+        )
+    )
+    service.schedule_due()
+    queued = service.list_tasks(kind="score", state="queued")["items"]
+    assert len(queued) == 1 and queued[0]["job_id"] == complete["id"]
+
+
+def test_user_completed_posting_survives_source_preview_refresh(case):
+    workspace, service = case
+    source = {
+        "title": "Engineer", "company": "Example", "posting": "Python, SQL",
+        "url": "https://example.test/jobs/preview", "metadata": {"description_complete": False},
+        "raw": {"preview": "Python, SQL"},
+    }
+    preview = workspace.ingest_job(source)
+    assert not preview["complete"] and not service.list_tasks(kind="score")["items"]
+    completed = workspace.update_job(
+        preview["id"], {"expected_version": preview["version"], "posting": "Build SQL services."}
+    )
+    refreshed = workspace.ingest_job({**source, "posting": "New source preview"})
+    assert completed["complete"] and refreshed["complete"]
+    assert refreshed["posting"] == "Build SQL services."
+    assert refreshed["metadata"]["description_complete"] is False
+    assert workspace.list_jobs(complete=True)["total"] == 1
+    assert workspace.overview()["incomplete"] == 0
+    assert service.list_tasks(kind="score", state="queued")["total"] == 1
+    raw = workspace.db.one("SELECT payload FROM postings WHERE job_id=?", (preview["id"],))
+    assert '"posting":"New source preview"' in raw["payload"]
+
+
+def test_task_queued_before_posting_became_partial_does_not_infer(case, monkeypatch):
+    workspace, service = case
+    original = workspace.ingest_job(
+        {"title": "Engineer", "company": "Example", "posting": "Build APIs."}
+    )
+    workspace.update_job(
+        original["id"],
+        {"expected_version": original["version"], "metadata": {"description_complete": False}},
+    )
+    monkeypatch.setattr(
+        module, "score_call", lambda *args: pytest.fail("Incomplete postings must not infer")
+    )
+    task = run_next(service)
+    assert service.get_task(task["id"])["result"] == {
+        "skipped": "job_not_eligible_for_scoring"
+    }
+    assert workspace.get_job(original["id"])["score"] is None
+
+
 def test_collection_and_scoring_preserve_identity_and_deliberate_freshness(case, monkeypatch):
     workspace, service = case
     source = service.create_source(

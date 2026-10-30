@@ -446,6 +446,16 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
                     f"{kind}:{host}:{identity}",
                     f"https://{host}/api/v1/public/search/job/" + quote(str(identity), safe=""),
                 )
+                description = (
+                    full.get("job_content")
+                    or full.get("content")
+                    or "\n\n".join(
+                        full[key]
+                        for key in ("template_lead_text", "template_text")
+                        if full.get(key)
+                    )
+                )
+                known_complete = f"{kind}:{host}:{identity}" in known
                 links = row.get("_links") or {}
                 url = next(
                     (
@@ -466,11 +476,11 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
                         else ""
                     ),
                     row.get("place"),
-                    full.get("job_content") or full.get("content") or row.get("preview"),
+                    description or ("" if known_complete else row.get("preview")),
                     company=row.get("company_name"),
                     published_at=row.get("publication_date"),
                     languages=row.get("language_skills"),
-                    description_complete=bool(full.get("job_content") or full.get("content")),
+                    description_complete=bool(description) or known_complete,
                 )
             if len(rows) < count:
                 break

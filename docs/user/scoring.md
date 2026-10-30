@@ -37,6 +37,9 @@ Oversized inputs are rejected when the scorer reports truncation; they are not
 silently scored as complete.
 
 New or materially changed complete jobs are queued when scoring is enabled.
+Known partial previews and punctuation-only placeholders stay archived without
+scoring. Completing the posting through **Edit details**, REST or MCP makes it
+eligible and preserves the correction during source refreshes.
 Relevant profile, rubric or model edits mark older results **Outdated** without
 enqueuing the whole archive. Contact/template edits do not require rescoring.
 Rescore selected jobs or request a bounded batch of unscored or outdated jobs.

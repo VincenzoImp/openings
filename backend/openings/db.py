@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .errors import DomainError
+from .posting import posting_complete
 
 
 class Database:
@@ -35,6 +36,7 @@ class Database:
     def connect(self):
         conn = sqlite3.connect(self.path, timeout=10)
         conn.row_factory = sqlite3.Row
+        conn.create_function("posting_complete", 3, posting_complete, deterministic=True)
         conn.execute("PRAGMA foreign_keys=ON")
         conn.execute("PRAGMA busy_timeout=10000")
         try:
