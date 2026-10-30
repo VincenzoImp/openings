@@ -10,8 +10,8 @@
 - Page source cards and load attachment lists when opened.
 - Reject redirects that would bypass another provider's request policy.
 
-Document approval now requires `expected_version`. Existing workspaces and compatible
-backups are upgraded to schema 2 while preserving records and files.
+Document approval now requires `expected_version`. This release uses schema 2;
+earlier database formats require separate conversion outside the application.
 
 ## 0.6.2
 

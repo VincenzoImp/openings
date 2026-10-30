@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .common import now, encode
 from .errors import DomainError
-from .db import SCHEMA_VERSION, migrate_workspace
+from .db import SCHEMA_VERSION
 
 
 def preserve_request_windows(restored, current):
@@ -39,27 +39,11 @@ def preserve_request_windows(restored, current):
 
 
 def restore_database(workspace, source_path):
-    # Never migrate the owner's backup in place, including service-level use.
-    with sqlite3.connect(source_path) as uploaded:
-        version = uploaded.execute("PRAGMA user_version").fetchone()[0]
-        if version == 1:
-            with tempfile.TemporaryDirectory(prefix="openings-upgrade-") as directory:
-                upgraded = Path(directory) / "workspace.sqlite"
-                with sqlite3.connect(upgraded) as target:
-                    uploaded.backup(target)
-                return _restore_database(workspace, upgraded)
-    return _restore_database(workspace, source_path)
-
-
-def _restore_database(workspace, source_path):
     with sqlite3.connect(source_path) as source:
-        if source.execute("PRAGMA user_version").fetchone()[0] not in (1, SCHEMA_VERSION):
+        if source.execute("PRAGMA user_version").fetchone()[0] != SCHEMA_VERSION:
             raise DomainError(
                 422, "backup_version", "Select a database backup from this Openings schema."
             )
-        # The upload is a temporary copy: upgrading it never modifies the user's
-        # original backup, and restore validates against the current schema.
-        migrate_workspace(source)
         if (
             source.execute("PRAGMA quick_check").fetchone()[0] != "ok"
             or source.execute("PRAGMA foreign_key_check").fetchall()

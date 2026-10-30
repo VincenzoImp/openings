@@ -65,8 +65,8 @@ compact paginated summaries; full postings, narratives, contexts and file bytes
 are separate reads. Backups use SQLite's online backup API. A restore preserves
 installation authentication and recent provider HTTP windows/later cooldowns.
 Model weights are a disposable cache outside the workspace.
-Schema upgrades preserve existing records. Restore upgrades an older compatible
-backup on its temporary copy before replacing workspace data.
+Workspaces and backups must use the current database format. Pre-1.0 releases
+do not include converters for earlier formats.
 
 ## Acquisition and classification
 

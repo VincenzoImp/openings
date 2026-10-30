@@ -106,6 +106,5 @@ Health checks the core and SQLite. An idle scorer is healthy before loading a
 model. For upgrades, take a [backup](operations.md), update the checkout/image tags,
 then run `docker compose pull` and `docker compose up -d --no-build`.
 
-Version 0.5.0 introduced a new database format; 0.4.x data/configuration are not
-compatible. Patch releases in the 0.5 line share this workspace format. Stable
-public API/data-format compatibility is not yet promised.
+Pre-1.0 releases may change APIs and the database format. The application accepts
+only its current workspace format; conversion tools are separate from the product.

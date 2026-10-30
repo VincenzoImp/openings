@@ -1,15 +1,13 @@
-"""Exact identities, concurrent review, persisted freshness and safe format upgrades."""
+"""Exact identities, concurrent review and current workspace format boundaries."""
 
-import hashlib
 import sqlite3
-from pathlib import Path
 
 import pytest
 from fastapi import APIRouter, FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
-from openings.db import Database, encode
+from openings.db import Database
 from openings.documents import DocumentCreate, DocumentService, UploadReservation, register_api
 from openings.errors import DomainError
 from openings.operations import restore_database
@@ -40,83 +38,22 @@ def test_source_identity_keeps_dismissal_across_url_changes_and_detects_conflict
     assert workspace.ingest_job(value)["id"] != first["id"]
 
 
-def v1_archive(path):
-    with sqlite3.connect(path) as conn:
-        conn.executescript(
-            Path(__file__).with_name("fixtures").joinpath("schema-v1.sql").read_text()
-        )
-        for job_id, url in [
-            ("first", "https://example.org/old"),
-            ("second", "https://example.org/new"),
-        ]:
-            conn.execute(
-                "INSERT INTO jobs(id,title,company,url,posting,triage,created_at,updated_at) VALUES(?,?,?,?,?,'dismissed','2026-01-01','2026-01-01')",
-                (job_id, "Engineer", "Example", url, "Build APIs"),
-            )
-            conn.execute(
-                "INSERT INTO postings(id,job_id,identity,url,payload,content_hash,first_seen_at,last_seen_at) VALUES(?,?,?,?,?,'hash','2026-01-01','2026-01-01')",
-                (job_id, job_id, "url:" + url, url, encode({"source_key": "bamboohr:example:1"})),
-            )
-        conn.execute(
-            "INSERT INTO applications(id,job_id,created_at,updated_at) VALUES('attempt','first','2026-01-01','2026-01-01')"
-        )
-        conn.execute(
-            "INSERT INTO documents(id,application_id,kind,review_state,created_at) VALUES('cv','attempt','resume','approved','2026-01-01')"
-        )
-        data = b"%PDF-1.4 synthetic archive"
-        sha = hashlib.sha256(data).hexdigest()
-        conn.execute("INSERT INTO blobs VALUES(?,?,?)", (sha, data, len(data)))
-        conn.execute(
-            "INSERT INTO files(id,sha256,name,size,document_id,created_at) VALUES('pdf',?,'cv.pdf',?,'cv','2026-01-01')",
-            (sha, len(data)),
-        )
-        conn.commit()
-
-
-def old_records(path):
-    with sqlite3.connect(path) as conn:
-        return {
-            table: conn.execute("SELECT * FROM " + table).fetchall()
-            for table in ("jobs", "postings", "applications", "files", "blobs")
-        }
-
-
-def test_v1_upgrade_and_restore_preserve_history_bytes_and_ambiguous_identities(tmp_path):
-    archive = tmp_path / "v1.sqlite"
-    v1_archive(archive)
-    original = old_records(archive)
-    workspace = Workspace(archive)
-    assert workspace.db.one("PRAGMA user_version")["user_version"] == 2
-    assert old_records(archive) == original
-    assert workspace.db.one("SELECT review_state,version FROM documents") == {
-        "review_state": "approved",
-        "version": 1,
-    }
-    assert workspace.db.one("PRAGMA quick_check")["quick_check"] == "ok"
-    assert workspace.db.all("PRAGMA foreign_key_check") == []
+def test_unsupported_formats_are_rejected_without_modifying_the_database(tmp_path):
+    archive = tmp_path / "unsupported.sqlite"
+    with sqlite3.connect(archive) as connection:
+        connection.execute("PRAGMA user_version=1")
+        connection.execute("CREATE TABLE marker(value TEXT)")
+        connection.execute("INSERT INTO marker VALUES('preserve')")
+    original = archive.read_bytes()
+    with pytest.raises(DomainError, match="Unsupported workspace"):
+        Database(archive)
+    target = Workspace(tmp_path / "current.sqlite")
+    job = target.ingest_job({"posting": "Build APIs"})
     with pytest.raises(DomainError) as error:
-        workspace.ingest_job(
-            {"source_key": "bamboohr:example:1", "url": "https://example.org/third"}
-        )
-    assert error.value.code == "identity_conflict" and workspace.list_jobs()["total"] == 2
-    workspace.merge_jobs("second", "first", 1, 1)
-    assert (
-        workspace.ingest_job(
-            {"source_key": "bamboohr:example:1", "url": "https://example.org/third"}
-        )["id"]
-        == "first"
-    )
-
-    backup = tmp_path / "backup-v1.sqlite"
-    v1_archive(backup)
-    target = Workspace(tmp_path / "target.sqlite")
-    target.set_settings("auth", {"secret": "installation", "password_hash": "preserved"})
-    restore_database(target, backup)
-    assert old_records(target.db.path) == original
-    assert target.get_settings("auth")["data"]["secret"] == "installation"
-    with sqlite3.connect(backup) as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
-    assert Database(target.db.path).all("PRAGMA foreign_key_check") == []
+        restore_database(target, archive)
+    assert error.value.code == "backup_version"
+    assert archive.read_bytes() == original
+    assert target.get_job(job["id"])["posting"] == "Build APIs"
 
 
 def test_approval_checks_file_set_but_parallel_upload_grants_remain_valid(tmp_path):

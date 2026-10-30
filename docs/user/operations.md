@@ -23,7 +23,8 @@ backup action to capture changes from an active WAL journal consistently.
 
 On the destination host, install Openings 0.7.0, set its owner password, then restore
 through Settings or `POST /api/v1/backup/restore` with the raw SQLite body. Restore
-checks the schema, database integrity and foreign keys before replacement. It
+accepts the current database format and checks integrity and foreign keys before
+replacement. It
 preserves the destination installation's owner credentials/API tokens, clears
 pending transfer grants and recovers interrupted tasks. Provider policy settings are
 restored, while recent HTTP window events and later cooldowns already recorded on
