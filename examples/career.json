@@ -2,27 +2,72 @@
   "knowledge": [
     {
       "kind": "experience",
-      "title": "Backend engineer — Example Cloud",
+      "title": "Backend engineer",
       "narrative": "Built Python APIs and asynchronous workers for a small developer platform. Added request tracing and revised core endpoints, reducing p95 latency by 20%. Documented the rollout and helped four colleagues operate the services.",
-      "metadata": {"start": "2021-01", "end": null, "skills": ["Python", "SQL", "APIs"]}
+      "metadata": {},
+      "organization": "Example Cloud",
+      "dates": {
+        "kind": "period",
+        "start": "2021-01",
+        "current": true
+      },
+      "skills": [
+        "Python",
+        "SQL",
+        "APIs"
+      ]
     },
     {
       "kind": "project",
       "title": "Reliable deployment workflow",
       "narrative": "Designed a typed deployment workflow with health checks and rollback. Reduced the manual deployment procedure from nine steps to three and made release status visible to the team.",
-      "metadata": {"year": 2023, "skills": ["TypeScript", "Docker", "Linux"]}
+      "metadata": {},
+      "dates": {
+        "kind": "single",
+        "start": "2023"
+      },
+      "skills": [
+        "TypeScript",
+        "Docker",
+        "Linux"
+      ]
     },
     {
       "kind": "award",
       "title": "Example community award",
       "narrative": "Received a fictional community award for documenting an open-source deployment workflow.",
-      "metadata": {"year": 2024, "organization": "Example Developer Community"}
+      "metadata": {},
+      "organization": "Example Developer Community",
+      "dates": {
+        "kind": "single",
+        "start": "2024"
+      }
     },
     {
       "kind": "publication",
       "title": "A fictional technical note on API reliability",
       "narrative": "Coauthored a synthetic workshop note describing API error handling and practical deployment checks.",
-      "metadata": {"year": 2024, "authors": ["Alex Example"], "url": "https://example.org/notes/api-reliability"}
+      "metadata": {
+        "authors": [
+          "Alex Example"
+        ],
+        "url": "https://example.org/notes/api-reliability"
+      },
+      "organization": "Example Reliability Workshop",
+      "dates": {
+        "kind": "single",
+        "start": "2024"
+      }
+    },
+    {
+      "kind": "skill",
+      "title": "Languages",
+      "skills": [
+        "Python",
+        "SQL",
+        "TypeScript"
+      ],
+      "metadata": {}
     }
   ]
 }

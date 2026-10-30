@@ -78,12 +78,14 @@ class Workspace:
                 k: v for k, v in profile.items() if k not in {"name", "email", "phone", "links"}
             },
             "knowledge": [
-                decode_record(r, ("metadata",))
-                for r in self.db.all("SELECT * FROM knowledge ORDER BY created_at")
+                decode_record(r, ("metadata", "dates", "skills"))
+                for r in self.db.all("SELECT * FROM knowledge ORDER BY position,created_at,id")
             ],
             "claims": [
                 decode_record(r, ("metadata",))
-                for r in self.db.all("SELECT * FROM claims WHERE approved=1 ORDER BY created_at")
+                for r in self.db.all(
+                    "SELECT * FROM claims WHERE approved=1 ORDER BY position,created_at,id"
+                )
             ],
         }
 
@@ -179,9 +181,11 @@ class Workspace:
                 score["job_version"] != row["content_version"]
                 or score["profile_version"] != profile
                 or score["config_version"] != config
-                or row["assessment"]["payload"].get("context", {}).get("versions", {}).get(
-                    "context_builder", 1
-                ) != CONTEXT_BUILDER_VERSION
+                or row["assessment"]["payload"]
+                .get("context", {})
+                .get("versions", {})
+                .get("context_builder", 1)
+                != CONTEXT_BUILDER_VERSION
             )
         )
         row["complete"] = posting_complete(row["posting"], row["metadata"], row["overrides"])

@@ -1445,15 +1445,12 @@ class DiscoveryService:
                 "id": entry["id"],
                 "kind": entry["kind"],
                 "title": scoring_text(entry["title"]),
+                "organization": scoring_text(entry["organization"]),
+                "dates": entry["dates"],
+                "skills": entry["skills"],
                 "metadata": {
                     key: metadata[key]
                     for key in (
-                        "dates",
-                        "start",
-                        "end",
-                        "year",
-                        "organization",
-                        "skills",
                         "languages",
                         "level",
                         "degree",
