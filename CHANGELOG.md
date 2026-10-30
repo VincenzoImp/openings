@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0
+
+- Record external fit reviews with scores, reasoning and frozen context through the dashboard, REST and MCP.
+- Choose whether automatic scoring includes updated jobs or only new arrivals.
+- Use an explicit compact scoring profile without duplicating detailed career evidence.
+- Organize awards and publications as career knowledge categories.
+- Display exact numeric scores consistently with filters.
+
 ## 0.5.4
 
 - Accept MCP requests at the endpoint advertised by the dashboard, with or without a trailing slash.

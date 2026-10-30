@@ -81,9 +81,11 @@ MCP tools run outside the event loop. Queued tasks have leases and cancellation;
 stale work cannot overwrite a current result. See [source configuration](../user/sources.md).
 
 Scoring is optional and advisory. Relevant profile/config edits mark scores outdated
-without queuing the archive. New or materially changed complete jobs may be scored;
-explicit selected/outdated batches and optional capped periodic rescoring are separate.
-Scores come only from the configured model. Model/provider details are in the
+without queuing the archive. New complete jobs may be scored automatically;
+automatic rescoring of updates has a separate switch. Explicit selected/outdated
+batches and optional capped periodic rescoring are separate. External reviews
+record a numeric score, source and reasoning against an exact context signature,
+without calling a model. Model/provider details are in the
 [scoring guide](../user/scoring.md).
 
 ## Extending the app

@@ -18,7 +18,7 @@ files live in one portable SQLite database.
 | **Company watch:** follow selected company ATS boards or RSS/Atom feeds. | **Your templates:** multiple LaTeX packages, assets, defaults and editable writing rules. |
 | **One inbox:** add a URL or posting yourself; search, filter, save, dismiss and update in bulk. | **Document revisions:** CVs, letters, form answers, PDF/source files and review history. |
 | **Controlled automation:** schedules, global pause, request budgets, cooldowns and visible task results. | **Application tracking:** list/Kanban, independent attempts and a funnel based on recorded progress. |
-| **Optional fit scoring:** a separate CPU classifier or compatible remote service. | **One portable archive:** SQLite stores records and file bytes; back up or move the workspace. |
+| **Fit reviews:** record an assessment or enable an optional local/remote classifier. | **One portable archive:** SQLite stores records and file bytes; back up or move the workspace. |
 
 <details>
 <summary>See the application board</summary>
@@ -70,8 +70,8 @@ Document generation and LaTeX compilation run in your external agent. Openings
 tracks the work; sending applications and automating portals stay outside the app.
 There is no built-in AI subscription, chat, server browser or TeX compiler.
 
-Version **0.5** uses a new workspace format; 0.4.x databases/configuration are
-not compatible. Stable API/data-format compatibility is not yet promised.
+Versions **0.5 and later** use a new workspace format; 0.4.x databases/configuration
+are not compatible. Stable API/data-format compatibility is not yet promised.
 The default core loads no model. Compose caps it at **0.5 CPU / 512 MiB**;
 the optional local scorer brings the combined cap to **2 CPU / 4 GiB**.
 Plan additional host resources for the operating system and Docker. See
