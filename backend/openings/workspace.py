@@ -18,6 +18,7 @@ from .models import (
     NotePatch,
     JobBulk,
 )
+from .posting import posting_complete, posting_complete_sql
 
 
 def normalize_url(url):
@@ -163,7 +164,7 @@ class Workspace:
         profile, config = revisions
         columns += [
             "substr(j.posting,1,240) AS j_posting_preview",
-            "length(trim(j.posting))>0 AS j_complete",
+            posting_complete_sql() + " AS j_complete",
             "a.score AS j_score",
             f"(a.id IS NOT NULL AND (a.job_version!=j.content_version OR a.profile_version!={profile} OR a.config_version!={config})) AS j_score_outdated",
         ]
@@ -211,7 +212,7 @@ class Workspace:
                 or score["config_version"] != config
             )
         )
-        row["complete"] = bool(row["posting"].strip())
+        row["complete"] = posting_complete(row["posting"], row["metadata"], row["overrides"])
         return row
 
     def get_job(self, job_id):
@@ -256,7 +257,7 @@ class Workspace:
             conditions.append("json_extract(j.metadata,'$.is_remote')=?")
             args.append(int(remote))
         if complete is not None:
-            conditions.append("(length(trim(j.posting))>0)=?")
+            conditions.append(posting_complete_sql() + "=?")
             args.append(int(complete))
         if job_type:
             conditions.append("json_extract(j.metadata,'$.job_type')=?")
@@ -915,7 +916,9 @@ class Workspace:
             outcome = (app["outcome"] or "not_pursued") if app["status"] == "closed" else "waiting"
             funnel[highest]["outcomes"][outcome] += 1
         counts = self.db.one(
-            "SELECT count(*) n,coalesce(sum(triage='inbox'),0) inbox,coalesce(sum(length(trim(posting))=0),0) incomplete FROM jobs WHERE triage!='dismissed'"
+            "SELECT count(*) n,coalesce(sum(triage='inbox'),0) inbox,coalesce(sum(NOT "
+            + posting_complete_sql()
+            + "),0) incomplete FROM jobs j WHERE triage!='dismissed'"
         )
         outdated = self.db.one(
             "SELECT count(*) n FROM jobs j JOIN assessments a ON a.id=(SELECT id FROM assessments WHERE job_id=j.id ORDER BY created_at DESC LIMIT 1) WHERE j.triage!='dismissed' AND (a.job_version!=j.content_version OR a.profile_version!=? OR a.config_version!=?)",

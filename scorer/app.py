@@ -147,7 +147,7 @@ async def lifespan(app):
             unload()
 
 
-app = FastAPI(title="Openings optional CPU scorer", version="0.5.2", lifespan=lifespan)
+app = FastAPI(title="Openings optional CPU scorer", version="0.5.3", lifespan=lifespan)
 
 
 @app.middleware("http")
