@@ -131,8 +131,8 @@ export default function CompaniesPage() {
   return (
     <>
       <Heading
-        title="Keep the right opportunities coming."
-        description="Save a focused search or follow a company, with clear schedules and shared provider limits."
+        title="Collection"
+        description="Configure saved searches, company feeds, schedules and shared provider limits."
       >
         <Button icon="refresh" onClick={resource.reload}>
           Refresh

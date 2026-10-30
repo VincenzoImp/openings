@@ -148,8 +148,8 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
   return (
     <>
       <Heading
-        title="Keep the whole picture."
-        description="Documents, conversations and decisions — each in its place."
+        title="Applications"
+        description="Track application attempts, documents and recorded progress."
       >
         <div className="segmented" aria-label="Application view">
           {["board", "list"].map((view) => (
@@ -888,7 +888,7 @@ export function ApplicationDrawer({
                   />
                 )}
                 <section className="context-panel">
-                  <h3>Your agent does the writing.</h3>
+                  <h3>Prepare application documents</h3>
                   <p>
                     Export the job, your stored knowledge, template and
                     instructions as a frozen context. Upload PDF and sources
@@ -1021,7 +1021,7 @@ export function ApplicationDrawer({
                     <DocumentCard key={d.id} document={d} application={app} />
                   ))
                 ) : (
-                  <Empty title="A clean starting point.">
+                  <Empty title="No documents in this view">
                     Save a CV, cover letter or source file prepared by you or
                     your external agent.
                   </Empty>

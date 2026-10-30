@@ -39,7 +39,7 @@ function band(x1: number, y1: number, x2: number, y2: number, height: number) {
 export function Funnel({ steps }: { steps: FunnelStep[] }) {
   if (!steps.length || !steps[0].count)
     return (
-      <Empty title="Your journey starts here.">
+      <Empty title="No submitted applications">
         Once you record a submitted application, its progress will appear in
         this view.
       </Empty>
@@ -239,8 +239,8 @@ export default function OverviewPage({
   return (
     <>
       <Heading
-        title="Your search, at a glance."
-        description="A clear view of your opportunities and the progress you are making."
+        title="Overview"
+        description="Review application totals, progress and recent workspace activity."
       >
         <span className="muted smalltext today">
           {new Date().toLocaleDateString("en", {
@@ -267,7 +267,7 @@ export default function OverviewPage({
           [
             data.interviews,
             "Reached interview",
-            "A conversation worth having",
+            "Recorded interview progress",
             "interview",
           ],
           [
@@ -291,7 +291,7 @@ export default function OverviewPage({
       <section className="card">
         <div className="cardhead">
           <div>
-            <h2>Your application journey</h2>
+            <h2>Application progress</h2>
             <p>
               Where submitted applications progressed, and where they stand now.
             </p>
@@ -326,7 +326,7 @@ export default function OverviewPage({
       <div className="grid-2">
         <section className="card">
           <div className="cardhead">
-            <h2>Worth a look</h2>
+            <h2>Needs attention</h2>
             <span className="tag neutral">{attention.length} items</span>
           </div>
           <div className="inner">
@@ -349,8 +349,7 @@ export default function OverviewPage({
               <div className="quiet-state">
                 <Icon name="check" />
                 <p>
-                  You are up to date. Add an opportunity or follow a company to
-                  keep exploring.
+                  No drafts, outdated scores or incomplete postings to show.
                 </p>
               </div>
             )}

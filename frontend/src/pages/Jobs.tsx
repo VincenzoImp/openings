@@ -60,7 +60,9 @@ export function AddJob({
   }
   return (
     <Dialog title="Add an opportunity." onClose={onClose}>
-      <p className="modal-intro">Keep a job you found, however you found it.</p>
+      <p className="modal-intro">
+        Add a posting by URL, pasted text or structured fields.
+      </p>
       <form onSubmit={submit}>
         <Field label="Job URL">
           <input
@@ -172,8 +174,8 @@ export function JobsPage({
   return (
     <>
       <Heading
-        title="Your opportunities."
-        description="A considered shortlist starts with a well-kept inbox."
+        title="Inbox"
+        description="Review, save, dismiss and organize collected or manually added jobs."
       >
         <Button variant="primary" icon="plus" onClick={onAdd}>
           Add job
