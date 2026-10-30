@@ -65,7 +65,7 @@ class DocumentCreate(Input):
 
 class ReviewUpdate(Input):
     review_state: Literal["approved"] = "approved"
-    expected_review_state: Literal["draft", "approved"] | None = None
+    expected_version: int = Field(ge=1)
 
 
 class UploadReservation(Input):
@@ -521,7 +521,7 @@ class DocumentService:
         items = []
         for row in rows:
             result = dict(row) if summary else decode_record(row, ["content"])
-            result.update(revision_number=revisions[result["id"]], version=1)
+            result.update(revision_number=revisions[result["id"]])
             if summary:
                 result["file_count"] = counts.get(result["id"], 0)
             else:
@@ -565,7 +565,7 @@ class DocumentService:
             params.append(f"%{q}%")
         clause = " WHERE " + " AND ".join(where) if where else ""
         columns = (
-            "id,application_id,context_id,kind,title,previous_id,review_state,created_at"
+            "id,application_id,context_id,kind,title,previous_id,review_state,version,created_at"
             if summary
             else "*"
         )
@@ -582,12 +582,13 @@ class DocumentService:
         """Approve exact document content/files; future changes require a new revision."""
         with self.db.transaction() as conn:
             row = _get(conn, "documents", document_id, "Document revision")
-            if (
-                value.expected_review_state is not None
-                and row["review_state"] != value.expected_review_state
-            ):
-                conflict("The document review state changed. Reload it before approving.")
-            conn.execute("UPDATE documents SET review_state='approved' WHERE id=?", (document_id,))
+            if row["version"] != value.expected_version:
+                conflict("The document or its files changed. Reload it before approving.")
+            if row["review_state"] != "approved":
+                conn.execute(
+                    "UPDATE documents SET review_state='approved',version=version+1 WHERE id=?",
+                    (document_id,),
+                )
         return self.get_document(document_id)
 
     def delete_document(self, document_id: str) -> dict:
@@ -830,6 +831,10 @@ class DocumentService:
                     conn.execute(
                         f"UPDATE {OWNER_TABLES[current['owner_type']]} SET version=version+1,updated_at=? WHERE id=?",
                         (now(), current["owner_id"]),
+                    )
+                elif current["owner_type"] == "document":
+                    conn.execute(
+                        "UPDATE documents SET version=version+1 WHERE id=?", (current["owner_id"],)
                     )
             current["file_id"] = file_id
             conn.execute(

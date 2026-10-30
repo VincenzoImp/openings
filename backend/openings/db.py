@@ -8,6 +8,46 @@ from pathlib import Path
 
 from .errors import DomainError
 from .posting import posting_complete
+from .identities import job_identities
+
+SCHEMA_VERSION = 2
+
+
+def migrate_workspace(conn):
+    """Upgrade the supported workspace format atomically, preserving ambiguous aliases.
+
+    Old archives may already contain duplicate source keys. Keep both jobs and
+    let ingestion require an explicit merge instead of silently losing history.
+    """
+    version = conn.execute("PRAGMA user_version").fetchone()[0]
+    if version == 1:
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            conn.execute("ALTER TABLE documents ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
+            conn.execute(
+                "CREATE TABLE job_identities(identity TEXT NOT NULL,job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,PRIMARY KEY(identity,job_id))"
+            )
+            conn.execute("CREATE INDEX job_identities_job ON job_identities(job_id)")
+            conn.execute(
+                "CREATE TABLE posting_details(identity TEXT PRIMARY KEY,job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,checked_at TEXT NOT NULL)"
+            )
+            conn.execute("CREATE INDEX posting_details_job ON posting_details(job_id)")
+            for row in conn.execute("SELECT id,url FROM jobs"):
+                conn.executemany(
+                    "INSERT OR IGNORE INTO job_identities VALUES(?,?)",
+                    [(key, row[0]) for key in job_identities(row[1])],
+                )
+            for row in conn.execute("SELECT job_id,identity,url,payload FROM postings"):
+                keys = job_identities(row[2], json.loads(row[3]).get("source_key"))
+                conn.executemany(
+                    "INSERT OR IGNORE INTO job_identities VALUES(?,?)",
+                    [(key, row[0]) for key in set(keys + [row[1]])],
+                )
+            conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+            conn.commit()
+        except BaseException:
+            conn.rollback()
+            raise
 
 
 class Database:
@@ -26,9 +66,10 @@ class Database:
                     "schema_version",
                     "Use an empty database or a compatible Openings workspace. Existing unrelated databases are not modified.",
                 )
-            if version not in (0, 1):
+            if version not in (0, 1, SCHEMA_VERSION):
                 raise DomainError(400, "schema_version", "Unsupported workspace database version.")
             conn.execute("PRAGMA journal_mode=WAL")
+            migrate_workspace(conn)
             conn.executescript(Path(__file__).with_name("schema.sql").read_text())
         self.path.chmod(0o600)
 

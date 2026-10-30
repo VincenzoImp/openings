@@ -37,6 +37,16 @@ CREATE TABLE IF NOT EXISTS postings (
  first_seen_at TEXT NOT NULL, last_seen_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS postings_job ON postings(job_id);
+CREATE TABLE IF NOT EXISTS job_identities (
+ identity TEXT NOT NULL, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+ PRIMARY KEY(identity,job_id)
+);
+CREATE INDEX IF NOT EXISTS job_identities_job ON job_identities(job_id);
+CREATE TABLE IF NOT EXISTS posting_details (
+ identity TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+ checked_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS posting_details_job ON posting_details(job_id);
 CREATE TABLE IF NOT EXISTS applications (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
  status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','applied','interview','offer','closed')),
@@ -81,7 +91,7 @@ CREATE TABLE IF NOT EXISTS documents (
  context_id TEXT REFERENCES contexts(id) ON DELETE CASCADE, kind TEXT NOT NULL,
  title TEXT NOT NULL DEFAULT '', content TEXT NOT NULL DEFAULT '{}',
  previous_id TEXT REFERENCES documents(id) ON DELETE SET NULL,
- review_state TEXT NOT NULL DEFAULT 'draft', created_at TEXT NOT NULL
+ review_state TEXT NOT NULL DEFAULT 'draft', version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS blobs (
  sha256 TEXT PRIMARY KEY, content BLOB NOT NULL, size INTEGER NOT NULL
@@ -131,4 +141,4 @@ CREATE INDEX IF NOT EXISTS files_context ON files(context_id);
 CREATE INDEX IF NOT EXISTS files_template ON files(template_id);
 CREATE INDEX IF NOT EXISTS files_knowledge ON files(knowledge_id);
 CREATE INDEX IF NOT EXISTS claims_knowledge ON claims(knowledge_id);
-PRAGMA user_version=1;
+PRAGMA user_version=2;
