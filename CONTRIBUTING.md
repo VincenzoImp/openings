@@ -1,7 +1,7 @@
 # Contributing
 
 Read the [architecture](docs/developer/architecture.md) and relevant
-[user guide](docs/user/getting-started.md) before changing behavior. Keep shared
+[user guide](docs/README.md) before changing behavior. Keep shared
 services useful through the dashboard, REST and MCP. Code, UI and documentation
 are English; public examples/screenshots contain synthetic data only.
 
@@ -43,7 +43,9 @@ docker compose config
 Use focused invariant checks and complete user workflows. For dashboard changes,
 check populated lists, desktop/mobile layouts, keyboard access, unsaved edits and
 loading/error states. For data changes, check versions, deletion/cancellation,
-frozen contexts, exact revision/file associations and backup consistency.
+frozen contexts, exact revision/file associations and backup consistency. Collection
+changes need a resume-after-deferral workflow, cumulative counts and a source edit
+that leaves queued snapshots unchanged. Keep HTTP attempts inside the shared gate.
 
 The manual MCP/file/backup driver requires an external Tectonic executable:
 

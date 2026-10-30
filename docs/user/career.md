@@ -20,6 +20,8 @@ Cards show titles, organizations, career dates and a two-line description or cla
 preview. Titles and organizations identify entries in selectors. Descriptions can stay empty;
 add context and evidence when useful rather than duplicating every claim.
 
+![Career entries showing titles, organizations, dates and reusable claim previews](../images/career.png)
+
 ## Dates and ordering
 
 Choose no date, a single date or a period. Each supplied date has a year and an

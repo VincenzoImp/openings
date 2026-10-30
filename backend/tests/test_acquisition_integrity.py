@@ -130,11 +130,19 @@ def test_detail_refresh_rotates_across_pages_and_sources_without_material_timest
     )
     version = job["content_version"]
     clock[0] = "2026-01-03T00:00:00.000000+00:00"
+    workspace.db.execute(
+        "UPDATE posting_details SET checked_at=? WHERE identity<>?",
+        (clock[0], "smartrecruiters:example:0"),
+    )
     run()
     assert calls == ["100", "0"]
     assert workspace.get_job(job["id"])["content_version"] == version
     body[0] = "Build a different system"
     clock[0] = "2026-01-05T00:00:00.000000+00:00"
+    workspace.db.execute(
+        "UPDATE posting_details SET checked_at=? WHERE identity<>?",
+        (clock[0], "smartrecruiters:example:1"),
+    )
     run()
     assert calls[-1] == "1"  # oldest check, not the first listing row again
     updated = workspace.get_job(
@@ -302,6 +310,7 @@ def test_workday_filters_later_metadata_pages_and_reports_candidate_cap():
         "config": {
             "board": "example.wd5.myworkdayjobs.com/Careers",
             "max_results": 1,
+            "max_candidates": 200,
             "max_details": 1,
             "filters": {"titles": ["Engineer"]},
         },

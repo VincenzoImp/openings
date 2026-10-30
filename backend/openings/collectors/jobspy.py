@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Literal
+from datetime import datetime, timedelta, timezone
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -75,7 +76,7 @@ def request_estimate(config, preview=False):
     }
 
 
-def collect(config, provider, budget, *, preview=False):
+def collect(config, provider, budget, *, preview=False, source=None):
     cfg = JobSpyConfig.model_validate(config)
     if provider not in cfg.providers:
         raise DomainError(422, "source_provider", "This provider is not part of the saved search.")
@@ -92,7 +93,16 @@ def collect(config, provider, budget, *, preview=False):
         from .._vendor.jobspy.glassdoor import Glassdoor
 
         cls = Glassdoor
+    source = source or {}
     scraper = cls(transport=budget)
+    scraper.checkpoint = source.setdefault("checkpoint", {}) if not preview else {}
+    scraper.on_checkpoint = source.get("on_checkpoint") if not preview else None
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    scraper.known_postings = {
+        key: value
+        for key, value in (source.get("known_postings") or {}).items()
+        if (source.get("detail_checked") or {}).get(key, "") > cutoff
+    }
     scraper_input = ScraperInput(
         site_name=[Site(provider)],
         search_term=cfg.query,
@@ -140,10 +150,34 @@ def collect(config, provider, budget, *, preview=False):
                         if raw.get(key) is not None
                     },
                     "external_id": row.id,
+                    "description_complete": bool(row.description)
+                    and len(row.description) <= 200000,
+                    "description_status": "complete"
+                    if row.description
+                    else "pending"
+                    if scraper.checkpoint.get("pending_details")
+                    else "unavailable",
                 },
                 "raw": raw,
             }
         )
+    source.setdefault("detail_checks", {}).update(
+        {
+            item["source_key"]: datetime.now(timezone.utc).isoformat(timespec="microseconds")
+            for item in items
+            if item["posting"] and item["source_key"] not in scraper.known_postings
+        }
+    )
+    if source.get("on_item"):
+        source["streamed"] = True
+        for item in items:
+            source["on_item"](item)
+    if scraper.checkpoint.get("complete"):
+        scraper.checkpoint["unavailable_descriptions"] = sum(not item["posting"] for item in items)
+        scraper.checkpoint.pop("jobs", None)
+        scraper.checkpoint.pop("detail_attempts", None)
+        if scraper.on_checkpoint:
+            scraper.on_checkpoint(scraper.checkpoint)
     diagnostic = budget.diagnostics()
     if scraper.error and budget.blocked is None:
         diagnostic.update(state="error", message=scraper.error[:500])
@@ -152,7 +186,7 @@ def collect(config, provider, budget, *, preview=False):
         if not items and diagnostic["state"] == "ok":
             diagnostic.update(state="warning", message="; ".join(scraper.warnings)[:500])
     # A challenge or schema error must not appear as a successful empty search.
-    if diagnostic["state"] == "error" and not items:
+    if diagnostic["state"] == "error":
         raise DomainError(
             502, "provider_response", f"{provider}: {diagnostic['message']}", diagnostic
         )

@@ -92,7 +92,9 @@ async def test_completeness_filter_matches_overview_and_page_totals_on_rest_and_
         present = client.get("/api/v1/jobs?complete=true").json()
         assert present["total"] == 3
         assert {row["id"] for row in present["items"]} == {
-            complete["id"], short["id"], non_latin["id"]
+            complete["id"],
+            short["id"],
+            non_latin["id"],
         }
         for item in (complete, incomplete, preview, placeholder, short, non_latin):
             assert client.get(f"/api/v1/jobs/{item['id']}").json()["complete"] == (
@@ -322,18 +324,14 @@ def test_http_validates_answers_dates_and_rotation_preserves_tokens(tmp_path):
         )
         assert client.get("/api/v1/jobs").status_code == 401
         client.headers["Authorization"] = "Bearer " + token["token"]
-        assert client.get("/api/v1/capabilities").json()["version"] == "0.8.0"
+        assert client.get("/api/v1/capabilities").json()["version"] == "0.9.0"
         assert client.get("/api/v1/tokens").json()["items"][0]["last_used_at"]
         source = client.post(
             "/api/v1/sources",
             json={
                 "name": "Synthetic API source",
-                "kind": "adzuna",
-                "config": {
-                    "query": "engineer",
-                    "app_id": "synthetic",
-                    "app_key": "synthetic-secret",
-                },
+                "kind": "jobspy",
+                "config": {"query": "engineer", "providers": ["linkedin"]},
             },
         )
         assert source.status_code == 201

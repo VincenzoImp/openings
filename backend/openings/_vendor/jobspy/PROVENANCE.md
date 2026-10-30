@@ -20,11 +20,15 @@ Local changes:
   search, location lookup and detail HTTP attempt and response, including errors.
 - All three provider session constructors supply `self.transport`.
 - Remove LinkedIn's random inter-page sleep; the shared persisted Openings gate
-  now spaces every HTTP attempt, including detail fetches. No upstream endpoint,
-  parser or query logic was changed.
+  now spaces every HTTP attempt, including detail fetches. Provider endpoints and parsers remain upstream-derived.
 - Disable implicit environment proxy/auth configuration on the new sessions.
   The transport bounds decoded response bodies to 8 MiB: synchronous streaming
   for requests, a bounded receive callback for curl without a background queue.
+
+- Provider pagination and pending detail rows are checkpointed after each page or
+  detail batch. Resumed tasks reuse that progress and fresh archived descriptions.
+- LinkedIn requests newest-first ordering (`sortBy=DD`). Indeed cursor values are
+  JSON-escaped; its upstream relevance ordering remains unchanged.
 
 Future upgrades must explicitly review this seam, reproduce the transport tests
 and bounded live provider checks, and update the pinned source hash and notice.

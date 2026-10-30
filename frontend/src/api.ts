@@ -173,7 +173,48 @@ export interface Source extends Versioned {
   last_outcome?: string;
   last_counts?: Json;
   last_task_id?: string;
+  last_run?: CollectionRun;
   last_diagnostics?: { warnings?: string[] }[];
+}
+export type CollectionSchedule =
+  | { kind: "daily"; times: string[]; timezone: string }
+  | { kind: "interval"; minutes: number };
+export interface BackgroundTask {
+  id: string;
+  kind: "collect" | "score";
+  state: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+  run_id?: string;
+  source_id?: string;
+  source_name?: string;
+  job_id?: string;
+  job_title?: string;
+  payload?: Json;
+  result?: Json;
+  attempts?: number;
+  next_run_at?: string;
+  created_at: string;
+  updated_at?: string;
+  error?: string;
+}
+export interface CollectionRun {
+  id: string;
+  source_id: string;
+  source_name: string;
+  source_version: number;
+  source_snapshot?: Json;
+  overrides?: Json;
+  state: string;
+  counts: Record<string, number>;
+  processing_seconds?: number;
+  waiting_seconds?: number;
+  total_seconds?: number;
+  planned_at?: string;
+  created_at: string;
+  started_at?: string;
+  finished_at?: string;
+  next_run_at?: string;
+  task_ids: string[];
+  tasks?: BackgroundTask[];
 }
 export interface Scoring {
   enabled: boolean;

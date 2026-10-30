@@ -58,6 +58,23 @@ Mutating service tools also commonly wrap fields in `value`. For example:
 }
 ```
 
+## Collection through an agent
+
+Use `sources_schemas` to discover valid provider settings, then read the saved
+sources before changing or running them. Include the current `expected_version`
+for updates, run and deletion. Keep one query/location per search and use the
+supported company board adapters.
+
+A run can use temporary lookback/result limits without editing the saved source.
+Its source settings are frozen at enqueue time. Use `collection_runs_list` and
+`collection_runs_get` for cumulative progress, wait reasons and resume times;
+`collection_runs_cancel` stops a selected run. Provider limits apply to agent
+operations just as they do to the dashboard.
+
+Prefer a compatible bulk patch when applying the same schedule or acquisition
+settings to several sources. Read per-source failures and retain untouched fields.
+The [Collection guide](sources.md) explains daily time slots, defaults and counters.
+
 ## State rules
 
 - Job triage is Inbox/Saved/Dismissed. Dismissed is reversible and remembered;

@@ -5,6 +5,8 @@ from abc import ABC, abstractmethod
 from datetime import date
 from enum import Enum
 
+from pydantic_core import to_jsonable_python
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -196,19 +198,14 @@ class JobPost(BaseModel):
             if isinstance(value, Location):
                 return value.display_location()
             if isinstance(value, list):
-                return (
-                    ", ".join(v.value if isinstance(v, Enum) else v for v in value)
-                    or None
-                )
+                return ", ".join(v.value if isinstance(v, Enum) else v for v in value) or None
             if isinstance(value, Enum):
                 return str(value.value)
             return value
 
         row = {name: text(getattr(self, name)) for name in type(self).model_fields}
         has_pay = self.min_amount or self.max_amount
-        row["salary_source"] = (
-            (self.salary_source or "direct_data") if has_pay else None
-        )
+        row["salary_source"] = (self.salary_source or "direct_data") if has_pay else None
         return row
 
     def annualised(self) -> JobPost:
@@ -241,9 +238,7 @@ class Site(Enum):
 
 
 class ScraperInput(BaseModel):
-    site_name: list[Site] = Field(
-        [site for site in Site if site != Site.GOOGLE], min_length=1
-    )
+    site_name: list[Site] = Field([site for site in Site if site != Site.GOOGLE], min_length=1)
     search_term: str | None = None
     google_search_term: str | None = None
 
@@ -286,6 +281,20 @@ class Scraper(ABC):
         self.log = logging.getLogger(type(self).__module__)
         self.error: str | None = None
         self.warnings: list[str] = []
+        self.checkpoint: dict = {}
+        self.on_checkpoint = None
+        self.known_postings: dict = {}
+
+    def save_progress(self, **values):
+        self.checkpoint.update(values)
+        if self.on_checkpoint:
+            self.on_checkpoint(self.checkpoint)
+
+    def saved_jobs(self):
+        return [JobPost.model_validate(row) for row in self.checkpoint.get("jobs", [])]
+
+    def save_jobs(self, jobs, **values):
+        self.save_progress(jobs=[to_jsonable_python(dict(row)) for row in jobs], **values)
 
     def fail(self, message: str) -> None:
         self.log.error(message)

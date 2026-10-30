@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.0
+
+- Resume portal pagination and missing descriptions across bounded collection batches.
+- Freeze each collection run with its settings, optional overrides and cumulative progress.
+- Schedule multiple daily local times or intervals and configure sources in bulk.
+- Align source version checks, run controls and configuration discovery across interfaces.
+- Score newly discovered incomplete jobs once their description becomes available.
+- Keep location filters from widening a specific geography to unrestricted remote work.
+- Simplify collection to JobSpy searches and supported company ATS/feed adapters.
+- Refresh Collection controls and English guides with populated product screenshots.
+
+This release uses schema 4. Installation-specific conversion remains outside the application.
+
 ## 0.8.0
 
 - Separate career titles, organizations, partial dates, skill tags and ordering.

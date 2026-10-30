@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS jobs (
  CHECK(triage IN ('inbox','saved','dismissed')), availability TEXT NOT NULL DEFAULT 'unknown',
  metadata TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(metadata)), overrides TEXT NOT NULL DEFAULT '{}',
  content_version INTEGER NOT NULL DEFAULT 1, version INTEGER NOT NULL DEFAULT 1,
+ initial_score_pending INTEGER NOT NULL DEFAULT 0 CHECK(initial_score_pending IN (0,1)),
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS jobs_url ON jobs(url);
@@ -28,7 +29,7 @@ CREATE TRIGGER IF NOT EXISTS jobs_au AFTER UPDATE OF title,company,posting ON jo
 CREATE TABLE IF NOT EXISTS sources (
  id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, config TEXT NOT NULL DEFAULT '{}',
  enabled INTEGER NOT NULL DEFAULT 0, schedule TEXT NOT NULL DEFAULT '{}', version INTEGER NOT NULL DEFAULT 1,
- last_run_at TEXT, last_error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+ last_run_at TEXT, last_scheduled_at TEXT, last_error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS postings (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -120,13 +121,23 @@ CREATE TABLE IF NOT EXISTS assessments (
  model TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS assessments_job ON assessments(job_id,created_at);
+CREATE TABLE IF NOT EXISTS collection_runs (
+ id TEXT PRIMARY KEY, source_id TEXT REFERENCES sources(id) ON DELETE SET NULL,
+ source_name TEXT NOT NULL, source_version INTEGER NOT NULL,
+ source_snapshot TEXT NOT NULL CHECK(json_valid(source_snapshot)),
+ overrides TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(overrides)), planned_at TEXT,
+ created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS collection_runs_source ON collection_runs(source_id,created_at);
 CREATE TABLE IF NOT EXISTS tasks (
- id TEXT PRIMARY KEY, kind TEXT NOT NULL, source_id TEXT REFERENCES sources(id) ON DELETE CASCADE,
+ id TEXT PRIMARY KEY, kind TEXT NOT NULL, source_id TEXT REFERENCES sources(id) ON DELETE SET NULL,
+ run_id TEXT REFERENCES collection_runs(id) ON DELETE CASCADE,
  job_id TEXT REFERENCES jobs(id) ON DELETE CASCADE, state TEXT NOT NULL DEFAULT 'queued',
  payload TEXT NOT NULL DEFAULT '{}', result TEXT NOT NULL DEFAULT '{}', attempts INTEGER NOT NULL DEFAULT 0,
  dedupe_key TEXT UNIQUE, next_run_at TEXT NOT NULL, lease_until TEXT, lease_owner TEXT, error TEXT,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS tasks_run ON tasks(run_id);
 CREATE INDEX IF NOT EXISTS tasks_due ON tasks(state,next_run_at);
 CREATE TABLE IF NOT EXISTS providers (
  id TEXT PRIMARY KEY, policy TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(policy)),
@@ -143,4 +154,4 @@ CREATE INDEX IF NOT EXISTS files_context ON files(context_id);
 CREATE INDEX IF NOT EXISTS files_template ON files(template_id);
 CREATE INDEX IF NOT EXISTS files_knowledge ON files(knowledge_id);
 CREATE INDEX IF NOT EXISTS claims_knowledge ON claims(knowledge_id);
-PRAGMA user_version=3;
+PRAGMA user_version=4;

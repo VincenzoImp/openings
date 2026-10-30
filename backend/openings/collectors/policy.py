@@ -49,16 +49,6 @@ PROVIDERS = {
         "search",
         "JobSpy 1.4.1 search, location lookup and optional batched details.",
     ),
-    "jobcloud": (
-        "JobCloud",
-        "search",
-        "Public jobs.ch/jobup.ch regional search; undocumented endpoint.",
-    ),
-    "adzuna": (
-        "Adzuna",
-        "search",
-        "Optional owner-supplied API credentials required; snippets only.",
-    ),
     "rss": ("RSS / Atom", "feed", "Explicit feed URL; locations absent from feeds remain unknown."),
     "manual": (
         "Manual URL / board detection",
@@ -93,9 +83,6 @@ def provider_for_url(value: str) -> str:
         "myworkdayjobs.com": "workday",
         "oraclecloud.com": "oracle",
         "join.com": "joincom",
-        "jobs.ch": "jobcloud",
-        "jobup.ch": "jobcloud",
-        "adzuna.com": "adzuna",
     }
     return next(
         (
@@ -169,7 +156,7 @@ class ProviderStore:
         self.db = db
         with db.transaction() as connection:
             for provider in PROVIDERS:
-                policy = ProviderPolicy(enabled=provider not in ("google", "adzuna")).model_dump()
+                policy = ProviderPolicy(enabled=provider != "google").model_dump()
                 connection.execute(
                     "INSERT OR IGNORE INTO providers(id,policy,runtime,updated_at) VALUES(?,?,?,?)",
                     (provider, encode(policy), "{}", now()),
@@ -224,7 +211,7 @@ class ProviderStore:
                 "transport_version": "jobspy1.4.1-openings1"
                 if provider in ("linkedin", "indeed", "glassdoor")
                 else "openings1",
-                "credentials_required": provider == "adzuna",
+                "credentials_required": False,
             },
             "policy": policy,
             "runtime": public_runtime,

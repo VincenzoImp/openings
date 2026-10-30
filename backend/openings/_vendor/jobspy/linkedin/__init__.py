@@ -56,12 +56,16 @@ class LinkedIn(Scraper):
             if getattr(scraper_input, name):
                 self.warn(f"{name} isn't supported, ignoring it")
         params = self._search_params()
-        job_list: list[JobPost] = []
-        seen = set()
-        start = scraper_input.offset
+        job_list = self.saved_jobs()
+        seen = {row.id.removeprefix("li-") for row in job_list if row.id}
+        start = self.checkpoint.get("offset", scraper_input.offset)
         page = 1
 
-        while len(job_list) < scraper_input.results_wanted and start < max_results:
+        while (
+            not self.checkpoint.get("listing_complete")
+            and len(job_list) < scraper_input.results_wanted
+            and start < max_results
+        ):
             self.log.info(f"search page: {page}")
             try:
                 response = self.session.get(
@@ -82,6 +86,7 @@ class LinkedIn(Scraper):
                     self.log.warning(
                         f"empty page at start={start} (the end of the results, or throttled)"
                     )
+                self.save_jobs(job_list, listing_complete=not self.error)
                 break
 
             new_cards = []
@@ -101,11 +106,49 @@ class LinkedIn(Scraper):
                 if len(job_list) >= scraper_input.results_wanted:
                     break
 
-            if not new_cards or len(job_cards) < jobs_per_page:
-                break
             start += jobs_per_page
+            finished = (
+                not new_cards
+                or len(job_cards) < jobs_per_page
+                or len(job_list) >= scraper_input.results_wanted
+                or start >= max_results
+            )
+            self.save_jobs(job_list, offset=start, listing_complete=finished)
+            if finished:
+                break
             page += 1
 
+        attempts = self.checkpoint.setdefault("detail_attempts", {})
+        for index, job in enumerate(job_list):
+            identity = "linkedin:" + str(job.id or job.job_url)
+            if identity in self.known_postings:
+                job_list[index] = job.model_copy(
+                    update={"description": self.known_postings[identity]}
+                )
+                continue
+            if (
+                not scraper_input.fetch_description
+                or job.description
+                or attempts.get(job.id, 0) >= 3
+            ):
+                continue
+            full = self._fetch_details(str(job.id).removeprefix("li-"))
+            if self.transport is not None and self.transport.blocked is not None:
+                break
+            attempts[job.id] = attempts.get(job.id, 0) + 1
+            job_list[index] = job.model_copy(update=full)
+            self.save_jobs(job_list)
+        pending = (
+            sum(not row.description and attempts.get(row.id, 0) < 3 for row in job_list)
+            if scraper_input.fetch_description
+            else 0
+        )
+        self.save_jobs(
+            job_list,
+            pending_details=pending,
+            complete=bool(self.checkpoint.get("listing_complete")) and pending == 0,
+            unavailable_descriptions=sum(not row.description for row in job_list) - pending,
+        )
         return job_list
 
     def _search_params(self) -> dict[str, str | int]:
@@ -114,6 +157,7 @@ class LinkedIn(Scraper):
             "keywords": scraper_input.search_term,
             "location": scraper_input.location,
             "distance": scraper_input.distance,
+            "sortBy": "DD",
         }
         if scraper_input.easy_apply:
             params["f_AL"] = "true"
@@ -139,27 +183,20 @@ class LinkedIn(Scraper):
         location = parse_location(location_tag.text.strip())
         time_tag = job_card.find("time")
         try:
-            date_posted = (
-                date.fromisoformat(str(time_tag["datetime"])) if time_tag else None
-            )
+            date_posted = date.fromisoformat(str(time_tag["datetime"])) if time_tag else None
         except (TypeError, KeyError, ValueError):
             date_posted = None
-        job_details = (
-            self._fetch_details(job_id) if self.scraper_input.fetch_description else {}
-        )
 
         return JobPost(
             id=f"li-{job_id}",
             title=title,
             company=company_tag.get_text(strip=True),
-            company_url=str(company_link["href"]).split("?")[0]
-            if company_link
-            else None,
+            company_url=str(company_link["href"]).split("?")[0] if company_link else None,
             location=location,
             is_remote=is_job_remote(title, location),
             date_posted=date_posted,
             job_url=f"{self.base_url}/jobs/view/{job_id}",
-        ).model_copy(update=job_details)
+        )
 
     @staticmethod
     def _parse_salary(text: str) -> Compensation:
@@ -196,13 +233,9 @@ class LinkedIn(Scraper):
         else:
             interval, below = CompensationInterval.YEARLY, upper_limit + 1
         factor = annual_factor[interval.value]
-        if high >= below or not (
-            lower_limit <= low * factor < high * factor <= upper_limit
-        ):
+        if high >= below or not (lower_limit <= low * factor < high * factor <= upper_limit):
             return Compensation()
-        return Compensation(
-            interval=interval, min_amount=low, max_amount=high, currency="USD"
-        )
+        return Compensation(interval=interval, min_amount=low, max_amount=high, currency="USD")
 
     def _fetch_details(self, job_id: str) -> dict[str, object]:
         """

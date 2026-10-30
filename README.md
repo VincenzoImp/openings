@@ -1,47 +1,39 @@
 # Openings
 
-A self-hosted workspace for collecting jobs, storing career evidence, preparing
-application documents with an external agent and tracking progress. Records and
-files live in one portable SQLite database.
+A self-hosted job search workspace. Collect offers, keep your career knowledge and
+templates together, and prepare applications with your own AI agent. Jobs,
+documents and file bytes live in one portable SQLite database.
 
-[Get started](docs/user/getting-started.md) · [Connect your agent](docs/user/agents.md) · [REST API](docs/user/api.md)
+[Get started](docs/user/getting-started.md) · [Documentation](docs/README.md) · [Connect your agent](docs/user/agents.md)
 
-![Openings dashboard with application progress and a recorded journey](docs/images/overview.png)
+![Job inbox with saved roles, fit scores and application progress](docs/images/inbox.png)
 
-![Collect jobs, organize your career context, prepare documents with your agent, and track applications](docs/images/workflow.svg)
+## From job search to application
 
-## Features
+- **Collect:** save keyword/location searches on LinkedIn, Indeed and Glassdoor,
+  or follow selected company ATS boards and feeds. Add individual jobs yourself.
+- **Organize:** search and filter the archive; save or dismiss jobs individually
+  or in bulk. Dismissed jobs stay remembered when collected again.
+- **Prepare:** store career entries, approved claims, multiple LaTeX templates,
+  assets and writing instructions for your external agent.
+- **Review:** keep CVs, cover letters, form answers and their exact PDF/source
+  revisions with each application.
+- **Track:** move applications through a Kanban board and inspect their recorded
+  journey, outcomes and funnel.
+- **Automate:** use the dashboard, REST API or MCP with shared operations. Optional
+  CPU fit scoring runs in a separate container or a compatible remote service.
 
-| Find and organize | Prepare and follow through |
-|---|---|
-| **Saved searches:** choose keywords, location and LinkedIn, Indeed or Glassdoor. | **Career entries:** organize roles, education, publications, skills and reusable claims. |
-| **Company watch:** follow selected company ATS boards or RSS/Atom feeds. | **Your templates:** multiple LaTeX packages, assets, defaults and editable writing rules. |
-| **One inbox:** add a URL or posting yourself; search, filter, save, dismiss and update in bulk. | **Document revisions:** CVs, letters, form answers, PDF/source files and review history. |
-| **Controlled automation:** schedules, global pause, request budgets, cooldowns and visible task results. | **Application tracking:** list/Kanban, independent attempts and a funnel based on recorded progress. |
-| **Optional fit scoring:** a separate CPU classifier or compatible remote service. | **One portable archive:** SQLite stores records and file bytes; back up or move the workspace. |
+![Collect jobs, organize career knowledge, prepare documents with your agent, and track applications](docs/images/workflow.svg)
 
-<details>
-<summary>See the application board</summary>
-
-![Compact application board with company, role, location, documents and recorded stages](docs/images/applications.png)
-
-</details>
-
-### Dashboard, API and agents
-
-Use the **dashboard** by hand, the **REST API** for scripts, or **MCP** with your
-external agent. They share the same application operations.
-
-Your agent reads the saved job, career evidence, templates and instructions;
-writes the CV, letter and form answers; compiles externally; then uploads the
-exact PDF and source files. You review the result and record what you submitted.
-An optional [agent skill](skills/openings-workspace/SKILL.md) teaches this workflow.
-Your chosen agent supplies its own AI access and tools.
+Your agent reads a frozen application context, writes and compiles documents on
+its own machine, then uploads the result. You review the files and record the
+submission. The [agent guide](docs/user/agents.md) and optional
+[skill](skills/openings-workspace/SKILL.md) explain the workflow; your agent supplies
+its own model access and tools.
 
 ## Start with Docker
 
-Requires Docker with Compose v2. Published [Docker Hub images](https://hub.docker.com/r/vincenzoimp/openings)
-support Linux amd64 and arm64.
+Requires Docker with Compose v2. Published images support Linux amd64 and arm64.
 
 ```bash
 git clone https://github.com/VincenzoImp/openings.git
@@ -51,30 +43,18 @@ docker compose pull
 docker compose up -d --no-build
 ```
 
-Open **http://127.0.0.1:8080** and set your owner password. Add your profile and a
-template, then save a search in **Collection** or add a job in **Inbox**. New sources
-start paused; enable the schedules you want. No AI account is needed to collect,
-organize or track jobs. Optional scoring starts separately.
+Open **http://127.0.0.1:8080**, choose an owner password and add your first job in
+**Inbox**. Set up **Collection** when you want scheduled searches; new sources start
+paused. Build your **Career** and **Templates** library before preparing documents.
 
-[Setup and LAN access](docs/user/getting-started.md) · [Career](docs/user/career.md) · [Search configuration](docs/user/sources.md) · [Scoring](docs/user/scoring.md) · [Backup and restore](docs/user/operations.md)
+The core Compose limit is **0.5 CPU / 512 MiB**. The optional local scorer adds
+**1.5 CPU / 3584 MiB**; allow host resources beyond these container budgets.
+[Setup](docs/user/getting-started.md) covers LAN access, storage and scoring modes.
 
-To build from source instead, follow [Development](CONTRIBUTING.md).
+## Explore
 
-## Limits
+[Collection and schedules](docs/user/sources.md) · [Career knowledge](docs/user/career.md) · [Application documents](docs/user/applications.md) · [Scoring](docs/user/scoring.md) · [REST API](docs/user/api.md) · [Operations](docs/user/operations.md)
 
-Scoring is advisory and disabled by default. Public portals can block requests or
-change their pages; provider budgets are safeguards, not guaranteed access.
-Google Jobs is unsupported. Paste the posting when URL extraction cannot read it.
-
-Document generation and LaTeX compilation run in your external agent. Openings
-tracks the work; sending applications and automating portals stay outside the app.
-There is no built-in AI subscription, chat, server browser or TeX compiler.
-
-Versions **0.5 and later** use a new workspace format; 0.4.x databases/configuration
-are not compatible. Stable API/data-format compatibility is not yet promised.
-The default core loads no model. Compose caps it at **0.5 CPU / 512 MiB**;
-the optional local scorer brings the combined cap to **2 CPU / 4 GiB**.
-Plan additional host resources for the operating system and Docker. See
-[deployment modes and resources](docs/user/getting-started.md#deployment-modes-and-resources).
+![Application board with draft, submitted and interview stages](docs/images/applications.png)
 
 [Contributing](CONTRIBUTING.md) · [Architecture](docs/developer/architecture.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md) · [MIT license](LICENSE)

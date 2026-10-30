@@ -103,8 +103,11 @@ def test_partial_postings_stay_archived_without_entering_scoring_batches(case):
 def test_user_completed_posting_survives_source_preview_refresh(case):
     workspace, service = case
     source = {
-        "title": "Engineer", "company": "Example", "posting": "Python, SQL",
-        "url": "https://example.test/jobs/preview", "metadata": {"description_complete": False},
+        "title": "Engineer",
+        "company": "Example",
+        "posting": "Python, SQL",
+        "url": "https://example.test/jobs/preview",
+        "metadata": {"description_complete": False},
         "raw": {"preview": "Python, SQL"},
     }
     preview = workspace.ingest_job(source)
@@ -136,9 +139,7 @@ def test_task_queued_before_posting_became_partial_does_not_infer(case, monkeypa
         module, "score_call", lambda *args: pytest.fail("Incomplete postings must not infer")
     )
     task = run_next(service)
-    assert service.get_task(task["id"])["result"] == {
-        "skipped": "job_not_eligible_for_scoring"
-    }
+    assert service.get_task(task["id"])["result"] == {"skipped": "job_not_eligible_for_scoring"}
     assert workspace.get_job(original["id"])["score"] is None
 
 
@@ -281,13 +282,13 @@ def test_failed_replacement_keeps_previous_score_and_source_failure_is_isolated(
     service.queue_collection(second["id"])
     run_next(service)
     run_next(service)
-    assert service.get_source(first["id"])["last_error"]
+    assert service.get_source(first["id"])["last_run"]["tasks"][0]["error"]
     assert service.get_source(second["id"])["last_error"] is None
     assert workspace.list_jobs()["total"] == 2
 
 
 def test_daily_schedule_avoids_double_run_during_fall_back():
-    schedule = {"kind": "daily", "at": "02:30", "timezone": "Europe/Zurich"}
+    schedule = {"kind": "daily", "times": ["02:30"], "timezone": "Europe/Zurich"}
     current = datetime(2026, 10, 25, 1, 45, tzinfo=timezone.utc)
     previous = "2026-10-25T00:30:00+00:00"
     assert next_due(schedule, previous, current).date().isoformat() == "2026-10-26"
@@ -384,17 +385,10 @@ def test_cancel_between_claim_and_collection_does_not_touch_source(case, monkeyp
     )
     service.queue_collection(source["id"])
     task = service.claim_task("test-worker")
-    original = service._source
-
-    def cancel_on_source_read(source_id):
-        result = original(source_id)
-        service.cancel_task(task["id"])
-        return result
-
-    monkeypatch.setattr(service, "_source", cancel_on_source_read)
+    service.cancel_task(task["id"])
     monkeypatch.setattr(module, "fetch_postings", lambda source: pytest.fail("Cancelled fetch"))
     service.run_task(task, "test-worker")
-    assert original(source["id"])["last_run_at"] is None
+    assert service.get_source(source["id"])["last_run_at"] is None
 
 
 def test_worker_restart_ignores_old_inflight_result(case, monkeypatch):

@@ -1,6 +1,6 @@
 {
   "format": "openings-operation-inventory-v1",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "status": "verified-logical-operation-map",
   "api_prefix": "/api/v1",
   "operations": [
@@ -420,12 +420,12 @@
         "sources_run"
       ],
       "dashboard": "Collection: Run now",
-      "notes": "Honors provider budgets. JobSpy queues one task per selected provider and returns task_ids."
+      "notes": "Requires current source version. Optional acquisition overrides freeze into this invocation without editing saved settings."
     },
     {
       "id": "sources.bulk",
       "group": "Collection and scoring",
-      "operation": "Enable/pause/run/delete selected sources",
+      "operation": "Enable, pause, run, configure or delete selected sources",
       "rest": [
         {
           "method": "POST",
@@ -1333,6 +1333,66 @@
       ],
       "dashboard": "Settings: change password",
       "notes": "Retains API tokens; cookie caller must log in again."
+    },
+    {
+      "id": "sources.schemas",
+      "group": "Collection",
+      "operation": "Discover source fields, defaults and collection options",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/sources/schemas"
+        }
+      ],
+      "mcp": [
+        "sources_schemas"
+      ],
+      "dashboard": "Collection: source fields and defaults"
+    },
+    {
+      "id": "collection.runs.list",
+      "group": "Collection",
+      "operation": "List logical collection invocations",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/collection/runs"
+        }
+      ],
+      "mcp": [
+        "collection_runs_list"
+      ],
+      "dashboard": "Collection: run history"
+    },
+    {
+      "id": "collection.runs.read",
+      "group": "Collection",
+      "operation": "Read frozen collection settings, progress and results",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/collection/runs/{run_id}"
+        }
+      ],
+      "mcp": [
+        "collection_runs_get"
+      ],
+      "dashboard": "Collection: source run details"
+    },
+    {
+      "id": "collection.runs.cancel",
+      "group": "Collection",
+      "operation": "Stop current collection work",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/collection/runs/{run_id}/cancel"
+        }
+      ],
+      "mcp": [
+        "collection_runs_cancel"
+      ],
+      "dashboard": "Collection: Stop current run"
     }
   ],
   "exceptions": [

@@ -1,19 +1,37 @@
 # Collector transport
 
-Collectors return normalized job records to the shared archive. Each saved search
-has one query/location; each company source has one explicit board/feed.
+Collectors emit normalized jobs through the shared ingestion service. A saved
+search has one query/location and selected portals; a company source has one
+supported ATS board or feed. Adapter-specific parsing stays inside the collector.
 
-Use `DiscoveryService.fetch_bytes` or an instance `ProviderBudget` for every public
-HTTP request, including previews, manual URL imports, redirects and detail pages.
-The gate validates public destinations, counts attempts and records responses.
-It shares persisted provider windows/cooldowns across runs and honors Retry-After.
-Long waits defer a task; cancellation and partial results remain visible.
+## HTTP and progress
 
-Do not bypass the gate with a new HTTP client, silently retry a blocked response,
-or turn challenge/error pages into successful empty searches. Keep listing/detail
-limits bounded and preserve already collected records when later requests fail.
+Use `DiscoveryService.fetch_bytes` or the supplied `ProviderBudget` for every
+public HTTP attempt, including previews, URL imports, redirects, listing pages
+and details. The persisted gate validates destinations, records responses and
+shares provider windows/cooldowns. A batch cap bounds worker work; rolling quotas
+remain shared when the next batch resumes. Long waits defer the task.
+
+`source['checkpoint']` contains durable pagination/detail state.
+`source['on_checkpoint'](state)` persists progress, while `source['on_item'](item)`
+ingests completed observations. Save enough progress to retry idempotently after
+quota waits or interruption. Mark the checkpoint complete only after the bounded
+listing/detail work is exhausted. Preserve successful records when a later
+request fails.
+
+Complete archived descriptions can be reused within the detail freshness window.
+Keep metadata collection separate from optional detail requests so known jobs do
+not spend the same detail budget repeatedly. Diagnostics should identify missing
+text, coverage caps and provider failures. Challenge/error pages must remain
+visible as failures.
+
+## JobSpy subset
 
 The attributed [JobSpy subset](../_vendor/jobspy/PROVENANCE.md) uses an explicit
-per-instance transport hook. Review that seam and the acquisition tests when
-upgrading it; no global client monkeypatch is used. See the
-[architecture guide](../../../docs/developer/architecture.md) for queue and service boundaries.
+per-instance transport hook. It carries resumable provider state and emits typed
+records without a dataframe dependency or global HTTP monkeypatch.
+
+When upgrading the subset, review its pinned source/notice, transport seam,
+pagination state and description reuse. Exercise a page → deferred batch → resume
+workflow and a bounded live request through the shared gate. See
+[Architecture](../../../docs/developer/architecture.md) for service boundaries.

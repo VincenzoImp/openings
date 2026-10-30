@@ -3,7 +3,8 @@
 Report vulnerabilities privately through
 [GitHub security advisories](https://github.com/VincenzoImp/openings/security/advisories/new).
 Do not include personal databases, API tokens or CVs in public issues.
-Openings 0.5.x is the supported release line.
+Security fixes target the latest published release. Upgrade to that release
+when reporting a problem.
 
 Openings is a single-owner workspace. Every owner session/API token can read and
 change career data, jobs and documents; tokens are not separate restricted roles.
