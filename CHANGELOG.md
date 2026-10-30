@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.2
+
+- Display structured compensation ranges and preserve existing salary text.
+- Keep scorer dependency layers reusable across version changes.
+
 ## 0.6.1
 
 - Remove manual fit assessments from the dashboard, REST and MCP.
