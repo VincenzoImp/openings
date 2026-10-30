@@ -320,7 +320,7 @@ def create_app(database=None, start_worker=True):
 
     def capabilities() -> dict:
         path = Path(__file__).with_name("operation-inventory.json")
-        return json.loads(path.read_text())
+        return {**json.loads(path.read_text()), "version": __version__}
 
     router.add_api_route("/capabilities", capabilities, methods=["GET"])
 
