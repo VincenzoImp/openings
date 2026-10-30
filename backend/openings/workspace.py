@@ -4,7 +4,7 @@ import hashlib
 import math
 import json
 import re
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import urlsplit
 
 from .common import (
     CONTEXT_BUILDER_VERSION,
@@ -25,44 +25,7 @@ from .models import (
     JobBulk,
 )
 from .posting import posting_complete, posting_complete_sql
-
-
-def normalize_url(url):
-    if not url:
-        return ""
-    p = urlsplit(url.strip())
-    query = [
-        (k, v)
-        for k, v in parse_qsl(p.query, keep_blank_values=True)
-        if not k.lower().startswith("utm_")
-        and k.lower() not in {"gclid", "fbclid", "ref", "source"}
-    ]
-    return urlunsplit(
-        (
-            p.scheme.lower(),
-            p.netloc.lower(),
-            p.path.rstrip("/") or "/",
-            urlencode(sorted(query)),
-            "",
-        )
-    )
-
-
-def posting_identity(url):
-    p = urlsplit(url)
-    parts = [s for s in p.path.split("/") if s]
-    host = (p.hostname or "").lower()
-    if (
-        host in {"boards.greenhouse.io", "job-boards.greenhouse.io"}
-        and len(parts) >= 3
-        and parts[1] == "jobs"
-    ):
-        return f"greenhouse:{parts[0]}:{parts[2]}"
-    if host in {"jobs.lever.co", "jobs.eu.lever.co"} and len(parts) >= 2:
-        return f"lever:{parts[0]}:{parts[1]}"
-    if host == "jobs.ashbyhq.com" and len(parts) >= 2:
-        return f"ashby:{parts[0]}:{parts[1]}"
-    return "url:" + normalize_url(url) if url else None
+from .identities import job_identities, normalize_url
 
 
 class Workspace:
@@ -382,20 +345,26 @@ class Workspace:
         if not value.url and not value.posting.strip():
             raise DomainError(422, "job_content", "Provide a job URL or posting text.")
         url = normalize_url(value.url)
-        identity = posting_identity(url) or value.source_key or "manual:" + new_id()
-        if value.source_key and not url:
-            identity = value.source_key
+        aliases = job_identities(url, value.source_key)
+        identity = aliases[0] if aliases else "manual:" + new_id()
         title = value.title.strip() or "Untitled opportunity"
         company = value.company.strip() or (urlsplit(url).hostname or "Unknown company")
         data.update(title=title, company=company, url=url)
         changed = False
         with self.db.transaction() as c:
-            prior = c.execute(
-                "SELECT jobs.* FROM postings JOIN jobs ON jobs.id=postings.job_id WHERE postings.identity=? OR (?<>'' AND postings.url=?) LIMIT 1",
-                (identity, url, url),
-            ).fetchone()
-            if prior is None and url:
-                prior = c.execute("SELECT * FROM jobs WHERE url=?", (url,)).fetchone()
+            placeholders = ",".join("?" for _ in aliases) or "NULL"
+            matches = c.execute(
+                f"SELECT DISTINCT jobs.* FROM jobs JOIN job_identities i ON i.job_id=jobs.id WHERE i.identity IN ({placeholders})",
+                aliases,
+            ).fetchall()
+            if len(matches) > 1:
+                raise DomainError(
+                    409,
+                    "identity_conflict",
+                    "These exact identities belong to different jobs. Merge the verified duplicates before importing this posting.",
+                    {"job_ids": sorted(row["id"] for row in matches)},
+                )
+            prior = matches[0] if matches else None
             job_id = prior["id"] if prior else new_id()
             stamp = now()
             if prior is None:
@@ -441,21 +410,37 @@ class Workspace:
                     )
                     self.event("posting_updated", job_id, payload={"fields": list(updates)}, conn=c)
                     changed = True
-            content_hash = hashlib.sha256(encode(data).encode()).hexdigest()
-            c.execute(
-                "INSERT INTO postings(id,job_id,source_id,identity,url,payload,content_hash,first_seen_at,last_seen_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(identity) DO UPDATE SET last_seen_at=excluded.last_seen_at,payload=excluded.payload,content_hash=excluded.content_hash",
-                (
-                    new_id(),
-                    job_id,
-                    value.source_id,
-                    identity,
-                    url,
-                    encode(data),
-                    content_hash,
-                    stamp,
-                    stamp,
-                ),
+            c.executemany(
+                "INSERT OR IGNORE INTO job_identities(identity,job_id) VALUES(?,?)",
+                [(key, job_id) for key in aliases],
             )
+            # Identity aliases contain no posting bodies. Update the observation
+            # already matching this exact posting rather than cloning its raw data.
+            observation = c.execute(
+                "SELECT id FROM postings WHERE job_id=? AND (identity=? OR (?<>'' AND url=?) OR (? IS NOT NULL AND json_extract(payload,'$.source_key')=?)) ORDER BY first_seen_at,id LIMIT 1",
+                (job_id, identity, url, url, value.source_key, value.source_key),
+            ).fetchone()
+            content_hash = hashlib.sha256(encode(data).encode()).hexdigest()
+            if observation:
+                c.execute(
+                    "UPDATE postings SET source_id=coalesce(source_id,?),url=?,payload=?,content_hash=?,last_seen_at=? WHERE id=?",
+                    (value.source_id, url, encode(data), content_hash, stamp, observation["id"]),
+                )
+            else:
+                c.execute(
+                    "INSERT INTO postings(id,job_id,source_id,identity,url,payload,content_hash,first_seen_at,last_seen_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (
+                        new_id(),
+                        job_id,
+                        value.source_id,
+                        identity,
+                        url,
+                        encode(data),
+                        content_hash,
+                        stamp,
+                        stamp,
+                    ),
+                )
         result = self.get_job(job_id)
         result["created"] = prior is None
         if changed and self.discovery is not None:
@@ -477,6 +462,22 @@ class Workspace:
                 if previous != val:
                     actual[key] = encode(val) if key == "metadata" else val
                     overrides[key] = True
+            if "url" in actual:
+                aliases = job_identities(actual["url"])
+                if (
+                    aliases
+                    and c.execute(
+                        "SELECT 1 FROM job_identities WHERE job_id<>? AND identity IN ("
+                        + ",".join("?" for _ in aliases)
+                        + ") LIMIT 1",
+                        (job_id, *aliases),
+                    ).fetchone()
+                ):
+                    raise DomainError(
+                        409,
+                        "identity_conflict",
+                        "This URL belongs to another archived job. Merge the verified duplicates before changing the URL.",
+                    )
             if actual:
                 material = any(
                     k in actual for k in ("title", "company", "location", "posting", "metadata")
@@ -487,6 +488,11 @@ class Workspace:
                     + ",overrides=?,version=version+1,content_version=content_version+?,updated_at=? WHERE id=?",
                     (*actual.values(), encode(overrides), int(material), now(), job_id),
                 )
+                if "url" in actual:
+                    c.executemany(
+                        "INSERT OR IGNORE INTO job_identities(identity,job_id) VALUES(?,?)",
+                        [(key, job_id) for key in job_identities(actual["url"])],
+                    )
                 self.event("job_edited", job_id, payload={"fields": list(actual)}, conn=c)
         if actual and self.discovery:
             self.discovery.enqueue_job(job_id, automatic_update=True)
@@ -544,6 +550,12 @@ class Workspace:
                 "UPDATE transfer_grants SET payload=json_set(payload,'$.job_id',?,'$.owner_id',CASE WHEN json_extract(payload,'$.owner_type')='job' THEN ? ELSE json_extract(payload,'$.owner_id') END) WHERE json_extract(payload,'$.job_id')=?",
                 (target_id, target_id, source_id),
             )
+            c.execute(
+                "INSERT OR IGNORE INTO job_identities(identity,job_id) SELECT identity,? FROM job_identities WHERE job_id=?",
+                (target_id, source_id),
+            )
+            c.execute("DELETE FROM job_identities WHERE job_id=?", (source_id,))
+            c.execute("UPDATE posting_details SET job_id=? WHERE job_id=?", (target_id, source_id))
             for table in ("postings", "applications", "events", "notes", "assessments", "tasks"):
                 c.execute(f"UPDATE {table} SET job_id=? WHERE job_id=?", (target_id, source_id))
             c.execute("UPDATE files SET job_id=? WHERE job_id=?", (target_id, source_id))

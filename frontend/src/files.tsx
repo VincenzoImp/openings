@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   api,
   date,
@@ -16,22 +16,39 @@ export function FileManager({
   immutable = false,
   preview = false,
   readOnly = false,
+  files,
 }: {
   ownerType: string;
   ownerId: string;
   immutable?: boolean;
   preview?: boolean;
   readOnly?: boolean;
+  files?: WorkspaceFile[];
 }) {
   const [query, setQuery] = useState(""),
     [offset, setOffset] = useState(0),
     [inspecting, setInspecting] = useState<WorkspaceFile | null>(null);
   const [mediaType, setMediaType] = useState("");
   const debounced = useDebounce(query);
-  const { data, error, reload } = useResource<ListResult<WorkspaceFile>>(
-    `/files?owner_type=${ownerType}&owner_id=${ownerId}&limit=20&offset=${offset}&q=${encodeURIComponent(debounced)}${mediaType ? `&media_type=${encodeURIComponent(mediaType)}` : ""}`,
+  const resource = useResource<ListResult<WorkspaceFile>>(
+    files
+      ? null
+      : `/files?owner_type=${ownerType}&owner_id=${ownerId}&limit=20&offset=${offset}&q=${encodeURIComponent(debounced)}${mediaType ? `&media_type=${encodeURIComponent(mediaType)}` : ""}`,
     { items: [], total: 0 },
   );
+  const data = useMemo(() => {
+    if (!files) return resource.data;
+    const matching = files.filter(
+      (file) =>
+        file.name.toLowerCase().includes(debounced.toLowerCase()) &&
+        (!mediaType || file.media_type === mediaType),
+    );
+    return {
+      items: matching.slice(offset, offset + 20),
+      total: matching.length,
+    };
+  }, [files, debounced, mediaType, offset, resource.data]);
+  const { error, reload } = resource;
   const { mutate, pending, notify } = useWorkspace();
   const [pdf, setPdf] = useState<string | null>(null);
   useEffect(() => {
@@ -141,7 +158,7 @@ export function FileManager({
           </div>
         ))}
       </div>
-      {data.total > 20 && (
+      {(data.total > 20 || offset > 0) && (
         <Pagination
           offset={offset}
           total={data.total}

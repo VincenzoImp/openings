@@ -4,6 +4,7 @@ import {
   useEffect,
   useId,
   useRef,
+  useState,
   type ReactNode,
   type ButtonHTMLAttributes,
 } from "react";
@@ -270,6 +271,26 @@ export function Loading() {
       <span className="spinner" />
       Loading workspace…
     </div>
+  );
+}
+export function LazyDetails({
+  summary,
+  className,
+  children,
+}: {
+  summary: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details
+      className={className}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary>{summary}</summary>
+      {open && children}
+    </details>
   );
 }
 export function Score({

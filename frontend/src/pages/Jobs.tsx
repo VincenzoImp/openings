@@ -13,6 +13,7 @@ import {
 } from "../api";
 import {
   confirmLeave,
+  selectRecords,
   useDebounce,
   useResource,
   useUrlFilters,
@@ -407,15 +408,13 @@ export function JobsPage({
                   (j) => selection[j.id] !== undefined,
                 )}
                 onChange={(e) =>
-                  setSelection((current) => {
-                    const next = { ...current };
-                    resource.data.items.forEach((j) => {
-                      if (e.target.checked && Object.keys(next).length < 200)
-                        next[j.id] = j.version;
-                      else delete next[j.id];
-                    });
-                    return next;
-                  })
+                  setSelection((current) =>
+                    selectRecords(
+                      current,
+                      resource.data.items,
+                      e.target.checked,
+                    ),
+                  )
                 }
               />
               Select this page
@@ -439,12 +438,9 @@ export function JobsPage({
                   selection[job.id] === undefined && selected.length >= 200
                 }
                 onChange={(e) =>
-                  setSelection((current) => {
-                    const next = { ...current };
-                    if (e.target.checked) next[job.id] = job.version;
-                    else delete next[job.id];
-                    return next;
-                  })
+                  setSelection((current) =>
+                    selectRecords(current, [job], e.target.checked),
+                  )
                 }
               />
               <button className="jobmain" onClick={() => onOpen(job.id)}>
@@ -572,6 +568,11 @@ export function JobDrawer({
   const [forget, setForget] = useState(false),
     [merging, setMerging] = useState(false);
   const job = resource.data;
+  const scoringResponse = job?.assessment?.payload?.response;
+  const inputShortened =
+    scoringResponse?.input_preparation?.shortened ||
+    scoringResponse?.usage?.truncated ||
+    (scoringResponse?.usage?.state_tokens_dropped || 0) > 0;
   const applications = useResource<ListResult<Application>>(
     job && tab === "notes"
       ? `/applications?company=${encodeURIComponent(job.company)}&limit=200`
@@ -588,6 +589,7 @@ export function JobDrawer({
       );
   }
   async function createApplication() {
+    if (!confirmLeave()) return;
     let app: Application | undefined;
     const ok = await mutate(async () => {
       app = await api<Application>("/applications", "POST", { job_id: id });
@@ -704,6 +706,14 @@ export function JobDrawer({
                     <dt>Fit assessment</dt>
                     <dd>
                       <Score score={job.score} outdated={job.score_outdated} />
+                      {inputShortened && (
+                        <span
+                          className="tag amber"
+                          title="The scoring service shortened the input for this assessment."
+                        >
+                          Input shortened
+                        </span>
+                      )}
                     </dd>
                   </div>
                   <div>
@@ -877,7 +887,7 @@ export function JobDrawer({
             ) : tab === "files" ? (
               <FileManager ownerType="job" ownerId={id} preview />
             ) : (
-              <form onSubmit={edit} key={job.id}>
+              <form onSubmit={edit} key={`${job.id}-${job.version}`}>
                 <div className="stack">
                   <Field label="Role">
                     <input name="title" defaultValue={job.title} required />

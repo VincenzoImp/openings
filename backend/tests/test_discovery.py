@@ -296,13 +296,12 @@ def test_daily_schedule_avoids_double_run_during_fall_back():
 @pytest.mark.parametrize(
     "payload, code",
     [
-        ({"usage": {"truncated": True}}, "context_too_long"),
         ({"usage": ["invalid"]}, "scorer_format"),
         ({"answers": ["invalid"]}, "scorer_format"),
         ({"answers": {"fit": {"type": "score", "score": True}}}, "scorer_format"),
     ],
 )
-def test_score_protocol_rejects_truncation_and_malformed_results(monkeypatch, payload, code):
+def test_score_protocol_rejects_malformed_results(monkeypatch, payload, code):
     original = httpx.Client
 
     def transport(request):
@@ -326,6 +325,56 @@ def test_score_protocol_rejects_truncation_and_malformed_results(monkeypatch, pa
             {"base_url": "https://model.example", "provider": "systemone"}, {"job": "synthetic"}
         )
     assert caught.value.code == code
+
+
+@pytest.mark.parametrize("include_preparation", [False, True])
+def test_score_protocol_accepts_state_clipping_and_optional_preparation(
+    monkeypatch, include_preparation
+):
+    original = httpx.Client
+    preparation = {"version": 1, "state": "Candidate\nJob\nPosting prefix", "shortened": True}
+
+    def transport(request):
+        return httpx.Response(
+            200,
+            json={
+                "model": "synthetic",
+                "answers": {"fit": {"type": "score", "score": 3}},
+                "usage": {
+                    "truncated": True,
+                    "state_tokens_dropped": 20,
+                    "truncated_questions": ["fit"],
+                },
+                **({"input_preparation": preparation} if include_preparation else {}),
+            },
+        )
+
+    monkeypatch.setattr(
+        module.httpx,
+        "Client",
+        lambda **kwargs: original(transport=httpx.MockTransport(transport), **kwargs),
+    )
+    result = score_call(
+        {"base_url": "https://model.example", "provider": "systemone"}, {"job": "synthetic"}
+    )
+    assert result["score"] == 75
+    if include_preparation:
+        assert result["response"]["input_preparation"] == preparation
+    else:
+        assert "input_preparation" not in result["response"]
+    assert result["request"]["state"] == {"job": "synthetic"}
+
+
+def test_score_protocol_reports_oversized_question_configuration(monkeypatch):
+    original = httpx.Client
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(422, json={"detail": {"code": "question_too_long"}})
+    )
+    monkeypatch.setattr(module.httpx, "Client", lambda **kwargs: original(transport=transport))
+    with pytest.raises(DomainError) as caught:
+        score_call({"base_url": "https://model.example"}, {"job": "synthetic"})
+    assert caught.value.code == "scoring_question_too_long"
+    assert "rubric or criteria" in caught.value.message
 
 
 def test_cancel_between_claim_and_collection_does_not_touch_source(case, monkeypatch):

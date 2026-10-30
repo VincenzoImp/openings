@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .common import now, encode
 from .errors import DomainError
+from .db import SCHEMA_VERSION
 
 
 def preserve_request_windows(restored, current):
@@ -39,7 +40,7 @@ def preserve_request_windows(restored, current):
 
 def restore_database(workspace, source_path):
     with sqlite3.connect(source_path) as source:
-        if source.execute("PRAGMA user_version").fetchone()[0] != 1:
+        if source.execute("PRAGMA user_version").fetchone()[0] != SCHEMA_VERSION:
             raise DomainError(
                 422, "backup_version", "Select a database backup from this Openings schema."
             )

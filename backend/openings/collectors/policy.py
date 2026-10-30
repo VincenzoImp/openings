@@ -11,7 +11,7 @@ import json
 import time
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -71,6 +71,40 @@ PROVIDERS = {
         "Unsupported: usable job data was unavailable in the verified JobSpy provider.",
     ),
 }
+
+
+def provider_for_url(value: str) -> str:
+    """Choose the same provider gate for a known public board/posting host."""
+    host = (urlsplit(value).hostname or "").lower()
+    suffixes = {
+        "linkedin.com": "linkedin",
+        "indeed.com": "indeed",
+        "glassdoor.com": "glassdoor",
+        "greenhouse.io": "greenhouse",
+        "lever.co": "lever",
+        "ashbyhq.com": "ashby",
+        "recruitee.com": "recruitee",
+        "jobs.personio.de": "personio",
+        "workable.com": "workable",
+        "breezy.hr": "breezy",
+        "bamboohr.com": "bamboohr",
+        "smartrecruiters.com": "smartrecruiters",
+        "rippling.com": "rippling",
+        "myworkdayjobs.com": "workday",
+        "oraclecloud.com": "oracle",
+        "join.com": "joincom",
+        "jobs.ch": "jobcloud",
+        "jobup.ch": "jobcloud",
+        "adzuna.com": "adzuna",
+    }
+    return next(
+        (
+            provider
+            for suffix, provider in suffixes.items()
+            if host == suffix or host.endswith("." + suffix)
+        ),
+        "manual",
+    )
 
 
 class ProviderPolicy(BaseModel):
@@ -246,6 +280,18 @@ class ProviderBudget:
 
     def before(self, method, url):
         self._check_active()
+        target_provider = provider_for_url(url)
+        if target_provider not in ("manual", self.provider):
+            raise DomainError(
+                422,
+                "provider_redirect",
+                f"This URL targets another provider: {url}. Import that destination URL directly so its provider policy is applied.",
+                {
+                    "provider": self.provider,
+                    "destination_provider": target_provider,
+                    "destination_url": url,
+                },
+            )
         if self.blocked is not None:
             raise self.blocked
         started = time.monotonic()

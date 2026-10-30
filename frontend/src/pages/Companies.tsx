@@ -9,7 +9,15 @@ import {
   type ListResult,
   type Source,
 } from "../api";
-import { confirmLeave, useResource, useUrlState, useWorkspace } from "../state";
+import {
+  confirmLeave,
+  selectRecords,
+  useDebounce,
+  useResource,
+  useUrlFilters,
+  useUrlState,
+  useWorkspace,
+} from "../state";
 import {
   AdvancedJson,
   Button,
@@ -20,6 +28,7 @@ import {
   Heading,
   Icon,
   Loading,
+  Pagination,
   Switch,
   Tabs,
 } from "../ui";
@@ -93,14 +102,38 @@ export default function CompaniesPage() {
     true,
   );
   const [tab, setTab] = useUrlState("section", "searches");
+  const [filters, setFilters] = useUrlFilters({ q: "", offset: "0" });
+  const query = useDebounce(filters.q).trim().toLowerCase();
   const [editing, setEditing] = useState<Source | "new" | null>(null),
-    [selected, setSelected] = useState<string[]>([]),
+    [selection, setSelection] = useState<Record<string, number>>({}),
     [confirmDelete, setConfirmDelete] = useState<Source[] | null>(null);
   const { mutate, pending, notify } = useWorkspace();
-  const rows = resource.data.items.filter(
-    (s) => (tab === "searches") === (s.kind === "jobspy"),
+  const matches = resource.data.items.filter(
+    (s) =>
+      (tab === "searches") === (s.kind === "jobspy") &&
+      (!query ||
+        [
+          s.name,
+          s.kind,
+          s.url,
+          s.config.query,
+          s.config.location,
+          s.config.board,
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(query)),
   );
-  const chosen = rows.filter((s) => selected.includes(s.id));
+  const limit = 30;
+  const offset = Math.min(
+    Math.max(0, Number(filters.offset) || 0),
+    Math.max(0, Math.ceil(matches.length / limit) - 1) * limit,
+  );
+  const rows = matches.slice(offset, offset + limit);
+  const selected = Object.keys(selection);
+  const chosen = resource.data.items
+    .filter((s) => selection[s.id] !== undefined)
+    .map((s) => ({ ...s, version: selection[s.id] }));
   async function batch(action: string, items = chosen) {
     let result:
       | {
@@ -119,7 +152,7 @@ export default function CompaniesPage() {
       `Source ${action === "run" ? "runs queued" : action === "delete" ? "removed" : action === "enable" ? "enabled" : "paused"}.`,
     );
     if (ok) {
-      setSelected([]);
+      setSelection({});
       setConfirmDelete(null);
       if (result?.failed)
         notify(
@@ -147,7 +180,8 @@ export default function CompaniesPage() {
         value={tab}
         onChange={(id) => {
           setTab(id);
-          setSelected([]);
+          setFilters({ offset: "0" });
+          setSelection({});
         }}
         items={[
           {
@@ -169,16 +203,34 @@ export default function CompaniesPage() {
           ? "Search only the keywords and locations you choose, on your selected job boards. Each saved search has its own schedule."
           : "Monitor the companies and feeds you choose. Optional title and location filters narrow their listings."}
       </p>
+      <div className="toolbar">
+        <div className="search">
+          <Icon name="search" />
+          <input
+            aria-label="Search collection sources"
+            placeholder="Find a search, company or feed"
+            value={filters.q}
+            onChange={(event) =>
+              setFilters({ q: event.target.value, offset: "0" })
+            }
+          />
+        </div>
+      </div>
       <div className="collection-caption">
         <label className="checkline">
           <input
             type="checkbox"
-            checked={!!rows.length && chosen.length === rows.length}
+            checked={
+              !!rows.length && rows.every((s) => selection[s.id] !== undefined)
+            }
+            disabled={!rows.length}
             onChange={(e) =>
-              setSelected(e.target.checked ? rows.map((s) => s.id) : [])
+              setSelection((current) =>
+                selectRecords(current, rows, e.target.checked),
+              )
             }
           />
-          Select {rows.length} {tab === "searches" ? "searches" : "sources"}
+          Select this page
         </label>
         <a href="#settings?section=collection" className="textbutton">
           Provider budgets & cooldowns <Icon name="arrow" />
@@ -186,7 +238,7 @@ export default function CompaniesPage() {
       </div>
       {chosen.length > 0 && (
         <div className="bulkbar" role="region" aria-label="Selected sources">
-          <strong>{chosen.length} selected</strong>
+          <strong>{chosen.length} selected across pages</strong>
           {["enable", "pause", "run"].map((action) => (
             <Button
               key={action}
@@ -203,6 +255,9 @@ export default function CompaniesPage() {
           <Button variant="danger" onClick={() => setConfirmDelete(chosen)}>
             Remove
           </Button>
+          <button className="textbutton" onClick={() => setSelection({})}>
+            Clear selection
+          </button>
         </div>
       )}
       {resource.error && (
@@ -218,12 +273,13 @@ export default function CompaniesPage() {
                 <input
                   type="checkbox"
                   aria-label={`Select ${source.name}`}
-                  checked={selected.includes(source.id)}
+                  checked={selection[source.id] !== undefined}
+                  disabled={
+                    selection[source.id] === undefined && selected.length >= 200
+                  }
                   onChange={(e) =>
-                    setSelected((ids) =>
-                      e.target.checked
-                        ? [...ids, source.id]
-                        : ids.filter((id) => id !== source.id),
+                    setSelection((current) =>
+                      selectRecords(current, [source], e.target.checked),
                     )
                   }
                 />
@@ -311,6 +367,16 @@ export default function CompaniesPage() {
                   {source.last_error}
                 </p>
               )}
+              {[
+                ...new Set(
+                  source.last_diagnostics?.flatMap((d) => d.warnings || []) ||
+                    [],
+                ),
+              ].map((warning) => (
+                <p className="hint" key={warning}>
+                  {warning}
+                </p>
+              ))}
               <div className="companyfoot">
                 <Button
                   className="small"
@@ -347,25 +413,45 @@ export default function CompaniesPage() {
           <section className="card full-grid">
             <Empty
               title={
-                tab === "searches"
-                  ? "Your next role starts with a focused search."
-                  : "Follow a team you would like to join."
+                query
+                  ? "No sources match this search."
+                  : tab === "searches"
+                    ? "Your next role starts with a focused search."
+                    : "Follow a team you would like to join."
               }
               action={
-                <Button icon="plus" onClick={() => setEditing("new")}>
-                  {tab === "searches"
-                    ? "Save your first search"
-                    : "Add your first company"}
-                </Button>
+                query ? (
+                  <Button onClick={() => setFilters({ q: "", offset: "0" })}>
+                    Clear search
+                  </Button>
+                ) : (
+                  <Button icon="plus" onClick={() => setEditing("new")}>
+                    {tab === "searches"
+                      ? "Save your first search"
+                      : "Add your first company"}
+                  </Button>
+                )
               }
             >
-              {tab === "searches"
-                ? "Choose one query and location, select providers, then preview or save it for later collection."
-                : "Paste a company board or RSS URL and choose a collection schedule."}
+              {query
+                ? "Try another name, query, location or board."
+                : tab === "searches"
+                  ? "Choose one query and location, select providers, then preview or save it for later collection."
+                  : "Paste a company board or RSS URL and choose a collection schedule."}
             </Empty>
           </section>
         )}
       </div>
+      <Pagination
+        offset={offset}
+        total={matches.length}
+        limit={limit}
+        onChange={(offset) => setFilters({ offset: String(offset) })}
+      />
+      <p className="hint">
+        Up to 200 selected sources per action. Selections are kept while you
+        search or change pages.
+      </p>
       {editing && (
         <SourceEditor
           key={editing === "new" ? `new-${tab}` : editing.id}

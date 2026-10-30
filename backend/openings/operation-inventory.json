@@ -1,6 +1,6 @@
 {
   "format": "openings-operation-inventory-v1",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "status": "verified-logical-operation-map",
   "api_prefix": "/api/v1",
   "operations": [
@@ -1113,7 +1113,7 @@
         "documents_review"
       ],
       "dashboard": "Applications: Approve revision",
-      "notes": "expected_review_state detects concurrent review changes. Approval blocks all further file uploads."
+      "notes": "Required expected_version detects concurrent file/review changes. Approval blocks all further file uploads."
     },
     {
       "id": "documents.delete",

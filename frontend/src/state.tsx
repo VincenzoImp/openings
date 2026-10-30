@@ -114,6 +114,20 @@ export function useWorkspace() {
   if (!value) throw Error("Missing workspace provider");
   return value;
 }
+export function selectRecords(
+  current: Record<string, number>,
+  records: { id: string; version: number }[],
+  selected: boolean,
+  limit = 200,
+) {
+  const next = { ...current };
+  for (const record of records) {
+    if (!selected) delete next[record.id];
+    else if (next[record.id] === undefined && Object.keys(next).length < limit)
+      next[record.id] = record.version;
+  }
+  return next;
+}
 async function readResource<T>(
   path: string,
   signal: AbortSignal,
@@ -165,11 +179,13 @@ export function useResource<T>(
   const previousPath = useRef(path);
   const [data, setData] = useState(initial),
     [loading, setLoading] = useState(Boolean(path)),
+    [refreshing, setRefreshing] = useState(Boolean(path)),
     [error, setError] = useState<string | null>(null),
     [local, setLocal] = useState(0);
   useEffect(() => {
     if (!path) {
       setLoading(false);
+      setRefreshing(false);
       return;
     }
     if (previousPath.current !== path) {
@@ -177,10 +193,13 @@ export function useResource<T>(
       loaded.current = false;
     }
     const abort = new AbortController();
+    setRefreshing(true);
     if (!loaded.current) setLoading(true);
     setError(null);
     readResource<T>(path, abort.signal, allPages)
       .then((value) => {
+        // Keep dirty values with the version they were edited against. Clean
+        // editors remount on an accepted record version to replace all fields.
         if (!loaded.current || !hasDirtyForms()) setData(value);
         loaded.current = true;
       })
@@ -191,13 +210,17 @@ export function useResource<T>(
           );
       })
       .finally(() => {
-        if (!abort.signal.aborted) setLoading(false);
+        if (!abort.signal.aborted) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       });
     return () => abort.abort();
   }, [path, revision, local, allPages, changed]);
   return {
     data,
     loading,
+    refreshing,
     error,
     reload: () => setLocal((n) => n + 1),
     setData,
@@ -214,6 +237,7 @@ function affected(read: string, changed: string) {
     return ["jobs", "applications", "scoring", "sources"].includes(b);
   if (a === "jobs") return ["scoring", "notes"].includes(b);
   if (a === "applications") return ["contexts", "documents"].includes(b);
+  if (a === "documents") return b === "files";
   if (
     a === "sources" ||
     a === "providers" ||

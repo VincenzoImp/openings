@@ -13,10 +13,14 @@ In Openings, use provider `laya`, served model `english` and URL
 The service exposes `POST /v1/systemone`, the text/JSON score subset Openings uses;
 an arbitrary OpenAI chat endpoint is not compatible.
 
-The default context is 2048 tokens. Truncated inputs are rejected rather than
-silently presented as a complete assessment. Dependency versions are locked in
-`constraints.txt`; the image installs its separately pinned CPU PyTorch wheel
-from the official PyTorch index.
+The default context is 2048 tokens, including the rubric and score levels. The
+service uses the checkpoint tokenizer to reserve that question, bound candidate
+and job details, and keep the posting prefix that fits. It returns preparation
+metadata and the prepared text when handling an Openings context. Original archived
+postings are unaffected. Oversized rubrics or levels return a configuration error.
+
+Dependency versions are locked in `constraints.txt`; the image installs its
+separately pinned CPU PyTorch wheel from the official PyTorch index.
 
 ## Configuration
 

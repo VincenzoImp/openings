@@ -4,7 +4,7 @@ from uuid import uuid4
 from .db import decode_record, encode
 from .errors import DomainError, conflict, missing
 
-CONTEXT_BUILDER_VERSION = 2
+CONTEXT_BUILDER_VERSION = 3
 
 
 def assessment_context_version_sql(alias="a"):

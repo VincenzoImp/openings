@@ -211,7 +211,9 @@ def test_document_revisions_validate_evidence_and_never_inherit_old_pdf(workspac
     )
     data = b"%PDF-1.4\nSynthetic storage fixture"
     pdf, _ = upload(documents, client, "document", first["id"], "cv.pdf", data, "application/pdf")
-    documents.review_document(first["id"], ReviewUpdate())
+    documents.review_document(
+        first["id"], ReviewUpdate(expected_version=documents.get_document(first["id"])["version"])
+    )
     with pytest.raises(DomainError):
         documents.reserve_upload(
             UploadReservation(
@@ -323,7 +325,9 @@ def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_
         )
     )
     asset, _ = upload(documents, client, "document", first["id"], "candidate.tex", b"source")
-    documents.review_document(first["id"], ReviewUpdate(expected_review_state="draft"))
+    documents.review_document(
+        first["id"], ReviewUpdate(expected_version=documents.get_document(first["id"])["version"])
+    )
     previous = first
     for number in range(25):
         previous = documents.create_document(

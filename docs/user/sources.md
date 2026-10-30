@@ -6,6 +6,7 @@ Preview a source, review the results/diagnostics, then enable its interval or da
 schedule with an IANA timezone. Run now queues work for an individually paused
 source; it still respects provider policy. Bulk controls enable, pause, run or delete
 selected sources. Deleting a source retains its archived jobs.
+Search and page the source list; bulk selection is limited to 200 sources.
 
 ## Source criteria
 
@@ -60,6 +61,11 @@ and RSS/Atom. Paste a board/feed URL, preview and correct the typed configuratio
 if necessary. Some platforms use undocumented public endpoints that can change.
 Breezy/snippet-only results can remain incomplete. Missing RSS locations stay unknown.
 An error or blocked page is reported rather than treated as an empty successful search.
+Detail requests respect each source's cap. Complete cached details become eligible
+for refresh after 24 hours; older unchecked entries are considered first. Greenhouse
+lists job metadata before requesting descriptions for matching roles.
+Listing and result caps can leave additional matches unseen. Source cards and task
+diagnostics report when a cap is reached.
 
 ## Provider safeguards and tasks
 
@@ -69,6 +75,8 @@ scheduled sources, redirects and supported vendor detail requests. Configure ena
 state, minimum spacing and hourly/daily/per-run caps. Retry-After seconds/date causes
 a durable cooldown; restart, pause and older-backup restore do not reset recent usage.
 Deferred tasks release the collection lane rather than sleeping for long periods.
+Cross-provider redirects are rejected with the destination URL. Use that URL
+directly so the request is checked against the correct provider policy.
 
 The global automatic collection switch preserves individual settings. It stops
 scheduled acquisition while explicit manual work remains available under the same

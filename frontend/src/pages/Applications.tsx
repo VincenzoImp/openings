@@ -38,10 +38,70 @@ import {
   Heading,
   Icon,
   Loading,
+  LazyDetails,
   stageLabels,
   Tabs,
 } from "../ui";
 const stages: Stage[] = ["draft", "applied", "interview", "offer", "closed"];
+function useApplicationProgress() {
+  const { mutate, pending } = useWorkspace();
+  const [closing, setClosing] = useState<Application | null>(null);
+  const [outcome, setOutcome] = useState("");
+  async function save(
+    application: Application,
+    status: Stage,
+    result: string | null = null,
+  ) {
+    if (!confirmLeave()) return false;
+    return mutate(
+      () =>
+        api(
+          `/applications/${application.id}`,
+          "PATCH",
+          version(application, { status, outcome: result }),
+        ),
+      `Moved to ${stageLabels[status]}.`,
+    );
+  }
+  async function move(application: Application, status: Stage) {
+    if (application.status === status) return;
+    if (status === "closed") {
+      setOutcome("");
+      setClosing(application);
+    } else await save(application, status);
+  }
+  const dialog = closing && (
+    <Dialog title="Close this application?" onClose={() => setClosing(null)}>
+      <p className="modal-intro">
+        Record the outcome of this application attempt.
+      </p>
+      <Field label="Outcome">
+        <select
+          value={outcome}
+          onChange={(event) => setOutcome(event.target.value)}
+        >
+          <option value="">Choose an outcome</option>
+          <option value="accepted">Accepted</option>
+          <option value="rejected">Not selected</option>
+          <option value="not_pursued">Not pursued</option>
+        </select>
+      </Field>
+      <div className="actions form-actions">
+        <Button onClick={() => setClosing(null)}>Keep application open</Button>
+        <Button
+          variant="primary"
+          disabled={pending || !outcome}
+          onClick={async () => {
+            if (await save(closing, "closed", outcome)) setClosing(null);
+          }}
+        >
+          Save outcome
+        </Button>
+      </div>
+    </Dialog>
+  );
+  return { move, dialog };
+}
 function StageMenu({
   application,
   pending,
@@ -127,23 +187,12 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
     `/applications?${params}`,
     { items: [], total: 0 },
   );
-  const { mutate, pending } = useWorkspace();
+  const { pending } = useWorkspace();
+  const progress = useApplicationProgress();
   const [dragged, setDragged] = useState<string | null>(null);
   async function move(id: string, status: Stage) {
     const app = resource.data.items.find((a) => a.id === id);
-    if (app && app.status !== status)
-      await mutate(
-        () =>
-          api(
-            `/applications/${id}`,
-            "PATCH",
-            version(app, {
-              status,
-              outcome: status === "closed" ? "not_pursued" : null,
-            }),
-          ),
-        `Moved to ${stageLabels[status]}.`,
-      );
+    if (app) await progress.move(app, status);
   }
   return (
     <>
@@ -372,6 +421,7 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
         Column totals include every matching attempt across pages. Record stage
         changes when they happen.
       </p>
+      {progress.dialog}
     </>
   );
 }
@@ -638,6 +688,7 @@ function DocumentCard({
             <FileManager
               ownerType="document"
               ownerId={document.id}
+              files={document.files}
               immutable
               preview
               readOnly={document.review_state === "approved"}
@@ -657,13 +708,13 @@ function DocumentCard({
                 <Button
                   variant="primary"
                   icon="check"
-                  disabled={pending}
+                  disabled={pending || detail.refreshing || !!detail.error}
                   onClick={() =>
                     mutate(
                       () =>
                         api(`/documents/${document.id}/review`, "POST", {
                           review_state: "approved",
-                          expected_review_state: document.review_state,
+                          expected_version: document.version,
                         }),
                       "Document approved.",
                     )
@@ -743,6 +794,7 @@ export function ApplicationDrawer({
       true,
     );
   const { mutate, pending, notify } = useWorkspace();
+  const progress = useApplicationProgress();
   const [tab, setTab] = useUrlState("detail", "documents");
   const [add, setAdd] = useState(false),
     [contextOpen, setContextOpen] = useState(false),
@@ -754,20 +806,7 @@ export function ApplicationDrawer({
   );
   const app = resource.data;
   async function stage(status: Stage) {
-    if (!confirmLeave()) return;
-    if (app)
-      await mutate(
-        () =>
-          api(
-            `/applications/${id}`,
-            "PATCH",
-            version(app, {
-              status,
-              outcome: status === "closed" ? "not_pursued" : null,
-            }),
-          ),
-        "Application progress saved.",
-      );
+    if (app) await progress.move(app, status);
   }
   async function saveDetails(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -947,8 +986,10 @@ export function ApplicationDrawer({
                         limit={20}
                         onChange={(offset) => setContextOffset(String(offset))}
                       />
-                      <details className="context-files">
-                        <summary>Files in frozen contexts</summary>
+                      <LazyDetails
+                        className="context-files"
+                        summary="Files in frozen contexts"
+                      >
                         {contexts.data.items.map((context) => (
                           <section key={String(context.id)}>
                             <h3>
@@ -963,7 +1004,7 @@ export function ApplicationDrawer({
                             />
                           </section>
                         ))}
-                      </details>
+                      </LazyDetails>
                     </details>
                   )}
                 </section>
@@ -1150,7 +1191,11 @@ export function ApplicationDrawer({
                 </div>
               </>
             ) : (
-              <form onSubmit={saveDetails} key={app.id} className="stack">
+              <form
+                onSubmit={saveDetails}
+                key={`${app.id}-${app.version}`}
+                className="stack"
+              >
                 {app.status === "closed" && (
                   <Field label="Outcome">
                     <select
@@ -1195,6 +1240,7 @@ export function ApplicationDrawer({
           </>
         )}
       </Dialog>
+      {progress.dialog}
       {app && contextOpen && (
         <ContextBuilder
           application={app}

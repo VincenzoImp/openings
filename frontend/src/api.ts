@@ -28,6 +28,14 @@ export interface Job extends Versioned {
   triage: Triage;
   score: number | null;
   score_outdated: boolean;
+  assessment?: {
+    payload?: {
+      response?: {
+        input_preparation?: { shortened?: boolean };
+        usage?: { truncated?: boolean; state_tokens_dropped?: number };
+      };
+    };
+  } | null;
   metadata: Json;
   salary?: string | Json | number;
   source?: string;
@@ -150,6 +158,7 @@ export interface Source extends Versioned {
   last_outcome?: string;
   last_counts?: Json;
   last_task_id?: string;
+  last_diagnostics?: { warnings?: string[] }[];
 }
 export interface Scoring {
   enabled: boolean;
