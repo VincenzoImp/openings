@@ -1004,23 +1004,6 @@ html[data-theme="dark"] .nav a.active {
 .reading-width {
   max-width: 900px;
 }
-.knowledge-card {
-  padding: 25px;
-  margin-bottom: 16px;
-}
-.knowledge-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 17px;
-}
-.knowledge-head h3 {
-  font-size: 13px;
-}
-.knowledge-head p {
-  font-size: 11px;
-  margin-top: 5px;
-}
 .narrative {
   font-size: 12px;
   line-height: 1.9;
@@ -1818,8 +1801,7 @@ html[data-theme="dark"] .nav a.active {
   .field.full {
     grid-column: auto;
   }
-  .sectioncard,
-  .knowledge-card {
+  .sectioncard {
     padding: 20px;
   }
   .section-footer {
@@ -1895,9 +1877,6 @@ html[data-theme="dark"] .nav a.active {
   }
   .table {
     min-width: 550px;
-  }
-  .knowledge-head {
-    gap: 10px;
   }
   .settingrow p {
     font-size: 10px;
@@ -2525,21 +2504,6 @@ html[data-theme="dark"] {
 }
 .global-instructions {
   margin-bottom: 25px;
-}
-.knowledge-grid {
-  display: grid;
-  gap: 18px;
-}
-.knowledge-card .narrative {
-  white-space: pre-wrap;
-  color: var(--ink);
-  font-size: 13px;
-  line-height: 1.9;
-  margin: 18px 0;
-}
-.knowledge-head h3 {
-  font-size: 16px;
-  margin: 5px 0 8px;
 }
 .evidence-files {
   font-size: 12px;
@@ -3657,4 +3621,189 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
 
 .password-form .form-actions {
   justify-content: flex-end;
+}
+
+/* Career headers remain compact; descriptions and claims open on demand. */
+.career-entry-list {
+  display: grid;
+  gap: 10px;
+}
+.career-entry-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 20px;
+  align-items: center;
+  padding: 18px 22px;
+}
+.career-entry-copy {
+  min-width: 0;
+}
+.career-entry-copy h3 {
+  margin: 5px 0;
+  line-height: 1.5;
+}
+.career-entry-title {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 550;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.career-entry-title:hover {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.career-entry-organization {
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.career-entry-meta {
+  display: grid;
+  gap: 5px;
+  text-align: right;
+}
+.career-entry-meta small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.career-entry-dates {
+  font-size: 12px;
+}
+.career-entry-actions {
+  gap: 4px;
+}
+.career-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.career-detail-organization {
+  margin: 8px 0;
+  font-size: 16px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.career-detail-header .muted {
+  font-size: 13px;
+}
+.career-skill-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 20px 0 26px;
+}
+.career-skill-tags .tag {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.career-description {
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.career-description h3,
+.career-entry-claims h3 {
+  font-size: 17px;
+}
+.career-description .narrative {
+  white-space: pre-wrap;
+  margin-top: 10px;
+  overflow-wrap: anywhere;
+}
+.career-entry-claims {
+  margin-top: 26px;
+}
+.career-entry-claims .sectiontitle {
+  margin-bottom: 14px;
+}
+.career-entry-claims .sectiontitle p {
+  line-height: 1.7;
+}
+.entry-scoped-claims .claimrow {
+  padding: 16px 12px;
+  gap: 10px;
+}
+.claim-actions {
+  flex-shrink: 0;
+  gap: 3px;
+}
+.career-date-fields {
+  border: 1px solid var(--line);
+  padding: 16px;
+  border-radius: 8px;
+  margin: 0 0 18px;
+}
+.career-date-fields legend {
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 550;
+}
+.career-date-parts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+.career-date-fields .field {
+  min-width: 0;
+}
+.career-date-fields .field:last-child {
+  margin-bottom: 0;
+}
+.career-date-fields .checkline {
+  margin: 12px 0 18px;
+}
+@media (max-width: 700px) {
+  .career-entry-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    padding: 16px;
+  }
+  .career-entry-meta {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    text-align: left;
+    align-items: baseline;
+  }
+  .career-entry-actions {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+  .career-entry-title {
+    font-size: 14px;
+  }
+  .career-detail-header {
+    flex-wrap: wrap;
+  }
+  .career-detail-header .btn {
+    flex-shrink: 0;
+  }
+  .career-claims-list .claimrow {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    gap: 8px 10px;
+    padding: 16px 12px;
+  }
+  .career-claims-list .claimrow .claimcopy {
+    min-width: 0;
+  }
+  .career-claims-list .claim-actions {
+    grid-column: 2;
+    justify-self: end;
+  }
+  .career-date-fields {
+    padding: 12px;
+  }
 }
