@@ -16,11 +16,12 @@ curl --fail "$OPENINGS_URL/api/v1/backup" \
 Keep backups private: they contain personal information and stored credentials.
 The database is not encrypted. A JSON export is useful for reading records, but
 omits binary file contents and is not a restorable backup. Download it through
-Settings, `GET /api/v1/export`, or the scoped `workspace_export` MCP grant. Use the backup action rather than copying a live `.sqlite` file with an active WAL journal.
+Settings, `GET /api/v1/export`, or the scoped `workspace_export` MCP grant. Use the
+backup action to capture changes from an active WAL journal consistently.
 
 ## Restore or move hosts
 
-On the destination host, install Openings 0.5.1, set its owner password, then restore
+On the destination host, install Openings 0.5.2, set its owner password, then restore
 through Settings or `POST /api/v1/backup/restore` with the raw SQLite body. Restore
 checks the schema, database integrity and foreign keys before replacement. It
 preserves the destination installation's owner credentials/API tokens, clears

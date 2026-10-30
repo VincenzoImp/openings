@@ -60,7 +60,9 @@ export function AddJob({
   }
   return (
     <Dialog title="Add an opportunity." onClose={onClose}>
-      <p className="modal-intro">Keep a job you found, however you found it.</p>
+      <p className="modal-intro">
+        Add a posting by URL, pasted text or structured fields.
+      </p>
       <form onSubmit={submit}>
         <Field label="Job URL">
           <input
@@ -78,7 +80,7 @@ export function AddJob({
           </Field>
         </div>
         <Field label="Location">
-          <input name="location" placeholder="Zurich, Switzerland" />
+          <input name="location" placeholder="City or region" />
         </Field>
         <AdvancedJson name="metadata" label="Job metadata" />
         <Field
@@ -121,6 +123,7 @@ export function JobsPage({
     score_min: "",
     score_max: "",
     score_state: "all",
+    complete: "",
     created_since: "",
     created_until: "",
     sort: "newest",
@@ -145,7 +148,10 @@ export function JobsPage({
       | {
           succeeded?: number;
           failed?: number;
-          items?: { error?: { message: string } }[];
+          items?: {
+            error?: { message: string };
+            result?: { count?: number };
+          }[];
         }
       | undefined;
     if (
@@ -161,7 +167,22 @@ export function JobsPage({
     ) {
       setSelection({});
       setForget(false);
-      if (result?.failed)
+      if (action === "rescore") {
+        const queued =
+          result?.items?.reduce(
+            (total, item) => total + (item.result?.count || 0),
+            0,
+          ) || 0;
+        const failed = result?.failed || 0;
+        notify(
+          `${queued} queued for scoring; ${(result?.succeeded || 0) - queued} skipped; ${failed} failed.${
+            failed
+              ? ` ${result?.items?.find((item) => item.error)?.error?.message || "Refresh and retry."}`
+              : ""
+          }`,
+          failed > 0,
+        );
+      } else if (result?.failed)
         notify(
           `${result.succeeded || 0} completed; ${result.failed} failed. ${result.items?.find((item) => item.error)?.error?.message || "Refresh and retry."}`,
           true,
@@ -171,8 +192,8 @@ export function JobsPage({
   return (
     <>
       <Heading
-        title="Your opportunities."
-        description="A considered shortlist starts with a well-kept inbox."
+        title="Inbox"
+        description="Review, save, dismiss and organize collected or manually added jobs."
       >
         <Button variant="primary" icon="plus" onClick={onAdd}>
           Add job
@@ -184,6 +205,7 @@ export function JobsPage({
         onChange={(value) => change("triage", value)}
         items={[
           { id: "inbox", label: "To review" },
+          { id: "active", label: "All active" },
           { id: "saved", label: "Saved" },
           { id: "dismissed", label: "Dismissed" },
         ]}
@@ -233,6 +255,7 @@ export function JobsPage({
           ].map(([key, label, facet]) => (
             <Field label={label} key={key}>
               <input
+                aria-label={label}
                 list={`facet-${key}`}
                 placeholder={`Any ${label.toLowerCase()}`}
                 value={filters[key]}
@@ -253,6 +276,16 @@ export function JobsPage({
               <option value="">Any work style</option>
               <option value="true">Remote</option>
               <option value="false">On site / hybrid</option>
+            </select>
+          </Field>
+          <Field label="Posting completeness">
+            <select
+              value={filters.complete}
+              onChange={(e) => change("complete", e.target.value)}
+            >
+              <option value="">All postings</option>
+              <option value="true">Full posting saved</option>
+              <option value="false">Needs posting text</option>
             </select>
           </Field>
           <Field label="Score freshness">
@@ -695,17 +728,22 @@ export function JobDrawer({
                   <Button
                     icon="refresh"
                     disabled={pending || !job.posting}
-                    onClick={() =>
-                      mutate(
-                        () =>
-                          api("/scoring/rescore", "POST", {
-                            job_ids: [id],
-                            outdated_only: false,
-                            limit: 1,
-                          }),
-                        "Fit assessment queued. Check Settings activity for progress.",
-                      )
-                    }
+                    onClick={async () => {
+                      let result: { count: number } | undefined;
+                      const ok = await mutate(async () => {
+                        result = await api("/scoring/rescore", "POST", {
+                          job_ids: [id],
+                          outdated_only: false,
+                          limit: 1,
+                        });
+                      }, "Fit assessment request checked.");
+                      if (ok)
+                        notify(
+                          result?.count
+                            ? "Fit assessment queued. Check Settings activity for progress."
+                            : "No assessment queued. Check your career profile and posting text.",
+                        );
+                    }}
                   >
                     Update fit score
                   </Button>

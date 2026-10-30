@@ -256,7 +256,7 @@ export function ErrorBox({
       <div>
         {message}
         {retry && (
-          <button className="textbutton" onClick={retry}>
+          <button type="button" className="textbutton" onClick={retry}>
             Try again
           </button>
         )}

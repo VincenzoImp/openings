@@ -39,7 +39,7 @@ function band(x1: number, y1: number, x2: number, y2: number, height: number) {
 export function Funnel({ steps }: { steps: FunnelStep[] }) {
   if (!steps.length || !steps[0].count)
     return (
-      <Empty title="Your journey starts here.">
+      <Empty title="No submitted applications">
         Once you record a submitted application, its progress will appear in
         this view.
       </Empty>
@@ -214,30 +214,33 @@ export default function OverviewPage({
     {
       count: data.drafts,
       title: "application draft",
+      plural: "application drafts",
       description: "Review the documents and decide what comes next.",
-      route: "applications",
+      route: "applications?status=draft",
       icon: "file" as const,
     },
     {
       count: data.outdated,
       title: "score needing an update",
+      plural: "scores needing an update",
       description: "Your context changed. Nothing was rescored automatically.",
-      route: "inbox",
+      route: "inbox?triage=active&score_state=outdated",
       icon: "refresh" as const,
     },
     {
       count: data.incomplete,
       title: "job needing the full posting",
+      plural: "jobs needing the full posting",
       description: "Paste the text to complete the record.",
-      route: "inbox",
+      route: "inbox?triage=active&complete=false",
       icon: "inbox" as const,
     },
   ].filter((a) => a.count);
   return (
     <>
       <Heading
-        title="Your search, at a glance."
-        description="A clear view of your opportunities and the progress you are making."
+        title="Overview"
+        description="Review application totals, progress and recent workspace activity."
       >
         <span className="muted smalltext today">
           {new Date().toLocaleDateString("en", {
@@ -264,7 +267,7 @@ export default function OverviewPage({
           [
             data.interviews,
             "Reached interview",
-            "A conversation worth having",
+            "Recorded interview progress",
             "interview",
           ],
           [
@@ -288,7 +291,7 @@ export default function OverviewPage({
       <section className="card">
         <div className="cardhead">
           <div>
-            <h2>Your application journey</h2>
+            <h2>Application progress</h2>
             <p>
               Where submitted applications progressed, and where they stand now.
             </p>
@@ -323,36 +326,30 @@ export default function OverviewPage({
       <div className="grid-2">
         <section className="card">
           <div className="cardhead">
-            <h2>Worth a look</h2>
+            <h2>Needs attention</h2>
             <span className="tag neutral">{attention.length} items</span>
           </div>
           <div className="inner">
             {attention.length ? (
               attention.map((a) => (
-                <button
-                  className="taskrow"
-                  key={a.title}
-                  onClick={() => onNavigate(a.route)}
-                >
+                <a className="taskrow" key={a.title} href={`#${a.route}`}>
                   <span className="circle">
                     <Icon name={a.icon} />
                   </span>
                   <span className="taskcopy">
                     <strong>
-                      {a.count} {a.title}
-                      {a.count !== 1 ? "s" : ""}
+                      {a.count} {a.count === 1 ? a.title : a.plural}
                     </strong>
                     <small>{a.description}</small>
                   </span>
                   <Icon name="arrow" />
-                </button>
+                </a>
               ))
             ) : (
               <div className="quiet-state">
                 <Icon name="check" />
                 <p>
-                  You are up to date. Add an opportunity or follow a company to
-                  keep exploring.
+                  No drafts, outdated scores or incomplete postings to show.
                 </p>
               </div>
             )}

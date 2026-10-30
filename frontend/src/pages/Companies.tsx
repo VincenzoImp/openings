@@ -102,34 +102,37 @@ export default function CompaniesPage() {
   );
   const chosen = rows.filter((s) => selected.includes(s.id));
   async function batch(action: string, items = chosen) {
-    const ok = await mutate(
-      async () => {
-        const result = await api<{
+    let result:
+      | {
           succeeded: number;
           failed: number;
           items: { error?: { message: string } }[];
-        }>("/sources/bulk", "POST", {
+        }
+      | undefined;
+    const ok = await mutate(
+      async () => {
+        result = await api("/sources/bulk", "POST", {
           action,
           items: items.map((s) => ({ id: s.id, expected_version: s.version })),
         });
-        if (result.failed)
-          notify(
-            `${result.succeeded} completed; ${result.failed} failed. ${result.items.find((i) => i.error)?.error?.message || "Refresh and retry."}`,
-            true,
-          );
       },
       `Source ${action === "run" ? "runs queued" : action === "delete" ? "removed" : action === "enable" ? "enabled" : "paused"}.`,
     );
     if (ok) {
       setSelected([]);
       setConfirmDelete(null);
+      if (result?.failed)
+        notify(
+          `${result.succeeded} completed; ${result.failed} failed. ${result.items.find((i) => i.error)?.error?.message || "Refresh and retry."}`,
+          true,
+        );
     }
   }
   return (
     <>
       <Heading
-        title="Keep the right opportunities coming."
-        description="Save a focused search or follow a company, with clear schedules and shared provider limits."
+        title="Collection"
+        description="Configure saved searches, company feeds, schedules and shared provider limits."
       >
         <Button icon="refresh" onClick={resource.reload}>
           Refresh
@@ -407,7 +410,10 @@ function SourceEditor({
   const { mutate, pending, notify } = useWorkspace();
   const [preview, setPreview] = useState<Preview | null>(null),
     [previewing, setPreviewing] = useState(false),
-    [kind, setKind] = useState(source?.kind || (search ? "jobspy" : "auto"));
+    [kind, setKind] = useState(source?.kind || (search ? "jobspy" : "auto")),
+    [scheduleKind, setScheduleKind] = useState(
+      String(source?.schedule.kind || "interval"),
+    );
   function values(form: HTMLFormElement) {
     const f = new FormData(form),
       configuration = jsonValue(f, "config", source?.config || {}) as Json;
@@ -427,7 +433,9 @@ function SourceEditor({
           }
         : {
             ...configuration,
-            ...(f.get("board") ? { board: f.get("board") } : {}),
+            ...(f.get("board") || Object.hasOwn(configuration, "board")
+              ? { board: String(f.get("board") || "") }
+              : {}),
           };
     return {
       name: f.get("name"),
@@ -448,8 +456,8 @@ function SourceEditor({
       },
       schedule: {
         kind: f.get("schedule_kind"),
-        minutes: Number(f.get("minutes")),
-        at: f.get("at"),
+        minutes: Number(f.get("minutes") || source?.schedule.minutes || 1440),
+        at: f.get("at") || source?.schedule.at || "07:00",
         timezone: f.get("timezone"),
       },
     };
@@ -504,7 +512,7 @@ function SourceEditor({
             name="name"
             required
             defaultValue={source?.name}
-            placeholder={search ? "Platform roles in Zurich" : "Company name"}
+            placeholder={search ? "My saved search" : "Company name"}
           />
         </Field>
         {search ? (
@@ -517,7 +525,7 @@ function SourceEditor({
                 name="query"
                 required
                 defaultValue={String(source?.config.query || "")}
-                placeholder="Platform engineer"
+                placeholder="Enter keywords"
               />
             </Field>
             <div className="formgrid">
@@ -525,18 +533,18 @@ function SourceEditor({
                 <input
                   name="location"
                   defaultValue={String(source?.config.location || "")}
-                  placeholder="Zurich, Switzerland"
+                  placeholder="City or region"
                 />
               </Field>
               <Field
                 label="Country"
-                hint="Use an English country name, such as switzerland, usa or uk."
+                hint="Use an English country name, such as usa, uk or germany."
               >
                 <input
                   name="country"
                   required
-                  defaultValue={String(source?.config.country || "switzerland")}
-                  placeholder="switzerland"
+                  defaultValue={String(source?.config.country || "usa")}
+                  placeholder="usa"
                 />
               </Field>
             </div>
@@ -549,7 +557,11 @@ function SourceEditor({
                     name="providers"
                     value={provider}
                     defaultChecked={(
-                      (source?.config.providers as string[]) || ["indeed"]
+                      (source?.config.providers as string[]) || [
+                        "linkedin",
+                        "indeed",
+                        "glassdoor",
+                      ]
                     ).includes(provider)}
                   />
                   {
@@ -665,7 +677,8 @@ function SourceEditor({
           <Field label="Schedule">
             <select
               name="schedule_kind"
-              defaultValue={String(source?.schedule.kind || "daily")}
+              value={scheduleKind}
+              onChange={(e) => setScheduleKind(e.target.value)}
             >
               <option value="daily">At a daily time</option>
               <option value="interval">At an interval</option>
@@ -675,6 +688,7 @@ function SourceEditor({
             <input
               type="time"
               name="at"
+              disabled={scheduleKind !== "daily"}
               defaultValue={String(source?.schedule.at || "07:00")}
             />
           </Field>
@@ -682,17 +696,14 @@ function SourceEditor({
             <input
               name="timezone"
               required
-              defaultValue={String(
-                source?.schedule.timezone ||
-                  Intl.DateTimeFormat().resolvedOptions().timeZone ||
-                  "UTC",
-              )}
+              defaultValue={String(source?.schedule.timezone || "UTC")}
             />
           </Field>
           <Field label="Interval in minutes">
             <input
               type="number"
               name="minutes"
+              disabled={scheduleKind !== "interval"}
               min={15}
               max={43200}
               defaultValue={Number(source?.schedule.minutes || 1440)}

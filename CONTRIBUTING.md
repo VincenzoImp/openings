@@ -80,4 +80,5 @@ match `pyproject.toml`; publication waits for CI. The versioned tags are
 checks do not publish.
 Before a release, review the changelog and a practical collection → application →
 external-agent documents → review → backup/restore workflow. Hardware claims need
-actual resource measurements, not just a successful image build.
+measurements with a stated platform and workload. Distinguish observed resource
+use, container limits and host requirements.
