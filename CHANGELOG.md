@@ -5,7 +5,8 @@
 - Separate career titles, organizations, partial dates, skill tags and ordering.
 - Support single dates, periods and Present without requiring descriptions.
 - Manage related claims from an entry and distinguish entries by organization.
-- Show career dates on cards and include organizations in career searches.
+- Show career dates and content previews on cards; search by organization.
+- Identify saved searches by query/location and compact template choices.
 - Preserve structured career facts and order in REST, MCP and frozen contexts.
 
 This release uses schema 3. Earlier database formats require separate conversion
