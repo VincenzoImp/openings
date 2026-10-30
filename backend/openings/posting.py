@@ -40,10 +40,12 @@ def remote_scope(item):
 
 def matches_filters(item, filters):
     titles = filters.get("titles") or []
-    if titles and not any(term.casefold() in item["title"].casefold() for term in titles):
+    if titles and not any(
+        term.casefold() in str(item.get("title") or "").casefold() for term in titles
+    ):
         return False
     locations = [term.casefold() for term in filters.get("locations", [])]
-    place = item["location"].casefold().strip()
+    place = str(item.get("location") or "").casefold().strip()
     if not locations or not place:
         return True
     specific = [term for term in locations if term not in ("remote", "worldwide", "anywhere")]
