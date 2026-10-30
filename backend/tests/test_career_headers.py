@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from openings.app import create_app
-from openings.career import CareerDates, KnowledgeCreate, TemplateCreate
+from openings.career import CareerDates, ClaimCreate, ClaimUpdate, KnowledgeCreate, TemplateCreate
 
 
 @pytest.mark.parametrize(
@@ -60,6 +60,21 @@ def test_skills_and_headers_normalize_without_alias_guessing():
     ]:
         with pytest.raises(ValidationError):
             KnowledgeCreate.model_validate({"title": "Entry", **fields})
+
+
+def test_summary_claim_preview_is_ordered_bounded_and_independent_of_description(tmp_path):
+    app = create_app(tmp_path / "preview.sqlite", start_worker=False)
+    career = app.state.career
+    owner = career.create_knowledge(KnowledgeCreate(title="Languages", narrative="User context."))
+    assert career.list_knowledge(summary=True)["items"][0]["claim_preview"] is None
+    first = career.create_claim(ClaimCreate(knowledge_id=owner["id"], text="Python, SQL."))
+    later = career.create_claim(ClaimCreate(knowledge_id=owner["id"], text="Long wording " * 100))
+    assert career.list_knowledge(summary=True)["items"][0]["claim_preview"] == first["text"]
+    career.update_claim(first["id"], ClaimUpdate(expected_version=first["version"], position=2))
+    row = career.list_knowledge(summary=True)["items"][0]
+    assert row["claim_preview"] == later["text"][:240]
+    assert row["narrative_preview"] == "User context."
+    assert career.get_knowledge(owner["id"])["narrative"] == "User context."
 
 
 @pytest.mark.parametrize("transport", ["rest", "mcp"])

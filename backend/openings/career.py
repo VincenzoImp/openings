@@ -383,6 +383,7 @@ class CareerService:
         clause = " WHERE " + " AND ".join(where) if where else ""
         columns = (
             "id,kind,title,organization,dates,skills,position,version,created_at,updated_at,substr(narrative,1,240) AS narrative_preview,"
+            "(SELECT substr(text,1,240) FROM claims WHERE knowledge_id=knowledge.id ORDER BY position,created_at,id LIMIT 1) AS claim_preview,"
             "(SELECT COUNT(*) FROM claims WHERE knowledge_id=knowledge.id) AS claim_count,"
             "(SELECT COUNT(*) FROM files WHERE knowledge_id=knowledge.id) AS file_count"
             if summary
