@@ -5,6 +5,7 @@ import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
+from openings import __version__
 from openings.app import create_app
 from openings.common import now
 from openings.errors import DomainError
@@ -324,7 +325,7 @@ def test_http_validates_answers_dates_and_rotation_preserves_tokens(tmp_path):
         )
         assert client.get("/api/v1/jobs").status_code == 401
         client.headers["Authorization"] = "Bearer " + token["token"]
-        assert client.get("/api/v1/capabilities").json()["version"] == "0.9.0"
+        assert client.get("/api/v1/capabilities").json()["version"] == __version__
         assert client.get("/api/v1/tokens").json()["items"][0]["last_used_at"]
         source = client.post(
             "/api/v1/sources",

@@ -11,29 +11,104 @@ import {
   type Source,
 } from "../api";
 import { useResource, useWorkspace } from "../state";
-import { AdvancedJson, Button, Dialog, Field } from "../ui";
+import { AdvancedJson, Button, Dialog, ErrorBox, Field, Loading } from "../ui";
 
-const boardKinds = [
-  "greenhouse",
-  "lever",
-  "ashby",
-  "rss",
-  "recruitee",
-  "personio",
-  "workable",
-  "breezy",
-  "smartrecruiters",
-  "bamboohr",
-  "rippling",
-  "workday",
-  "oracle",
-  "joincom",
-];
+interface ConfigProperty {
+  default?: unknown;
+  minimum?: number;
+  maximum?: number;
+}
+type ConfigProperties = Record<string, ConfigProperty>;
 interface SourceSchema {
   kind: string;
   label: string;
   config_schema: Json;
-  capabilities: { search: boolean; lookback: boolean; details: boolean };
+  capabilities: {
+    search: boolean;
+    lookback: boolean;
+    details: boolean;
+    description_mode: "inline" | "separate" | "metadata" | "portal";
+  };
+}
+function schemaProperties(schema?: SourceSchema): ConfigProperties {
+  return (schema?.config_schema.properties as ConfigProperties) || {};
+}
+function sharedProperties(
+  schemas: SourceSchema[],
+  kinds: string[],
+): ConfigProperties {
+  const properties = kinds.map((kind) =>
+    schemaProperties(schemas.find((schema) => schema.kind === kind)),
+  );
+  return Object.fromEntries(
+    Object.entries(properties[0] || {})
+      .filter(([key]) => properties.every((item) => Object.hasOwn(item, key)))
+      .map(([key, property]) => {
+        const minima = properties.flatMap((item) =>
+          item[key].minimum == null ? [] : [item[key].minimum!],
+        );
+        const maxima = properties.flatMap((item) =>
+          item[key].maximum == null ? [] : [item[key].maximum!],
+        );
+        return [
+          key,
+          {
+            ...property,
+            minimum: minima.length ? Math.max(...minima) : undefined,
+            maximum: maxima.length ? Math.min(...maxima) : undefined,
+          },
+        ];
+      }),
+  );
+}
+const acquisitionLimits = [
+  { key: "hours_old", label: "Posted within (hours)" },
+  { key: "results_wanted", label: "Results per portal" },
+  { key: "max_results", label: "Results per run" },
+  { key: "max_details", label: "Description requests per batch" },
+];
+function limitValues(form: FormData, properties: ConfigProperties): Json {
+  const values: Json = {};
+  for (const { key } of acquisitionLimits) {
+    const value = form.get(key);
+    if (
+      Object.hasOwn(properties, key) &&
+      typeof value === "string" &&
+      value.trim()
+    )
+      values[key] = Number(value);
+  }
+  return values;
+}
+function SharedAcquisitionLimits({
+  properties,
+  placeholder,
+}: {
+  properties: ConfigProperties;
+  placeholder: string;
+}) {
+  const fields = acquisitionLimits.filter(({ key }) =>
+    Object.hasOwn(properties, key),
+  );
+  return fields.length ? (
+    <div className="formgrid">
+      {fields.map(({ key, label }) => (
+        <Field label={label} key={key}>
+          <input
+            name={key}
+            type="number"
+            min={properties[key].minimum}
+            max={properties[key].maximum}
+            placeholder={placeholder}
+          />
+        </Field>
+      ))}
+    </div>
+  ) : (
+    <p className="hint">
+      The selected sources have no shared acquisition limits.
+    </p>
+  );
 }
 interface Preview {
   kind: string;
@@ -75,14 +150,23 @@ export function RunProgress({
     waiting =
       run.state === "queued" &&
       !!run.next_run_at &&
-      new Date(run.next_run_at).valueOf() > Date.now();
+      new Date(run.next_run_at).valueOf() > Date.now(),
+    waitingReason = waiting
+      ? run.tasks?.find((task) => task.state === "queued" && task.error)?.error
+      : undefined,
+    budgetWait =
+      !!waitingReason && /provider (hour|day|run) budget/i.test(waitingReason);
   return (
     <div className={`run-progress ${compact ? "compact" : ""}`}>
       <div className="run-state">
         <span
           className={`tag ${run.state === "failed" ? "amber" : run.state === "succeeded" ? "green" : "neutral"}`}
         >
-          {waiting ? "Waiting" : run.state}
+          {budgetWait
+            ? "Waiting for provider budget"
+            : waiting
+              ? "Waiting"
+              : run.state}
         </span>
         <span className="smalltext muted">
           {waiting
@@ -92,16 +176,7 @@ export function RunProgress({
               : "Ready to start"}
         </span>
       </div>
-      {waiting &&
-        run.tasks?.find((task) => task.state === "queued" && task.error)
-          ?.error && (
-          <p className="hint run-wait-reason">
-            {
-              run.tasks.find((task) => task.state === "queued" && task.error)!
-                .error
-            }
-          </p>
-        )}
+      {waitingReason && <p className="hint run-wait-reason">{waitingReason}</p>}
       <dl className="run-counts">
         {[
           ["received", "Found"],
@@ -306,16 +381,31 @@ export function SourceEditor({
   );
   const [preview, setPreview] = useState<Preview | null>(null),
     [previewing, setPreviewing] = useState(false);
-  const searchSource = kind === "jobspy",
-    board = kind !== "auto" && !searchSource && kind !== "rss";
+  const searchSource = kind === "jobspy";
   const schema = schemas.data.items.find((s) => s.kind === kind);
+  const properties =
+    kind === "auto"
+      ? sharedProperties(
+          schemas.data.items,
+          schemas.data.items
+            .filter((item) => !item.capabilities.search)
+            .map((item) => item.kind),
+        )
+      : schemaProperties(schema);
+  const hasField = (key: string) => Object.hasOwn(properties, key);
   const defaults = (key: string, fallback: unknown) =>
-    (schema?.config_schema.properties as Record<string, Json> | undefined)?.[
-      key
-    ]?.default ?? fallback;
+    properties[key]?.default ?? fallback;
+  const providerConfig = Object.fromEntries(
+    Object.entries(source?.config || {}).filter(
+      ([key]) => kind === "auto" || hasField(key),
+    ),
+  );
   function values(form: HTMLFormElement) {
     const f = new FormData(form),
-      config = jsonValue(f, "config", source?.config || {}) as Json;
+      config = { ...(jsonValue(f, "config", providerConfig) as Json) };
+    if (kind !== "auto")
+      for (const key of Object.keys(config))
+        if (!hasField(key)) delete config[key];
     if (searchSource)
       Object.assign(config, {
         query: String(f.get("query")),
@@ -329,16 +419,17 @@ export function SourceEditor({
         fetch_description: f.get("fetch_description") === "on",
       });
     else {
-      if (board && f.get("board")) config.board = String(f.get("board"));
-      if (board) {
-        config.region = String(
-          f.get("region") || source?.config.region || "global",
-        );
-        config.max_details = Number(f.get("max_details"));
-        if (f.has("max_candidates"))
-          config.max_candidates = Number(f.get("max_candidates"));
-      }
-      config.max_results = Number(f.get("max_results") || 100);
+      for (const key of ["board", "region"])
+        if (hasField(key) && f.has(key) && f.get(key))
+          config[key] = String(f.get(key));
+      Object.assign(config, limitValues(f, properties));
+      const candidates = f.get("max_candidates");
+      if (
+        hasField("max_candidates") &&
+        typeof candidates === "string" &&
+        candidates.trim()
+      )
+        config.max_candidates = Number(candidates);
     }
     return {
       name: String(f.get("name")),
@@ -392,6 +483,25 @@ export function SourceEditor({
   }
   const filters = (key: string) =>
     ((source?.filters[key] as string[]) || []).join(", ");
+  if (schemas.loading || (schemas.error && !schemas.data.items.length))
+    return (
+      <Dialog
+        title={
+          source
+            ? `Configure ${source.name}`
+            : search
+              ? "Save a search"
+              : "Follow a company"
+        }
+        onClose={onClose}
+      >
+        {schemas.loading ? (
+          <Loading />
+        ) : (
+          <ErrorBox message={schemas.error!} retry={schemas.reload} />
+        )}
+      </Dialog>
+    );
   return (
     <Dialog
       title={
@@ -518,20 +628,23 @@ export function SourceEditor({
                   }}
                 >
                   <option value="auto">Detect from URL</option>
-                  {boardKinds.map((value) => (
-                    <option key={value} value={value}>
-                      {value === "rss" ? "RSS / Atom" : value}
-                    </option>
-                  ))}
+                  {schemas.data.items
+                    .filter((item) => !item.capabilities.search)
+                    .map((item) => (
+                      <option key={item.kind} value={item.kind}>
+                        {item.label}
+                      </option>
+                    ))}
                 </select>
               </Field>
-              {board && (
+              {hasField("board") && (
                 <Field
                   label="Board identifier"
                   hint="Usually detected from the URL. Keep the detected value when editing."
                 >
                   <input
                     name="board"
+                    key={kind}
                     defaultValue={String(source?.config.board || "")}
                   />
                 </Field>
@@ -569,7 +682,7 @@ export function SourceEditor({
               : "Limits apply to one collection run. Large boards can require several batches."
           }
         >
-          <div className="formgrid">
+          <div className="formgrid" key={kind}>
             {searchSource ? (
               <>
                 <Field label="Results per portal" hint="1–50. Default: 20.">
@@ -603,23 +716,25 @@ export function SourceEditor({
               </>
             ) : (
               <>
-                <Field
-                  label="Results per run"
-                  hint="1–2,000. Default: 100 matching roles."
-                >
-                  <input
-                    name="max_results"
-                    type="number"
-                    min={1}
-                    max={2000}
-                    required
-                    defaultValue={Number(
-                      source?.config.max_results ||
-                        defaults("max_results", 100),
-                    )}
-                  />
-                </Field>
-                {board && (
+                {hasField("max_results") && (
+                  <Field
+                    label="Results per run"
+                    hint="1–2,000. Default: 100 matching roles."
+                  >
+                    <input
+                      name="max_results"
+                      type="number"
+                      min={1}
+                      max={2000}
+                      required
+                      defaultValue={Number(
+                        source?.config.max_results ||
+                          defaults("max_results", 100),
+                      )}
+                    />
+                  </Field>
+                )}
+                {hasField("max_details") && (
                   <Field
                     label="Description requests per batch"
                     hint="0–25. Default: 10; unfinished descriptions continue in later batches."
@@ -640,6 +755,19 @@ export function SourceEditor({
               </>
             )}
           </div>
+          {schema?.capabilities.description_mode === "metadata" && (
+            <p className="hint">
+              This source provides job titles and links only, without full
+              descriptions. Open the original posting to read the full job
+              description.
+            </p>
+          )}
+          {schema?.capabilities.description_mode === "inline" && (
+            <p className="hint">
+              Full descriptions are included in the listing; no separate
+              description requests are needed.
+            </p>
+          )}
           {searchSource && (
             <>
               <Field label="Job type">
@@ -704,33 +832,37 @@ export function SourceEditor({
         </Section>
         <details className="collection-advanced">
           <summary>Advanced configuration</summary>
-          {kind === "lever" && (
+          {hasField("region") && (
             <Field
               label="ATS region"
               hint="Usually global. Some services use a regional board endpoint."
             >
               <select
                 name="region"
-                defaultValue={String(source?.config.region || "global")}
+                key={kind}
+                defaultValue={String(
+                  source?.config.region ?? defaults("region", "global"),
+                )}
               >
                 <option value="global">Global</option>
                 <option value="eu">Europe</option>
               </select>
             </Field>
           )}
-          {["workday", "oracle", "smartrecruiters"].includes(kind) && (
+          {hasField("max_candidates") && (
             <Field
               label="Candidates to inspect"
               hint="20–10,000 listing candidates before local filters. Default: 2,000; paging resumes across batches."
             >
               <input
                 name="max_candidates"
+                key={kind}
                 type="number"
                 min={20}
                 max={10000}
                 required
                 defaultValue={Number(
-                  source?.config.max_candidates ||
+                  source?.config.max_candidates ??
                     defaults("max_candidates", 2000),
                 )}
               />
@@ -739,7 +871,7 @@ export function SourceEditor({
           <AdvancedJson
             name="config"
             label="Provider configuration"
-            value={source?.config || {}}
+            value={providerConfig}
           />
         </details>
         {preview && (
@@ -817,8 +949,14 @@ export function RunOptionsDialog({
   onRun: (overrides: Json) => Promise<boolean>;
 }) {
   const { pending } = useWorkspace();
-  const searches = sources.every((s) => s.kind === "jobspy"),
-    companies = sources.every((s) => s.kind !== "jobspy");
+  const schemas = useResource<ListResult<SourceSchema>>("/sources/schemas", {
+    items: [],
+    total: 0,
+  });
+  const properties = sharedProperties(
+    schemas.data.items,
+    sources.map((source) => source.kind),
+  );
   return (
     <Dialog
       title={`Run ${sources.length === 1 ? sources[0].name : `${sources.length} sources`} with options`}
@@ -827,77 +965,32 @@ export function RunOptionsDialog({
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          const f = new FormData(e.currentTarget),
-            overrides: Json = {};
-          for (const key of [
-            "hours_old",
-            "results_wanted",
-            "max_results",
-            "max_details",
-          ])
-            if (String(f.get(key) || "").trim())
-              overrides[key] = Number(f.get(key));
+          if (schemas.loading || schemas.error) return;
+          const overrides = limitValues(
+            new FormData(e.currentTarget),
+            properties,
+          );
           if (await onRun(overrides)) onClose();
         }}
       >
         <p className="modal-intro">
           These options apply to this run only. Saved settings stay the same.
         </p>
-        {searches ? (
-          <div className="formgrid">
-            <Field
-              label="Posted within (hours)"
-              hint="Leave empty to use each saved window."
-            >
-              <input
-                name="hours_old"
-                type="number"
-                min={1}
-                max={8760}
-                placeholder="Saved setting"
-              />
-            </Field>
-            <Field
-              label="Results per portal"
-              hint="Includes jobs already archived."
-            >
-              <input
-                name="results_wanted"
-                type="number"
-                min={1}
-                max={50}
-                placeholder="Saved setting"
-              />
-            </Field>
-          </div>
-        ) : companies ? (
-          <div className="formgrid">
-            <Field label="Results per run">
-              <input
-                name="max_results"
-                type="number"
-                min={1}
-                max={2000}
-                placeholder="Saved setting"
-              />
-            </Field>
-            {sources.every((s) => s.kind !== "rss") && (
-              <Field label="Description requests per batch">
-                <input
-                  name="max_details"
-                  type="number"
-                  min={0}
-                  max={25}
-                  placeholder="Saved setting"
-                />
-              </Field>
-            )}
-          </div>
+        {schemas.loading ? (
+          <Loading />
+        ) : schemas.error ? (
+          <ErrorBox message={schemas.error} retry={schemas.reload} />
         ) : (
-          <p className="hint">
-            Select only saved searches or only company sources to change run
-            limits.
-          </p>
+          <>
+            <SharedAcquisitionLimits
+              properties={properties}
+              placeholder="Saved setting"
+            />
+            <p className="hint">
+              Empty fields use each source's saved settings. Only limits
+              supported by every selected source are shown.
+            </p>
+          </>
         )}
         <p className="hint">
           Provider limits and cooldowns still apply. An incompatible active run
@@ -907,7 +1000,10 @@ export function RunOptionsDialog({
           <Button type="button" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={pending}>
+          <Button
+            variant="primary"
+            disabled={pending || schemas.loading || !!schemas.error}
+          >
             Run with options
           </Button>
         </div>
@@ -929,8 +1025,14 @@ export function SourceBulkEditor({
   const [schedule, setSchedule] = useState(false),
     [acquisition, setAcquisition] = useState(false),
     [filters, setFilters] = useState(false);
-  const searches = sources.every((s) => s.kind === "jobspy"),
-    companies = sources.every((s) => s.kind !== "jobspy");
+  const schemas = useResource<ListResult<SourceSchema>>("/sources/schemas", {
+    items: [],
+    total: 0,
+  });
+  const properties = sharedProperties(
+    schemas.data.items,
+    sources.map((source) => source.kind),
+  );
   return (
     <Dialog title={`Configure ${sources.length} sources`} onClose={onClose}>
       <form
@@ -940,15 +1042,8 @@ export function SourceBulkEditor({
             patch: Json = {};
           if (schedule) patch.schedule = scheduleValues(f);
           if (acquisition) {
-            const config: Json = {};
-            for (const key of [
-              "hours_old",
-              "results_wanted",
-              "max_results",
-              "max_details",
-            ])
-              if (String(f.get(key) || "").trim())
-                config[key] = Number(f.get(key));
+            if (schemas.loading || schemas.error) return;
+            const config = limitValues(f, properties);
             if (Object.keys(config).length) patch.config = config;
           }
           if (filters)
@@ -984,58 +1079,19 @@ export function SourceBulkEditor({
           </label>
           {acquisition && (
             <>
-              {searches ? (
-                <div className="formgrid">
-                  <Field label="Posted within (hours)">
-                    <input
-                      name="hours_old"
-                      type="number"
-                      min={1}
-                      max={8760}
-                      placeholder="Keep current"
-                    />
-                  </Field>
-                  <Field label="Results per portal">
-                    <input
-                      name="results_wanted"
-                      type="number"
-                      min={1}
-                      max={50}
-                      placeholder="Keep current"
-                    />
-                  </Field>
-                </div>
-              ) : companies ? (
-                <div className="formgrid">
-                  <Field label="Results per run">
-                    <input
-                      name="max_results"
-                      type="number"
-                      min={1}
-                      max={2000}
-                      placeholder="Keep current"
-                    />
-                  </Field>
-                  {sources.every((s) => s.kind !== "rss") && (
-                    <Field label="Description requests per batch">
-                      <input
-                        name="max_details"
-                        type="number"
-                        min={0}
-                        max={25}
-                        placeholder="Keep current"
-                      />
-                    </Field>
-                  )}
-                </div>
+              {schemas.loading ? (
+                <Loading />
+              ) : schemas.error ? (
+                <ErrorBox message={schemas.error} retry={schemas.reload} />
               ) : (
-                <p className="hint">
-                  Select only saved searches or only company sources to share
-                  acquisition limits.
-                </p>
+                <SharedAcquisitionLimits
+                  properties={properties}
+                  placeholder="Keep current"
+                />
               )}
               <p className="hint">
-                Empty fields keep each source's current value.
+                Empty fields keep each source's current value. Only limits
+                supported by every selected source are shown.
               </p>
             </>
           )}
@@ -1072,7 +1128,11 @@ export function SourceBulkEditor({
           </Button>
           <Button
             variant="primary"
-            disabled={pending || (!schedule && !acquisition && !filters)}
+            disabled={
+              pending ||
+              (!schedule && !acquisition && !filters) ||
+              (acquisition && (schemas.loading || !!schemas.error))
+            }
           >
             Save changes
           </Button>

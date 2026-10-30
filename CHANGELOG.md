@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.1
+
+- Show and validate only acquisition options supported by each ATS adapter.
+- Align native source, bulk and run controls with discovered configuration schemas.
+- Report metadata-only descriptions as unavailable and the collection as partial.
+- Explain unavailable public Ashby boards and avoid automatic retries for their 404 responses.
+- Identify provider-budget waits clearly in collection progress.
+
+Workspace format remains schema 4. Saved company configurations must match their
+current adapter schema; remove options that the adapter does not use.
+
 ## 0.9.0
 
 - Resume portal pagination and missing descriptions across bounded collection batches.
