@@ -148,8 +148,8 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
   return (
     <>
       <Heading
-        title="Keep the whole picture."
-        description="Documents, conversations and decisions — each in its place."
+        title="Applications"
+        description="Track application attempts, documents and recorded progress."
       >
         <div className="segmented" aria-label="Application view">
           {["board", "list"].map((view) => (
@@ -385,7 +385,7 @@ function DocumentEditor({
   previous?: Document;
   onClose: () => void;
 }) {
-  const { mutate, pending } = useWorkspace();
+  const { mutate, pending, refresh } = useWorkspace();
   const [file, setFile] = useState<File | null>(null),
     [createdId, setCreatedId] = useState<string | null>(null);
   const [documentText, setDocumentText] = useState(
@@ -426,7 +426,10 @@ function DocumentEditor({
       }
       if (file) await uploadFile(file, "document", id);
     }, "Document revision saved.");
-    if (ok) onClose();
+    if (ok) {
+      refresh();
+      onClose();
+    }
   }
   return (
     <Dialog
@@ -619,7 +622,9 @@ function DocumentCard({
         </button>
       </header>
       {expanded &&
-        (detail.loading || !detail.data ? (
+        (detail.error ? (
+          <ErrorBox message={detail.error} retry={detail.reload} />
+        ) : detail.loading || !detail.data ? (
           <Loading />
         ) : (
           <>
@@ -883,7 +888,7 @@ export function ApplicationDrawer({
                   />
                 )}
                 <section className="context-panel">
-                  <h3>Your agent does the writing.</h3>
+                  <h3>Prepare application documents</h3>
                   <p>
                     Export the job, your stored knowledge, template and
                     instructions as a frozen context. Upload PDF and sources
@@ -1016,7 +1021,7 @@ export function ApplicationDrawer({
                     <DocumentCard key={d.id} document={d} application={app} />
                   ))
                 ) : (
-                  <Empty title="A clean starting point.">
+                  <Empty title="No documents in this view">
                     Save a CV, cover letter or source file prepared by you or
                     your external agent.
                   </Empty>
@@ -1132,7 +1137,11 @@ export function ApplicationDrawer({
                             )}
                         </strong>
                         <p>
-                          {e.payload?.status ? String(e.payload.status) : ""}
+                          {e.payload?.to
+                            ? `${e.payload.from ? `${stageLabels[String(e.payload.from) as Stage] || String(e.payload.from)} → ` : ""}${stageLabels[String(e.payload.to) as Stage] || String(e.payload.to)}`
+                            : e.payload?.status
+                              ? String(e.payload.status)
+                              : ""}
                         </p>
                         <time>{date(e.created_at)}</time>
                       </div>
@@ -1435,6 +1444,11 @@ function ContextBuilder({
       <form
         onSubmit={async (e) => {
           e.preventDefault();
+          if (
+            (selectEvidence && (knowledge.loading || knowledge.error)) ||
+            (selectClaims && (claims.loading || claims.error))
+          )
+            return;
           const f = new FormData(e.currentTarget);
           if (
             await mutate(async () => {
@@ -1478,6 +1492,11 @@ function ContextBuilder({
         {selectEvidence && (
           <fieldset className="selection-box">
             <legend>Career evidence</legend>
+            {knowledge.error ? (
+              <ErrorBox message={knowledge.error} retry={knowledge.reload} />
+            ) : knowledge.loading ? (
+              <Loading />
+            ) : null}
             <input
               aria-label="Find evidence for context"
               value={query}
@@ -1516,6 +1535,11 @@ function ContextBuilder({
         {selectClaims && (
           <fieldset className="selection-box">
             <legend>Approved claims</legend>
+            {claims.error ? (
+              <ErrorBox message={claims.error} retry={claims.reload} />
+            ) : claims.loading ? (
+              <Loading />
+            ) : null}
             {claims.data.items.map((c) => (
               <label className="checkline" key={c.id}>
                 <input
@@ -1533,7 +1557,14 @@ function ContextBuilder({
           <textarea name="note" rows={4} />
         </Field>
         <div className="actions form-actions">
-          <Button variant="primary" disabled={pending}>
+          <Button
+            variant="primary"
+            disabled={
+              pending ||
+              (selectEvidence && (knowledge.loading || !!knowledge.error)) ||
+              (selectClaims && (claims.loading || !!claims.error))
+            }
+          >
             Save & download context
           </Button>
         </div>

@@ -96,8 +96,8 @@ export default function TemplatesPage() {
   return (
     <>
       <Heading
-        title="A good starting point."
-        description="Your templates and writing guidance, ready for you and your agent."
+        title="Templates"
+        description="Manage LaTeX templates, assets and writing instructions for your agent."
       >
         <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
           Add template
@@ -162,7 +162,7 @@ export default function TemplatesPage() {
       ) : !template ? (
         <section className="card form-section">
           <Empty
-            title="Bring your own template."
+            title="No template selected"
             action={
               <Button icon="plus" onClick={() => setCreating(true)}>
                 Add a LaTeX template

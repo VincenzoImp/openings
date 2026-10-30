@@ -1,8 +1,8 @@
 # Architecture
 
 Openings is a FastAPI application, React dashboard and SQLite workspace. An
-optional CPU scorer runs as a separate service. There is no agent runtime,
-browser crawler, Redis, vector store or TeX compiler in the core.
+optional CPU scorer runs as a separate service. Agents, browser automation and
+TeX compilation run externally; the core uses no model runtime.
 
 ```mermaid
 flowchart LR
@@ -83,12 +83,13 @@ stale work cannot overwrite a current result. See [source configuration](../user
 Scoring is optional and advisory. Relevant profile/config edits mark scores outdated
 without queuing the archive. New or materially changed complete jobs may be scored;
 explicit selected/outdated batches and optional capped periodic rescoring are separate.
-There is no empirical fallback. Model/provider details are in the [scoring guide](../user/scoring.md).
+Scores come only from the configured model. Model/provider details are in the
+[scoring guide](../user/scoring.md).
 
 ## Extending the app
 
 Add behavior in the shared service before exposing it through REST, MCP and the
-manual dashboard. Update the operation inventory when adding an operation. Keep
+dashboard. Update the operation inventory when adding an operation. Keep
 operator/bootstrap and raw-byte transport differences explicit.
 
 Provider adapters emit bounded structured postings and use the shared HTTP gate.
