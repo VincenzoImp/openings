@@ -88,8 +88,8 @@ coalesce while a run is active. Pausing automation stops future enqueueing;
 explicit cancellation stops an active run.
 
 Every HTTP attempt uses the persisted provider gate: search, detail, preview,
-manual import and redirects. Policy includes minimum spacing, hourly/daily/run
-caps and Retry-After cooldown. Long waits defer tasks rather than occupying the
+manual import and redirects. Policy includes minimum spacing, shared hourly/daily
+caps, per-batch caps and Retry-After cooldown. Long waits defer tasks rather than occupying the
 collection lane. Failed/blocked responses remain visible; they are not successful
 empty results. Provider limits are local safeguards, not platform access guarantees.
 

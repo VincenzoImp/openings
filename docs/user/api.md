@@ -97,7 +97,9 @@ For a shared schedule, send a compatible bulk patch:
 ```
 
 `POST /sources/bulk` returns per-source outcomes. Omitted configuration keys remain
-unchanged; inspect failures before retrying. [Collection](sources.md) defines the
+unchanged. Omitted filter keys are preserved; an explicit empty list clears that
+filter. `schedule` replaces the whole schedule variant. Inspect failures before
+retrying. [Collection](sources.md) defines the
 limits, defaults, run counters and provider safeguards.
 
 ## Document and byte flow

@@ -50,7 +50,9 @@ Read `sources_schemas` for supported adapters, defaults and limits. Store one
 query/location per search. Read the current source and include `expected_version`
 for updates, runs and deletion; source service is fixed after creation. For a
 one-off backfill use run overrides, leaving saved settings unchanged. Compatible
-bulk configuration preserves omitted fields; inspect each source's outcome.
+bulk configuration preserves omitted config and filter keys; an empty filter list
+clears it. A schedule replaces the whole schedule variant. Inspect each source's
+outcome.
 
 Runs freeze source settings at enqueue time. Use `collection_runs_list` and
 `collection_runs_get` to distinguish progress, provider waits and failure.

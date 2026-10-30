@@ -97,7 +97,9 @@ configuration when queued; later source edits affect subsequent runs.
 
 Select sources to enable, pause, run, configure or delete them together. Bulk
 configuration changes only the chosen compatible fields and preserves untouched
-settings. Each source reports its own outcome; failed items remain selected for
+settings. Configuration and filter keys merge; an empty filter list clears that
+filter. A schedule replaces the whole schedule variant. Each source reports its
+own outcome; failed items remain selected for
 correction. Deleting a source retains its archived jobs. To use another source
 service, create a new source; an existing source's service is fixed.
 
@@ -108,9 +110,9 @@ provider limits and resume from stored progress. The run keeps cumulative counts
 
 | Counter | Meaning |
 |---|---|
-| Found | Received observations, including repeated jobs. |
+| Found | One observation per provider identity in this run; retrying or filling its description does not count it again. |
 | New | Unique new archive records. |
-| Already archived | Observations resolved to existing jobs; repeated observations can count again. |
+| Already archived | Observations resolved to existing archive records. The same job can appear through another provider or another source run. |
 | Invalid | Observations rejected during ingestion. |
 | Pending descriptions | Records still awaiting required detail work. |
 | Unavailable descriptions | Detail work finished without obtaining usable full text. |
