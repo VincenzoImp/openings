@@ -29,6 +29,7 @@ import {
   Heading,
   Icon,
   Loading,
+  LazyDetails,
   Tabs,
 } from "../ui";
 const blankProfile: Profile = {
@@ -106,7 +107,7 @@ function ProfileForm() {
   if (loading) return <Loading />;
   if (error) return <ErrorBox message={error} retry={reload} />;
   return (
-    <form className="profile-layout" onSubmit={save} key="profile">
+    <form className="profile-layout" onSubmit={save} key={data.version}>
       <section className="card sectioncard">
         <div className="sectiontitle">
           <div>
@@ -362,10 +363,12 @@ function KnowledgePage() {
               <p className="narrative">
                 {item.narrative_preview || item.narrative}
               </p>
-              <details className="evidence-files">
-                <summary>Supporting files</summary>
+              <LazyDetails
+                className="evidence-files"
+                summary="Supporting files"
+              >
                 <FileManager ownerType="knowledge" ownerId={item.id} />
-              </details>
+              </LazyDetails>
             </article>
           ))
         ) : (

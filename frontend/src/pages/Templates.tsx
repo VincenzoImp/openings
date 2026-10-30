@@ -45,10 +45,14 @@ export default function TemplatesPage() {
     });
   const { mutate, pending } = useWorkspace();
   const [selected, setSelected] = useUrlState("template", "");
+  const [fallbackTemplate, setFallbackTemplate] = useState("");
   const [tab, setTab] = useUrlState("section", "instructions");
   const [creating, setCreating] = useState(false),
     [removing, setRemoving] = useState(false);
-  const templateId = selected || resource.data.items[0]?.id;
+  const templateId = selected || fallbackTemplate || resource.data.items[0]?.id;
+  useEffect(() => {
+    if (!fallbackTemplate && templateId) setFallbackTemplate(templateId);
+  }, [fallbackTemplate, templateId]);
   const detail = useResource<Template | null>(
     templateId ? `/templates/${templateId}` : null,
     null,
@@ -157,7 +161,8 @@ export default function TemplatesPage() {
           </form>
         )}
       </section>
-      {resource.loading || (templateId && !template && !detail.error) ? (
+      {(!template && resource.loading) ||
+      (templateId && !template && !detail.error) ? (
         <Loading />
       ) : !template ? (
         <section className="card form-section">
@@ -176,6 +181,12 @@ export default function TemplatesPage() {
       ) : (
         <div className="templates-layout form-section">
           <aside className="template-list" aria-label="Saved templates">
+            {!resource.data.items.length && (
+              <p className="hint">
+                No templates match this search. Your current template remains
+                open.
+              </p>
+            )}
             {resource.data.items.map((item) => (
               <button
                 key={item.id}
@@ -382,7 +393,16 @@ export default function TemplatesPage() {
                   )
                 ) {
                   setRemoving(false);
-                  setSelected("");
+                  const remaining = resource.data.items.filter(
+                    (item) => item.id !== template.id,
+                  );
+                  resource.setData({
+                    ...resource.data,
+                    items: remaining,
+                    total: resource.data.total - 1,
+                  });
+                  setFallbackTemplate(remaining[0]?.id || "");
+                  setSelected(remaining[0]?.id || "");
                 }
               }}
             >
