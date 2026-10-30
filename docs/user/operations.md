@@ -16,7 +16,8 @@ curl --fail "$OPENINGS_URL/api/v1/backup" \
 Keep backups private: they contain personal information and stored credentials.
 The database is not encrypted. A JSON export is useful for reading records, but
 omits binary file contents and is not a restorable backup. Download it through
-Settings, `GET /api/v1/export`, or the scoped `workspace_export` MCP grant. Use the backup action rather than copying a live `.sqlite` file with an active WAL journal.
+Settings, `GET /api/v1/export`, or the scoped `workspace_export` MCP grant. Use the
+backup action to capture changes from an active WAL journal consistently.
 
 ## Restore or move hosts
 

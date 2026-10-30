@@ -1,9 +1,8 @@
 # Openings
 
-**Find the right jobs. Keep your story ready. Let your agent handle the paperwork.**
-
-A self-hosted job-search workspace: scheduled collection, career knowledge, tailored
-application documents and progress tracking, in one portable SQLite database.
+A self-hosted workspace for collecting jobs, storing career evidence, preparing
+application documents with an external agent and tracking progress. Records and
+files live in one portable SQLite database.
 
 [Get started](docs/user/getting-started.md) · [Connect your agent](docs/user/agents.md) · [REST API](docs/user/api.md)
 
@@ -11,13 +10,13 @@ application documents and progress tracking, in one portable SQLite database.
 
 ![Collect jobs, organize your career context, prepare documents with your agent, and track applications](docs/images/workflow.svg)
 
-## Everything around an application
+## Features
 
 | Find and organize | Prepare and follow through |
 |---|---|
 | **Saved searches:** choose keywords, location and LinkedIn, Indeed or Glassdoor. | **Career knowledge:** keep your profile, detailed experience, approved claims and evidence. |
 | **Company watch:** follow selected company ATS boards or RSS/Atom feeds. | **Your templates:** multiple LaTeX packages, assets, defaults and editable writing rules. |
-| **One inbox:** add a URL or posting yourself; search, filter, save, dismiss and update in bulk. | **Exact documents:** CVs, letters, form answers, PDF/source revisions and review history. |
+| **One inbox:** add a URL or posting yourself; search, filter, save, dismiss and update in bulk. | **Document revisions:** CVs, letters, form answers, PDF/source files and review history. |
 | **Controlled automation:** schedules, global pause, request budgets, cooldowns and visible task results. | **Application tracking:** list/Kanban, independent attempts and a funnel based on recorded progress. |
 | **Optional fit scoring:** a separate CPU classifier or compatible remote service. | **One portable archive:** SQLite stores records and file bytes; back up or move the workspace. |
 
@@ -28,10 +27,10 @@ application documents and progress tracking, in one portable SQLite database.
 
 </details>
 
-### Your dashboard. Your scripts. Your agent.
+### Dashboard, API and agents
 
 Use the **dashboard** by hand, the **REST API** for scripts, or **MCP** with your
-preferred external agent. They share the same application operations.
+external agent. They share the same application operations.
 
 Your agent reads the saved job, career evidence, templates and instructions;
 writes the CV, letter and form answers; compiles externally; then uploads the
@@ -61,7 +60,7 @@ organize or track jobs. Optional scoring starts separately.
 
 To build from source instead, follow [Development](CONTRIBUTING.md).
 
-## A few useful boundaries
+## Limits
 
 Scoring is advisory and disabled by default. Public portals can block requests or
 change their pages; provider budgets are safeguards, not guaranteed access.
@@ -71,9 +70,11 @@ Document generation and LaTeX compilation run in your external agent. Openings
 tracks the work; sending applications and automating portals stay outside the app.
 There is no built-in AI subscription, chat, server browser or TeX compiler.
 
-Version **0.5** is a substantial rewrite. Previous databases/configuration are
-not compatible, and stable API/data-format compatibility is not yet promised.
-The default core loads no model; the optional local-scoring deployment has a
-combined **2 CPU / 4 GiB** Compose budget. See the [hardware notes](docs/user/scoring.md).
+Version **0.5** uses a new workspace format; 0.4.x databases/configuration are
+not compatible. Stable API/data-format compatibility is not yet promised.
+The default core loads no model. Compose caps it at **0.5 CPU / 512 MiB**;
+the optional local scorer brings the combined cap to **2 CPU / 4 GiB**.
+These are container limits, not minimum host requirements. See
+[deployment modes and resources](docs/user/getting-started.md#deployment-modes-and-resources).
 
 [Contributing](CONTRIBUTING.md) · [Architecture](docs/developer/architecture.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md) · [MIT license](LICENSE)

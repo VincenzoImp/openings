@@ -13,16 +13,15 @@ it. An agent's `localhost` refers to the agent machine, not necessarily the serv
 The optional repository skill is
 [`skills/openings-workspace/SKILL.md`](../../skills/openings-workspace/SKILL.md).
 Install it using your agent's skill mechanism if desired. MCP remains usable
-without it: discover actual tools/resources and their typed input schemas.
-
+without it: discover the tools/resources and their typed input schemas.
 
 ## Working sequence
 
 1. Call `workspace_info`, `capabilities_get`, `career_get_profile`, `knowledge_list`, `claims_list`,
    `templates_list` and `instructions_get` as needed. Detailed narratives explain
    the facts; approved claims are reusable wording, not the only allowed wording.
-2. Find or ingest the job with `jobs_search`, `job_get` or `job_ingest`. A manual
-   offer is first-class; scheduled collection is not required.
+2. Find or ingest the job with `jobs_search`, `job_get` or `job_ingest`. You can
+   add a posting manually without setting up collection.
 3. Create a draft attempt with `application_create`, including questions and
    application-specific notes/guidance. Do not change progress merely to prepare files.
 4. Call `application_prepare_context` with the application, selected templates,
@@ -37,7 +36,7 @@ without it: discover actual tools/resources and their typed input schemas.
 7. Leave reviewable drafts. Approve only when asked, and record Applied only after
    actual submission. Portals and sending are outside Openings.
 
-Discover actual input schemas. `jobs_search`, `applications_list` and `overview_get`
+Check the discovered input schemas. `jobs_search`, `applications_list` and `overview_get`
 accept an optional `value` DTO: for example, `jobs_search({"value":{"q":"Python",
 "triage":"saved","limit":20}})`. Career lists keep flat filters and offer
 `summary=true`; fetch detail records before generating from evidence/templates.
@@ -74,6 +73,5 @@ REST supports the same workflow when scripting is more convenient. See the
 `workspace_restore_upload` and `workspace_export` return short-lived operational
 transfer instructions. Restore replaces workspace data.
 
-Your chosen agent/provider supplies generation and compilation. An existing
-agent subscription may cover its own work; Openings neither includes nor logs
-into that subscription. With no agent, you can edit and upload documents manually.
+Your agent supplies its own model access and compilation tools. You can also
+prepare and upload documents manually.
