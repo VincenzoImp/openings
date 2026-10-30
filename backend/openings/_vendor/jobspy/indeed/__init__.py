@@ -56,13 +56,13 @@ class Indeed(Scraper):
             transport=self.transport,
         )
         filters = self._build_filters()
-        job_list: list[JobPost] = []
-        seen: set[object] = set()
-        skip = scraper_input.offset
-        cursor = None
+        job_list = self.saved_jobs()
+        seen = set(self.checkpoint.get("seen", []))
+        skip = 0 if self.checkpoint else scraper_input.offset
+        cursor = self.checkpoint.get("cursor")
         page = 1
 
-        while len(job_list) < scraper_input.results_wanted:
+        while not self.checkpoint.get("complete") and len(job_list) < scraper_input.results_wanted:
             self.log.info(f"search page: {page}")
             try:
                 response = self.session.post(
@@ -76,9 +76,7 @@ class Indeed(Scraper):
                     raise ValueError(f"API error: {data.get('errors')}")
                 job_search = JobSearch.model_validate(search)
                 jobs = {
-                    result.job["key"]: result.job
-                    for result in job_search.results
-                    if result.job
+                    result.job["key"]: result.job for result in job_search.results if result.job
                 }
                 new_jobs = [job for key, job in jobs.items() if key not in seen]
                 seen.update(jobs)
@@ -97,7 +95,11 @@ class Indeed(Scraper):
                     break
             skip = max(skip - len(new_jobs), 0)
 
-            if not new_jobs or not cursor:
+            finished = not new_jobs or not cursor or len(job_list) >= scraper_input.results_wanted
+            self.save_jobs(
+                job_list, cursor=cursor, seen=list(seen), complete=finished, pending_details=0
+            )
+            if finished:
                 break
             page += 1
 
@@ -110,18 +112,14 @@ class Indeed(Scraper):
         if distance is None:
             distance = default_distance
         return job_search_query.format(
-            what=(
-                f"what: {json.dumps(search_term, ensure_ascii=False)}"
-                if search_term
-                else ""
-            ),
+            what=(f"what: {json.dumps(search_term, ensure_ascii=False)}" if search_term else ""),
             location=(
                 f"location: {{where: {json.dumps(location, ensure_ascii=False)}, radius: {distance}, radiusUnit: MILES}}"
                 if location
                 else ""
             ),
             limit=jobs_per_page,
-            cursor=f'cursor: "{cursor}"' if cursor else "",
+            cursor=f"cursor: {json.dumps(cursor)}" if cursor else "",
             filters=filters,
         )
 
@@ -146,9 +144,7 @@ class Indeed(Scraper):
             keys.append(permanent_key)
         if len(keys) > 1:
             any_key = ", ".join(attribute(key) for key in keys)
-            filters.append(
-                f"{{ composite: {{ filters: [{any_key}], operation: OR }} }}"
-            )
+            filters.append(f"{{ composite: {{ filters: [{any_key}], operation: OR }} }}")
         elif keys:
             filters.append(attribute(keys[0]))
         if self.scraper_input.is_remote:
@@ -156,9 +152,7 @@ class Indeed(Scraper):
             filters.append(attribute(hybrid_key, ", match: MUST_NOT"))
 
         if self.scraper_input.easy_apply:
-            filters.append(
-                '{ keyword: { field: "indeedApplyScope", keys: ["DESKTOP"] } }'
-            )
+            filters.append('{ keyword: { field: "indeedApplyScope", keys: ["DESKTOP"] } }')
         return f"filters: [{', '.join(filters)}]" if filters else ""
 
     def _process_job(self, raw: dict[str, object]) -> JobPost:

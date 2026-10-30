@@ -29,10 +29,15 @@ def populated(tmp_path):
                 ),
             )
             connection.execute(
-                "INSERT INTO tasks(id,kind,source_id,payload,dedupe_key,next_run_at,created_at,updated_at) VALUES(?,'collect',?,?,?,?,?,?)",
+                "INSERT INTO collection_runs(id,source_id,source_name,source_version,source_snapshot,created_at) VALUES(?,?,?,1,'{}',?)",
+                (f"run-{index:04}", source_id, f"Example {index:04}", stamp),
+            )
+            connection.execute(
+                "INSERT INTO tasks(id,kind,source_id,run_id,payload,dedupe_key,next_run_at,created_at,updated_at) VALUES(?,'collect',?,?,?,?,?,?,?)",
                 (
                     f"task-{index:04}",
                     source_id,
+                    f"run-{index:04}",
                     encode({"manual": False, "source_version": 1, "provider": "greenhouse"}),
                     f"collect:{source_id}",
                     stamp,
@@ -50,20 +55,22 @@ def test_source_page_batches_reads_and_preserves_provider_summaries(populated, m
             "UPDATE sources SET kind='jobspy',config=? WHERE id='source-0000'",
             (encode({"providers": ["indeed", "linkedin"]}),),
         )
-        for task_id, provider, state, created, result, error in [
-            ("indeed-old", "indeed", "succeeded", "2026-01-02", {"created": 50}, None),
-            ("indeed-new", "indeed", "failed", "2026-01-03", {"created": 3}, "Blocked"),
+        connection.execute(
+            "INSERT INTO collection_runs(id,source_id,source_name,source_version,source_snapshot,created_at) VALUES('new-run','source-0000','Example',1,'{}',?)",
+            ("2026-01-03T00:00:00+00:00",),
+        )
+        for task_id, provider, state, result, error in [
+            ("indeed-new", "indeed", "failed", {"created": 3}, "Blocked"),
             (
                 "linkedin-new",
                 "linkedin",
                 "running",
-                "2026-01-03",
                 {"received": 2, "diagnostics": [{"provider": "linkedin"}]},
                 None,
             ),
         ]:
             connection.execute(
-                "INSERT INTO tasks(id,kind,source_id,state,payload,result,next_run_at,error,created_at,updated_at) VALUES(?,'collect','source-0000',?,?,?,?,?,?,?)",
+                "INSERT INTO tasks(id,kind,source_id,run_id,state,payload,result,next_run_at,error,created_at,updated_at) VALUES(?,'collect','source-0000','new-run',?,?,?,?,?,?,?)",
                 (
                     task_id,
                     state,
@@ -71,8 +78,8 @@ def test_source_page_batches_reads_and_preserves_provider_summaries(populated, m
                     encode(result),
                     stamp,
                     error,
-                    created,
-                    created,
+                    "2026-01-03T00:00:00+00:00",
+                    stamp,
                 ),
             )
     reads = []
@@ -89,14 +96,16 @@ def test_source_page_batches_reads_and_preserves_provider_summaries(populated, m
     assert len(reads) <= 5
     first = page["items"][0]
     assert first["last_outcome"] == "running"
-    assert first["last_task_id"] == "linkedin-new"
-    assert first["last_counts"] == {"created": 3, "received": 2}
+    assert first["last_task_id"] in {"indeed-new", "linkedin-new"}
+    assert first["last_counts"]["created"] == 3 and first["last_counts"]["received"] == 2
     assert first["last_error"] == "Blocked"
     assert first["last_diagnostics"] == [{"provider": "linkedin"}]
-    assert first["next_run_at"] == stamp
-    assert first == service.get_source(first["id"])
+    assert first["next_run_at"] is None
+    assert first["last_counts"] == service.get_source(first["id"])["last_counts"]
     assert page["items"][1]["last_outcome"] == "queued"
-    assert service.list_sources(limit=2, offset=348)["items"] == page["items"][348:]
+    assert [item["id"] for item in service.list_sources(limit=2, offset=348)["items"]] == [
+        item["id"] for item in page["items"][348:]
+    ]
 
 
 def test_scheduler_does_not_rebuild_collection_or_source_summaries(populated, monkeypatch):

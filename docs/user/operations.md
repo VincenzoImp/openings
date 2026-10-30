@@ -21,11 +21,10 @@ backup action to capture changes from an active WAL journal consistently.
 
 ## Restore or move hosts
 
-On the destination host, install Openings 0.8.0, set its owner password, then restore
-through Settings or `POST /api/v1/backup/restore` with the raw SQLite body. Restore
-accepts the current database format and checks integrity and foreign keys before
-replacement. It
-preserves the destination installation's owner credentials/API tokens, clears
+On the destination host, install the same Openings release and set its owner
+password. Restore through Settings or `POST /api/v1/backup/restore` with the raw
+SQLite body. Restore accepts the current database format and checks integrity and
+foreign keys before replacement. It preserves the destination installation's owner credentials/API tokens, clears
 pending transfer grants and recovers interrupted tasks. Provider policy settings are
 restored, while recent HTTP window events and later cooldowns already recorded on
 the destination are conservatively retained; restoring an older backup does not
@@ -60,7 +59,8 @@ container is recreated. Editing `OPENINGS_PASSWORD` does not reset an existing o
 Tasks show failures, cancellation and explicit retry. Source/scorer failures do
 not discard acquired jobs. Relevant profile/settings edits mark scores outdated;
 periodic rescoring is optional and off by default. The global automatic collection
-switch preserves source settings; explicit manual runs still honor provider budgets.
+switch preserves source settings and prevents new scheduled runs. Queued/current
+runs continue until stopped; explicit manual runs still honor provider budgets.
 Disable scoring when you want inference to stop.
 
 ## Access controls

@@ -1,4 +1,4 @@
-"""Narrow clients for public ATS boards and two explicit regional searches.
+"""Bounded clients for public company ATS boards.
 
 These adapters read public JSON/XML or embedded page data. They do not execute
 JavaScript, traverse arbitrary pages or import user-provided Python code.
@@ -25,26 +25,7 @@ class BoardConfig(BaseModel):
     region: str = "global"
     max_results: int = Field(default=100, ge=1, le=2000)
     max_details: int = Field(default=10, ge=0, le=25)
-
-
-class JobCloudConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-    query: str = Field(min_length=1, max_length=300)
-    location: str = Field(default="", max_length=300)
-    host: str = Field(default="jobs.ch", pattern=r"^(jobs\.ch|jobup\.ch)$")
-    results_wanted: int = Field(default=20, ge=1, le=40)
-    max_details: int = Field(default=10, ge=0, le=25)
-
-
-class AdzunaConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-    query: str = Field(min_length=1, max_length=300)
-    location: str = Field(default="", max_length=300)
-    country: str = Field(default="gb", pattern=r"^[a-z]{2}$")
-    app_id: str = Field(min_length=1, max_length=300)
-    app_key: str = Field(min_length=1, max_length=1000)
-    results_wanted: int = Field(default=20, ge=1, le=50)
-    max_days_old: int = Field(default=7, ge=1, le=365)
+    max_candidates: int = Field(default=2000, ge=20, le=10000)
 
 
 def xml(body):
@@ -92,6 +73,29 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
     max_details = min(config.get("max_details", 10), 3 if preview else 25)
     details = 0
     items = []
+    checkpoint = source.get("checkpoint", {}) if not preview else {}
+    cache = checkpoint.setdefault("responses", {})
+    attempts = checkpoint.setdefault("detail_attempts", {})
+    detail_requests = checkpoint.setdefault("detail_requests", {})
+    pending = set()
+    unavailable = set()
+    max_candidates = min(config.get("max_candidates", 2000), 3 if preview else 10000)
+
+    def save():
+        checkpoint["complete"] = False
+        checkpoint["pending_details"] = len(pending)
+        if source.get("on_checkpoint") and not preview:
+            source["on_checkpoint"](checkpoint)
+
+    def response(url, *, body=None):
+        key = json.dumps([url, body], sort_keys=True)
+        if key not in cache:
+            cache[key] = (
+                request(url) if body is None else request(url, method="POST", body=body)
+            ).decode("utf-8")
+            save()
+        return cache[key].encode("utf-8")
+
     known = known or {}
     checked = source.get("detail_checked") or {}
     cutoff = (datetime.fromisoformat(now()) - timedelta(hours=24)).isoformat(
@@ -107,9 +111,9 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         return matches_filters({"title": str(title or ""), "location": str(place or "")}, filters)
 
     def select(rows, title, place):
-        if len(rows) > 2000:
+        if len(rows) > max_candidates:
             source["candidate_capped"] = True
-        matching = [row for row in rows[:2000] if matches(title(row), place(row))]
+        matching = [row for row in rows[:max_candidates] if matches(title(row), place(row))]
         if len(matching) > maximum:
             source["result_capped"] = True
         return matching[:maximum]
@@ -121,8 +125,10 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
 
     def get(url, *, body=None):
         try:
-            return json.loads(request(url, method="POST" if body is not None else "GET", body=body))
+            return json.loads(response(url, body=body))
         except (ValueError, UnicodeError) as error:
+            cache.pop(json.dumps([url, body], sort_keys=True), None)
+            save()
             raise DomainError(
                 502,
                 "source_format",
@@ -131,15 +137,23 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
 
     def detail(key, url, *, body=None):
         nonlocal details
-        if (
-            source.get("collection_error")
-            or (not preview and checked.get(key, "") > cutoff)
-            or details >= max_details
-        ):
+        if not preview and key in known and checked.get(key, "") > cutoff:
+            return {}
+        request_key = json.dumps([url, body], sort_keys=True)
+        if request_key in cache:
+            return get(url, body=body)
+        if max_details == 0 or attempts.get(key, 0) >= 3:
+            unavailable.add(key)
+            return {}
+        if source.get("collection_error") or details >= max_details:
+            pending.add(key)
             return {}
         details += 1
+        detail_requests[key] = request_key
         result = get(url, body=body)
+        attempts[key] = attempts.get(key, 0) + 1
         detail_checks[key] = now()
+        save()
         return result
 
     def add(row, identity, title, url, place="", posting="", **metadata):
@@ -148,14 +162,30 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         key = f"{kind}:{board or config.get('host', '')}:{identity}"
         previous = known.get(key, {}) if isinstance(known, dict) else {}
         posting = text(str(posting or ""))
+        if not posting and key in known:
+            posting = (source.get("known_postings") or {}).get(key, "")
+        if not posting and key in attempts and key not in pending:
+            if attempts[key] < 3 and max_details:
+                pending.add(key)
+                # An empty detail response is retried in a later bounded batch.
+                cache.pop(detail_requests.get(key), None)
+            else:
+                unavailable.add(key)
         metadata = {
             **previous,
             **{key: value for key, value in metadata.items() if value is not None and value != ""},
         }
-        if len(posting) > 200000:
+        if not posting and key in known:
+            metadata["description_complete"] = previous.get("description_complete", True)
+        elif not posting:
             metadata["description_complete"] = False
-        elif posting and key in detail_checks and previous.get("description_complete") is False:
+            metadata["description_status"] = "pending" if key in pending else "unavailable"
+        elif len(posting) > 200000:
+            metadata["description_complete"] = False
+        elif posting:
+            unavailable.discard(key)
             metadata["description_complete"] = True
+            metadata["description_status"] = "complete"
         items.append(
             {
                 "source_key": key,
@@ -218,7 +248,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             )
     elif kind == "personio":
         base = f"https://{board}.jobs.personio.de"
-        root = xml(request(base + "/xml?language=en"))
+        root = xml(response(base + "/xml?language=en"))
         if root.tag != "workzag-jobs":
             raise DomainError(
                 502, "source_format", "Personio did not return its public positions feed."
@@ -333,7 +363,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         base = f"https://api.smartrecruiters.com/v1/companies/{slug}/postings"
         listed = []
         try:
-            for offset in range(0, 100 if preview else 500, 100):
+            for offset in range(0, 100 if preview else max_candidates, 100):
                 rows = records(
                     get(base + "?" + urlencode({"limit": 100, "offset": offset})),
                     "content",
@@ -380,7 +410,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         api, public = f"https://{host}/wday/cxs/{tenant}/{site}", f"https://{host}/{site}"
         listed = []
         try:
-            for offset in range(0, 20 if preview else 200, 20):
+            for offset in range(0, 20 if preview else max_candidates, 20):
                 rows = records(
                     get(
                         api + "/jobs",
@@ -425,7 +455,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         base = f"https://{host}/hcmRestApi/resources/latest"
         listed = []
         try:
-            for offset in range(0, 50 if preview else 200, 50):
+            for offset in range(0, 50 if preview else max_candidates, 50):
                 payload = get(
                     base
                     + "/recruitingCEJobRequisitions?"
@@ -487,7 +517,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         base = f"https://join.com/companies/{slug}"
 
         def state(url):
-            page = request(url).decode("utf-8", errors="replace")
+            page = response(url).decode("utf-8", errors="replace")
             match = re.search(r'id="__NEXT_DATA__"[^>]*>(.*?)</script>', page, re.S)
             if not match:
                 raise DomainError(
@@ -527,10 +557,20 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             url = base + "/" + quote(path, safe="-") if path else ""
             full = {}
             key = f"{kind}:{board}:{identity}"
-            if url and (preview or checked.get(key, "") <= cutoff) and details < max_details:
-                details += 1
-                full = state(url).get("job") or {}
-                detail_checks[key] = now()
+            if url and (preview or key not in known or checked.get(key, "") <= cutoff):
+                if key in attempts and json.dumps([url, None], sort_keys=True) in cache:
+                    full = state(url).get("job") or {}
+                elif details < max_details and attempts.get(key, 0) < 3:
+                    details += 1
+                    detail_requests[key] = json.dumps([url, None], sort_keys=True)
+                    full = state(url).get("job") or {}
+                    attempts[key] = attempts.get(key, 0) + 1
+                    detail_checks[key] = now()
+                    save()
+                elif max_details and attempts.get(key, 0) < 3:
+                    pending.add(key)
+                else:
+                    unavailable.add(key)
             merged = {**row, **full}
             city = merged.get("city") or {}
             add(
@@ -549,105 +589,15 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
                 ),
                 remote=merged.get("workplaceType") == "REMOTE",
             )
-    elif kind == "jobcloud":
-        host = config["host"]
-        listed = []
-        try:
-            for page in range(1, 2 if preview else 3):
-                count = 20
-                rows = records(
-                    get(
-                        f"https://{host}/api/v1/public/search?"
-                        + urlencode(
-                            {
-                                "query": config["query"],
-                                "location": config["location"],
-                                "rows": count,
-                                "page": page,
-                            }
-                        )
-                    ),
-                    "documents",
-                )
-                listed.extend(rows)
-                if len(rows) < count:
-                    break
-            else:
-                source["candidate_capped"] = True
-        except DomainError as error:
-            if not listed:
-                raise
-            source["collection_error"] = error
-        for row in ordered(
-            select(listed, lambda row: row.get("title"), lambda row: row.get("place")),
-            lambda row: f"{kind}:{config['host']}:{row.get('job_id')}",
-        ):
-            identity = row.get("job_id")
-            full = detail(
-                f"{kind}:{host}:{identity}",
-                f"https://{host}/api/v1/public/search/job/" + quote(str(identity), safe=""),
-            )
-            description = (
-                full.get("job_content")
-                or full.get("content")
-                or "\n\n".join(
-                    full[key] for key in ("template_lead_text", "template_text") if full.get(key)
-                )
-            )
-            known_complete = f"{kind}:{host}:{identity}" in known
-            links = row.get("_links") or {}
-            url = next(
-                (
-                    (links.get(key) or {}).get("href")
-                    for key in ("detail_en", "detail_de", "detail_fr", "detail_it")
-                    if (links.get(key) or {}).get("href")
-                ),
-                "",
-            )
-            add(
-                {"listing": row, "detail": full},
-                identity,
-                row.get("title"),
-                url
-                or (
-                    f"https://{host}/en/vacancies/detail/{row['slug']}/" if row.get("slug") else ""
-                ),
-                row.get("place"),
-                description or ("" if known_complete else row.get("preview")),
-                company=row.get("company_name"),
-                published_at=row.get("publication_date"),
-                languages=row.get("language_skills"),
-                description_complete=bool(description) or known_complete,
-            )
-    elif kind == "adzuna":
-        params = {
-            "app_id": config["app_id"],
-            "app_key": config["app_key"],
-            "what": config["query"],
-            "where": config["location"],
-            "results_per_page": maximum,
-            "max_days_old": config["max_days_old"],
-        }
-        payload = get(
-            f"https://api.adzuna.com/v1/api/jobs/{config['country']}/search/1?" + urlencode(params)
-        )
-        for row in select(
-            records(payload, "results"),
-            lambda row: row.get("title"),
-            lambda row: (row.get("location") or {}).get("display_name"),
-        ):
-            add(
-                row,
-                row.get("id"),
-                row.get("title"),
-                row.get("redirect_url"),
-                (row.get("location") or {}).get("display_name"),
-                row.get("description"),
-                company=(row.get("company") or {}).get("display_name"),
-                published_at=row.get("created"),
-                description_complete=False,
-                salary={"min_amount": row.get("salary_min"), "max_amount": row.get("salary_max")},
-            )
     else:
         raise DomainError(422, "unsupported_source", "This company source type is unsupported.")
+    checkpoint["pending_details"] = len(pending)
+    checkpoint["unavailable_descriptions"] = len(unavailable)
+    checkpoint["complete"] = not pending and not source.get("collection_error")
+    if checkpoint["complete"]:
+        checkpoint.pop("responses", None)
+        checkpoint.pop("detail_attempts", None)
+        checkpoint.pop("detail_requests", None)
+    if source.get("on_checkpoint") and not preview:
+        source["on_checkpoint"](checkpoint)
     return items

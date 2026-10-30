@@ -49,13 +49,16 @@ rubrics or score levels are rejected before inference so their meaning is preser
 Other compatible System One services control their own input preparation. Their
 reported token usage is retained with the result.
 
-New complete jobs are queued when scoring is enabled. **Automatic rescoring of
-changed postings** is on by default; turn it off to score only previously unseen
-jobs automatically. Saving that switch does not queue or invalidate existing scores.
+Newly discovered complete jobs are queued when scoring is enabled. A newly
+collected header with a pending description becomes eligible for its first score
+when that description is completed. **Automatic rescoring of changed postings**
+is on by default; turn it off to keep existing jobs out of automatic update
+rescoring. With that switch off, historical unscored jobs wait for an explicit
+batch. Saving the switch does not queue or invalidate existing scores.
+
 Known partial previews and punctuation-only placeholders stay archived without
-scoring. Completing the posting through **Edit details**, REST or MCP makes it
-eligible for explicit scoring, and for automatic scoring when update rescoring
-is enabled. Source refreshes preserve that correction.
+scoring. Correct text through **Edit details**, REST or MCP; source refreshes
+preserve that correction.
 Relevant profile, rubric or model edits mark older results **Outdated** without
 enqueuing the whole archive. Contact/template edits do not require rescoring.
 Rescore selected jobs or request a bounded batch of unscored or outdated jobs.

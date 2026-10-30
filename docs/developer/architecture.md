@@ -76,10 +76,20 @@ do not include converters for earlier formats.
 A saved search has one explicit query/location and provider selection. Company
 sources watch selected ATS boards/feeds with optional title/location filters.
 Both use the same ingestion path as manually added jobs. New sources start paused.
+Typed schemas expose adapter defaults and capabilities. Source service is immutable;
+versioned bulk patches merge compatible fields without replacing untouched config.
+
+A collection invocation freezes effective source configuration and optional run-only
+overrides, then groups provider tasks under one run ID. Each task persists its
+pagination/detail checkpoint between bounded attempts. Counts accumulate across
+retries and waits; source summaries reference one invocation. Daily schedules store
+local time slots and timezone, independently of execution timestamps; missed slots
+coalesce while a run is active. Pausing automation stops future enqueueing;
+explicit cancellation stops an active run.
 
 Every HTTP attempt uses the persisted provider gate: search, detail, preview,
-manual import and redirects. Policy includes minimum spacing, hourly/daily/run
-caps and Retry-After cooldown. Long waits defer tasks rather than occupying the
+manual import and redirects. Policy includes minimum spacing, shared hourly/daily
+caps, per-batch caps and Retry-After cooldown. Long waits defer tasks rather than occupying the
 collection lane. Failed/blocked responses remain visible; they are not successful
 empty results. Provider limits are local safeguards, not platform access guarantees.
 
@@ -90,7 +100,10 @@ stale work cannot overwrite a current result. See [source configuration](../user
 
 Scoring is optional and advisory. Relevant profile/config edits mark scores outdated
 without queuing the archive. New complete jobs may be scored automatically;
-automatic rescoring of updates has a separate switch. Explicit selected/outdated
+a pending-first-score marker also allows newly collected incomplete jobs to receive
+one initial score after detail completion. Existing historical unscored jobs do not
+acquire that eligibility merely because they are refreshed. Automatic rescoring
+of updates has a separate switch. Explicit selected/outdated
 batches and optional capped periodic rescoring are separate. Scores come from the
 configured classifier. Model/provider details are in the
 [scoring guide](../user/scoring.md).

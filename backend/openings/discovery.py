@@ -18,9 +18,9 @@ from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from typing import Any, Literal
 from urllib.parse import parse_qs, quote, urljoin, urlsplit
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
+from fastapi import Query
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
@@ -37,6 +37,7 @@ from .common import (
 from .errors import DomainError
 from .posting import posting_complete_sql, matches_filters
 from .worker import inference_guard
+from .scheduling import Schedule, IntervalSchedule, schedule_adapter, next_due
 from .collectors import company as company_collectors
 from .collectors import jobspy as jobspy_collector
 from .collectors.policy import (
@@ -65,8 +66,6 @@ SourceKind = Literal[
     "workday",
     "oracle",
     "joincom",
-    "jobcloud",
-    "adzuna",
 ]
 MAX_FEED_BYTES = 8 * 1024 * 1024
 HTTP_BUDGET: ContextVar[ProviderBudget | None] = ContextVar("collection_http_budget", default=None)
@@ -98,29 +97,6 @@ class Filters(Input):
         return list(dict.fromkeys(v.strip()[:150] for v in values if v.strip()))
 
 
-class Schedule(Input):
-    kind: Literal["interval", "daily"] = "interval"
-    minutes: int = Field(default=1440, ge=15, le=43_200)
-    at: str = "07:00"
-    timezone: str = "UTC"
-
-    @field_validator("at")
-    @classmethod
-    def valid_time(cls, value):
-        if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", value):
-            raise ValueError("Use a time in HH:MM format.")
-        return value
-
-    @field_validator("timezone")
-    @classmethod
-    def valid_timezone(cls, value):
-        try:
-            ZoneInfo(value)
-        except ZoneInfoNotFoundError as error:
-            raise ValueError("Use a valid IANA time zone.") from error
-        return value
-
-
 class SourcePreview(Input):
     name: str = Field(default="", max_length=200)
     url: str = Field(default="", max_length=2000)
@@ -131,7 +107,7 @@ class SourcePreview(Input):
 
 class SourceCreate(SourcePreview):
     enabled: bool = False
-    schedule: Schedule = Field(default_factory=Schedule)
+    schedule: Schedule = Field(default_factory=IntervalSchedule)
 
 
 class RSSConfig(Input):
@@ -166,9 +142,53 @@ class SourceVersion(Input):
     expected_version: int = Field(ge=1)
 
 
+class RunOverrides(Input):
+    hours_old: int | None = Field(default=None, ge=1, le=8760)
+    results_wanted: int | None = Field(default=None, ge=1, le=50)
+    max_results: int | None = Field(default=None, ge=1, le=2000)
+    max_details: int | None = Field(default=None, ge=0, le=25)
+
+    @model_validator(mode="after")
+    def reject_null(self):
+        if any(getattr(self, key) is None for key in self.model_fields_set):
+            raise ValueError("Omit unchanged run options rather than sending null.")
+        return self
+
+
+class SourceRun(Input):
+    expected_version: int = Field(ge=1)
+    overrides: RunOverrides = Field(default_factory=RunOverrides)
+
+
+class SourceConfigure(Input):
+    schedule: Schedule | None = None
+    config: dict[str, Any] | None = None
+    filters: Filters | None = None
+
+    @model_validator(mode="after")
+    def nonempty(self):
+        if not self.model_fields_set or any(
+            getattr(self, key) is None for key in self.model_fields_set
+        ):
+            raise ValueError("Provide at least one non-null configuration field.")
+        return self
+
+
 class SourceBulk(Input):
-    action: Literal["enable", "pause", "run", "delete"]
+    action: Literal["enable", "pause", "run", "delete", "configure"]
     items: list[SourceVersion] = Field(min_length=1, max_length=200)
+    patch: SourceConfigure | None = None
+    overrides: RunOverrides = Field(default_factory=RunOverrides)
+
+    @model_validator(mode="after")
+    def valid_options(self):
+        if (self.action == "configure") != (self.patch is not None):
+            raise ValueError("A configuration patch is required only for Configure.")
+        if self.action != "run" and self.overrides.model_fields_set:
+            raise ValueError("Run overrides apply only to Run.")
+        if len({item.id for item in self.items}) != len(self.items):
+            raise ValueError("Select each source once.")
+        return self
 
 
 class PeriodicRescore(Input):
@@ -487,12 +507,8 @@ def resolve_source(value: dict) -> dict:
             resolved = next(iter(found.values()))
         kind, config = resolved["kind"], {**config, **resolved["config"]}
         url = resolved["url"]
-    elif kind in ("jobspy", "jobcloud", "adzuna"):
-        cls = {
-            "jobspy": jobspy_collector.JobSpyConfig,
-            "jobcloud": company_collectors.JobCloudConfig,
-            "adzuna": company_collectors.AdzunaConfig,
-        }[kind]
+    elif kind == "jobspy":
+        cls = jobspy_collector.JobSpyConfig
         try:
             config = cls.model_validate(
                 {key: val for key, val in config.items() if key not in ("url", "filters")}
@@ -529,7 +545,7 @@ def resolve_source(value: dict) -> dict:
                     422, "source_mismatch", "The URL does not match the selected ATS type."
                 )
             config.update(resolved["config"])
-    if kind not in ("jobspy", "jobcloud", "adzuna", "rss"):
+    if kind not in ("jobspy", "rss"):
         validate_board(config.get("board", ""), kind)
         if config.get("region", "global") not in ("global", "eu"):
             raise DomainError(422, "invalid_region", "Lever region must be global or eu.")
@@ -613,7 +629,9 @@ def fetch_postings(source: dict) -> list[dict]:
             source["provider"],
             budget,
             preview=source.get("preview", False),
+            source=source,
         )
+        source["streamed"] = source.get("on_item") is not None
         source["diagnostic"] = diagnostic
     elif kind not in ("lever", "ashby", "rss"):
         source["streamed"] = source.get("on_item") is not None
@@ -853,22 +871,6 @@ def parse_time(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value) if value else None
 
 
-def next_due(schedule: dict, last_run: str | None, moment: datetime | None = None) -> datetime:
-    current = moment or datetime.now(timezone.utc)
-    cfg = Schedule.model_validate(schedule or {})
-    previous = parse_time(last_run)
-    if cfg.kind == "interval":
-        return previous + timedelta(minutes=cfg.minutes) if previous else current
-    zone = ZoneInfo(cfg.timezone)
-    local = current.astimezone(zone)
-    hour, minute = (int(part) for part in cfg.at.split(":"))
-    target = local.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    if previous and previous.astimezone(zone).date() >= target.date():
-        target += timedelta(days=1)
-    # UTC round-trip resolves a nonexistent spring-forward local time to its next valid instant.
-    return target.astimezone(timezone.utc)
-
-
 class DiscoveryService:
     def __init__(self, workspace):
         self.workspace = workspace
@@ -925,11 +927,11 @@ class DiscoveryService:
         upcoming = [tasks["next_run_at"]] if tasks["next_run_at"] else []
         if enabled:
             upcoming.extend(
-                next_due(json.loads(row["schedule"]), row["last_run_at"]).isoformat(
-                    timespec="microseconds"
-                )
+                next_due(
+                    json.loads(row["schedule"]), row["last_scheduled_at"] or row["created_at"]
+                ).isoformat(timespec="microseconds")
                 for row in self.db.all(
-                    "SELECT schedule,last_run_at FROM sources WHERE enabled=1 AND NOT EXISTS(SELECT 1 FROM tasks WHERE source_id=sources.id AND kind='collect' AND state IN ('queued','running'))"
+                    "SELECT schedule,last_scheduled_at,created_at FROM sources WHERE enabled=1 AND NOT EXISTS(SELECT 1 FROM tasks WHERE source_id=sources.id AND kind='collect' AND state IN ('queued','running'))"
                 )
             )
         return {
@@ -953,11 +955,6 @@ class DiscoveryService:
                 "INSERT INTO settings(key,data,version,updated_at) VALUES('collection',?,1,?) ON CONFLICT(key) DO UPDATE SET data=excluded.data,version=settings.version+1,updated_at=excluded.updated_at",
                 (encode({"enabled": value.enabled}), stamp),
             )
-            if not value.enabled:
-                connection.execute(
-                    "UPDATE tasks SET state='cancelled',error=NULL,lease_until=NULL,lease_owner=NULL,updated_at=? WHERE kind='collect' AND state IN ('queued','running') AND json_extract(payload,'$.manual') IS NOT 1",
-                    (stamp,),
-                )
         return self.get_collection()
 
     def list_providers(self):
@@ -985,6 +982,14 @@ class DiscoveryService:
                             enabled=value.action == "enable",
                         ),
                     )
+                elif value.action == "configure":
+                    result = self.update_source(
+                        selected.id,
+                        SourcePatch(
+                            expected_version=selected.expected_version,
+                            **value.patch.model_dump(exclude_unset=True),
+                        ),
+                    )
                 else:
                     with self.db.lock:
                         source = self._source(selected.id)
@@ -993,7 +998,9 @@ class DiscoveryService:
                             self.delete_source(selected.id, selected.expected_version)
                             if value.action == "delete"
                             else self.queue_collection(
-                                selected.id, expected_version=selected.expected_version
+                                selected.id,
+                                expected_version=selected.expected_version,
+                                overrides=value.overrides,
                             )
                         )
                 items.append({"id": selected.id, "result": result})
@@ -1025,65 +1032,236 @@ class DiscoveryService:
     def _source_records(self, rows):
         if not rows:
             return []
-        source_ids = [row["id"] for row in rows]
-        placeholders = ",".join("?" for _ in source_ids)
-        recent = {source_id: [] for source_id in source_ids}
-        for task in self.db.all(
-            "SELECT * FROM (SELECT id,source_id,state,result,next_run_at,error,created_at,json_extract(payload,'$.provider') AS provider,ROW_NUMBER() OVER (PARTITION BY source_id,json_extract(payload,'$.provider') ORDER BY created_at DESC,id DESC) AS position FROM tasks WHERE kind='collect' AND source_id IN ("
+        ids = [row["id"] for row in rows]
+        placeholders = ",".join("?" for _ in ids)
+        runs = self.db.all(
+            "SELECT * FROM (SELECT *,ROW_NUMBER() OVER (PARTITION BY source_id ORDER BY created_at DESC,id DESC) AS position FROM collection_runs WHERE source_id IN ("
             + placeholders
-            + ")) WHERE position=1 ORDER BY created_at DESC,id DESC",
-            source_ids,
-        ):
-            recent[task["source_id"]].append(task)
-        active = {
-            task["source_id"]: task["next_run_at"]
-            for task in self.db.all(
-                "SELECT source_id,MIN(next_run_at) AS next_run_at FROM tasks WHERE state IN ('queued','running') AND source_id IN ("
-                + placeholders
-                + ") GROUP BY source_id",
-                source_ids,
-            )
-        }
-        enabled = self.workspace.get_settings("collection", {"enabled": True})["data"] or {}
-        return [
-            self._source_record(row, recent[row["id"]], active.get(row["id"]), enabled)
-            for row in rows
-        ]
-
-    def _source_record(self, row, recent, active, enabled):
-        row = decode_record(row, ("config", "schedule"))
-        row["enabled"] = bool(row["enabled"])
-        row["url"] = row["config"].get("url", "")
-        row["filters"] = row["config"].get("filters", {"titles": [], "locations": []})
-        providers = row["config"]["providers"] if row["kind"] == "jobspy" else [row["kind"]]
-        recent = [task for task in recent if (task["provider"] or row["kind"]) in providers]
-        row["next_run_at"] = active or (
-            next_due(row["schedule"], row["last_run_at"]).isoformat(timespec="microseconds")
-            if row["enabled"] and enabled.get("enabled", True)
-            else None
+            + ")) WHERE position=1",
+            ids,
         )
-        states = {task["state"] for task in recent}
-        row["last_outcome"] = next(
+        run_ids = [row["id"] for row in runs]
+        tasks = (
+            self.db.all(
+                "SELECT * FROM tasks WHERE run_id IN (" + ",".join("?" for _ in run_ids) + ")",
+                run_ids,
+            )
+            if run_ids
+            else []
+        )
+        grouped = {run_id: [] for run_id in run_ids}
+        for task in tasks:
+            grouped[task["run_id"]].append(task)
+        latest = {row["source_id"]: self._run_record(row, grouped[row["id"]]) for row in runs}
+        enabled = (self.workspace.get_settings("collection", {"enabled": True})["data"] or {}).get(
+            "enabled", True
+        )
+        result = []
+        for raw in rows:
+            row = decode_record(raw, ("config", "schedule"))
+            row["enabled"] = bool(row["enabled"])
+            row["url"] = row["config"].get("url", "")
+            row["filters"] = row["config"].get("filters", {"titles": [], "locations": []})
+            run = latest.get(row["id"])
+            row["last_run"] = run
+            row["last_outcome"] = run["state"] if run else None
+            row["last_task_id"] = run["task_ids"][0] if run and run["task_ids"] else None
+            row["last_counts"] = run["counts"] if run else {}
+            row["last_diagnostics"] = (
+                [diag for task in run["tasks"] for diag in task["result"].get("diagnostics", [])]
+                if run
+                else []
+            )
+            row["last_error"] = (
+                "; ".join(
+                    task["error"]
+                    for task in run["tasks"]
+                    if task["error"] and task["state"] == "failed"
+                )[:1000]
+                or None
+                if run
+                else None
+            )
+            row["next_run_at"] = (
+                run["next_run_at"]
+                if run and run["state"] in ("queued", "running")
+                else (
+                    next_due(
+                        row["schedule"], row["last_scheduled_at"] or row["created_at"]
+                    ).isoformat(timespec="microseconds")
+                    if row["enabled"] and enabled
+                    else None
+                )
+            )
+            result.append(row)
+        return result
+
+    def _run_record(self, row, tasks):
+        record = decode_record(row, ("source_snapshot", "overrides"))
+        record.pop("position", None)
+        decoded = [decode_record(task, ("payload", "result")) for task in tasks]
+        states = {task["state"] for task in decoded}
+        record["state"] = next(
             (
                 state
                 for state in ("running", "queued", "failed", "cancelled", "succeeded")
                 if state in states
             ),
-            None,
+            "cancelled",
         )
-        row["last_task_id"] = recent[0]["id"] if recent else None
-        row["last_counts"], row["last_diagnostics"] = {}, []
-        errors = []
-        for task in recent:
-            result = json.loads(task["result"])
-            for key in ("received", "created", "existing", "invalid"):
-                if key in result:
-                    row["last_counts"][key] = row["last_counts"].get(key, 0) + result[key]
-            row["last_diagnostics"].extend(result.get("diagnostics", []))
-            if task["error"]:
-                errors.append(task["error"])
-        row["last_error"] = "; ".join(errors)[:1000] or None
-        return row
+        record["counts"] = {
+            key: sum(task["result"].get(key, 0) for task in decoded)
+            for key in (
+                "received",
+                "created",
+                "existing",
+                "invalid",
+                "pending_descriptions",
+                "unavailable_descriptions",
+            )
+        }
+        record["task_ids"] = [task["id"] for task in decoded]
+        record["started_at"] = min(
+            (task["result"]["started_at"] for task in decoded if task["result"].get("started_at")),
+            default=None,
+        )
+        record["finished_at"] = (
+            max((task["updated_at"] for task in decoded), default=None)
+            if not states.intersection(("queued", "running"))
+            else None
+        )
+        ending = parse_time(record["finished_at"]) or datetime.now(timezone.utc)
+        record["total_seconds"] = max(
+            0, round((ending - parse_time(record["created_at"])).total_seconds(), 3)
+        )
+        record["processing_seconds"] = round(
+            sum(task["result"].get("processing_seconds", 0) for task in decoded), 3
+        )
+        record["waiting_seconds"] = max(
+            0, round(record["total_seconds"] - record["processing_seconds"], 3)
+        )
+        record["http_requests"] = sum(task["result"].get("http_requests", 0) for task in decoded)
+        record["next_run_at"] = min(
+            (task["next_run_at"] for task in decoded if task["state"] == "queued"), default=None
+        )
+        record["partial"] = any(
+            task["result"].get("candidate_capped")
+            or task["result"].get("result_capped")
+            or task["result"].get("unavailable_descriptions")
+            for task in decoded
+        )
+        record["tasks"] = [
+            {key: value for key, value in task.items() if key not in ("lease_owner", "lease_until")}
+            for task in decoded
+        ]
+        for task in record["tasks"]:
+            task["payload"] = {
+                key: value
+                for key, value in task["payload"].items()
+                if key not in ("checkpoint", "observed_identities")
+            }
+        return record
+
+    def list_runs(self, limit=50, offset=0, source_id=None, state=None):
+        if state not in (None, "queued", "running", "succeeded", "failed", "cancelled"):
+            raise DomainError(422, "run_state", "Use a supported collection run state.")
+        states_sql = (
+            "CASE "
+            + " ".join(
+                "WHEN EXISTS(SELECT 1 FROM tasks t WHERE t.run_id=r.id AND t.state='"
+                + item
+                + "') THEN '"
+                + item
+                + "'"
+                for item in ("running", "queued", "failed", "cancelled", "succeeded")
+            )
+            + " ELSE 'cancelled' END"
+        )
+        clauses, params = [], []
+        if source_id:
+            clauses.append("source_id=?")
+            params.append(source_id)
+        if state:
+            clauses.append("state=?")
+            params.append(state)
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        query = "SELECT r.*," + states_sql + " AS state FROM collection_runs r"
+        rows = self.db.all(
+            "SELECT * FROM ("
+            + query
+            + ")"
+            + where
+            + " ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?",
+            (*params, min(max(limit, 1), 200), max(offset, 0)),
+        )
+        ids = [row["id"] for row in rows]
+        tasks = (
+            self.db.all(
+                "SELECT * FROM tasks WHERE run_id IN ("
+                + ",".join("?" for _ in ids)
+                + ") ORDER BY created_at,id",
+                ids,
+            )
+            if ids
+            else []
+        )
+        grouped = {run_id: [] for run_id in ids}
+        for task in tasks:
+            grouped[task["run_id"]].append(task)
+        return {
+            "items": [self._run_record(row, grouped[row["id"]]) for row in rows],
+            "total": self.db.one("SELECT COUNT(*) AS n FROM (" + query + ")" + where, params)["n"],
+        }
+
+    def get_run(self, run_id):
+        row = self.db.one("SELECT * FROM collection_runs WHERE id=?", (run_id,))
+        if row is None:
+            missing("Collection run")
+        return self._run_record(
+            row, self.db.all("SELECT * FROM tasks WHERE run_id=? ORDER BY created_at,id", (run_id,))
+        )
+
+    def cancel_run(self, run_id):
+        self.get_run(run_id)
+        self.db.execute(
+            "UPDATE tasks SET state='cancelled',error=NULL,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE run_id=? AND state IN ('queued','running')",
+            (now(), run_id),
+        )
+        return self.get_run(run_id)
+
+    def source_schemas(self):
+        items = []
+        for kind in SourceKind.__args__:
+            if kind == "auto":
+                continue
+            cls = (
+                jobspy_collector.JobSpyConfig
+                if kind == "jobspy"
+                else RSSConfig
+                if kind == "rss"
+                else company_collectors.BoardConfig
+            )
+            items.append(
+                {
+                    "kind": kind,
+                    "label": "Saved portal search"
+                    if kind == "jobspy"
+                    else "RSS / Atom feed"
+                    if kind == "rss"
+                    else kind.title(),
+                    "config_schema": cls.model_json_schema(),
+                    "capabilities": {
+                        "search": kind == "jobspy",
+                        "lookback": kind == "jobspy",
+                        "details": kind not in ("rss", "ashby", "lever"),
+                    },
+                }
+            )
+        return {
+            "items": items,
+            "schedule_schema": schedule_adapter.json_schema(),
+            "run_overrides_schema": RunOverrides.model_json_schema(),
+        }
 
     def list_sources(self, limit=100, offset=0):
         rows = self.db.all(
@@ -1146,6 +1324,19 @@ class DiscoveryService:
             "total": len(items),
             "preview_limit": 20,
             "request_estimate": estimate,
+            "full_request_estimate": jobspy_collector.request_estimate(config)
+            if source["kind"] == "jobspy"
+            else {
+                "total": 1 + source["config"].get("max_details", 0),
+                "providers": [
+                    {
+                        "id": providers[0],
+                        "min": 1,
+                        "max": 1 + source["config"].get("max_details", 0),
+                    }
+                ],
+                "note": "A lower-bound estimate for the configured detail batch; paging, redirects and retries may add requests.",
+            },
             "diagnostics": diagnostics,
         }
 
@@ -1156,7 +1347,7 @@ class DiscoveryService:
         record_id, stamp = new_id(), now()
         with self.db.transaction() as connection:
             connection.execute(
-                "INSERT INTO sources(id,name,kind,config,enabled,schedule,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+                "INSERT INTO sources(id,name,kind,config,enabled,schedule,last_scheduled_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
                 (
                     record_id,
                     value.name.strip(),
@@ -1164,6 +1355,7 @@ class DiscoveryService:
                     encode(resolved["config"]),
                     int(value.enabled),
                     encode(value.schedule.model_dump()),
+                    stamp,
                     stamp,
                     stamp,
                 ),
@@ -1182,33 +1374,39 @@ class DiscoveryService:
                 if key != "expected_version" and val is not None
             },
         }
+        if "kind" in updates and updates["kind"] != old["kind"]:
+            raise DomainError(
+                422, "source_kind_immutable", "Create a new source to use a different service."
+            )
+        if "config" in updates:
+            merged["config"] = {**old["config"], **updates["config"]}
+        if "filters" in updates:
+            merged["filters"] = {**old["filters"], **updates["filters"]}
         if not merged["name"].strip():
             raise DomainError(422, "source_name", "Give the company or feed a name.")
         if any(key in updates for key in ("url", "kind", "config", "filters")):
             resolved = self._resolve_source(merged)
         else:
             resolved = old
-        schedule = Schedule.model_validate(merged["schedule"]).model_dump()
+        schedule = schedule_adapter.validate_python(merged["schedule"]).model_dump()
         with self.db.transaction() as connection:
             row = connection.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchone()
             check_version(row, value.expected_version)
             connection.execute(
-                "UPDATE sources SET name=?,kind=?,config=?,enabled=?,schedule=?,version=version+1,updated_at=? WHERE id=?",
+                "UPDATE sources SET name=?,kind=?,config=?,enabled=?,schedule=?,last_scheduled_at=?,version=version+1,updated_at=? WHERE id=?",
                 (
                     merged["name"].strip(),
                     resolved["kind"],
                     encode(resolved["config"]),
                     int(merged["enabled"]),
                     encode(schedule),
+                    now()
+                    if "schedule" in updates or (merged["enabled"] and not old["enabled"])
+                    else old["last_scheduled_at"],
                     now(),
                     source_id,
                 ),
             )
-            if not merged["enabled"]:
-                connection.execute(
-                    "UPDATE tasks SET state='cancelled',error=NULL,updated_at=? WHERE source_id=? AND state IN ('queued','running') AND json_extract(payload,'$.manual') IS NOT 1",
-                    (now(), source_id),
-                )
         return self._source(source_id)
 
     def delete_source(self, source_id, expected_version=None):
@@ -1217,11 +1415,28 @@ class DiscoveryService:
             if row is None:
                 missing("Source")
             check_version(row, expected_version)
+            connection.execute(
+                "UPDATE tasks SET state='cancelled',error=NULL,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE source_id=? AND state IN ('queued','running')",
+                (now(), source_id),
+            )
             connection.execute("DELETE FROM sources WHERE id=?", (source_id,))
         return {"deleted": True, "id": source_id}
 
-    def queue_collection(self, source_id, *, manual=True, _stopping=None, expected_version=None):
-        task_ids = []
+    def queue_collection(
+        self,
+        source_id,
+        *,
+        manual=True,
+        _stopping=None,
+        expected_version=None,
+        overrides=None,
+        planned_at=None,
+    ):
+        options = (
+            overrides
+            if isinstance(overrides, RunOverrides)
+            else RunOverrides.model_validate(overrides or {})
+        ).model_dump(exclude_none=True)
         with self.db.transaction() as connection:
             row = connection.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchone()
             if row is None:
@@ -1229,43 +1444,96 @@ class DiscoveryService:
             check_version(row, expected_version)
             if _stopping is not None and _stopping.is_set():
                 return None
-            if not manual:
-                setting = connection.execute(
-                    "SELECT data FROM settings WHERE key='collection'"
+            setting = connection.execute(
+                "SELECT data FROM settings WHERE key='collection'"
+            ).fetchone()
+            if not manual and (
+                not row["enabled"]
+                or (setting and not json.loads(setting["data"]).get("enabled", True))
+            ):
+                return None
+            source = decode_record(row, ("config", "schedule"))
+            allowed_overrides = (
+                {"hours_old", "results_wanted"}
+                if source["kind"] == "jobspy"
+                else {"max_results"}
+                if source["kind"] == "rss"
+                else {"max_results", "max_details"}
+            )
+            if set(options) - allowed_overrides:
+                raise DomainError(
+                    422, "run_options", "These run options do not apply to this source service."
+                )
+            active = connection.execute(
+                "SELECT * FROM tasks WHERE source_id=? AND kind='collect' AND state IN ('queued','running') ORDER BY created_at,id",
+                (source_id,),
+            ).fetchall()
+            if active:
+                if not manual:
+                    connection.execute(
+                        "UPDATE sources SET last_scheduled_at=? WHERE id=?",
+                        (planned_at or now(), source_id),
+                    )
+                active_run = connection.execute(
+                    "SELECT overrides FROM collection_runs WHERE id=?", (active[0]["run_id"],)
                 ).fetchone()
-                if not row["enabled"] or (
-                    setting and not json.loads(setting["data"]).get("enabled", True)
-                ):
-                    return None
-            source = decode_record(row, ("config",))
+                if options and (not active_run or json.loads(active_run["overrides"]) != options):
+                    raise DomainError(
+                        409,
+                        "collection_active",
+                        "A collection is already active. Wait or stop it before running different options.",
+                    )
+                if manual:
+                    connection.execute(
+                        "UPDATE tasks SET payload=json_set(payload,'$.manual',json('true')),updated_at=? WHERE source_id=? AND kind='collect' AND state IN ('queued','running')",
+                        (now(), source_id),
+                    )
+                task_ids = [task["id"] for task in active]
+                task = self._task_record(active[0])
+                task["payload"]["manual"] = manual or task["payload"].get("manual", False)
+                return {**task, "task_ids": task_ids, "run_id": active[0]["run_id"]}
+            source["config"] = {**source["config"], **options}
+            # Validate the frozen effective configuration, not a temporary edit of the saved source.
+            if source["kind"] == "jobspy":
+                jobspy_collector.JobSpyConfig.model_validate(
+                    {k: v for k, v in source["config"].items() if k not in ("url", "filters")}
+                )
             providers = (
                 source["config"]["providers"] if source["kind"] == "jobspy" else [source["kind"]]
             )
+            run_id, stamp = new_id(), now()
+            snapshot = {
+                key: source[key] for key in ("id", "name", "kind", "config", "version", "schedule")
+            }
+            connection.execute(
+                "INSERT INTO collection_runs(id,source_id,source_name,source_version,source_snapshot,overrides,planned_at,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                (
+                    run_id,
+                    source_id,
+                    source["name"],
+                    source["version"],
+                    encode(snapshot),
+                    encode(options),
+                    planned_at,
+                    stamp,
+                ),
+            )
+            task_ids = []
             for provider in providers:
-                existing = connection.execute(
-                    "SELECT * FROM tasks WHERE source_id=? AND kind='collect' AND state IN ('queued','running') AND json_extract(payload,'$.provider')=? ORDER BY created_at LIMIT 1",
-                    (source_id, provider),
-                ).fetchone()
-                if existing:
-                    if manual and not json.loads(existing["payload"]).get("manual"):
-                        connection.execute(
-                            "UPDATE tasks SET payload=json_set(payload,'$.manual',json('true')),updated_at=? WHERE id=?",
-                            (now(), existing["id"]),
-                        )
-                    task_ids.append(existing["id"])
-                    continue
-                task_id, stamp = new_id(), now()
+                task_id = new_id()
                 connection.execute(
-                    "INSERT INTO tasks(id,kind,source_id,payload,dedupe_key,next_run_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+                    "INSERT INTO tasks(id,kind,source_id,run_id,payload,dedupe_key,next_run_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
                     (
                         task_id,
                         "collect",
                         source_id,
+                        run_id,
                         encode(
                             {
                                 "manual": manual,
                                 "source_version": source["version"],
                                 "provider": provider,
+                                "run_id": run_id,
                             }
                         ),
                         "collect:" + source_id + ":" + provider + ":" + task_id,
@@ -1275,7 +1543,13 @@ class DiscoveryService:
                     ),
                 )
                 task_ids.append(task_id)
-        return {**self.get_task(task_ids[0]), "task_ids": task_ids}
+            if not manual:
+                connection.execute(
+                    "UPDATE sources SET last_scheduled_at=? WHERE id=?",
+                    (planned_at or stamp, source_id),
+                )
+        task_ids.sort()
+        return {**self.get_task(task_ids[0]), "task_ids": task_ids, "run_id": run_id}
 
     def _config(self):
         stored = self.workspace.get_settings("scoring", {})
@@ -1538,9 +1812,13 @@ class DiscoveryService:
         self, job_id, *, force=False, manual=False, automatic_update=False, _stopping=None
     ):
         config, _ = self._config()
-        if not config["enabled"] or (automatic_update and not config["auto_rescore_updates"]):
-            return None
         job = self.workspace.get_job(job_id)
+        if not config["enabled"] or (
+            automatic_update
+            and not config["auto_rescore_updates"]
+            and not job["initial_score_pending"]
+        ):
+            return None
         if job["triage"] == "dismissed" or not job["complete"]:
             return None
         context = self.assessment_context(job_id)
@@ -1680,18 +1958,29 @@ class DiscoveryService:
             (*params, min(max(limit, 1), 200), max(offset, 0)),
         )
         return {
-            "items": [decode_record(row, ("payload", "result")) for row in rows],
+            "items": [self._task_record(row) for row in rows],
             "total": self.db.one("SELECT COUNT(*) AS n FROM tasks t" + where, params)["n"],
         }
 
-    def get_task(self, task_id):
+    @staticmethod
+    def _task_record(row, include_checkpoint=False):
+        task = decode_record(row, ("payload", "result"))
+        if not include_checkpoint:
+            task["payload"] = {
+                key: value
+                for key, value in task["payload"].items()
+                if key not in ("checkpoint", "observed_identities")
+            }
+        return task
+
+    def get_task(self, task_id, *, include_checkpoint=False):
         row = self.db.one(
             "SELECT t.*,s.name AS source_name,j.title AS job_title FROM tasks t LEFT JOIN sources s ON s.id=t.source_id LEFT JOIN jobs j ON j.id=t.job_id WHERE t.id=?",
             (task_id,),
         )
         if row is None:
             missing("Task")
-        return decode_record(row, ("payload", "result"))
+        return self._task_record(row, include_checkpoint)
 
     def cancel_task(self, task_id):
         self.get_task(task_id)
@@ -1702,27 +1991,15 @@ class DiscoveryService:
         return self.get_task(task_id)
 
     def retry_task(self, task_id):
-        task = self.get_task(task_id)
+        task = self.get_task(task_id, include_checkpoint=True)
         if task["state"] not in ("failed", "cancelled"):
             raise DomainError(409, "task_state", "Only a failed or cancelled task can be retried.")
         if task["kind"] == "collect":
-            source = self._source(task["source_id"])
-            provider = task["payload"].get("provider", source["kind"])
-            allowed = (
-                source["config"]["providers"] if source["kind"] == "jobspy" else [source["kind"]]
-            )
-            if provider not in allowed:
+            if task["source_id"] is None:
                 raise DomainError(
-                    409,
-                    "source_changed",
-                    "The source no longer uses this provider. Run the current source instead.",
+                    409, "source_removed", "Create a source before starting another collection."
                 )
-            payload = {
-                **task["payload"],
-                "manual": True,
-                "source_version": source["version"],
-                "run_id": new_id(),
-            }
+            payload = {**task["payload"], "manual": True}
         else:
             config, _ = self._config()
             if not config["enabled"]:
@@ -1740,8 +2017,16 @@ class DiscoveryService:
         if active:
             raise DomainError(409, "task_active", "Equivalent work is already queued or running.")
         self.db.execute(
-            "UPDATE tasks SET state='queued',attempts=0,payload=?,result='{}',next_run_at=?,lease_until=NULL,lease_owner=NULL,error=NULL,updated_at=? WHERE id=? AND state IN ('failed','cancelled')",
-            (encode(payload), now(), now(), task_id),
+            "UPDATE tasks SET state='queued',attempts=CASE WHEN kind='score' THEN 0 ELSE attempts END,payload=?,result=?,next_run_at=?,lease_until=NULL,lease_owner=NULL,error=NULL,updated_at=? WHERE id=? AND state IN ('failed','cancelled')",
+            (
+                encode(payload),
+                encode(
+                    {**task["result"], "failure_attempts": 0} if task["kind"] == "collect" else {}
+                ),
+                now(),
+                now(),
+                task_id,
+            ),
         )
         return self.get_task(task_id)
 
@@ -1757,8 +2042,18 @@ class DiscoveryService:
             if stopping is not None and stopping.is_set():
                 return
             source = decode_record(row, ("schedule", "config"))
-            if next_due(source["schedule"], source["last_run_at"], moment) <= moment:
-                self.queue_collection(source["id"], manual=False, _stopping=stopping)
+            due = next_due(
+                source["schedule"], source["last_scheduled_at"] or source["created_at"], moment
+            )
+            if due <= moment:
+                self.queue_collection(
+                    source["id"],
+                    manual=False,
+                    _stopping=stopping,
+                    planned_at=(
+                        moment if source["schedule"]["kind"] == "interval" else due
+                    ).isoformat(timespec="microseconds"),
+                )
         config, _ = self._config()
         periodic = config["periodic_rescore"]
         if config["enabled"] and periodic["enabled"] and not (stopping and stopping.is_set()):
@@ -1796,7 +2091,7 @@ class DiscoveryService:
                 "UPDATE tasks SET state='running',attempts=attempts+1,lease_owner=?,lease_until=?,updated_at=? WHERE id=?",
                 (owner, expiry, stamp, row["id"]),
             )
-        return self.get_task(row["id"])
+        return self.get_task(row["id"], include_checkpoint=True)
 
     def heartbeat(self, task_id, owner):
         expiry = (datetime.now(timezone.utc) + timedelta(seconds=90)).isoformat(
@@ -1819,42 +2114,72 @@ class DiscoveryService:
         )
 
     def _collect(self, task, owner):
-        source = self._source(task["source_id"])
-        if not source["enabled"] and not task["payload"].get("manual"):
-            return {"skipped": "source_paused"}
-        if not task["payload"].get("manual") and not self.get_collection()["enabled"]:
-            return {"skipped": "collection_paused"}
-        provider = task["payload"].get("provider", source["kind"])
-        allowed = source["config"]["providers"] if source["kind"] == "jobspy" else [source["kind"]]
-        if provider not in allowed:
-            return {"skipped": "source_provider_changed"}
+        current_source = self.db.one("SELECT id FROM sources WHERE id=?", (task["source_id"],))
+        if current_source is None:
+            return {"cancelled": True}
+        run = self.db.one(
+            "SELECT source_snapshot FROM collection_runs WHERE id=?", (task["run_id"],)
+        )
+        if run is None:
+            raise DomainError(409, "collection_run", "The collection invocation is missing.")
+        source = json.loads(run["source_snapshot"])
+        provider = task["payload"]["provider"]
         source["provider"] = provider
         prefix = (
-            f"{source['kind']}:{source['config'].get('board') or source['config'].get('host', '')}:"
+            provider + ":"
+            if source["kind"] == "jobspy"
+            else f"{source['kind']}:{source['config'].get('board', '')}:"
         )
         known_rows = self.db.all(
-            "SELECT i.identity,j.metadata,d.checked_at," + posting_complete_sql() + " AS complete "
+            "SELECT i.identity,j.metadata,j.posting,d.checked_at,"
+            + posting_complete_sql()
+            + " AS complete "
             "FROM job_identities i JOIN jobs j ON j.id=i.job_id "
             "LEFT JOIN posting_details d ON d.identity=i.identity AND d.job_id=j.id "
             "WHERE i.identity>=? AND i.identity<?",
             (prefix, prefix + "\uffff"),
         )
-        # Exact provider/board identities work across overlapping saved sources.
-        # Network freshness is separate from material job/scoring metadata.
         source["known"] = {
             row["identity"]: json.loads(row["metadata"]) for row in known_rows if row["complete"]
+        }
+        source["known_postings"] = {
+            row["identity"]: row["posting"] for row in known_rows if row["complete"]
         }
         source["detail_checked"] = {
             row["identity"]: row["checked_at"] for row in known_rows if row["checked_at"]
         }
+        source["checkpoint"] = dict(task["payload"].get("checkpoint") or {})
         budget = self.http_budget(
             provider,
-            task["payload"].get("run_id", task["id"]),
+            f"{task['id']}:{task['attempts']}",
             active=lambda: self._active(task["id"], owner),
         )
         task["budget"] = budget
-        result = {"received": 0, "created": 0, "existing": 0, "invalid": 0}
+        result = dict(task["result"])
+        for key in ("received", "created", "existing", "invalid"):
+            result.setdefault(key, 0)
+        result.setdefault("started_at", now())
         task["partial_result"] = result
+        observed = set(task["payload"].get("observed_identities") or [])
+
+        def persist():
+            self.db.execute(
+                "UPDATE tasks SET payload=?,result=?,updated_at=? WHERE id=? AND state='running' AND lease_owner=?",
+                (encode(task["payload"]), encode(result), now(), task["id"], owner),
+            )
+
+        def checkpoint(value):
+            if not self._active(task["id"], owner):
+                raise DomainError(409, "task_cancelled", "Collection was cancelled.")
+            source["checkpoint"] = value
+            task["payload"]["checkpoint"] = value
+            for key, target in (
+                ("pending_details", "pending_descriptions"),
+                ("unavailable_descriptions", "unavailable_descriptions"),
+            ):
+                count = value.get(key, 0)
+                result[target] = len(count) if isinstance(count, (list, dict)) else int(count or 0)
+            persist()
 
         def store(posting):
             if not matches_filters(posting, source["config"].get("filters") or {}):
@@ -1862,11 +2187,26 @@ class DiscoveryService:
             with self.db.lock:
                 if not self._active(task["id"], owner):
                     raise DomainError(409, "task_cancelled", "Collection was cancelled.")
-                result["received"] += 1
                 posting = normalize_posting({**posting, "source_id": source["id"]})
+                identity = (
+                    posting.get("source_key")
+                    or posting.get("url")
+                    or hashlib.sha256(encode(posting).encode()).hexdigest()
+                )
+                first_observation = identity not in observed
                 try:
                     saved = self.workspace.ingest_job(posting)
                 except (ValidationError, DomainError) as error:
+                    if (
+                        isinstance(error, DomainError)
+                        and error.status != 422
+                        and error.code != "identity_conflict"
+                    ):
+                        raise
+                    if first_observation:
+                        result["received"] += 1
+                        result["invalid"] += 1
+                        observed.add(identity)
                     if isinstance(error, DomainError) and error.code == "identity_conflict":
                         result["conflict_count"] = result.get("conflict_count", 0) + 1
                         conflicts = result.setdefault("identity_conflicts", [])
@@ -1874,29 +2214,29 @@ class DiscoveryService:
                             conflicts.append(
                                 {"source_key": posting.get("source_key"), **error.details}
                             )
-                        return
-                    if isinstance(error, DomainError) and error.status != 422:
-                        raise
-                    result["invalid"] += 1
-                    return
-                checked_at = (source.get("detail_checks") or {}).get(posting.get("source_key"))
-                if checked_at:
-                    self.db.execute(
-                        "INSERT INTO posting_details(identity,job_id,checked_at) VALUES(?,?,?) "
-                        "ON CONFLICT(identity) DO UPDATE SET job_id=excluded.job_id,checked_at=excluded.checked_at",
-                        (posting["source_key"], saved["id"], checked_at),
-                    )
-                result["created"] += int(bool(saved.get("created")))
-                result["existing"] += int(not saved.get("created", False))
+                else:
+                    checked_at = (source.get("detail_checks") or {}).get(posting.get("source_key"))
+                    if checked_at:
+                        self.db.execute(
+                            "INSERT INTO posting_details(identity,job_id,checked_at) VALUES(?,?,?) ON CONFLICT(identity) DO UPDATE SET job_id=excluded.job_id,checked_at=excluded.checked_at",
+                            (posting["source_key"], saved["id"], checked_at),
+                        )
+                    if first_observation:
+                        result["received"] += 1
+                        result["created"] += int(bool(saved.get("created")))
+                        result["existing"] += int(not saved.get("created", False))
+                        observed.add(identity)
+                task["payload"]["observed_identities"] = sorted(observed)
+                persist()
 
         source["on_item"] = store
-        with self.db.transaction() as connection:
-            if not self._active(task["id"], owner):
-                return {"cancelled": True}
-            connection.execute(
-                "UPDATE sources SET last_run_at=?,last_error=NULL WHERE id=?",
-                (now(), source["id"]),
-            )
+        source["on_checkpoint"] = checkpoint
+        if not self._active(task["id"], owner):
+            return {"cancelled": True}
+        self.db.execute(
+            "UPDATE sources SET last_run_at=?,last_error=NULL WHERE id=?",
+            (result["started_at"], source["id"]),
+        )
         token = HTTP_BUDGET.set(budget)
         try:
             postings = fetch_postings(source)
@@ -1926,21 +2266,20 @@ class DiscoveryService:
                 result[key] = True
                 diagnostic.setdefault("warnings", []).append(message)
         result["diagnostics"] = [diagnostic]
-        if budget.blocked and getattr(budget.blocked, "code", None) != "provider_run_budget":
-            # A portal may catch a transport exception while still returning a
-            # useful partial page. Preserve those jobs before deferring the task.
-            task["partial_result"] = result
-            raise budget.blocked
         if budget.blocked:
-            result["capped"] = True
+            raise budget.blocked
         if source.get("collection_error"):
             raise source["collection_error"]
-        if result.get("conflict_count"):
+        if result.get("identity_conflicts"):
             raise DomainError(
                 409,
                 "identity_conflict",
-                f"{result['conflict_count']} postings have conflicting archived identities. Other results were retained. Merge the verified duplicate jobs listed in this task's results, then retry.",
+                "Some postings have conflicting archived identities. Other results were retained; merge the verified duplicates before retrying.",
             )
+        if source["checkpoint"].get("complete") is False:
+            result["continuing"] = True
+        else:
+            result.pop("continuing", None)
         return result
 
     def _score(self, task, owner):
@@ -2005,73 +2344,93 @@ class DiscoveryService:
                     started_at,
                 ),
             )
+            connection.execute("UPDATE jobs SET initial_score_pending=0 WHERE id=?", (job["id"],))
         return {"assessment_id": assessment_id, "score": result["score"], "model": result["model"]}
 
     def run_task(self, task, owner):
         if not self._active(task["id"], owner):
             return
+        started = time.monotonic()
+        result = task.get("result", {})
+        state, message, next_run = "failed", None, now()
+        error_code = None
         try:
-            if task["kind"] == "collect":
-                result = self._collect(task, owner)
-            elif task["kind"] == "score":
-                result = self._score(task, owner)
-            else:
-                raise DomainError(422, "task_kind", "Unknown background task kind.")
+            result = (
+                self._collect(task, owner)
+                if task["kind"] == "collect"
+                else self._score(task, owner)
+            )
             state = (
                 "cancelled"
                 if result.get("skipped") or result.get("cancelled") or result.get("discarded")
+                else "queued"
+                if result.pop("continuing", False)
                 else "succeeded"
             )
-            self.db.execute(
-                "UPDATE tasks SET state=?,result=?,error=NULL,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE id=? AND state='running' AND lease_owner=?",
-                (state, encode(result), now(), task["id"], owner),
-            )
+            if state == "queued":
+                next_run = (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat(
+                    timespec="microseconds"
+                )
         except Exception as error:
             message = (
                 error.message
                 if isinstance(error, DomainError)
-                else "The background task failed. Review the source or scoring settings and retry."
+                else "The background task failed. Review the settings and retry."
             )
+            error_code = getattr(error, "code", type(error).__name__)
             deferred = isinstance(error, ProviderDeferred)
-            capped = deferred and error.code == "provider_run_budget"
             retryable = not isinstance(error, DomainError) or error.status >= 500
-            retry = (deferred and not capped) or (retryable and task["attempts"] < 3)
-            next_run = (
-                datetime.now(timezone.utc)
-                + timedelta(seconds=min(3600, 15 * (4 ** min(max(task["attempts"] - 1, 0), 8))))
+            # Quota waits do not consume the transient error retry allowance.
+            failures = task.get("result", {}).get("failure_attempts", 0) + int(not deferred)
+            retry = deferred or (retryable and failures < 3)
+            state = "queued" if retry else "failed"
+            delay = min(3600, 15 * 4 ** min(max(failures - 1, 0), 8))
+            if deferred and error.code == "provider_run_budget":
+                delay = 1
+            next_run = getattr(error, "next_run_at", None) or (
+                datetime.now(timezone.utc) + timedelta(seconds=delay)
             ).isoformat(timespec="microseconds")
-            if deferred:
-                next_run = error.next_run_at or (
-                    datetime.now(timezone.utc) + timedelta(minutes=5)
-                ).isoformat(timespec="microseconds")
-            result = task.get("partial_result", {})
+            result = task.get("partial_result", dict(task.get("result", {})))
+            result["failure_attempts"] = failures
             if task.get("budget"):
                 result["diagnostics"] = [task["budget"].diagnostics()]
-            if capped:
-                result["capped"] = True
-            with self.db.transaction() as connection:
-                changed = connection.execute(
-                    "UPDATE tasks SET state=?,result=?,error=?,next_run_at=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE id=? AND state='running' AND lease_owner=?",
-                    (
-                        "succeeded" if capped else "queued" if retry else "failed",
-                        encode(result),
-                        message[:1000],
-                        next_run,
-                        now(),
-                        task["id"],
-                        owner,
-                    ),
-                )
-                if changed.rowcount and task["source_id"]:
-                    connection.execute(
-                        "UPDATE sources SET last_error=? WHERE id=?",
-                        (message[:1000], task["source_id"]),
-                    )
-            LOG.warning(
-                "Background task %s failed (%s).",
-                task["id"],
-                getattr(error, "code", type(error).__name__),
+            LOG.warning("Background task %s paused or failed (%s).", task["id"], error_code)
+        if task["kind"] == "collect":
+            result["processing_seconds"] = round(
+                result.get("processing_seconds", 0) + time.monotonic() - started, 3
             )
+            result["http_requests"] = result.get("http_requests", 0) + (
+                task["budget"].requests if task.get("budget") else 0
+            )
+            history = result.setdefault("attempt_history", [])
+            history.append(
+                {
+                    "attempt": task["attempts"],
+                    "finished_at": now(),
+                    "state": state,
+                    "reason": error_code,
+                    "requests": task["budget"].requests if task.get("budget") else 0,
+                }
+            )
+            result["attempt_history"] = history[-50:]
+        with self.db.transaction() as connection:
+            changed = connection.execute(
+                "UPDATE tasks SET state=?,result=?,error=?,next_run_at=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE id=? AND state='running' AND lease_owner=?",
+                (
+                    state,
+                    encode(result),
+                    message[:1000] if message else None,
+                    next_run,
+                    now(),
+                    task["id"],
+                    owner,
+                ),
+            )
+            if changed.rowcount and task["source_id"]:
+                connection.execute(
+                    "UPDATE sources SET last_error=? WHERE id=?",
+                    (message[:1000] if state == "failed" and message else None, task["source_id"]),
+                )
 
 
 def register_api(router, service: DiscoveryService):
@@ -2090,6 +2449,24 @@ def register_api(router, service: DiscoveryService):
     @router.patch("/providers/{provider_id}")
     def providers_update(provider_id: str, value: ProviderPatch):
         return service.update_provider(provider_id, value)
+
+    @router.get("/collection/runs")
+    def collection_runs_list(
+        limit: int = 50, offset: int = 0, source_id: str | None = None, state: str | None = None
+    ):
+        return service.list_runs(limit, offset, source_id, state)
+
+    @router.get("/collection/runs/{run_id}")
+    def collection_runs_get(run_id: str):
+        return service.get_run(run_id)
+
+    @router.post("/collection/runs/{run_id}/cancel")
+    def collection_runs_cancel(run_id: str):
+        return service.cancel_run(run_id)
+
+    @router.get("/sources/schemas")
+    def sources_schemas():
+        return service.source_schemas()
 
     @router.get("/sources")
     def sources_list(limit: int = 100, offset: int = 0):
@@ -2116,12 +2493,14 @@ def register_api(router, service: DiscoveryService):
         return service.update_source(source_id, value)
 
     @router.delete("/sources/{source_id}")
-    def sources_delete(source_id: str):
-        return service.delete_source(source_id)
+    def sources_delete(source_id: str, expected_version: int = Query(ge=1)):
+        return service.delete_source(source_id, expected_version)
 
     @router.post("/sources/{source_id}/run")
-    def sources_run(source_id: str):
-        return service.queue_collection(source_id)
+    def sources_run(source_id: str, value: SourceRun):
+        return service.queue_collection(
+            source_id, expected_version=value.expected_version, overrides=value.overrides
+        )
 
     @router.get("/scoring")
     def scoring_get():
@@ -2171,6 +2550,36 @@ def register_mcp(mcp, service: DiscoveryService):
     @mcp.tool(
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
     )
+    def sources_schemas() -> dict:
+        """Discover supported source fields/defaults, schedule variants and temporary run options."""
+        return service.source_schemas()
+
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+    )
+    def collection_runs_list(
+        limit: int = 50, offset: int = 0, source_id: str | None = None, state: str | None = None
+    ) -> dict:
+        """List logical collections with cumulative provider counts, waiting and processing time."""
+        return service.list_runs(limit, offset, source_id, state)
+
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+    )
+    def collection_runs_get(run_id: str) -> dict:
+        """Read frozen acquisition settings and provider tasks for one collection invocation."""
+        return service.get_run(run_id)
+
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)
+    )
+    def collection_runs_cancel(run_id: str) -> dict:
+        """Stop current collection work while retaining jobs already archived."""
+        return service.cancel_run(run_id)
+
+    @mcp.tool(
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+    )
     def collection_get() -> dict:
         """Read the global automatic collection switch, counts and next queued run."""
         return service.get_collection()
@@ -2200,7 +2609,7 @@ def register_mcp(mcp, service: DiscoveryService):
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=True)
     )
     def sources_bulk(value: SourceBulk) -> dict:
-        """Enable, pause, run or delete up to 200 selected versioned sources; inspect each result/error."""
+        """Enable, pause, run, configure or delete selected versioned sources; inspect each result/error."""
         return service.bulk_sources(value)
 
     @mcp.tool(
@@ -2241,16 +2650,18 @@ def register_mcp(mcp, service: DiscoveryService):
     @mcp.tool(
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=False)
     )
-    def sources_delete(source_id: str) -> dict:
-        """Remove a source while retaining its archived jobs."""
-        return service.delete_source(source_id)
+    def sources_delete(source_id: str, expected_version: int) -> dict:
+        """Remove a versioned source while retaining archived jobs and collection history."""
+        return service.delete_source(source_id, expected_version)
 
     @mcp.tool(
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True)
     )
-    def sources_run(source_id: str) -> dict:
-        """Run one source now, even when automatic collection is paused. Portal providers get separate bounded tasks."""
-        return service.queue_collection(source_id)
+    def sources_run(source_id: str, value: SourceRun) -> dict:
+        """Run a versioned source with frozen optional overrides; shared portal budgets always apply."""
+        return service.queue_collection(
+            source_id, expected_version=value.expected_version, overrides=value.overrides
+        )
 
     @mcp.tool(
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
@@ -2319,5 +2730,5 @@ def register_mcp(mcp, service: DiscoveryService):
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True)
     )
     def tasks_retry(task_id: str) -> dict:
-        """Explicitly retry a failed/cancelled task with current inputs."""
+        """Retry failed/cancelled work; collection keeps its frozen inputs and saved progress."""
         return service.retry_task(task_id)

@@ -7,7 +7,7 @@ COPY scorer/constraints.txt /app/constraints.txt
 RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt && useradd --create-home --uid 1000 scorer && mkdir -p /cache/huggingface && chown -R scorer:scorer /cache /app
 COPY --chown=scorer:scorer scorer/app.py /app/app.py
 COPY --chown=scorer:scorer scorer/preparation.py /app/preparation.py
-ARG VERSION=0.8.0
+ARG VERSION=0.9.0
 ARG VCS_REF=unknown
 LABEL org.opencontainers.image.title="Openings CPU scorer" \
       org.opencontainers.image.description="Optional local CPU classification for Openings" \
