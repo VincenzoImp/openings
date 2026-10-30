@@ -1,11 +1,12 @@
 """Company adapter capabilities shared by validation, discovery and the dashboard."""
 
 from dataclasses import dataclass
+from typing import Literal
 
 
 @dataclass(frozen=True)
 class CompanyAdapter:
-    description_mode: str
+    description_mode: Literal["inline", "separate", "metadata"]
     candidates: bool = True
     region: bool = False
 

@@ -51,12 +51,26 @@ the detected service and configuration.
 | Setting | Meaning and default |
 |---|---|
 | Board | Required board identifier or supported board URL; depends on the ATS. |
-| Region | Adapter region, default `global`; used by services with regional endpoints. |
+| Region | Lever endpoint region, default `global`; choose `eu` for a European Lever board. |
 | Result limit | Up to **100 matching jobs per run** by default; range 1–2000. |
-| Detail batch | Up to **10 detail fetches per batch** by default; range 0–25. Setting zero leaves listing-only text where the listing lacks a description. |
-| Candidate limit | Up to **2000 board listings** inspected by default; range 20–10000. Limits scanning before local role/location filters. |
+| Detail batch | For adapters with separate description requests: up to **10 fetches per batch**, range 0–25. Zero keeps the text available in the listing. |
+| Candidate limit | Where supported: up to **2000 listings** inspected by default, range 20–10000, before local role/location filters. |
 | Title filters | Optional terms for matching roles on the selected board. Empty means unrestricted. |
 | Location filters | Optional locations; unknown or region-only remote eligibility needs review. Empty means unrestricted. |
+
+The form and discovered schema expose the options that each adapter uses. Lever,
+Ashby, Recruitee, Personio and Workable provide descriptions in their listing
+response. Greenhouse, BambooHR, Rippling, SmartRecruiters, Workday, Oracle and
+join.com use separate detail requests. Breezy currently supplies titles, links and
+metadata; its missing descriptions are reported as unavailable in a partial run.
+Add the full posting manually when needed. Run options and bulk edits show only
+fields supported by every selected source.
+
+Ashby uses its public [Job Postings API](https://developers.ashbyhq.com/docs/public-job-posting-api).
+A 404 ends the attempt with a message to check the exact board URL and identifier.
+It is distinct from a successful empty board. Ashby allows employers to
+[disable the hosted board and unauthenticated API](https://docs.ashbyhq.com/can-i-disable-my-ashby-job-board).
+If public access is unavailable, use a supported portal source or add the job manually.
 
 Company boards can contain undated jobs; a saved-search age window does not apply
 to them. RSS uses a feed URL and a result limit, without ATS detail controls.

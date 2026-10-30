@@ -25,7 +25,7 @@ flowchart LR
 | `backend/openings/career.py` | Profile, detailed evidence, claims, templates and instructions |
 | `backend/openings/documents.py` | Frozen contexts, document revisions and scoped file transfers |
 | `backend/openings/discovery.py` | Typed sources, schedules, scoring configuration and queue operations |
-| `backend/openings/collectors` | Narrow provider adapters and shared HTTP policy/runtime |
+| `backend/openings/collectors` | Adapter capability catalog, typed options and shared HTTP policy/runtime |
 | `backend/openings/worker.py` | Independent scheduling, acquisition and inference lanes |
 | `backend/openings/app.py`, `api.py` | Authentication, REST/MCP registration and dashboard hosting |
 | `backend/openings/schema.sql` | Relational ownership, SQLite indexes and JSON payloads |
@@ -76,7 +76,9 @@ do not include converters for earlier formats.
 A saved search has one explicit query/location and provider selection. Company
 sources watch selected ATS boards/feeds with optional title/location filters.
 Both use the same ingestion path as manually added jobs. New sources start paused.
-Typed schemas expose adapter defaults and capabilities. Source service is immutable;
+A shared adapter catalog drives typed configuration, applicable fields and description
+capabilities. Metadata-only results are explicitly partial; unavailable public
+Ashby boards receive an actionable permanent error. Source service is immutable;
 versioned bulk patches merge compatible fields without replacing untouched config.
 
 A collection invocation freezes effective source configuration and optional run-only
