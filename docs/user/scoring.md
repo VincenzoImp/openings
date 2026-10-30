@@ -17,6 +17,10 @@ context 2048 and the API key from `SCORER_API_KEY`. First download/loading can
 be slow; a 600-second request timeout accommodates a cold start. The connection
 test performs a real classification.
 
+After testing, turn on **Enable AI scoring** and click **Save scoring settings**.
+The saved-state message confirms whether scoring is active. Editing the switch
+or fields leaves a draft until you save; **Discard changes** restores saved values.
+
 Remote mode accepts a base URL, an explicit served model and an optional API key.
 It requires the **System One score contract**, including typed ordinal answers;
 an arbitrary OpenAI chat-completions endpoint is not interchangeable. The
@@ -26,8 +30,8 @@ be served by that endpoint.
 ## Inputs and freshness
 
 The input combines your role/preferences, a compact career summary, selected
-career facts and the posting. Use the optional profile **Scoring summary** for a
-concise, user-authored classification profile; detailed evidence remains available
+career facts and the posting. Use the optional profile **Compact scoring profile**
+for a concise, user-authored classification profile; detailed evidence remains available
 to document agents. The scoring-context view/API reports omitted details.
 Oversized inputs are rejected when the scorer reports truncation; they are not
 silently scored as complete.
@@ -35,8 +39,8 @@ silently scored as complete.
 New or materially changed complete jobs are queued when scoring is enabled.
 Relevant profile, rubric or model edits mark older results **Outdated** without
 enqueuing the whole archive. Contact/template edits do not require rescoring.
-Rescore selected jobs or request an explicit bounded outdated batch. Periodic
-rescoring is separately disabled by default and has a configurable batch cap.
+Rescore selected jobs or request a bounded batch of unscored or outdated jobs.
+Periodic rescoring is separately disabled by default and has a configurable batch cap.
 Dismissed jobs are excluded. Failed requests remain visible in Tasks for retry.
 
 ## Score limitations
@@ -56,11 +60,10 @@ The default Compose file enforces these limits:
 | Optional local scorer | 1.5 CPU | 3584 MiB |
 | Combined local stack | 2 CPU | 4 GiB |
 
-Limits are caps, not reserved resources, measured usage or minimum host
-requirements. Allow additional resources for the operating system, Docker and
-other host services. Model loading, input length and filesystem cache affect
-memory use; CPU and storage affect startup and inference time. No minimum host
-specification or inference-time target has been established.
+These figures are enforced container budgets. Allow additional resources for the
+operating system, Docker and other host services. Model loading, input length and
+filesystem cache affect memory use; CPU and storage affect startup and inference
+time. Actual usage and inference time vary with the host and input.
 
 Check memory use and logs during a connection test and representative scoring
 requests on your host. If local scoring is impractical, use a compatible remote

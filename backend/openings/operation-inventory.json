@@ -64,7 +64,7 @@
         "jobs_search"
       ],
       "dashboard": "Inbox: search, filters, pagination",
-      "notes": "q, triage, company, location, source, remote, job_type, score_min/max, score_state, created_since/until, sort, limit, offset; includes facets."
+      "notes": "q, triage (including active), company, location, source, remote, job_type, complete, score_min/max, score_state, created_since/until, sort, limit, offset; includes facets."
     },
     {
       "id": "jobs.read",

@@ -538,7 +538,7 @@ function SourceEditor({
               </Field>
               <Field
                 label="Country"
-                hint="Use an English country name, such as switzerland, usa or uk."
+                hint="Use an English country name, such as usa, uk or germany."
               >
                 <input
                   name="country"

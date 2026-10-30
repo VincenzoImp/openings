@@ -38,7 +38,7 @@ const blankScoring: Scoring = {
   rubric: "",
   max_len: 2048,
   timeout_seconds: 120,
-  periodic_rescore: { enabled: false, minutes: 1440, batch_size: 50 },
+  periodic_rescore: { enabled: false, minutes: 1440, batch_size: 25 },
   version: 1,
 };
 interface Token {
@@ -70,8 +70,8 @@ export default function SettingsPage({
   return (
     <>
       <Heading
-        title="Make it work for you."
-        description="A small set of controls, with deliberate defaults."
+        title="Settings"
+        description="Manage scoring, collection limits, agent access and workspace backups."
       />
       <Tabs
         label="Settings sections"
@@ -112,11 +112,15 @@ function ScoringSettings() {
     [mode, setMode] = useState("local"),
     [periodic, setPeriodic] = useState(false),
     [testing, setTesting] = useState<string | null>(null),
+    [isTesting, setIsTesting] = useState(false),
+    [dirty, setDirty] = useState(false),
+    [saveError, setSaveError] = useState<string | null>(null),
     [rescore, setRescore] = useState(false);
   useEffect(() => {
     setEnabled(resource.data.enabled);
     setMode(resource.data.mode);
     setPeriodic(resource.data.periodic_rescore.enabled);
+    setDirty(false);
   }, [resource.data]);
   function values(form: HTMLFormElement) {
     const f = new FormData(form);
@@ -142,7 +146,7 @@ function ScoringSettings() {
         batch_size:
           Number(
             f.get("batch_size") ?? resource.data.periodic_rescore.batch_size,
-          ) || 50,
+          ) || 25,
       },
     };
     if (f.get("api_key")) body.api_key = f.get("api_key");
@@ -151,18 +155,29 @@ function ScoringSettings() {
   }
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    await mutate(
-      () =>
-        api(
-          "/scoring",
-          "PATCH",
-          version(resource.data, values(e.currentTarget)),
-        ),
-      "Scoring settings saved. Existing scores may be marked outdated; no bulk rescoring started.",
-    );
+    const body = version(resource.data, values(e.currentTarget));
+    let saved: Scoring | undefined;
+    setSaveError(null);
+    const ok = await mutate(async () => {
+      try {
+        saved = await api<Scoring>("/scoring", "PATCH", body);
+      } catch (error) {
+        setSaveError(
+          error instanceof Error
+            ? error.message
+            : "Settings could not be saved.",
+        );
+        throw error;
+      }
+    }, "Scoring settings saved.");
+    if (ok && saved) {
+      resource.setData(saved);
+      setDirty(false);
+    }
   }
   async function test(form: HTMLFormElement | null) {
-    if (!form) return;
+    if (!form || isTesting || pending) return;
+    setIsTesting(true);
     try {
       setTesting("Testing the endpoint…");
       const result = await api<Record<string, unknown>>(
@@ -176,6 +191,8 @@ function ScoringSettings() {
     } catch (e) {
       setTesting(null);
       notify(e instanceof Error ? e.message : "Connection failed.", true);
+    } finally {
+      setIsTesting(false);
     }
   }
   if (resource.loading) return <Loading />;
@@ -188,7 +205,61 @@ function ScoringSettings() {
         onSubmit={save}
         key={resource.data.version}
         id="scoring-form"
+        onChange={() => {
+          setDirty(true);
+          setTesting(null);
+        }}
       >
+        <div className="scoring-actions" aria-live="polite">
+          <div>
+            <strong>
+              {resource.data.enabled
+                ? "Saved: AI scoring is on"
+                : "Saved: AI scoring is off"}
+            </strong>
+            <p className="smalltext muted">
+              {pending
+                ? "Checking the service and saving. The first connection can take several minutes."
+                : dirty
+                  ? "Unsaved changes. Save settings to apply them."
+                  : "Settings are saved."}
+            </p>
+          </div>
+          <div className="actions">
+            <Button
+              type="button"
+              disabled={!dirty || pending || isTesting}
+              onClick={(event) => {
+                const form = event.currentTarget.form;
+                form?.reset();
+                if (form) {
+                  form.dataset.dirty = "false";
+                  form
+                    .querySelector<HTMLTextAreaElement>(
+                      "textarea[name=criteria]",
+                    )
+                    ?.setCustomValidity("");
+                }
+                setEnabled(resource.data.enabled);
+                setMode(resource.data.mode);
+                setPeriodic(resource.data.periodic_rescore.enabled);
+                setDirty(false);
+                setSaveError(null);
+                setTesting(null);
+              }}
+            >
+              Discard changes
+            </Button>
+            <Button variant="primary" disabled={!dirty || pending || isTesting}>
+              {pending ? "Saving settings…" : "Save scoring settings"}
+            </Button>
+          </div>
+        </div>
+        {saveError && (
+          <div className="scoring-save-error">
+            <ErrorBox message={saveError} />
+          </div>
+        )}
         <section className="card sectioncard">
           <div className="settingrow">
             <div>
@@ -201,7 +272,10 @@ function ScoringSettings() {
             <Switch
               label="Enable AI scoring"
               checked={enabled}
-              onChange={setEnabled}
+              onChange={(value) => {
+                setEnabled(value);
+                setDirty(true);
+              }}
             />
           </div>
           <div className="radio-cards">
@@ -293,51 +367,53 @@ function ScoringSettings() {
             <Button
               type="button"
               icon="play"
-              disabled={pending}
+              disabled={pending || isTesting}
               onClick={(e) => test(e.currentTarget.form)}
             >
-              Test connection
+              {isTesting ? "Testing connection…" : "Test connection"}
             </Button>
             {testing && <span className="smalltext">{testing}</span>}
           </div>
         </section>
         <section className="card sectioncard">
-          <h2 className="section-heading">Define a useful fit assessment.</h2>
-          <Field
-            label="Score levels"
-            hint="One description per line, from lowest to highest fit. Use 2–10 levels."
-          >
-            <textarea
-              name="criteria"
-              onChange={(e) => {
-                const levels = e.target.value
-                  .split("\n")
-                  .filter((x) => x.trim());
-                e.target.setCustomValidity(
-                  levels.length >= 2 && levels.length <= 10
-                    ? ""
-                    : "Use 2–10 score levels, one per line.",
-                );
-              }}
-              rows={6}
-              required
-              defaultValue={(resource.data.criteria || []).join("\n")}
-            />
-          </Field>
-          <Field
-            label="Assessment instructions"
-            hint="Used only for fit scoring, separately from your document-writing guidance."
-          >
-            <textarea
-              name="rubric"
-              rows={7}
-              defaultValue={resource.data.rubric}
-            />
-          </Field>
+          <h2 className="section-heading">Scoring rules</h2>
+          <div className="formgrid">
+            <Field
+              label="Score levels"
+              hint="One description per line, from lowest to highest fit. Use 2–10 levels."
+            >
+              <textarea
+                name="criteria"
+                onChange={(e) => {
+                  const levels = e.target.value
+                    .split("\n")
+                    .filter((x) => x.trim());
+                  e.target.setCustomValidity(
+                    levels.length >= 2 && levels.length <= 10
+                      ? ""
+                      : "Use 2–10 score levels, one per line.",
+                  );
+                }}
+                rows={7}
+                required
+                defaultValue={(resource.data.criteria || []).join("\n")}
+              />
+            </Field>
+            <Field
+              label="Assessment instructions"
+              hint="Used only for fit scoring, separately from your document-writing guidance."
+            >
+              <textarea
+                name="rubric"
+                rows={7}
+                defaultValue={resource.data.rubric}
+              />
+            </Field>
+          </div>
           <div className="divider" />
           <div className="settingrow">
             <div>
-              <h3>Periodically update outdated scores</h3>
+              <h3>Periodically score missing or outdated jobs</h3>
               <p>
                 Off by default. Editing a profile never starts a bulk rescore.
               </p>
@@ -345,7 +421,10 @@ function ScoringSettings() {
             <Switch
               label="Periodic rescoring"
               checked={periodic}
-              onChange={setPeriodic}
+              onChange={(value) => {
+                setPeriodic(value);
+                setDirty(true);
+              }}
             />
           </div>
           {periodic && (
@@ -374,19 +453,16 @@ function ScoringSettings() {
             <span>
               Scoring is indicative. Turning it off keeps stored scores.
             </span>
-            <Button variant="primary" disabled={pending}>
-              Save scoring settings
-            </Button>
           </div>
         </section>
       </form>
       <div className="card sectioncard form-section">
         <div className="sectiontitle">
           <div>
-            <h2>Update scores deliberately.</h2>
+            <h2>Score existing jobs</h2>
             <p>
-              Queue a bounded batch of outdated jobs. This never generates
-              application documents.
+              Queue a bounded batch of unscored or outdated jobs. This never
+              generates application documents.
             </p>
           </div>
         </div>
@@ -395,34 +471,39 @@ function ScoringSettings() {
           disabled={!resource.data.enabled || pending}
           onClick={() => setRescore(true)}
         >
-          Update outdated scores
+          Update missing or outdated scores
         </Button>
       </div>
       {rescore && (
         <Dialog
-          title="Update outdated scores?"
+          title="Update missing or outdated scores?"
           onClose={() => setRescore(false)}
         >
           <p className="modal-intro">
-            Only non-dismissed jobs with outdated assessments will be queued.
-            Existing scores remain until a replacement succeeds.
+            Eligible non-dismissed jobs with missing or outdated scores will be
+            queued. Existing scores remain until a replacement succeeds.
           </p>
           <form
             onSubmit={async (e) => {
               e.preventDefault();
               const limit = Number(new FormData(e.currentTarget).get("limit"));
+              let result: { count: number; skipped: string[] } | undefined;
               if (
-                await mutate(
-                  () =>
-                    api("/scoring/rescore", "POST", {
-                      outdated_only: true,
-                      limit,
-                      job_ids: [],
-                    }),
-                  "Rescoring queued.",
-                )
-              )
+                await mutate(async () => {
+                  result = await api("/scoring/rescore", "POST", {
+                    outdated_only: true,
+                    limit,
+                    job_ids: [],
+                  });
+                }, "Scoring batch checked.")
+              ) {
+                notify(
+                  result?.count
+                    ? `${result.count} jobs queued for scoring.`
+                    : "No jobs queued. Check your career profile, posting text and existing scores.",
+                );
                 setRescore(false);
+              }
             }}
           >
             <Field label="Maximum jobs in this batch">
@@ -468,10 +549,10 @@ function AgentSettings() {
       <section className="card sectioncard">
         <div className="sectiontitle">
           <div>
-            <h2>Your agent, your tools.</h2>
+            <h2>Connect an agent</h2>
             <p>
-              The workspace keeps context. Your external agent writes and
-              compiles.
+              Connect an external agent with the MCP endpoint and an access
+              token.
             </p>
           </div>
         </div>
@@ -492,13 +573,31 @@ function AgentSettings() {
             </button>
           </span>
         </Field>
+        <div className="actions form-actions">
+          <a
+            className="btn small"
+            href="/api/docs"
+            target="_blank"
+            rel="noreferrer"
+          >
+            API reference
+          </a>
+          <a
+            className="textbutton smalltext"
+            href="/api/v1/capabilities"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Available operations
+          </a>
+        </div>
         {[
           [
             "Connect your assistant",
             "Configure this HTTP MCP endpoint in Codex, Claude Code or another MCP client using an access token.",
           ],
           [
-            "Read the right context",
+            "Read application context",
             "Your agent reads career evidence, the posting, templates and stored instructions through the same service as this dashboard.",
           ],
           [
@@ -620,7 +719,7 @@ function TaskSettings() {
       <section className="card sectioncard">
         <div className="sectiontitle">
           <div>
-            <h2>Workspace activity.</h2>
+            <h2>Activity</h2>
             <p>
               Inspect collection and scoring work, including failures and retry
               eligibility.
@@ -825,7 +924,7 @@ function WorkspaceSettings({
         <div className="settingrow">
           <div>
             <h3>Appearance</h3>
-            <p>Comfortable contrast and quiet surfaces.</p>
+            <p>Use a light or dark theme.</p>
           </div>
           <Button icon={theme === "light" ? "moon" : "sun"} onClick={onTheme}>
             {theme === "light" ? "Dark mode" : "Light mode"}

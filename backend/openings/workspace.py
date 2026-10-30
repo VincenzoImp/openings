@@ -235,7 +235,9 @@ class Workspace:
         complete=None,
     ):
         conditions, args = [], []
-        if triage:
+        if triage == "active":
+            conditions.append("j.triage!='dismissed'")
+        elif triage:
             if triage not in ("inbox", "saved", "dismissed"):
                 raise DomainError(422, "triage", "Choose inbox, saved or dismissed.")
             conditions.append("j.triage=?")

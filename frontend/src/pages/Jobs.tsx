@@ -148,7 +148,10 @@ export function JobsPage({
       | {
           succeeded?: number;
           failed?: number;
-          items?: { error?: { message: string } }[];
+          items?: {
+            error?: { message: string };
+            result?: { count?: number };
+          }[];
         }
       | undefined;
     if (
@@ -164,7 +167,22 @@ export function JobsPage({
     ) {
       setSelection({});
       setForget(false);
-      if (result?.failed)
+      if (action === "rescore") {
+        const queued =
+          result?.items?.reduce(
+            (total, item) => total + (item.result?.count || 0),
+            0,
+          ) || 0;
+        const failed = result?.failed || 0;
+        notify(
+          `${queued} queued for scoring; ${(result?.succeeded || 0) - queued} skipped; ${failed} failed.${
+            failed
+              ? ` ${result?.items?.find((item) => item.error)?.error?.message || "Refresh and retry."}`
+              : ""
+          }`,
+          failed > 0,
+        );
+      } else if (result?.failed)
         notify(
           `${result.succeeded || 0} completed; ${result.failed} failed. ${result.items?.find((item) => item.error)?.error?.message || "Refresh and retry."}`,
           true,
@@ -710,17 +728,22 @@ export function JobDrawer({
                   <Button
                     icon="refresh"
                     disabled={pending || !job.posting}
-                    onClick={() =>
-                      mutate(
-                        () =>
-                          api("/scoring/rescore", "POST", {
-                            job_ids: [id],
-                            outdated_only: false,
-                            limit: 1,
-                          }),
-                        "Fit assessment queued. Check Settings activity for progress.",
-                      )
-                    }
+                    onClick={async () => {
+                      let result: { count: number } | undefined;
+                      const ok = await mutate(async () => {
+                        result = await api("/scoring/rescore", "POST", {
+                          job_ids: [id],
+                          outdated_only: false,
+                          limit: 1,
+                        });
+                      }, "Fit assessment request checked.");
+                      if (ok)
+                        notify(
+                          result?.count
+                            ? "Fit assessment queued. Check Settings activity for progress."
+                            : "No assessment queued. Check your career profile and posting text.",
+                        );
+                    }}
                   >
                     Update fit score
                   </Button>

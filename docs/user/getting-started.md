@@ -77,7 +77,8 @@ port; update `OPENINGS_PUBLIC_URL` to match.
    `docker compose --profile local up -d --no-build`.
 3. In **Settings → AI scoring**, select local/Laya, URL `http://scorer:8000`, model
    `english`, context 2048 and the same API key. Use a 600-second timeout for a
-   cold model start. Test the connection, then enable scoring.
+   cold model start. Test the connection, turn on **Enable AI scoring**, then click
+   **Save scoring settings**. Confirm the page shows **Saved: AI scoring is on**.
 
 Starting the container does not enable scoring. The first test downloads the
 pinned model into the disposable `model-cache` volume and loads it on CPU.

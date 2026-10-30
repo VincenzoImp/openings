@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Show saved scoring state and keep Save visible while editing; report skipped scoring requests.
+- Repair source edits, document refresh, context retry and application history in the dashboard.
+- Match new-search defaults across interfaces and link overview counts to filtered results.
+- Generalize public documentation and clarify container resource budgets.
+
 ## 0.5.1
 
 - Restore join.com company listings and posting details for its current page data.

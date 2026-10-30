@@ -81,6 +81,26 @@ async def test_completeness_filter_matches_overview_and_page_totals_on_rest_and_
     assert structured["total"] == 1 and structured["items"][0]["id"] == incomplete["id"]
 
 
+@pytest.mark.asyncio
+async def test_active_job_filter_matches_attention_counts_without_dismissed_jobs(tmp_path):
+    app = create_app(tmp_path / "active.sqlite", start_worker=False)
+    workspace = app.state.workspace
+    for state in ("inbox", "saved", "dismissed"):
+        item = job(workspace, url=f"https://example.test/{state}", posting="")
+        if state != "inbox":
+            workspace.set_triage(item["id"], state, item["version"])
+    with TestClient(app) as client:
+        client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
+        result = client.get("/api/v1/jobs?triage=active&complete=false").json()
+        assert result["total"] == client.get("/api/v1/overview").json()["incomplete"] == 2
+        assert {row["triage"] for row in result["items"]} == {"inbox", "saved"}
+        assert client.get("/api/v1/jobs?triage=dismissed&complete=false").json()["total"] == 1
+    result = await app.state.mcp.call_tool(
+        "jobs_search", {"value": {"triage": "active", "complete": False}}
+    )
+    assert json.loads(result[0].text)["total"] == 2
+
+
 def test_attempts_and_recorded_funnel_are_separate_from_job_triage(workspace):
     original = job(workspace)
     first = workspace.create_application({"job_id": original["id"], "idempotency_key": "once"})

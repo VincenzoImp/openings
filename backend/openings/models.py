@@ -142,7 +142,7 @@ def normalized_date(value, *, end=False):
 
 class JobQuery(Input):
     q: str = Field(default="", max_length=1000)
-    triage: Literal["inbox", "saved", "dismissed"] | None = None
+    triage: Literal["inbox", "saved", "dismissed", "active"] | None = None
     company: str | None = Field(default=None, max_length=300)
     location: str | None = Field(default=None, max_length=500)
     source: str | None = Field(default=None, max_length=300)
