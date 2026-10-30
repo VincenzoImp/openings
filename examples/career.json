@@ -11,6 +11,18 @@
       "title": "Reliable deployment workflow",
       "narrative": "Designed a typed deployment workflow with health checks and rollback. Reduced the manual deployment procedure from nine steps to three and made release status visible to the team.",
       "metadata": {"year": 2023, "skills": ["TypeScript", "Docker", "Linux"]}
+    },
+    {
+      "kind": "award",
+      "title": "Example community award",
+      "narrative": "Received a fictional community award for documenting an open-source deployment workflow.",
+      "metadata": {"year": 2024, "organization": "Example Developer Community"}
+    },
+    {
+      "kind": "publication",
+      "title": "A fictional technical note on API reliability",
+      "narrative": "Coauthored a synthetic workshop note describing API error handling and practical deployment checks.",
+      "metadata": {"year": 2024, "authors": ["Alex Example"], "url": "https://example.org/notes/api-reliability"}
     }
   ]
 }

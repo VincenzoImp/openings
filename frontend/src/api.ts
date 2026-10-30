@@ -75,12 +75,25 @@ export interface Profile {
   version: number;
 }
 export interface Knowledge extends Versioned {
-  kind: string;
+  kind: KnowledgeKind;
   title: string;
   narrative: string;
   narrative_preview?: string;
   metadata: Json;
 }
+export const knowledgeKinds = {
+  experience: "Experience",
+  project: "Project",
+  course: "Course",
+  education: "Education",
+  award: "Award",
+  publication: "Publication",
+  fact: "Fact",
+  skill: "Skill",
+  language: "Language",
+  other: "Other",
+} as const;
+export type KnowledgeKind = keyof typeof knowledgeKinds;
 export interface Claim extends Versioned {
   knowledge_id: string;
   text: string;
