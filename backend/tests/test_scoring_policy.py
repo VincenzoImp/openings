@@ -147,7 +147,8 @@ def test_scoring_projection_cleans_copies_and_excludes_raw_metadata(app, monkeyp
             kind="fact",
             title="API experience",
             narrative="Python APIs.",
-            metadata={"skills": ["Python"], "raw": "duplicated original " * 1000},
+            skills=["Python"],
+            metadata={"raw": "duplicated original " * 1000},
         )
     )
     config = service.update_scoring(
@@ -166,7 +167,8 @@ def test_scoring_projection_cleans_copies_and_excludes_raw_metadata(app, monkeyp
         "Python engineer.\n\nC++ and C#."
     )
     assert snapshot["state"]["job"]["metadata"] == {"is_remote": True}
-    assert snapshot["state"]["candidate"]["knowledge"][0]["metadata"] == {"skills": ["Python"]}
+    assert snapshot["state"]["candidate"]["knowledge"][0]["skills"] == ["Python"]
+    assert snapshot["state"]["candidate"]["knowledge"][0]["metadata"] == {}
     assert workspace.get_job(job["id"])["posting"] == posting
     assert career.get_knowledge(fact["id"])["metadata"]["raw"].startswith("duplicated original")
     assert "raw_cv" in career.get_profile()["metadata"]

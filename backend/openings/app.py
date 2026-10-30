@@ -442,7 +442,7 @@ def create_app(database=None, start_worker=True):
                 "postings": ["payload"],
                 "applications": ["questions", "answers"],
                 "events": ["payload"],
-                "knowledge": ["metadata"],
+                "knowledge": ["metadata", "dates", "skills"],
                 "claims": ["metadata"],
                 "templates": ["rules"],
                 "contexts": ["payload"],

@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import {
   api,
+  careerEntryLabel,
   date,
   download,
   newId,
@@ -1533,27 +1534,29 @@ function ContextBuilder({
             checked={selectEvidence}
             onChange={(e) => setSelectEvidence(e.target.checked)}
           />
-          Choose specific career evidence
+          Choose specific career entries
         </label>
         {selectEvidence && (
           <fieldset className="selection-box">
-            <legend>Career evidence</legend>
+            <legend>Career entries</legend>
             {knowledge.error ? (
               <ErrorBox message={knowledge.error} retry={knowledge.reload} />
             ) : knowledge.loading ? (
               <Loading />
             ) : null}
             <input
-              aria-label="Find evidence for context"
+              aria-label="Find career entries for context"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Find evidence"
+              placeholder="Find career entries"
             />
             {knowledge.data.items.map((k) => (
               <label
                 className="checkline"
                 style={{
-                  display: k.title.toLowerCase().includes(query.toLowerCase())
+                  display: careerEntryLabel(k)
+                    .toLowerCase()
+                    .includes(query.toLowerCase())
                     ? undefined
                     : "none",
                 }}
@@ -1565,7 +1568,7 @@ function ContextBuilder({
                   value={k.id}
                   defaultChecked
                 />
-                {k.title}
+                {careerEntryLabel(k)}
               </label>
             ))}
           </fieldset>

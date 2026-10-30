@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { Fragment, useEffect, useState, type FormEvent } from "react";
 import {
   api,
   date,
@@ -92,9 +92,19 @@ const kinds = [
   "workday",
   "oracle",
   "joincom",
-  "jobcloud",
-  "adzuna",
 ];
+function isSavedSearch(kind: string) {
+  return ["jobspy", "jobcloud", "adzuna"].includes(kind);
+}
+function searchProviders(source: Source) {
+  if (source.kind === "jobspy")
+    return (source.config.providers as string[]) || [];
+  return [
+    source.kind === "jobcloud"
+      ? String(source.config.host || "jobs.ch")
+      : "Adzuna",
+  ];
+}
 export default function CompaniesPage() {
   const resource = useResource<ListResult<Source>>(
     "/sources",
@@ -110,7 +120,7 @@ export default function CompaniesPage() {
   const { mutate, pending, notify } = useWorkspace();
   const matches = resource.data.items.filter(
     (s) =>
-      (tab === "searches") === (s.kind === "jobspy") &&
+      (tab === "searches") === isSavedSearch(s.kind) &&
       (!query ||
         [
           s.name,
@@ -187,13 +197,13 @@ export default function CompaniesPage() {
           {
             id: "searches",
             label: "Saved searches",
-            count: resource.data.items.filter((s) => s.kind === "jobspy")
+            count: resource.data.items.filter((s) => isSavedSearch(s.kind))
               .length,
           },
           {
             id: "companies",
             label: "Companies",
-            count: resource.data.items.filter((s) => s.kind !== "jobspy")
+            count: resource.data.items.filter((s) => !isSavedSearch(s.kind))
               .length,
           },
         ]}
@@ -285,14 +295,14 @@ export default function CompaniesPage() {
                 />
                 <span className="source-icon">
                   <Icon
-                    name={source.kind === "jobspy" ? "search" : "companies"}
+                    name={isSavedSearch(source.kind) ? "search" : "companies"}
                   />
                 </span>
                 <div>
                   <h3>{source.name}</h3>
                   <p>
-                    {source.kind === "jobspy"
-                      ? `${String(source.config.query || "")} · ${String(source.config.location || "Anywhere")}`
+                    {isSavedSearch(source.kind)
+                      ? `${String(source.config.query || "")} · ${String(source.config.location || source.config.country || "All locations")}`
                       : `${source.kind} · ${String(source.config.board || "Company board")}`}
                   </p>
                 </div>
@@ -313,9 +323,9 @@ export default function CompaniesPage() {
                   }
                 />
               </div>
-              {source.kind === "jobspy" && (
+              {isSavedSearch(source.kind) && (
                 <div className="provider-tags">
-                  {((source.config.providers as string[]) || []).map((p) => (
+                  {searchProviders(source).map((p) => (
                     <span className="tag neutral" key={p}>
                       {p}
                     </span>
@@ -456,7 +466,9 @@ export default function CompaniesPage() {
         <SourceEditor
           key={editing === "new" ? `new-${tab}` : editing.id}
           source={editing === "new" ? undefined : editing}
-          search={tab === "searches"}
+          search={
+            editing === "new" ? tab === "searches" : editing.kind === "jobspy"
+          }
           onClose={() => setEditing(null)}
         />
       )}
@@ -517,16 +529,30 @@ function SourceEditor({
             job_type: f.get("job_type") || null,
             fetch_description: f.get("fetch_description") === "on",
           }
-        : {
-            ...configuration,
-            ...(f.get("board") || Object.hasOwn(configuration, "board")
-              ? { board: String(f.get("board") || "") }
-              : {}),
-          };
+        : kind === "jobcloud" || kind === "adzuna"
+          ? {
+              ...configuration,
+              query: f.get("query"),
+              location: f.get("location"),
+              results_wanted: Number(f.get("results_wanted")),
+              ...(kind === "jobcloud"
+                ? { host: f.get("host") }
+                : {
+                    country: f.get("country"),
+                    app_id: f.get("app_id"),
+                    app_key: f.get("app_key"),
+                  }),
+            }
+          : {
+              ...configuration,
+              ...(f.get("board") || Object.hasOwn(configuration, "board")
+                ? { board: String(f.get("board") || "") }
+                : {}),
+            };
     return {
       name: f.get("name"),
       kind,
-      url: kind === "jobspy" ? "" : f.get("url"),
+      url: isSavedSearch(kind) ? "" : f.get("url"),
       config,
       enabled: f.get("enabled") === "on",
       filters: {
@@ -593,28 +619,171 @@ function SourceEditor({
       onClose={onClose}
     >
       <form onSubmit={save}>
-        <Field label={search ? "Search name" : "Company / source name"}>
+        <Field
+          label={isSavedSearch(kind) ? "Search name" : "Company / source name"}
+        >
           <input
             name="name"
             required
             defaultValue={source?.name}
-            placeholder={search ? "My saved search" : "Company name"}
+            placeholder={
+              isSavedSearch(kind) ? "My saved search" : "Company name"
+            }
           />
         </Field>
-        {search ? (
-          <>
-            <Field
-              label="Search query"
-              hint="Keywords sent to the selected job boards, for example backend engineer. Use a separate saved search for another query or location."
+        {(search || isSavedSearch(kind)) && (
+          <Field
+            label="Search service"
+            hint={
+              source
+                ? "Add another search to use a different service."
+                : undefined
+            }
+          >
+            <select
+              value={kind}
+              disabled={!!source}
+              onChange={(e) => {
+                setKind(e.target.value);
+                setPreview(null);
+              }}
             >
-              <input
-                name="query"
-                required
-                defaultValue={String(source?.config.query || "")}
-                placeholder="Enter keywords"
-              />
-            </Field>
-            <div className="formgrid">
+              <option value="jobspy">
+                JobSpy · LinkedIn, Indeed, Glassdoor
+              </option>
+              <option value="jobcloud">JobCloud · jobs.ch, jobup.ch</option>
+              <option value="adzuna">Adzuna · API credentials required</option>
+            </select>
+          </Field>
+        )}
+        <Fragment key={kind}>
+          {kind === "jobspy" ? (
+            <>
+              <Field
+                label="Search query"
+                hint="Keywords sent to the selected job boards, for example backend engineer. Use a separate saved search for another query or location."
+              >
+                <input
+                  name="query"
+                  required
+                  defaultValue={String(source?.config.query || "")}
+                  placeholder="Enter keywords"
+                />
+              </Field>
+              <div className="formgrid">
+                <Field label="Location">
+                  <input
+                    name="location"
+                    defaultValue={String(source?.config.location || "")}
+                    placeholder="City or region"
+                  />
+                </Field>
+                <Field
+                  label="Country"
+                  hint="Use an English country name, such as usa, uk or germany."
+                >
+                  <input
+                    name="country"
+                    required
+                    defaultValue={String(source?.config.country || "usa")}
+                    placeholder="usa"
+                  />
+                </Field>
+              </div>
+              <fieldset className="provider-choices">
+                <legend>Search providers</legend>
+                {["linkedin", "indeed", "glassdoor"].map((provider) => (
+                  <label className="checkline" key={provider}>
+                    <input
+                      type="checkbox"
+                      name="providers"
+                      value={provider}
+                      defaultChecked={(
+                        (source?.config.providers as string[]) || [
+                          "linkedin",
+                          "indeed",
+                          "glassdoor",
+                        ]
+                      ).includes(provider)}
+                    />
+                    {
+                      {
+                        linkedin: "LinkedIn",
+                        indeed: "Indeed",
+                        glassdoor: "Glassdoor",
+                      }[provider]
+                    }
+                  </label>
+                ))}
+              </fieldset>
+              <div className="formgrid">
+                <Field label="Results per provider">
+                  <input
+                    type="number"
+                    name="results_wanted"
+                    min={1}
+                    max={50}
+                    defaultValue={Number(source?.config.results_wanted || 20)}
+                  />
+                </Field>
+                <Field label="Posted within (hours)">
+                  <input
+                    type="number"
+                    name="hours_old"
+                    min={1}
+                    max={8760}
+                    defaultValue={Number(source?.config.hours_old || 72)}
+                  />
+                </Field>
+                <Field label="Job type">
+                  <select
+                    name="job_type"
+                    defaultValue={String(source?.config.job_type || "")}
+                  >
+                    <option value="">Any type</option>
+                    {[
+                      "fulltime",
+                      "parttime",
+                      "contract",
+                      "temporary",
+                      "internship",
+                      "perdiem",
+                      "other",
+                      "volunteer",
+                    ].map((k) => (
+                      <option key={k} value={k}>
+                        {k}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+              <label className="checkline">
+                <input
+                  type="checkbox"
+                  name="is_remote"
+                  defaultChecked={!!source?.config.is_remote}
+                />
+                Remote roles only
+              </label>
+              <label className="checkline">
+                <input
+                  type="checkbox"
+                  name="fetch_description"
+                  defaultChecked={source?.config.fetch_description !== false}
+                />
+                Fetch full descriptions where supported
+              </label>
+            </>
+          ) : kind === "jobcloud" || kind === "adzuna" ? (
+            <>
+              <Field label="Search query">
+                <input
+                  name="query"
+                  required
+                  defaultValue={String(source?.config.query || "")}
+                />
+              </Field>
               <Field label="Location">
                 <input
                   name="location"
@@ -622,134 +791,95 @@ function SourceEditor({
                   placeholder="City or region"
                 />
               </Field>
-              <Field
-                label="Country"
-                hint="Use an English country name, such as usa, uk or germany."
-              >
-                <input
-                  name="country"
-                  required
-                  defaultValue={String(source?.config.country || "usa")}
-                  placeholder="usa"
-                />
-              </Field>
-            </div>
-            <fieldset className="provider-choices">
-              <legend>Search providers</legend>
-              {["linkedin", "indeed", "glassdoor"].map((provider) => (
-                <label className="checkline" key={provider}>
+              {kind === "adzuna" && (
+                <div className="formgrid">
+                  <Field label="Adzuna application ID">
+                    <input
+                      name="app_id"
+                      required
+                      autoComplete="off"
+                      defaultValue={String(source?.config.app_id || "")}
+                    />
+                  </Field>
+                  <Field label="Adzuna API key">
+                    <input
+                      name="app_key"
+                      type="password"
+                      required
+                      autoComplete="off"
+                      defaultValue={String(source?.config.app_key || "")}
+                    />
+                  </Field>
+                </div>
+              )}
+              <div className="formgrid">
+                {kind === "jobcloud" ? (
+                  <Field label="Search provider">
+                    <select
+                      name="host"
+                      defaultValue={String(source?.config.host || "jobs.ch")}
+                    >
+                      <option value="jobs.ch">jobs.ch</option>
+                      <option value="jobup.ch">jobup.ch</option>
+                    </select>
+                  </Field>
+                ) : (
+                  <Field label="Country code">
+                    <input
+                      name="country"
+                      required
+                      pattern="[a-z]{2}"
+                      defaultValue={String(source?.config.country || "gb")}
+                    />
+                  </Field>
+                )}
+                <Field label="Results per search">
                   <input
-                    type="checkbox"
-                    name="providers"
-                    value={provider}
-                    defaultChecked={(
-                      (source?.config.providers as string[]) || [
-                        "linkedin",
-                        "indeed",
-                        "glassdoor",
-                      ]
-                    ).includes(provider)}
+                    name="results_wanted"
+                    type="number"
+                    required
+                    min={1}
+                    max={kind === "jobcloud" ? 40 : 50}
+                    defaultValue={Number(source?.config.results_wanted || 20)}
                   />
-                  {
-                    {
-                      linkedin: "LinkedIn",
-                      indeed: "Indeed",
-                      glassdoor: "Glassdoor",
-                    }[provider]
-                  }
-                </label>
-              ))}
-            </fieldset>
-            <div className="formgrid">
-              <Field label="Results per provider">
+                </Field>
+              </div>
+            </>
+          ) : (
+            <>
+              <Field label="Career / board URL">
                 <input
-                  type="number"
-                  name="results_wanted"
-                  min={1}
-                  max={50}
-                  defaultValue={Number(source?.config.results_wanted || 20)}
+                  type="url"
+                  name="url"
+                  required
+                  defaultValue={source?.url || ""}
+                  placeholder="https://jobs.lever.co/company"
                 />
               </Field>
-              <Field label="Posted within (hours)">
-                <input
-                  type="number"
-                  name="hours_old"
-                  min={1}
-                  max={8760}
-                  defaultValue={Number(source?.config.hours_old || 72)}
-                />
-              </Field>
-              <Field label="Job type">
-                <select
-                  name="job_type"
-                  defaultValue={String(source?.config.job_type || "")}
-                >
-                  <option value="">Any type</option>
-                  {[
-                    "fulltime",
-                    "parttime",
-                    "contract",
-                    "temporary",
-                    "internship",
-                    "perdiem",
-                    "other",
-                    "volunteer",
-                  ].map((k) => (
-                    <option key={k} value={k}>
-                      {k}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-            <label className="checkline">
-              <input
-                type="checkbox"
-                name="is_remote"
-                defaultChecked={!!source?.config.is_remote}
-              />
-              Remote roles only
-            </label>
-            <label className="checkline">
-              <input
-                type="checkbox"
-                name="fetch_description"
-                defaultChecked={source?.config.fetch_description !== false}
-              />
-              Fetch full descriptions where supported
-            </label>
-          </>
-        ) : (
-          <>
-            <Field label="Career / board URL">
-              <input
-                type="url"
-                name="url"
-                required
-                defaultValue={source?.url || ""}
-                placeholder="https://jobs.lever.co/company"
-              />
-            </Field>
-            <div className="formgrid">
-              <Field label="Board type">
-                <select value={kind} onChange={(e) => setKind(e.target.value)}>
-                  <option value="auto">Detect from URL</option>
-                  {kinds.map((k) => (
-                    <option key={k} value={k}>
-                      {k === "rss" ? "RSS feed" : k}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Board identifier (optional)">
-                <input
-                  name="board"
-                  defaultValue={String(source?.config.board || "")}
-                />
-              </Field>
-            </div>
-          </>
-        )}
+              <div className="formgrid">
+                <Field label="Board type">
+                  <select
+                    value={kind}
+                    onChange={(e) => setKind(e.target.value)}
+                  >
+                    <option value="auto">Detect from URL</option>
+                    {kinds.map((k) => (
+                      <option key={k} value={k}>
+                        {k === "rss" ? "RSS feed" : k}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Board identifier (optional)">
+                  <input
+                    name="board"
+                    defaultValue={String(source?.config.board || "")}
+                  />
+                </Field>
+              </div>
+            </>
+          )}
+        </Fragment>
         <div className="formgrid">
           <Field label="Role filters" hint="Optional comma-separated words.">
             <input name="titles" defaultValue={filters("titles")} />

@@ -66,13 +66,15 @@ CREATE TABLE IF NOT EXISTS notes (
  version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS knowledge (
- id TEXT PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL, narrative TEXT NOT NULL DEFAULT '',
+ id TEXT PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL, organization TEXT NOT NULL DEFAULT '',
+ dates TEXT CHECK(dates IS NULL OR json_valid(dates)), skills TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(skills)),
+ position INTEGER NOT NULL DEFAULT 0 CHECK(position>=0), narrative TEXT NOT NULL DEFAULT '',
  metadata TEXT NOT NULL DEFAULT '{}', version INTEGER NOT NULL DEFAULT 1,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS claims (
  id TEXT PRIMARY KEY, knowledge_id TEXT NOT NULL REFERENCES knowledge(id) ON DELETE CASCADE,
- text TEXT NOT NULL, approved INTEGER NOT NULL DEFAULT 0, metadata TEXT NOT NULL DEFAULT '{}',
+ text TEXT NOT NULL, approved INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL DEFAULT 0 CHECK(position>=0), metadata TEXT NOT NULL DEFAULT '{}',
  version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS templates (
@@ -141,4 +143,4 @@ CREATE INDEX IF NOT EXISTS files_context ON files(context_id);
 CREATE INDEX IF NOT EXISTS files_template ON files(template_id);
 CREATE INDEX IF NOT EXISTS files_knowledge ON files(knowledge_id);
 CREATE INDEX IF NOT EXISTS claims_knowledge ON claims(knowledge_id);
-PRAGMA user_version=2;
+PRAGMA user_version=3;
