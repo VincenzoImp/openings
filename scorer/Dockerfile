@@ -1,5 +1,5 @@
 FROM python:3.12-slim-bookworm
-ARG VERSION=0.5.3
+ARG VERSION=0.5.4
 ARG VCS_REF=unknown
 LABEL org.opencontainers.image.title="Openings CPU scorer" \
       org.opencontainers.image.description="Optional local CPU classification for Openings" \

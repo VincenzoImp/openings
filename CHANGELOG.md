@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.4
+
+- Accept MCP requests at the endpoint advertised by the dashboard, with or without a trailing slash.
+
 ## 0.5.3
 
 - Exclude partial previews and punctuation-only placeholders from scoring; align completeness filters and counts.
