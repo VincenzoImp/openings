@@ -10,13 +10,16 @@ import json
 import re
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
+from copy import deepcopy
+from functools import lru_cache
 from urllib.parse import quote, urlencode
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from ..errors import DomainError
 from ..common import now
 from ..posting import matches_filters
+from .catalog import COMPANY_ADAPTERS
 
 
 class BoardConfig(BaseModel):
@@ -26,6 +29,22 @@ class BoardConfig(BaseModel):
     max_results: int = Field(default=100, ge=1, le=2000)
     max_details: int = Field(default=10, ge=0, le=25)
     max_candidates: int = Field(default=2000, ge=20, le=10000)
+
+
+@lru_cache(maxsize=None)
+def config_model(kind):
+    adapter = COMPANY_ADAPTERS[kind]
+    return create_model(
+        kind.title() + "Config",
+        __config__=BoardConfig.model_config,
+        **{
+            name: (
+                BoardConfig.model_fields[name].annotation,
+                deepcopy(BoardConfig.model_fields[name]),
+            )
+            for name in adapter.fields
+        },
+    )
 
 
 def xml(body):
@@ -176,8 +195,11 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             **{key: value for key, value in metadata.items() if value is not None and value != ""},
         }
         if not posting and key in known:
+            unavailable.discard(key)
             metadata["description_complete"] = previous.get("description_complete", True)
         elif not posting:
+            if key not in pending:
+                unavailable.add(key)
             metadata["description_complete"] = False
             metadata["description_status"] = "pending" if key in pending else "unavailable"
         elif len(posting) > 200000:

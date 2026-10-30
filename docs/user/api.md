@@ -66,7 +66,9 @@ headers, partial dates, skills and ordering.
 
 ## Collection recipes
 
-Read `GET /sources/schemas` for typed defaults and supported configuration fields.
+Read `GET /sources/schemas` for typed defaults and applicable configuration fields.
+Each adapter exposes its description mode and accepts only its supported options.
+For example, an inline-body adapter has no separate detail-request budget.
 A source's service is fixed after creation. Read its current `version` before a
 PATCH, run or DELETE; include it as `expected_version` (a query parameter for
 DELETE). A 409 means the source changed since it was read.
