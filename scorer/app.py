@@ -13,6 +13,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from preparation import prepare_state
+
 MODEL = os.environ.get("SCORER_MODEL", "convaiinnovations/laya")
 REVISION = os.environ.get("SCORER_REVISION", "55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851")
 MAX_CONTEXT = int(os.environ.get("SCORER_MAX_CONTEXT", "2048"))
@@ -51,6 +53,7 @@ def model_loop(connection):
     try:
         import torch
         from laya import Agent
+        from laya.common import build_head, encode_text, render_options
 
         torch.set_num_threads(THREADS)
         torch.set_num_interop_threads(1)
@@ -58,7 +61,45 @@ def model_loop(connection):
         while True:
             value = connection.recv()
             try:
-                result = agent.predict(value["state"], value["questions"], max_len=value["max_len"])
+                question = agent._to_internal(next(iter(value["questions"].values())))
+                head, _, _ = build_head(agent.tok, question, agent.cfg.get("head_max_len", 192))
+                instruction = f"{question['t']} question: {question['ins']}".replace(
+                    agent.tok.mask_token, " "
+                )
+                full_head = [agent.tok.cls_token_id]
+                full_head += encode_text(agent.tok, instruction, add_special_tokens=False)[
+                    "input_ids"
+                ]
+                full_head += [agent.tok.sep_token_id]
+                for option in render_options(question):
+                    full_head += [agent.tok.mask_token_id]
+                    full_head += encode_text(
+                        agent.tok,
+                        " " + option.replace(agent.tok.mask_token, " "),
+                        add_special_tokens=False,
+                    )["input_ids"]
+                full_head += [agent.tok.sep_token_id]
+                # Laya can shorten instructions/options without a usage flag.
+                # Require its assembled head to contain the complete rendered question.
+                if head != full_head:
+                    connection.send({"ok": False, "error": "question_too_long"})
+                    continue
+                state, preparation = prepare_state(
+                    agent.tok, value["state"], max(0, value["max_len"] - len(head) - 1)
+                )
+                result = agent.predict(state, value["questions"], max_len=value["max_len"])
+                if preparation is not None:
+                    usage = result["usage"]
+                    preparation.update(
+                        state_tokens_used=(
+                            preparation["state_tokens_used"] - usage["state_tokens_dropped"]
+                        ),
+                        state_tokens_dropped=(
+                            preparation["state_tokens_dropped"] + usage["state_tokens_dropped"]
+                        ),
+                        shortened=preparation["shortened"] or usage["truncated"],
+                    )
+                    result["input_preparation"] = preparation
                 connection.send({"ok": True, "result": result})
             except Exception as error:
                 connection.send({"ok": False, "error": type(error).__name__})
@@ -107,10 +148,20 @@ def predict(value):
             raise TimeoutError("Model response deadline exceeded")
         response = MODEL_PIPE.recv()
         if not response.get("ok"):
+            if response.get("error") == "question_too_long":
+                raise HTTPException(
+                    422,
+                    {
+                        "code": "question_too_long",
+                        "message": "Shorten the score rubric or criteria; their complete text must fit the question token budget.",
+                    },
+                )
             raise RuntimeError(response.get("error", "Model inference failed"))
         READY = True
         LAST_ERROR = None
         return response["result"]
+    except HTTPException:
+        raise
     except Exception as error:
         LAST_ERROR = type(error).__name__
         unload()
@@ -147,7 +198,7 @@ async def lifespan(app):
             unload()
 
 
-app = FastAPI(title="Openings optional CPU scorer", version="0.6.2", lifespan=lifespan)
+app = FastAPI(title="Openings optional CPU scorer", version="0.7.0", lifespan=lifespan)
 
 
 @app.middleware("http")
@@ -216,16 +267,6 @@ def system_one(value: ScoreRequest):
                 "max_len": value.max_len,
             }
         )
-        usage = result.get("usage") or {}
-        if (
-            usage.get("truncated")
-            or usage.get("state_tokens_dropped")
-            or usage.get("truncated_questions")
-        ):
-            raise HTTPException(
-                422,
-                "Context was truncated; no fit score is returned. Use a shorter scoring profile or a larger compatible service.",
-            )
         return {**result, "model": MODEL, "model_revision": REVISION}
     finally:
         LAST_USED = time.monotonic()

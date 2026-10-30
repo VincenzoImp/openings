@@ -35,11 +35,17 @@ from .common import (
     now,
 )
 from .errors import DomainError
-from .posting import posting_complete_sql
+from .posting import posting_complete_sql, matches_filters
 from .worker import inference_guard
 from .collectors import company as company_collectors
 from .collectors import jobspy as jobspy_collector
-from .collectors.policy import ProviderBudget, ProviderDeferred, ProviderPatch, ProviderStore
+from .collectors.policy import (
+    ProviderBudget,
+    ProviderDeferred,
+    ProviderPatch,
+    ProviderStore,
+    provider_for_url,
+)
 
 LOG = logging.getLogger(__name__)
 SourceKind = Literal[
@@ -297,40 +303,6 @@ def public_url(value: str) -> str:
             422, "private_url", "Collection URLs must resolve to public network addresses."
         )
     return value
-
-
-def provider_for_url(value: str) -> str:
-    """Choose the same provider gate for a known public board/posting host."""
-    host = (urlsplit(value).hostname or "").lower()
-    suffixes = {
-        "linkedin.com": "linkedin",
-        "indeed.com": "indeed",
-        "glassdoor.com": "glassdoor",
-        "greenhouse.io": "greenhouse",
-        "lever.co": "lever",
-        "ashbyhq.com": "ashby",
-        "recruitee.com": "recruitee",
-        "jobs.personio.de": "personio",
-        "workable.com": "workable",
-        "breezy.hr": "breezy",
-        "bamboohr.com": "bamboohr",
-        "smartrecruiters.com": "smartrecruiters",
-        "rippling.com": "rippling",
-        "myworkdayjobs.com": "workday",
-        "oraclecloud.com": "oracle",
-        "join.com": "joincom",
-        "jobs.ch": "jobcloud",
-        "jobup.ch": "jobcloud",
-        "adzuna.com": "adzuna",
-    }
-    return next(
-        (
-            provider
-            for suffix, provider in suffixes.items()
-            if host == suffix or host.endswith("." + suffix)
-        ),
-        "manual",
-    )
 
 
 def fetch_bytes(
@@ -624,17 +596,6 @@ def normalize_posting(item: dict) -> dict:
     return {**item, "metadata": metadata}
 
 
-def matches_filters(item, filters):
-    return (
-        not filters.get("titles")
-        or any(term.casefold() in item["title"].casefold() for term in filters["titles"])
-    ) and (
-        not filters.get("locations")
-        or not item["location"].strip()
-        or any(term.casefold() in item["location"].casefold() for term in filters["locations"])
-    )
-
-
 def fetch_postings(source: dict) -> list[dict]:
     config, kind = source["config"], source["kind"]
     name = source.get("name") or config.get("board") or "RSS source"
@@ -654,7 +615,7 @@ def fetch_postings(source: dict) -> list[dict]:
             preview=source.get("preview", False),
         )
         source["diagnostic"] = diagnostic
-    elif kind not in ("greenhouse", "lever", "ashby", "rss"):
+    elif kind not in ("lever", "ashby", "rss"):
         source["streamed"] = source.get("on_item") is not None
         items = company_collectors.collect(
             source,
@@ -664,26 +625,6 @@ def fetch_postings(source: dict) -> list[dict]:
             preview=source.get("preview", False),
             on_item=source.get("on_item"),
         )
-    elif kind == "greenhouse":
-        raw = _json(f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true")
-        for row in company_collectors.records(raw, "jobs"):
-            items.append(
-                {
-                    "source_key": f"greenhouse:{board}:{row['id']}",
-                    "title": row.get("title", "Untitled role"),
-                    "company": name,
-                    "location": (row.get("location") or {}).get("name", ""),
-                    "url": row.get("absolute_url", ""),
-                    "posting": html_text(row.get("content", "")),
-                    "metadata": {
-                        "ats": kind,
-                        "board": board,
-                        "external_id": str(row["id"]),
-                        "departments": row.get("departments", []),
-                    },
-                    "raw": row,
-                }
-            )
     elif kind == "lever":
         host = "api.eu.lever.co" if config.get("region") == "eu" else "api.lever.co"
         raw = _json(f"https://{host}/v0/postings/{slug}?mode=json")
@@ -820,6 +761,15 @@ def fetch_postings(source: dict) -> list[dict]:
     ]
 
 
+def scoring_text(value: str) -> str:
+    """Normalize presentation in a scoring copy without rewriting archived evidence."""
+    if re.search(r"</?(?:p|div|li|ul|ol|br|h[1-6]|section)(?:\s|/?>)", value, re.I):
+        value = html_text(value)
+    value = value.replace("\r\n", "\n").replace("\r", "\n")
+    lines = [re.sub(r"[\t \u00a0]+", " ", line).strip() for line in value.split("\n")]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
 def score_call(config: dict, state: dict) -> dict:
     cfg = ScoringConfig.model_validate(config)
     body = {
@@ -837,11 +787,22 @@ def score_call(config: dict, state: dict) -> dict:
     try:
         with httpx.Client(timeout=cfg.timeout_seconds, trust_env=False) as client:
             response = client.post(endpoint, json=body, headers=headers)
+        if response.status_code == 422:
+            try:
+                detail = response.json().get("detail", {})
+            except (ValueError, AttributeError):
+                detail = {}
+            if isinstance(detail, dict) and detail.get("code") == "question_too_long":
+                raise DomainError(
+                    422,
+                    "scoring_question_too_long",
+                    "Shorten the score rubric or criteria; their complete text must fit the question token budget.",
+                )
         if response.status_code == 422 and "context" in response.text.lower():
             raise DomainError(
                 422,
                 "context_too_long",
-                "The scorer could not assess the complete context. Use a larger compatible endpoint or a shorter scoring profile.",
+                "The requested context exceeds the scorer's limit. Match the configured scorer context.",
             )
         response.raise_for_status()
         result = response.json()
@@ -865,16 +826,6 @@ def score_call(config: dict, state: dict) -> dict:
     answers = result.get("answers") or {}
     if not isinstance(usage, dict) or not isinstance(answers, dict):
         raise DomainError(502, "scorer_format", "The scorer returned invalid usage or answers.")
-    if (
-        usage.get("truncated")
-        or usage.get("state_tokens_dropped", 0)
-        or usage.get("truncated_questions")
-    ):
-        raise DomainError(
-            422,
-            "context_too_long",
-            "The scorer truncated the supplied context; this result was not saved.",
-        )
     answer = answers.get("fit") or {}
     if not isinstance(answer, dict):
         raise DomainError(502, "scorer_format", "The scorer returned an invalid fit answer.")
@@ -1448,9 +1399,19 @@ class DiscoveryService:
     def _assessment_context(self, job_id):
         job = self.workspace.get_job(job_id)
         career = self.workspace.scoring_profile()
-        profile = dict(career.get("profile") or {})
-        for key in ("name", "email", "phone", "address", "links"):
-            profile.pop(key, None)
+        source_profile = career.get("profile") or {}
+        profile = {
+            key: scoring_text(str(source_profile[key]))
+            for key in (
+                "headline",
+                "location",
+                "roles",
+                "preferences",
+                "summary",
+                "scoring_summary",
+            )
+            if source_profile.get(key)
+        }
         compact_summary = str(profile.get("scoring_summary") or "").strip()
         if compact_summary:
             profile = {
@@ -1459,6 +1420,21 @@ class DiscoveryService:
                 "preferences": profile.get("preferences", ""),
             }
         knowledge, omissions = [], []
+        if source_profile.get("metadata"):
+            omissions.append(
+                {"field": "profile.metadata", "reason": "Scoring uses explicit profile fields."}
+            )
+        omitted_job_metadata = sorted(
+            set(job.get("metadata", {})) - {"is_remote", "job_type", "job_types", "salary"}
+        )
+        if omitted_job_metadata:
+            omissions.append(
+                {
+                    "field": "job.metadata",
+                    "keys": omitted_job_metadata,
+                    "reason": "Source bookkeeping and arbitrary metadata remain in the archive.",
+                }
+            )
         for entry in career.get("knowledge", []):
             if compact_summary:
                 continue
@@ -1468,11 +1444,36 @@ class DiscoveryService:
             record = {
                 "id": entry["id"],
                 "kind": entry["kind"],
-                "title": entry["title"],
-                "metadata": metadata,
+                "title": scoring_text(entry["title"]),
+                "metadata": {
+                    key: metadata[key]
+                    for key in (
+                        "dates",
+                        "start",
+                        "end",
+                        "year",
+                        "organization",
+                        "skills",
+                        "languages",
+                        "level",
+                        "degree",
+                        "field",
+                    )
+                    if key in metadata
+                },
             }
+            omitted_metadata = sorted(set(metadata) - set(record["metadata"]))
+            if omitted_metadata:
+                omissions.append(
+                    {
+                        "knowledge_id": entry["id"],
+                        "field": "metadata",
+                        "keys": omitted_metadata,
+                        "reason": "Scoring uses career dates, skills and qualifications; other metadata remains in the archive.",
+                    }
+                )
             if entry["kind"] == "fact":
-                record["narrative"] = entry.get("narrative", "")
+                record["narrative"] = scoring_text(entry.get("narrative", ""))
             elif entry.get("narrative"):
                 omissions.append(
                     {
@@ -1513,11 +1514,15 @@ class DiscoveryService:
         state = {
             "candidate": {"profile": profile, "knowledge": knowledge},
             "job": {
-                "title": job["title"],
-                "company": job["company"],
-                "location": job["location"],
-                "posting": job["posting"],
-                "metadata": job.get("metadata", {}),
+                "title": scoring_text(job["title"]),
+                "company": scoring_text(job["company"]),
+                "location": scoring_text(job["location"]),
+                "posting": scoring_text(job["posting"]),
+                "metadata": {
+                    key: job["metadata"][key]
+                    for key in ("is_remote", "job_type", "job_types", "salary")
+                    if key in job.get("metadata", {})
+                },
             },
         }
         signature = hashlib.sha256(
@@ -1621,8 +1626,10 @@ class DiscoveryService:
                     + assessment_context_version_sql()
                     + "=?) ORDER BY j.created_at DESC LIMIT ?",
                     (
-                        self.workspace.scoring_profile_version(), self._config_version(),
-                        CONTEXT_BUILDER_VERSION, value.limit,
+                        self.workspace.scoring_profile_version(),
+                        self._config_version(),
+                        CONTEXT_BUILDER_VERSION,
+                        value.limit,
                     ),
                 )
             ]
@@ -1825,14 +1832,23 @@ class DiscoveryService:
         if provider not in allowed:
             return {"skipped": "source_provider_changed"}
         source["provider"] = provider
+        prefix = (
+            f"{source['kind']}:{source['config'].get('board') or source['config'].get('host', '')}:"
+        )
+        known_rows = self.db.all(
+            "SELECT i.identity,j.metadata,d.checked_at," + posting_complete_sql() + " AS complete "
+            "FROM job_identities i JOIN jobs j ON j.id=i.job_id "
+            "LEFT JOIN posting_details d ON d.identity=i.identity AND d.job_id=j.id "
+            "WHERE i.identity>=? AND i.identity<?",
+            (prefix, prefix + "\uffff"),
+        )
+        # Exact provider/board identities work across overlapping saved sources.
+        # Network freshness is separate from material job/scoring metadata.
         source["known"] = {
-            row["source_key"]: json.loads(row["metadata"])
-            for row in self.db.all(
-                "SELECT json_extract(p.payload,'$.source_key') AS source_key,j.metadata FROM postings p JOIN jobs j ON j.id=p.job_id WHERE p.source_id=? AND "
-                + posting_complete_sql(),
-                (source["id"],),
-            )
-            if row["source_key"]
+            row["identity"]: json.loads(row["metadata"]) for row in known_rows if row["complete"]
+        }
+        source["detail_checked"] = {
+            row["identity"]: row["checked_at"] for row in known_rows if row["checked_at"]
         }
         budget = self.http_budget(
             provider,
@@ -1854,10 +1870,25 @@ class DiscoveryService:
                 try:
                     saved = self.workspace.ingest_job(posting)
                 except (ValidationError, DomainError) as error:
+                    if isinstance(error, DomainError) and error.code == "identity_conflict":
+                        result["conflict_count"] = result.get("conflict_count", 0) + 1
+                        conflicts = result.setdefault("identity_conflicts", [])
+                        if len(conflicts) < 20:
+                            conflicts.append(
+                                {"source_key": posting.get("source_key"), **error.details}
+                            )
+                        return
                     if isinstance(error, DomainError) and error.status != 422:
                         raise
                     result["invalid"] += 1
                     return
+                checked_at = (source.get("detail_checks") or {}).get(posting.get("source_key"))
+                if checked_at:
+                    self.db.execute(
+                        "INSERT INTO posting_details(identity,job_id,checked_at) VALUES(?,?,?) "
+                        "ON CONFLICT(identity) DO UPDATE SET job_id=excluded.job_id,checked_at=excluded.checked_at",
+                        (posting["source_key"], saved["id"], checked_at),
+                    )
                 result["created"] += int(bool(saved.get("created")))
                 result["existing"] += int(not saved.get("created", False))
 
@@ -1883,7 +1914,21 @@ class DiscoveryService:
         if not source.get("streamed"):
             for posting in postings:
                 store(posting)
-        result["diagnostics"] = [source.get("diagnostic") or budget.diagnostics()]
+        diagnostic = source.get("diagnostic") or budget.diagnostics()
+        for key, message in (
+            (
+                "candidate_capped",
+                "Only a bounded part of this board was inspected; additional matching jobs may exist.",
+            ),
+            (
+                "result_capped",
+                "More jobs match than this source's result limit. Increase the result limit or narrow its filters.",
+            ),
+        ):
+            if source.get(key):
+                result[key] = True
+                diagnostic.setdefault("warnings", []).append(message)
+        result["diagnostics"] = [diagnostic]
         if budget.blocked and getattr(budget.blocked, "code", None) != "provider_run_budget":
             # A portal may catch a transport exception while still returning a
             # useful partial page. Preserve those jobs before deferring the task.
@@ -1891,6 +1936,14 @@ class DiscoveryService:
             raise budget.blocked
         if budget.blocked:
             result["capped"] = True
+        if source.get("collection_error"):
+            raise source["collection_error"]
+        if result.get("conflict_count"):
+            raise DomainError(
+                409,
+                "identity_conflict",
+                f"{result['conflict_count']} postings have conflicting archived identities. Other results were retained. Merge the verified duplicate jobs listed in this task's results, then retry.",
+            )
         return result
 
     def _score(self, task, owner):
@@ -1927,6 +1980,7 @@ class DiscoveryService:
             "criteria": config["criteria"],
             "elapsed_seconds": result["elapsed_seconds"],
             "response": result["response"],
+            "request": result.get("request"),
         }
         assessment_id = new_id()
         with self.db.transaction() as connection:

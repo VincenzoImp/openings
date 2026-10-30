@@ -9,6 +9,8 @@ from pathlib import Path
 from .errors import DomainError
 from .posting import posting_complete
 
+SCHEMA_VERSION = 2
+
 
 class Database:
     def __init__(self, path):
@@ -24,9 +26,9 @@ class Database:
                 raise DomainError(
                     400,
                     "schema_version",
-                    "Use an empty database or a compatible Openings workspace. Existing unrelated databases are not modified.",
+                    "Use an empty database or a current-format Openings workspace. Existing unrelated databases are not modified.",
                 )
-            if version not in (0, 1):
+            if version not in (0, SCHEMA_VERSION):
                 raise DomainError(400, "schema_version", "Unsupported workspace database version.")
             conn.execute("PRAGMA journal_mode=WAL")
             conn.executescript(Path(__file__).with_name("schema.sql").read_text())

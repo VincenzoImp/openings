@@ -40,8 +40,14 @@ The input combines your role/preferences, career facts and the posting. When
 for classification. Without it, selected career facts accompany your profile.
 Document agents retain access to the full archive. The scoring-context view/API
 reports omitted details.
-Oversized inputs are rejected when the scorer reports truncation; they are not
-silently scored as complete.
+The bundled scorer cleans formatting and fits the candidate, job details and a
+posting prefix within the configured token limit. Original descriptions stay
+unchanged in the archive. **Input shortened** identifies scores made from shortened
+input; the assessment retains the prepared text and token counts. Oversized
+rubrics or score levels are rejected before inference so their meaning is preserved.
+
+Other compatible System One services control their own input preparation. Their
+reported token usage is retained with the result.
 
 New complete jobs are queued when scoring is enabled. **Automatic rescoring of
 changed postings** is on by default; turn it off to score only previously unseen

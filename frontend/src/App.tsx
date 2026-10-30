@@ -450,6 +450,7 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
       )}{" "}
       {overlay?.kind === "job" && (
         <JobDrawer
+          key={overlay.id}
           id={overlay.id}
           onClose={closeObject}
           onApplication={(id) =>
@@ -458,7 +459,11 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
         />
       )}{" "}
       {overlay?.kind === "application" && (
-        <ApplicationDrawer id={overlay.id} onClose={closeObject} />
+        <ApplicationDrawer
+          key={overlay.id}
+          id={overlay.id}
+          onClose={closeObject}
+        />
       )}
     </>
   );
