@@ -178,6 +178,7 @@ class JobQuery(Input):
 
 class ApplicationQuery(Input):
     q: str = Field(default="", max_length=1000)
+    job_id: str | None = None
     status: Literal["draft", "applied", "interview", "offer", "closed"] | None = None
     outcome: Literal["accepted", "rejected", "not_pursued"] | None = None
     company: str | None = Field(default=None, max_length=300)
