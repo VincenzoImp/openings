@@ -1,4 +1,4 @@
-"""Synthetic join.com pages keep current and legacy embedded data compatible."""
+"""Synthetic join.com public page layouts expose complete job descriptions."""
 
 import json
 
@@ -44,16 +44,19 @@ def test_joincom_embedded_pages_preserve_jobs_and_bound_detail_requests(state_ke
     source = {
         "name": "Example",
         "kind": "joincom",
-        "config": {"board": "example", "max_details": 1},
+        "config": {"board": "example"},
     }
     rows = company.collect(source, request, html_text)
-    assert calls == [base, base + "/11-api-engineer"]
+    assert calls == [base, base + "/11-api-engineer", base + "/12-analyst"]
     assert [row["source_key"] for row in rows] == ["joincom:example:11", "joincom:example:12"]
     assert rows[0]["title"] == "Senior API Engineer"
     assert rows[0]["posting"] == "Build APIs.\nTest APIs."
     assert rows[0]["location"] == "Example City, Example Country"
     assert rows[0]["metadata"]["remote"] is True
-    assert rows[1]["title"] == "Analyst" and rows[1]["posting"] == ""
+    assert (
+        rows[1]["title"] == "Senior API Engineer"
+        and rows[1]["posting"] == "Build APIs.\nTest APIs."
+    )
 
     calls.clear()
     source["detail_checked"] = {row["source_key"]: company.now() for row in rows}

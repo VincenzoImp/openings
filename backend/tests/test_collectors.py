@@ -73,9 +73,9 @@ def test_only_complete_postings_supply_preserved_body_metadata(collection, monke
 
 
 @pytest.mark.parametrize("header", ["120", "date"])
-def test_every_http_attempt_obeys_persisted_cooldown_and_windows(collection, monkeypatch, header):
+def test_every_http_attempt_obeys_persisted_cooldown(collection, monkeypatch, header):
     workspace, service = collection
-    policy(service, "manual", min_interval_seconds=0, max_requests_per_hour=2)
+    policy(service, "manual", min_interval_seconds=0)
     calls = []
     retry = (
         "120"
@@ -200,25 +200,13 @@ def test_provider_split_bulk_pause_and_explicit_manual_run(collection, monkeypat
 
 def test_preview_manual_and_worker_share_provider_gate(collection, monkeypatch):
     workspace, service = collection
-    policy(service, "greenhouse", min_interval_seconds=0, max_requests_per_hour=1)
+    policy(service, "greenhouse", min_interval_seconds=0)
     calls = []
     original = httpx.Client
 
     def send(request):
         calls.append(str(request.url))
-        return httpx.Response(
-            200,
-            json={
-                "jobs": [
-                    {
-                        "id": "1",
-                        "title": "Engineer",
-                        "content": "Build APIs",
-                        "absolute_url": "https://example.org/1",
-                    }
-                ]
-            },
-        )
+        return httpx.Response(429, headers={"Retry-After": "120"})
 
     monkeypatch.setattr(
         module.httpx,
@@ -276,7 +264,7 @@ def test_feed_unknown_location_is_retained_when_location_filters_are_set(monkeyp
     assert len(rows) == 1 and rows[0]["location"] == ""
 
 
-def test_narrow_company_clients_bound_details_and_preserve_missing_bodies():
+def test_company_clients_fetch_all_details_and_reuse_complete_cached_bodies():
     calls = []
 
     def request(url, **kwargs):
@@ -295,11 +283,11 @@ def test_narrow_company_clients_bound_details_and_preserve_missing_bodies():
     source = {
         "name": "Example",
         "kind": "bamboohr",
-        "config": {"board": "example", "max_details": 1},
+        "config": {"board": "example"},
     }
     rows = company.collect(source, request, module.html_text)
-    assert len(calls) == 2
-    assert len(rows) == 2 and rows[0]["posting"] == "Build APIs" and not rows[1]["posting"]
+    assert len(calls) == 3
+    assert len(rows) == 2 and all(row["posting"] == "Build APIs" for row in rows)
     calls.clear()
     source["detail_checked"] = {
         key: module.now() for key in ("bamboohr:example:1", "bamboohr:example:2")

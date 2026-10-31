@@ -280,6 +280,7 @@ class Scraper(ABC):
         self.transport = transport
         self.log = logging.getLogger(type(self).__module__)
         self.error: str | None = None
+        self.error_code: str | None = None
         self.warnings: list[str] = []
         self.checkpoint: dict = {}
         self.on_checkpoint = None
@@ -296,9 +297,10 @@ class Scraper(ABC):
     def save_jobs(self, jobs, **values):
         self.save_progress(jobs=[to_jsonable_python(dict(row)) for row in jobs], **values)
 
-    def fail(self, message: str) -> None:
+    def fail(self, message: str, *, code="provider_response") -> None:
         self.log.error(message)
         self.error = message
+        self.error_code = code
 
     def warn(self, message: str) -> None:
         self.log.warning(message)

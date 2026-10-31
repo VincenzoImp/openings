@@ -1,8 +1,8 @@
 """One transactional HTTP gate for scheduled, manual and preview acquisition.
 
-Limits are conservative owner-configurable safeguards, not provider guarantees.
-Reservations count attempted requests (including transport failures). Runtime is
-stored in SQLite, so restarting the process cannot reset a window or cooldown.
+Requests share one configurable spacing and durable server cooldowns.
+Attempts count even when transport fails. Internal batches yield the worker;
+they do not impose an hourly or daily acquisition quota.
 """
 
 from __future__ import annotations
@@ -15,10 +15,12 @@ from urllib.parse import urljoin, urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..common import check_version, encode, new_id, now
+from ..common import check_version, encode, now
 from ..errors import DomainError, missing
 
 from .catalog import COMPANY_KINDS
+
+REQUEST_BATCH_SIZE = 40
 
 PROVIDERS = {
     **{
@@ -29,12 +31,12 @@ PROVIDERS = {
         )
         for kind in COMPANY_KINDS
     },
-    "linkedin": ("LinkedIn", "search", "JobSpy 1.4.1 public search and optional posting details."),
+    "linkedin": ("LinkedIn", "search", "JobSpy 1.4.1 public search and full posting details."),
     "indeed": ("Indeed", "search", "JobSpy 1.4.1 public search; country support varies."),
     "glassdoor": (
         "Glassdoor",
         "search",
-        "JobSpy 1.4.1 search, location lookup and optional batched details.",
+        "JobSpy 1.4.1 search, location lookup and batched posting details.",
     ),
     "rss": ("RSS / Atom", "feed", "Explicit feed URL; locations absent from feeds remain unknown."),
     "manual": (
@@ -84,10 +86,7 @@ def provider_for_url(value: str) -> str:
 class ProviderPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     enabled: bool = True
-    min_interval_seconds: float = Field(default=3.0, ge=0, le=3600)
-    max_requests_per_hour: int = Field(default=100, ge=1, le=10000)
-    max_requests_per_day: int = Field(default=500, ge=1, le=10000)
-    max_requests_per_run: int = Field(default=40, ge=1, le=200)
+    min_interval_seconds: float = Field(default=5.0, ge=0, le=3600)
 
 
 class ProviderPatch(BaseModel):
@@ -95,9 +94,6 @@ class ProviderPatch(BaseModel):
     expected_version: int = Field(ge=1)
     enabled: bool | None = None
     min_interval_seconds: float | None = Field(default=None, ge=0, le=3600)
-    max_requests_per_hour: int | None = Field(default=None, ge=1, le=10000)
-    max_requests_per_day: int | None = Field(default=None, ge=1, le=10000)
-    max_requests_per_run: int | None = Field(default=None, ge=1, le=200)
 
 
 def iso(moment: float) -> str:
@@ -178,14 +174,6 @@ class ProviderStore:
             }
         )
         targets = [epoch(runtime.get(key)) for key in ("next_allowed_at", "cooldown_until")]
-        day = [value for value in events if value > moment - 86400]
-        hour = [value for value in day if value > moment - 3600]
-        for values, maximum, window in (
-            (day, policy["max_requests_per_day"], 86400),
-            (hour, policy["max_requests_per_hour"], 3600),
-        ):
-            if len(values) >= maximum:
-                targets.append(values[-maximum] + window)
         if max(targets, default=0):
             public_runtime["next_allowed_at"] = iso(max(targets))
         return {
@@ -236,10 +224,9 @@ class ProviderBudget:
     raise ProviderDeferred and are persisted on the task rather than sleeping.
     """
 
-    def __init__(self, store, provider, run_id=None, active=None, validate_url=None, max_wait=5):
+    def __init__(self, store, provider, *, active=None, validate_url=None, max_wait=5):
         store._row(provider)
         self.store, self.provider = store, provider
-        self.run_id = run_id or new_id()
         self.active = active
         self.validate_url = validate_url
         self.max_wait = max_wait
@@ -283,21 +270,9 @@ class ProviderBudget:
                     self.blocked = ProviderDeferred(self.provider, "provider_paused")
                     raise self.blocked
                 events = [value for value in runtime.get("events", []) if value > moment - 86400]
-                hour = [value for value in events if value > moment - 3600]
-                runs = runtime.get("runs", {})
-                run_count = runs.get(self.run_id, {}).get("count", 0)
-                if run_count >= policy["max_requests_per_run"]:
-                    self.blocked = ProviderDeferred(self.provider, "provider_run_budget")
+                if self.requests >= REQUEST_BATCH_SIZE:
+                    self.blocked = ProviderDeferred(self.provider, "collection_batch")
                     raise self.blocked
-                if len(events) >= policy["max_requests_per_day"]:
-                    wait_until, reason = (
-                        events[-policy["max_requests_per_day"]] + 86400,
-                        "provider_day_budget",
-                    )
-                if len(hour) >= policy["max_requests_per_hour"]:
-                    target = hour[-policy["max_requests_per_hour"]] + 3600
-                    if target > wait_until:
-                        wait_until, reason = target, "provider_hour_budget"
                 for key, why in (
                     ("next_allowed_at", "provider_interval"),
                     ("cooldown_until", "provider_cooldown"),
@@ -307,12 +282,9 @@ class ProviderBudget:
                         wait_until, reason = target, why
                 if wait_until <= moment:
                     events.append(moment)
-                    runs[self.run_id] = {"count": run_count + 1, "at": moment}
-                    runs = dict(sorted(runs.items(), key=lambda pair: pair[1]["at"])[-200:])
                     runtime.update(
                         {
                             "events": events,
-                            "runs": runs,
                             "total_requests": runtime.get("total_requests", 0) + 1,
                             "last_request_at": iso(moment),
                             "next_allowed_at": iso(moment + policy["min_interval_seconds"]),

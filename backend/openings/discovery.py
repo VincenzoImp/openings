@@ -34,8 +34,9 @@ from .common import (
     new_id,
     now,
 )
+from . import __version__
 from .errors import DomainError
-from .posting import posting_complete_sql, matches_filters
+from .posting import posting_complete, posting_complete_sql, matches_filters
 from .worker import inference_guard
 from .scheduling import Schedule, IntervalSchedule, schedule_adapter, next_due
 from .collectors import company as company_collectors
@@ -51,6 +52,23 @@ from .collectors.policy import (
 
 LOG = logging.getLogger(__name__)
 SourceKind = Literal["auto", "jobspy", "rss", *COMPANY_KINDS]
+
+
+def automatic_collection_supported(kind):
+    adapter = COMPANY_ADAPTERS.get(kind)
+    return adapter is None or adapter.description_mode != "metadata"
+
+
+def require_automatic_collection(kind):
+    if not automatic_collection_supported(kind):
+        raise DomainError(
+            422,
+            "source_description_unavailable",
+            f"{kind.title()} supplies listing metadata without posting text. "
+            "Use another public source for automatic collection, or add the full posting manually.",
+        )
+
+
 MAX_FEED_BYTES = 8 * 1024 * 1024
 HTTP_BUDGET: ContextVar[ProviderBudget | None] = ContextVar("collection_http_budget", default=None)
 DEFAULT_RUBRIC = (
@@ -130,7 +148,6 @@ class RunOverrides(Input):
     hours_old: int | None = Field(default=None, ge=1, le=8760)
     results_wanted: int | None = Field(default=None, ge=1, le=50)
     max_results: int | None = Field(default=None, ge=1, le=2000)
-    max_details: int | None = Field(default=None, ge=0, le=25)
 
     @model_validator(mode="after")
     def reject_null(self):
@@ -325,7 +342,7 @@ def fetch_bytes(
             timeout=httpx.Timeout(20, connect=8),
             follow_redirects=False,
             trust_env=False,
-            headers={"User-Agent": "Openings/0.5 (job archive)"},
+            headers={"User-Agent": f"Openings/{__version__} (job archive)"},
         ) as client:
             for _ in range(5):
                 if public:
@@ -888,9 +905,9 @@ class DiscoveryService:
         with self.inference_lock:
             return score_call(config, state)
 
-    def http_budget(self, provider_id, run_id=None, active=None):
+    def http_budget(self, provider_id, active=None):
         """Shared per-request gate for collectors, previews and manual URL import."""
-        return ProviderBudget(self.providers, provider_id, run_id, active, public_url)
+        return ProviderBudget(self.providers, provider_id, active=active, validate_url=public_url)
 
     provider_for_url = staticmethod(provider_for_url)
 
@@ -1066,6 +1083,7 @@ class DiscoveryService:
         for raw in rows:
             row = decode_record(raw, ("config", "schedule"))
             row["enabled"] = bool(row["enabled"])
+            row["automatic_collection"] = automatic_collection_supported(row["kind"])
             row["url"] = row["config"].get("url", "")
             row["filters"] = row["config"].get("filters", {"titles": [], "locations": []})
             run = latest.get(row["id"])
@@ -1257,6 +1275,7 @@ class DiscoveryService:
                     else kind.title(),
                     "config_schema": cls.model_json_schema(),
                     "capabilities": {
+                        "automatic_collection": automatic_collection_supported(kind),
                         "search": kind == "jobspy",
                         "lookback": kind == "jobspy",
                         "details": kind == "jobspy"
@@ -1300,20 +1319,20 @@ class DiscoveryService:
         providers = (
             source["config"]["providers"] if source["kind"] == "jobspy" else [source["kind"]]
         )
-        estimate = (
-            jobspy_collector.request_estimate(config, preview=True)
-            if source["kind"] == "jobspy"
-            else {
-                "total": 1 + min(source["config"].get("max_details", 0), 3),
-                "providers": [
-                    {
-                        "id": providers[0],
-                        "min": 1,
-                        "max": 1 + min(source["config"].get("max_details", 0), 3),
-                    }
-                ],
+
+        def estimate(preview):
+            if source["kind"] == "jobspy":
+                return jobspy_collector.request_estimate(config, preview=preview)
+            adapter = COMPANY_ADAPTERS.get(source["kind"])
+            count = source["config"].get("max_results", 100)
+            count = min(count, 3) if preview else count
+            requests = 1 + (count if adapter and adapter.description_mode == "separate" else 0)
+            return {
+                "total": requests,
+                "providers": [{"id": providers[0], "min": 1, "max": requests}],
+                "note": "Listing pagination, redirects and retries may add requests; cached text can reduce detail fetches.",
             }
-        )
+
         items, diagnostics = [], []
         for provider in providers:
             budget = self.http_budget(provider)
@@ -1338,20 +1357,9 @@ class DiscoveryService:
             ],
             "total": len(items),
             "preview_limit": 20,
-            "request_estimate": estimate,
-            "full_request_estimate": jobspy_collector.request_estimate(config)
-            if source["kind"] == "jobspy"
-            else {
-                "total": 1 + source["config"].get("max_details", 0),
-                "providers": [
-                    {
-                        "id": providers[0],
-                        "min": 1,
-                        "max": 1 + source["config"].get("max_details", 0),
-                    }
-                ],
-                "note": "A lower-bound estimate for the configured detail batch; paging, redirects and retries may add requests.",
-            },
+            "request_estimate": estimate(True),
+            "full_request_estimate": estimate(False),
+            "automatic_collection": automatic_collection_supported(source["kind"]),
             "diagnostics": diagnostics,
         }
 
@@ -1359,6 +1367,7 @@ class DiscoveryService:
         if not value.name.strip():
             raise DomainError(422, "source_name", "Give the company or feed a name.")
         resolved = self._resolve_source(value.model_dump())
+        require_automatic_collection(resolved["kind"])
         record_id, stamp = new_id(), now()
         with self.db.transaction() as connection:
             connection.execute(
@@ -1403,6 +1412,8 @@ class DiscoveryService:
             resolved = self._resolve_source(merged)
         else:
             resolved = old
+        if merged["enabled"]:
+            require_automatic_collection(resolved["kind"])
         schedule = schedule_adapter.validate_python(merged["schedule"]).model_dump()
         with self.db.transaction() as connection:
             row = connection.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchone()
@@ -1468,13 +1479,9 @@ class DiscoveryService:
             ):
                 return None
             source = decode_record(row, ("config", "schedule"))
+            require_automatic_collection(source["kind"])
             allowed_overrides = (
-                {"hours_old", "results_wanted"}
-                if source["kind"] == "jobspy"
-                else {"max_results", "max_details"}
-                if source["kind"] in COMPANY_ADAPTERS
-                and COMPANY_ADAPTERS[source["kind"]].description_mode == "separate"
-                else {"max_results"}
+                {"hours_old", "results_wanted"} if source["kind"] == "jobspy" else {"max_results"}
             )
             if set(options) - allowed_overrides:
                 raise DomainError(
@@ -2095,7 +2102,7 @@ class DiscoveryService:
             row = connection.execute(
                 "SELECT * FROM tasks WHERE state='queued' AND next_run_at<=?"
                 + (" AND kind=?" if kind else "")
-                + " AND (kind<>'score' OR NOT EXISTS(SELECT 1 FROM tasks active WHERE active.kind='score' AND active.state='running')) ORDER BY created_at,id LIMIT 1",
+                + " AND (kind<>'score' OR NOT EXISTS(SELECT 1 FROM tasks active WHERE active.kind='score' AND active.state='running')) ORDER BY next_run_at,created_at,id LIMIT 1",
                 (stamp, kind) if kind else (stamp,),
             ).fetchone()
             if row is None:
@@ -2167,7 +2174,6 @@ class DiscoveryService:
         source["checkpoint"] = dict(task["payload"].get("checkpoint") or {})
         budget = self.http_budget(
             provider,
-            f"{task['id']}:{task['attempts']}",
             active=lambda: self._active(task["id"], owner),
         )
         task["budget"] = budget
@@ -2204,6 +2210,9 @@ class DiscoveryService:
                 if not self._active(task["id"], owner):
                     raise DomainError(409, "task_cancelled", "Collection was cancelled.")
                 posting = normalize_posting({**posting, "source_id": source["id"]})
+                if not posting_complete(posting.get("posting"), posting.get("metadata"), {}):
+                    # Incomplete candidates remain in the adapter checkpoint, outside the archive.
+                    return
                 identity = (
                     posting.get("source_key")
                     or posting.get("url")
@@ -2265,6 +2274,11 @@ class DiscoveryService:
                 "This feed has more than 2000 matching postings. Narrow the source filters.",
             )
         if not source.get("streamed"):
+            result["unavailable_descriptions"] = sum(
+                not posting_complete(posting.get("posting"), posting.get("metadata"), {})
+                for posting in postings
+                if matches_filters(posting, source["config"].get("filters") or {})
+            )
             for posting in postings:
                 store(posting)
         diagnostic = source.get("diagnostic") or budget.diagnostics()
@@ -2401,7 +2415,7 @@ class DiscoveryService:
             retry = deferred or (retryable and failures < 3)
             state = "queued" if retry else "failed"
             delay = min(3600, 15 * 4 ** min(max(failures - 1, 0), 8))
-            if deferred and error.code == "provider_run_budget":
+            if deferred and error.code == "collection_batch":
                 delay = 1
             next_run = getattr(error, "next_run_at", None) or (
                 datetime.now(timezone.utc) + timedelta(seconds=delay)
