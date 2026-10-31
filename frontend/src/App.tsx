@@ -32,8 +32,7 @@ const pages: { id: string; title: string; icon: IconName }[] = [
 type Overlay =
   { kind: "add" } | { kind: "job" | "application"; id: string } | null;
 function readRoute() {
-  const raw = location.hash.slice(1).split("?")[0];
-  const hash = raw === "companies" ? "collection" : raw;
+  const hash = location.hash.slice(1).split("?")[0];
   return pages.some((p) => p.id === hash) ? hash : "overview";
 }
 export default function App() {

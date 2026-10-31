@@ -26,9 +26,8 @@ password. Restore through Settings or `POST /api/v1/backup/restore` with the raw
 SQLite body. Restore accepts the current database format and checks integrity and
 foreign keys before replacement. It preserves the destination installation's owner credentials/API tokens, clears
 pending transfer grants and recovers interrupted tasks. Provider policy settings are
-restored, while recent HTTP window events and later cooldowns already recorded on
-the destination are conservatively retained; restoring an older backup does not
-reset request quotas. Reload the dashboard.
+restored, while recent request history and later cooldowns already recorded on
+the destination are retained. Reload the dashboard.
 
 ```bash
 curl --fail "$OPENINGS_URL/api/v1/backup/restore" \
@@ -58,9 +57,9 @@ container is recreated. Editing `OPENINGS_PASSWORD` does not reset an existing o
 
 Tasks show failures, cancellation and explicit retry. Source/scorer failures do
 not discard acquired jobs. Relevant profile/settings edits mark scores outdated;
-periodic rescoring is optional and off by default. The global automatic collection
+periodic rescoring is optional and off by default. The global scheduled collection
 switch preserves source settings and prevents new scheduled runs. Queued/current
-runs continue until stopped; explicit manual runs still honor provider budgets.
+runs continue until stopped; manual runs share provider spacing and cooldowns.
 Disable scoring when you want inference to stop.
 
 ## Access controls
@@ -76,6 +75,9 @@ ends that token’s access on its next request.
 |---|---|
 | MCP rejects a host or download points to the wrong machine | Set `OPENINGS_PUBLIC_URL` to the client's reachable origin and recreate the container. |
 | URL import has incomplete text | Paste the full posting; login/JavaScript pages may not expose readable HTML. |
+| Collection is waiting | Read the displayed reason and resume time. Server cooldowns survive restarts and setting changes. |
+| A result has no description | Automatic candidates remain in collection progress until text is available; manually added jobs can be completed under Edit details. |
+| Starting an application returns 409 | Open the existing non-Closed attempt identified in the response. |
 | Upload fails | Exact byte size, 20 MiB limit, grant expiry, safe relative name and draft revision state. |
 | Edit returns 409 | Reload the current version, then reapply the intended change. |
 | Scorer times out or is killed | Inspect scorer logs/resource limits, allow cold startup, or use off/remote mode. |

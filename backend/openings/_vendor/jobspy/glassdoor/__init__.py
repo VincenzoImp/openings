@@ -139,9 +139,11 @@ class Glassdoor(Scraper):
             else []
         )
         for start in range(0, len(pending), details_per_request):
+            if self.error:
+                break
             group = pending[start : start + details_per_request]
             details = self._fetch_details([row.id for row in group if row.id])
-            if self.transport is not None and self.transport.blocked is not None:
+            if self.error or (self.transport is not None and self.transport.blocked is not None):
                 break
             for row in group:
                 attempts[row.id] = attempts.get(row.id, 0) + 1
@@ -291,13 +293,21 @@ class Glassdoor(Scraper):
                     for job_id in job_ids[start : start + details_per_request]
                 )
                 response = self._graph("JobDetails", f"query JobDetails {{{aliases}}}", {})
-                check_status(response)
+                if response.status_code != 200:
+                    self.fail(
+                        f"Posting details returned HTTP {response.status_code}.",
+                        code="provider_access"
+                        if response.status_code in (401, 403, 999)
+                        else "provider_response",
+                    )
+                    break
                 for alias, view in response.json()[0]["data"].items():
                     if view:
                         details[f"gd-{alias[1:]}"] = description_fields(
                             view["job"]["description"],
                             self.scraper_input.description_format,
                         )
-        except Exception as e:
-            self.log.warning(f"job details: {e}")
+        except Exception as error:
+            if self.transport is None or self.transport.blocked is None:
+                self.fail(f"Posting details could not be read ({type(error).__name__}).")
         return details

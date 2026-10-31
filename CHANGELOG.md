@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.10.0
+
+- Archive automatic results only after usable posting text is available; resume pending details from collection checkpoints.
+- Simplify provider settings to enable/pause and request spacing, with automatic server cooldowns.
+- Retrieve descriptions automatically and identify sources that cannot supply them.
+- Show shortlist membership and application progress together, with direct removal and Start/Continue actions.
+- Enforce one open application per job, explicit closing outcomes and versioned job/application deletion.
+- Align job-specific application lookup, field clearing and bulk failure handling across dashboard, REST and MCP.
+- Refresh English guides and populated screenshots, including the workspace overview.
+
+This release uses workspace schema 5. APIs and stored source/provider settings use
+the current contract; earlier workspace formats require separate conversion.
+
 ## 0.9.1
 
 - Show and validate only acquisition options supported by each ATS adapter.

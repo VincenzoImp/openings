@@ -12,8 +12,8 @@ from .errors import DomainError
 from .db import SCHEMA_VERSION
 
 
-def preserve_request_windows(restored, current):
-    """Restoring an older archive cannot undo HTTP requests already sent by this installation."""
+def preserve_provider_runtime(restored, current):
+    """Keep recent request counts and active provider cooldowns across a restore."""
     result = {**restored, **current}
     result["events"] = sorted(
         {
@@ -23,11 +23,6 @@ def preserve_request_windows(restored, current):
             if value > time.time() - 86400
         }
     )
-    runs = dict(restored.get("runs", {}))
-    for key, value in current.get("runs", {}).items():
-        if key not in runs or value.get("count", 0) >= runs[key].get("count", 0):
-            runs[key] = value
-    result["runs"] = dict(sorted(runs.items(), key=lambda pair: pair[1].get("at", 0))[-200:])
     for key in ("next_allowed_at", "cooldown_until", "last_request_at"):
         result[key] = max(restored.get(key) or "", current.get(key) or "") or None
     for key in ("total_requests", "throttle_count"):
@@ -105,7 +100,7 @@ def restore_database(workspace, source_path):
                                 "SELECT runtime FROM providers WHERE id=?", (provider["id"],)
                             ).fetchone()
                             if restored:
-                                runtime = preserve_request_windows(
+                                runtime = preserve_provider_runtime(
                                     json.loads(restored[0]), json.loads(provider["runtime"])
                                 )
                                 target.execute(

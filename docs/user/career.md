@@ -17,8 +17,8 @@ holds reusable wording. An entry can have no claims, one claim or several.
 Use **Career → Career entries** to add or edit an entry and manage its claims.
 The global **Reusable claims** view supports searching and filtering across entries.
 Cards show titles, organizations, career dates and a two-line description or claim
-preview. Titles and organizations identify entries in selectors. Descriptions can stay empty;
-add context and evidence when useful rather than duplicating every claim.
+preview. Titles and organizations identify entries in selectors. Descriptions can
+stay empty; use them for context and evidence, and claims for reusable wording.
 
 ![Career entries showing titles, organizations, dates and reusable claim previews](../images/career.png)
 

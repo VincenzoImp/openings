@@ -144,7 +144,8 @@ CREATE TABLE IF NOT EXISTS providers (
  runtime TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(runtime)), version INTEGER NOT NULL DEFAULT 1,
  updated_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS applications_job ON applications(job_id);
+CREATE INDEX IF NOT EXISTS applications_job ON applications(job_id,created_at DESC,id DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS applications_active_job ON applications(job_id) WHERE status<>'closed';
 CREATE INDEX IF NOT EXISTS applications_status ON applications(status,updated_at);
 CREATE INDEX IF NOT EXISTS documents_app ON documents(application_id,created_at);
 CREATE INDEX IF NOT EXISTS documents_context ON documents(context_id);
@@ -154,4 +155,4 @@ CREATE INDEX IF NOT EXISTS files_context ON files(context_id);
 CREATE INDEX IF NOT EXISTS files_template ON files(template_id);
 CREATE INDEX IF NOT EXISTS files_knowledge ON files(knowledge_id);
 CREATE INDEX IF NOT EXISTS claims_knowledge ON claims(knowledge_id);
-PRAGMA user_version=4;
+PRAGMA user_version=5;

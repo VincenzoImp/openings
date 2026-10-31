@@ -40,6 +40,8 @@ import {
   Icon,
   Loading,
   LazyDetails,
+  outcomeLabel,
+  outcomeLabels,
   stageLabels,
   Tabs,
 } from "../ui";
@@ -82,9 +84,11 @@ function useApplicationProgress() {
           onChange={(event) => setOutcome(event.target.value)}
         >
           <option value="">Choose an outcome</option>
-          <option value="accepted">Accepted</option>
-          <option value="rejected">Not selected</option>
-          <option value="not_pursued">Not pursued</option>
+          {Object.entries(outcomeLabels).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
         </select>
       </Field>
       <div className="actions form-actions">
@@ -242,9 +246,11 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
           onChange={(e) => setFilters({ outcome: e.target.value, offset: "0" })}
         >
           <option value="">All outcomes</option>
-          <option value="accepted">Accepted</option>
-          <option value="rejected">Not selected</option>
-          <option value="not_pursued">Not pursued</option>
+          {Object.entries(outcomeLabels).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
         </select>
         <select
           aria-label="Sort applications"
@@ -341,7 +347,7 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                       </span>
                       {app.outcome && (
                         <span className="tag neutral outcome">
-                          {app.outcome.replaceAll("_", " ")}
+                          {outcomeLabel(app.outcome)}
                         </span>
                       )}
                       <footer>
@@ -404,7 +410,7 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                       ))}
                     </select>
                   </td>
-                  <td>{app.outcome?.replaceAll("_", " ") || "—"}</td>
+                  <td>{outcomeLabel(app.outcome)}</td>
                   <td>{date(app.updated_at)}</td>
                 </tr>
               ))}
@@ -820,13 +826,9 @@ export function ApplicationDrawer({
           "PATCH",
           version(app, {
             note: form.get("note"),
-            ...(form.get("applied_at")
-              ? {
-                  applied_at: new Date(
-                    String(form.get("applied_at")) + "Z",
-                  ).toISOString(),
-                }
-              : {}),
+            applied_at: form.get("applied_at")
+              ? new Date(String(form.get("applied_at")) + "Z").toISOString()
+              : null,
             outcome: app.status === "closed" ? form.get("outcome") : null,
           }),
         ),
@@ -871,11 +873,21 @@ export function ApplicationDrawer({
         title={app?.job?.title || "Application workspace"}
         onClose={onClose}
         footer={
-          <span className="smalltext muted">
-            {app?.status === "draft"
-              ? "Draft — not sent"
-              : "Application progress is recorded manually."}
-          </span>
+          <>
+            <span className="smalltext muted">
+              {app?.status === "draft"
+                ? "Draft — not submitted"
+                : "Application progress is recorded manually."}
+            </span>
+            {app && (
+              <a
+                className="btn small"
+                href={`#inbox?job=${encodeURIComponent(app.job_id)}`}
+              >
+                View job
+              </a>
+            )}
+          </>
         }
       >
         {resource.error ? (
@@ -1203,15 +1215,17 @@ export function ApplicationDrawer({
                       name="outcome"
                       defaultValue={app.outcome || "not_pursued"}
                     >
-                      <option value="accepted">Accepted</option>
-                      <option value="rejected">Not selected</option>
-                      <option value="not_pursued">Not pursued</option>
+                      {Object.entries(outcomeLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
                     </select>
                   </Field>
                 )}
                 <Field
                   label="Submission time (UTC)"
-                  hint="Set this when recording a past submission. Stage changes record the current time by default."
+                  hint="Set a past submission time or leave blank to clear it. Moving to a submitted stage records the current time when no date is known."
                 >
                   <input
                     type="datetime-local"

@@ -55,7 +55,7 @@ def test_detail_refresh_rotates_across_pages_and_sources_without_material_timest
         SourceCreate(
             name="Example",
             kind="smartrecruiters",
-            config={"board": "example", "max_results": 101, "max_details": 1},
+            config={"board": "example", "max_results": 101},
         )
     )
     clock = ["2026-01-01T00:00:00.000000+00:00"]
@@ -118,7 +118,7 @@ def test_detail_refresh_rotates_across_pages_and_sources_without_material_timest
         SourceCreate(
             name="Example",
             kind="smartrecruiters",
-            config={"board": "example", "max_results": 101, "max_details": 1},
+            config={"board": "example", "max_results": 101},
         )
     )
     run(second)
@@ -160,7 +160,7 @@ def test_greenhouse_filters_metadata_before_bounded_detail_requests(tmp_path, mo
         SourceCreate(
             name="Example",
             kind="greenhouse",
-            config={"board": "example", "max_details": 1},
+            config={"board": "example"},
             filters=module.Filters(titles=["Engineer"]),
         )
     )
@@ -220,14 +220,16 @@ def test_collection_retains_other_results_and_bounds_identity_conflict_report(
     assert workspace.list_jobs()["total"] == 3
 
 
-def test_later_listing_page_failure_preserves_earlier_metadata(tmp_path, monkeypatch):
+def test_later_listing_page_failure_stages_metadata_without_archiving_empty_jobs(
+    tmp_path, monkeypatch
+):
     workspace = Workspace(tmp_path / "partial-pages.sqlite")
     discovery = DiscoveryService(workspace)
     source = discovery.create_source(
         SourceCreate(
             name="Example",
             kind="smartrecruiters",
-            config={"board": "example", "max_results": 101, "max_details": 1},
+            config={"board": "example", "max_results": 101},
         )
     )
 
@@ -244,15 +246,16 @@ def test_later_listing_page_failure_preserves_earlier_metadata(tmp_path, monkeyp
     task = discovery.claim_task("owner", "collect")
     discovery.run_task(task, "owner")
     result = discovery.get_task(task["id"])
-    assert result["state"] == "queued" and result["result"]["created"] == 100
-    assert workspace.list_jobs()["total"] == 100
+    assert result["state"] == "queued" and result["result"]["created"] == 0
+    assert result["result"]["pending_descriptions"] == 100
+    assert workspace.list_jobs()["total"] == 0
 
 
 def test_bounded_description_is_explicitly_incomplete():
     source = {
         "kind": "bamboohr",
         "name": "Example",
-        "config": {"board": "example", "max_details": 1},
+        "config": {"board": "example"},
     }
 
     def request(url, **kwargs):
@@ -274,7 +277,6 @@ def test_bamboohr_filters_before_result_and_detail_caps():
         "config": {
             "board": "example",
             "max_results": 1,
-            "max_details": 1,
             "filters": {"titles": ["Engineer"], "locations": ["Zurich"]},
         },
     }
@@ -311,7 +313,6 @@ def test_workday_filters_later_metadata_pages_and_reports_candidate_cap():
             "board": "example.wd5.myworkdayjobs.com/Careers",
             "max_results": 1,
             "max_candidates": 200,
-            "max_details": 1,
             "filters": {"titles": ["Engineer"]},
         },
     }

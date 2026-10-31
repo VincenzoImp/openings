@@ -5,10 +5,11 @@ import json
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from openings import discovery as module
 from openings.app import create_app
-from openings.discovery import DiscoveryService, SourceCreate
+from openings.discovery import DiscoveryService, SourceCreate, SourcePreview
 from openings.errors import DomainError
 from openings.workspace import Workspace
 
@@ -45,7 +46,9 @@ def test_source_options_follow_actual_adapter_workflow(service):
         assert not schemas[kind]["capabilities"]["details"]
     assert schemas["greenhouse"]["capabilities"]["description_mode"] == "separate"
     assert schemas["breezy"]["capabilities"]["description_mode"] == "metadata"
-    assert "max_details" in schemas["greenhouse"]["config_schema"]["properties"]
+    assert "max_details" not in schemas["greenhouse"]["config_schema"]["properties"]
+    assert schemas["greenhouse"]["capabilities"]["automatic_collection"]
+    assert not schemas["breezy"]["capabilities"]["automatic_collection"]
     assert "region" in schemas["lever"]["config_schema"]["properties"]
     assert "region" not in schemas["greenhouse"]["config_schema"]["properties"]
     with pytest.raises(DomainError) as invalid:
@@ -58,13 +61,12 @@ def test_source_options_follow_actual_adapter_workflow(service):
     inline = service.create_source(
         SourceCreate(name="Example", kind="lever", config={"board": "example"})
     )
-    with pytest.raises(DomainError) as invalid_run:
+    with pytest.raises(ValidationError):
         service.queue_collection(inline["id"], overrides={"max_details": 1})
-    assert invalid_run.value.code == "run_options"
     assert not service.list_tasks()["items"]
 
 
-def test_metadata_only_source_finishes_partial_without_retrying_missing_bodies(
+def test_metadata_only_source_can_be_previewed_but_not_saved_as_an_automatic_watch(
     service, monkeypatch
 ):
     transport(
@@ -73,17 +75,16 @@ def test_metadata_only_source_finishes_partial_without_retrying_missing_bodies(
             200, json=[{"id": "1", "name": "Engineer", "url": "https://example.com/1"}]
         ),
     )
-    source = service.create_source(
-        SourceCreate(name="Example", kind="breezy", config={"board": "example"})
+    preview = service.preview_source(
+        SourcePreview(name="Example", kind="breezy", config={"board": "example"})
     )
-    task = run(service, source)
-    assert task["state"] == "succeeded" and task["result"]["created"] == 1
-    assert task["result"]["pending_descriptions"] == 0
-    assert task["result"]["unavailable_descriptions"] == 1
-    assert task["result"]["http_requests"] == 1
-    assert service.get_run(task["run_id"])["partial"]
-    job = service.workspace.list_jobs()["items"][0]
-    assert not job["complete"] and job["metadata"]["description_status"] == "unavailable"
+    assert preview["total"] == 1 and not preview["automatic_collection"]
+    with pytest.raises(DomainError) as error:
+        service.create_source(
+            SourceCreate(name="Example", kind="breezy", config={"board": "example"})
+        )
+    assert error.value.code == "source_description_unavailable"
+    assert service.list_sources()["total"] == service.workspace.list_jobs()["total"] == 0
 
 
 @pytest.mark.parametrize(

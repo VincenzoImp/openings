@@ -88,7 +88,7 @@ def test_frozen_options_resume_with_cumulative_unique_observations(collection, m
         source["streamed"] = True
         if not source["checkpoint"]:
             source["on_checkpoint"]({"page": 1, "complete": False, "pending_details": 1})
-            raise ProviderDeferred("greenhouse", "provider_run_budget")
+            raise ProviderDeferred("greenhouse", "collection_batch")
         source["on_checkpoint"]({"page": 2, "complete": True, "pending_details": 0})
         return []
 
@@ -186,7 +186,8 @@ def test_bulk_configuration_preserves_untouched_fields_and_service(collection):
     )
     assert result["succeeded"] == result["failed"] == 1
     current = service.get_source(source["id"])
-    assert current["config"]["board"] == "example" and current["config"]["max_details"] == 10
+    assert current["config"]["board"] == "example"
+    assert "max_details" not in current["config"]
     assert current["config"]["max_results"] == 50
     with pytest.raises(DomainError, match="Create a new source"):
         service.update_source(

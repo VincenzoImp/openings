@@ -45,7 +45,10 @@ check populated lists, desktop/mobile layouts, keyboard access, unsaved edits an
 loading/error states. For data changes, check versions, deletion/cancellation,
 frozen contexts, exact revision/file associations and backup consistency. Collection
 changes need a resume-after-deferral workflow, cumulative counts and a source edit
-that leaves queued snapshots unchanged. Keep HTTP attempts inside the shared gate.
+that leaves queued snapshots unchanged. Check that incomplete automatic candidates
+stay outside the archive, then enter once after their text arrives. Exercise one
+open application per job, explicit closure outcomes and versioned deletion through
+REST/MCP and the dashboard. Keep HTTP attempts inside the shared gate.
 
 The manual MCP/file/backup driver requires an external Tectonic executable:
 

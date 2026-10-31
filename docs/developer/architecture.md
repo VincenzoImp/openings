@@ -46,9 +46,12 @@ authoritative for individual input fields. Read [REST](../user/api.md) and
   alone never merges jobs. Dismissal survives URL changes.
 - **Corrections:** source refreshes preserve user edits, triage and application
   attempts. Unchanged content does not trigger another classification.
-- **Lifecycle:** Inbox/Saved/Dismissed is job triage. Draft/Applied/Interview/Offer/
-  Closed belongs to an independent application attempt. Uploading documents does
-  not mark an attempt submitted. Forget permanently removes job-owned records.
+- **Lifecycle:** To review/Shortlist/Dismissed is job triage (`inbox`/`saved`/
+  `dismissed`). Starting an application shortlists its job and creates Draft.
+  Draft/Applied/Interview/Offer/Closed belongs to the application; each job permits
+  one non-Closed attempt, enforced by the shared service and a partial unique
+  index. Reopening and merging respect that constraint. Closing requires an
+  explicit outcome. Forget permanently removes job-owned records.
 - **Snapshots:** preparing a context freezes the job, career evidence, instructions,
   questions, selected templates and exact assets. Later profile edits affect new
   contexts. Changed document content creates a revision with its own uploaded files.
@@ -61,24 +64,27 @@ authoritative for individual input fields. Read [REST](../user/api.md) and
   Reserved structured fields are stored once, outside arbitrary metadata.
 - **Concurrency:** typed inputs, optimistic versions, idempotency keys, foreign
   keys and short transactions protect shared state. Run one application process
-  per workspace; database connections do not cross threads.
+  per workspace; database connections do not cross threads. Mutable job and
+  application deletion requires the current version as well.
 
 SQLite uses WAL and stores SHA-256-deduplicated BLOBs for attachments. Lists return
 compact paginated summaries; full postings, narratives, contexts and file bytes
 are separate reads. Backups use SQLite's online backup API. A restore preserves
-installation authentication and recent provider HTTP windows/later cooldowns.
+installation authentication, recent provider request history and later cooldowns.
 Model weights are a disposable cache outside the workspace.
-Workspaces and backups must use the current database format. Pre-1.0 releases
+Workspaces and backups must use schema 5, the current database format. Pre-1.0 releases
 do not include converters for earlier formats.
 
 ## Acquisition and classification
 
 A saved search has one explicit query/location and provider selection. Company
 sources watch selected ATS boards/feeds with optional title/location filters.
-Both use the same ingestion path as manually added jobs. New sources start paused.
-A shared adapter catalog drives typed configuration, applicable fields and description
-capabilities. Metadata-only results are explicitly partial; unavailable public
-Ashby boards receive an actionable permanent error. Source service is immutable;
+Collected candidates reach the shared ingestion service only after usable posting
+text is available. Pending descriptions remain in the existing task checkpoint;
+manual job input can intentionally be incomplete. New sources start paused.
+A shared adapter catalog drives typed configuration and description capabilities.
+Metadata-only adapters can be previewed but cannot create automatic watches;
+unavailable public Ashby boards receive an actionable permanent error. Source service is immutable;
 versioned bulk patches merge compatible fields without replacing untouched config.
 
 A collection invocation freezes effective source configuration and optional run-only
@@ -90,10 +96,13 @@ coalesce while a run is active. Pausing automation stops future enqueueing;
 explicit cancellation stops an active run.
 
 Every HTTP attempt uses the persisted provider gate: search, detail, preview,
-manual import and redirects. Policy includes minimum spacing, shared hourly/daily
-caps, per-batch caps and Retry-After cooldown. Long waits defer tasks rather than occupying the
-collection lane. Failed/blocked responses remain visible; they are not successful
-empty results. Provider limits are local safeguards, not platform access guarantees.
+manual import and redirects. Provider settings contain enable/pause and minimum
+request spacing, defaulting to five seconds. Recent request counts are informative.
+Internal bounded attempts yield with their checkpoint intact; ready tasks are
+ordered by next execution time. Actual 429/503 responses can set durable
+Retry-After cooldowns, with increasing delays for a 429 lacking that header.
+Long waits release the collection lane. Provider-wide access challenges and
+individual unavailable postings have distinct diagnostics.
 
 The scheduler, collector and inference lanes progress independently. A process/
 database guard serializes inference, including manual endpoint tests. Network-capable
@@ -101,10 +110,10 @@ MCP tools run outside the event loop. Queued tasks have leases and cancellation;
 stale work cannot overwrite a current result. See [source configuration](../user/sources.md).
 
 Scoring is optional and advisory. Relevant profile/config edits mark scores outdated
-without queuing the archive. New complete jobs may be scored automatically;
-a pending-first-score marker also allows newly collected incomplete jobs to receive
-one initial score after detail completion. Existing historical unscored jobs do not
-acquire that eligibility merely because they are refreshed. Automatic rescoring
+without queuing the archive. New complete jobs may be scored automatically.
+The pending-first-score marker also supports manually added incomplete jobs once
+their text is completed. Existing historical unscored jobs do not acquire that
+eligibility merely because they are refreshed. Automatic rescoring
 of updates has a separate switch. Explicit selected/outdated
 batches and optional capped periodic rescoring are separate. Scores come from the
 configured classifier. Model/provider details are in the

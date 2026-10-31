@@ -417,6 +417,14 @@ export const stageLabels = {
   offer: "Offer",
   closed: "Closed",
 };
+export const outcomeLabels: Record<string, string> = {
+  accepted: "Accepted",
+  rejected: "Not selected",
+  not_pursued: "Not pursued",
+};
+export function outcomeLabel(outcome?: string | null) {
+  return (outcome && outcomeLabels[outcome]) || "—";
+}
 
 export function AdvancedJson({
   name,

@@ -14,7 +14,6 @@ from pydantic import (
     FilePath,
     field_validator,
     model_serializer,
-    model_validator,
 )
 
 
@@ -250,8 +249,6 @@ class ScraperInput(BaseModel):
     easy_apply: bool | None = None
     offset: int = Field(0, ge=0)
     fetch_description: bool = False
-    linkedin_fetch_description: bool = False
-    """Deprecated since 1.2.0: use fetch_description; will be removed in 2.0."""
     linkedin_company_ids: list[int] | None = None
     description_format: DescriptionFormat = DescriptionFormat.MARKDOWN
 
@@ -268,18 +265,13 @@ class ScraperInput(BaseModel):
     def _one_or_several(cls, value: object) -> object:
         return [value] if isinstance(value, (str, Enum)) else value
 
-    @model_validator(mode="after")
-    def _merge_linkedin_fetch_description(self) -> ScraperInput:
-        if self.linkedin_fetch_description:
-            self.fetch_description = True
-        return self
-
 
 class Scraper(ABC):
     def __init__(self, transport=None) -> None:
         self.transport = transport
         self.log = logging.getLogger(type(self).__module__)
         self.error: str | None = None
+        self.error_code: str | None = None
         self.warnings: list[str] = []
         self.checkpoint: dict = {}
         self.on_checkpoint = None
@@ -296,9 +288,10 @@ class Scraper(ABC):
     def save_jobs(self, jobs, **values):
         self.save_progress(jobs=[to_jsonable_python(dict(row)) for row in jobs], **values)
 
-    def fail(self, message: str) -> None:
+    def fail(self, message: str, *, code="provider_response") -> None:
         self.log.error(message)
         self.error = message
+        self.error_code = code
 
     def warn(self, message: str) -> None:
         self.log.warning(message)

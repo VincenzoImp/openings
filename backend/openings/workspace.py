@@ -136,6 +136,8 @@ class Workspace:
         columns += [
             "substr(j.posting,1,240) AS j_posting_preview",
             posting_complete_sql() + " AS j_complete",
+            "(SELECT json_object('id',id,'status',status,'outcome',outcome,'version',version) FROM applications WHERE job_id=j.id ORDER BY (status='closed'),created_at DESC,id DESC LIMIT 1) AS j_application",
+            "(SELECT count(*) FROM applications WHERE job_id=j.id) AS j_application_count",
             "a.score AS j_score",
             f"(a.id IS NOT NULL AND (a.job_version!=j.content_version OR a.profile_version!={profile} OR a.config_version!={config} OR {assessment_context_version_sql()}!={CONTEXT_BUILDER_VERSION})) AS j_score_outdated",
         ]
@@ -147,6 +149,7 @@ class Workspace:
         result["metadata"] = json.loads(result["metadata"])
         result["complete"] = bool(result["complete"])
         result["score_outdated"] = bool(result["score_outdated"])
+        result["application"] = json.loads(result["application"]) if result["application"] else None
         result["source"] = (
             result["metadata"].get("source") or result["metadata"].get("ats") or "manual"
         )
@@ -173,6 +176,14 @@ class Workspace:
                     (row["id"],),
                 )
             ]
+            application = connection.execute(
+                "SELECT id,status,outcome,version,(SELECT count(*) FROM applications WHERE job_id=?) AS application_count FROM applications WHERE job_id=? ORDER BY (status='closed'),created_at DESC,id DESC LIMIT 1",
+                (row["id"], row["id"]),
+            ).fetchone()
+            row["application"] = dict(application) if application else None
+            row["application_count"] = (
+                row["application"].pop("application_count") if application else 0
+            )
         row["assessment"] = decode_record(score, ("payload",))
         row["score"] = score["score"] if score else None
         row["score_outdated"] = bool(
@@ -540,10 +551,10 @@ class Workspace:
                 )
         return self.get_job(job_id)
 
-    def forget_job(self, job_id):
+    def forget_job(self, job_id, expected_version):
         with self.db.transaction() as c:
-            if not c.execute("SELECT 1 FROM jobs WHERE id=?", (job_id,)).fetchone():
-                missing("Job")
+            row = c.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+            check_version(row, expected_version)
             c.execute(
                 "DELETE FROM transfer_grants WHERE json_extract(payload,'$.job_id')=?", (job_id,)
             )
@@ -558,6 +569,17 @@ class Workspace:
             for record_id, version in ((source_id, expected_version), (target_id, target_version)):
                 check_version(
                     c.execute("SELECT * FROM jobs WHERE id=?", (record_id,)).fetchone(), version
+                )
+            active = c.execute(
+                "SELECT id FROM applications WHERE job_id IN (?,?) AND status<>'closed'",
+                (source_id, target_id),
+            ).fetchall()
+            if len(active) > 1:
+                raise DomainError(
+                    409,
+                    "application_in_progress",
+                    "Close one active application before merging these jobs.",
+                    {"application_ids": [row["id"] for row in active]},
                 )
             next_content = c.execute(
                 "SELECT max(v)+1 FROM (SELECT content_version v FROM jobs WHERE id IN (?,?) UNION ALL SELECT job_version v FROM assessments WHERE job_id IN (?,?))",
@@ -622,9 +644,20 @@ class Workspace:
         return row
 
     def list_applications(
-        self, status=None, limit=100, offset=0, q="", outcome=None, company=None, sort="updated"
+        self,
+        status=None,
+        limit=100,
+        offset=0,
+        q="",
+        outcome=None,
+        company=None,
+        sort="updated",
+        job_id=None,
     ):
         conditions, args = [], []
+        if job_id is not None:
+            conditions.append("app.job_id=?")
+            args.append(job_id)
         if status:
             if status not in ("draft", "applied", "interview", "offer", "closed"):
                 raise DomainError(422, "application_status", "Choose a valid application stage.")
@@ -679,7 +712,7 @@ class Workspace:
             items.append(item)
         return {"items": items, "total": total, "stage_counts": counts}
 
-    def delete_application(self, application_id, expected_version=None):
+    def delete_application(self, application_id, expected_version):
         with self.db.transaction() as connection:
             row = connection.execute(
                 "SELECT * FROM applications WHERE id=?", (application_id,)
@@ -732,7 +765,7 @@ class Workspace:
                     row = self.db.one("SELECT id,version FROM jobs WHERE id=?", (item.id,))
                     check_version(row, item.expected_version)
                     if value.action == "forget":
-                        self.forget_job(item.id)
+                        self.forget_job(item.id, item.expected_version)
                         result = {"deleted": True}
                     elif value.action == "rescore":
                         if self.discovery is None:
@@ -776,8 +809,6 @@ class Workspace:
             job = c.execute("SELECT * FROM jobs WHERE id=?", (value.job_id,)).fetchone()
             if not job:
                 missing("Job")
-            if job["triage"] == "dismissed":
-                conflict("Restore the dismissed job before preparing an application.")
             if value.idempotency_key:
                 old = c.execute(
                     "SELECT id,job_id FROM applications WHERE idempotency_key=?",
@@ -787,6 +818,9 @@ class Workspace:
                     if old["job_id"] != value.job_id:
                         conflict("This idempotency key already belongs to another job.")
                     return self.get_application(old["id"])
+            if job["triage"] == "dismissed":
+                conflict("Restore the dismissed job before preparing an application.")
+            self._check_active_application(c, value.job_id)
             self.validate_answers([q.model_dump() for q in value.questions], {})
             record_id, stamp = new_id(), now()
             c.execute(
@@ -808,6 +842,20 @@ class Workspace:
             self.event("application_created", value.job_id, record_id, {"status": "draft"}, c)
         return self.get_application(record_id)
 
+    @staticmethod
+    def _check_active_application(connection, job_id, excluding=None):
+        active = connection.execute(
+            "SELECT id,status FROM applications WHERE job_id=? AND status<>'closed' AND (? IS NULL OR id<>?) LIMIT 1",
+            (job_id, excluding, excluding),
+        ).fetchone()
+        if active:
+            raise DomainError(
+                409,
+                "application_in_progress",
+                f"This job already has an active application ({active['id']}). Continue it or close it before starting another.",
+                {"application_id": active["id"], "status": active["status"]},
+            )
+
     def update_application(self, application_id, value):
         value = (
             value if isinstance(value, ApplicationPatch) else ApplicationPatch.model_validate(value)
@@ -817,11 +865,21 @@ class Workspace:
             row = c.execute("SELECT * FROM applications WHERE id=?", (application_id,)).fetchone()
             check_version(row, value.expected_version)
             status = changes.get("status") or row["status"]
-            changes["outcome"] = (
-                (changes.get("outcome") or row["outcome"] or "not_pursued")
-                if status == "closed"
-                else None
-            )
+            if row["status"] == "closed" and status != "closed":
+                self._check_active_application(c, row["job_id"], excluding=application_id)
+            if status == "closed":
+                outcome = changes.get("outcome", row["outcome"])
+                if not outcome:
+                    raise DomainError(
+                        422, "application_outcome", "Choose an outcome when closing an application."
+                    )
+                changes["outcome"] = outcome
+            else:
+                if changes.get("outcome"):
+                    raise DomainError(
+                        422, "application_outcome", "Close the application to record an outcome."
+                    )
+                changes["outcome"] = None
             questions = (
                 changes.get("questions")
                 if changes.get("questions") is not None

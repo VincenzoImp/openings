@@ -8,6 +8,10 @@ backend/openings/operation-inventory.json maps logical operations across interfa
   same useful operations, allowing documented authentication/transport differences.
 - Preserve version checks, context/document immutability, exact file ownership,
   reversible dismissal and deliberate permanent deletion.
+- Keep incomplete automatic candidates in collection checkpoints; admit usable
+  posting text before archive and count bookkeeping. Preserve manual partial input.
+- Enforce one non-Closed application per job in shared services and SQLite.
+  Starting an application shortlists its job; document work never submits it.
 - Keep SQLite portable and the core independent of model, browser and TeX runtimes.
   Generation and compilation belong to an external agent.
 - Provider requests must use the shared persisted gate, including previews,

@@ -9,21 +9,25 @@ supported ATS board or feed. Adapter-specific parsing stays inside the collector
 Use `DiscoveryService.fetch_bytes` or the supplied `ProviderBudget` for every
 public HTTP attempt, including previews, URL imports, redirects, listing pages
 and details. The persisted gate validates destinations, records responses and
-shares provider windows/cooldowns. A batch cap bounds worker work; rolling quotas
-remain shared when the next batch resumes. Long waits defer the task.
+shares request spacing and server cooldowns. Provider settings contain enable/pause
+and the request interval. Internal bounded attempts yield without losing progress;
+long waits defer the task and release the collection lane.
 
 `source['checkpoint']` contains durable pagination/detail state.
 `source['on_checkpoint'](state)` persists progress, while `source['on_item'](item)`
-ingests completed observations. Save enough progress to retry idempotently after
-quota waits or interruption. Mark the checkpoint complete only after the bounded
+offers observations to the complete-text admission rule. Save enough progress to
+retry idempotently after a cooldown or interruption. Mark the checkpoint complete only after the bounded
 listing/detail work is exhausted. Preserve successful records when a later
 request fails.
 
 Complete archived descriptions can be reused within the detail freshness window.
-Keep metadata collection separate from optional detail requests so known jobs do
-not spend the same detail budget repeatedly. Diagnostics should identify missing
-text, coverage caps and provider failures. Challenge/error pages must remain
-visible as failures.
+Detail retrieval is automatic; keep pending candidates in the checkpoint until
+usable text is available. The admission rule precedes archive/count bookkeeping,
+so a header cannot consume the identity's later completed observation. Diagnostics
+distinguish pending or unavailable text, coverage caps and provider-wide failures.
+An access challenge must stop affected work instead of triggering empty detail
+retries for every job. Metadata-only adapters expose `automatic_collection: false`
+and support preview only.
 
 ## JobSpy subset
 

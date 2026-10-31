@@ -42,7 +42,6 @@ from openings._vendor.jobspy.util import (
 
 class LinkedIn(Scraper):
     base_url = "https://www.linkedin.com"
-    delay = (3, 7)
 
     def scrape(self, scraper_input: ScraperInput) -> list[JobPost]:
         self.scraper_input = scraper_input
@@ -72,6 +71,8 @@ class LinkedIn(Scraper):
                     f"{self.base_url}/jobs-guest/jobs/api/seeMoreJobPostings/search",
                     params={**params, "start": start},
                 )
+                if not self._public_access(response):
+                    break
                 check_status(response)
             except Exception as e:
                 self.fail(str(e))
@@ -120,6 +121,8 @@ class LinkedIn(Scraper):
 
         attempts = self.checkpoint.setdefault("detail_attempts", {})
         for index, job in enumerate(job_list):
+            if self.error:
+                break
             identity = "linkedin:" + str(job.id or job.job_url)
             if identity in self.known_postings:
                 job_list[index] = job.model_copy(
@@ -133,10 +136,10 @@ class LinkedIn(Scraper):
             ):
                 continue
             full = self._fetch_details(str(job.id).removeprefix("li-"))
-            if self.transport is not None and self.transport.blocked is not None:
+            if self.error or (self.transport is not None and self.transport.blocked is not None):
                 break
-            attempts[job.id] = attempts.get(job.id, 0) + 1
-            job_list[index] = job.model_copy(update=full)
+            attempts[job.id] = 3 if full is None else attempts.get(job.id, 0) + 1
+            job_list[index] = job.model_copy(update=full or {})
             self.save_jobs(job_list)
         pending = (
             sum(not row.description and attempts.get(row.id, 0) < 3 for row in job_list)
@@ -237,15 +240,33 @@ class LinkedIn(Scraper):
             return Compensation()
         return Compensation(interval=interval, min_amount=low, max_amount=high, currency="USD")
 
-    def _fetch_details(self, job_id: str) -> dict[str, object]:
-        """
-        The job page's description, pay, logo and criteria; empty when the page can't be read
-        """
+    def _public_access(self, response):
+        path = urlparse(response.url).path.casefold()
+        if response.status_code in (401, 403, 999) or any(
+            segment in path for segment in ("/login", "/authwall", "/checkpoint", "/challenge")
+        ):
+            self.fail(
+                f"Public LinkedIn access is blocked (HTTP {response.status_code}). "
+                "Stop this run and retry later or add the posting manually.",
+                code="provider_access",
+            )
+            return False
+        return True
+
+    def _fetch_details(self, job_id: str) -> dict[str, object] | None:
+        """Read posting details; None means an individually removed posting."""
         try:
             response = self.session.get(f"{self.base_url}/jobs/view/{job_id}")
-            check_status(response)
-        except Exception as e:
-            self.log.warning(f"job {job_id}: {e}")
+        except Exception as error:
+            if self.transport is None or self.transport.blocked is None:
+                self.fail(f"Posting details could not be fetched ({type(error).__name__}).")
+            return {}
+        if not self._public_access(response):
+            return {}
+        if response.status_code in (404, 410):
+            return None
+        if response.status_code != 200:
+            self.fail(f"Posting details returned HTTP {response.status_code}.")
             return {}
         path = urlparse(response.url).path
         if not path.startswith("/jobs/view/"):

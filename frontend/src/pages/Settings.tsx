@@ -69,7 +69,7 @@ export default function SettingsPage({
     <>
       <Heading
         title="Settings"
-        description="Manage scoring, collection limits, agent access and workspace backups."
+        description="Manage scoring, collection, agent access and workspace backups."
       />
       <Tabs
         label="Settings sections"

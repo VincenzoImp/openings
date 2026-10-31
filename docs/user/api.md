@@ -39,20 +39,40 @@ Paste the posting when extraction cannot obtain the complete text.
 | Operations | `GET /workspace`, `/capabilities`, `/overview`, `/export`, `/backup`; `POST /backup/restore`; `/tokens`; `POST /auth/password` |
 
 List routes return `{items,total}` and accept bounded `limit`/`offset` where
-applicable. Job/application rows are compact: request a detail record before using
-full posting, questions or answers. Career/claims/templates/documents offer
+applicable. Job rows include `application_count` and a compact `application`
+summary with `id`, `status`, `outcome` and `version`: the open attempt, otherwise
+the latest closed attempt, or null. Read detail records for full postings,
+questions or answers. Career/claims/templates/documents offer
 `summary=true` for bounded previews/counts without narratives, metadata, TeX or
 structured content. Context lists never return payloads; files contain metadata only.
 Versioned changes include the last read `expected_version`.
 A conflict returns HTTP 409; reload before editing again. A typical error is
 `{"error":{"code":"conflict","message":"…","details":null}}`.
 
-For triage use `{"expected_version":3,"triage":"saved"}`. Application status
-changes use `PATCH /applications/{id}` with its version and a status/outcome.
-`DELETE /jobs/{id}` means permanent Forget, including its documents/history.
-`DELETE /applications/{id}` removes one attempt and its contexts/documents/files
-while preserving the job and other attempts. Frozen contexts and approved revisions
-have no mutable content interface; create a new revision/context as appropriate.
+For Shortlist use `{"expected_version":3,"triage":"saved"}`; `inbox` returns a
+job to review and `dismissed` remembers it outside active review.
+
+Creating an application shortlists the job and starts Draft. Each job permits one
+non-Closed attempt. A conflicting creation or reopening returns 409
+`application_in_progress` with the active `application_id`; use that attempt or
+close it before starting another. Use `idempotency_key` for retries of one creation.
+`GET /applications?job_id=JOB_ID` lists the exact job's attempts with pagination.
+
+Application changes use `PATCH /applications/{id}` and its `expected_version`.
+Entering Closed requires an explicit outcome: `accepted`, `rejected` or
+`not_pursued`. Send `applied_at: null` to clear the submission date.
+
+Deletion requires the current `expected_version` query parameter:
+
+```text
+DELETE /jobs/JOB_ID?expected_version=3
+DELETE /applications/APPLICATION_ID?expected_version=2
+```
+
+Forgetting a job removes its identities, documents and application history.
+Deleting an application removes that attempt and its contexts/documents/files,
+while preserving the job and other attempts. Frozen contexts and approved
+revisions retain their content; create a new revision/context for changed input.
 
 The authenticated `/capabilities` inventory maps all logical operations to REST,
 MCP and dashboard locations, with explicit bootstrap/transport exceptions. Lists
@@ -67,8 +87,8 @@ headers, partial dates, skills and ordering.
 ## Collection recipes
 
 Read `GET /sources/schemas` for typed defaults and applicable configuration fields.
-Each adapter exposes its description mode and accepts only its supported options.
-For example, an inline-body adapter has no separate detail-request budget.
+Each adapter exposes its description mode and `automatic_collection` capability,
+and accepts its applicable options. Description retrieval is automatic.
 A source's service is fixed after creation. Read its current `version` before a
 PATCH, run or DELETE; include it as `expected_version` (a query parameter for
 DELETE). A 409 means the source changed since it was read.
@@ -85,6 +105,13 @@ curl --fail "$OPENINGS_URL/api/v1/sources/SOURCE_ID/run" \
 The returned run groups provider tasks and freezes the effective source settings.
 Read `/collection/runs/{id}` for cumulative counts and waiting/processing time;
 `POST /collection/runs/{id}/cancel` stops it. Later source edits affect new runs.
+Only candidates with usable posting text enter the archive. Pending descriptions
+remain in the run checkpoint and appear separately in progress.
+
+Provider policy is shared across every source and manual request. Read
+`GET /providers`, then `PATCH /providers/{id}` with the current `expected_version`
+and either `enabled` or `min_interval_seconds` (default 5). Recent request counts
+are informational; actual provider cooldowns remain effective after edits.
 
 For a shared schedule, send a compatible bulk patch:
 
@@ -102,7 +129,7 @@ For a shared schedule, send a compatible bulk patch:
 unchanged. Omitted filter keys are preserved; an explicit empty list clears that
 filter. `schedule` replaces the whole schedule variant. Inspect failures before
 retrying. [Collection](sources.md) defines the
-limits, defaults, run counters and provider safeguards.
+settings, defaults, run counters and request pacing.
 
 ## Document and byte flow
 

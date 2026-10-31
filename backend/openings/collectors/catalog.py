@@ -13,8 +13,6 @@ class CompanyAdapter:
     @property
     def fields(self):
         fields = ["board", "max_results"]
-        if self.description_mode == "separate":
-            fields.append("max_details")
         if self.candidates:
             fields.append("max_candidates")
         if self.region:

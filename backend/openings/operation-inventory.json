@@ -63,7 +63,7 @@
         "jobs_search"
       ],
       "dashboard": "Inbox: search, filters, pagination",
-      "notes": "q, triage (including active), company, location, source, remote, job_type, complete, score_min/max, score_state, created_since/until, sort, limit, offset; includes facets."
+      "notes": "q, triage (including active), company, location, source, remote, job_type, complete, score_min/max, score_state, created_since/until, sort, limit, offset; includes facets, compact active-or-latest application and application_count."
     },
     {
       "id": "jobs.read",
@@ -78,7 +78,8 @@
       "mcp": [
         "job_get"
       ],
-      "dashboard": "Inbox: job detail"
+      "dashboard": "Inbox: job detail",
+      "notes": "Includes compact active-or-latest application and application_count, alongside full posting, versions and provenance."
     },
     {
       "id": "jobs.create",
@@ -115,7 +116,7 @@
     {
       "id": "jobs.triage",
       "group": "Archive",
-      "operation": "Save, dismiss or restore one job",
+      "operation": "Shortlist, dismiss or return a job to review",
       "rest": [
         {
           "method": "POST",
@@ -125,12 +126,13 @@
       "mcp": [
         "job_triage"
       ],
-      "dashboard": "Inbox: Save, Dismiss, Restore"
+      "dashboard": "Inbox: Add/remove shortlist, Dismiss, Restore",
+      "notes": "saved means shortlist/interest; it is separate from application progress. Starting an application also shortlists its job."
     },
     {
       "id": "jobs.bulk",
       "group": "Archive",
-      "operation": "Save/dismiss/restore/forget/rescore selected jobs",
+      "operation": "Shortlist/dismiss/restore/forget/rescore selected jobs",
       "rest": [
         {
           "method": "POST",
@@ -157,7 +159,7 @@
         "job_merge"
       ],
       "dashboard": "Inbox: merge duplicate",
-      "notes": "Both record versions are required."
+      "notes": "Both record versions are required. Resolve an open-application conflict before merging jobs that each have an open attempt."
     },
     {
       "id": "jobs.delete",
@@ -173,7 +175,7 @@
         "job_forget"
       ],
       "dashboard": "Inbox: Forget",
-      "notes": "Future acquisition is new; deletion includes attempts, snapshots and owned files."
+      "notes": "expected_version is required. Future acquisition is new; deletion includes attempts, snapshots and owned files."
     },
     {
       "id": "notes.list",
@@ -268,7 +270,7 @@
     {
       "id": "collection.update",
       "group": "Collection and scoring",
-      "operation": "Enable or pause automatic collection globally",
+      "operation": "Enable or pause scheduled collection globally",
       "rest": [
         {
           "method": "PATCH",
@@ -278,8 +280,8 @@
       "mcp": [
         "collection_update"
       ],
-      "dashboard": "Settings/Collection: automatic collection",
-      "notes": "Preserves per-source settings; manual ingestion remains available."
+      "dashboard": "Settings/Collection: scheduled collection",
+      "notes": "Preserves per-source settings. Pausing prevents future scheduled runs; queued/current runs continue until explicitly stopped. Manual runs remain available."
     },
     {
       "id": "providers.list",
@@ -294,8 +296,8 @@
       "mcp": [
         "providers_list"
       ],
-      "dashboard": "Settings: provider budgets",
-      "notes": "Runtime, cooldown and capability/version are read-only."
+      "dashboard": "Settings: provider pacing",
+      "notes": "Recent request counts, actual cooldowns, capabilities and runtime are read-only; counts do not impose hourly/daily quotas."
     },
     {
       "id": "providers.update",
@@ -310,8 +312,8 @@
       "mcp": [
         "providers_update"
       ],
-      "dashboard": "Settings: provider budgets",
-      "notes": "Flat policy fields: enabled, min_interval_seconds, max_requests_per_hour/day/run; expected_version required."
+      "dashboard": "Settings: provider pacing",
+      "notes": "Editable policy fields: enabled and min_interval_seconds. expected_version is required. An existing server cooldown remains in effect."
     },
     {
       "id": "sources.list",
@@ -357,7 +359,7 @@
         "sources_preview"
       ],
       "dashboard": "Collection: source preview",
-      "notes": "Uses the same per-HTTP budgets/cooldowns as scheduled and manual collection; bounded diagnostic/estimate response."
+      "notes": "Uses the same shared HTTP spacing/cooldowns as scheduled and manual collection; bounded diagnostic/estimate response. Preview capability does not imply support for automatic full-text collection."
     },
     {
       "id": "sources.create",
@@ -373,7 +375,7 @@
         "sources_create"
       ],
       "dashboard": "Collection: add saved search/company",
-      "notes": "New sources are individually paused; one query/location per JobSpy source, no implicit Cartesian product."
+      "notes": "New sources start paused; one query/location per JobSpy source. Automatic collection requires an adapter that supplies descriptions."
     },
     {
       "id": "sources.update",
@@ -418,8 +420,8 @@
       "mcp": [
         "sources_run"
       ],
-      "dashboard": "Collection: Run now",
-      "notes": "Requires current source version. Optional acquisition overrides freeze into this invocation without editing saved settings."
+      "dashboard": "Collection: Run once",
+      "notes": "Requires current source version. Supported run-only acquisition overrides freeze into this invocation without editing saved settings. Only complete automatic postings enter the archive."
     },
     {
       "id": "sources.bulk",
@@ -923,7 +925,7 @@
         "applications_list"
       ],
       "dashboard": "Applications: list/Kanban filters",
-      "notes": "q, status, outcome, company, sort, limit, offset; stage_counts span all matching records."
+      "notes": "q, job_id, status, outcome, company, sort, limit, offset; job_id is exact and stage_counts span all matching records."
     },
     {
       "id": "applications.read",
@@ -943,7 +945,7 @@
     {
       "id": "applications.create",
       "group": "Applications and documents",
-      "operation": "Create an independent draft attempt",
+      "operation": "Start a draft application attempt",
       "rest": [
         {
           "method": "POST",
@@ -953,8 +955,8 @@
       "mcp": [
         "application_create"
       ],
-      "dashboard": "Inbox/Applications: create attempt",
-      "notes": "Never submits a portal application or generates documents."
+      "dashboard": "Inbox: Start application",
+      "notes": "At most one non-Closed attempt per job. A conflicting new request reports the active application ID; idempotency keys support retries. Starting shortlists the job; it never submits or generates documents."
     },
     {
       "id": "applications.update",
@@ -970,7 +972,7 @@
         "application_update"
       ],
       "dashboard": "Applications: progress and questions/answers",
-      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history."
+      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history. Entering Closed requires an explicit outcome. Reopening enforces one open attempt per job. applied_at:null clears the recorded submission date."
     },
     {
       "id": "applications.delete",
@@ -986,7 +988,7 @@
         "application_delete"
       ],
       "dashboard": "Applications: delete attempt",
-      "notes": "Keeps the archived job and other attempts; removes owned contexts/documents and their transfers."
+      "notes": "expected_version is required. Keeps the archived job and other attempts; removes owned contexts/documents and their transfers."
     },
     {
       "id": "applications.history",
@@ -1346,7 +1348,8 @@
       "mcp": [
         "sources_schemas"
       ],
-      "dashboard": "Collection: source fields and defaults"
+      "dashboard": "Collection: source fields and defaults",
+      "notes": "Typed settings and computed capabilities include automatic_collection. Description retrieval is automatic; internal batch sizing is not user configuration."
     },
     {
       "id": "collection.runs.list",

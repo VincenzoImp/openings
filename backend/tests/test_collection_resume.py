@@ -2,8 +2,13 @@
 
 import json
 
-from openings.collectors import company, jobspy
-from openings.collectors.policy import ProviderBudget, ProviderPatch, ProviderStore
+from openings.collectors import company, jobspy, policy
+from openings.collectors.policy import (
+    ProviderBudget,
+    ProviderDeferred,
+    ProviderPatch,
+    ProviderStore,
+)
 from openings.discovery import html_text
 from openings.posting import matches_filters
 from openings.workspace import Workspace
@@ -11,14 +16,19 @@ from openings.workspace import Workspace
 
 def test_company_details_continue_without_relisting_or_refetching_completed_bodies():
     checkpoint, requests = {}, []
+    remaining = [1]
     source = {
         "name": "Example",
         "kind": "greenhouse",
-        "config": {"board": "example", "max_details": 1},
+        "config": {"board": "example"},
         "checkpoint": checkpoint,
     }
 
     def request(url):
+        if not url.endswith("/jobs"):
+            if not remaining[0]:
+                raise ProviderDeferred("greenhouse", "collection_batch")
+            remaining[0] -= 1
         requests.append(url)
         if url.endswith("/jobs"):
             return json.dumps(
@@ -34,28 +44,24 @@ def test_company_details_continue_without_relisting_or_refetching_completed_bodi
     first = company.collect(source, request, html_text)
     assert sum(bool(row["posting"]) for row in first) == 1
     assert checkpoint["pending_details"] == 2 and not checkpoint["complete"]
+    remaining[0] = 1
     second = company.collect(source, request, html_text)
     assert sum(bool(row["posting"]) for row in second) == 2
+    remaining[0] = 1
     final = company.collect(source, request, html_text)
     assert all(row["posting"] for row in final) and checkpoint["complete"]
     assert len(requests) == 4 and len(set(requests)) == 4
     assert "responses" not in checkpoint
 
 
-def test_zero_detail_budget_finishes_metadata_only_without_continuation():
-    checkpoint = {}
-    rows = company.collect(
-        {
-            "name": "Example",
-            "kind": "greenhouse",
-            "config": {"board": "example", "max_details": 0},
-            "checkpoint": checkpoint,
-        },
-        lambda url: b'{"jobs":[{"id":1,"title":"Engineer"}]}',
-        html_text,
-    )
-    assert checkpoint["complete"] and checkpoint["pending_details"] == 0
-    assert rows[0]["metadata"]["description_complete"] is False
+def test_description_off_options_are_not_part_of_source_configuration():
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        company.config_model("greenhouse").model_validate({"board": "example", "max_details": 0})
+    with pytest.raises(ValidationError):
+        jobspy.JobSpyConfig(query="engineer", fetch_description=False)
 
 
 def test_empty_description_retries_are_finite_and_keep_a_partial_result():
@@ -80,10 +86,11 @@ def test_empty_description_retries_are_finite_and_keep_a_partial_result():
 def test_linkedin_description_budget_resumes_metadata_checkpoint(tmp_path, monkeypatch):
     import openings._vendor.jobspy.linkedin as provider
 
+    monkeypatch.setattr(policy, "REQUEST_BATCH_SIZE", 3)
     store = ProviderStore(Workspace(tmp_path / "resume.sqlite").db)
     store.update(
         "linkedin",
-        ProviderPatch(expected_version=1, min_interval_seconds=0, max_requests_per_run=3),
+        ProviderPatch(expected_version=1, min_interval_seconds=0),
     )
     calls = []
     cards = "".join(
@@ -128,7 +135,7 @@ def test_linkedin_description_budget_resumes_metadata_checkpoint(tmp_path, monke
     config = {"query": "engineer", "providers": ["linkedin"], "results_wanted": 15}
     for batch in range(6):
         rows, _ = jobspy.collect(
-            config, "linkedin", ProviderBudget(store, "linkedin", f"batch-{batch}"), source=source
+            config, "linkedin", ProviderBudget(store, "linkedin"), source=source
         )
     assert source["checkpoint"]["complete"]
     assert len(rows) == 15 and all(row["posting"] for row in rows)
@@ -155,11 +162,13 @@ def test_workday_page_resume_reuses_prior_pages_after_provider_deferral():
 
     def request(url, *, body=None, **kwargs):
         nonlocal blocked
+        if body is None:
+            return b'{"jobPostingInfo":{"jobDescription":"Build APIs"}}'
         offset = body["offset"]
         calls.append(offset)
         if offset == 20 and blocked:
             blocked = False
-            raise ProviderDeferred("workday", "provider_hour_budget")
+            raise ProviderDeferred("workday", "provider_cooldown")
         rows = [
             {"title": "Engineer", "externalPath": f"/job/{i}", "locationsText": "Canada"}
             for i in range(offset, min(offset + 20, 21))
@@ -172,7 +181,6 @@ def test_workday_page_resume_reuses_prior_pages_after_provider_deferral():
         "config": {
             "board": "example.wd1.myworkdayjobs.com/careers",
             "max_candidates": 40,
-            "max_details": 0,
         },
         "checkpoint": checkpoint,
     }

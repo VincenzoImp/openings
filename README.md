@@ -6,14 +6,15 @@ documents and file bytes live in one portable SQLite database.
 
 [Get started](docs/user/getting-started.md) · [Documentation](docs/README.md) · [Connect your agent](docs/user/agents.md)
 
-![Job inbox with saved roles, fit scores and application progress](docs/images/inbox.png)
+![Workspace overview with application progress, outcomes and recent activity](docs/images/overview.png)
 
 ## From job search to application
 
-- **Collect:** save keyword/location searches on LinkedIn, Indeed and Glassdoor,
-  or follow selected company ATS boards and feeds. Add individual jobs yourself.
-- **Organize:** search and filter the archive; save or dismiss jobs individually
-  or in bulk. Dismissed jobs stay remembered when collected again.
+- **Collect:** schedule keyword/location searches on LinkedIn, Indeed and Glassdoor,
+  or follow selected company ATS boards and feeds. Automatic results enter the
+  archive with their posting text; you can also add individual jobs yourself.
+- **Organize:** search, filter and shortlist offers individually or in bulk.
+  Dismissed jobs stay remembered when collected again.
 - **Prepare:** store career entries, approved claims, multiple LaTeX templates,
   assets and writing instructions for your external agent.
 - **Review:** keep CVs, cover letters, form answers and their exact PDF/source
@@ -54,6 +55,8 @@ The core Compose limit is **0.5 CPU / 512 MiB**. The optional local scorer adds
 ## Explore
 
 [Collection and schedules](docs/user/sources.md) · [Career knowledge](docs/user/career.md) · [Application documents](docs/user/applications.md) · [Scoring](docs/user/scoring.md) · [REST API](docs/user/api.md) · [Operations](docs/user/operations.md)
+
+![Job inbox with compact roles, shortlists and application stages](docs/images/inbox.png)
 
 ![Application board with draft, submitted and interview stages](docs/images/applications.png)
 
