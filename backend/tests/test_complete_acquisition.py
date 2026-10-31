@@ -7,7 +7,7 @@ import pytest
 import requests
 
 from openings import discovery as module
-from openings._vendor.jobspy import linkedin
+from openings._vendor.jobspy import glassdoor, linkedin
 from openings.collectors import policy
 from openings.collectors.policy import ProviderDeferred, ProviderPatch
 from openings.discovery import DiscoveryService, SourceCreate
@@ -33,7 +33,7 @@ def cards(count):
     )
 
 
-def transport(monkeypatch, send):
+def transport(monkeypatch, send, provider=linkedin):
     class Session:
         def __init__(self, gate):
             self.gate = gate
@@ -41,11 +41,14 @@ def transport(monkeypatch, send):
         def get(self, url, **kwargs):
             return self.gate.request(send, "GET", url, **kwargs)
 
+        def post(self, url, **kwargs):
+            return self.gate.request(send, "POST", url, **kwargs)
+
         def close(self):
             pass
 
     monkeypatch.setattr(
-        linkedin, "create_session", lambda *args, transport=None, **kwargs: Session(transport)
+        provider, "create_session", lambda *args, transport=None, **kwargs: Session(transport)
     )
 
 
@@ -234,3 +237,118 @@ def test_removed_individual_postings_finish_unavailable_without_retrying_the_pro
     assert final["result"]["unavailable_descriptions"] == 2
     assert final["result"]["pending_descriptions"] == 0
     assert len(calls) == 3 and workspace.list_jobs()["total"] == 0
+
+
+def glassdoor_checkpoint(service, task_id):
+    """Resume from a successful listing phase without unrelated location/listing calls."""
+    task = service.get_task(task_id, include_checkpoint=True)
+    task["payload"]["checkpoint"] = {
+        "variables": {"keyword": "engineer"},
+        "listing_complete": True,
+        "jobs": [
+            {
+                "id": f"gd-{index}",
+                "title": "Engineer",
+                "company": "Example",
+                "job_url": f"https://www.glassdoor.com/job-listing/engineer?jl={index}",
+            }
+            for index in (1, 2)
+        ],
+    }
+    service.db.execute(
+        "UPDATE tasks SET payload=? WHERE id=?", (json.dumps(task["payload"]), task_id)
+    )
+
+
+@pytest.mark.parametrize("failure", [503, requests.Timeout, "graphql"])
+def test_glassdoor_failed_detail_batch_retains_all_candidates_for_retry(
+    tmp_path, monkeypatch, failure
+):
+    workspace = Workspace(tmp_path / "glassdoor.sqlite")
+    service = DiscoveryService(workspace)
+    service.update_provider("glassdoor", ProviderPatch(expected_version=1, min_interval_seconds=0))
+    monkeypatch.setattr(module, "public_url", lambda url: url)
+    calls = []
+    fail_once = True
+
+    def send(method, url, **kwargs):
+        nonlocal fail_once
+        calls.append(kwargs["json"][0]["operationName"])
+        assert calls[-1] == "JobDetails"
+        if fail_once:
+            fail_once = False
+            if failure == "graphql":
+                return response(url, 200, '[{"data":null,"errors":[{"message":"Unavailable"}]}]')
+            if isinstance(failure, int):
+                return response(url, failure, "Unavailable")
+            raise failure("Synthetic transport failure")
+        return response(
+            url,
+            200,
+            json.dumps(
+                [
+                    {
+                        "data": {
+                            f"j{index}": {"job": {"description": "Build APIs."}} for index in (1, 2)
+                        }
+                    }
+                ]
+            ),
+        )
+
+    transport(monkeypatch, send, glassdoor)
+    source = service.create_source(
+        SourceCreate(
+            name="Engineering",
+            kind="jobspy",
+            config={"query": "engineer", "providers": ["glassdoor"], "results_wanted": 2},
+        )
+    )
+    queued = service.queue_collection(source["id"])
+    glassdoor_checkpoint(service, queued["id"])
+    first = run_next(service)
+    assert first["state"] == "queued" and first["result"]["created"] == 0
+    assert first["result"]["attempt_history"][-1]["reason"] == "provider_response"
+    assert first["result"]["pending_descriptions"] == 2
+    assert first["result"]["unavailable_descriptions"] == 0
+    checkpoint = service.get_task(first["id"], include_checkpoint=True)["payload"]["checkpoint"]
+    assert checkpoint["detail_attempts"] == {} and calls == ["JobDetails"]
+    service.db.execute("UPDATE tasks SET next_run_at=? WHERE id=?", (module.now(), first["id"]))
+    final = run_next(service)
+    assert final["state"] == "succeeded" and final["result"]["created"] == 2
+    assert final["result"]["pending_descriptions"] == 0
+    assert final["result"]["unavailable_descriptions"] == 0
+    assert workspace.list_jobs(complete=True)["total"] == 2 and calls == ["JobDetails"] * 2
+
+
+def test_glassdoor_valid_empty_detail_results_finish_as_unavailable(tmp_path, monkeypatch):
+    workspace = Workspace(tmp_path / "glassdoor-empty.sqlite")
+    service = DiscoveryService(workspace)
+    service.update_provider("glassdoor", ProviderPatch(expected_version=1, min_interval_seconds=0))
+    monkeypatch.setattr(module, "public_url", lambda url: url)
+    calls = []
+
+    def send(method, url, **kwargs):
+        calls.append(kwargs["json"][0]["operationName"])
+        return response(url, 200, '[{"data":{"j1":null,"j2":null}}]')
+
+    transport(monkeypatch, send, glassdoor)
+    source = service.create_source(
+        SourceCreate(
+            name="Engineering",
+            kind="jobspy",
+            config={"query": "engineer", "providers": ["glassdoor"], "results_wanted": 2},
+        )
+    )
+    queued = service.queue_collection(source["id"])
+    glassdoor_checkpoint(service, queued["id"])
+    for _ in range(3):
+        final = run_next(service)
+        service.db.execute(
+            "UPDATE tasks SET next_run_at=? WHERE id=?", (module.now(), queued["id"])
+        )
+    assert final["state"] == "succeeded" and final["result"]["created"] == 0
+    assert final["result"]["pending_descriptions"] == 0
+    assert final["result"]["unavailable_descriptions"] == 2
+    assert final["result"].get("failure_attempts", 0) == 0
+    assert calls == ["JobDetails"] * 3 and workspace.list_jobs()["total"] == 0
