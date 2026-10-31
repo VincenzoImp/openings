@@ -13,6 +13,10 @@ export interface Versioned {
 }
 export type Triage = "inbox" | "saved" | "dismissed";
 export type Stage = "draft" | "applied" | "interview" | "offer" | "closed";
+export interface ApplicationSummary extends Versioned {
+  status: Stage;
+  outcome: string | null;
+}
 export interface Job extends Versioned {
   title: string;
   company: string;
@@ -41,6 +45,8 @@ export interface Job extends Versioned {
   source?: string;
   availability?: string;
   notes?: Note[];
+  application: ApplicationSummary | null;
+  application_count: number;
 }
 export interface Note {
   id: string;
@@ -65,7 +71,7 @@ export interface Application extends Versioned {
   questions: Question[];
   answers: Record<string, unknown>;
   job?: Job;
-  applied_at?: string;
+  applied_at?: string | null;
   documents_count?: number;
 }
 export interface Profile {
@@ -164,6 +170,7 @@ export interface Source extends Versioned {
   config: Json;
   url?: string;
   enabled: boolean;
+  automatic_collection: boolean;
   filters: Json;
   schedule: Json;
   next_run_at?: string;

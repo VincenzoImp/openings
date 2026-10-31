@@ -46,9 +46,6 @@ interface Provider {
   policy: {
     enabled: boolean;
     min_interval_seconds: number;
-    max_requests_per_hour: number;
-    max_requests_per_day: number;
-    max_requests_per_run: number;
   };
   runtime: {
     cooldown_until?: string;
@@ -181,7 +178,7 @@ export default function CompaniesPage() {
     <>
       <Heading
         title="Collection"
-        description="Configure saved searches, company feeds, schedules and shared provider limits."
+        description="Configure searches, company boards, schedules and provider request settings."
       >
         <Button icon="refresh" onClick={resource.reload}>
           Refresh
@@ -249,7 +246,7 @@ export default function CompaniesPage() {
           Select this page
         </label>
         <a href="#settings?section=collection" className="textbutton">
-          Provider budgets & cooldowns <Icon name="arrow" />
+          Provider request settings <Icon name="arrow" />
         </a>
       </div>
       {chosen.length > 0 && (
@@ -355,7 +352,7 @@ export default function CompaniesPage() {
                 <Switch
                   label={`Enable ${source.name}`}
                   checked={source.enabled}
-                  disabled={pending}
+                  disabled={pending || !source.automatic_collection}
                   onChange={(enabled) =>
                     mutate(
                       () =>
@@ -397,6 +394,12 @@ export default function CompaniesPage() {
                 </div>
               </div>
               {source.last_run && <RunProgress run={source.last_run} compact />}
+              {!source.automatic_collection && (
+                <p className="source-error">
+                  This source cannot supply full posting text. Use a supported
+                  portal or add the full posting manually.
+                </p>
+              )}
               {source.last_error &&
                 !["queued", "running"].includes(
                   source.last_run?.state || "",
@@ -422,28 +425,28 @@ export default function CompaniesPage() {
                   icon="edit"
                   onClick={() => setEditing(source)}
                 >
-                  Configure
+                  Edit settings
                 </Button>
                 <Button
                   className="small"
                   icon="play"
-                  disabled={pending}
+                  disabled={pending || !source.automatic_collection}
                   onClick={() => batch("run", [source])}
                 >
                   Run once
                 </Button>
                 <Button
                   className="small"
-                  disabled={pending}
+                  disabled={pending || !source.automatic_collection}
                   onClick={() => setRunningOptions([source])}
                 >
-                  Options
+                  Run with options
                 </Button>
                 <a
                   className="textbutton smalltext"
                   href={`#settings?section=activity&source_id=${source.id}`}
                 >
-                  Progress
+                  View progress
                 </a>
                 {source.last_run &&
                   ["queued", "running"].includes(source.last_run.state) && (
@@ -586,19 +589,19 @@ export function CollectionControl({ compact = false }: { compact?: boolean }) {
           <div>
             <h3>
               {resource.data.enabled
-                ? "Automatic collection is on"
-                : "Automatic collection is paused"}
+                ? "Scheduled collection is on"
+                : "Scheduled collection is paused"}
             </h3>
             <p>
               {resource.data.enabled_sources} enabled sources ·{" "}
               {resource.data.running_tasks} running ·{" "}
-              {resource.data.queued_tasks} queued
-              {!compact &&
-                ". Pausing stops future automatic runs; work already queued continues. Stop a current run from its source or Activity."}
+              {resource.data.queued_tasks} queued . Pausing stops future
+              scheduled runs; queued and current runs continue. Use Stop run to
+              cancel a collection already in progress.
             </p>
           </div>
           <Switch
-            label="Automatic collection"
+            label="Scheduled collection"
             checked={resource.data.enabled}
             disabled={pending || resource.loading}
             onChange={(enabled) =>
@@ -610,8 +613,8 @@ export function CollectionControl({ compact = false }: { compact?: boolean }) {
                     version(resource.data, { enabled }),
                   ),
                 enabled
-                  ? "Automatic collection resumed."
-                  : "Automatic collection paused.",
+                  ? "Scheduled collection resumed."
+                  : "Scheduled collection paused. Existing runs continue.",
               )
             }
           />
@@ -632,10 +635,11 @@ export function ProviderSettings() {
       <CollectionControl />
       <div className="sectiontitle form-section">
         <div>
-          <h2>Shared provider limits.</h2>
+          <h2>Provider request settings</h2>
           <p>
-            Limits apply across saved searches, company sources, previews and
-            manual runs.
+            One request interval per provider, shared by searches, company
+            boards, previews and manual imports. Providers can request a longer
+            pause.
           </p>
         </div>
         <Button icon="refresh" onClick={resource.reload}>
@@ -646,84 +650,93 @@ export function ProviderSettings() {
         <ErrorBox message={resource.error} retry={resource.reload} />
       )}
       <div className="provider-grid">
-        {resource.data.items.map((provider) => (
-          <article className="card sectioncard" key={provider.id}>
-            <div className="sectiontitle">
-              <div>
-                <h3>{provider.name}</h3>
-                <p>{provider.capability.description}</p>
+        {resource.data.items.map((provider) => {
+          const cooldown = provider.runtime.cooldown_until,
+            waiting = !!cooldown && new Date(cooldown).valueOf() > Date.now(),
+            next = provider.runtime.next_allowed_at,
+            pacing = !!next && new Date(next).valueOf() > Date.now();
+          return (
+            <article className="card sectioncard" key={provider.id}>
+              <div className="sectiontitle">
+                <div>
+                  <h3>{provider.name}</h3>
+                  <p>{provider.capability.description}</p>
+                </div>
+                <span
+                  className={`tag ${!provider.capability.supported || waiting ? "amber" : provider.policy.enabled ? "green" : "neutral"}`}
+                >
+                  {!provider.capability.supported
+                    ? "Unsupported"
+                    : !provider.policy.enabled
+                      ? "Paused"
+                      : waiting
+                        ? "Waiting on provider"
+                        : pacing
+                          ? "Pacing requests"
+                          : "Ready"}
+                </span>
               </div>
-              <span
-                className={`tag ${provider.capability.supported ? (provider.policy.enabled ? "green" : "neutral") : "amber"}`}
+              <dl className="detailfacts">
+                <div>
+                  <dt>Request interval</dt>
+                  <dd>
+                    {provider.policy.min_interval_seconds
+                      ? `At least ${provider.policy.min_interval_seconds}s apart`
+                      : "Spacing disabled"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Recent requests</dt>
+                  <dd>
+                    {provider.runtime.requests_hour || 0} in the last hour ·{" "}
+                    {provider.runtime.requests_day || 0} in 24 hours
+                  </dd>
+                </div>
+                <div>
+                  <dt>{waiting ? "Provider pause ends" : "Next request"}</dt>
+                  <dd>
+                    {!provider.policy.enabled
+                      ? "Provider paused"
+                      : waiting
+                        ? formatTime(cooldown)
+                        : pacing
+                          ? formatTime(next)
+                          : "Ready now"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Last response</dt>
+                  <dd>
+                    {provider.runtime.last_status
+                      ? `HTTP ${provider.runtime.last_status}`
+                      : "No requests yet"}
+                  </dd>
+                </div>
+              </dl>
+              {provider.runtime.last_error && (
+                <p className="source-error">{provider.runtime.last_error}</p>
+              )}
+              <Button
+                className="small"
+                icon="edit"
+                disabled={!provider.capability.supported}
+                onClick={() => setEditing(provider)}
               >
-                {provider.capability.supported
-                  ? provider.policy.enabled
-                    ? "Enabled"
-                    : "Paused"
-                  : "Unsupported"}
-              </span>
-            </div>
-            <dl className="detailfacts">
-              <div>
-                <dt>Hourly / daily requests</dt>
-                <dd>
-                  {provider.runtime.requests_hour || 0} /{" "}
-                  {provider.policy.max_requests_per_hour} ·{" "}
-                  {provider.runtime.requests_day || 0} /{" "}
-                  {provider.policy.max_requests_per_day}
-                </dd>
-              </div>
-              <div>
-                <dt>Per batch / spacing</dt>
-                <dd>
-                  {provider.policy.max_requests_per_run} requests ·{" "}
-                  {provider.policy.min_interval_seconds}s
-                </dd>
-              </div>
-              <div>
-                <dt>Next allowed</dt>
-                <dd>
-                  {provider.runtime.cooldown_until ||
-                  provider.runtime.next_allowed_at
-                    ? formatTime(
-                        provider.runtime.cooldown_until ||
-                          provider.runtime.next_allowed_at,
-                      )
-                    : "Ready now"}
-                </dd>
-              </div>
-            </dl>
-            {provider.runtime.last_error && (
-              <p className="source-error">{provider.runtime.last_error}</p>
-            )}
-            <Button
-              className="small"
-              icon="edit"
-              disabled={!provider.capability.supported}
-              onClick={() => setEditing(provider)}
-            >
-              Configure limits
-            </Button>
-          </article>
-        ))}
+                Edit request settings
+              </Button>
+            </article>
+          );
+        })}
       </div>
       {editing && (
         <Dialog
-          title={`${editing.name} limits.`}
+          title={`${editing.name} request settings`}
           onClose={() => setEditing(null)}
         >
           <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              const f = new FormData(e.currentTarget);
-              const body = Object.fromEntries(
-                [
-                  "min_interval_seconds",
-                  "max_requests_per_hour",
-                  "max_requests_per_day",
-                  "max_requests_per_run",
-                ].map((key) => [key, Number(f.get(key))]),
-              );
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const form = new FormData(event.currentTarget);
               if (
                 await mutate(
                   () =>
@@ -731,11 +744,13 @@ export function ProviderSettings() {
                       `/providers/${editing.id}`,
                       "PATCH",
                       version(editing, {
-                        ...body,
-                        enabled: f.get("enabled") === "on",
+                        enabled: form.get("enabled") === "on",
+                        min_interval_seconds: Number(
+                          form.get("min_interval_seconds"),
+                        ),
                       }),
                     ),
-                  "Provider limits saved.",
+                  "Provider request settings saved.",
                 )
               )
                 setEditing(null);
@@ -749,42 +764,32 @@ export function ProviderSettings() {
               />
               Enable this provider
             </label>
-            <div className="formgrid">
-              {[
-                ["min_interval_seconds", "Minimum spacing (seconds)"],
-                ["max_requests_per_hour", "Maximum requests per hour"],
-                ["max_requests_per_day", "Maximum requests per day"],
-                ["max_requests_per_run", "Maximum requests per batch"],
-              ].map(([name, label]) => (
-                <Field key={name} label={label}>
-                  <input
-                    name={name}
-                    type="number"
-                    required
-                    min={name === "min_interval_seconds" ? 0 : 1}
-                    step={name === "min_interval_seconds" ? 0.1 : 1}
-                    max={
-                      name === "min_interval_seconds"
-                        ? 3600
-                        : name === "max_requests_per_run"
-                          ? 200
-                          : 10000
-                    }
-                    defaultValue={
-                      editing.policy[
-                        name as keyof typeof editing.policy
-                      ] as number
-                    }
-                  />
-                </Field>
-              ))}
-            </div>
+            <Field
+              label="Request interval (seconds)"
+              hint="Minimum spacing; default: 5 seconds. Set 0 for no delay. Provider pauses still apply."
+            >
+              <input
+                name="min_interval_seconds"
+                type="number"
+                required
+                min={0}
+                max={3600}
+                step={0.1}
+                defaultValue={editing.policy.min_interval_seconds}
+              />
+            </Field>
             <p className="hint">
-              An active server cooldown remains in effect when you edit limits.
+              An active provider pause remains in effect when you save settings.
+              Request counts are informational.
             </p>
-            <Button variant="primary" disabled={pending}>
-              Save limits
-            </Button>
+            <div className="actions form-actions">
+              <Button type="button" onClick={() => setEditing(null)}>
+                Cancel
+              </Button>
+              <Button variant="primary" disabled={pending}>
+                Save settings
+              </Button>
+            </div>
           </form>
         </Dialog>
       )}

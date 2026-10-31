@@ -1,9 +1,11 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import {
   api,
+  ApiError,
   date,
   formatSalary,
   jsonValue,
+  newId,
   version,
   type Application,
   type Job,
@@ -33,6 +35,7 @@ import {
   Icon,
   Loading,
   Score,
+  stageLabels,
   Tabs,
 } from "../ui";
 
@@ -54,7 +57,7 @@ export function AddJob({
         ...Object.fromEntries(f),
         metadata: jsonValue(f, "metadata"),
       });
-    }, "Opportunity saved.");
+    }, "Job added to Inbox.");
     if (ok && created) {
       onClose();
       onCreated(created.id);
@@ -140,6 +143,9 @@ export function JobsPage({
   const resource = useResource<ListResult<Job>>(`/jobs?${params}`, blankJobs);
   const [selection, setSelection] = useState<Record<string, number>>({}),
     [forget, setForget] = useState(false);
+  const [batchErrors, setBatchErrors] = useState<
+    { id: string; message: string }[]
+  >([]);
   const { mutate, pending, notify } = useWorkspace();
   const selected = Object.keys(selection),
     change = (key: string, value: string) =>
@@ -151,6 +157,7 @@ export function JobsPage({
           succeeded?: number;
           failed?: number;
           items?: {
+            id: string;
             error?: { message: string };
             result?: { count?: number };
           }[];
@@ -167,7 +174,17 @@ export function JobsPage({
         });
       }, "Selected opportunities updated.")
     ) {
-      setSelection({});
+      setSelection((current) => {
+        const remaining = { ...current };
+        for (const item of result?.items || [])
+          if (!item.error) delete remaining[item.id];
+        return remaining;
+      });
+      setBatchErrors(
+        result?.items?.flatMap((item) =>
+          item.error ? [{ id: item.id, message: item.error.message }] : [],
+        ) || [],
+      );
       setForget(false);
       if (action === "rescore") {
         const queued =
@@ -195,7 +212,7 @@ export function JobsPage({
     <>
       <Heading
         title="Inbox"
-        description="Review, save, dismiss and organize collected or manually added jobs."
+        description="Review offers, keep a shortlist and start applications when ready."
       >
         <Button variant="primary" icon="plus" onClick={onAdd}>
           Add job
@@ -208,7 +225,7 @@ export function JobsPage({
         items={[
           { id: "inbox", label: "To review" },
           { id: "active", label: "All active" },
-          { id: "saved", label: "Saved" },
+          { id: "saved", label: "Shortlist" },
           { id: "dismissed", label: "Dismissed" },
         ]}
       />
@@ -286,7 +303,7 @@ export function JobsPage({
               onChange={(e) => change("complete", e.target.value)}
             >
               <option value="">All postings</option>
-              <option value="true">Full posting saved</option>
+              <option value="true">Full posting available</option>
               <option value="false">Needs posting text</option>
             </select>
           </Field>
@@ -328,14 +345,14 @@ export function JobsPage({
               onChange={(e) => change("score_max", e.target.value)}
             />
           </Field>
-          <Field label="Saved from">
+          <Field label="Added from">
             <input
               type="date"
               value={filters.created_since}
               onChange={(e) => change("created_since", e.target.value)}
             />
           </Field>
-          <Field label="Saved through">
+          <Field label="Added through">
             <input
               type="date"
               value={filters.created_until}
@@ -371,13 +388,13 @@ export function JobsPage({
         <div className="bulkbar" aria-label="Selected opportunities">
           <strong>{selected.length} selected</strong>
           <Button disabled={pending} onClick={() => bulk("saved")}>
-            Save
+            Shortlist
           </Button>
           <Button disabled={pending} onClick={() => bulk("dismissed")}>
             Dismiss
           </Button>
           <Button disabled={pending} onClick={() => bulk("inbox")}>
-            Restore
+            Move to review
           </Button>
           <Button
             disabled={pending}
@@ -389,13 +406,36 @@ export function JobsPage({
           <Button variant="danger" onClick={() => setForget(true)}>
             Forget
           </Button>
-          <button className="textbutton" onClick={() => setSelection({})}>
+          <button
+            className="textbutton"
+            onClick={() => {
+              setSelection({});
+              setBatchErrors([]);
+            }}
+          >
             Clear
           </button>
         </div>
       )}
       {resource.error && (
         <ErrorBox message={resource.error} retry={resource.reload} />
+      )}
+      {batchErrors.length > 0 && (
+        <div className="batch-errors job-bulk-errors" role="alert">
+          <strong>{batchErrors.length} selected jobs need attention.</strong>
+          <ul>
+            {batchErrors.map((item) => (
+              <li key={item.id}>
+                {resource.data.items.find((job) => job.id === item.id)?.title ||
+                  "Selected job"}
+                : {item.message}
+              </li>
+            ))}
+          </ul>
+          <Button className="small" onClick={resource.reload}>
+            Refresh jobs
+          </Button>
+        </div>
       )}
       <section className="card joblist" aria-label="Opportunities">
         {!!resource.data.items.length && (
@@ -455,7 +495,7 @@ export function JobsPage({
                       String(
                         job.metadata.source ||
                           job.metadata.ats ||
-                          "Saved posting",
+                          "Archived posting",
                       )}
                     {job.job_type && (
                       <>
@@ -475,6 +515,21 @@ export function JobsPage({
                     {job.complete === false && (
                       <span className="tag amber posting-status">
                         Needs text
+                      </span>
+                    )}
+                    {job.triage === "saved" && (
+                      <span
+                        className="job-shortlist"
+                        role="img"
+                        aria-label="Shortlisted"
+                        title="In your shortlist"
+                      >
+                        <Icon name="bookmark" />
+                      </span>
+                    )}
+                    {job.application && (
+                      <span className="tag neutral job-application-stage">
+                        {stageLabels[job.application.status]}
                       </span>
                     )}
                   </div>
@@ -569,17 +624,22 @@ export function JobDrawer({
   > | null>(null);
   const [forget, setForget] = useState(false),
     [merging, setMerging] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false),
+    [applicationOffset, setApplicationOffset] = useState(0);
+  const applicationKey = useRef<string | null>(null);
   const job = resource.data;
+  const application = job?.application;
   const scoringResponse = job?.assessment?.payload?.response;
   const inputShortened =
     scoringResponse?.input_preparation?.shortened ||
     scoringResponse?.usage?.truncated ||
     (scoringResponse?.usage?.state_tokens_dropped || 0) > 0;
   const applications = useResource<ListResult<Application>>(
-    job && tab === "notes"
-      ? `/applications?company=${encodeURIComponent(job.company)}&limit=200`
+    job && (tab === "notes" || historyOpen)
+      ? `/applications?job_id=${encodeURIComponent(id)}`
       : null,
     { items: [], total: 0 },
+    true,
   );
   async function triage(value: Triage) {
     if (!confirmLeave()) return;
@@ -593,9 +653,27 @@ export function JobDrawer({
   async function createApplication() {
     if (!confirmLeave()) return;
     let app: Application | undefined;
+    applicationKey.current ||= newId();
     const ok = await mutate(async () => {
-      app = await api<Application>("/applications", "POST", { job_id: id });
-    }, "Application draft created.");
+      try {
+        app = await api<Application>("/applications", "POST", {
+          job_id: id,
+          idempotency_key: applicationKey.current,
+        });
+      } catch (error) {
+        if (
+          error instanceof ApiError &&
+          error.code === "application_in_progress"
+        ) {
+          const updated = await api<Job>(`/jobs/${id}`);
+          if (updated.application && updated.application.status !== "closed") {
+            onApplication(updated.application.id);
+            return;
+          }
+        }
+        throw error;
+      }
+    }, "Application opened.");
     if (ok && app) onApplication(app.id);
   }
   async function edit(e: FormEvent<HTMLFormElement>) {
@@ -660,19 +738,36 @@ export function JobDrawer({
                     </Button>
                     <Button
                       icon="bookmark"
-                      onClick={() => triage("saved")}
+                      onClick={() =>
+                        triage(job.triage === "saved" ? "inbox" : "saved")
+                      }
                       disabled={pending}
                     >
-                      {job.triage === "saved" ? "Saved" : "Save job"}
+                      {job.triage === "saved"
+                        ? "Remove from shortlist"
+                        : "Shortlist"}
                     </Button>
+                  </>
+                )}
+                {application ? (
+                  <Button
+                    variant="primary"
+                    onClick={() => onApplication(application.id)}
+                  >
+                    {application.status === "draft"
+                      ? "Continue draft"
+                      : "View application"}
+                  </Button>
+                ) : (
+                  job.triage !== "dismissed" && (
                     <Button
                       variant="primary"
                       onClick={createApplication}
                       disabled={pending}
                     >
-                      Create application
+                      Start application
                     </Button>
-                  </>
+                  )
                 )}
               </div>
             </>
@@ -690,6 +785,88 @@ export function JobDrawer({
                 {job.company} · {job.location || "Location not specified"}
               </span>
             </div>
+            <section
+              className="job-application-summary"
+              aria-label="Application progress"
+            >
+              {application ? (
+                <>
+                  <div className="sectiontitle">
+                    <div>
+                      <strong>
+                        Application · {stageLabels[application.status]}
+                      </strong>
+                      <p>
+                        {application.status === "draft"
+                          ? "Preparation started. This application has not been submitted."
+                          : application.status === "closed"
+                            ? `Outcome: ${application.outcome?.replaceAll("_", " ") || "Not recorded"}.`
+                            : "Track progress and documents in Applications."}
+                      </p>
+                    </div>
+                    {application.status === "closed" &&
+                      job.triage !== "dismissed" && (
+                        <Button
+                          className="small"
+                          onClick={createApplication}
+                          disabled={pending}
+                        >
+                          New application attempt
+                        </Button>
+                      )}
+                  </div>
+                  <details
+                    open={historyOpen}
+                    onToggle={(event) =>
+                      setHistoryOpen(event.currentTarget.open)
+                    }
+                  >
+                    <summary>
+                      Application history · {job.application_count}
+                    </summary>
+                    {applications.error ? (
+                      <ErrorBox
+                        message={applications.error}
+                        retry={applications.reload}
+                      />
+                    ) : applications.loading ? (
+                      <Loading />
+                    ) : (
+                      applications.data.items
+                        .slice(applicationOffset, applicationOffset + 20)
+                        .map((attempt) => (
+                          <button
+                            className="application-history-link"
+                            key={attempt.id}
+                            onClick={() => onApplication(attempt.id)}
+                          >
+                            <span>
+                              {stageLabels[attempt.status]}
+                              {attempt.outcome
+                                ? ` · ${attempt.outcome.replaceAll("_", " ")}`
+                                : ""}
+                            </span>
+                            <time>{date(attempt.created_at)}</time>
+                            <Icon name="arrow" />
+                          </button>
+                        ))
+                    )}
+                    <Pagination
+                      offset={applicationOffset}
+                      total={applications.data.total}
+                      limit={20}
+                      onChange={setApplicationOffset}
+                    />
+                  </details>
+                </>
+              ) : (
+                <p>
+                  {job.triage === "saved"
+                    ? "Shortlisted for consideration. Start an application when you are ready to prepare documents."
+                    : "Shortlist this offer to keep it for later, or start preparing an application."}
+                </p>
+              )}
+            </section>
             <Tabs
               label="Opportunity details"
               items={[
@@ -731,7 +908,7 @@ export function JobDrawer({
                     </dd>
                   </div>
                   <div>
-                    <dt>Saved in workspace</dt>
+                    <dt>Added to workspace</dt>
                     <dd>{date(job.created_at)}</dd>
                   </div>
                 </dl>
@@ -794,7 +971,7 @@ export function JobDrawer({
                             p.source_name ||
                               p.source_id ||
                               p.provider ||
-                              "Saved posting",
+                              "Archived posting",
                           )}
                         </strong>
                         <p>{String(p.url || p.source_url || "")}</p>
@@ -862,18 +1039,16 @@ export function JobDrawer({
                       placeholder="What stands out? Questions to ask?"
                     />
                   </Field>
-                  {applications.data.items.some((app) => app.job_id === id) && (
+                  {applications.data.items.length > 0 && (
                     <Field label="Link to an application (optional)">
                       <select name="application_id">
                         <option value="">Job note</option>
-                        {applications.data.items
-                          .filter((app) => app.job_id === id)
-                          .map((app) => (
-                            <option key={app.id} value={app.id}>
-                              {app.status} · {date(app.created_at)} ·{" "}
-                              {app.id.slice(0, 8)}
-                            </option>
-                          ))}
+                        {applications.data.items.map((app) => (
+                          <option key={app.id} value={app.id}>
+                            {stageLabels[app.status]} · {date(app.created_at)} ·{" "}
+                            {app.id.slice(0, 8)}
+                          </option>
+                        ))}
                       </select>
                     </Field>
                   )}
@@ -885,6 +1060,12 @@ export function JobDrawer({
                     Add note
                   </Button>
                 </form>
+                {applications.error && (
+                  <ErrorBox
+                    message={applications.error}
+                    retry={applications.reload}
+                  />
+                )}
               </>
             ) : tab === "files" ? (
               <FileManager ownerType="job" ownerId={id} preview />
@@ -983,7 +1164,7 @@ export function JobDrawer({
           onMerged={onClose}
         />
       )}
-      {forget && (
+      {forget && job && (
         <Dialog title="Forget this job?" onClose={() => setForget(false)}>
           <p className="modal-intro">
             Permanently remove this opportunity, its applications, notes and
@@ -997,7 +1178,11 @@ export function JobDrawer({
               onClick={async () => {
                 if (
                   await mutate(
-                    () => api(`/jobs/${id}`, "DELETE"),
+                    () =>
+                      api(
+                        `/jobs/${id}?expected_version=${job.version}`,
+                        "DELETE",
+                      ),
                     "Job and related records removed.",
                   )
                 ) {

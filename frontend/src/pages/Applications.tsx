@@ -820,13 +820,9 @@ export function ApplicationDrawer({
           "PATCH",
           version(app, {
             note: form.get("note"),
-            ...(form.get("applied_at")
-              ? {
-                  applied_at: new Date(
-                    String(form.get("applied_at")) + "Z",
-                  ).toISOString(),
-                }
-              : {}),
+            applied_at: form.get("applied_at")
+              ? new Date(String(form.get("applied_at")) + "Z").toISOString()
+              : null,
             outcome: app.status === "closed" ? form.get("outcome") : null,
           }),
         ),
@@ -871,11 +867,21 @@ export function ApplicationDrawer({
         title={app?.job?.title || "Application workspace"}
         onClose={onClose}
         footer={
-          <span className="smalltext muted">
-            {app?.status === "draft"
-              ? "Draft — not sent"
-              : "Application progress is recorded manually."}
-          </span>
+          <>
+            <span className="smalltext muted">
+              {app?.status === "draft"
+                ? "Draft — not submitted"
+                : "Application progress is recorded manually."}
+            </span>
+            {app && (
+              <a
+                className="btn small"
+                href={`#inbox?job=${encodeURIComponent(app.job_id)}`}
+              >
+                View job
+              </a>
+            )}
+          </>
         }
       >
         {resource.error ? (
@@ -1211,7 +1217,7 @@ export function ApplicationDrawer({
                 )}
                 <Field
                   label="Submission time (UTC)"
-                  hint="Set this when recording a past submission. Stage changes record the current time by default."
+                  hint="Set a past submission time or leave blank to clear it. Moving to a submitted stage records the current time when no date is known."
                 >
                   <input
                     type="datetime-local"

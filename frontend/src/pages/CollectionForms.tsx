@@ -19,7 +19,7 @@ interface ConfigProperty {
   maximum?: number;
 }
 type ConfigProperties = Record<string, ConfigProperty>;
-interface SourceSchema {
+export interface SourceSchema {
   kind: string;
   label: string;
   config_schema: Json;
@@ -28,6 +28,7 @@ interface SourceSchema {
     lookback: boolean;
     details: boolean;
     description_mode: "inline" | "separate" | "metadata" | "portal";
+    automatic_collection: boolean;
   };
 }
 function schemaProperties(schema?: SourceSchema): ConfigProperties {
@@ -65,7 +66,6 @@ const acquisitionLimits = [
   { key: "hours_old", label: "Posted within (hours)" },
   { key: "results_wanted", label: "Results per portal" },
   { key: "max_results", label: "Results per run" },
-  { key: "max_details", label: "Description requests per batch" },
 ];
 function limitValues(form: FormData, properties: ConfigProperties): Json {
   const values: Json = {};
@@ -112,6 +112,7 @@ function SharedAcquisitionLimits({
 }
 interface Preview {
   kind: string;
+  automatic_collection?: boolean;
   total: number;
   items: { title: string; company?: string; location?: string }[];
   diagnostics?: {
@@ -154,16 +155,15 @@ export function RunProgress({
     waitingReason = waiting
       ? run.tasks?.find((task) => task.state === "queued" && task.error)?.error
       : undefined,
-    budgetWait =
-      !!waitingReason && /provider (hour|day|run) budget/i.test(waitingReason);
+    continuing = !!waitingReason && /collection batch/i.test(waitingReason);
   return (
     <div className={`run-progress ${compact ? "compact" : ""}`}>
       <div className="run-state">
         <span
           className={`tag ${run.state === "failed" ? "amber" : run.state === "succeeded" ? "green" : "neutral"}`}
         >
-          {budgetWait
-            ? "Waiting for provider budget"
+          {continuing
+            ? "Continuing collection"
             : waiting
               ? "Waiting"
               : run.state}
@@ -179,11 +179,11 @@ export function RunProgress({
       {waitingReason && <p className="hint run-wait-reason">{waitingReason}</p>}
       <dl className="run-counts">
         {[
-          ["received", "Found"],
+          ["received", "Processed"],
           ["created", "New"],
           ["existing", "Already archived"],
           ["invalid", "Invalid"],
-          ["pending_descriptions", "Pending text"],
+          ["pending_descriptions", "Waiting for text"],
           ["unavailable_descriptions", "Text unavailable"],
         ]
           .filter(
@@ -383,6 +383,11 @@ export function SourceEditor({
     [previewing, setPreviewing] = useState(false);
   const searchSource = kind === "jobspy";
   const schema = schemas.data.items.find((s) => s.kind === kind);
+  const resolvedSchema =
+    schema || schemas.data.items.find((s) => s.kind === preview?.kind);
+  const automaticCollection =
+    resolvedSchema?.capabilities.automatic_collection !== false &&
+    preview?.automatic_collection !== false;
   const properties =
     kind === "auto"
       ? sharedProperties(
@@ -416,7 +421,6 @@ export function SourceEditor({
         hours_old: Number(f.get("hours_old")),
         is_remote: f.get("is_remote") === "on",
         job_type: f.get("job_type") || null,
-        fetch_description: f.get("fetch_description") === "on",
       });
     else {
       for (const key of ["board", "region"])
@@ -734,32 +738,14 @@ export function SourceEditor({
                     />
                   </Field>
                 )}
-                {hasField("max_details") && (
-                  <Field
-                    label="Description requests per batch"
-                    hint="0–25. Default: 10; unfinished descriptions continue in later batches."
-                  >
-                    <input
-                      name="max_details"
-                      type="number"
-                      min={0}
-                      max={25}
-                      required
-                      defaultValue={Number(
-                        source?.config.max_details ??
-                          defaults("max_details", 10),
-                      )}
-                    />
-                  </Field>
-                )}
               </>
             )}
           </div>
-          {schema?.capabilities.description_mode === "metadata" && (
-            <p className="hint">
-              This source provides job titles and links only, without full
-              descriptions. Open the original posting to read the full job
-              description.
+          {!automaticCollection && (
+            <p className="source-error" role="alert">
+              This service provides titles and links without posting text and
+              cannot be used for automatic collection. Use a supported portal or
+              add the full posting manually in Inbox.
             </p>
           )}
           {schema?.capabilities.description_mode === "inline" && (
@@ -800,19 +786,13 @@ export function SourceEditor({
                 />
                 Remote roles only
               </label>
-              <label className="checkline">
-                <input
-                  name="fetch_description"
-                  type="checkbox"
-                  defaultChecked={source?.config.fetch_description !== false}
-                />
-                Fetch full descriptions
-              </label>
             </>
           )}
           <p className="hint">
-            Result limits do not guarantee full coverage of the age window.
-            Shared request budgets can delay a run.
+            Full descriptions are retrieved automatically before jobs enter the
+            archive. Result limits bound matches, including known jobs; they do
+            not guarantee complete coverage. A portal may require a pause before
+            collection can continue.
           </p>
         </Section>
         <Section title="Schedule">
@@ -822,6 +802,7 @@ export function SourceEditor({
               name="enabled"
               type="checkbox"
               defaultChecked={!!source?.enabled}
+              disabled={!automaticCollection}
             />
             Enable automatic collection
           </label>
@@ -930,7 +911,10 @@ export function SourceEditor({
           >
             {previewing ? "Previewing…" : "Preview"}
           </Button>
-          <Button variant="primary" disabled={pending || previewing}>
+          <Button
+            variant="primary"
+            disabled={pending || previewing || !automaticCollection}
+          >
             Save {searchSource ? "search" : "source"}
           </Button>
         </div>
@@ -993,8 +977,8 @@ export function RunOptionsDialog({
           </>
         )}
         <p className="hint">
-          Provider limits and cooldowns still apply. An incompatible active run
-          must finish or be stopped first.
+          Provider request spacing and cooldowns still apply. An incompatible
+          active run must finish or be stopped first.
         </p>
         <div className="actions form-actions">
           <Button type="button" onClick={onClose}>
