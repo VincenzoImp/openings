@@ -3147,6 +3147,13 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
 .provider-grid .sectiontitle {
   align-items: start;
 }
+.provider-grid .sectiontitle > div {
+  flex: 1;
+  min-width: 0;
+}
+.provider-grid .sectiontitle > .tag {
+  flex-shrink: 0;
+}
 .provider-grid .detailfacts {
   grid-template-columns: 1fr;
 }

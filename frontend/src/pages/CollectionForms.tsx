@@ -173,7 +173,11 @@ export function RunProgress({
             ? `Resumes ${formatTime(run.next_run_at)}`
             : run.started_at
               ? `Started ${formatTime(run.started_at)}`
-              : "Ready to start"}
+              : run.state === "cancelled"
+                ? "Stopped before starting"
+                : run.state === "failed"
+                  ? "Failed before starting"
+                  : "Ready to start"}
         </span>
       </div>
       {waitingReason && <p className="hint run-wait-reason">{waitingReason}</p>}

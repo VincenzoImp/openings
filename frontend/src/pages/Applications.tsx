@@ -40,6 +40,8 @@ import {
   Icon,
   Loading,
   LazyDetails,
+  outcomeLabel,
+  outcomeLabels,
   stageLabels,
   Tabs,
 } from "../ui";
@@ -82,9 +84,11 @@ function useApplicationProgress() {
           onChange={(event) => setOutcome(event.target.value)}
         >
           <option value="">Choose an outcome</option>
-          <option value="accepted">Accepted</option>
-          <option value="rejected">Not selected</option>
-          <option value="not_pursued">Not pursued</option>
+          {Object.entries(outcomeLabels).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
         </select>
       </Field>
       <div className="actions form-actions">
@@ -242,9 +246,11 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
           onChange={(e) => setFilters({ outcome: e.target.value, offset: "0" })}
         >
           <option value="">All outcomes</option>
-          <option value="accepted">Accepted</option>
-          <option value="rejected">Not selected</option>
-          <option value="not_pursued">Not pursued</option>
+          {Object.entries(outcomeLabels).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
         </select>
         <select
           aria-label="Sort applications"
@@ -341,7 +347,7 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                       </span>
                       {app.outcome && (
                         <span className="tag neutral outcome">
-                          {app.outcome.replaceAll("_", " ")}
+                          {outcomeLabel(app.outcome)}
                         </span>
                       )}
                       <footer>
@@ -404,7 +410,7 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                       ))}
                     </select>
                   </td>
-                  <td>{app.outcome?.replaceAll("_", " ") || "—"}</td>
+                  <td>{outcomeLabel(app.outcome)}</td>
                   <td>{date(app.updated_at)}</td>
                 </tr>
               ))}
@@ -1209,9 +1215,11 @@ export function ApplicationDrawer({
                       name="outcome"
                       defaultValue={app.outcome || "not_pursued"}
                     >
-                      <option value="accepted">Accepted</option>
-                      <option value="rejected">Not selected</option>
-                      <option value="not_pursued">Not pursued</option>
+                      {Object.entries(outcomeLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
                     </select>
                   </Field>
                 )}

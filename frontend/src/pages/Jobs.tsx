@@ -34,6 +34,7 @@ import {
   Heading,
   Icon,
   Loading,
+  outcomeLabel,
   Score,
   stageLabels,
   Tabs,
@@ -800,7 +801,7 @@ export function JobDrawer({
                         {application.status === "draft"
                           ? "Preparation started. This application has not been submitted."
                           : application.status === "closed"
-                            ? `Outcome: ${application.outcome?.replaceAll("_", " ") || "Not recorded"}.`
+                            ? `Outcome: ${outcomeLabel(application.outcome)}.`
                             : "Track progress and documents in Applications."}
                       </p>
                     </div>
@@ -843,7 +844,7 @@ export function JobDrawer({
                             <span>
                               {stageLabels[attempt.status]}
                               {attempt.outcome
-                                ? ` · ${attempt.outcome.replaceAll("_", " ")}`
+                                ? ` · ${outcomeLabel(attempt.outcome)}`
                                 : ""}
                             </span>
                             <time>{date(attempt.created_at)}</time>
