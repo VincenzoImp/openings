@@ -156,3 +156,81 @@ def test_linkedin_provider_access_failure_stops_detail_loop(tmp_path, monkeypatc
     assert result["result"]["attempt_history"][-1]["reason"] == "provider_access"
     assert len(calls) == 2 and workspace.list_jobs()["total"] == 0
     assert result["result"]["pending_descriptions"] == 3
+
+
+@pytest.mark.parametrize("failure", [502, 503, requests.Timeout, requests.ConnectionError])
+def test_transient_detail_failure_retries_the_run_without_spending_posting_attempts(
+    tmp_path, monkeypatch, failure
+):
+    workspace = Workspace(tmp_path / "transient.sqlite")
+    service = DiscoveryService(workspace)
+    service.update_provider("linkedin", ProviderPatch(expected_version=1, min_interval_seconds=0))
+    monkeypatch.setattr(module, "public_url", lambda url: url)
+    calls = []
+    fail_once = True
+
+    def send(method, url, **kwargs):
+        nonlocal fail_once
+        calls.append(url)
+        if "seeMore" in url:
+            return response(url, 200, cards(2))
+        if fail_once:
+            fail_once = False
+            if isinstance(failure, int):
+                return response(url, failure, "Temporary failure")
+            raise failure("Synthetic transport failure")
+        return response(url, 200, '<div class="show-more-less-html__markup">Build APIs.</div>')
+
+    transport(monkeypatch, send)
+    source = service.create_source(
+        SourceCreate(
+            name="Engineering",
+            kind="jobspy",
+            config={"query": "engineer", "providers": ["linkedin"], "results_wanted": 2},
+        )
+    )
+    service.queue_collection(source["id"])
+    first = run_next(service)
+    assert first["state"] == "queued" and first["result"]["created"] == 0
+    assert first["result"]["pending_descriptions"] == 2
+    assert first["result"]["unavailable_descriptions"] == 0
+    assert first["result"]["attempt_history"][-1]["reason"] == "provider_response"
+    checkpoint = service.get_task(first["id"], include_checkpoint=True)["payload"]["checkpoint"]
+    assert checkpoint["detail_attempts"] == {} and len(calls) == 2
+    service.db.execute("UPDATE tasks SET next_run_at=? WHERE id=?", (module.now(), first["id"]))
+    final = run_next(service)
+    assert final["state"] == "succeeded" and final["result"]["created"] == 2
+    assert final["result"]["pending_descriptions"] == 0
+    assert final["result"]["unavailable_descriptions"] == 0
+    assert workspace.list_jobs(complete=True)["total"] == 2
+    assert len(calls) == 4 and sum("seeMore" in url for url in calls) == 1
+
+
+@pytest.mark.parametrize("status", [404, 410])
+def test_removed_individual_postings_finish_unavailable_without_retrying_the_provider(
+    tmp_path, monkeypatch, status
+):
+    workspace = Workspace(tmp_path / "removed.sqlite")
+    service = DiscoveryService(workspace)
+    service.update_provider("linkedin", ProviderPatch(expected_version=1, min_interval_seconds=0))
+    monkeypatch.setattr(module, "public_url", lambda url: url)
+    calls = []
+
+    def send(method, url, **kwargs):
+        calls.append(url)
+        return response(url, 200, cards(2)) if "seeMore" in url else response(url, status, "")
+
+    transport(monkeypatch, send)
+    source = service.create_source(
+        SourceCreate(
+            name="Engineering",
+            kind="jobspy",
+            config={"query": "engineer", "providers": ["linkedin"], "results_wanted": 2},
+        )
+    )
+    service.queue_collection(source["id"])
+    final = run_next(service)
+    assert final["state"] == "succeeded" and final["result"]["created"] == 0
+    assert final["result"]["unavailable_descriptions"] == 2
+    assert final["result"]["pending_descriptions"] == 0
+    assert len(calls) == 3 and workspace.list_jobs()["total"] == 0
