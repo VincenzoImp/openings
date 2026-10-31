@@ -32,7 +32,9 @@ JobSpy searches **LinkedIn**, **Indeed** and **Glassdoor** through the attribute
 | Age window | **72 hours** by default; allowed range 1–8760 hours. Applied through the portal's supported age filter. |
 | Remote only | Off by default. Requests remote roles; eligibility still depends on each posting. |
 | Job type | No restriction by default; choose a supported type when useful. |
-| Fetch descriptions | On by default; full text may require additional provider requests. |
+
+Description retrieval is automatic. LinkedIn and some other sources need an
+additional request for each posting; complete cached descriptions can be reused.
 
 Preview saves no jobs and requests at most three results per portal. Its request
 estimate describes that preview; a complete configured run can need more requests.
@@ -43,8 +45,8 @@ and a limit of 50 do not establish complete coverage of that day.
 
 ### Company boards and feeds
 
-Supported ATS adapters are Greenhouse, Lever, Ashby, Recruitee, Personio, Workable,
-Breezy, SmartRecruiters, BambooHR, Rippling, Workday, Oracle and join.com. RSS/Atom
+Automatic ATS collection supports Greenhouse, Lever, Ashby, Recruitee, Personio,
+Workable, SmartRecruiters, BambooHR, Rippling, Workday, Oracle and join.com. RSS/Atom
 feeds are also supported. Paste the official board/feed URL, preview it and check
 the detected service and configuration.
 
@@ -53,7 +55,6 @@ the detected service and configuration.
 | Board | Required board identifier or supported board URL; depends on the ATS. |
 | Region | Lever endpoint region, default `global`; choose `eu` for a European Lever board. |
 | Result limit | Up to **100 matching jobs per run** by default; range 1–2000. |
-| Detail batch | For adapters with separate description requests: up to **10 fetches per batch**, range 0–25. Zero keeps the text available in the listing. |
 | Candidate limit | Where supported: up to **2000 listings** inspected by default, range 20–10000, before local role/location filters. |
 | Title filters | Optional terms for matching roles on the selected board. Empty means unrestricted. |
 | Location filters | Optional locations; unknown or region-only remote eligibility needs review. Empty means unrestricted. |
@@ -61,10 +62,12 @@ the detected service and configuration.
 The form and discovered schema expose the options that each adapter uses. Lever,
 Ashby, Recruitee, Personio and Workable provide descriptions in their listing
 response. Greenhouse, BambooHR, Rippling, SmartRecruiters, Workday, Oracle and
-join.com use separate detail requests. Breezy currently supplies titles, links and
-metadata; its missing descriptions are reported as unavailable in a partial run.
-Add the full posting manually when needed. Run options and bulk edits show only
-fields supported by every selected source.
+join.com retrieve details separately and resume that work automatically. Run
+options and bulk edits show fields supported by every selected source.
+
+Breezy can be detected and previewed, but its adapter supplies only titles, links
+and metadata. Its `automatic_collection: false` capability prevents saving or
+running an automatic watch. Use a supported portal or add the posting manually.
 
 Ashby uses its public [Job Postings API](https://developers.ashbyhq.com/docs/public-job-posting-api).
 A 404 ends the attempt with a message to check the exact board URL and identifier.
@@ -78,10 +81,11 @@ Within each filter group, any matching term is sufficient; title and location
 groups apply together. Unknown locations stay visible for review. Adapters report
 listing/result caps and unsupported or blocked responses.
 
-Complete cached descriptions can be reused; after 24 hours they become eligible
-for refresh. Missing descriptions and bounded pages continue through the same run
-where the adapter supports them. A source can retain a useful header while its
-text is still pending. Inspect **Needs text** records before preparing documents.
+Complete cached descriptions become eligible for refresh after 24 hours. Pending
+pages and descriptions continue through the same run from saved progress.
+Automatic results enter the archive only when usable posting text is available.
+Candidates awaiting text stay in collection progress; unavailable text is reported
+there too. A manually added URL can remain **Needs text** until you complete it.
 
 ## Set the schedule
 
@@ -98,15 +102,15 @@ The next execution is shown on the source. Daily slots are tracked independently
 from actual start/finish times. Delayed work continues as one active invocation;
 missed slots coalesce instead of creating a queue of duplicate runs.
 
-**Pause automatic collection** preserves individual source settings and prevents
-new scheduled runs. Queued or current runs continue; **Stop** cancels a selected
+Turning off **Scheduled collection** preserves source settings and prevents new
+scheduled runs. Queued or current runs continue; **Stop run** cancels a selected
 active run. Pausing one source controls its future automation. Manual runs remain
-available under the same provider limits.
+available under the same provider pacing and cooldowns.
 
 ## Run once or change settings in bulk
 
 **Run once** uses the saved settings. **Run with options** changes the lookback or
-result/detail limits for that invocation only. The run freezes its source
+result limit for that invocation only. The run freezes its source
 configuration when queued; later source edits affect subsequent runs.
 
 Select sources to enable, pause, run, configure or delete them together. Bulk
@@ -119,47 +123,48 @@ service, create a new source; an existing source's service is fixed.
 
 ## Read progress
 
-One collection run groups its source's provider tasks. Task batches can pause for
-provider limits and resume from stored progress. The run keeps cumulative counts:
+One collection run groups its source's provider tasks. Bounded batches resume
+from stored progress, including after a provider cooldown. Counts are cumulative:
 
 | Counter | Meaning |
 |---|---|
-| Found | One observation per provider identity in this run; retrying or filling its description does not count it again. |
+| Processed | Complete observations processed once per provider identity in this run. Includes any rejected during ingestion. |
 | New | Unique new archive records. |
 | Already archived | Observations resolved to existing archive records. The same job can appear through another provider or another source run. |
 | Invalid | Observations rejected during ingestion. |
-| Pending descriptions | Records still awaiting required detail work. |
-| Unavailable descriptions | Detail work finished without obtaining usable full text. |
+| Waiting for text | Candidates still awaiting required detail work. |
+| Text unavailable | Detail work ended without obtaining usable text; no new job was archived for that candidate. |
 
-Provider status distinguishes active work, a scheduled wait with a resume time,
+Provider status distinguishes active work, a wait with a resume time,
 failed work and cancellation. Processing time measures active attempts; waiting
 time and total elapsed time explain longer runs. Raw task diagnostics remain
 available for investigation. A **Partial** run reports bounded coverage or
 unavailable descriptions; completion does not imply every matching job was fetched.
 
-Collection and scoring use separate lanes. A newly discovered incomplete job can
-receive its first automatic score when its description is completed. Completing
-an arbitrary historical record does not trigger that rule. [Scoring](scoring.md)
-explains update rescoring and explicit batches.
+Collection and scoring use separate lanes. New complete jobs can receive an
+automatic score when scoring is enabled. Historical jobs follow the configured
+update-rescoring rule. [Scoring](scoring.md) explains freshness and explicit batches.
 
 ![Saved search form with query, portal selection and acquisition limits](../images/collection-settings.png)
 
-## Provider safeguards
+## Request pacing
 
-**Settings → Collection** stores provider-wide policy once for previews, URL
-imports, scheduled/manual runs, redirects and detail fetches.
+**Settings → Collection** stores two provider-wide controls for previews, URL
+imports, scheduled/manual runs, redirects and detail fetches:
 
-| Policy | Default | Scope |
+| Setting | Default | Scope |
 |---|---|---|
-| Minimum spacing | 3 seconds | Between requests to that provider; fractional seconds are accepted. |
-| Hourly cap | 100 requests | Shared rolling hour. |
-| Daily cap | 500 requests | Shared rolling 24 hours. |
-| Batch cap | 40 requests | One bounded worker attempt; unfinished work can continue in another batch. |
+| Enable provider | On for supported providers | Pause or allow requests across its sources. |
+| Request interval | 5 seconds | Minimum spacing between requests to that provider; fractional seconds are accepted. |
 
-These are local safeguards, not published portal quotas or access guarantees.
-HTTP attempts count even when a response fails. Retry-After creates a durable
-cooldown. Long waits release the collection lane; restart or pause does not reset
-usage. Cross-provider redirects require using the destination URL directly.
+Recent hourly, daily and total request counts are informational. A page of results
+and each detail page are separate HTTP requests, including failed attempts.
+
+An HTTP 429 response pauses requests; `Retry-After` sets the resume time when
+provided, otherwise retries use increasing delays. Cooldowns survive restarts and
+setting changes. Long waits release the collection lane. A login/challenge page
+is reported as blocked access. Use a cross-provider redirect's destination URL
+directly so its own policy applies.
 
 A portal can still block requests or change its pages. Review failed/empty searches
 and diagnostics; paste a posting when a public page cannot supply its full text.

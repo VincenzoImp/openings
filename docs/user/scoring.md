@@ -5,7 +5,7 @@ Scoring classifies job fit. Document generation runs in your external agent.
 Scores are numeric **0–100**, with higher values indicating better fit. The
 classifier compares the posting against ordered criteria and maps its continuous
 ordinal result onto that range. Filters use the stored numeric value. A score is
-an indicative fit assessment, not a probability of an offer.
+an indicative assessment of fit to those criteria.
 
 The core works with scoring disabled; it has no keyword-based fallback score.
 Existing scores remain visible when you turn scoring off. An in-flight request may
@@ -28,10 +28,9 @@ The saved-state message confirms whether scoring is active. Editing the switch
 or fields leaves a draft until you save; **Discard changes** restores saved values.
 
 Remote mode accepts a base URL, an explicit served model and an optional API key.
-It requires the **System One score contract**, including typed ordinal answers;
-an arbitrary OpenAI chat-completions endpoint is not interchangeable. The
-connection test checks the required subset. The configured model must already
-be served by that endpoint.
+The endpoint must implement the **System One score contract**, including typed
+ordinal answers. The connection test checks the required subset, and the selected
+model must already be served there.
 
 ## Inputs and freshness
 
@@ -49,16 +48,15 @@ rubrics or score levels are rejected before inference so their meaning is preser
 Other compatible System One services control their own input preparation. Their
 reported token usage is retained with the result.
 
-Newly discovered complete jobs are queued when scoring is enabled. A newly
-collected header with a pending description becomes eligible for its first score
-when that description is completed. **Automatic rescoring of changed postings**
-is on by default; turn it off to keep existing jobs out of automatic update
+New complete jobs are queued when scoring is enabled. Automatic collection waits
+for usable text before creating the archived job. A manually added incomplete job
+can receive its initial score after its description is completed.
+**Automatic rescoring of changed postings** is on by default; turn it off to keep existing jobs out of automatic update
 rescoring. With that switch off, historical unscored jobs wait for an explicit
 batch. Saving the switch does not queue or invalidate existing scores.
 
-Known partial previews and punctuation-only placeholders stay archived without
-scoring. Correct text through **Edit details**, REST or MCP; source refreshes
-preserve that correction.
+Incomplete manual entries stay unscored. Complete their text through **Edit
+details**, REST or MCP; source refreshes preserve that correction.
 Relevant profile, rubric or model edits mark older results **Outdated** without
 enqueuing the whole archive. Contact/template edits do not require rescoring.
 Rescore selected jobs or request a bounded batch of unscored or outdated jobs.
