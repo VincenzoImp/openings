@@ -71,8 +71,8 @@ def register_core(router: APIRouter, workspace):
         )
 
     @router.delete("/jobs/{job_id}")
-    def forget(job_id: str):
-        return workspace.forget_job(job_id)
+    def forget(job_id: str, expected_version: Annotated[int, Query(ge=1)]):
+        return workspace.forget_job(job_id, expected_version)
 
     @router.get("/jobs/{job_id}/notes")
     def notes(job_id: str):
@@ -99,7 +99,7 @@ def register_core(router: APIRouter, workspace):
         return workspace.update_note(note_id, value)
 
     @router.delete("/applications/{application_id}")
-    def delete_application(application_id: str, expected_version: int | None = None):
+    def delete_application(application_id: str, expected_version: Annotated[int, Query(ge=1)]):
         return workspace.delete_application(application_id, expected_version)
 
     @router.post("/applications")
@@ -150,7 +150,7 @@ def register_core_mcp(mcp, workspace):
         """Read full job text, metadata, versions and assessment provenance."""
         return workspace.get_job(job_id)
 
-    @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=True))
     async def job_ingest(value: JobInput) -> dict:
         """Add a URL, pasted text or structured job. Duplicate identities preserve history."""
         from .fetching import complete_input
@@ -169,9 +169,9 @@ def register_core_mcp(mcp, workspace):
         return workspace.set_triage(job_id, value.triage, value.expected_version)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
-    def job_forget(job_id: str) -> dict:
-        """Permanently delete a job and its application/file history. Future acquisition is new."""
-        return workspace.forget_job(job_id)
+    def job_forget(job_id: str, expected_version: int) -> dict:
+        """Permanently delete the current version of a job and its application/file history. Future acquisition is new."""
+        return workspace.forget_job(job_id, expected_version)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
     def job_merge(job_id: str, value: MergeInput) -> dict:
@@ -197,11 +197,11 @@ def register_core_mcp(mcp, workspace):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def applications_list(value: ApplicationQuery | None = None) -> dict:
-        """Read paginated application summaries and stage totals independent of page, with query/stage/outcome/company filters."""
+        """Read paginated application summaries and stage totals with exact job_id or query/stage/outcome/company filters."""
         return workspace.list_applications(**(value or ApplicationQuery()).model_dump())
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
-    def application_delete(application_id: str, expected_version: int | None = None) -> dict:
+    def application_delete(application_id: str, expected_version: int) -> dict:
         """Delete one attempt and its owned documents/history, retaining the archived job and other attempts."""
         return workspace.delete_application(application_id, expected_version)
 

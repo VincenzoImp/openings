@@ -20,8 +20,9 @@ covers local builds.
    For unattended setup, set `OPENINGS_PASSWORD` in `.env` before the first start.
 2. In **Inbox**, choose **Add job**. Paste a URL or enter the title, company and full
    posting. If URL extraction cannot obtain the text, paste it yourself.
-3. Open the job to inspect its description, save it for later or create an
-   application. **Dismiss** removes it from active review while retaining its identity.
+3. Open the job to inspect its description, add it to **Shortlist** or choose
+   **Start application**. Starting creates a Draft and shortlists the job;
+   an existing application opens instead. **Dismiss** keeps its identity and history.
 4. In **Collection**, add a saved search or company board, preview it, then enable
    its schedule. New sources start paused.
 5. Add [career entries and claims](career.md), templates and writing instructions.

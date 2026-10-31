@@ -283,7 +283,7 @@ def test_transfer_scope_integrity_and_forget_prevent_late_resurrection(workspace
     late = documents.reserve_upload(
         UploadReservation(owner_type="document", owner_id=document["id"], name="late.tex", size=4)
     )
-    ws.forget_job(application["job_id"])
+    ws.forget_job(application["job_id"], ws.get_job(application["job_id"])["version"])
     assert client.put(late["url"], headers=late["headers"], content=b"late").status_code == 401
     assert client.get(download["url"], headers=download["headers"]).status_code == 401
     assert ws.db.one("SELECT count(*) AS n FROM documents")["n"] == 0

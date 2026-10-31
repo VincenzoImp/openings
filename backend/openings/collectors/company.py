@@ -20,6 +20,7 @@ from ..errors import DomainError
 from ..common import now
 from ..posting import matches_filters
 from .catalog import COMPANY_ADAPTERS
+from .policy import ProviderDeferred
 
 
 class BoardConfig(BaseModel):
@@ -27,7 +28,6 @@ class BoardConfig(BaseModel):
     board: str = Field(min_length=1, max_length=250)
     region: str = "global"
     max_results: int = Field(default=100, ge=1, le=2000)
-    max_details: int = Field(default=10, ge=0, le=25)
     max_candidates: int = Field(default=2000, ge=20, le=10000)
 
 
@@ -89,8 +89,6 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
     maximum = min(
         config.get("max_results", config.get("results_wanted", 100)), 3 if preview else 2000
     )
-    max_details = min(config.get("max_details", 10), 3 if preview else 25)
-    details = 0
     items = []
     checkpoint = source.get("checkpoint", {}) if not preview else {}
     cache = checkpoint.setdefault("responses", {})
@@ -138,7 +136,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         return matching[:maximum]
 
     def ordered(rows, identity):
-        # List first, then spend the existing detail budget on the oldest checks.
+        # List first, then refresh the oldest complete descriptions.
         # This rotates across the entire bounded board, including later pages.
         return sorted(rows, key=lambda row: checked.get(identity(row), ""))
 
@@ -154,22 +152,32 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
                 f"{kind} returned invalid JSON; its public endpoint may have changed.",
             ) from error
 
-    def detail(key, url, *, body=None):
-        nonlocal details
+    def detail(key, url, *, body=None, decode=None):
         if not preview and key in known and checked.get(key, "") > cutoff:
             return {}
         request_key = json.dumps([url, body], sort_keys=True)
+        load = (lambda: decode(url)) if decode else (lambda: get(url, body=body))
         if request_key in cache:
-            return get(url, body=body)
-        if max_details == 0 or attempts.get(key, 0) >= 3:
+            return load()
+        if attempts.get(key, 0) >= 3:
             unavailable.add(key)
             return {}
-        if source.get("collection_error") or details >= max_details:
+        if source.get("collection_error"):
             pending.add(key)
             return {}
-        details += 1
         detail_requests[key] = request_key
-        result = get(url, body=body)
+        try:
+            result = load()
+        except DomainError as error:
+            status = (error.details or {}).get("http_status")
+            if not isinstance(error, ProviderDeferred) and status in (404, 410):
+                attempts[key] = 3
+                unavailable.add(key)
+            else:
+                source["collection_error"] = error
+                pending.add(key)
+            save()
+            return {}
         attempts[key] = attempts.get(key, 0) + 1
         detail_checks[key] = now()
         save()
@@ -181,10 +189,12 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
         key = f"{kind}:{board or config.get('host', '')}:{identity}"
         previous = known.get(key, {}) if isinstance(known, dict) else {}
         posting = text(str(posting or ""))
+        if not any(character.isalnum() for character in posting):
+            posting = ""
         if not posting and key in known:
             posting = (source.get("known_postings") or {}).get(key, "")
         if not posting and key in attempts and key not in pending:
-            if attempts[key] < 3 and max_details:
+            if attempts[key] < 3:
                 pending.add(key)
                 # An empty detail response is retried in a later bounded batch.
                 cache.pop(detail_requests.get(key), None)
@@ -203,7 +213,9 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             metadata["description_complete"] = False
             metadata["description_status"] = "pending" if key in pending else "unavailable"
         elif len(posting) > 200000:
+            unavailable.add(key)
             metadata["description_complete"] = False
+            metadata["description_status"] = "truncated"
         elif posting:
             unavailable.discard(key)
             metadata["description_complete"] = True
@@ -579,20 +591,8 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             url = base + "/" + quote(path, safe="-") if path else ""
             full = {}
             key = f"{kind}:{board}:{identity}"
-            if url and (preview or key not in known or checked.get(key, "") <= cutoff):
-                if key in attempts and json.dumps([url, None], sort_keys=True) in cache:
-                    full = state(url).get("job") or {}
-                elif details < max_details and attempts.get(key, 0) < 3:
-                    details += 1
-                    detail_requests[key] = json.dumps([url, None], sort_keys=True)
-                    full = state(url).get("job") or {}
-                    attempts[key] = attempts.get(key, 0) + 1
-                    detail_checks[key] = now()
-                    save()
-                elif max_details and attempts.get(key, 0) < 3:
-                    pending.add(key)
-                else:
-                    unavailable.add(key)
+            if url:
+                full = detail(key, url, decode=state).get("job") or {}
             merged = {**row, **full}
             city = merged.get("city") or {}
             add(

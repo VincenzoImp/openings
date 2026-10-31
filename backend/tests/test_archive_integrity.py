@@ -33,15 +33,16 @@ def test_source_identity_keeps_dismissal_across_url_changes_and_detects_conflict
     )
     merged = workspace.ingest_job({**value, "url": "https://example.org/other"})
     assert merged["id"] == first["id"] and merged["triage"] == dismissed["triage"]
-    workspace.forget_job(first["id"])
+    workspace.forget_job(first["id"], workspace.get_job(first["id"])["version"])
     assert not workspace.db.all("SELECT * FROM job_identities")
     assert workspace.ingest_job(value)["id"] != first["id"]
 
 
-def test_unsupported_formats_are_rejected_without_modifying_the_database(tmp_path):
+@pytest.mark.parametrize("version", [1, 4])
+def test_unsupported_formats_are_rejected_without_modifying_the_database(tmp_path, version):
     archive = tmp_path / "unsupported.sqlite"
     with sqlite3.connect(archive) as connection:
-        connection.execute("PRAGMA user_version=1")
+        connection.execute(f"PRAGMA user_version={version}")
         connection.execute("CREATE TABLE marker(value TEXT)")
         connection.execute("INSERT INTO marker VALUES('preserve')")
     original = archive.read_bytes()

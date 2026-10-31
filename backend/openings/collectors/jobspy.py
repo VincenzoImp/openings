@@ -37,7 +37,6 @@ class JobSpyConfig(BaseModel):
         ]
         | None
     ) = None
-    fetch_description: bool = True
 
     @field_validator("query")
     @classmethod
@@ -63,16 +62,16 @@ def request_estimate(config, preview=False):
     providers = []
     for provider in cfg.providers:
         if provider == "linkedin":
-            minimum, maximum = 1, (count + 9) // 10 + (count if cfg.fetch_description else 0)
+            minimum, maximum = 1, (count + 9) // 10 + count
         elif provider == "glassdoor":
-            minimum, maximum = 1, 2 + ((count + 24) // 25 if cfg.fetch_description else 0)
+            minimum, maximum = 1, 2 + (count + 24) // 25
         else:
             minimum = maximum = 1
         providers.append({"id": provider, "min": minimum, "max": maximum})
     return {
         "total": sum(value["max"] for value in providers),
         "providers": providers,
-        "note": "Estimate excludes redirects and transport errors; the shared request limits always apply.",
+        "note": "Estimate excludes redirects and transport errors; shared request spacing and server cooldowns apply.",
     }
 
 
@@ -112,7 +111,7 @@ def collect(config, provider, budget, *, preview=False, source=None):
         job_type=JobType(cfg.job_type) if cfg.job_type else None,
         results_wanted=min(cfg.results_wanted, 3) if preview else cfg.results_wanted,
         hours_old=cfg.hours_old,
-        fetch_description=cfg.fetch_description,
+        fetch_description=True,
         description_format=DescriptionFormat.PLAIN,
     )
     try:
@@ -124,6 +123,10 @@ def collect(config, provider, budget, *, preview=False, source=None):
     items = []
     for row in rows:
         raw = row.model_dump(mode="json")
+        description = row.description or ""
+        complete = (
+            any(character.isalnum() for character in description) and len(description) <= 200000
+        )
         if cfg.is_remote and row.is_remote is False:
             continue
         if cfg.job_type and row.job_type and JobType(cfg.job_type) not in row.job_type:
@@ -134,7 +137,7 @@ def collect(config, provider, budget, *, preview=False, source=None):
                 "company": (row.company or "")[:300],
                 "location": row.location.display_location()[:500] if row.location else "",
                 "url": row.job_url,
-                "posting": (row.description or "")[:200000],
+                "posting": description[:200000],
                 "source_key": f"{provider}:{row.id or row.job_url}",
                 "metadata": {
                     "source": provider,
@@ -150,10 +153,11 @@ def collect(config, provider, budget, *, preview=False, source=None):
                         if raw.get(key) is not None
                     },
                     "external_id": row.id,
-                    "description_complete": bool(row.description)
-                    and len(row.description) <= 200000,
+                    "description_complete": complete,
                     "description_status": "complete"
-                    if row.description
+                    if complete
+                    else "truncated"
+                    if len(description) > 200000
                     else "pending"
                     if scraper.checkpoint.get("pending_details")
                     else "unavailable",
@@ -173,7 +177,9 @@ def collect(config, provider, budget, *, preview=False, source=None):
         for item in items:
             source["on_item"](item)
     if scraper.checkpoint.get("complete"):
-        scraper.checkpoint["unavailable_descriptions"] = sum(not item["posting"] for item in items)
+        scraper.checkpoint["unavailable_descriptions"] = sum(
+            not item["metadata"]["description_complete"] for item in items
+        )
         scraper.checkpoint.pop("jobs", None)
         scraper.checkpoint.pop("detail_attempts", None)
         if scraper.on_checkpoint:
@@ -188,6 +194,9 @@ def collect(config, provider, budget, *, preview=False, source=None):
     # A challenge or schema error must not appear as a successful empty search.
     if diagnostic["state"] == "error":
         raise DomainError(
-            502, "provider_response", f"{provider}: {diagnostic['message']}", diagnostic
+            403 if scraper.error_code == "provider_access" else 502,
+            scraper.error_code or "provider_response",
+            f"{provider}: {diagnostic['message']}",
+            diagnostic,
         )
     return items, diagnostic

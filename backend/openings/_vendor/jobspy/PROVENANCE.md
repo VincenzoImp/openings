@@ -29,6 +29,8 @@ Local changes:
   detail batch. Resumed tasks reuse that progress and fresh archived descriptions.
 - LinkedIn requests newest-first ordering (`sortBy=DD`). Indeed cursor values are
   JSON-escaped; its upstream relevance ordering remains unchanged.
+- LinkedIn distinguishes unavailable individual postings from provider-wide access
+  challenges, preserving pending details and the shared transport's cooldown state.
 
 Future upgrades must explicitly review this seam, reproduce the transport tests
 and bounded live provider checks, and update the pinned source hash and notice.

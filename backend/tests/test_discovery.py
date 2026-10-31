@@ -187,7 +187,7 @@ def test_late_assessment_cannot_resurrect_forgotten_job(case, monkeypatch):
     assert task and task["job_id"] == job["id"]
 
     def forget_then_answer(config, state):
-        workspace.forget_job(job["id"])
+        workspace.forget_job(job["id"], workspace.get_job(job["id"])["version"])
         return {"score": 90, "model": "synthetic-model", "elapsed_seconds": 0, "response": {}}
 
     monkeypatch.setattr(module, "score_call", forget_then_answer)

@@ -172,7 +172,7 @@ def test_forget_cascades_owned_bytes_and_allows_fresh_acquisition(workspace):
             "INSERT INTO files(id,sha256,name,size,job_id,created_at) VALUES(?,?,?,?,?,?)",
             ("f1", sha, "example.pdf", len(pdf), original["id"], now()),
         )
-    workspace.forget_job(original["id"])
+    workspace.forget_job(original["id"], workspace.get_job(original["id"])["version"])
     assert workspace.db.one("SELECT count(*) n FROM applications")["n"] == 0
     assert workspace.db.one("SELECT count(*) n FROM files")["n"] == 0
     assert workspace.db.one("SELECT count(*) n FROM blobs")["n"] == 0
@@ -273,6 +273,10 @@ def test_compact_filters_bulk_conflicts_and_attempt_delete(workspace):
     assert result["succeeded"] == result["failed"] == 1
     assert result["items"][1]["error"]["status"] == 409
     attempt = workspace.create_application({"job_id": first["id"]})
+    attempt = workspace.update_application(
+        attempt["id"],
+        {"expected_version": attempt["version"], "status": "closed", "outcome": "not_pursued"},
+    )
     retained = workspace.create_application({"job_id": first["id"]})
     note = workspace.add_note(first["id"], {"body": "Original", "application_id": retained["id"]})
     workspace.update_note(note["id"], {"expected_version": 1, "body": "Edited"})

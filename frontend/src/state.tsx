@@ -234,9 +234,12 @@ function affected(read: string, changed: string) {
     b = scope(changed);
   if (a === b) return true;
   if (a === "overview")
-    return ["jobs", "applications", "scoring", "sources"].includes(b);
-  if (a === "jobs") return ["scoring", "notes"].includes(b);
-  if (a === "applications") return ["contexts", "documents"].includes(b);
+    return ["jobs", "applications", "career", "scoring", "sources"].includes(b);
+  if (a === "jobs")
+    return ["applications", "career", "scoring", "notes"].includes(b);
+  if (a === "applications")
+    return ["jobs", "contexts", "documents"].includes(b);
+  if (a === "career" || a === "templates") return b === "files";
   if (a === "documents") return b === "files";
   if (
     a === "sources" ||
