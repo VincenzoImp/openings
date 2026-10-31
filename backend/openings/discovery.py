@@ -633,7 +633,7 @@ def fetch_postings(source: dict) -> list[dict]:
         budget = HTTP_BUDGET.get()
         if budget is None:
             raise DomainError(
-                500, "provider_gate", "A provider HTTP budget is required for portal collection."
+                500, "provider_gate", "The shared HTTP gate is required for portal collection."
             )
         items, diagnostic = jobspy_collector.collect(
             {key: val for key, val in config.items() if key not in ("url", "filters")},
@@ -2660,7 +2660,7 @@ def register_mcp(mcp, service: DiscoveryService):
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=True)
     )
     async def sources_preview(value: SourcePreview) -> dict:
-        """Preview a saved-search/company/feed configuration without saving jobs; shared HTTP budgets apply."""
+        """Preview a saved-search/company/feed configuration without saving jobs; shared request spacing and cooldowns apply."""
         return await asyncio.to_thread(service.preview_source, value)
 
     @mcp.tool(
@@ -2688,7 +2688,7 @@ def register_mcp(mcp, service: DiscoveryService):
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True)
     )
     def sources_run(source_id: str, value: SourceRun) -> dict:
-        """Run a versioned source with frozen optional overrides; shared portal budgets always apply."""
+        """Run a versioned source with frozen optional overrides; shared request spacing and cooldowns apply."""
         return service.queue_collection(
             source_id, expected_version=value.expected_version, overrides=value.overrides
         )

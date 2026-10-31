@@ -44,11 +44,6 @@ PROVIDERS = {
         "manual",
         "Public URL import and explicit ATS board detection.",
     ),
-    "google": (
-        "Google Jobs",
-        "unsupported",
-        "Unsupported: usable job data was unavailable in the verified JobSpy provider.",
-    ),
 }
 
 
@@ -139,7 +134,7 @@ class ProviderStore:
         self.db = db
         with db.transaction() as connection:
             for provider in PROVIDERS:
-                policy = ProviderPolicy(enabled=provider != "google").model_dump()
+                policy = ProviderPolicy().model_dump()
                 connection.execute(
                     "INSERT OR IGNORE INTO providers(id,policy,runtime,updated_at) VALUES(?,?,?,?)",
                     (provider, encode(policy), "{}", now()),
@@ -180,7 +175,7 @@ class ProviderStore:
             "id": provider,
             "name": name,
             "capability": {
-                "supported": provider != "google",
+                "supported": True,
                 "kind": kind,
                 "description": description,
                 "transport_version": "jobspy1.4.1-openings1"
@@ -202,8 +197,6 @@ class ProviderStore:
         updates = value.model_dump(exclude_unset=True, exclude={"expected_version"})
         if any(value is None for value in updates.values()):
             raise DomainError(422, "provider_policy", "Provider policy values cannot be null.")
-        if provider == "google" and updates.get("enabled"):
-            raise DomainError(422, "unsupported_provider", PROVIDERS[provider][2])
         with self.db.transaction() as connection:
             row = connection.execute("SELECT * FROM providers WHERE id=?", (provider,)).fetchone()
             check_version(row, value.expected_version)
@@ -264,8 +257,6 @@ class ProviderBudget:
                     "SELECT * FROM providers WHERE id=?", (self.provider,)
                 ).fetchone()
                 policy, runtime = json.loads(row["policy"]), json.loads(row["runtime"])
-                if self.provider == "google":
-                    raise DomainError(422, "unsupported_provider", PROVIDERS[self.provider][2])
                 if not policy["enabled"]:
                     self.blocked = ProviderDeferred(self.provider, "provider_paused")
                     raise self.blocked

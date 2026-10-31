@@ -369,13 +369,12 @@ def test_collection_lane_progresses_during_a_slow_inference_and_queues_successor
         worker.stop()
 
 
-def test_google_is_explicitly_unsupported_and_retry_after_is_not_guessed(collection):
+def test_provider_list_excludes_unsupported_services_and_retry_after_is_not_guessed(collection):
     _, service = collection
-    google = service.providers.get("google")
-    assert not google["capability"]["supported"] and not google["policy"]["enabled"]
+    assert "google" not in {row["id"] for row in service.providers.list()["items"]}
     with pytest.raises(DomainError) as caught:
         service.update_provider("google", ProviderPatch(expected_version=1, enabled=True))
-    assert caught.value.code == "unsupported_provider"
+    assert caught.value.code == "not_found"
     assert retry_after("not a date", 1) is None
     assert retry_after("3", 1) == 4
 

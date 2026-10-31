@@ -56,7 +56,7 @@ The core Compose limit is **0.5 CPU / 512 MiB**. The optional local scorer adds
 
 [Collection and schedules](docs/user/sources.md) · [Career knowledge](docs/user/career.md) · [Application documents](docs/user/applications.md) · [Scoring](docs/user/scoring.md) · [REST API](docs/user/api.md) · [Operations](docs/user/operations.md)
 
-![Job inbox with compact roles, fit scores and application stages](docs/images/inbox.png)
+![Job inbox with compact roles, shortlists and application stages](docs/images/inbox.png)
 
 ![Application board with draft, submitted and interview stages](docs/images/applications.png)
 

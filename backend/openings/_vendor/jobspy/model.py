@@ -14,7 +14,6 @@ from pydantic import (
     FilePath,
     field_validator,
     model_serializer,
-    model_validator,
 )
 
 
@@ -250,8 +249,6 @@ class ScraperInput(BaseModel):
     easy_apply: bool | None = None
     offset: int = Field(0, ge=0)
     fetch_description: bool = False
-    linkedin_fetch_description: bool = False
-    """Deprecated since 1.2.0: use fetch_description; will be removed in 2.0."""
     linkedin_company_ids: list[int] | None = None
     description_format: DescriptionFormat = DescriptionFormat.MARKDOWN
 
@@ -267,12 +264,6 @@ class ScraperInput(BaseModel):
     @classmethod
     def _one_or_several(cls, value: object) -> object:
         return [value] if isinstance(value, (str, Enum)) else value
-
-    @model_validator(mode="after")
-    def _merge_linkedin_fetch_description(self) -> ScraperInput:
-        if self.linkedin_fetch_description:
-            self.fetch_description = True
-        return self
 
 
 class Scraper(ABC):
