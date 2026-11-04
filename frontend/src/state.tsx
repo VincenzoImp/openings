@@ -7,7 +7,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { api, type ListResult } from "./api";
+import { ApiError, api, copyText, type ListResult } from "./api";
+import { createPortal } from "react-dom";
 interface Store {
   revision: number;
   refresh: () => void;
@@ -23,6 +24,10 @@ interface Store {
 const Context = createContext<Store | null>(null);
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [revision, setRevision] = useState(0),
+    [conflict, setConflict] = useState<{
+      form: HTMLFormElement;
+      path: string;
+    } | null>(null),
     [pending, setPending] = useState(0),
     [toast, setToast] = useState<{ message: string; error: boolean } | null>(
       null,
@@ -57,6 +62,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         notify(message);
         return true;
       } catch (error) {
+        if (
+          error instanceof ApiError &&
+          error.status === 409 &&
+          submitted &&
+          error.path &&
+          !/\?/.test(error.path)
+        )
+          setConflict({ form: submitted.form, path: error.path });
         notify(
           error instanceof Error
             ? error.message
@@ -92,8 +105,165 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     >
       {children}
       <Notification />
+      {conflict?.form.isConnected &&
+        createPortal(
+          <ConflictRecovery
+            path={conflict.path}
+            form={conflict.form}
+            onClose={() => setConflict(null)}
+            onReload={(record) => {
+              conflict.form.dataset.dirty = "false";
+              window.dispatchEvent(
+                new CustomEvent("openings:record-reloaded", {
+                  detail: { path: conflict.path, record },
+                }),
+              );
+              setConflict(null);
+              refresh();
+            }}
+          />,
+          conflict.form,
+        )}
     </Context.Provider>
   );
+}
+function ConflictRecovery({
+  path,
+  form,
+  onClose,
+  onReload,
+}: {
+  path: string;
+  form: HTMLFormElement;
+  onClose: () => void;
+  onReload: (record: Record<string, unknown>) => void;
+}) {
+  const [latest, setLatest] = useState<Record<string, unknown> | null>(null),
+    [error, setError] = useState("");
+  const { notify } = useWorkspace();
+  const fields = Array.from(form.elements).filter(
+    (
+      element,
+    ): element is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement =>
+      "name" in element &&
+      !!element.name &&
+      !(
+        element instanceof HTMLInputElement &&
+        ["password", "file", "hidden"].includes(element.type)
+      ),
+  );
+  const currentValues = latest
+    ? {
+        ...latest,
+        ...((latest.policy as object) || {}),
+        ...((latest.config as object) || {}),
+      }
+    : null;
+  const draft = fields
+    .map(
+      (field) =>
+        `${field.labels?.[0]?.textContent?.trim() || field.name}: ${field instanceof HTMLInputElement && field.type === "checkbox" ? field.checked : field.value}`,
+    )
+    .join("\n\n");
+  return (
+    <section className="conflict-recovery note" role="alert">
+      <h3>This record changed in another session</h3>
+      <p>
+        Your edits are still here. Review the latest values, then copy your
+        draft before reloading the editor. Reloading discards this draft.
+      </p>
+      {error && <p>{error}</p>}
+      {latest && (
+        <dl>
+          {fields
+            .filter((field) => Object.hasOwn(currentValues!, field.name))
+            .map((field, i) => (
+              <div key={i}>
+                <dt>{field.labels?.[0]?.textContent?.trim() || field.name}</dt>
+                <dd>
+                  {typeof currentValues![field.name] === "object"
+                    ? JSON.stringify(currentValues![field.name], null, 2)
+                    : String(currentValues![field.name] ?? "Empty")}
+                </dd>
+              </div>
+            ))}
+        </dl>
+      )}
+      <div className="actions">
+        <button
+          type="button"
+          className="btn"
+          onClick={async () => {
+            try {
+              if (path.startsWith("/providers/")) {
+                const result =
+                  await api<ListResult<Record<string, unknown>>>("/providers");
+                const record = result.items.find(
+                  (item) => item.id === path.split("/").pop(),
+                );
+                if (!record)
+                  throw Error("This provider is no longer available.");
+                setLatest(record);
+              } else setLatest(await api(path));
+              setError("");
+            } catch (e) {
+              setError(
+                e instanceof Error
+                  ? e.message
+                  : "Unable to load current values.",
+              );
+            }
+          }}
+        >
+          Review latest values
+        </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={async () => {
+            try {
+              await copyText(draft);
+              notify("Draft copied. You can reload and reapply your edits.");
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Unable to copy.");
+            }
+          }}
+        >
+          Copy my draft
+        </button>
+        <button
+          type="button"
+          className="btn"
+          disabled={!latest}
+          onClick={() => {
+            if (latest) onReload(latest);
+          }}
+        >
+          Reload editor and discard draft
+        </button>
+        <button type="button" className="btn" onClick={onClose}>
+          Keep editing
+        </button>
+      </div>
+    </section>
+  );
+}
+export function useEditorRecord<T extends { version?: number }>(
+  initial: T | undefined,
+  path: string,
+) {
+  const [replacement, setReplacement] = useState<T>();
+  useEffect(() => {
+    const reload = (event: Event) => {
+      const detail = (event as CustomEvent<{ path: string; record: T }>).detail;
+      if (detail.path === path) setReplacement(detail.record);
+    };
+    window.addEventListener("openings:record-reloaded", reload);
+    return () => window.removeEventListener("openings:record-reloaded", reload);
+  }, [path]);
+  return replacement && (replacement.version ?? 0) >= (initial?.version ?? 0)
+    ? replacement
+    : initial;
 }
 export function Notification({ inDialog = false }: { inDialog?: boolean }) {
   const { toast, dismiss } = useWorkspace();
@@ -191,6 +361,7 @@ export function useResource<T>(
     if (previousPath.current !== path) {
       previousPath.current = path;
       loaded.current = false;
+      setData(initial);
     }
     const abort = new AbortController();
     setRefreshing(true);
@@ -198,6 +369,7 @@ export function useResource<T>(
     setError(null);
     readResource<T>(path, abort.signal, allPages)
       .then((value) => {
+        if (abort.signal.aborted) return;
         // Keep dirty values with the version they were edited against. Clean
         // editors remount on an accepted record version to replace all fields.
         if (!loaded.current || !hasDirtyForms()) setData(value);
@@ -219,7 +391,7 @@ export function useResource<T>(
   }, [path, revision, local, allPages, changed]);
   return {
     data,
-    loading,
+    loading: loading || previousPath.current !== path,
     refreshing,
     error,
     reload: () => setLocal((n) => n + 1),

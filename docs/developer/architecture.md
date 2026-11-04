@@ -70,7 +70,11 @@ authoritative for individual input fields. Read [REST](../user/api.md) and
 
 SQLite uses WAL and stores SHA-256-deduplicated BLOBs for attachments. Lists return
 compact paginated summaries; full postings, narratives, contexts and file bytes
-are separate reads. Backups use SQLite's online backup API. A restore preserves
+are separate reads. Application preparation summaries count current revision leaves
+and their exact PDF/review state. Byte downloads and record exports prepare a
+temporary snapshot on the database thread before streaming, preserving bounded
+memory and releasing SQLite readers before cancellation or thread changes.
+Backups use SQLite's online backup API. A restore preserves
 installation authentication, recent provider request history and later cooldowns.
 
 Workspaces and backups use schema 6. Opening schema 5 upgrades it transactionally,

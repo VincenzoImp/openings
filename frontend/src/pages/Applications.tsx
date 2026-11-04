@@ -1,6 +1,8 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   api,
+  ApiError,
+  formatTime,
   careerEntryLabel,
   date,
   download,
@@ -21,6 +23,7 @@ import {
 } from "../api";
 import { FileManager } from "../files";
 import {
+  useEditorRecord,
   confirmLeave,
   useDebounce,
   useResource,
@@ -44,6 +47,7 @@ import {
   outcomeLabels,
   stageLabels,
   Tabs,
+  PendingResults,
 } from "../ui";
 const stages: Stage[] = ["draft", "applied", "interview", "offer", "closed"];
 function useApplicationProgress() {
@@ -174,7 +178,16 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
     outcome: "",
     sort: "updated",
     offset: "0",
-    view: "board",
+    view: (() => {
+      try {
+        return (
+          localStorage.getItem("openings-application-view") ||
+          (matchMedia("(max-width: 600px)").matches ? "list" : "board")
+        );
+      } catch {
+        return matchMedia("(max-width: 600px)").matches ? "list" : "board";
+      }
+    })(),
   });
   const query = useDebounce(filters.q),
     offset = Number(filters.offset) || 0,
@@ -192,6 +205,8 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
     `/applications?${params}`,
     { items: [], total: 0 },
   );
+  const updating = resource.loading || query !== filters.q;
+  const filtered = !!(filters.q || filters.status || filters.outcome);
   const { pending } = useWorkspace();
   const progress = useApplicationProgress();
   const [dragged, setDragged] = useState<string | null>(null);
@@ -211,7 +226,12 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
               key={view}
               variant={filters.view === view ? "selected" : ""}
               icon={view === "board" ? "board" : "list"}
-              onClick={() => setFilters({ view })}
+              onClick={() => {
+                setFilters({ view });
+                try {
+                  localStorage.setItem("openings-application-view", view);
+                } catch {}
+              }}
             >
               {view === "board" ? "Board" : "List"}
             </Button>
@@ -268,24 +288,61 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
       {resource.error && (
         <ErrorBox message={resource.error} retry={resource.reload} />
       )}
+      <PendingResults pending={updating} />
+      <div className="stage-overview" aria-label="Application stage totals">
+        {stages.map((stage) => (
+          <Button
+            key={stage}
+            variant={filters.status === stage ? "selected" : ""}
+            onClick={() =>
+              setFilters({
+                status: filters.status === stage ? "" : stage,
+                offset: "0",
+              })
+            }
+          >
+            {stageLabels[stage]}{" "}
+            <span>{resource.data.stage_counts?.[stage] ?? 0}</span>
+          </Button>
+        ))}
+      </div>
       <div className="boardcaption">
         <span>{resource.data.total} application attempts</span>
-        <span>Open a card. Drag between columns or use its move menu.</span>
+        <span>
+          {filters.view === "board"
+            ? "Scroll across stages. Drag cards or use the move menu."
+            : "Open an application to review documents and update progress."}
+        </span>
       </div>
-      {resource.loading && !resource.data.items.length ? (
+      {updating ? (
         <Loading />
       ) : !resource.data.items.length ? (
         <section className="card">
           <Empty
-            title="No applications in this view."
+            title={
+              filtered
+                ? "No applications match your filters"
+                : "Ready to prepare an application?"
+            }
             action={
-              <a href="#inbox" className="btn">
-                Browse opportunities
-              </a>
+              filtered ? (
+                <Button
+                  onClick={() =>
+                    setFilters({ q: "", status: "", outcome: "", offset: "0" })
+                  }
+                >
+                  Clear filters
+                </Button>
+              ) : (
+                <a href="#shortlist" className="btn">
+                  Review Shortlist
+                </a>
+              )
             }
           >
-            Try another filter, or create an application from a job in your
-            inbox.
+            {filtered
+              ? "Try another search or clear the filters to see your applications."
+              : "Choose a shortlisted job and start preparing its documents. Submission is recorded separately."}
           </Empty>
         </section>
       ) : filters.view === "board" ? (
@@ -318,6 +375,18 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                       .length}
                 </span>
               </header>
+              {(resource.data.stage_counts?.[stage] || 0) >
+                resource.data.items.filter((a) => a.status === stage)
+                  .length && (
+                <button
+                  className="textbutton stage-page-link"
+                  onClick={() => setFilters({ status: stage, offset: "0" })}
+                >
+                  Showing{" "}
+                  {resource.data.items.filter((a) => a.status === stage).length}{" "}
+                  of {resource.data.stage_counts?.[stage]} · View stage
+                </button>
+              )}
               {resource.data.items
                 .filter((a) => a.status === stage)
                 .map((app) => (
@@ -350,12 +419,21 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                           {outcomeLabel(app.outcome)}
                         </span>
                       )}
+                      <Preparation application={app} />
+                      <span className="application-next">
+                        {app.status === "draft"
+                          ? "Continue preparation"
+                          : app.status === "closed"
+                            ? "View outcome and documents"
+                            : "Review documents and progress"}{" "}
+                        <Icon name="arrow" />
+                      </span>
                       <footer>
                         <span>
                           {!!app.documents_count && (
                             <>
                               <Icon name="file" />
-                              {app.documents_count} document
+                              {app.documents_count} saved revision
                               {app.documents_count === 1 ? "" : "s"}
                             </>
                           )}
@@ -374,12 +452,13 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
           ))}
         </div>
       ) : (
-        <div className="card table-wrap">
+        <div className="card application-list">
           <table className="table">
             <thead>
               <tr>
                 <th scope="col">Company / role</th>
                 <th scope="col">Stage</th>
+                <th scope="col">Preparation</th>
                 <th scope="col">Outcome</th>
                 <th scope="col">Updated</th>
               </tr>
@@ -393,10 +472,14 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                       onClick={() => onOpen(app.id)}
                     >
                       <strong>{app.job?.title || "Application"}</strong>
-                      <small>{app.job?.company}</small>
+                      <small>
+                        {[app.job?.company, app.job?.location]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </small>
                     </button>
                   </td>
-                  <td>
+                  <td data-label="Stage">
                     <select
                       aria-label={`Stage for ${app.job?.title || "application"}`}
                       value={app.status}
@@ -410,8 +493,11 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                       ))}
                     </select>
                   </td>
-                  <td>{outcomeLabel(app.outcome)}</td>
-                  <td>{date(app.updated_at)}</td>
+                  <td data-label="Preparation">
+                    <Preparation application={app} />
+                  </td>
+                  <td data-label="Outcome">{outcomeLabel(app.outcome)}</td>
+                  <td data-label="Updated">{date(app.updated_at)}</td>
                 </tr>
               ))}
             </tbody>
@@ -431,6 +517,53 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
       {progress.dialog}
     </>
   );
+}
+
+function Preparation({ application }: { application: Application }) {
+  const kinds: Record<string, string> = {
+    resume: "CV",
+    cover_letter: "Cover letter",
+    answers: "Form answers",
+    other: "Other",
+  };
+  return (
+    <div className="preparation-summary" aria-label="Document preparation">
+      {application.preparation?.length ? (
+        application.preparation.map((item) => (
+          <span
+            key={item.kind}
+            className={`preparation-item ${item.approved === item.revisions ? "approved" : ""}`}
+          >
+            {kinds[item.kind] || item.kind}:{" "}
+            {item.approved === item.revisions
+              ? "Approved PDF"
+              : item.pdf < item.revisions
+                ? ["resume", "cover_letter"].includes(item.kind)
+                  ? "Needs PDF"
+                  : "Content saved"
+                : "PDF to review"}
+            {item.revisions > 1
+              ? ` (${item.approved}/${item.revisions} approved)`
+              : ""}
+          </span>
+        ))
+      ) : (
+        <span>No documents yet</span>
+      )}
+    </div>
+  );
+}
+function contextLabel(context: Json) {
+  return [
+    formatTime(String(context.created_at)),
+    context.template_name || context.job_title,
+    `${context.knowledge_count ?? 0} entries`,
+    `${context.claim_count ?? 0} claims`,
+    context.note_preview ? String(context.note_preview).slice(0, 60) : "",
+    String(context.id).slice(0, 6),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function DocumentEditor({
@@ -552,8 +685,7 @@ function DocumentEditor({
                   )}
                 {contexts.data.items.map((context) => (
                   <option key={String(context.id)} value={String(context.id)}>
-                    {date(String(context.created_at))} ·{" "}
-                    {String(context.id).slice(0, 8)}
+                    {contextLabel(context)}
                   </option>
                 ))}
               </select>
@@ -659,14 +791,25 @@ function DocumentCard({
     <article className="document-card">
       <header>
         <div>
-          <span className="eyebrow">{document.kind.replaceAll("_", " ")}</span>
+          <span className="eyebrow">
+            {(
+              {
+                resume: "CV",
+                cover_letter: "Cover letter",
+                answers: "Form answers",
+                other: "Other",
+              } as Record<string, string>
+            )[document.kind] || document.kind}
+          </span>
           <h3>{document.title || "Untitled document"}</h3>
           <p>
             Revision {document.revision_number || 1} ·{" "}
             {date(document.created_at)} ·{" "}
             {document.review_state === "approved"
               ? "Approved"
-              : "Draft — ready for review"}
+              : (document.file_count ?? document.files?.length ?? 0)
+                ? "Awaiting review"
+                : "Content saved · no files"}
           </p>
         </div>
         <button
@@ -880,12 +1023,9 @@ export function ApplicationDrawer({
                 : "Application progress is recorded manually."}
             </span>
             {app && (
-              <a
-                className="btn small"
-                href={`#inbox?job=${encodeURIComponent(app.job_id)}`}
-              >
-                View job
-              </a>
+              <Button className="small" onClick={() => setTab("posting")}>
+                View posting
+              </Button>
             )}
           </>
         }
@@ -926,12 +1066,30 @@ export function ApplicationDrawer({
                   label: "Documents",
                   count: documents.data.total,
                 },
+                { id: "posting", label: "Posting" },
                 { id: "answers", label: "Form answers" },
                 { id: "history", label: "History" },
                 { id: "details", label: "Details" },
               ]}
             />
-            {tab === "documents" ? (
+            {tab === "posting" ? (
+              <>
+                <div className="posting">
+                  {app.job?.posting ||
+                    "The full posting is missing. Open the job from All jobs to add its text."}
+                </div>
+                {app.job?.url && (
+                  <a
+                    className="btn"
+                    href={app.job.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Original posting <Icon name="external" />
+                  </a>
+                )}
+              </>
+            ) : tab === "documents" ? (
               <>
                 {documents.error && (
                   <ErrorBox
@@ -939,7 +1097,11 @@ export function ApplicationDrawer({
                     retry={documents.reload}
                   />
                 )}
-                <section className="context-panel">
+                <details className="context-panel agent-preparation">
+                  <summary>
+                    Prepare with your agent · {contexts.data.total} saved
+                    context{contexts.data.total === 1 ? "" : "s"}
+                  </summary>
                   <h3>Prepare application documents</h3>
                   <p>
                     Export the job, your stored knowledge, template and
@@ -961,7 +1123,7 @@ export function ApplicationDrawer({
                       {contexts.data.items.map((context) => (
                         <div className="settingrow" key={String(context.id)}>
                           <div>
-                            <strong>{date(String(context.created_at))}</strong>
+                            <strong>{contextLabel(context)}</strong>
                             <p>
                               Frozen snapshot · {String(context.id).slice(0, 8)}
                             </p>
@@ -1005,10 +1167,7 @@ export function ApplicationDrawer({
                       >
                         {contexts.data.items.map((context) => (
                           <section key={String(context.id)}>
-                            <h3>
-                              {date(String(context.created_at))} ·{" "}
-                              {String(context.id).slice(0, 8)}
-                            </h3>
+                            <h3>{contextLabel(context)}</h3>
                             <FileManager
                               ownerType="context"
                               ownerId={String(context.id)}
@@ -1020,7 +1179,8 @@ export function ApplicationDrawer({
                       </LazyDetails>
                     </details>
                   )}
-                </section>
+                </details>
+                <Preparation application={app} />
                 <div className="sectiontitle">
                   <h3>Documents and revisions</h3>
                   <Button icon="plus" onClick={() => setAdd(true)}>
@@ -1070,14 +1230,53 @@ export function ApplicationDrawer({
                     <option value="approved">Approved</option>
                   </select>
                 </div>
-                {documents.data.items.length ? (
+                <PendingResults
+                  pending={
+                    documents.loading || documentQuery !== documentFilters.doc_q
+                  }
+                />
+                {documents.loading ||
+                documentQuery !== documentFilters.doc_q ? (
+                  <Loading />
+                ) : documents.data.items.length ? (
                   documents.data.items.map((d) => (
                     <DocumentCard key={d.id} document={d} application={app} />
                   ))
                 ) : (
-                  <Empty title="No documents in this view">
-                    Save a CV, cover letter or source file prepared by you or
-                    your external agent.
+                  <Empty
+                    title={
+                      documentFilters.doc_q ||
+                      documentFilters.doc_kind ||
+                      documentFilters.doc_review
+                        ? "No documents match your filters"
+                        : "Prepare your first document"
+                    }
+                    action={
+                      documentFilters.doc_q ||
+                      documentFilters.doc_kind ||
+                      documentFilters.doc_review ? (
+                        <Button
+                          onClick={() =>
+                            setDocumentFilters({
+                              doc_q: "",
+                              doc_kind: "",
+                              doc_review: "",
+                              doc_offset: "0",
+                            })
+                          }
+                        >
+                          Clear document filters
+                        </Button>
+                      ) : (
+                        <Button onClick={() => setContextOpen(true)}>
+                          Prepare with your agent
+                        </Button>
+                      )
+                    }
+                  >
+                    Save a CV or cover letter, attach its files and review the
+                    exact revision. Adding documents does not submit this
+                    application.
                   </Empty>
                 )}
                 <Pagination
@@ -1259,7 +1458,7 @@ export function ApplicationDrawer({
       {app && contextOpen && (
         <ContextBuilder
           application={app}
-          templates={templates.data.items}
+          templatesResource={templates}
           onClose={() => setContextOpen(false)}
         />
       )}
@@ -1306,13 +1505,42 @@ export function ApplicationDrawer({
     </>
   );
 }
-function QuestionEditor({ application }: { application: Application }) {
+function QuestionEditor({
+  application: initial,
+}: {
+  application: Application;
+}) {
+  const application = useEditorRecord(initial, `/applications/${initial.id}`)!;
+  const [editorRevision, setEditorRevision] = useState(0);
   const [editing, setEditing] = useState<
       import("../api").Question | "new" | null
     >(null),
     [kind, setKind] = useState("text");
   const { mutate, pending } = useWorkspace();
+  const [answerError, setAnswerError] = useState("");
+  const [removingQuestion, setRemovingQuestion] = useState<
+    import("../api").Question | null
+  >(null);
   const record = editing && editing !== "new" ? editing : null;
+  useEffect(() => {
+    const reload = (event: Event) => {
+      const { path, record: latest } = (
+        event as CustomEvent<{ path: string; record: Application }>
+      ).detail;
+      if (path !== `/applications/${initial.id}`) return;
+      if (editing && editing !== "new") {
+        const next = latest.questions.find(
+          (question) => question.id === editing.id,
+        );
+        setEditing(next || null);
+        if (next) setKind(next.type || "text");
+      }
+      setAnswerError("");
+      setEditorRevision((value) => value + 1);
+    };
+    window.addEventListener("openings:record-reloaded", reload);
+    return () => window.removeEventListener("openings:record-reloaded", reload);
+  }, [initial.id, editing]);
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -1334,17 +1562,29 @@ function QuestionEditor({ application }: { application: Application }) {
       ? application.questions.map((q) => (q.id === record.id ? question : q))
       : [...application.questions, question];
     const answers = { ...application.answers };
-    if (record) delete answers[record.id];
+    const clearAnswer = record && f.get("clear_answer") === "on";
+    if (clearAnswer && record) delete answers[record.id];
     if (
-      await mutate(
-        () =>
-          api(
+      await mutate(async () => {
+        try {
+          await api(
             `/applications/${application.id}`,
             "PATCH",
-            version(application, { questions, answers }),
-          ),
-        "Question saved.",
-      )
+            version(application, {
+              questions,
+              ...(clearAnswer ? { answers } : {}),
+            }),
+          );
+        } catch (error) {
+          if (
+            error instanceof ApiError &&
+            error.status === 422 &&
+            error.code.startsWith("answer_")
+          )
+            setAnswerError(error.message);
+          throw error;
+        }
+      }, "Question saved.")
     )
       setEditing(null);
   }
@@ -1355,6 +1595,7 @@ function QuestionEditor({ application }: { application: Application }) {
         <Button
           icon="plus"
           onClick={() => {
+            setAnswerError("");
             setKind("text");
             setEditing("new");
           }}
@@ -1372,6 +1613,7 @@ function QuestionEditor({ application }: { application: Application }) {
                 className="iconbtn"
                 aria-label={`Edit ${q.label}`}
                 onClick={() => {
+                  setAnswerError("");
                   setKind(q.type || "text");
                   setEditing(q);
                 }}
@@ -1382,24 +1624,7 @@ function QuestionEditor({ application }: { application: Application }) {
                 className="iconbtn danger"
                 aria-label={`Remove ${q.label}`}
                 disabled={pending}
-                onClick={() => {
-                  const answers = { ...application.answers };
-                  delete answers[q.id];
-                  void mutate(
-                    () =>
-                      api(
-                        `/applications/${application.id}`,
-                        "PATCH",
-                        version(application, {
-                          questions: application.questions.filter(
-                            (x) => x.id !== q.id,
-                          ),
-                          answers,
-                        }),
-                      ),
-                    "Question removed.",
-                  );
-                }}
+                onClick={() => setRemovingQuestion(q)}
               >
                 <Icon name="trash" />
               </button>
@@ -1407,12 +1632,56 @@ function QuestionEditor({ application }: { application: Application }) {
           ))}
         </details>
       )}
+      {removingQuestion && (
+        <Dialog
+          title="Remove this question and its answer?"
+          onClose={() => setRemovingQuestion(null)}
+        >
+          <p className="modal-intro">{removingQuestion.label}</p>
+          <p>
+            Its saved live answer will be permanently removed. Frozen contexts
+            and document revisions keep their copies.
+          </p>
+          <div className="actions form-actions">
+            <Button onClick={() => setRemovingQuestion(null)}>
+              Keep question
+            </Button>
+            <Button
+              variant="danger-fill"
+              disabled={pending}
+              onClick={async () => {
+                const answers = { ...application.answers };
+                delete answers[removingQuestion.id];
+                if (
+                  await mutate(
+                    () =>
+                      api(
+                        `/applications/${application.id}`,
+                        "PATCH",
+                        version(application, {
+                          questions: application.questions.filter(
+                            (q) => q.id !== removingQuestion.id,
+                          ),
+                          answers,
+                        }),
+                      ),
+                    "Question removed.",
+                  )
+                )
+                  setRemovingQuestion(null);
+              }}
+            >
+              Remove question and answer
+            </Button>
+          </div>
+        </Dialog>
+      )}
       {editing && (
         <Dialog
           title={record ? "Edit form question." : "Add a form question."}
           onClose={() => setEditing(null)}
         >
-          <form onSubmit={save}>
+          <form key={editorRevision} onSubmit={save}>
             <Field label="Question">
               <textarea
                 name="label"
@@ -1460,9 +1729,25 @@ function QuestionEditor({ application }: { application: Application }) {
             </label>
             {record && (
               <p className="hint">
-                Updating a question clears its draft answer so you can review it
-                again.
+                Compatible saved answers are kept when you update this question.
               </p>
+            )}
+            {answerError && (
+              <div className="note">
+                <div>
+                  <p>{answerError}</p>
+                  <p>
+                    Saved answer:{" "}
+                    {JSON.stringify(
+                      record ? application.answers[record.id] : null,
+                    )}
+                  </p>
+                  <label className="checkline">
+                    <input type="checkbox" name="clear_answer" />
+                    Clear this incompatible answer when saving the question
+                  </label>
+                </div>
+              </div>
             )}
             <div className="actions form-actions">
               <Button variant="primary" disabled={pending}>
@@ -1477,13 +1762,14 @@ function QuestionEditor({ application }: { application: Application }) {
 }
 function ContextBuilder({
   application,
-  templates,
+  templatesResource,
   onClose,
 }: {
   application: Application;
-  templates: Template[];
+  templatesResource: ReturnType<typeof useResource<ListResult<Template>>>;
   onClose: () => void;
 }) {
+  const templates = templatesResource.data.items;
   const knowledge = useResource<ListResult<Knowledge>>(
       "/career/knowledge?summary=true",
       { items: [], total: 0 },
@@ -1497,32 +1783,44 @@ function ContextBuilder({
   const { mutate, pending } = useWorkspace();
   const [selectEvidence, setSelectEvidence] = useState(false),
     [selectClaims, setSelectClaims] = useState(false),
-    [query, setQuery] = useState("");
+    [evidenceIds, setEvidenceIds] = useState<string[] | null>(null),
+    [claimIds, setClaimIds] = useState<string[] | null>(null),
+    [templateIds, setTemplateIds] = useState<string[]>([]);
+  const chosenEvidence =
+    evidenceIds ?? knowledge.data.items.slice(0, 500).map((k) => k.id);
+  const availableClaims = claims.data.items.filter(
+    (c) => !selectEvidence || chosenEvidence.includes(c.knowledge_id),
+  );
+  const chosenClaims = (
+    claimIds ?? availableClaims.slice(0, 1000).map((c) => c.id)
+  ).filter((id) => availableClaims.some((c) => c.id === id));
   return (
     <Dialog title="Prepare a frozen context." onClose={onClose}>
       <p className="modal-intro">
-        Choose the evidence and templates your external agent should use. Saved
-        snapshots retain the exact content and files from this moment.
+        Choose evidence and templates for your external agent. Saved snapshots
+        retain the exact content and files from this moment.
       </p>
       <form
-        onSubmit={async (e) => {
-          e.preventDefault();
+        onSubmit={async (event) => {
+          event.preventDefault();
           if (
-            (selectEvidence && (knowledge.loading || knowledge.error)) ||
-            (selectClaims && (claims.loading || claims.error))
+            templatesResource.loading ||
+            templatesResource.error ||
+            knowledge.loading ||
+            claims.loading ||
+            knowledge.error ||
+            claims.error
           )
             return;
-          const f = new FormData(e.currentTarget);
+          const form = new FormData(event.currentTarget);
           if (
             await mutate(async () => {
               const context = await api<Json>("/contexts", "POST", {
                 application_id: application.id,
-                template_ids: f.getAll("templates"),
-                ...(selectEvidence
-                  ? { knowledge_ids: f.getAll("knowledge") }
-                  : {}),
-                ...(selectClaims ? { claim_ids: f.getAll("claims") } : {}),
-                note: f.get("note"),
+                template_ids: templateIds,
+                ...(selectEvidence ? { knowledge_ids: chosenEvidence } : {}),
+                ...(selectClaims ? { claim_ids: chosenClaims } : {}),
+                note: form.get("note"),
                 idempotency_key: newId(),
               });
               download(
@@ -1534,16 +1832,37 @@ function ContextBuilder({
             onClose();
         }}
       >
-        <fieldset className="selection-box">
-          <legend>Templates</legend>
-          <p className="hint">Leave empty to use your defaults.</p>
-          {templates.map((t) => (
-            <label className="checkline" key={t.id}>
-              <input type="checkbox" name="templates" value={t.id} />
-              {t.name} · {t.kind.replaceAll("_", " ")}
-            </label>
-          ))}
-        </fieldset>
+        {templatesResource.loading && <Loading />}
+        {templatesResource.error && (
+          <ErrorBox
+            message={templatesResource.error}
+            retry={templatesResource.reload}
+          />
+        )}
+        <ChoiceList
+          label="Templates"
+          limit={20}
+          items={templates.map((t) => ({
+            id: t.id,
+            label: `${t.name} · ${t.kind === "resume" ? "CV" : "Cover letter"}`,
+          }))}
+          selected={templateIds}
+          onChange={setTemplateIds}
+          hint="Select up to 20 templates. Leave empty to use your defaults."
+        />
+        {!templatesResource.loading &&
+          !templatesResource.error &&
+          templates.length === 0 && (
+            <p className="note">
+              Add a template in Templates before preparing a context.
+            </p>
+          )}
+        {knowledge.error && (
+          <ErrorBox message={knowledge.error} retry={knowledge.reload} />
+        )}
+        {claims.error && (
+          <ErrorBox message={claims.error} retry={claims.reload} />
+        )}
         <label className="checkline">
           <input
             type="checkbox"
@@ -1553,41 +1872,27 @@ function ContextBuilder({
           Choose specific career entries
         </label>
         {selectEvidence && (
-          <fieldset className="selection-box">
-            <legend>Career entries</legend>
-            {knowledge.error ? (
-              <ErrorBox message={knowledge.error} retry={knowledge.reload} />
-            ) : knowledge.loading ? (
-              <Loading />
-            ) : null}
-            <input
-              aria-label="Find career entries for context"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Find career entries"
-            />
-            {knowledge.data.items.map((k) => (
-              <label
-                className="checkline"
-                style={{
-                  display: careerEntryLabel(k)
-                    .toLowerCase()
-                    .includes(query.toLowerCase())
-                    ? undefined
-                    : "none",
-                }}
-                key={k.id}
-              >
-                <input
-                  type="checkbox"
-                  name="knowledge"
-                  value={k.id}
-                  defaultChecked
-                />
-                {careerEntryLabel(k)}
-              </label>
-            ))}
-          </fieldset>
+          <ChoiceList
+            label="Career entries"
+            limit={500}
+            items={knowledge.data.items.map((k) => ({
+              id: k.id,
+              label: careerEntryLabel(k),
+            }))}
+            selected={chosenEvidence}
+            onChange={(ids) => {
+              setEvidenceIds(ids);
+              if (selectClaims)
+                setClaimIds(
+                  chosenClaims.filter((id) =>
+                    claims.data.items.some(
+                      (c) => c.id === id && ids.includes(c.knowledge_id),
+                    ),
+                  ),
+                );
+            }}
+            hint="Entries are initially selected, up to 500. Clear the selection to include none. Claims from excluded entries are excluded too."
+          />
         )}
         <label className="checkline">
           <input
@@ -1598,25 +1903,17 @@ function ContextBuilder({
           Choose specific approved claims
         </label>
         {selectClaims && (
-          <fieldset className="selection-box">
-            <legend>Approved claims</legend>
-            {claims.error ? (
-              <ErrorBox message={claims.error} retry={claims.reload} />
-            ) : claims.loading ? (
-              <Loading />
-            ) : null}
-            {claims.data.items.map((c) => (
-              <label className="checkline" key={c.id}>
-                <input
-                  type="checkbox"
-                  name="claims"
-                  value={c.id}
-                  defaultChecked
-                />
-                {c.text_preview || c.text}
-              </label>
-            ))}
-          </fieldset>
+          <ChoiceList
+            label="Approved claims"
+            limit={1000}
+            items={availableClaims.map((c) => ({
+              id: c.id,
+              label: `${c.knowledge_title || "Career entry"}${c.knowledge_organization ? ` · ${c.knowledge_organization}` : ""}: ${c.text_preview || c.text}`,
+            }))}
+            selected={chosenClaims}
+            onChange={setClaimIds}
+            hint="Only claims belonging to included entries are available. An empty selection deliberately includes no claims."
+          />
         )}
         <Field label="Instructions for this snapshot">
           <textarea name="note" rows={4} />
@@ -1626,8 +1923,13 @@ function ContextBuilder({
             variant="primary"
             disabled={
               pending ||
-              (selectEvidence && (knowledge.loading || !!knowledge.error)) ||
-              (selectClaims && (claims.loading || !!claims.error))
+              !templates.length ||
+              templatesResource.loading ||
+              !!templatesResource.error ||
+              knowledge.loading ||
+              claims.loading ||
+              !!knowledge.error ||
+              !!claims.error
             }
           >
             Save & download context
@@ -1635,5 +1937,91 @@ function ContextBuilder({
         </div>
       </form>
     </Dialog>
+  );
+}
+function ChoiceList({
+  label,
+  items,
+  selected,
+  onChange,
+  hint,
+  limit,
+}: {
+  label: string;
+  items: { id: string; label: string }[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+  hint: string;
+  limit: number;
+}) {
+  const [query, setQuery] = useState("");
+  const visible = items.filter((item) =>
+    item.label.toLowerCase().includes(query.toLowerCase()),
+  );
+  return (
+    <fieldset className="selection-box">
+      <legend>
+        {label} · {selected.length} selected
+      </legend>
+      <p className="hint">{hint}</p>
+      <input
+        aria-label={`Find ${label.toLowerCase()} for context`}
+        placeholder={`Find ${label.toLowerCase()}`}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      <div className="actions selection-actions">
+        <Button
+          type="button"
+          data-dirty-control
+          disabled={selected.length >= limit}
+          onClick={() =>
+            onChange(
+              [
+                ...new Set([...selected, ...visible.map((item) => item.id)]),
+              ].slice(0, limit),
+            )
+          }
+        >
+          Select matching
+        </Button>
+        <Button
+          type="button"
+          data-dirty-control
+          onClick={() =>
+            onChange(
+              selected.filter((id) => !visible.some((item) => item.id === id)),
+            )
+          }
+        >
+          Clear matching
+        </Button>
+      </div>
+      <div className="choice-options">
+        {visible.length ? (
+          visible.map((item) => (
+            <label className="checkline" key={item.id}>
+              <input
+                type="checkbox"
+                checked={selected.includes(item.id)}
+                disabled={
+                  !selected.includes(item.id) && selected.length >= limit
+                }
+                onChange={(e) =>
+                  onChange(
+                    e.target.checked
+                      ? [...selected, item.id]
+                      : selected.filter((id) => id !== item.id),
+                  )
+                }
+              />
+              {item.label}
+            </label>
+          ))
+        ) : (
+          <p className="hint">No matching {label.toLowerCase()}.</p>
+        )}
+      </div>
+    </fieldset>
   );
 }

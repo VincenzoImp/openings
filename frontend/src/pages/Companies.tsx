@@ -28,6 +28,7 @@ import {
   Pagination,
   Switch,
   Tabs,
+  PendingResults,
 } from "../ui";
 interface Collection {
   enabled: boolean;
@@ -109,11 +110,17 @@ export default function CompaniesPage() {
     Math.max(0, Math.ceil(matches.length / limit) - 1) * limit,
   );
   const rows = matches.slice(offset, offset + limit);
+  const updating = resource.loading || query !== filters.q.trim().toLowerCase();
+  useEffect(() => {
+    setSelection({});
+    setBatchErrors([]);
+  }, [filters.q, tab]);
   const selected = Object.keys(selection);
   const chosen = resource.data.items
     .filter((s) => selection[s.id] !== undefined)
     .map((s) => ({ ...s, version: selection[s.id] }));
   async function batch(action: string, items = chosen, extra: Json = {}) {
+    if (updating || resource.error) return false;
     let result:
       | {
           succeeded: number;
@@ -236,7 +243,7 @@ export default function CompaniesPage() {
             checked={
               !!rows.length && rows.every((s) => selection[s.id] !== undefined)
             }
-            disabled={!rows.length}
+            disabled={!rows.length || updating || !!resource.error}
             onChange={(e) =>
               setSelection((current) =>
                 selectRecords(current, rows, e.target.checked),
@@ -255,7 +262,7 @@ export default function CompaniesPage() {
           {["enable", "pause", "run"].map((action) => (
             <Button
               key={action}
-              disabled={pending}
+              disabled={pending || updating || !!resource.error}
               onClick={() => batch(action)}
             >
               {action === "run"
@@ -265,13 +272,23 @@ export default function CompaniesPage() {
                   : "Pause"}
             </Button>
           ))}
-          <Button disabled={pending} onClick={() => setBulkEditing(true)}>
+          <Button
+            disabled={pending || updating || !!resource.error}
+            onClick={() => setBulkEditing(true)}
+          >
             Configure
           </Button>
-          <Button disabled={pending} onClick={() => setRunningOptions(chosen)}>
+          <Button
+            disabled={pending || updating || !!resource.error}
+            onClick={() => setRunningOptions(chosen)}
+          >
             Run with options
           </Button>
-          <Button variant="danger" onClick={() => setConfirmDelete(chosen)}>
+          <Button
+            variant="danger"
+            disabled={updating || !!resource.error}
+            onClick={() => setConfirmDelete(chosen)}
+          >
             Remove
           </Button>
           <button className="textbutton" onClick={() => setSelection({})}>
@@ -316,8 +333,9 @@ export default function CompaniesPage() {
           </Button>
         </div>
       )}
-      <div className="companygrid">
-        {resource.loading && !resource.data.items.length ? (
+      <PendingResults pending={updating} />
+      <div className="companygrid" aria-busy={updating}>
+        {updating ? (
           <Loading />
         ) : rows.length ? (
           rows.map((source) => (
@@ -587,11 +605,11 @@ export function CollectionControl({ compact = false }: { compact?: boolean }) {
       ) : (
         <div className="settingrow">
           <div>
-            <h3>
+            <h2 className="collection-control-title">
               {resource.data.enabled
                 ? "Scheduled collection is on"
                 : "Scheduled collection is paused"}
-            </h3>
+            </h2>
             <p>
               {resource.data.enabled_sources} enabled sources ·{" "}
               {resource.data.running_tasks} running ·{" "}
@@ -630,6 +648,14 @@ export function ProviderSettings() {
   });
   const { mutate, pending } = useWorkspace();
   const [editing, setEditing] = useState<Provider | null>(null);
+  useEffect(() => {
+    const reload = (event: Event) => {
+      const { path, record } = (event as CustomEvent).detail;
+      if (path === `/providers/${editing?.id}`) setEditing(record);
+    };
+    window.addEventListener("openings:record-reloaded", reload);
+    return () => window.removeEventListener("openings:record-reloaded", reload);
+  }, [editing?.id]);
   return (
     <>
       <CollectionControl />
@@ -730,6 +756,7 @@ export function ProviderSettings() {
       </div>
       {editing && (
         <Dialog
+          key={editing.version}
           title={`${editing.name} request settings`}
           onClose={() => setEditing(null)}
         >

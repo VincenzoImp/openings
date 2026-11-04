@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   api,
   ApiError,
@@ -37,6 +37,7 @@ import {
   outcomeLabel,
   stageLabels,
   Tabs,
+  PendingResults,
 } from "../ui";
 
 const blankJobs: ListResult<Job> = { items: [], total: 0 };
@@ -151,7 +152,33 @@ export function JobsPage({
     change = (key: string, value: string) =>
       setFilters({ [key]: value, offset: "0" });
   const facets = resource.data.facets || {};
+  const updating = resource.loading || filters.q !== query;
+  const filtered = Object.entries(filters).some(
+    ([key, value]) => !["queue", "sort", "offset"].includes(key) && !!value,
+  );
+  const selectionScope = JSON.stringify(
+    Object.entries(filters).filter(
+      ([key]) => key !== "offset" && key !== "sort",
+    ),
+  );
+  useEffect(() => {
+    setSelection({});
+    setBatchErrors([]);
+  }, [selectionScope]);
+  const clearFilters = () =>
+    setFilters(
+      Object.fromEntries(
+        Object.keys(filters)
+          .filter((key) => key !== "queue")
+          .map((key) => [
+            key,
+            key === "sort" ? "newest" : key === "offset" ? "0" : "",
+          ]),
+      ),
+    );
+
   async function bulk(action: string) {
+    if (updating || resource.error) return;
     let result:
       | {
           succeeded?: number;
@@ -341,19 +368,32 @@ export function JobsPage({
       </details>
       {selected.length > 0 && (
         <div className="bulkbar" aria-label="Selected opportunities">
-          <strong>{selected.length} selected</strong>
-          <Button disabled={pending} onClick={() => bulk("saved")}>
+          <strong>{selected.length} selected across pages</strong>
+          <Button
+            disabled={pending || updating || !!resource.error}
+            onClick={() => bulk("saved")}
+          >
             Shortlist
           </Button>
-          <Button disabled={pending} onClick={() => bulk("dismissed")}>
+          <Button
+            disabled={pending || updating || !!resource.error}
+            onClick={() => bulk("dismissed")}
+          >
             Dismiss
           </Button>
           {["inbox", "shortlist"].includes(filters.queue) && (
-            <Button disabled={pending} onClick={() => bulk("inbox")}>
+            <Button
+              disabled={pending || updating || !!resource.error}
+              onClick={() => bulk("inbox")}
+            >
               Return to inbox
             </Button>
           )}
-          <Button variant="danger" onClick={() => setForget(true)}>
+          <Button
+            variant="danger"
+            disabled={updating || !!resource.error}
+            onClick={() => setForget(true)}
+          >
             Forget
           </Button>
           <button
@@ -387,8 +427,13 @@ export function JobsPage({
           </Button>
         </div>
       )}
-      <section className="card joblist" aria-label="Opportunities">
-        {!!resource.data.items.length && (
+      <PendingResults pending={updating} />
+      <section
+        className="card joblist"
+        aria-label="Opportunities"
+        aria-busy={updating}
+      >
+        {!updating && !!resource.data.items.length && (
           <div className="selection-head">
             <label className="checkline">
               <input
@@ -414,7 +459,7 @@ export function JobsPage({
             </span>
           </div>
         )}
-        {resource.loading && !resource.data.items.length ? (
+        {updating ? (
           <Loading />
         ) : resource.data.items.length ? (
           resource.data.items.map((job) => (
@@ -504,14 +549,40 @@ export function JobsPage({
           ))
         ) : (
           <Empty
-            title="No opportunities in this view."
+            title={
+              filtered
+                ? "No jobs match your filters"
+                : filters.queue === "shortlist"
+                  ? "Your Shortlist is clear"
+                  : filters.queue === "dismissed"
+                    ? "No dismissed jobs"
+                    : filters.queue === "inbox"
+                      ? "Your Inbox is clear"
+                      : "Add your first opportunity"
+            }
             action={
-              <Button onClick={onAdd} icon="plus">
-                Add a job
-              </Button>
+              filtered ? (
+                <Button onClick={clearFilters}>Clear filters</Button>
+              ) : filters.queue === "shortlist" ? (
+                <a className="btn" href="#inbox">
+                  Review Inbox
+                </a>
+              ) : (
+                <Button onClick={onAdd} icon="plus">
+                  Add a job
+                </Button>
+              )
             }
           >
-            Adjust your filters, add a posting, or save a search in Collection.
+            {filtered
+              ? "Try another search or clear your filters."
+              : filters.queue === "shortlist"
+                ? "Review Inbox and shortlist jobs you want to pursue. Started attempts are in Applications."
+                : filters.queue === "dismissed"
+                  ? "Dismissed jobs stay remembered here and can be restored."
+                  : filters.queue === "inbox"
+                    ? "New jobs arrive here for review. Your selected jobs are in Shortlist."
+                    : "Add a posting or set up a saved search in Collection."}
           </Empty>
         )}
       </section>
@@ -538,7 +609,7 @@ export function JobsPage({
             <Button onClick={() => setForget(false)}>Keep jobs</Button>
             <Button
               variant="danger-fill"
-              disabled={pending}
+              disabled={pending || updating || !!resource.error}
               onClick={() => bulk("forget")}
             >
               Forget selected jobs
@@ -566,7 +637,16 @@ export function JobDrawer({
     });
   const { mutate, pending, notify } = useWorkspace();
   const [tab, setTab] = useUrlState("detail", "posting");
-  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [editingNote, setEditingNote] = useState<Note | null>(null),
+    [removingNote, setRemovingNote] = useState<Note | null>(null);
+  useEffect(() => {
+    const reload = (event: Event) => {
+      const { path, record } = (event as CustomEvent).detail;
+      if (path === `/notes/${editingNote?.id}`) setEditingNote(record);
+    };
+    window.addEventListener("openings:record-reloaded", reload);
+    return () => window.removeEventListener("openings:record-reloaded", reload);
+  }, [editingNote?.id]);
   const [forget, setForget] = useState(false),
     [merging, setMerging] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false),
@@ -656,13 +736,6 @@ export function JobDrawer({
         footer={
           job && (
             <>
-              <Button
-                icon="trash"
-                variant="subtle small danger"
-                onClick={() => setForget(true)}
-              >
-                Forget
-              </Button>
               <div className="actions">
                 {job.triage === "dismissed" ? (
                   <Button
@@ -684,6 +757,7 @@ export function JobDrawer({
                     {!job.application_count && (
                       <Button
                         icon="bookmark"
+                        variant={job.triage === "inbox" ? "primary" : ""}
                         onClick={() =>
                           triage(job.triage === "saved" ? "inbox" : "saved")
                         }
@@ -708,7 +782,7 @@ export function JobDrawer({
                 ) : (
                   job.triage !== "dismissed" && (
                     <Button
-                      variant="primary"
+                      variant={job.triage === "saved" ? "primary" : ""}
                       onClick={createApplication}
                       disabled={pending}
                     >
@@ -732,88 +806,90 @@ export function JobDrawer({
                 {job.company} · {job.location || "Location not specified"}
               </span>
             </div>
-            <section
-              className="job-application-summary"
-              aria-label="Application progress"
-            >
-              {application ? (
-                <>
-                  <div className="sectiontitle">
-                    <div>
-                      <strong>
-                        Application · {stageLabels[application.status]}
-                      </strong>
-                      <p>
-                        {application.status === "draft"
-                          ? "Preparation started. This application has not been submitted."
-                          : application.status === "closed"
-                            ? `Outcome: ${outcomeLabel(application.outcome)}.`
-                            : "Track progress and documents in Applications."}
-                      </p>
-                    </div>
-                    {application.status === "closed" &&
-                      job.triage !== "dismissed" && (
-                        <Button
-                          className="small"
-                          onClick={createApplication}
-                          disabled={pending}
-                        >
-                          New application attempt
-                        </Button>
-                      )}
-                  </div>
-                  <details
-                    open={historyOpen}
-                    onToggle={(event) =>
-                      setHistoryOpen(event.currentTarget.open)
-                    }
-                  >
-                    <summary>
-                      Application history · {job.application_count}
-                    </summary>
-                    {applications.error ? (
-                      <ErrorBox
-                        message={applications.error}
-                        retry={applications.reload}
-                      />
-                    ) : applications.loading ? (
-                      <Loading />
-                    ) : (
-                      applications.data.items
-                        .slice(applicationOffset, applicationOffset + 20)
-                        .map((attempt) => (
-                          <button
-                            className="application-history-link"
-                            key={attempt.id}
-                            onClick={() => onApplication(attempt.id)}
+            {application && (
+              <section
+                className="job-application-summary"
+                aria-label="Application progress"
+              >
+                {application ? (
+                  <>
+                    <div className="sectiontitle">
+                      <div>
+                        <strong>
+                          Application · {stageLabels[application.status]}
+                        </strong>
+                        <p>
+                          {application.status === "draft"
+                            ? "Preparation started. This application has not been submitted."
+                            : application.status === "closed"
+                              ? `Outcome: ${outcomeLabel(application.outcome)}.`
+                              : "Track progress and documents in Applications."}
+                        </p>
+                      </div>
+                      {application.status === "closed" &&
+                        job.triage !== "dismissed" && (
+                          <Button
+                            className="small"
+                            onClick={createApplication}
+                            disabled={pending}
                           >
-                            <span>
-                              {stageLabels[attempt.status]}
-                              {attempt.outcome
-                                ? ` · ${outcomeLabel(attempt.outcome)}`
-                                : ""}
-                            </span>
-                            <time>{date(attempt.created_at)}</time>
-                            <Icon name="arrow" />
-                          </button>
-                        ))
-                    )}
-                    <Pagination
-                      offset={applicationOffset}
-                      total={applications.data.total}
-                      limit={20}
-                      onChange={setApplicationOffset}
-                    />
-                  </details>
-                </>
-              ) : (
-                <p>
-                  {job.triage === "saved"
-                    ? "Shortlisted for consideration. Start an application when you are ready to prepare documents."
-                    : "Shortlist this offer to keep it for later, or start preparing an application."}
-                </p>
-              )}
-            </section>
+                            New application attempt
+                          </Button>
+                        )}
+                    </div>
+                    <details
+                      open={historyOpen}
+                      onToggle={(event) =>
+                        setHistoryOpen(event.currentTarget.open)
+                      }
+                    >
+                      <summary>
+                        Application history · {job.application_count}
+                      </summary>
+                      {applications.error ? (
+                        <ErrorBox
+                          message={applications.error}
+                          retry={applications.reload}
+                        />
+                      ) : applications.loading ? (
+                        <Loading />
+                      ) : (
+                        applications.data.items
+                          .slice(applicationOffset, applicationOffset + 20)
+                          .map((attempt) => (
+                            <button
+                              className="application-history-link"
+                              key={attempt.id}
+                              onClick={() => onApplication(attempt.id)}
+                            >
+                              <span>
+                                {stageLabels[attempt.status]}
+                                {attempt.outcome
+                                  ? ` · ${outcomeLabel(attempt.outcome)}`
+                                  : ""}
+                              </span>
+                              <time>{date(attempt.created_at)}</time>
+                              <Icon name="arrow" />
+                            </button>
+                          ))
+                      )}
+                      <Pagination
+                        offset={applicationOffset}
+                        total={applications.data.total}
+                        limit={20}
+                        onChange={setApplicationOffset}
+                      />
+                    </details>
+                  </>
+                ) : (
+                  <p>
+                    {job.triage === "saved"
+                      ? "Shortlisted for consideration. Start an application when you are ready to prepare documents."
+                      : "Shortlist this offer to keep it for later, or start preparing an application."}
+                  </p>
+                )}
+              </section>
+            )}
             <Tabs
               label="Opportunity details"
               items={[
@@ -827,24 +903,6 @@ export function JobDrawer({
             />
             {tab === "posting" ? (
               <>
-                <dl className="detailfacts">
-                  <div>
-                    <dt>Availability</dt>
-                    <dd>{job.availability || "Unknown"}</dd>
-                  </div>
-                  <div>
-                    <dt>Compensation</dt>
-                    <dd>
-                      {formatSalary(job.salary) ||
-                        formatSalary(job.metadata.salary) ||
-                        "Not specified"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Added to workspace</dt>
-                    <dd>{date(job.created_at)}</dd>
-                  </div>
-                </dl>
                 {job.url && (
                   <a
                     className="btn small external-link"
@@ -855,34 +913,6 @@ export function JobDrawer({
                     <Icon name="external" />
                     Original posting
                   </a>
-                )}
-                <div className="actions form-actions">
-                  <Button onClick={() => setMerging(true)}>
-                    Merge duplicate
-                  </Button>
-                </div>
-                {!!job.postings?.length && (
-                  <details className="provenance">
-                    <summary>
-                      Source provenance · {job.postings.length} postings
-                    </summary>
-                    {job.postings.map((p, i) => (
-                      <article key={i}>
-                        <strong>
-                          {String(
-                            p.source_name ||
-                              p.source_id ||
-                              p.provider ||
-                              "Archived posting",
-                          )}
-                        </strong>
-                        <p>{String(p.url || p.source_url || "")}</p>
-                        <small>
-                          {String(p.created_at || p.last_seen_at || "")}
-                        </small>
-                      </article>
-                    ))}
-                  </details>
                 )}
                 {job.posting ? (
                   <div className="posting">{job.posting}</div>
@@ -895,6 +925,62 @@ export function JobDrawer({
                     </span>
                   </div>
                 )}
+                <details className="job-maintenance">
+                  <summary>Job details, sources & maintenance</summary>{" "}
+                  <dl className="detailfacts">
+                    <div>
+                      <dt>Availability</dt>
+                      <dd>{job.availability || "Unknown"}</dd>
+                    </div>
+                    <div>
+                      <dt>Compensation</dt>
+                      <dd>
+                        {formatSalary(job.salary) ||
+                          formatSalary(job.metadata.salary) ||
+                          "Not specified"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Added to workspace</dt>
+                      <dd>{date(job.created_at)}</dd>
+                    </div>
+                  </dl>
+                  <div className="actions form-actions">
+                    <Button onClick={() => setMerging(true)}>
+                      Merge duplicate
+                    </Button>
+                  </div>
+                  {!!job.postings?.length && (
+                    <details className="provenance">
+                      <summary>
+                        Source provenance · {job.postings.length} postings
+                      </summary>
+                      {job.postings.map((p, i) => (
+                        <article key={i}>
+                          <strong>
+                            {String(
+                              p.source_name ||
+                                p.source_id ||
+                                p.provider ||
+                                "Archived posting",
+                            )}
+                          </strong>
+                          <p>{String(p.url || p.source_url || "")}</p>
+                          <small>
+                            {String(p.created_at || p.last_seen_at || "")}
+                          </small>
+                        </article>
+                      ))}
+                    </details>
+                  )}
+                  <Button
+                    icon="trash"
+                    variant="danger"
+                    onClick={() => setForget(true)}
+                  >
+                    Forget job permanently
+                  </Button>
+                </details>
               </>
             ) : tab === "notes" ? (
               <>
@@ -919,12 +1005,7 @@ export function JobDrawer({
                           className="iconbtn danger"
                           aria-label="Delete note"
                           disabled={pending}
-                          onClick={() =>
-                            mutate(
-                              () => api(`/notes/${note.id}`, "DELETE"),
-                              "Note removed.",
-                            )
-                          }
+                          onClick={() => setRemovingNote(note)}
                         >
                           <Icon name="trash" />
                         </button>
@@ -1013,8 +1094,38 @@ export function JobDrawer({
           </>
         )}
       </Dialog>
+      {removingNote && (
+        <Dialog title="Delete this note?" onClose={() => setRemovingNote(null)}>
+          <p className="modal-intro">
+            {removingNote.body || removingNote.text}
+          </p>
+          <p>This note will be permanently removed.</p>
+          <div className="actions form-actions">
+            <Button onClick={() => setRemovingNote(null)}>Keep note</Button>
+            <Button
+              variant="danger-fill"
+              disabled={pending}
+              onClick={async () => {
+                if (
+                  await mutate(
+                    () => api(`/notes/${removingNote.id}`, "DELETE"),
+                    "Note removed.",
+                  )
+                )
+                  setRemovingNote(null);
+              }}
+            >
+              Delete note
+            </Button>
+          </div>
+        </Dialog>
+      )}
       {editingNote && (
-        <Dialog title="Edit your note." onClose={() => setEditingNote(null)}>
+        <Dialog
+          key={editingNote.version}
+          title="Edit your note."
+          onClose={() => setEditingNote(null)}
+        >
           <form
             onSubmit={async (e) => {
               e.preventDefault();

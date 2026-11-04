@@ -15,6 +15,7 @@ import {
 } from "../api";
 import { FileManager } from "../files";
 import {
+  useEditorRecord,
   useDebounce,
   useResource,
   useUrlFilters,
@@ -34,6 +35,7 @@ import {
   Loading,
   LazyDetails,
   Tabs,
+  PendingResults,
 } from "../ui";
 const blankProfile: Profile = {
   name: "",
@@ -71,7 +73,11 @@ export default function CareerPage() {
       ) : tab === "knowledge" ? (
         <KnowledgePage />
       ) : (
-        <ClaimsPage />
+        <ClaimsPage
+          onAddEntry={() => {
+            setTab("knowledge");
+          }}
+        />
       )}
     </>
   );
@@ -312,7 +318,7 @@ function KnowledgePage() {
         </select>
       </div>
       <div className="career-entry-list">
-        {resource.loading ? (
+        {resource.loading || filters.q !== query ? (
           <Loading />
         ) : resource.data.items.length ? (
           resource.data.items.map((item) => (
@@ -526,7 +532,20 @@ const entryLabels: Partial<Record<KnowledgeKind, [string, string]>> = {
   skill: ["Group title", "Organization"],
   language: ["Language or group", "Organization"],
 };
-function KnowledgeEditor({
+function KnowledgeEditor(props: Parameters<typeof KnowledgeEditorForm>[0]) {
+  const record = useEditorRecord(
+    props.record,
+    props.record ? `/career/knowledge/${props.record.id}` : "",
+  );
+  return (
+    <KnowledgeEditorForm
+      key={record?.version || "new"}
+      {...props}
+      record={record}
+    />
+  );
+}
+function KnowledgeEditorForm({
   record,
   onClose,
   onSaved,
@@ -800,97 +819,114 @@ function KnowledgeImport({ onClose }: { onClose: () => void }) {
         Preview text, Markdown or JSON before adding it. Profile fields are
         changed only after you confirm the preview.
       </p>
-      {!preview ? (
-        <>
-          <Field label="Text or JSON">
-            <textarea
-              rows={12}
-              value={raw}
-              onChange={(e) => setRaw(e.target.value)}
-              placeholder='[{"kind":"project","title":"Example project","narrative":"What you built and learned…"}]'
-            />
-          </Field>
-          <Field label="Or select a text / JSON file">
-            <input
-              type="file"
-              accept=".txt,.md,.json"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  if (file.size > 2_000_000) {
-                    notify("Use a text file below 2 MB.", true);
-                    return;
+      <form
+        data-dirty={raw ? "true" : "false"}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!preview) void inspect();
+        }}
+      >
+        {!preview ? (
+          <>
+            <Field label="Text or JSON">
+              <textarea
+                name="import_text"
+                rows={12}
+                value={raw}
+                onChange={(e) => setRaw(e.target.value)}
+                placeholder='[{"kind":"project","title":"Example project","narrative":"What you built and learned…"}]'
+              />
+            </Field>
+            <Field label="Or select a text / JSON file">
+              <input
+                type="file"
+                accept=".txt,.md,.json"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    if (file.size > 2_000_000) {
+                      notify("Use a text file below 2 MB.", true);
+                      return;
+                    }
+                    setRaw(await file.text());
                   }
-                  setRaw(await file.text());
-                }
-              }}
-            />
-          </Field>
-          <Button
-            variant="primary"
-            disabled={pending || !raw.trim()}
-            onClick={inspect}
-          >
-            Preview import
-          </Button>
-        </>
-      ) : (
-        <>
-          {preview.warnings?.map((warning, i) => (
-            <div className="note" key={i}>
-              <Icon name="info" />
-              <span>{warning}</span>
-            </div>
-          ))}
-          {preview.profile && (
-            <section className="import-profile">
-              <h3>Profile fields to update</h3>
-              <dl>
-                {Object.entries(preview.profile).map(([key, value]) => (
-                  <div key={key}>
-                    <dt>{key.replaceAll("_", " ")}</dt>
-                    <dd>
-                      {typeof value === "string"
-                        ? value
-                        : JSON.stringify(value)}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-          )}
-          <div className="import-preview">
-            {preview.knowledge.map((entry, i) => (
-              <article key={i}>
-                <span className="tag neutral">
-                  {entry.kind
-                    ? knowledgeKinds[entry.kind] || entry.kind
-                    : "Other"}
-                </span>
-                <h3>{entry.title}</h3>
-                {entry.organization && <p>{entry.organization}</p>}
-                {entry.dates && <small>{careerDates(entry.dates)}</small>}
-                {entry.narrative && (
-                  <p>
-                    {entry.narrative.slice(0, 180)}
-                    {entry.narrative.length > 180 ? "…" : ""}
-                  </p>
-                )}
-              </article>
-            ))}
-          </div>
-          <div className="actions form-actions">
-            <Button onClick={() => setPreview(null)}>Back</Button>
-            <Button variant="primary" disabled={pending} onClick={apply}>
-              Confirm import
+                }}
+              />
+            </Field>
+            <Button
+              type="button"
+              variant="primary"
+              disabled={pending || !raw.trim()}
+              onClick={inspect}
+            >
+              Preview import
             </Button>
-          </div>
-        </>
-      )}
+          </>
+        ) : (
+          <>
+            {preview.warnings?.map((warning, i) => (
+              <div className="note" key={i}>
+                <Icon name="info" />
+                <span>{warning}</span>
+              </div>
+            ))}
+            {preview.profile && (
+              <section className="import-profile">
+                <h3>Profile fields to update</h3>
+                <dl>
+                  {Object.entries(preview.profile).map(([key, value]) => (
+                    <div key={key}>
+                      <dt>{key.replaceAll("_", " ")}</dt>
+                      <dd>
+                        {typeof value === "string"
+                          ? value
+                          : JSON.stringify(value)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            )}
+            <div className="import-preview">
+              {preview.knowledge.map((entry, i) => (
+                <article key={i}>
+                  <span className="tag neutral">
+                    {entry.kind
+                      ? knowledgeKinds[entry.kind] || entry.kind
+                      : "Other"}
+                  </span>
+                  <h3>{entry.title}</h3>
+                  {entry.organization && <p>{entry.organization}</p>}
+                  {entry.dates && <small>{careerDates(entry.dates)}</small>}
+                  {entry.narrative && (
+                    <p>
+                      {entry.narrative.slice(0, 180)}
+                      {entry.narrative.length > 180 ? "…" : ""}
+                    </p>
+                  )}
+                </article>
+              ))}
+            </div>
+            <div className="actions form-actions">
+              <Button type="button" onClick={() => setPreview(null)}>
+                Back
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                disabled={pending}
+                onClick={apply}
+              >
+                Confirm import
+              </Button>
+            </div>
+          </>
+        )}
+      </form>
     </Dialog>
   );
 }
-function ClaimsPage() {
+function ClaimsPage({ onAddEntry }: { onAddEntry: () => void }) {
   const [filters, setFilters] = useUrlFilters({
     q: "",
     approved: "",
@@ -907,6 +943,7 @@ function ClaimsPage() {
     { items: [], total: 0 },
     true,
   );
+  const [creatingEntry, setCreatingEntry] = useState(false);
   const [editing, setEditing] = useState<Claim | "new" | null>(null);
   return (
     <>
@@ -970,12 +1007,42 @@ function ClaimsPage() {
           ))}
         </select>
       </div>
-      <ClaimList resource={resource} onEdit={setEditing} />
+      {!knowledge.loading &&
+        !knowledge.error &&
+        !knowledge.data.items.length && (
+          <Empty
+            title="Add a career entry first"
+            action={
+              <Button icon="plus" onClick={() => setCreatingEntry(true)}>
+                Add career entry
+              </Button>
+            }
+          >
+            Claims belong to an experience, project or other career entry.
+          </Empty>
+        )}
+      <PendingResults pending={resource.loading || filters.q !== query} />
+      <ClaimList
+        resource={{
+          ...resource,
+          loading: resource.loading || filters.q !== query,
+        }}
+        onEdit={setEditing}
+      />
       <Pagination
         offset={Number(filters.offset) || 0}
         total={resource.data.total}
         onChange={(offset) => setFilters({ offset: String(offset) })}
       />
+      {creatingEntry && (
+        <KnowledgeEditor
+          onClose={() => setCreatingEntry(false)}
+          onSaved={() => {
+            setCreatingEntry(false);
+            onAddEntry();
+          }}
+        />
+      )}
       {editing && (
         <ClaimEditor
           record={editing === "new" ? undefined : editing}
@@ -1151,7 +1218,20 @@ function ClaimList({
     </>
   );
 }
-function ClaimEditor({
+function ClaimEditor(props: Parameters<typeof ClaimEditorForm>[0]) {
+  const record = useEditorRecord(
+    props.record,
+    props.record ? `/career/claims/${props.record.id}` : "",
+  );
+  return (
+    <ClaimEditorForm
+      key={record?.version || "new"}
+      {...props}
+      record={record}
+    />
+  );
+}
+function ClaimEditorForm({
   record,
   knowledge,
   fixedEntry,

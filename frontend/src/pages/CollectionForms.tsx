@@ -10,7 +10,7 @@ import {
   type ListResult,
   type Source,
 } from "../api";
-import { useResource, useWorkspace } from "../state";
+import { useEditorRecord, useResource, useWorkspace } from "../state";
 import { AdvancedJson, Button, Dialog, ErrorBox, Field, Loading } from "../ui";
 
 interface ConfigProperty {
@@ -352,7 +352,20 @@ function terms(value: FormDataEntryValue | null) {
     .filter(Boolean);
 }
 
-export function SourceEditor({
+export function SourceEditor(props: Parameters<typeof SourceEditorForm>[0]) {
+  const source = useEditorRecord(
+    props.source,
+    props.source ? `/sources/${props.source.id}` : "",
+  );
+  return (
+    <SourceEditorForm
+      key={source?.version || "new"}
+      {...props}
+      source={source}
+    />
+  );
+}
+function SourceEditorForm({
   source,
   search,
   onClose,

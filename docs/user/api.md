@@ -46,6 +46,12 @@ questions or answers. Career/claims/templates/documents offer
 `summary=true` for bounded previews/counts without narratives, metadata, TeX or
 structured content. Context lists never return payloads; files contain metadata only.
 Versioned changes include the last read `expected_version`.
+Application list/detail records include `preparation`: per-kind counts of current
+revision leaves (`revisions`), leaves with their own PDF (`pdf`) and leaves with
+an approved PDF (`approved`). A new revision inherits neither files nor approval.
+These counts do not certify content quality, required document completeness or
+submission. Context lists with `summary=true` include frozen job/template labels,
+evidence/claim counts and a bounded `note_preview`, alongside file/document counts.
 A conflict returns HTTP 409; reload before editing again. A typical error is
 `{"error":{"code":"conflict","message":"…","details":null}}`.
 
@@ -66,6 +72,9 @@ close it before starting another. Use `idempotency_key` for retries of one creat
 Application changes use `PATCH /applications/{id}` and its `expected_version`.
 Entering Closed requires an explicit outcome: `accepted`, `rejected` or
 `not_pursued`. Send `applied_at: null` to clear the submission date.
+Updating `questions` without `answers` preserves compatible existing answers.
+Incompatible answers reject the update atomically; explicitly update or remove
+only the affected answer when that is intended.
 
 Deletion requires the current `expected_version` query parameter:
 
