@@ -28,6 +28,7 @@ import {
   Icon,
   Loading,
   Tabs,
+  PendingResults,
 } from "../ui";
 export default function TemplatesPage() {
   const [filters, setFilters] = useUrlFilters({ q: "", kind: "", offset: "0" });
@@ -130,7 +131,8 @@ export default function TemplatesPage() {
           <option value="cover_letter">Cover letter</option>
         </select>
       </div>
-      <section className="card sectioncard global-instructions">
+      <details className="card sectioncard global-instructions">
+        <summary>General writing instructions</summary>
         <div className="sectiontitle">
           <div>
             <h2>General writing instructions.</h2>
@@ -160,7 +162,8 @@ export default function TemplatesPage() {
             </div>
           </form>
         )}
-      </section>
+      </details>
+      <PendingResults pending={resource.loading || filters.q !== query} />
       {(!template && resource.loading) ||
       (templateId && !template && !detail.error) ? (
         <Loading />
@@ -180,7 +183,41 @@ export default function TemplatesPage() {
         </section>
       ) : (
         <div className="templates-layout form-section">
-          <aside className="template-list" aria-label="Saved templates">
+          <div className="mobile-template-picker">
+            <Field label="Selected template">
+              <select
+                value={template.id}
+                onChange={(event) => {
+                  if (confirmLeave()) setSelected(event.target.value);
+                }}
+                disabled={resource.loading || filters.q !== query}
+              >
+                <option value={template.id}>{template.name} · selected</option>
+                {resource.data.items
+                  .filter((item) => item.id !== template.id)
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                      {item.is_default ? " · Default" : ""}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+            <Pagination
+              label="Template chooser pages"
+              offset={Number(filters.offset) || 0}
+              total={resource.data.total}
+              onChange={(offset) => {
+                if (confirmLeave()) setFilters({ offset: String(offset) });
+              }}
+            />
+          </div>
+          <aside
+            className="template-list"
+            aria-label="Saved templates"
+            aria-busy={resource.loading || filters.q !== query}
+            inert={resource.loading || filters.q !== query}
+          >
             {!resource.data.items.length && (
               <p className="hint">
                 No templates match this search. Your current template remains

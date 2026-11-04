@@ -66,3 +66,8 @@ to clear dates in a versioned update. Omit unchanged fields. Claims also expose
 Prepared application contexts freeze the selected entries, claims, dates and
 ordering. Later edits affect future contexts. Review generated wording and files
 before recording a submission.
+
+Import previews keep the pasted text while you review it. Leaving an unfinished
+import asks before discarding it. If a versioned editor reports a conflict, review
+the latest values and copy your draft before choosing **Reload editor and discard
+draft**. Reapply only the changes you intend to keep.

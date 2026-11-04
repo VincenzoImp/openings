@@ -317,18 +317,42 @@ export function Switch({
     />
   );
 }
+let scrollLocks = 0;
+let originalOverflow = "";
+export function lockPageScroll() {
+  if (scrollLocks++ === 0) {
+    originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+  }
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    if (--scrollLocks === 0) document.body.style.overflow = originalOverflow;
+  };
+}
+export function PendingResults({ pending }: { pending: boolean }) {
+  return pending ? (
+    <p className="loading inline-loading" role="status">
+      <span className="spinner" />
+      Updating results…
+    </p>
+  ) : null;
+}
 export function Dialog({
   title,
   children,
   onClose,
   drawer = false,
   footer,
+  className = "",
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   drawer?: boolean;
   footer?: ReactNode;
+  className?: string;
 }) {
   const close = () => {
     if (!ref.current || confirmLeave(ref.current)) onClose();
@@ -338,17 +362,16 @@ export function Dialog({
   useEffect(() => {
     const last = document.activeElement as HTMLElement | null;
     ref.current?.showModal();
-    const old = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockPageScroll();
     return () => {
-      document.body.style.overflow = old;
-      last?.focus();
+      unlock();
+      if (last?.isConnected) last.focus({ preventScroll: true });
     };
   }, []);
   return (
     <dialog
       ref={ref}
-      className={drawer ? "drawer native-dialog" : "modal native-dialog"}
+      className={`${drawer ? "drawer native-dialog" : "modal native-dialog"} ${className}`}
       aria-labelledby={id}
       onCancel={(e) => {
         e.preventDefault();

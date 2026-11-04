@@ -63,6 +63,12 @@ export interface Application extends Versioned {
   job?: Job;
   applied_at?: string | null;
   documents_count?: number;
+  preparation?: {
+    kind: string;
+    revisions: number;
+    pdf: number;
+    approved: number;
+  }[];
 }
 export interface Profile {
   name: string;
@@ -142,6 +148,7 @@ export interface Document extends Versioned {
   review_state: string;
   revision_number?: number;
   files?: WorkspaceFile[];
+  file_count?: number;
 }
 export interface WorkspaceFile {
   id: string;
@@ -254,6 +261,7 @@ export class ApiError extends Error {
     message: string,
     public status: number,
     public code = "request_failed",
+    public path = "",
   ) {
     super(message);
   }
@@ -277,8 +285,22 @@ export async function api<T>(
       signal,
     },
   );
-  const value =
-    response.status === 204 ? {} : await response.json().catch(() => ({}));
+  let value;
+  try {
+    value = response.status === 204 ? {} : await response.json();
+  } catch (error) {
+    if (
+      signal?.aborted ||
+      (error instanceof DOMException && error.name === "AbortError")
+    )
+      throw error;
+    throw new ApiError(
+      "The server returned an unreadable response. Refresh this view to try again.",
+      response.status,
+      "invalid_response",
+      path,
+    );
+  }
   if (
     response.status === 401 &&
     path !== "/auth/session" &&
@@ -306,6 +328,7 @@ export async function api<T>(
           `Request failed (${response.status})`) + (fields ? " " + fields : ""),
       response.status,
       error?.code,
+      path,
     );
   }
   if (

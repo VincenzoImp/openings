@@ -33,6 +33,7 @@ uv run ruff check backend
 uv run pytest
 npm --prefix frontend run build
 npm --prefix frontend run format:check
+npm --prefix frontend test
 npm --prefix frontend audit --audit-level=moderate
 docker compose config
 ```
@@ -46,6 +47,18 @@ that leaves queued snapshots unchanged. Check that incomplete automatic candidat
 stay outside the archive, then enter once after their text arrives. Exercise one
 open application per job, explicit closure outcomes and versioned deletion through
 REST/MCP and the dashboard. Keep HTTP attempts inside the shared gate.
+
+Browser regressions start a disposable synthetic workspace with acquisition workers
+disabled. Build the dashboard first, then run:
+
+```bash
+cd frontend
+npx playwright install chromium webkit
+npm run test:e2e
+```
+
+The four projects cover Chromium and WebKit at desktop/mobile widths. CI runs
+Chromium at both widths. Browser binaries are development tools, outside the core.
 
 The manual MCP/file/backup driver requires an external Tectonic executable:
 

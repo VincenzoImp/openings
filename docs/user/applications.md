@@ -38,6 +38,13 @@ The context freezes the posting, profile, approved claims, instructions, questio
 templates and exact asset bytes. Later edits affect newly prepared contexts;
 existing documents retain the material used to write them.
 
+In the application, **Documents** comes first. Expand **Prepare with your agent**
+to prepare or download a frozen context. The chooser supports search and selecting
+or clearing matching entries, claims and templates. Claims follow their owning
+entries: excluding an entry also excludes its claims. Omitted entry/claim selections
+use all eligible material; an explicitly empty selection includes none. An empty
+template selection uses your defaults.
+
 ## Write, compile and upload
 
 Connect an [external agent through MCP](agents.md), or work manually. Ask it to
@@ -58,6 +65,17 @@ Open the uploaded PDF and check wording, dates, layout and page count. Approve t
 reviewed revision when ready. For changed content, create a new revision and upload
 its new files. Approved revisions keep their content and attachments fixed.
 
+Cards and the document list distinguish **Needs PDF**, **PDF to review** and
+**Approved PDF** using current revisions and their own attachments. These labels
+describe stored files and review, not submission or an automatic quality check.
+Click a filename to preview a supported PDF, image or text file; use **Details**
+for its hash and metadata. Unsupported formats remain downloadable.
+
+Editing a form question keeps compatible live answers. If a changed type, option
+or limit makes an answer invalid, the editor shows the saved answer and requires
+an explicit choice before clearing it. Frozen contexts and document revisions stay
+unchanged.
+
 Submit through the employer's portal, then record **Applied**. Preparing documents
 or uploading a PDF leaves the application in its current stage.
 
@@ -68,6 +86,12 @@ Use the list or Kanban view to move between **Preparing**, **Applied**, **Interv
 or **Not pursued**; choose an outcome explicitly. Events retain the recorded
 journey, including an interview before a later rejection. The overview funnel
 follows those recorded stages. The submission date can be corrected or cleared.
+
+On narrow screens the initial application view is a compact list. Choose **Board**
+or **List** to remember a preference. Stage shortcuts filter the whole result set;
+board columns show when only part of a stage is loaded and link to the full stage.
+Open **Posting** in an application to read the job without leaving your current
+filters. Rare job maintenance actions live under **Job details, sources & maintenance**.
 
 ![Application board showing compact cards across stages](../images/applications.png)
 

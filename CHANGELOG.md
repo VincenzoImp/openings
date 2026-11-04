@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.12.0
+
+- Clarify application cards with current revision PDF/review state and direct next actions; keep postings accessible inside the application.
+- Make mobile applications start in a compact list, remember the chosen view, and expose stage totals and partial board pages.
+- Prioritize posting text and triage in job details; group rare maintenance actions and make queue empty states actionable.
+- Add searchable context selectors with evidence/claim dependencies and a compact mobile template chooser.
+- Preserve compatible form answers and unfinished import text; add editor-local conflict recovery and deliberate note/file/question deletion.
+- Preview supported files from filenames and keep exact metadata under Details.
+- Fix cancelled-response crashes, nested dialog scroll locks, navigation focus, loading/selection races, sidebar counts, contrast and mobile chart overflow.
+- Fix JSON export of undated career entries and snapshot file bytes before streaming across worker threads.
+- Add synthetic desktop/mobile browser workflows for Chromium and WebKit, request regressions and exact revision/export/file invariants.
+
+Workspace schema remains 6. Existing data and frozen snapshots require no migration.
+
 ## 0.11.0
 
 - Give Inbox and Shortlist distinct actionable queues, excluding all jobs with application history.

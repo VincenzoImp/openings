@@ -64,7 +64,12 @@ export function Funnel({ steps }: { steps: FunnelStep[] }) {
     y = 112;
   return (
     <>
-      <div className="funnel-wrap">
+      <div
+        className="funnel-wrap"
+        tabIndex={0}
+        role="region"
+        aria-label="Application journey chart"
+      >
         <svg
           viewBox={`0 0 ${width} ${height}`}
           role="img"
@@ -169,30 +174,37 @@ export function Funnel({ steps }: { steps: FunnelStep[] }) {
       </div>
       <details className="funnel-table">
         <summary>View counts as a table</summary>
-        <table className="table">
-          <thead>
-            <tr>
-              <th scope="col">Stage</th>
-              <th scope="col">Reached</th>
-              <th scope="col">Waiting</th>
-              <th scope="col">Closed</th>
-            </tr>
-          </thead>
-          <tbody>
-            {steps.map((s) => (
-              <tr key={s.stage}>
-                <td>{labels[s.stage] || s.stage}</td>
-                <td>{s.count}</td>
-                <td>{s.outcomes.waiting || 0}</td>
-                <td>
-                  {Object.entries(s.outcomes)
-                    .filter(([k]) => k !== "waiting")
-                    .reduce((n, [, v]) => n + v, 0)}
-                </td>
+        <div
+          className="table-wrap"
+          tabIndex={0}
+          role="region"
+          aria-label="Application journey counts"
+        >
+          <table className="table">
+            <thead>
+              <tr>
+                <th scope="col">Stage</th>
+                <th scope="col">Reached</th>
+                <th scope="col">Waiting</th>
+                <th scope="col">Closed</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {steps.map((s) => (
+                <tr key={s.stage}>
+                  <td>{labels[s.stage] || s.stage}</td>
+                  <td>{s.count}</td>
+                  <td>{s.outcomes.waiting || 0}</td>
+                  <td>
+                    {Object.entries(s.outcomes)
+                      .filter(([k]) => k !== "waiting")
+                      .reduce((n, [, v]) => n + v, 0)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </details>
     </>
   );

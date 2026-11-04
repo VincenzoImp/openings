@@ -554,7 +554,12 @@ function TaskSettings() {
               )}
               <details className="collection-advanced">
                 <summary>Technical details and frozen settings</summary>
-                <pre className="json-readout">
+                <pre
+                  className="json-readout"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Technical details"
+                >
                   {JSON.stringify(detail.data, null, 2)}
                 </pre>
               </details>
@@ -691,8 +696,10 @@ function WorkspaceSettings({
             <h2>Workspace.</h2>
             <p>
               {String(workspace.data.name || "Openings")}{" "}
-              {String(workspace.data.version || "0.9.1")} · Private, single
-              owner workspace
+              {workspace.data.version
+                ? `${String(workspace.data.version)} · `
+                : ""}
+              Private, single owner workspace
             </p>
           </div>
         </div>
@@ -872,7 +879,7 @@ function PasswordSettings() {
         </div>
       </form>
       <div className="divider" />
-      <p className="hint">Openings 0.9.1 · Your job search workspace</p>
+      <p className="hint">Your job search workspace</p>
       <p className="hint">
         <a
           className="textbutton"

@@ -1,0 +1,622 @@
+import { test, expect, type Page, type BrowserContext } from "@playwright/test";
+
+function syntheticPdf() {
+  const stream = "BT /F1 18 Tf 40 440 Td (Synthetic application CV) Tj ET";
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 500] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+  ];
+  let data = "%PDF-1.4\n";
+  const offsets = [0];
+  for (const [index, object] of objects.entries()) {
+    offsets.push(Buffer.byteLength(data));
+    data += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  }
+  const xref = Buffer.byteLength(data);
+  data +=
+    "xref\n0 6\n0000000000 65535 f \n" +
+    offsets
+      .slice(1)
+      .map((offset) => String(offset).padStart(10, "0") + " 00000 n \n")
+      .join("") +
+    `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Buffer.from(data);
+}
+async function call(page: Page, path: string, method = "GET", body?: unknown) {
+  return page.evaluate(
+    async ({ path, method, body }) => {
+      const session = await fetch("/api/v1/auth/session").then((r) => r.json());
+      const response = await fetch("/api/v1" + path, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": session.csrf_token,
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      const value = await response.json();
+      if (!response.ok) throw Error(JSON.stringify(value));
+      return value;
+    },
+    { path, method, body },
+  );
+}
+async function go(page: Page, hash: string) {
+  await page.goto("/#" + hash);
+  await expect(page.locator(".main h1")).toBeVisible();
+}
+const top = (page: Page) => page.locator("dialog[open]").last();
+const errors = new WeakMap<Page, string[]>();
+let ownerCookies: Parameters<BrowserContext["addCookies"]>[0] = [];
+test.beforeAll(async ({ browser }) => {
+  const context = await browser.newContext({
+    baseURL: "http://127.0.0.1:18084",
+  });
+  const page = await context.newPage();
+  await page.goto("/");
+  await page.locator("input[name=password]").fill("synthetic-browser-password");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.locator(".main h1")).toBeVisible();
+  ownerCookies = await context.cookies();
+  await context.close();
+});
+test.beforeEach(async ({ page }) => {
+  errors.set(page, []);
+  page.on("pageerror", (error) => errors.get(page)!.push(error.message));
+  await page.context().addCookies(ownerCookies);
+  await page.goto("/");
+  await expect(page.locator(".main h1")).toBeVisible();
+});
+test.afterEach(async ({ page }, info) => {
+  await page.screenshot({
+    path: info.outputPath("workspace.png"),
+    fullPage: true,
+  });
+  expect(errors.get(page)).toEqual([]);
+});
+
+test("queue count, posting hierarchy and query-safe selection", async ({
+  page,
+}) => {
+  const active = (await call(page, "/applications?status=draft&limit=1"))
+    .items[0];
+  const job = await call(page, "/jobs/" + active.job_id);
+  await call(page, `/jobs/${job.id}/triage`, "POST", {
+    triage: "inbox",
+    expected_version: job.version,
+  });
+  await go(page, "inbox");
+  const queue = await call(page, "/jobs?queue=inbox");
+  await expect(page.locator(".navcount")).toHaveText(String(queue.total));
+  await page.locator(".jobmain").first().click();
+  await expect(top(page).locator(".posting")).toBeVisible();
+  await expect(
+    top(page).getByRole("button", { name: "Shortlist", exact: true }),
+  ).toHaveClass(/primary/);
+  await expect(
+    top(page).getByRole("button", { name: "Merge duplicate", exact: true }),
+  ).not.toBeVisible();
+  await top(page)
+    .getByRole("button", { name: "Close dialog", exact: true })
+    .click();
+  await page.locator(".row-select").first().check();
+  await expect(page.getByLabel("Selected opportunities")).toBeVisible();
+  await page.route("**/api/v1/jobs?*", async (route) => {
+    if (new URL(route.request().url()).searchParams.get("q")) {
+      const response = await route.fetch();
+      await new Promise((r) => setTimeout(r, 700));
+      await route.fulfill({ response });
+    } else await route.continue();
+  });
+  await page
+    .getByRole("textbox", { name: "Search jobs", exact: true })
+    .fill("no-such-synthetic-role");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Updating results" }),
+  ).toBeVisible();
+  await expect(page.locator(".jobrow")).toHaveCount(0);
+  await expect(page.getByLabel("Selected opportunities")).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "No jobs match your filters" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Clear filters", exact: true })
+    .last()
+    .click();
+  await expect(page.locator(".jobrow").first()).toBeVisible();
+});
+
+test("document upload, revision ownership and safe file preview", async ({
+  page,
+}) => {
+  const job = await call(page, "/jobs", "POST", {
+    title: "Document workflow",
+    posting: "Build reliable systems.",
+  });
+  const application = await call(page, "/applications", "POST", {
+    job_id: job.id,
+  });
+  await go(page, `applications?application=${application.id}`);
+  await top(page)
+    .getByRole("button", { name: "Add document", exact: true })
+    .click();
+  await top(page).locator("input[name=title]").fill("Workflow CV");
+  await top(page)
+    .locator("textarea[name=text]")
+    .fill("Synthetic document text.");
+  await top(page).locator("input[type=file]").setInputFiles({
+    name: "workflow.pdf",
+    mimeType: "application/pdf",
+    buffer: syntheticPdf(),
+  });
+  await top(page)
+    .getByRole("button", { name: "Save revision", exact: true })
+    .click();
+  await expect(page.locator("dialog[open]")).toHaveCount(1);
+  await expect(top(page).locator(".preparation-summary")).toContainText(
+    "PDF to review",
+  );
+  await top(page)
+    .getByRole("button", { name: "Show Workflow CV", exact: true })
+    .click();
+  await top(page)
+    .getByRole("button", { name: "Approve this revision", exact: true })
+    .click();
+  await expect(top(page).locator(".preparation-summary")).toContainText(
+    "Approved PDF",
+  );
+  await top(page)
+    .getByRole("button", { name: "workflow.pdf", exact: true })
+    .click();
+  await expect(top(page).getByTitle("Preview of workflow.pdf")).toBeVisible();
+  await top(page)
+    .getByRole("button", { name: "Close preview", exact: true })
+    .click();
+  await top(page)
+    .getByRole("button", { name: "New revision", exact: true })
+    .click();
+  await top(page)
+    .locator("textarea[name=text]")
+    .fill("Changed synthetic document.");
+  await top(page)
+    .getByRole("button", { name: "Save revision", exact: true })
+    .click();
+  await expect(top(page).locator(".preparation-summary")).toContainText(
+    "Needs PDF",
+  );
+  expect((await call(page, `/applications/${application.id}`)).status).toBe(
+    "draft",
+  );
+  await top(page)
+    .getByRole("button", { name: "View posting", exact: true })
+    .click();
+  await expect(top(page).locator(".posting")).toContainText(
+    "Build reliable systems.",
+  );
+  await top(page)
+    .getByRole("button", { name: "Close dialog", exact: true })
+    .click();
+  await expect(page.locator(".main h1")).toHaveText("Applications");
+});
+
+test("question edits preserve compatible work and require deliberate incompatible removal", async ({
+  page,
+}) => {
+  const job = await call(page, "/jobs", "POST", {
+    title: "Question workflow",
+    posting: "Build services.",
+  });
+  let application = await call(page, "/applications", "POST", {
+    job_id: job.id,
+    questions: [{ id: "motivation", label: "Why this role?", type: "text" }],
+  });
+  application = await call(page, `/applications/${application.id}`, "PATCH", {
+    expected_version: application.version,
+    answers: { motivation: "Synthetic motivation." },
+  });
+  await go(page, `applications?application=${application.id}`);
+  await top(page)
+    .getByRole("tab", { name: "Form answers", exact: true })
+    .click();
+  await top(page).getByText("Manage questions", { exact: true }).click();
+  await top(page)
+    .getByRole("button", { name: "Edit Why this role?", exact: true })
+    .click();
+  await top(page).locator("textarea[name=label]").fill("Why this team?");
+  await top(page)
+    .getByRole("button", { name: "Save question", exact: true })
+    .click();
+  await expect(page.locator("dialog[open]")).toHaveCount(1);
+  await expect(top(page).locator("textarea[name=motivation]")).toHaveValue(
+    "Synthetic motivation.",
+  );
+  await top(page)
+    .getByRole("button", { name: "Edit Why this team?", exact: true })
+    .click();
+  await top(page)
+    .getByLabel("Answer type", { exact: true })
+    .selectOption("number");
+  await top(page)
+    .getByRole("button", { name: "Save question", exact: true })
+    .click();
+  await expect(
+    top(page).getByText("Saved answer:", { exact: false }),
+  ).toContainText("Synthetic motivation.");
+  await top(page)
+    .getByRole("checkbox", {
+      name: "Clear this incompatible answer when saving the question",
+    })
+    .check();
+  await top(page)
+    .getByRole("button", { name: "Save question", exact: true })
+    .click();
+  await expect(page.locator("dialog[open]")).toHaveCount(1);
+  expect((await call(page, `/applications/${application.id}`)).answers).toEqual(
+    {},
+  );
+});
+
+test("context selection follows evidence and supports deliberate empty selections", async ({
+  page,
+}) => {
+  const application = (await call(page, "/applications?status=draft&limit=1"))
+    .items[0];
+  await go(page, `applications?application=${application.id}`);
+  await top(page).locator(".agent-preparation > summary").click();
+  await top(page)
+    .getByRole("button", { name: "Prepare context", exact: true })
+    .click();
+  await top(page)
+    .getByRole("checkbox", {
+      name: "Choose specific career entries",
+      exact: true,
+    })
+    .check();
+  await top(page)
+    .getByRole("checkbox", {
+      name: "Choose specific approved claims",
+      exact: true,
+    })
+    .check();
+  const evidence = top(page).getByRole("group", { name: /Career entries/ });
+  await evidence
+    .getByRole("button", { name: "Clear matching", exact: true })
+    .click();
+  await expect(
+    top(page)
+      .getByRole("group", { name: /Approved claims/ })
+      .getByRole("checkbox"),
+  ).toHaveCount(0);
+  const download = page.waitForEvent("download");
+  await top(page)
+    .getByRole("button", { name: "Save & download context", exact: true })
+    .click();
+  await download;
+  await expect(page.locator("dialog[open]")).toHaveCount(1);
+  const contexts = await call(
+    page,
+    `/contexts?application_id=${application.id}&summary=true`,
+  );
+  const context = await call(page, `/contexts/${contexts.items[0].id}`);
+  expect(context.payload.knowledge).toEqual([]);
+  expect(context.payload.claims).toEqual([]);
+});
+
+test("version conflict reviews latest values and reloads the editor with a usable version", async ({
+  page,
+}) => {
+  const job = await call(page, "/jobs", "POST", {
+    title: "Concurrent editor",
+    company: "Original",
+    posting: "Build services.",
+  });
+  await go(page, `inbox?job=${job.id}`);
+  await top(page)
+    .getByRole("tab", { name: "Edit details", exact: true })
+    .click();
+  await top(page).locator("input[name=company]").fill("My draft");
+  await call(page, `/jobs/${job.id}`, "PATCH", {
+    expected_version: job.version,
+    company: "Newer value",
+  });
+  await top(page)
+    .getByRole("button", { name: "Save details", exact: true })
+    .click();
+  await expect(top(page).locator("input[name=company]")).toHaveValue(
+    "My draft",
+  );
+  await top(page)
+    .getByRole("button", { name: "Review latest values", exact: true })
+    .click();
+  await expect(top(page).locator(".conflict-recovery")).toContainText(
+    "Newer value",
+  );
+  await top(page)
+    .getByRole("button", {
+      name: "Reload editor and discard draft",
+      exact: true,
+    })
+    .click();
+  await expect(top(page).locator("input[name=company]")).toHaveValue(
+    "Newer value",
+  );
+  await top(page).locator("input[name=company]").fill("Reapplied deliberately");
+  await top(page)
+    .getByRole("button", { name: "Save details", exact: true })
+    .click();
+  await expect
+    .poll(async () => (await call(page, `/jobs/${job.id}`)).company)
+    .toBe("Reapplied deliberately");
+});
+
+test("import protection and nested dialogs restore scroll after browser Back", async ({
+  page,
+}) => {
+  await go(page, "inbox");
+  await go(page, "career?section=knowledge");
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await top(page)
+    .getByRole("textbox", { name: "Text or JSON", exact: true })
+    .fill("Synthetic unsaved evidence");
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await top(page)
+    .getByRole("button", { name: "Close dialog", exact: true })
+    .click();
+  await expect(
+    top(page).getByRole("textbox", { name: "Text or JSON", exact: true }),
+  ).toHaveValue("Synthetic unsaved evidence");
+  page.once("dialog", (dialog) => dialog.accept());
+  await top(page)
+    .getByRole("button", { name: "Close dialog", exact: true })
+    .click();
+  await page.locator(".career-entry-card .career-entry-title").first().click();
+  await top(page)
+    .getByRole("button", { name: "Edit details", exact: true })
+    .click();
+  await expect(page.locator("dialog[open]")).toHaveCount(2);
+  await page.goBack();
+  await expect(page.locator(".main h1")).toHaveText("Inbox");
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  await expect
+    .poll(() => page.evaluate(() => document.body.style.overflow))
+    .not.toBe("hidden");
+});
+
+test("mobile navigation contains focus and releases the background on close and resize", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const button = page.getByRole("button", {
+    name: "Open navigation",
+    exact: true,
+  });
+  await button.click();
+  await expect(page.locator("main")).toHaveAttribute("inert", "");
+  for (let index = 0; index < 15; index++) {
+    await page.keyboard.press("Tab");
+    expect(
+      await page.evaluate(() => !!document.activeElement?.closest(".sidebar")),
+    ).toBe(true);
+  }
+  await page.keyboard.press("Escape");
+  await expect(button).toBeFocused();
+  await expect(page.locator("main")).not.toHaveAttribute("inert", "");
+  await button.click();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(page.locator("main")).not.toHaveAttribute("inert", "");
+});
+
+test("mobile applications, templates and funnel stay usable inside the viewport", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await go(page, "applications");
+  await expect(page.locator(".application-list")).toBeVisible();
+  await expect(page.locator(".stage-overview .btn")).toHaveCount(5);
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(390);
+  await go(page, "templates");
+  await expect(page.locator(".mobile-template-picker select")).toBeVisible();
+  const chooser = page.locator(".mobile-template-picker select");
+  await expect(chooser.locator("option")).toHaveCount(30);
+  await chooser.selectOption({ index: 1 });
+  await expect(
+    page.getByRole("heading", { name: "Synthetic CV 01", exact: true }),
+  ).toBeVisible();
+  expect(
+    await page
+      .locator(".templates-layout > section")
+      .evaluate((element) => element.getBoundingClientRect().top),
+  ).toBeLessThan(844);
+  await go(page, "overview");
+  await page.getByText("View counts as a table", { exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(390);
+  await expect(
+    page.getByRole("region", { name: "Application journey chart" }),
+  ).toHaveAttribute("tabindex", "0");
+});
+
+test("records export downloads valid JSON with undated career entries", async ({
+  page,
+}) => {
+  await go(page, "settings?section=workspace");
+  const download = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Export records", exact: true })
+    .click();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(/\.json$/);
+  const records = await call(page, "/export");
+  expect(records.knowledge.some((entry: any) => entry.dates === null)).toBe(
+    true,
+  );
+  await expect(page.getByText("Openings 0.9.1", { exact: false })).toHaveCount(
+    0,
+  );
+});
+
+test("independent career, source and provider editors recover their own concurrent versions", async ({
+  page,
+}) => {
+  const recover = async (field: string, value: string) => {
+    await top(page)
+      .getByRole("button", { name: "Review latest values", exact: true })
+      .click();
+    await expect(top(page).locator(".conflict-recovery")).toContainText(value);
+    await top(page)
+      .getByRole("button", {
+        name: "Reload editor and discard draft",
+        exact: true,
+      })
+      .click();
+    await expect(top(page).locator(`[name=${field}]`)).toHaveValue(value);
+  };
+  const entry = await call(page, "/career/knowledge", "POST", {
+    kind: "project",
+    title: "Concurrent career entry",
+  });
+  await go(page, "career?section=knowledge&q=Concurrent");
+  await page.locator(".career-entry-title").first().click();
+  await top(page)
+    .getByRole("button", { name: "Edit details", exact: true })
+    .click();
+  await top(page).locator("[name=title]").fill("My entry draft");
+  await call(page, `/career/knowledge/${entry.id}`, "PATCH", {
+    expected_version: entry.version,
+    title: "Newer career title",
+  });
+  await top(page)
+    .getByRole("button", { name: "Save entry", exact: true })
+    .click();
+  await recover("title", "Newer career title");
+  await top(page)
+    .getByRole("button", { name: "Save entry", exact: true })
+    .click();
+  await expect(page.locator("dialog[open]")).toHaveCount(1);
+  await top(page)
+    .getByRole("button", { name: "Close dialog", exact: true })
+    .click();
+  const source = await call(page, "/sources", "POST", {
+    name: "Concurrent search",
+    kind: "jobspy",
+    config: {
+      query: "synthetic engineer",
+      location: "Zurich",
+      providers: ["linkedin"],
+    },
+  });
+  await go(page, "collection?q=Concurrent");
+  await page
+    .locator(".companycard")
+    .getByRole("button", { name: "Edit settings", exact: true })
+    .click();
+  await top(page).locator("[name=name]").fill("My source draft");
+  await call(page, `/sources/${source.id}`, "PATCH", {
+    expected_version: source.version,
+    name: "Newer search name",
+  });
+  await top(page)
+    .getByRole("button", { name: "Save search", exact: true })
+    .click();
+  await recover("name", "Newer search name");
+  await top(page)
+    .getByRole("button", { name: "Save search", exact: true })
+    .click();
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  await go(page, "settings?section=collection");
+  const provider = (await call(page, "/providers")).items.find(
+    (item: any) => item.capability.supported,
+  );
+  const card = page.locator(".provider-grid > article").filter({
+    has: page.getByRole("heading", { name: provider.name, exact: true }),
+  });
+  await card
+    .getByRole("button", { name: "Edit request settings", exact: true })
+    .click();
+  await top(page).locator("[name=min_interval_seconds]").fill("7");
+  await call(page, `/providers/${provider.id}`, "PATCH", {
+    expected_version: provider.version,
+    min_interval_seconds: provider.policy.min_interval_seconds + 2,
+  });
+  await top(page)
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await recover(
+    "min_interval_seconds",
+    String(provider.policy.min_interval_seconds + 2),
+  );
+  await top(page)
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+});
+
+test("live file and note deletion identify the item before removal", async ({
+  page,
+}) => {
+  const job = await call(page, "/jobs", "POST", {
+    title: "Owned notes and files",
+    posting: "Build services.",
+  });
+  await go(page, `inbox?job=${job.id}`);
+  await top(page).getByRole("tab", { name: /Notes/ }).click();
+  await top(page)
+    .locator("[name=body]")
+    .fill("Synthetic note to review before deletion.");
+  await top(page)
+    .getByRole("button", { name: "Add note", exact: true })
+    .click();
+  await top(page)
+    .getByRole("button", { name: "Delete note", exact: true })
+    .click();
+  await expect(top(page)).toContainText(
+    "Synthetic note to review before deletion.",
+  );
+  await top(page)
+    .getByRole("button", { name: "Keep note", exact: true })
+    .click();
+  await expect(page.locator(".note-entry")).toHaveCount(1);
+  await top(page).getByRole("tab", { name: "Files", exact: true }).click();
+  await top(page)
+    .locator("input[type=file]")
+    .setInputFiles({
+      name: "safe-text.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from(
+        "<script>window.__unsafe=true</script>\nSynthetic source",
+      ),
+    });
+  await top(page)
+    .getByRole("button", { name: "safe-text.txt", exact: true })
+    .click();
+  await expect(top(page).locator(".file-text")).toContainText("<script>");
+  expect(await page.evaluate(() => (window as any).__unsafe)).toBeUndefined();
+  await top(page)
+    .getByRole("button", { name: "Close preview", exact: true })
+    .click();
+  await top(page)
+    .getByRole("button", { name: "Delete safe-text.txt", exact: true })
+    .click();
+  await expect(top(page)).toContainText("safe-text.txt");
+  await top(page)
+    .getByRole("button", { name: "Keep file", exact: true })
+    .click();
+  await expect(
+    top(page).getByRole("button", { name: "safe-text.txt", exact: true }),
+  ).toBeVisible();
+  await top(page)
+    .getByRole("button", { name: "Delete safe-text.txt", exact: true })
+    .click();
+  await top(page)
+    .getByRole("button", { name: "Delete file", exact: true })
+    .click();
+  await expect(
+    top(page).getByRole("button", { name: "safe-text.txt", exact: true }),
+  ).toHaveCount(0);
+});
