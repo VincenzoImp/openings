@@ -2,7 +2,7 @@ name: openings
 
 services:
   openings:
-    image: ${OPENINGS_IMAGE:-docker.io/vincenzoimp/openings:0.10.0}
+    image: ${OPENINGS_IMAGE:-docker.io/vincenzoimp/openings:0.11.0}
     build:
       context: .
       dockerfile: Dockerfile
@@ -22,30 +22,5 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
 
-  # Starting this profile does not enable scoring. Configure it in Settings.
-  scorer:
-    profiles: [local]
-    image: ${OPENINGS_SCORER_IMAGE:-docker.io/vincenzoimp/openings:scorer-0.10.0}
-    build:
-      context: .
-      dockerfile: scorer/Dockerfile
-    init: true
-    restart: unless-stopped
-    environment:
-      SCORER_API_KEY: ${SCORER_API_KEY:-}
-      SCORER_THREADS: 2
-      SCORER_MAX_CONTEXT: 2048
-      SCORER_IDLE_UNLOAD: 120
-      SCORER_REQUEST_TIMEOUT: 600
-    volumes:
-      - model-cache:/cache
-    cpus: 1.5
-    mem_limit: 3584m
-    pids_limit: 128
-    cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
-    # No host port: the core reaches http://scorer:8000 on the Compose network.
-
 volumes:
   workspace:
-  model-cache:

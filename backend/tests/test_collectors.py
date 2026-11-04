@@ -3,7 +3,6 @@
 import json
 import asyncio
 import threading
-import time
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
 
@@ -24,7 +23,6 @@ from openings.discovery import (
     fetch_postings,
 )
 from openings.errors import DomainError
-from openings.worker import Worker
 from openings.workspace import Workspace
 
 
@@ -298,75 +296,6 @@ def test_company_clients_fetch_all_details_and_reuse_complete_cached_bodies():
     assert len(calls) == 1
 
 
-def test_collection_lane_progresses_during_a_slow_inference_and_queues_successor(
-    tmp_path, monkeypatch
-):
-    workspace = Workspace(tmp_path / "lanes.sqlite")
-    service = DiscoveryService(workspace)
-    workspace.discovery = service
-    workspace.set_settings("profile", {"summary": "Python engineer"})
-    workspace.set_settings("scoring", {"enabled": True})
-    entered, release, collected = threading.Event(), threading.Event(), threading.Event()
-    calls = []
-
-    def score(config, state):
-        calls.append(state["job"]["posting"])
-        if len(calls) == 1:
-            entered.set()
-            assert release.wait(5)
-        return {"score": 80, "model": "synthetic", "elapsed_seconds": 0, "response": {}}
-
-    def fetch(source):
-        collected.set()
-        return [
-            {
-                "title": "Engineer",
-                "company": "Example",
-                "posting": "Build changed Python APIs",
-                "url": "https://example.org/role",
-            }
-        ]
-
-    monkeypatch.setattr(module, "score_call", score)
-    monkeypatch.setattr(module, "fetch_postings", fetch)
-    job = workspace.ingest_job(
-        {
-            "title": "Engineer",
-            "company": "Example",
-            "posting": "Build APIs",
-            "url": "https://example.org/role",
-        }
-    )
-    source = service.create_source(
-        SourceCreate(name="Example", kind="greenhouse", config={"board": "example"})
-    )
-    worker = Worker(workspace, service)
-    worker.start()
-    try:
-        assert entered.wait(3)
-        service.queue_collection(source["id"])
-        assert collected.wait(3)
-        deadline = time.monotonic() + 2
-        while (
-            workspace.get_job(job["id"])["posting"] != "Build changed Python APIs"
-            or service.list_tasks(kind="score", state="queued")["total"] != 1
-        ) and time.monotonic() < deadline:
-            time.sleep(0.01)
-        assert workspace.get_job(job["id"])["posting"] == "Build changed Python APIs"
-        assert service.list_tasks(kind="score", state="queued")["total"] == 1
-        assert len(calls) == 1
-        release.set()
-        deadline = time.monotonic() + 3
-        while len(calls) != 2 and time.monotonic() < deadline:
-            time.sleep(0.01)
-        assert calls == ["Build APIs", "Build changed Python APIs"]
-        deadline = time.monotonic() + 2
-        while workspace.get_job(job["id"])["score_outdated"] and time.monotonic() < deadline:
-            time.sleep(0.01)
-        assert not workspace.get_job(job["id"])["score_outdated"]
-    finally:
-        release.set()
-        worker.stop()
 
 
 def test_provider_list_excludes_unsupported_services_and_retry_after_is_not_guessed(collection):
@@ -577,43 +506,3 @@ async def test_slow_mcp_preview_keeps_health_and_other_tools_responsive(tmp_path
     finally:
         release.set()
         await task
-
-
-def test_manual_score_checks_share_the_worker_inference_slot(collection, monkeypatch):
-    from concurrent.futures import ThreadPoolExecutor
-
-    workspace, service = collection
-    workspace.set_settings("profile", {"summary": "Python engineer"})
-    workspace.set_settings("scoring", {"enabled": True})
-    entered, release = threading.Event(), threading.Event()
-    calls = []
-
-    def score(config, state):
-        calls.append(state["job"]["posting"])
-        if len(calls) == 1:
-            entered.set()
-            assert release.wait(3)
-        return {"score": 80, "model": "synthetic", "elapsed_seconds": 0, "response": {}}
-
-    monkeypatch.setattr(module, "score_call", score)
-    worker = Worker(workspace, service)
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        manual = pool.submit(service.test_scoring)
-        try:
-            assert entered.wait(1)
-            job = workspace.ingest_job(
-                {"title": "Engineer", "company": "Example", "posting": "Queued job"}
-            )
-            worker.start()
-            time.sleep(0.1)
-            assert len(calls) == 1
-            release.set()
-            assert manual.result(timeout=2)["connected"]
-            deadline = time.monotonic() + 3
-            while workspace.get_job(job["id"])["score"] is None and time.monotonic() < deadline:
-                time.sleep(0.01)
-            assert calls == ["Build and maintain Python APIs.", "Queued job"]
-            assert workspace.get_job(job["id"])["score"] == 80
-        finally:
-            release.set()
-            worker.stop()

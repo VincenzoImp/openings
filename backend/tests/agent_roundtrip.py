@@ -126,11 +126,32 @@ async def exercise(base, token, folder, tectonic):
                         },
                     )
                 )
+                unpack(
+                    await session.call_tool(
+                        "job_triage",
+                        {
+                            "job_id": job["id"],
+                            "value": {"triage": "saved", "expected_version": job["version"]},
+                        },
+                    )
+                )
+                checks["shortlist_before_preparation"] = (
+                    unpack(
+                        await session.call_tool("jobs_search", {"value": {"queue": "shortlist"}})
+                    )["total"]
+                    == 1
+                )
                 application = unpack(
                     await session.call_tool(
                         "application_create",
                         {"value": {"job_id": job["id"], "note": "Prefer technical detail."}},
                     )
+                )
+                checks["preparation_leaves_shortlist"] = (
+                    unpack(
+                        await session.call_tool("jobs_search", {"value": {"queue": "shortlist"}})
+                    )["total"]
+                    == 0
                 )
                 context = unpack(
                     await session.call_tool(
@@ -302,6 +323,35 @@ async def exercise(base, token, folder, tectonic):
                         )
                     )["status"]
                     == "draft"
+                )
+                current = unpack(
+                    await session.call_tool(
+                        "application_get", {"application_id": application["id"]}
+                    )
+                )
+                for status in ("applied", "closed"):
+                    current = unpack(
+                        await session.call_tool(
+                            "application_update",
+                            {
+                                "application_id": application["id"],
+                                "value": {
+                                    "expected_version": current["version"],
+                                    "status": status,
+                                    **({"outcome": "rejected"} if status == "closed" else {}),
+                                },
+                            },
+                        )
+                    )
+                checks["closed_stays_out_of_pending_queues"] = (
+                    unpack(
+                        await session.call_tool("jobs_search", {"value": {"queue": "shortlist"}})
+                    )["total"]
+                    == 0
+                    and unpack(
+                        await session.call_tool("jobs_search", {"value": {"queue": "inbox"}})
+                    )["total"]
+                    == 0
                 )
                 response = await http.get(base + "/api/v1/backup")
                 response.raise_for_status()

@@ -1,7 +1,6 @@
 # Architecture
 
-Openings is a FastAPI application, React dashboard and SQLite workspace. An
-optional CPU scorer runs as a separate service. Agents, browser automation and
+Openings is a FastAPI application, React dashboard and SQLite workspace. Agents, browser automation and
 TeX compilation run externally; the core uses no model runtime.
 
 ```mermaid
@@ -14,7 +13,6 @@ flowchart LR
   Services <--> DB[(SQLite + file bytes)]
   Worker[Bounded worker] --> Services
   Worker --> Sources[Public search / ATS / feeds]
-  Worker --> Scorer[Optional local or remote scorer]
 ```
 
 ## Code map
@@ -24,13 +22,12 @@ flowchart LR
 | `backend/openings/workspace.py` | Job identities, triage, notes, application attempts and reporting |
 | `backend/openings/career.py` | Profile, detailed evidence, claims, templates and instructions |
 | `backend/openings/documents.py` | Frozen contexts, document revisions and scoped file transfers |
-| `backend/openings/discovery.py` | Typed sources, schedules, scoring configuration and queue operations |
+| `backend/openings/discovery.py` | Typed sources, schedules and queue operations |
 | `backend/openings/collectors` | Adapter capability catalog, typed options and shared HTTP policy/runtime |
-| `backend/openings/worker.py` | Independent scheduling, acquisition and inference lanes |
+| `backend/openings/worker.py` | Independent scheduling and acquisition lanes |
 | `backend/openings/app.py`, `api.py` | Authentication, REST/MCP registration and dashboard hosting |
 | `backend/openings/schema.sql` | Relational ownership, SQLite indexes and JSON payloads |
 | `frontend/src` | Dashboard using REST; no duplicated domain decisions |
-| `scorer` | Optional isolated Laya/System One-compatible CPU classification service |
 | `skills/openings-workspace` | Optional external-agent workflow guidance |
 
 The [operation inventory](../../backend/openings/operation-inventory.json) is
@@ -45,9 +42,13 @@ authoritative for individual input fields. Read [REST](../user/api.md) and
   aliases. Conflicting identities require explicit Merge; title/company similarity
   alone never merges jobs. Dismissal survives URL changes.
 - **Corrections:** source refreshes preserve user edits, triage and application
-  attempts. Unchanged content does not trigger another classification.
-- **Lifecycle:** To review/Shortlist/Dismissed is job triage (`inbox`/`saved`/
-  `dismissed`). Starting an application shortlists its job and creates Draft.
+  attempts.
+- **Lifecycle:** triage (`inbox`/`saved`/`dismissed`) stores interest independently.
+  The derived `queue=inbox` and `queue=shortlist` exclude any application history;
+  Shortlist requires saved interest. Starting an application retains saved interest
+  and creates Preparing (`draft`), removing it from pending queues. Closed attempts
+  stay in Applications. Deleting the final attempt deliberately restores pending
+  queue membership; closing as not pursued preserves preparation history.
   Draft/Applied/Interview/Offer/Closed belongs to the application; each job permits
   one non-Closed attempt, enforced by the shared service and a partial unique
   index. Reopening and merging respect that constraint. Closing requires an
@@ -71,11 +72,12 @@ SQLite uses WAL and stores SHA-256-deduplicated BLOBs for attachments. Lists ret
 compact paginated summaries; full postings, narratives, contexts and file bytes
 are separate reads. Backups use SQLite's online backup API. A restore preserves
 installation authentication, recent provider request history and later cooldowns.
-Model weights are a disposable cache outside the workspace.
-Workspaces and backups must use schema 5, the current database format. Pre-1.0 releases
-do not include converters for earlier formats.
 
-## Acquisition and classification
+Workspaces and backups use schema 6. Opening schema 5 upgrades it transactionally,
+removing obsolete derived data and preserving owned records and immutable snapshots.
+Other historical formats require the matching release; restore accepts schema 6.
+
+## Acquisition
 
 A saved search has one explicit query/location and provider selection. Company
 sources watch selected ATS boards/feeds with optional title/location filters.
@@ -104,22 +106,9 @@ Retry-After cooldowns, with increasing delays for a 429 lacking that header.
 Long waits release the collection lane. Provider-wide access challenges and
 individual unavailable postings have distinct diagnostics.
 
-The scheduler, collector and inference lanes progress independently. A process/
-database guard serializes inference, including manual endpoint tests. Network-capable
-MCP tools run outside the event loop. Queued tasks have leases and cancellation;
-stale work cannot overwrite a current result. See [source configuration](../user/sources.md).
-
-Scoring is optional and advisory. Relevant profile/config edits mark scores outdated
-without queuing the archive. New complete jobs may be scored automatically.
-The pending-first-score marker also supports manually added incomplete jobs once
-their text is completed. Existing historical unscored jobs do not acquire that
-eligibility merely because they are refreshed. Automatic rescoring
-of updates has a separate switch. Explicit selected/outdated
-batches and optional capped periodic rescoring are separate. Scores come from the
-configured classifier. Model/provider details are in the
-[scoring guide](../user/scoring.md).
-The core builds a lean scoring context; the isolated scorer uses its tokenizer to
-bound input and records any shortening. Full archive text remains available to agents.
+The scheduler and collector progress independently. Network-capable MCP tools
+run outside the event loop. Queued tasks have leases and cancellation; stale work
+cannot overwrite a current result. See [source configuration](../user/sources.md).
 
 ## Extending the app
 

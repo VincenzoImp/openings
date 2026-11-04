@@ -35,7 +35,6 @@ import {
   Icon,
   Loading,
   outcomeLabel,
-  Score,
   stageLabels,
   Tabs,
 } from "../ui";
@@ -114,21 +113,20 @@ export function AddJob({
 export function JobsPage({
   onAdd,
   onOpen,
+  defaultQueue = "inbox",
 }: {
   onAdd: () => void;
   onOpen: (id: string) => void;
+  defaultQueue?: string;
 }) {
   const [filters, setFilters] = useUrlFilters({
-    triage: "inbox",
+    queue: defaultQueue,
     q: "",
     company: "",
     location: "",
     source: "",
     remote: "",
     job_type: "",
-    score_min: "",
-    score_max: "",
-    score_state: "all",
     complete: "",
     created_since: "",
     created_until: "",
@@ -141,6 +139,7 @@ export function JobsPage({
   Object.entries(filters).forEach(([k, v]) => {
     if (!v) params.delete(k);
   });
+  if (filters.queue === "all") params.delete("queue");
   const resource = useResource<ListResult<Job>>(`/jobs?${params}`, blankJobs);
   const [selection, setSelection] = useState<Record<string, number>>({}),
     [forget, setForget] = useState(false);
@@ -187,22 +186,7 @@ export function JobsPage({
         ) || [],
       );
       setForget(false);
-      if (action === "rescore") {
-        const queued =
-          result?.items?.reduce(
-            (total, item) => total + (item.result?.count || 0),
-            0,
-          ) || 0;
-        const failed = result?.failed || 0;
-        notify(
-          `${queued} queued for scoring; ${(result?.succeeded || 0) - queued} skipped; ${failed} failed.${
-            failed
-              ? ` ${result?.items?.find((item) => item.error)?.error?.message || "Refresh and retry."}`
-              : ""
-          }`,
-          failed > 0,
-        );
-      } else if (result?.failed)
+      if (result?.failed)
         notify(
           `${result.succeeded || 0} completed; ${result.failed} failed. ${result.items?.find((item) => item.error)?.error?.message || "Refresh and retry."}`,
           true,
@@ -212,8 +196,24 @@ export function JobsPage({
   return (
     <>
       <Heading
-        title="Inbox"
-        description="Review offers, keep a shortlist and start applications when ready."
+        title={
+          filters.queue === "shortlist"
+            ? "Shortlist"
+            : filters.queue === "dismissed"
+              ? "Dismissed"
+              : filters.queue === "all"
+                ? "All jobs"
+                : "Inbox"
+        }
+        description={
+          filters.queue === "shortlist"
+            ? "Selected jobs awaiting preparation. Start an application to work on documents."
+            : filters.queue === "dismissed"
+              ? "Jobs you chose not to pursue. Restore a job to reconsider it; its history stays intact."
+              : filters.queue === "all"
+                ? "Your complete job archive, including application history."
+                : "Review new jobs. Shortlist the opportunities you want to pursue or dismiss the rest."
+        }
       >
         <Button variant="primary" icon="plus" onClick={onAdd}>
           Add job
@@ -221,13 +221,16 @@ export function JobsPage({
       </Heading>
       <Tabs
         label="Job triage"
-        value={filters.triage}
-        onChange={(value) => change("triage", value)}
+        value={filters.queue}
+        onChange={(value) => {
+          if (value === "inbox" || value === "shortlist") location.hash = value;
+          else change("queue", value);
+        }}
         items={[
-          { id: "inbox", label: "To review" },
-          { id: "active", label: "All active" },
-          { id: "saved", label: "Shortlist" },
+          { id: "inbox", label: "Inbox" },
+          { id: "shortlist", label: "Shortlist" },
           { id: "dismissed", label: "Dismissed" },
+          { id: "all", label: "All jobs" },
         ]}
       />
       <div className="toolbar">
@@ -248,23 +251,18 @@ export function JobsPage({
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
           <option value="title">Role A–Z</option>
-          <option value="score">Highest fit</option>
           <option value="company">Company A–Z</option>
         </select>
       </div>
       <details
         className="filter-panel"
         open={Object.entries(filters).some(
-          ([k, v]) =>
-            !["triage", "q", "sort", "offset", "score_state"].includes(k) &&
-            !!v,
+          ([k, v]) => !["queue", "q", "sort", "offset"].includes(k) && !!v,
         )}
       >
         <summary>
           Filter opportunities{" "}
-          <span className="muted">
-            Location, source, work style, score & dates
-          </span>
+          <span className="muted">Location, source, work style & dates</span>
         </summary>
         <div className="filter-grid">
           {[
@@ -308,44 +306,6 @@ export function JobsPage({
               <option value="false">Needs posting text</option>
             </select>
           </Field>
-          <Field label="Score freshness">
-            <select
-              value={filters.score_state}
-              onChange={(e) => change("score_state", e.target.value)}
-            >
-              {["all", "current", "outdated", "unscored"].map((v) => (
-                <option key={v} value={v}>
-                  {v[0].toUpperCase() + v.slice(1)}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field
-            label="Minimum fit score"
-            hint="0–100; higher means a stronger fit."
-          >
-            <input
-              type="number"
-              min={0}
-              max={100}
-              step="any"
-              value={filters.score_min}
-              onChange={(e) => change("score_min", e.target.value)}
-            />
-          </Field>
-          <Field
-            label="Maximum fit score"
-            hint="Inclusive upper bound, from 0 to 100."
-          >
-            <input
-              type="number"
-              min={0}
-              max={100}
-              step="any"
-              value={filters.score_max}
-              onChange={(e) => change("score_max", e.target.value)}
-            />
-          </Field>
           <Field label="Added from">
             <input
               type="date"
@@ -366,16 +326,10 @@ export function JobsPage({
               setFilters(
                 Object.fromEntries(
                   Object.keys(filters)
-                    .filter((k) => k !== "triage")
+                    .filter((k) => k !== "queue")
                     .map((k) => [
                       k,
-                      k === "score_state"
-                        ? "all"
-                        : k === "sort"
-                          ? "newest"
-                          : k === "offset"
-                            ? "0"
-                            : "",
+                      k === "sort" ? "newest" : k === "offset" ? "0" : "",
                     ]),
                 ),
               )
@@ -394,16 +348,11 @@ export function JobsPage({
           <Button disabled={pending} onClick={() => bulk("dismissed")}>
             Dismiss
           </Button>
-          <Button disabled={pending} onClick={() => bulk("inbox")}>
-            Move to review
-          </Button>
-          <Button
-            disabled={pending}
-            icon="refresh"
-            onClick={() => bulk("rescore")}
-          >
-            Rescore
-          </Button>
+          {["inbox", "shortlist"].includes(filters.queue) && (
+            <Button disabled={pending} onClick={() => bulk("inbox")}>
+              Return to inbox
+            </Button>
+          )}
           <Button variant="danger" onClick={() => setForget(true)}>
             Forget
           </Button>
@@ -518,7 +467,7 @@ export function JobsPage({
                         Needs text
                       </span>
                     )}
-                    {job.triage === "saved" && (
+                    {job.triage === "saved" && !job.application_count && (
                       <span
                         className="job-shortlist"
                         role="img"
@@ -544,7 +493,6 @@ export function JobsPage({
                   )}
                 <time>{date(job.date_posted || job.created_at)}</time>
               </span>
-              <Score score={job.score} outdated={job.score_outdated} />
               <button
                 className="iconbtn"
                 aria-label={`Open ${job.title}`}
@@ -574,8 +522,8 @@ export function JobsPage({
         onChange={(value) => setFilters({ offset: String(value) })}
       />
       <p className="hint">
-        Fit scores range from 0 to 100; higher means a stronger fit. Changes are
-        checked against each selected record’s version.
+        Shortlist holds selected jobs awaiting preparation. Started and closed
+        attempts stay in Applications.
       </p>
       {forget && (
         <Dialog
@@ -619,10 +567,6 @@ export function JobDrawer({
   const { mutate, pending, notify } = useWorkspace();
   const [tab, setTab] = useUrlState("detail", "posting");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
-  const [scoringContext, setScoringContext] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
   const [forget, setForget] = useState(false),
     [merging, setMerging] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false),
@@ -630,11 +574,6 @@ export function JobDrawer({
   const applicationKey = useRef<string | null>(null);
   const job = resource.data;
   const application = job?.application;
-  const scoringResponse = job?.assessment?.payload?.response;
-  const inputShortened =
-    scoringResponse?.input_preparation?.shortened ||
-    scoringResponse?.usage?.truncated ||
-    (scoringResponse?.usage?.state_tokens_dropped || 0) > 0;
   const applications = useResource<ListResult<Application>>(
     job && (tab === "notes" || historyOpen)
       ? `/applications?job_id=${encodeURIComponent(id)}`
@@ -726,8 +665,13 @@ export function JobDrawer({
               </Button>
               <div className="actions">
                 {job.triage === "dismissed" ? (
-                  <Button onClick={() => triage("inbox")} disabled={pending}>
-                    Restore to inbox
+                  <Button
+                    onClick={() =>
+                      triage(job.application_count ? "saved" : "inbox")
+                    }
+                    disabled={pending}
+                  >
+                    {job.application_count ? "Restore job" : "Restore to inbox"}
                   </Button>
                 ) : (
                   <>
@@ -737,17 +681,19 @@ export function JobDrawer({
                     >
                       Dismiss
                     </Button>
-                    <Button
-                      icon="bookmark"
-                      onClick={() =>
-                        triage(job.triage === "saved" ? "inbox" : "saved")
-                      }
-                      disabled={pending}
-                    >
-                      {job.triage === "saved"
-                        ? "Remove from shortlist"
-                        : "Shortlist"}
-                    </Button>
+                    {!job.application_count && (
+                      <Button
+                        icon="bookmark"
+                        onClick={() =>
+                          triage(job.triage === "saved" ? "inbox" : "saved")
+                        }
+                        disabled={pending}
+                      >
+                        {job.triage === "saved"
+                          ? "Return to inbox"
+                          : "Shortlist"}
+                      </Button>
+                    )}
                   </>
                 )}
                 {application ? (
@@ -756,7 +702,7 @@ export function JobDrawer({
                     onClick={() => onApplication(application.id)}
                   >
                     {application.status === "draft"
-                      ? "Continue draft"
+                      ? "Continue application"
                       : "View application"}
                   </Button>
                 ) : (
@@ -883,20 +829,6 @@ export function JobDrawer({
               <>
                 <dl className="detailfacts">
                   <div>
-                    <dt>Fit assessment</dt>
-                    <dd>
-                      <Score score={job.score} outdated={job.score_outdated} />
-                      {inputShortened && (
-                        <span
-                          className="tag amber"
-                          title="The scoring service shortened the input for this assessment."
-                        >
-                          Input shortened
-                        </span>
-                      )}
-                    </dd>
-                  </div>
-                  <div>
                     <dt>Availability</dt>
                     <dd>{job.availability || "Unknown"}</dd>
                   </div>
@@ -925,37 +857,6 @@ export function JobDrawer({
                   </a>
                 )}
                 <div className="actions form-actions">
-                  <Button
-                    icon="refresh"
-                    disabled={pending || !job.posting}
-                    onClick={async () => {
-                      let result: { count: number } | undefined;
-                      const ok = await mutate(async () => {
-                        result = await api("/scoring/rescore", "POST", {
-                          job_ids: [id],
-                          outdated_only: false,
-                          limit: 1,
-                        });
-                      }, "Fit assessment request checked.");
-                      if (ok)
-                        notify(
-                          result?.count
-                            ? "Fit assessment queued. Check Settings activity for progress."
-                            : "No assessment queued. Check your career profile and posting text.",
-                        );
-                    }}
-                  >
-                    Update fit score
-                  </Button>
-                  <Button
-                    onClick={() =>
-                      api<Record<string, unknown>>(`/scoring/context/${id}`)
-                        .then(setScoringContext)
-                        .catch((e) => notify(e.message, true))
-                    }
-                  >
-                    Inspect scoring context
-                  </Button>
                   <Button onClick={() => setMerging(true)}>
                     Merge duplicate
                   </Button>
@@ -1112,20 +1013,6 @@ export function JobDrawer({
           </>
         )}
       </Dialog>
-      {scoringContext && (
-        <Dialog
-          title="Scoring context."
-          onClose={() => setScoringContext(null)}
-        >
-          <p className="modal-intro">
-            The compact profile, job text and score levels used by the optional
-            scorer.
-          </p>
-          <pre className="json-readout">
-            {JSON.stringify(scoringContext, null, 2)}
-          </pre>
-        </Dialog>
-      )}
       {editingNote && (
         <Dialog title="Edit your note." onClose={() => setEditingNote(null)}>
           <form

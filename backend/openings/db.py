@@ -9,7 +9,7 @@ from pathlib import Path
 from .errors import DomainError
 from .posting import posting_complete
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 class Database:
@@ -28,9 +28,23 @@ class Database:
                     "schema_version",
                     "Use an empty database or a current-format Openings workspace. Existing unrelated databases are not modified.",
                 )
-            if version not in (0, SCHEMA_VERSION):
+            if version not in (0, 5, SCHEMA_VERSION):
                 raise DomainError(400, "schema_version", "Unsupported workspace database version.")
             conn.execute("PRAGMA journal_mode=WAL")
+            if version == 5:
+                # Only obsolete derived data is removed; owned documents and snapshots stay intact.
+                with conn:
+                    conn.execute("BEGIN IMMEDIATE")
+                    conn.execute("DROP TABLE IF EXISTS assessments")
+                    conn.execute("ALTER TABLE jobs DROP COLUMN initial_score_pending")
+                    conn.execute("DELETE FROM tasks WHERE kind='score'")
+                    conn.execute(
+                        "DELETE FROM settings WHERE key IN ('scoring','scoring_profile_revision','scoring_config_revision','scoring_periodic_last_run')"
+                    )
+                    conn.execute(
+                        "UPDATE settings SET data=json_remove(data,'$.scoring_summary') WHERE key='profile'"
+                    )
+                    conn.execute("PRAGMA user_version=6")
             conn.executescript(Path(__file__).with_name("schema.sql").read_text())
         self.path.chmod(0o600)
 

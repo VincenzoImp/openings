@@ -23,6 +23,7 @@ import SettingsPage from "./pages/Settings";
 const pages: { id: string; title: string; icon: IconName }[] = [
   { id: "overview", title: "Overview", icon: "overview" },
   { id: "inbox", title: "Inbox", icon: "inbox" },
+  { id: "shortlist", title: "Shortlist", icon: "bookmark" },
   { id: "applications", title: "Applications", icon: "applications" },
   { id: "collection", title: "Collection", icon: "companies" },
   { id: "career", title: "Career", icon: "career" },
@@ -411,8 +412,10 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
                 onAdd={() => setOverlay({ kind: "add" })}
                 onNavigate={navigate}
               />
-            ) : route === "inbox" ? (
+            ) : route === "inbox" || route === "shortlist" ? (
               <JobsPage
+                key={route}
+                defaultQueue={route}
                 onAdd={() => setOverlay({ kind: "add" })}
                 onOpen={openJob}
               />

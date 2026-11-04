@@ -15,7 +15,7 @@ results and enable the schedule when ready. You can run a paused source manually
 | Manual job | The URL or posting you supply | Inbox → Add job |
 
 Create another saved search for another query or location. Career preferences guide
-optional fit scoring; the query controls what is requested from a portal.
+your agent’s job review; the query controls what is requested from a portal.
 
 ### Saved searches
 
@@ -140,10 +140,6 @@ failed work and cancellation. Processing time measures active attempts; waiting
 time and total elapsed time explain longer runs. Raw task diagnostics remain
 available for investigation. A **Partial** run reports bounded coverage or
 unavailable descriptions; completion does not imply every matching job was fetched.
-
-Collection and scoring use separate lanes. New complete jobs can receive an
-automatic score when scoring is enabled. Historical jobs follow the configured
-update-rescoring rule. [Scoring](scoring.md) explains freshness and explicit batches.
 
 ![Saved search form with query, portal selection and acquisition limits](../images/collection-settings.png)
 

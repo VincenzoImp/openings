@@ -1,4 +1,4 @@
-"""One SQLite queue with independent scheduler, collection and inference lanes."""
+"""One SQLite queue with independent scheduler and collection lanes."""
 
 import logging
 import threading
@@ -8,14 +8,6 @@ from uuid import uuid4
 from .common import now
 
 LOG = logging.getLogger(__name__)
-INFERENCE_LOCKS = {}
-LOCKS_LOCK = threading.Lock()
-
-
-def inference_guard(database_path):
-    """One process/database inference slot, shared with explicit scorer tests."""
-    with LOCKS_LOCK:
-        return INFERENCE_LOCKS.setdefault(str(database_path), threading.RLock())
 
 
 class Worker:
@@ -26,7 +18,6 @@ class Worker:
         self.stopping = threading.Event()
         self.thread = None
         self.threads = []
-        self.inference_lock = inference_guard(workspace.db.path)
 
     def start(self):
         if self.thread and self.thread.is_alive() and not self.stopping.is_set():
@@ -47,7 +38,7 @@ class Worker:
                 name="openings-" + kind,
                 daemon=True,
             )
-            for kind in ("collect", "score")
+            for kind in ("collect",)
         ]
         for thread in self.threads:
             thread.start()
@@ -95,14 +86,7 @@ class Worker:
 
     def _loop(self, owner, stopping, kind):
         while not stopping.is_set():
-            acquired = False
             try:
-                # Acquire before claiming: waiting for a finishing old request
-                # must not consume the successor's task lease after a restart.
-                if kind == "score":
-                    acquired = self.inference_lock.acquire(timeout=0.5)
-                    if not acquired:
-                        continue
                 if stopping.is_set():
                     break
                 task = self.discovery.claim_task(owner, kind)
@@ -111,7 +95,4 @@ class Worker:
                     continue
             except Exception:
                 LOG.exception("The background worker could not complete this cycle.")
-            finally:
-                if acquired:
-                    self.inference_lock.release()
             stopping.wait(1)

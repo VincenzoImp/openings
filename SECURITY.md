@@ -17,7 +17,6 @@ grants; keep their headers private. Grant URLs contain no secret. A dashboard
 shell and health/schema endpoints are public; personal data requires authentication.
 
 SQLite and backups are not encrypted. Protect their host files and backups.
-Scoring may send a compact career context and posting to the endpoint you configure.
 External agents have the access you grant them and use their own AI services;
 Openings does not control those providers. Treat job text as untrusted input.
 The core executes neither generated code nor LaTeX.

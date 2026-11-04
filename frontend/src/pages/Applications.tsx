@@ -876,7 +876,7 @@ export function ApplicationDrawer({
           <>
             <span className="smalltext muted">
               {app?.status === "draft"
-                ? "Draft — not submitted"
+                ? "Preparing — not submitted"
                 : "Application progress is recorded manually."}
             </span>
             {app && (
@@ -1270,7 +1270,9 @@ export function ApplicationDrawer({
         >
           <p className="modal-intro">
             Remove this attempt, its history, frozen contexts, documents and
-            files. The job and its other application attempts are kept.
+            files. The job and its other application attempts are kept. If this
+            is its final attempt, a saved job returns to Shortlist. To stop
+            preparation and keep documents, close as Not pursued instead.
           </p>
           <div className="actions form-actions">
             <Button onClick={() => setRemoving(false)}>Keep application</Button>

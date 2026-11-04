@@ -29,7 +29,6 @@ DEFAULT_PROFILE = {
     "roles": "",
     "preferences": "",
     "summary": "",
-    "scoring_summary": "",
     "links": [],
     "metadata": {},
 }
@@ -38,15 +37,6 @@ DEFAULT_GUIDANCE = (
     "Select relevant approved claims or write accurate new wording from detailed evidence. "
     "Respect the template and answer limits; make missing facts visible."
 )
-SCORING_FIELDS = {
-    "headline",
-    "location",
-    "roles",
-    "preferences",
-    "summary",
-    "scoring_summary",
-    "metadata",
-}
 
 
 class Input(BaseModel):
@@ -86,7 +76,6 @@ class ProfileUpdate(NonNullUpdate):
     roles: str | None = Field(default=None, max_length=3000)
     preferences: str | None = Field(default=None, max_length=10000)
     summary: str | None = Field(default=None, max_length=20000)
-    scoring_summary: str | None = Field(default=None, max_length=6000)
     links: list[dict[str, str]] | None = Field(default=None, max_length=50)
     metadata: dict[str, Any] | None = None
 
@@ -292,13 +281,6 @@ def _write_setting(conn, key, data, version):
     )
 
 
-def _bump_scoring(conn):
-    previous = _setting(conn, "scoring_profile_revision", 0)
-    _write_setting(
-        conn, "scoring_profile_revision", int(previous["data"]) + 1, previous["version"] + 1
-    )
-
-
 def _get(conn, table, record_id, label):
     # Table names are fixed internally, never client-controlled.
     row = conn.execute(f"SELECT * FROM {table} WHERE id=?", (record_id,)).fetchone()
@@ -325,7 +307,7 @@ class CareerService:
                     _write_setting(conn, key, default, 1)
 
     def get_profile(self) -> dict:
-        """Read the current single-user profile and version, including optional compact scoring summary."""
+        """Read the current single-user profile and version."""
         setting = self.workspace.get_settings("profile", DEFAULT_PROFILE)
         return {**DEFAULT_PROFILE, **setting["data"], "version": setting["version"]}
 
@@ -335,13 +317,11 @@ class CareerService:
             conflict()
         previous = {**DEFAULT_PROFILE, **setting["data"]}
         merged = {**previous, **data}
-        if any(previous.get(key) != merged.get(key) for key in SCORING_FIELDS):
-            _bump_scoring(conn)
         if previous != merged:
             _write_setting(conn, "profile", merged, expected + 1)
 
     def update_profile(self, value: ProfileUpdate) -> dict:
-        """Edit current profile with optimistic version checking. Relevant changes mark scores outdated without launching inference."""
+        """Edit current profile with optimistic version checking."""
         data = values(value)
         expected = data.pop("expected_version")
         with self.db.transaction() as conn:
@@ -357,7 +337,7 @@ class CareerService:
         }
 
     def update_instructions(self, value: InstructionsUpdate) -> dict:
-        """Save editable general CV/letter guidance; this does not change scoring or old contexts."""
+        """Save editable general CV/letter guidance; existing contexts remain unchanged."""
         self.workspace.set_settings(
             "instructions", {"general": value.general}, value.expected_version
         )
@@ -414,7 +394,6 @@ class CareerService:
         record_id, timestamp = new_id(), now()
         with self.db.transaction() as conn:
             self._insert_knowledge(conn, value, record_id, timestamp)
-            _bump_scoring(conn)
         return self.get_knowledge(record_id)
 
     @staticmethod
@@ -483,7 +462,6 @@ class CareerService:
                         knowledge_id,
                     ),
                 )
-                _bump_scoring(conn)
         return self.get_knowledge(knowledge_id)
 
     def delete_knowledge(self, knowledge_id: str, expected_version: int) -> dict:
@@ -493,7 +471,6 @@ class CareerService:
                 _get(conn, "knowledge", knowledge_id, "Career knowledge"), expected_version
             )
             conn.execute("DELETE FROM knowledge WHERE id=?", (knowledge_id,))
-            _bump_scoring(conn)
         self.db.collect_blobs()
         return {"deleted": True, "id": knowledge_id}
 
@@ -571,7 +548,6 @@ class CareerService:
                     timestamp,
                 ),
             )
-            _bump_scoring(conn)
         return self.get_claim(record_id)
 
     def update_claim(self, claim_id: str, value: ClaimUpdate) -> dict:
@@ -603,7 +579,6 @@ class CareerService:
                         claim_id,
                     ),
                 )
-                _bump_scoring(conn)
         return self.get_claim(claim_id)
 
     def delete_claim(self, claim_id: str, expected_version: int) -> dict:
@@ -611,7 +586,6 @@ class CareerService:
         with self.db.transaction() as conn:
             check_version(_get(conn, "claims", claim_id, "Claim"), expected_version)
             conn.execute("DELETE FROM claims WHERE id=?", (claim_id,))
-            _bump_scoring(conn)
         return {"deleted": True, "id": claim_id}
 
     def list_templates(
@@ -838,8 +812,6 @@ class CareerService:
                 record_id = new_id()
                 self._insert_knowledge(conn, item, record_id, timestamp)
                 identifiers.append(record_id)
-            if identifiers:
-                _bump_scoring(conn)
         return {
             "profile": self.get_profile(),
             "items": [self.get_knowledge(record_id) for record_id in identifiers],

@@ -1,4 +1,4 @@
-"""Complete collection workflows across saved settings, resumable tasks and scoring."""
+"""Complete collection workflows across saved settings, resumable tasks."""
 
 from datetime import datetime, timezone
 
@@ -114,56 +114,6 @@ def test_frozen_options_resume_with_cumulative_unique_observations(collection, m
     assert service.list_runs(state="succeeded")["total"] == 1
 
 
-def test_new_partial_initial_score_does_not_rescore_history(collection, monkeypatch):
-    workspace, service = collection
-    workspace.set_settings("profile", {"summary": "Backend engineer"})
-    workspace.set_settings("scoring", {"enabled": True, "auto_rescore_updates": False})
-    monkeypatch.setattr(
-        module,
-        "score_call",
-        lambda *args: {"score": 75, "model": "example", "elapsed_seconds": 0, "response": {}},
-    )
-    new = workspace.ingest_job(
-        {
-            "title": "Engineer",
-            "company": "Example",
-            "url": "https://example.org/new",
-            "metadata": {"description_complete": False},
-        }
-    )
-    historical = workspace.ingest_job(
-        {
-            "title": "Engineer",
-            "company": "Example",
-            "url": "https://example.org/old",
-            "metadata": {"description_complete": False},
-        }
-    )
-    workspace.db.execute("UPDATE jobs SET initial_score_pending=0 WHERE id=?", (historical["id"],))
-    for job in (new, historical):
-        workspace.ingest_job(
-            {
-                "title": "Engineer",
-                "company": "Example",
-                "url": job["url"],
-                "posting": "Build APIs.",
-                "metadata": {"description_complete": True},
-            }
-        )
-    tasks = service.list_tasks(kind="score")["items"]
-    assert len(tasks) == 1 and tasks[0]["job_id"] == new["id"]
-    task = service.claim_task("worker", "score")
-    service.run_task(task, "worker")
-    assert workspace.get_job(new["id"])["initial_score_pending"] == 0
-    workspace.ingest_job(
-        {
-            "title": "Engineer",
-            "company": "Example",
-            "url": new["url"],
-            "posting": "Build APIs and queues.",
-        }
-    )
-    assert service.list_tasks(kind="score", state="queued")["total"] == 0
 
 
 def test_bulk_configuration_preserves_untouched_fields_and_service(collection):
@@ -304,16 +254,6 @@ def test_partial_refresh_keeps_complete_body_and_records_raw_observation(collect
     assert '"description_complete":false' in observation["payload"]
 
 
-def test_initial_score_can_wait_for_profile_without_rescoring_history(collection):
-    workspace, service = collection
-    workspace.set_settings("scoring", {"enabled": True, "auto_rescore_updates": False})
-    posting = {"url": "https://example.org/job", "posting": "Build APIs.", "title": "Engineer"}
-    job = workspace.ingest_job(posting)
-    assert job["initial_score_pending"] and service.list_tasks(kind="score")["total"] == 0
-    workspace.set_settings("profile", {"summary": "Backend engineer"})
-    refreshed = workspace.ingest_job(posting)
-    assert refreshed["content_version"] == job["content_version"]
-    assert service.list_tasks(kind="score", state="queued")["total"] == 1
 
 
 def test_partial_filter_patch_preserves_other_terms_and_explicit_empty_clears(collection):

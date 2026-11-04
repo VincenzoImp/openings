@@ -5,7 +5,7 @@
 Use **Settings → Workspace → Backup**, authenticated `GET /api/v1/backup`, or the MCP
 `workspace_backup` download grant. These create a consistent SQLite snapshot while
 the service runs, including PDF/source bytes, templates, career data, job history
-and settings. The optional model cache is disposable and is not in the backup.
+and settings.
 
 ```bash
 curl --fail "$OPENINGS_URL/api/v1/backup" \
@@ -38,8 +38,7 @@ curl --fail "$OPENINGS_URL/api/v1/backup/restore" \
 
 The default restore limit is 512 MiB; configure `OPENINGS_MAX_RESTORE_MB` before
 uploading a larger backup. Allow disk space for the upload and rollback snapshot.
-Enabled sources and scoring settings come from the restored workspace; inspect
-those when moving to different hardware or endpoints. `.env` remains host-local.
+Enabled sources come from the restored workspace; inspect them when moving hosts. `.env` remains host-local.
 
 ## Service lifecycle
 
@@ -55,12 +54,10 @@ all uploaded documents; use it only when intentionally discarding the installati
 To change installation environment settings, use `docker compose up -d` so the
 container is recreated. Editing `OPENINGS_PASSWORD` does not reset an existing owner.
 
-Tasks show failures, cancellation and explicit retry. Source/scorer failures do
-not discard acquired jobs. Relevant profile/settings edits mark scores outdated;
-periodic rescoring is optional and off by default. The global scheduled collection
+Tasks show collection failures, cancellation and explicit retry. Source failures
+do not discard acquired jobs. The global scheduled collection
 switch preserves source settings and prevents new scheduled runs. Queued/current
 runs continue until stopped; manual runs share provider spacing and cooldowns.
-Disable scoring when you want inference to stop.
 
 ## Access controls
 
@@ -80,7 +77,13 @@ ends that token’s access on its next request.
 | Starting an application returns 409 | Open the existing non-Closed attempt identified in the response. |
 | Upload fails | Exact byte size, 20 MiB limit, grant expiry, safe relative name and draft revision state. |
 | Edit returns 409 | Reload the current version, then reapply the intended change. |
-| Scorer times out or is killed | Inspect scorer logs/resource limits, allow cold startup, or use off/remote mode. |
 | Core cannot create SQLite | Ensure `/data` is writable by UID/GID 10001. |
 
 For development commands and release gates, see [Contributing](../../CONTRIBUTING.md).
+
+## Upgrade from 0.10
+
+Back up before starting 0.11. Schema 5 is upgraded automatically to schema 6,
+preserving jobs, application progress, versions, files and frozen contexts. Earlier
+backups remain usable with 0.10; open a copy with 0.11 to upgrade it before restoring
+into 0.11. Restore itself accepts schema 6.

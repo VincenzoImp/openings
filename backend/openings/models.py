@@ -122,7 +122,7 @@ class BulkItem(Versioned):
 
 
 class JobBulk(Input):
-    action: Literal["saved", "dismissed", "inbox", "forget", "rescore"]
+    action: Literal["saved", "dismissed", "inbox", "forget"]
     items: list[BulkItem] = Field(min_length=1, max_length=200)
 
 
@@ -143,18 +143,16 @@ def normalized_date(value, *, end=False):
 class JobQuery(Input):
     q: str = Field(default="", max_length=1000)
     triage: Literal["inbox", "saved", "dismissed", "active"] | None = None
+    queue: Literal["inbox", "shortlist", "applications", "dismissed"] | None = None
     company: str | None = Field(default=None, max_length=300)
     location: str | None = Field(default=None, max_length=500)
     source: str | None = Field(default=None, max_length=300)
     remote: bool | None = None
     complete: bool | None = None
     job_type: str | None = Field(default=None, max_length=100)
-    score_min: float | None = Field(default=None, ge=0, le=100)
-    score_max: float | None = Field(default=None, ge=0, le=100)
-    score_state: Literal["all", "current", "outdated", "unscored"] = "all"
     created_since: str | None = None
     created_until: str | None = None
-    sort: Literal["newest", "oldest", "company", "title", "score", "fit"] = "newest"
+    sort: Literal["newest", "oldest", "company", "title"] = "newest"
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
 
@@ -165,12 +163,6 @@ class JobQuery(Input):
 
     @model_validator(mode="after")
     def valid_range(self):
-        if (
-            self.score_min is not None
-            and self.score_max is not None
-            and self.score_min > self.score_max
-        ):
-            raise ValueError("The minimum score must not exceed the maximum.")
         if self.created_since and self.created_until and self.created_since > self.created_until:
             raise ValueError("The start date must not follow the end date.")
         return self

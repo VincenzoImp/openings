@@ -30,16 +30,6 @@ export interface Job extends Versioned {
   job_type?: string;
   postings?: Json[];
   triage: Triage;
-  score: number | null;
-  score_outdated: boolean;
-  assessment?: {
-    payload?: {
-      response?: {
-        input_preparation?: { shortened?: boolean };
-        usage?: { truncated?: boolean; state_tokens_dropped?: number };
-      };
-    };
-  } | null;
   metadata: Json;
   salary?: string | Json | number;
   source?: string;
@@ -80,7 +70,6 @@ export interface Profile {
   location: string;
   email: string;
   phone: string;
-  scoring_summary?: string;
   roles: string;
   preferences: string;
   summary: string;
@@ -188,7 +177,7 @@ export type CollectionSchedule =
   | { kind: "interval"; minutes: number };
 export interface BackgroundTask {
   id: string;
-  kind: "collect" | "score";
+  kind: "collect";
   state: "queued" | "running" | "succeeded" | "failed" | "cancelled";
   run_id?: string;
   source_id?: string;
@@ -223,22 +212,6 @@ export interface CollectionRun {
   task_ids: string[];
   tasks?: BackgroundTask[];
 }
-export interface Scoring {
-  enabled: boolean;
-  auto_rescore_updates: boolean;
-  mode: "local" | "remote";
-  provider: "laya" | "systemone";
-  base_url: string;
-  model: string;
-  api_key?: string;
-  api_key_set?: boolean;
-  rubric: string;
-  criteria?: string[];
-  periodic_rescore: { enabled: boolean; minutes: number; batch_size: number };
-  max_len: number;
-  timeout_seconds: number;
-  version: number;
-}
 export interface Activity {
   id?: string;
   kind?: string;
@@ -262,7 +235,6 @@ export interface Overview {
   active: number;
   drafts: number;
   inbox: number;
-  outdated: number;
   incomplete: number;
   funnel: FunnelStep[];
   activity: Activity[];

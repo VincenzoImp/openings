@@ -11,7 +11,7 @@ the `X-CSRF-Token` returned by `/auth/session`; scripts use bearer auth instead.
 ```bash
 export OPENINGS_URL=http://127.0.0.1:8080
 # Set OPENINGS_TOKEN to the token shown once in Settings.
-curl --fail "$OPENINGS_URL/api/v1/jobs?triage=inbox&limit=50" \
+curl --fail "$OPENINGS_URL/api/v1/jobs?queue=inbox&limit=50" \
   -H "Authorization: Bearer $OPENINGS_TOKEN"
 
 curl --fail "$OPENINGS_URL/api/v1/jobs" \
@@ -33,7 +33,7 @@ Paste the posting when extraction cannot obtain the complete text.
 | Career | `GET/PATCH /career/profile`, CRUD `/career/knowledge` and `/career/claims`, `POST /career/import/preview` then `/career/import` |
 | Templates/guidance | CRUD `/templates`, `GET/PATCH /instructions` |
 | Collection | `GET/PATCH /collection`, `GET /providers`, `PATCH /providers/{id}`, CRUD `/sources`, `/sources/schemas`, preview/run, `/sources/bulk` and `/collection/runs` |
-| Scoring/tasks | `GET/PATCH /scoring`, `POST /scoring/test`, `/scoring/rescore`, `GET /scoring/context/{job_id}`, `GET /tasks`, `GET /tasks/{id}`, `POST /tasks/{id}/cancel` or `/retry` |
+| Tasks | `GET /tasks`, `GET /tasks/{id}`, `POST /tasks/{id}/cancel` or `/retry` |
 | Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `POST /documents/{id}/review` |
 | Files | `GET /files`, `GET/DELETE /files/{id}`, `GET /files/{id}/content`, `POST /files/uploads`, `POST /files/{id}/download` |
 | Operations | `GET /workspace`, `/capabilities`, `/overview`, `/export`, `/backup`; `POST /backup/restore`; `/tokens`; `POST /auth/password` |
@@ -50,9 +50,14 @@ A conflict returns HTTP 409; reload before editing again. A typical error is
 `{"error":{"code":"conflict","message":"…","details":null}}`.
 
 For Shortlist use `{"expected_version":3,"triage":"saved"}`; `inbox` returns a
-job to review and `dismissed` remembers it outside active review.
+job without attempts to review and `dismissed` remembers it outside active review.
 
-Creating an application shortlists the job and starts Draft. Each job permits one
+Creating an application retains saved interest and starts Preparing (`draft`).
+Use `queue=inbox` / `shortlist` for jobs without any application attempts;
+`queue=applications` includes all jobs with attempts, even Closed or dismissed.
+Omitting `queue` searches the full archive. `triage=saved` remains an inclusive
+interest filter. Queue predicates apply before totals, facets and pagination.
+Each job permits one
 non-Closed attempt. A conflicting creation or reopening returns 409
 `application_in_progress` with the active `application_id`; use that attempt or
 close it before starting another. Use `idempotency_key` for retries of one creation.
