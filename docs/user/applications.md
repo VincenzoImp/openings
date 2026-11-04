@@ -66,7 +66,9 @@ reviewed revision when ready. For changed content, create a new revision and upl
 its new files. Approved revisions keep their content and attachments fixed.
 
 Cards and the document list distinguish **Needs PDF**, **PDF to review** and
-**Approved PDF** using current revisions and their own attachments. These labels
+**Approved PDF** using current revisions and their own attachments. Form-answer
+and other content-only revisions can show **Content saved** without requiring a PDF.
+These labels
 describe stored files and review, not submission or an automatic quality check.
 Click a filename to preview a supported PDF, image or text file; use **Details**
 for its hash and metadata. Unsupported formats remain downloadable.

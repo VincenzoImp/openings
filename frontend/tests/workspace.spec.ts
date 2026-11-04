@@ -187,9 +187,26 @@ test("document upload, revision ownership and safe file preview", async ({
   await expect(top(page).locator(".preparation-summary")).toContainText(
     "Needs PDF",
   );
-  expect((await call(page, `/applications/${application.id}`)).status).toBe(
-    "draft",
+  await top(page)
+    .getByRole("button", { name: "Add document", exact: true })
+    .click();
+  await top(page).locator("select[name=kind]").selectOption("answers");
+  await top(page).locator("input[name=title]").fill("Archived form answers");
+  await top(page)
+    .locator("textarea[name=text]")
+    .fill("Synthetic archived answer, separate from live answers.");
+  await top(page)
+    .getByRole("button", { name: "Save revision", exact: true })
+    .click();
+  await expect(top(page).locator(".preparation-summary")).toContainText(
+    "Form answers: Content saved",
   );
+  const preparedApplication = await call(
+    page,
+    `/applications/${application.id}`,
+  );
+  expect(preparedApplication.status).toBe("draft");
+  expect(preparedApplication.answers).toEqual({});
   await top(page)
     .getByRole("button", { name: "View posting", exact: true })
     .click();

@@ -538,7 +538,9 @@ function Preparation({ application }: { application: Application }) {
             {item.approved === item.revisions
               ? "Approved PDF"
               : item.pdf < item.revisions
-                ? "Needs PDF"
+                ? ["resume", "cover_letter"].includes(item.kind)
+                  ? "Needs PDF"
+                  : "Content saved"
                 : "PDF to review"}
             {item.revisions > 1
               ? ` (${item.approved}/${item.revisions} approved)`
@@ -1098,7 +1100,7 @@ export function ApplicationDrawer({
                 <details className="context-panel agent-preparation">
                   <summary>
                     Prepare with your agent · {contexts.data.total} saved
-                    contexts
+                    context{contexts.data.total === 1 ? "" : "s"}
                   </summary>
                   <h3>Prepare application documents</h3>
                   <p>
