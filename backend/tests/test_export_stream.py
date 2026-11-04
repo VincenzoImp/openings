@@ -36,7 +36,6 @@ def test_export_stream_survives_worker_thread_changes(tmp_path, monkeypatch, sna
     workspace.ingest_job(
         JobInput(title="Synthetic role", company="Example", posting="Build Python APIs.")
     )
-    workspace.set_settings("scoring", {"enabled": False, "api_key": "synthetic-secret"})
     workspace.set_settings("instructions", {"general": "Reviewed synthetic evidence."})
     executors = [ThreadPoolExecutor(max_workers=1) for _ in range(2)]
     calls = 0
@@ -71,7 +70,6 @@ def test_export_stream_survives_worker_thread_changes(tmp_path, monkeypatch, sna
         assert archive["files_include_bytes"] is False
         assert archive["jobs"][0]["title"] == "Synthetic role"
         assert archive["settings"]["instructions"]["general"] == "Reviewed synthetic evidence."
-        assert "api_key" not in archive["settings"]["scoring"]
         assert "auth" not in archive["settings"]
         assert int(response.headers["content-length"]) == len(response.content)
         assert snapshots and all(snapshot.closed for snapshot in snapshots)

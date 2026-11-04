@@ -10,7 +10,6 @@ three work with the same jobs, career knowledge, documents and collection settin
 | Organize experience, skills and reusable wording | [Career entries and claims](user/career.md) |
 | Prepare a CV, letter or form answers | [Application documents](user/applications.md) |
 | Connect an AI agent | [Agents and MCP](user/agents.md) |
-| Classify job fit | [Optional scoring](user/scoring.md) |
 | Write scripts | [REST API](user/api.md) |
 | Move, restore or operate a workspace | [Operations](user/operations.md) |
 | Run from source or contribute | [Contributing](../CONTRIBUTING.md) and [Architecture](developer/architecture.md) |

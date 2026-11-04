@@ -293,30 +293,6 @@ export function LazyDetails({
     </details>
   );
 }
-export function Score({
-  score,
-  outdated,
-}: {
-  score: number | null | undefined;
-  outdated?: boolean;
-}) {
-  return (
-    <span className="scorebox">
-      {score == null ? (
-        <span className="muted smalltext">Unscored</span>
-      ) : (
-        <>
-          <span className="score">
-            <i className={`dot ${score >= 75 ? "" : "offer"}`} />
-            {score.toLocaleString("en", { maximumFractionDigits: 2 })}{" "}
-            <small>fit</small>
-          </span>
-          {outdated && <span className="tag amber">Outdated</span>}
-        </>
-      )}
-    </span>
-  );
-}
 export function Switch({
   label,
   checked,
@@ -411,7 +387,7 @@ export function Dialog({
   );
 }
 export const stageLabels = {
-  draft: "Draft",
+  draft: "Preparing",
   applied: "Applied",
   interview: "Interview",
   offer: "Offer",

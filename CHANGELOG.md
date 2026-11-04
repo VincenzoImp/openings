@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.11.0
+
+- Give Inbox and Shortlist distinct actionable queues, excluding all jobs with application history.
+- Add direct Shortlist navigation and name application preparation clearly as Preparing.
+- Keep closed attempts, documents and deliberate later attempts in Applications; restore known workaround dismissals explicitly.
+- Remove fit scoring, its UI, REST/MCP operations, queue work and optional container.
+- Align API/MCP contracts, agent guidance, user documentation and populated screenshots.
+
+Schema 5 upgrades automatically to schema 6, preserving jobs, applications, file
+ownership and immutable snapshots. Back up before upgrading. Restores require
+schema 6; upgrade a copy of an older schema-5 backup before restoring it.
+
+
 ## 0.10.0
 
 - Archive automatic results only after usable posting text is available; resume pending details from collection checkpoints.

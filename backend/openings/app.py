@@ -448,7 +448,6 @@ def create_app(database=None, start_worker=True):
                 "contexts": ["payload"],
                 "documents": ["content"],
                 "sources": ["config", "schedule"],
-                "assessments": ["payload"],
                 "providers": ["policy", "runtime"],
             }
             tables = [
@@ -464,7 +463,6 @@ def create_app(database=None, start_worker=True):
                 "documents",
                 "files",
                 "sources",
-                "assessments",
                 "providers",
             ]
             yield '{"format":"openings-records-v1","files_include_bytes":false'
@@ -484,7 +482,7 @@ def create_app(database=None, start_worker=True):
                     yield "]"
                 settings = {}
                 for row in conn.execute(
-                    "SELECT key,data FROM settings WHERE key IN ('profile','instructions','scoring','collection')"
+                    "SELECT key,data FROM settings WHERE key IN ('profile','instructions','collection')"
                 ):
                     data = json.loads(row["data"])
                     settings[row["key"]] = redact_secrets(data)

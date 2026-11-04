@@ -9,7 +9,6 @@ const initial: Overview = {
   active: 0,
   drafts: 0,
   inbox: 0,
-  outdated: 0,
   incomplete: 0,
   funnel: [],
   activity: [],
@@ -213,26 +212,18 @@ export default function OverviewPage({
   const attention = [
     {
       count: data.drafts,
-      title: "application draft",
-      plural: "application drafts",
+      title: "application in preparation",
+      plural: "applications in preparation",
       description: "Review the documents and decide what comes next.",
       route: "applications?status=draft",
       icon: "file" as const,
-    },
-    {
-      count: data.outdated,
-      title: "score needing an update",
-      plural: "scores needing an update",
-      description: "Your context changed. Nothing was rescored automatically.",
-      route: "inbox?triage=active&score_state=outdated",
-      icon: "refresh" as const,
     },
     {
       count: data.incomplete,
       title: "job needing the full posting",
       plural: "jobs needing the full posting",
       description: "Paste the text to complete the record.",
-      route: "inbox?triage=active&complete=false",
+      route: "inbox?queue=all&complete=false",
       icon: "inbox" as const,
     },
   ].filter((a) => a.count);
@@ -349,7 +340,7 @@ export default function OverviewPage({
               <div className="quiet-state">
                 <Icon name="check" />
                 <p>
-                  No drafts, outdated scores or incomplete postings to show.
+                  No applications in preparation or incomplete postings to show.
                 </p>
               </div>
             )}

@@ -71,7 +71,7 @@ with TestClient(app) as client:
     response.raise_for_status()
     inventory = response.json()
     assert inventory['version'] == version('openings') == openings.__version__
-    assert len(inventory['operations']) >= 84
+    assert len(inventory['operations']) >= 83
     assert client.get('/health').json()['status'] == 'ok'
     print(json.dumps({'installed_version': version('openings'),
                       'operation_count': len(inventory['operations']),

@@ -215,19 +215,15 @@ def test_http_owner_csrf_and_revocable_tokens(tmp_path):
         )
 
 
-def test_merge_preserves_scores_as_outdated_and_cancels_old_work(workspace):
+def test_merge_cancels_old_work(workspace):
     source = job(workspace)
     target = job(workspace, url="https://jobs.lever.co/example/duplicate")
     workspace.db.execute(
-        "INSERT INTO assessments(id,job_id,signature,profile_version,job_version,config_version,score,model,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
-        ("old-score", source["id"], "source-signature", 0, 2, 0, 80, "synthetic", now()),
-    )
-    workspace.db.execute(
         "INSERT INTO tasks(id,kind,job_id,state,next_run_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
-        ("old-work", "score", source["id"], "running", now(), now(), now()),
+        ("old-work", "collect", source["id"], "running", now(), now(), now()),
     )
     merged = workspace.merge_jobs(source["id"], target["id"], source["version"], target["version"])
-    assert merged["score"] == 80 and merged["score_outdated"]
+    assert merged["id"] == target["id"]
     assert workspace.db.one("SELECT state FROM tasks WHERE id='old-work'")["state"] == "cancelled"
 
 
@@ -373,7 +369,7 @@ async def test_scoped_export_and_auth_mcp_are_available(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_url_extraction_does_not_score_challenge_or_generic_html():
+async def test_url_extraction_rejects_challenge_or_generic_html():
     from openings.fetching import complete_input
     from openings.models import JobInput
 

@@ -24,9 +24,6 @@ To build Docker images locally, give them local names:
 
 ```bash
 OPENINGS_IMAGE=openings:local docker compose up -d --build
-# Include the optional scorer:
-OPENINGS_IMAGE=openings:local OPENINGS_SCORER_IMAGE=openings-scorer:local \
-  docker compose --profile local up -d --build
 ```
 
 ## Verify a change
@@ -62,7 +59,6 @@ uv run python backend/tests/agent_roundtrip.py --tectonic /path/to/tectonic
 |---|---|
 | `backend/openings` | Shared SQLite services, REST, MCP, collection, worker and authentication |
 | `frontend` | React dashboard calling REST |
-| `scorer` | Optional separate CPU classifier, never imported by the core |
 | `examples` | Synthetic career data and LaTeX templates |
 | `skills/openings-workspace` | Optional external-agent workflow guidance |
 | `docs/user` | Setup, workflow and operator guides |
@@ -78,10 +74,10 @@ CI checks backend/frontend, dependency audits, an installed wheel and native Lin
 amd64/arm64 core images. Container smoke checks authentication, nonroot startup
 and packaged source/resource hashes.
 
-The release workflow publishes versioned core/scorer images to Docker Hub for a pushed
+The release workflow publishes versioned core images to Docker Hub for a pushed
 `vX.Y.Z` tag, or a manual run with **publish** enabled. The requested version must
 match `pyproject.toml`; publication waits for CI. The versioned tags are
-`vincenzoimp/openings:X.Y.Z` and `vincenzoimp/openings:scorer-X.Y.Z`. Branch/PR
+`vincenzoimp/openings:X.Y.Z`. Branch/PR
 checks do not publish.
 Before a release, review the changelog and a practical collection → application →
 external-agent documents → review → backup/restore workflow. Hardware claims need

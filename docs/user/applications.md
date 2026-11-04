@@ -17,14 +17,21 @@ layout. Your external agent fills it using the selected facts and instructions.
 
 ## Start an application
 
-Open a job and choose **Start application**, then add its questions or notes.
-This creates a **Draft** and adds the job to **Shortlist**. Shortlisting alone
-simply keeps an interesting offer; it creates no application. Collection and
-scoring also leave application creation to you or your agent.
+Review new jobs in **Inbox**. Choose **Shortlist** to save an opportunity for
+later, or **Dismiss** to reject it reversibly. Inbox and Shortlist contain only
+jobs without application attempts. Shortlist is your ready-to-prepare queue.
+
+![Shortlist of selected jobs awaiting application preparation](../images/shortlist.png)
+
+From Shortlist, open a job and choose **Start application**. This creates an
+application in **Preparing** (`draft` in REST/MCP) and removes the job from
+Shortlist automatically. Add its questions or notes and prepare documents in
+**Applications**. Saving a job creates no application; collecting jobs does not
+start preparation.
 
 The job shows its application stage and opens the existing attempt when one is
 already underway. After closing an attempt, you can deliberately start another.
-Keep the application in **Draft** while preparing files. Prepare a context with
+Keep the application in **Preparing** while preparing files. Prepare a context with
 the selected templates and relevant career entries or claims.
 
 The context freezes the posting, profile, approved claims, instructions, questions,
@@ -43,7 +50,7 @@ Keep each PDF with the source revision that produced it. Form answers have both
 an archived document revision and live application answers; update the live answers
 when you want to reuse them in the application form.
 
-![Application detail with document revisions and PDF review](../images/documents.png)
+![Application workspace with document revisions](../images/documents.png)
 
 ## Review and submit
 
@@ -56,7 +63,7 @@ or uploading a PDF leaves the application in its current stage.
 
 ## Follow progress
 
-Use the list or Kanban view to move between **Draft**, **Applied**, **Interview**,
+Use the list or Kanban view to move between **Preparing**, **Applied**, **Interview**,
 **Offer** and **Closed**. Closing an attempt records **Accepted**, **Not selected**
 or **Not pursued**; choose an outcome explicitly. Events retain the recorded
 journey, including an interview before a later rejection. The overview funnel
@@ -69,15 +76,24 @@ follows those recorded stages. The submission date can be corrected or cleared.
 | Action | Result |
 |---|---|
 | Shortlist | Keep an interesting job without starting an application. |
-| Remove from Shortlist | Return the job to review; application history stays intact. |
+| Return to inbox | Reconsider a shortlisted job before starting preparation. |
 | Close application | Record its outcome and retain documents and history. |
 | Dismiss job | Hide it from active review and remember it during later collection. |
 | Delete application | Remove that attempt and its documents/files; keep the job. |
 | Forget job | Permanently remove the job, identities and owned application history/files. Future collection can find it again. |
 
-Closing or deleting an application leaves its job in Shortlist. Dismissing a job
-preserves its applications; record a closing outcome when you stop pursuing one.
-Restore a dismissed job before preparing new application documents.
+Closing an application keeps it in Applications, including its history and
+files. It never returns the job to Inbox or Shortlist. To cancel preparation
+without losing documents, close it as **Not pursued**. Deleting the final attempt
+is permanent and deliberately returns a saved job to Shortlist; the confirmation
+explains this. Other retained attempts keep it out of pending queues.
+
+Dismissing a job preserves its applications. Restore it before preparing new
+documents. If you previously dismissed an applied job just to clear Shortlist,
+find it under Dismissed and choose **Restore job**. REST/MCP can set `triage=saved`
+with its current version. Do this only for known workaround dismissals; the job
+remains in Applications and does not return to Inbox. A later attempt is always
+explicit and respects the one-open-application rule.
 
 Scripts and agents can perform the same workflow using the [REST API](api.md)
 or [MCP tools](agents.md).

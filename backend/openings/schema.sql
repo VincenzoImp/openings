@@ -13,7 +13,6 @@ CREATE TABLE IF NOT EXISTS jobs (
  CHECK(triage IN ('inbox','saved','dismissed')), availability TEXT NOT NULL DEFAULT 'unknown',
  metadata TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(metadata)), overrides TEXT NOT NULL DEFAULT '{}',
  content_version INTEGER NOT NULL DEFAULT 1, version INTEGER NOT NULL DEFAULT 1,
- initial_score_pending INTEGER NOT NULL DEFAULT 0 CHECK(initial_score_pending IN (0,1)),
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS jobs_url ON jobs(url);
@@ -114,13 +113,6 @@ CREATE TABLE IF NOT EXISTS transfer_grants (
  token_hash TEXT PRIMARY KEY, payload TEXT NOT NULL, method TEXT NOT NULL,
  expires_at TEXT NOT NULL, used INTEGER NOT NULL DEFAULT 0
 );
-CREATE TABLE IF NOT EXISTS assessments (
- id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
- signature TEXT NOT NULL, profile_version INTEGER NOT NULL, job_version INTEGER NOT NULL,
- config_version INTEGER NOT NULL, score REAL NOT NULL CHECK(score>=0 AND score<=100),
- model TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS assessments_job ON assessments(job_id,created_at);
 CREATE TABLE IF NOT EXISTS collection_runs (
  id TEXT PRIMARY KEY, source_id TEXT REFERENCES sources(id) ON DELETE SET NULL,
  source_name TEXT NOT NULL, source_version INTEGER NOT NULL,
@@ -155,4 +147,4 @@ CREATE INDEX IF NOT EXISTS files_context ON files(context_id);
 CREATE INDEX IF NOT EXISTS files_template ON files(template_id);
 CREATE INDEX IF NOT EXISTS files_knowledge ON files(knowledge_id);
 CREATE INDEX IF NOT EXISTS claims_knowledge ON claims(knowledge_id);
-PRAGMA user_version=5;
+PRAGMA user_version=6;
