@@ -137,17 +137,17 @@ def register_core_mcp(mcp, workspace):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def jobs_search(value: JobQuery | None = None) -> dict:
-        """Search compact paginated job summaries with location/source/remote/date/score filters. Read job_get for full content."""
+        """Search compact paginated job summaries with location/source/remote/date/queue filters. Read job_get for full content."""
         return workspace.list_jobs(**(value or JobQuery()).model_dump())
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
     def jobs_bulk(value: JobBulk) -> dict:
-        """Apply saved/dismissed/inbox/forget/rescore to at most 200 explicit job IDs/versions, with per-item results. Forget is permanent."""
+        """Apply saved/dismissed/inbox/forget to at most 200 explicit job IDs/versions, with per-item results. Forget is permanent."""
         return workspace.bulk_jobs(value)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def job_get(job_id: str) -> dict:
-        """Read full job text, metadata, versions and assessment provenance."""
+        """Read full job text, metadata, versions."""
         return workspace.get_job(job_id)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=True))
@@ -165,7 +165,7 @@ def register_core_mcp(mcp, workspace):
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     def job_triage(job_id: str, value: TriageInput) -> dict:
-        """Set inbox/saved/dismissed. Dismissed jobs remain remembered and excluded from scoring."""
+        """Set inbox/saved/dismissed. Use queue=inbox/shortlist/applications for actionable queues; saved is retained interest."""
         return workspace.set_triage(job_id, value.triage, value.expected_version)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))

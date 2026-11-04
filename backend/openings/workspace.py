@@ -7,8 +7,6 @@ import re
 from urllib.parse import urlsplit
 
 from .common import (
-    CONTEXT_BUILDER_VERSION,
-    assessment_context_version_sql,
     check_version,
     new_id,
     now,
@@ -55,40 +53,6 @@ class Workspace:
             )
         return {"data": data, "version": version + 1}
 
-    def bump_scoring_profile(self):
-        with self.db.transaction() as c:
-            row = c.execute(
-                "SELECT data,version FROM settings WHERE key='scoring_profile_revision'"
-            ).fetchone()
-            value = int(json.loads(row["data"])) + 1 if row else 1
-            c.execute(
-                "INSERT INTO settings(key,data,version,updated_at) VALUES('scoring_profile_revision',?,?,?) ON CONFLICT(key) DO UPDATE SET data=excluded.data,version=excluded.version,updated_at=excluded.updated_at",
-                (encode(value), value, now()),
-            )
-        return value
-
-    def scoring_profile_version(self):
-        return int(self.get_settings("scoring_profile_revision", 0)["data"])
-
-    def scoring_profile(self):
-        profile = self.get_settings("profile")["data"]
-        return {
-            "version": self.scoring_profile_version(),
-            "profile": {
-                k: v for k, v in profile.items() if k not in {"name", "email", "phone", "links"}
-            },
-            "knowledge": [
-                decode_record(r, ("metadata", "dates", "skills"))
-                for r in self.db.all("SELECT * FROM knowledge ORDER BY position,created_at,id")
-            ],
-            "claims": [
-                decode_record(r, ("metadata",))
-                for r in self.db.all(
-                    "SELECT * FROM claims WHERE approved=1 ORDER BY position,created_at,id"
-                )
-            ],
-        }
-
     def event(self, kind, job_id=None, application_id=None, payload=None, conn=None):
         args = (new_id(), job_id, application_id, kind, encode(payload or {}), now())
         sql = "INSERT INTO events(id,job_id,application_id,kind,payload,created_at) VALUES(?,?,?,?,?,?)"
@@ -98,23 +62,7 @@ class Workspace:
             self.db.execute(sql, args)
 
     @staticmethod
-    def _revisions(connection):
-        values = {
-            row["key"]: json.loads(row["data"])
-            for row in connection.execute(
-                "SELECT key,data FROM settings WHERE key IN ('scoring_profile_revision','scoring_config_revision')"
-            )
-        }
-        return int(values.get("scoring_profile_revision", 0)), int(
-            values.get("scoring_config_revision", 0)
-        )
-
-    @staticmethod
-    def _job_join():
-        return " LEFT JOIN assessments a ON a.id=(SELECT id FROM assessments WHERE job_id=j.id ORDER BY created_at DESC,id DESC LIMIT 1) "
-
-    @staticmethod
-    def _job_columns(revisions):
+    def _job_columns():
         columns = [
             f"j.{key} AS j_{key}"
             for key in (
@@ -132,14 +80,11 @@ class Workspace:
                 "updated_at",
             )
         ]
-        profile, config = revisions
         columns += [
             "substr(j.posting,1,240) AS j_posting_preview",
             posting_complete_sql() + " AS j_complete",
             "(SELECT json_object('id',id,'status',status,'outcome',outcome,'version',version) FROM applications WHERE job_id=j.id ORDER BY (status='closed'),created_at DESC,id DESC LIMIT 1) AS j_application",
             "(SELECT count(*) FROM applications WHERE job_id=j.id) AS j_application_count",
-            "a.score AS j_score",
-            f"(a.id IS NOT NULL AND (a.job_version!=j.content_version OR a.profile_version!={profile} OR a.config_version!={config} OR {assessment_context_version_sql()}!={CONTEXT_BUILDER_VERSION})) AS j_score_outdated",
         ]
         return ",".join(columns)
 
@@ -148,7 +93,6 @@ class Workspace:
         result = {key[2:]: value for key, value in dict(row).items() if key.startswith("j_")}
         result["metadata"] = json.loads(result["metadata"])
         result["complete"] = bool(result["complete"])
-        result["score_outdated"] = bool(result["score_outdated"])
         result["application"] = json.loads(result["application"]) if result["application"] else None
         result["source"] = (
             result["metadata"].get("source") or result["metadata"].get("ats") or "manual"
@@ -163,12 +107,6 @@ class Workspace:
             missing("Job")
         row = decode_record(row, ("metadata", "overrides"))
         with self.db.connect() as connection:
-            raw = connection.execute(
-                "SELECT * FROM assessments WHERE job_id=? ORDER BY created_at DESC,id DESC LIMIT 1",
-                (row["id"],),
-            ).fetchone()
-            score = dict(raw) if raw else None
-            profile, config = self._revisions(connection)
             row["postings"] = [
                 dict(posting)
                 for posting in connection.execute(
@@ -184,21 +122,6 @@ class Workspace:
             row["application_count"] = (
                 row["application"].pop("application_count") if application else 0
             )
-        row["assessment"] = decode_record(score, ("payload",))
-        row["score"] = score["score"] if score else None
-        row["score_outdated"] = bool(
-            score
-            and (
-                score["job_version"] != row["content_version"]
-                or score["profile_version"] != profile
-                or score["config_version"] != config
-                or row["assessment"]["payload"]
-                .get("context", {})
-                .get("versions", {})
-                .get("context_builder", 1)
-                != CONTEXT_BUILDER_VERSION
-            )
-        )
         row["complete"] = posting_complete(row["posting"], row["metadata"], row["overrides"])
         return row
 
@@ -214,13 +137,10 @@ class Workspace:
         source=None,
         remote=None,
         job_type=None,
-        score_min=None,
-        score_max=None,
-        score_state="all",
         created_since=None,
         created_until=None,
-        revisions=(0, 0),
         complete=None,
+        queue=None,
     ):
         conditions, args = [], []
         if triage == "active":
@@ -230,6 +150,20 @@ class Workspace:
                 raise DomainError(422, "triage", "Choose inbox, saved or dismissed.")
             conditions.append("j.triage=?")
             args.append(triage)
+        if queue is not None:
+            if queue not in {"inbox", "shortlist", "applications", "dismissed"}:
+                raise DomainError(
+                    422, "queue", "Choose inbox, shortlist, applications or dismissed."
+                )
+            if queue in {"inbox", "shortlist"}:
+                conditions.append(
+                    "j.triage=? AND NOT EXISTS (SELECT 1 FROM applications WHERE job_id=j.id)"
+                )
+                args.append("inbox" if queue == "inbox" else "saved")
+            elif queue == "applications":
+                conditions.append("EXISTS (SELECT 1 FROM applications WHERE job_id=j.id)")
+            else:
+                conditions.append("j.triage='dismissed'")
         if company:
             conditions.append("j.company=?")
             args.append(company)
@@ -249,22 +183,6 @@ class Workspace:
         if job_type:
             conditions.append("json_extract(j.metadata,'$.job_type')=?")
             args.append(job_type)
-        for value, operator in ((score_min, ">="), (score_max, "<=")):
-            if value is not None:
-                if not 0 <= value <= 100:
-                    raise DomainError(422, "score_range", "Score bounds must be between 0 and 100.")
-                conditions.append("a.score" + operator + "?")
-                args.append(value)
-        profile, config = revisions
-        stale = f"(a.job_version!=j.content_version OR a.profile_version!={profile} OR a.config_version!={config} OR {assessment_context_version_sql()}!={CONTEXT_BUILDER_VERSION})"
-        if score_state == "unscored":
-            conditions.append("a.id IS NULL")
-        elif score_state in ("current", "outdated"):
-            conditions.append(
-                "a.id IS NOT NULL AND " + (stale if score_state == "outdated" else "NOT " + stale)
-            )
-        elif score_state != "all":
-            raise DomainError(422, "score_state", "Choose all, current, outdated or unscored.")
         for value, operator in ((created_since, ">="), (created_until, "<=")):
             if value:
                 conditions.append("j.created_at" + operator + "?")
@@ -287,16 +205,13 @@ class Workspace:
         source=None,
         remote=None,
         job_type=None,
-        score_min=None,
-        score_max=None,
-        score_state="all",
         created_since=None,
         created_until=None,
         complete=None,
+        queue=None,
     ):
         limit, offset = min(max(int(limit), 1), 200), max(int(offset), 0)
         with self.db.connect() as connection:
-            revisions = self._revisions(connection)
             where, args = self._job_filters(
                 q,
                 triage,
@@ -305,25 +220,20 @@ class Workspace:
                 source,
                 remote,
                 job_type,
-                score_min,
-                score_max,
-                score_state,
                 created_since,
                 created_until,
-                revisions,
                 complete,
+                queue,
             )
-            base = " FROM jobs j" + self._job_join()
+            base = " FROM jobs j"
             order = {
                 "oldest": "j.created_at ASC",
                 "company": "j.company,j.title",
                 "title": "j.title",
-                "score": "a.score DESC",
-                "fit": "a.score DESC",
             }.get(sort, "j.created_at DESC")
             rows = connection.execute(
                 "SELECT "
-                + self._job_columns(revisions)
+                + self._job_columns()
                 + base
                 + where
                 + " ORDER BY "
@@ -365,7 +275,6 @@ class Workspace:
         title = value.title.strip() or "Untitled opportunity"
         company = value.company.strip() or (urlsplit(url).hostname or "Unknown company")
         data.update(title=title, company=company, url=url)
-        changed = False
         with self.db.transaction() as c:
             placeholders = ",".join("?" for _ in aliases) or "NULL"
             matches = c.execute(
@@ -384,7 +293,7 @@ class Workspace:
             stamp = now()
             if prior is None:
                 c.execute(
-                    "INSERT INTO jobs(id,title,company,location,url,posting,metadata,initial_score_pending,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO jobs(id,title,company,location,url,posting,metadata,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
                     (
                         job_id,
                         title,
@@ -393,7 +302,6 @@ class Workspace:
                         url,
                         value.posting,
                         encode(value.metadata),
-                        int(bool(self.discovery and self.discovery.get_scoring()["enabled"])),
                         stamp,
                         stamp,
                     ),
@@ -401,7 +309,6 @@ class Workspace:
                 self.event(
                     "job_added", job_id, payload={"title": title, "company": company}, conn=c
                 )
-                changed = True
             else:
                 overrides = json.loads(prior["overrides"])
                 updates = {}
@@ -441,7 +348,6 @@ class Workspace:
                         (*updates.values(), stamp, job_id),
                     )
                     self.event("posting_updated", job_id, payload={"fields": list(updates)}, conn=c)
-                    changed = True
             c.executemany(
                 "INSERT OR IGNORE INTO job_identities(identity,job_id) VALUES(?,?)",
                 [(key, job_id) for key in aliases],
@@ -475,8 +381,6 @@ class Workspace:
                 )
         result = self.get_job(job_id)
         result["created"] = prior is None
-        if (changed or result["initial_score_pending"]) and self.discovery is not None:
-            self.discovery.enqueue_job(job_id, automatic_update=prior is not None)
         return result
 
     def update_job(self, job_id, value):
@@ -526,8 +430,6 @@ class Workspace:
                         [(key, job_id) for key in job_identities(actual["url"])],
                     )
                 self.event("job_edited", job_id, payload={"fields": list(actual)}, conn=c)
-        if actual and self.discovery:
-            self.discovery.enqueue_job(job_id, automatic_update=True)
         return self.get_job(job_id)
 
     def set_triage(self, job_id, triage, expected_version):
@@ -582,8 +484,8 @@ class Workspace:
                     {"application_ids": [row["id"] for row in active]},
                 )
             next_content = c.execute(
-                "SELECT max(v)+1 FROM (SELECT content_version v FROM jobs WHERE id IN (?,?) UNION ALL SELECT job_version v FROM assessments WHERE job_id IN (?,?))",
-                (source_id, target_id, source_id, target_id),
+                "SELECT max(content_version)+1 FROM jobs WHERE id IN (?,?)",
+                (source_id, target_id),
             ).fetchone()[0]
             c.execute(
                 "UPDATE tasks SET state='cancelled',updated_at=? WHERE job_id IN (?,?) AND state IN ('queued','running')",
@@ -599,7 +501,7 @@ class Workspace:
             )
             c.execute("DELETE FROM job_identities WHERE job_id=?", (source_id,))
             c.execute("UPDATE posting_details SET job_id=? WHERE job_id=?", (target_id, source_id))
-            for table in ("postings", "applications", "events", "notes", "assessments", "tasks"):
+            for table in ("postings", "applications", "events", "notes", "tasks"):
                 c.execute(f"UPDATE {table} SET job_id=? WHERE job_id=?", (target_id, source_id))
             c.execute("UPDATE files SET job_id=? WHERE job_id=?", (target_id, source_id))
             c.execute("DELETE FROM jobs WHERE id=?", (source_id,))
@@ -675,7 +577,7 @@ class Workspace:
             conditions.append("(j.title LIKE ? OR j.company LIKE ? OR app.note LIKE ?)")
             args.extend(["%" + q.strip() + "%"] * 3)
         where = " WHERE " + " AND ".join(conditions) if conditions else ""
-        base = " FROM applications app JOIN jobs j ON j.id=app.job_id" + self._job_join()
+        base = " FROM applications app JOIN jobs j ON j.id=app.job_id"
         order = {
             "newest": "app.created_at DESC",
             "oldest": "app.created_at ASC",
@@ -688,7 +590,7 @@ class Workspace:
             projection += (
                 "(SELECT count(*) FROM documents WHERE application_id=app.id) AS documents_count,"
             )
-            projection += self._job_columns(self._revisions(connection))
+            projection += self._job_columns()
             rows = connection.execute(
                 "SELECT "
                 + projection
@@ -767,16 +669,6 @@ class Workspace:
                     if value.action == "forget":
                         self.forget_job(item.id, item.expected_version)
                         result = {"deleted": True}
-                    elif value.action == "rescore":
-                        if self.discovery is None:
-                            raise DomainError(
-                                409, "scoring_unavailable", "Scoring is not configured."
-                            )
-                        from .discovery import RescoreRequest
-
-                        result = self.discovery.queue_rescore(
-                            RescoreRequest(job_ids=[item.id], outdated_only=False, limit=1)
-                        )
                     else:
                         updated = self.set_triage(item.id, value.action, item.expected_version)
                         result = {"triage": updated["triage"], "version": updated["version"]}
@@ -1016,20 +908,10 @@ class Workspace:
             outcome = (app["outcome"] or "not_pursued") if app["status"] == "closed" else "waiting"
             funnel[highest]["outcomes"][outcome] += 1
         counts = self.db.one(
-            "SELECT count(*) n,coalesce(sum(triage='inbox'),0) inbox,coalesce(sum(NOT "
+            "SELECT count(*) n,coalesce(sum(triage='inbox' AND NOT EXISTS (SELECT 1 FROM applications WHERE job_id=j.id)),0) inbox,coalesce(sum(NOT "
             + posting_complete_sql()
             + "),0) incomplete FROM jobs j WHERE triage!='dismissed'"
         )
-        outdated = self.db.one(
-            "SELECT count(*) n FROM jobs j JOIN assessments a ON a.id=(SELECT id FROM assessments WHERE job_id=j.id ORDER BY created_at DESC,id DESC LIMIT 1) WHERE j.triage!='dismissed' AND (a.job_version!=j.content_version OR a.profile_version!=? OR a.config_version!=? OR "
-            + assessment_context_version_sql()
-            + "!=?)",
-            (
-                self.scoring_profile_version(),
-                int(self.get_settings("scoring_config_revision", 0)["data"]),
-                CONTEXT_BUILDER_VERSION,
-            ),
-        )["n"]
         return {
             "sent": sent,
             "interviews": funnel[1]["count"],
@@ -1037,7 +919,6 @@ class Workspace:
             "active": sum(a["status"] not in {"draft", "closed"} for a in apps),
             "drafts": sum(a["status"] == "draft" for a in apps),
             "inbox": counts["inbox"],
-            "outdated": outdated,
             "incomplete": counts["incomplete"],
             "funnel": funnel,
             "activity": [

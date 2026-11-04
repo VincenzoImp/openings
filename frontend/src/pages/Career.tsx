@@ -44,7 +44,6 @@ const blankProfile: Profile = {
   roles: "",
   preferences: "",
   summary: "",
-  scoring_summary: "",
   links: [],
   metadata: {},
   version: 1,
@@ -95,7 +94,6 @@ function ProfileForm() {
       "roles",
       "preferences",
       "summary",
-      "scoring_summary",
     ];
     const body: Record<string, unknown> = Object.fromEntries(
       fields.map((k) => [k, String(f.get(k) || "")]),
@@ -104,7 +102,7 @@ function ProfileForm() {
     body.metadata = jsonValue(f, "metadata");
     await mutate(
       () => api("/career/profile", "PATCH", version(data, body)),
-      "Profile saved. Relevant changes mark scores outdated without running inference.",
+      "Profile saved.",
     );
   }
   if (loading) return <Loading />;
@@ -164,8 +162,8 @@ function ProfileForm() {
           <div>
             <h2>Job preferences</h2>
             <p>
-              These preferences guide optional fit scoring and application
-              preparation.
+              Your agent uses these preferences to review jobs and prepare
+              applications.
             </p>
           </div>
         </div>
@@ -177,18 +175,7 @@ function ProfileForm() {
             placeholder="Locations, remote preferences, team interests, compensation…"
           />
         </Field>
-        <Field
-          label="Compact scoring profile"
-          hint="A concise, factual overview for the optional scorer. Your external document agent can still read the career entries."
-        >
-          <textarea
-            name="scoring_summary"
-            rows={5}
-            defaultValue={data.scoring_summary}
-          />
-        </Field>
         <div className="section-footer">
-          <span>Contact-only edits do not invalidate fit scores.</span>
           <Button variant="primary" disabled={pending}>
             Save profile
           </Button>

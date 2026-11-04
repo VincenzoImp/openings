@@ -64,7 +64,6 @@ def test_complete_jobs_only_across_batch_cooldown_and_restart(tmp_path, monkeypa
     service = DiscoveryService(workspace)
     workspace.discovery = service
     workspace.set_settings("profile", {"summary": "Backend engineer"})
-    workspace.set_settings("scoring", {"enabled": True, "auto_rescore_updates": False})
     service.update_provider("linkedin", ProviderPatch(expected_version=1, min_interval_seconds=0))
     monkeypatch.setattr(module, "public_url", lambda url: url)
     monkeypatch.setattr(policy, "REQUEST_BATCH_SIZE", 2)
@@ -99,7 +98,6 @@ def test_complete_jobs_only_across_batch_cooldown_and_restart(tmp_path, monkeypa
     assert first["result"]["pending_descriptions"] == 1
     assert first["result"]["attempt_history"][-1]["reason"] == "collection_batch"
     assert workspace.list_jobs(complete=False)["total"] == 0
-    assert service.list_tasks(kind="score")["total"] == 1
     clock[0] += 2
     second = run_next(service)
     assert second["state"] == "queued" and second["result"]["created"] == 1
@@ -119,7 +117,6 @@ def test_complete_jobs_only_across_batch_cooldown_and_restart(tmp_path, monkeypa
     assert final["result"]["existing"] == final["result"]["pending_descriptions"] == 0
     assert restarted_workspace.list_jobs(complete=True)["total"] == 2
     assert restarted_workspace.list_jobs(complete=False)["total"] == 0
-    assert restarted.list_tasks(kind="score")["total"] == 2
     assert len(calls) == 4 and sum("seeMore" in url for url in calls) == 1
     assert calls.count("https://www.linkedin.com/jobs/view/1") == 1
     assert restarted.get_run(queued["run_id"])["counts"]["created"] == 2

@@ -114,24 +114,20 @@ def upload(
 
 def test_relevant_profile_edits_are_distinct_from_contacts_and_templates(workspace):
     ws, career, _, _, evidence, _, template, _ = workspace
-    score_revision = ws.scoring_profile_version()
     profile = career.get_profile()
     changed = career.update_profile(
         ProfileUpdate(expected_version=profile["version"], email="alex@example.test")
     )
-    assert ws.scoring_profile_version() == score_revision
     career.update_profile(
         ProfileUpdate(
             expected_version=changed["version"],
-            scoring_summary="Python API engineer; remote roles.",
+            summary="Python API engineer; remote roles.",
         )
     )
-    assert ws.scoring_profile_version() == score_revision + 1
     career.update_template(
         template["id"],
         TemplateUpdate(expected_version=template["version"], guidance="Prefer short bullets."),
     )
-    assert ws.scoring_profile_version() == score_revision + 1
     with pytest.raises(DomainError) as stale:
         career.update_profile(
             ProfileUpdate(expected_version=profile["version"], summary="Stale overwrite")

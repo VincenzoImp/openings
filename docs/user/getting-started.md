@@ -21,7 +21,7 @@ covers local builds.
 2. In **Inbox**, choose **Add job**. Paste a URL or enter the title, company and full
    posting. If URL extraction cannot obtain the text, paste it yourself.
 3. Open the job to inspect its description, add it to **Shortlist** or choose
-   **Start application**. Starting creates a Draft and shortlists the job;
+   **Start application**. Starting creates an application in Preparing and removes it from the pending Shortlist;
    an existing application opens instead. **Dismiss** keeps its identity and history.
 4. In **Collection**, add a saved search or company board, preview it, then enable
    its schedule. New sources start paused.
@@ -36,16 +36,9 @@ address and image selection. Search settings need no YAML file.
 
 ## Deployment modes and resources
 
-| Mode | Containers on this host | Compose resource limits |
-|---|---|---|
-| Core only | `openings` | 0.5 CPU / 512 MiB |
-| Local scoring | `openings` and `scorer` | Core plus 1.5 CPU / 3584 MiB; 2 CPU / 4 GiB combined |
-| Remote scoring | `openings`; scorer elsewhere | 0.5 CPU / 512 MiB here; remote service separate |
-
-These are enforced container budgets. They do not establish minimum host
-requirements or measured usage. Allow resources for the operating system, Docker
-and other services. Local scoring also needs model cache space and enough memory
-for loading and inference. See [scoring resources](scoring.md#resources-and-cpu-compatibility).
+The single `openings` container has a Compose budget of **0.5 CPU / 512 MiB**.
+This is an enforced container limit, not a measured host requirement. Allow
+resources for the operating system, Docker and other services.
 
 ## LAN access
 
@@ -66,27 +59,6 @@ trusted reverse proxy across untrusted networks.
 The core listens on port 8080 inside its container. `OPENINGS_PORT` changes the
 host port; update `OPENINGS_PUBLIC_URL` to match.
 
-## Optional local scoring
-
-1. Set `SCORER_API_KEY` to a random secret in `.env`.
-2. Run `docker compose --profile local pull`, then
-   `docker compose --profile local up -d --no-build`.
-3. In **Settings → AI scoring**, select local/Laya, URL `http://scorer:8000`, model
-   `english`, context 2048 and the same API key. Allow a 600-second timeout for a
-   cold model start. Test the connection, enable scoring and save the settings.
-   Confirm the saved-state message says scoring is on.
-
-The container starts separately from the scoring switch. The first test downloads
-and loads the pinned model on CPU. Weights use the disposable `model-cache` volume;
-the scorer has no published host port. [Scoring](scoring.md) covers remote mode,
-input preparation and CPU compatibility.
-
-To stop local inference, turn off scoring in Settings, save, then run:
-
-```bash
-docker compose --profile local stop scorer
-```
-
 ## Storage and checks
 
 The `workspace` volume holds `/data/openings.sqlite`, live journals and all uploaded
@@ -99,8 +71,8 @@ docker compose logs --tail=100 openings
 curl --fail http://127.0.0.1:8080/health
 ```
 
-Health checks the core and SQLite. An idle scorer can be healthy before loading a
-model; its connection test verifies inference. [Operations](operations.md) covers
+Health checks the core and SQLite. [Operations](operations.md) covers
 backups, restore and service lifecycle. Before upgrading, read the release notes:
 pre-1.0 releases can change APIs and database format, and the app accepts its
-current workspace format.
+current workspace format. Version 0.11 upgrades schema 5 to 6 automatically; back
+up before upgrading. Older formats still require their matching release.

@@ -27,8 +27,7 @@ without it: discover the tools/resources and their typed input schemas.
    add a posting manually without setting up collection.
 3. Inspect `job.application` or use `applications_list` with `value.job_id` to find
    its attempts. Continue the open application, or use `application_create` to
-   start Draft with questions, notes and an idempotency key. Starting also
-   shortlists the job. A later attempt is possible after the previous one closes.
+   start Preparing (`draft`) with questions, notes and an idempotency key. Starting removes it from the pending Shortlist queue. A later attempt is possible after the previous one closes.
 4. Call `application_prepare_context` with the application, selected templates,
    optional evidence/claim filters and an idempotency key. Read the returned
    payload or its `openings://contexts/{id}` resource. Follow stored general,
@@ -82,7 +81,7 @@ The [Collection guide](sources.md) explains daily time slots, defaults and count
 
 ## State rules
 
-- Job triage uses `inbox` (To review), `saved` (Shortlist) and `dismissed`.
+- Job triage uses `inbox` (unreviewed interest), `saved` (saved interest) and `dismissed`.
   Dismissed is reversible and remembered. `job_forget` permanently removes
   job-owned history/files and permits rediscovery; include `job_id` and the
   job's current `expected_version`.
@@ -99,8 +98,10 @@ The [Collection guide](sources.md) explains daily time slots, defaults and count
 - An answers document created with `documents_create` archives a revision. Use
   `application_update` with `value.answers` and `value.expected_version` for live
   application answers.
-- Profile/rubric/model changes do not launch bulk scoring. Use explicit
-  `scoring_rescore` when intended; classification never writes a CV.
+- Use `jobs_search` with `value.queue="inbox"` to review and select jobs, then
+  `value.queue="shortlist"` to prepare selected jobs without any application history.
+  Closed attempts remain in Applications. Restore known workaround dismissals to
+  `saved` explicitly; retained applications keep them out of pending queues.
 
 REST supports the same workflow when scripting is more convenient. See the
 [API guide](api.md) for transfers and optimistic updates. `workspace_backup`,

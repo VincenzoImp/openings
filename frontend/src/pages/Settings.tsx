@@ -12,7 +12,6 @@ import {
   type Job,
   version,
   type ListResult,
-  type Scoring,
 } from "../api";
 import {
   useResource,
@@ -36,19 +35,6 @@ import {
 } from "../ui";
 import { ProviderSettings } from "./Companies";
 import { RunProgress, duration } from "./CollectionForms";
-const blankScoring: Scoring = {
-  enabled: false,
-  auto_rescore_updates: true,
-  mode: "local",
-  provider: "laya",
-  base_url: "http://scorer:8000",
-  model: "english",
-  rubric: "",
-  max_len: 2048,
-  timeout_seconds: 120,
-  periodic_rescore: { enabled: false, minutes: 1440, batch_size: 25 },
-  version: 1,
-};
 interface Token {
   id: string;
   name: string;
@@ -64,19 +50,18 @@ export default function SettingsPage({
   onTheme: () => void;
   onLogout: () => void;
 }) {
-  const [tab, setTab] = useUrlState("section", "scoring");
+  const [tab, setTab] = useUrlState("section", "agents");
   return (
     <>
       <Heading
         title="Settings"
-        description="Manage scoring, collection, agent access and workspace backups."
+        description="Manage agent access, collection and workspace backups."
       />
       <Tabs
         label="Settings sections"
         value={tab}
         onChange={setTab}
         items={[
-          { id: "scoring", label: "AI scoring" },
           { id: "collection", label: "Collection" },
           { id: "agents", label: "Agent access" },
           { id: "activity", label: "Activity" },
@@ -84,9 +69,7 @@ export default function SettingsPage({
         ]}
       />
       <div className="settings-content">
-        {tab === "scoring" ? (
-          <ScoringSettings />
-        ) : tab === "collection" ? (
+        {tab === "collection" ? (
           <ProviderSettings />
         ) : tab === "agents" ? (
           <AgentSettings />
@@ -100,449 +83,6 @@ export default function SettingsPage({
           />
         )}
       </div>
-    </>
-  );
-}
-function ScoringSettings() {
-  const resource = useResource<Scoring>("/scoring", blankScoring);
-  const { mutate, pending, notify } = useWorkspace();
-  const [enabled, setEnabled] = useState(false),
-    [autoUpdates, setAutoUpdates] = useState(true),
-    [mode, setMode] = useState("local"),
-    [periodic, setPeriodic] = useState(false),
-    [testing, setTesting] = useState<string | null>(null),
-    [isTesting, setIsTesting] = useState(false),
-    [dirty, setDirty] = useState(false),
-    [saveError, setSaveError] = useState<string | null>(null),
-    [rescore, setRescore] = useState(false);
-  useEffect(() => {
-    setEnabled(resource.data.enabled);
-    setAutoUpdates(resource.data.auto_rescore_updates ?? true);
-    setMode(resource.data.mode);
-    setPeriodic(resource.data.periodic_rescore.enabled);
-    setDirty(false);
-  }, [resource.data]);
-  function values(form: HTMLFormElement) {
-    const f = new FormData(form);
-    const body: Record<string, unknown> = {
-      enabled,
-      auto_rescore_updates: autoUpdates,
-      mode,
-      provider: f.get("provider"),
-      base_url: f.get("base_url"),
-      model: f.get("model"),
-      rubric: f.get("rubric"),
-      criteria: String(f.get("criteria") || "")
-        .split("\n")
-        .map((value) => value.trim())
-        .filter(Boolean),
-      max_len: Number(f.get("max_len")) || 2048,
-      timeout_seconds: Number(f.get("timeout_seconds")) || 120,
-      periodic_rescore: {
-        enabled: periodic,
-        minutes:
-          Number(
-            f.get("periodic_minutes") ?? resource.data.periodic_rescore.minutes,
-          ) || 1440,
-        batch_size:
-          Number(
-            f.get("batch_size") ?? resource.data.periodic_rescore.batch_size,
-          ) || 25,
-      },
-    };
-    if (f.get("api_key")) body.api_key = f.get("api_key");
-    if (f.get("clear_key") === "on") body.api_key = "";
-    return body;
-  }
-  async function save(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const body = version(resource.data, values(e.currentTarget));
-    let saved: Scoring | undefined;
-    setSaveError(null);
-    const ok = await mutate(async () => {
-      try {
-        saved = await api<Scoring>("/scoring", "PATCH", body);
-      } catch (error) {
-        setSaveError(
-          error instanceof Error
-            ? error.message
-            : "Settings could not be saved.",
-        );
-        throw error;
-      }
-    }, "Scoring settings saved.");
-    if (ok && saved) {
-      resource.setData(saved);
-      setDirty(false);
-    }
-  }
-  async function test(form: HTMLFormElement | null) {
-    if (!form || isTesting || pending) return;
-    setIsTesting(true);
-    try {
-      setTesting("Testing the endpoint…");
-      const result = await api<Record<string, unknown>>(
-        "/scoring/test",
-        "POST",
-        values(form),
-      );
-      setTesting(
-        `Connected. ${String(result.model || result.message || "The endpoint returned a valid score.")}`,
-      );
-    } catch (e) {
-      setTesting(null);
-      notify(e instanceof Error ? e.message : "Connection failed.", true);
-    } finally {
-      setIsTesting(false);
-    }
-  }
-  if (resource.loading) return <Loading />;
-  if (resource.error)
-    return <ErrorBox message={resource.error} retry={resource.reload} />;
-  return (
-    <>
-      <form
-        className="settings-grid scoring-layout"
-        onSubmit={save}
-        key={resource.data.version}
-        id="scoring-form"
-        onChange={() => {
-          setDirty(true);
-          setTesting(null);
-        }}
-      >
-        <div className="scoring-actions" aria-live="polite">
-          <div>
-            <strong>
-              {resource.data.enabled
-                ? "Saved: AI scoring is on"
-                : "Saved: AI scoring is off"}
-            </strong>
-            <p className="smalltext muted">
-              {pending
-                ? "Checking the service and saving. The first connection can take several minutes."
-                : dirty
-                  ? "Unsaved changes. Save settings to apply them."
-                  : "Settings are saved."}
-            </p>
-          </div>
-          <div className="actions">
-            <Button
-              type="button"
-              disabled={!dirty || pending || isTesting}
-              onClick={(event) => {
-                const form = event.currentTarget.form;
-                form?.reset();
-                if (form) {
-                  form.dataset.dirty = "false";
-                  form
-                    .querySelector<HTMLTextAreaElement>(
-                      "textarea[name=criteria]",
-                    )
-                    ?.setCustomValidity("");
-                }
-                setEnabled(resource.data.enabled);
-                setAutoUpdates(resource.data.auto_rescore_updates ?? true);
-                setMode(resource.data.mode);
-                setPeriodic(resource.data.periodic_rescore.enabled);
-                setDirty(false);
-                setSaveError(null);
-                setTesting(null);
-              }}
-            >
-              Discard changes
-            </Button>
-            <Button variant="primary" disabled={!dirty || pending || isTesting}>
-              {pending ? "Saving settings…" : "Save scoring settings"}
-            </Button>
-          </div>
-        </div>
-        {saveError && (
-          <div className="scoring-save-error">
-            <ErrorBox message={saveError} />
-          </div>
-        )}
-        <section className="card sectioncard">
-          <div className="settingrow">
-            <div>
-              <h3>Enable AI scoring</h3>
-              <p>
-                Assess complete opportunities against your stored profile and
-                preferences.
-              </p>
-            </div>
-            <Switch
-              label="Enable AI scoring"
-              checked={enabled}
-              onChange={(value) => {
-                setEnabled(value);
-                setDirty(true);
-              }}
-            />
-          </div>
-          <div className="radio-cards">
-            {[
-              [
-                "local",
-                "Local service",
-                "One optional CPU model on this host.",
-              ],
-              [
-                "remote",
-                "Remote service",
-                "A compatible service on another machine.",
-              ],
-            ].map(([id, title, description]) => (
-              <label className="radio-card" key={id}>
-                <input
-                  type="radio"
-                  name="mode"
-                  checked={mode === id}
-                  onChange={() => setMode(id)}
-                />
-                <span>
-                  <strong>{title}</strong>
-                  <small>{description}</small>
-                </span>
-              </label>
-            ))}
-          </div>
-          <div className="formgrid">
-            <Field label="Service URL">
-              <input
-                name="base_url"
-                type="url"
-                defaultValue={resource.data.base_url}
-                required
-              />
-            </Field>
-            <Field label="Served model">
-              <input name="model" defaultValue={resource.data.model} required />
-            </Field>
-            <Field label="Protocol profile">
-              <select name="provider" defaultValue={resource.data.provider}>
-                <option value="laya">Laya</option>
-                <option value="systemone">Jev / System One compatible</option>
-              </select>
-            </Field>
-            <Field label="Maximum context tokens">
-              <input
-                name="max_len"
-                type="number"
-                min={256}
-                max={8192}
-                defaultValue={resource.data.max_len}
-              />
-            </Field>
-            <Field
-              label="API key (optional)"
-              hint={
-                resource.data.api_key_set
-                  ? "A key is stored. Leave empty to keep it."
-                  : "Required only if your endpoint asks for one."
-              }
-            >
-              <input
-                name="api_key"
-                type="password"
-                autoComplete="new-password"
-                placeholder={resource.data.api_key_set ? "••••••••" : ""}
-              />
-            </Field>
-            <Field label="Request timeout (seconds)">
-              <input
-                name="timeout_seconds"
-                type="number"
-                min={5}
-                max={600}
-                defaultValue={resource.data.timeout_seconds}
-              />
-            </Field>
-          </div>
-          {resource.data.api_key_set && (
-            <label className="checkline">
-              <input name="clear_key" type="checkbox" />
-              Remove the stored API key
-            </label>
-          )}
-          <div className="actions form-actions">
-            <Button
-              type="button"
-              icon="play"
-              disabled={pending || isTesting}
-              onClick={(e) => test(e.currentTarget.form)}
-            >
-              {isTesting ? "Testing connection…" : "Test connection"}
-            </Button>
-            {testing && <span className="smalltext">{testing}</span>}
-          </div>
-        </section>
-        <section className="card sectioncard">
-          <h2 className="section-heading">Scoring rules</h2>
-          <div className="formgrid">
-            <Field
-              label="Score levels"
-              hint="One description per line, from lowest to highest fit. Use 2–10 levels."
-            >
-              <textarea
-                name="criteria"
-                onChange={(e) => {
-                  const levels = e.target.value
-                    .split("\n")
-                    .filter((x) => x.trim());
-                  e.target.setCustomValidity(
-                    levels.length >= 2 && levels.length <= 10
-                      ? ""
-                      : "Use 2–10 score levels, one per line.",
-                  );
-                }}
-                rows={7}
-                required
-                defaultValue={(resource.data.criteria || []).join("\n")}
-              />
-            </Field>
-            <Field
-              label="Assessment instructions"
-              hint="Used only for fit scoring, separately from your document-writing guidance."
-            >
-              <textarea
-                name="rubric"
-                rows={7}
-                defaultValue={resource.data.rubric}
-              />
-            </Field>
-          </div>
-          <div className="divider" />
-          <div className="settingrow">
-            <div>
-              <h3>Rescore changed postings automatically</h3>
-              <p>
-                On by default. Turn this off to score only newly added jobs
-                automatically. Manual and periodic rescoring remain available.
-              </p>
-            </div>
-            <Switch
-              label="Automatic rescoring of changed postings"
-              checked={autoUpdates}
-              onChange={(value) => {
-                setAutoUpdates(value);
-                setDirty(true);
-              }}
-            />
-          </div>
-          <div className="divider" />
-          <div className="settingrow">
-            <div>
-              <h3>Periodically score missing or outdated jobs</h3>
-              <p>
-                Off by default. Editing a profile never starts a bulk rescore.
-              </p>
-            </div>
-            <Switch
-              label="Periodic rescoring"
-              checked={periodic}
-              onChange={(value) => {
-                setPeriodic(value);
-                setDirty(true);
-              }}
-            />
-          </div>
-          {periodic && (
-            <div className="formgrid">
-              <Field label="Check every (minutes)">
-                <input
-                  name="periodic_minutes"
-                  type="number"
-                  min={60}
-                  max={43200}
-                  defaultValue={resource.data.periodic_rescore.minutes}
-                />
-              </Field>
-              <Field label="Maximum jobs per batch">
-                <input
-                  name="batch_size"
-                  type="number"
-                  min={1}
-                  max={200}
-                  defaultValue={resource.data.periodic_rescore.batch_size}
-                />
-              </Field>
-            </div>
-          )}
-          <div className="section-footer">
-            <span>
-              Scoring is indicative. Turning it off keeps stored scores.
-            </span>
-          </div>
-        </section>
-      </form>
-      <div className="card sectioncard form-section">
-        <div className="sectiontitle">
-          <div>
-            <h2>Score existing jobs</h2>
-            <p>
-              Queue a bounded batch of unscored or outdated jobs. This never
-              generates application documents.
-            </p>
-          </div>
-        </div>
-        <Button
-          icon="refresh"
-          disabled={!resource.data.enabled || pending}
-          onClick={() => setRescore(true)}
-        >
-          Update missing or outdated scores
-        </Button>
-      </div>
-      {rescore && (
-        <Dialog
-          title="Update missing or outdated scores?"
-          onClose={() => setRescore(false)}
-        >
-          <p className="modal-intro">
-            Eligible non-dismissed jobs with missing or outdated scores will be
-            queued. Existing scores remain until a replacement succeeds.
-          </p>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              const limit = Number(new FormData(e.currentTarget).get("limit"));
-              let result: { count: number; skipped: string[] } | undefined;
-              if (
-                await mutate(async () => {
-                  result = await api("/scoring/rescore", "POST", {
-                    outdated_only: true,
-                    limit,
-                    job_ids: [],
-                  });
-                }, "Scoring batch checked.")
-              ) {
-                notify(
-                  result?.count
-                    ? `${result.count} jobs queued for scoring.`
-                    : "No jobs queued. Check your career profile, posting text and existing scores.",
-                );
-                setRescore(false);
-              }
-            }}
-          >
-            <Field label="Maximum jobs in this batch">
-              <input
-                name="limit"
-                type="number"
-                defaultValue={50}
-                min={1}
-                max={200}
-              />
-            </Field>
-            <div className="actions form-actions">
-              <Button variant="primary" disabled={pending}>
-                Queue rescoring
-              </Button>
-            </div>
-          </form>
-        </Dialog>
-      )}
     </>
   );
 }
@@ -768,7 +308,7 @@ function TaskSettings() {
         <div className="sectiontitle">
           <div>
             <h2>Activity</h2>
-            <p>Follow collection runs, provider waits and scoring tasks.</p>
+            <p>Follow collection runs and provider waits.</p>
           </div>
           <Button icon="refresh" onClick={resource.reload}>
             Refresh
@@ -839,7 +379,6 @@ function TaskSettings() {
                 >
                   <option value="">All kinds</option>
                   <option value="collect">Collection</option>
-                  <option value="score">Scoring</option>
                 </select>
               </Field>
               <Field label="Job">
@@ -946,10 +485,8 @@ function TaskSettings() {
                         </h3>
                       </button>
                       <p>
-                        {task.kind === "collect"
-                          ? String(task.payload?.provider || "Collection")
-                          : "Scoring"}{" "}
-                        · {formatTime(task.created_at)}
+                        {String(task.payload?.provider || "Collection")} ·{" "}
+                        {formatTime(task.created_at)}
                       </p>
                     </div>
                     <TaskState task={task} />
@@ -964,7 +501,7 @@ function TaskSettings() {
             })
           ) : (
             <Empty title="No activity in this view.">
-              Runs and tasks appear here when collection or scoring starts.
+              Runs and tasks appear here when collection starts.
             </Empty>
           )}
         </div>
@@ -1069,9 +606,6 @@ function TaskSummary({ task }: { task: BackgroundTask }) {
           .map(([key, label]) => `${label}: ${counts[key]}`)
           .join(" · ")}
       </p>
-      {task.kind === "score" && typeof counts.score === "number" && (
-        <p className="smalltext">Fit score: {counts.score}/100</p>
-      )}
       {!!task.attempts && (
         <p className="smalltext muted">{task.attempts} attempts</p>
       )}
