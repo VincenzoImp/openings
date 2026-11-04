@@ -155,3 +155,44 @@ async def test_export_disconnect_closes_snapshot(spec_version, snapshots):
     else:
         await response(scope, receive, send)
     assert snapshots and all(snapshot.closed for snapshot in snapshots)
+
+
+@pytest.mark.asyncio
+async def test_export_preserves_nullable_career_dates_and_scoped_mcp_download(tmp_path):
+    from openings.career import ClaimCreate, KnowledgeCreate, TemplateCreate
+    from openings.documents import ContextCreate
+
+    app = create_app(tmp_path / "nullable-export.sqlite", start_worker=False)
+    career, workspace, documents = app.state.career, app.state.workspace, app.state.documents
+    undated = career.create_knowledge(
+        KnowledgeCreate(title="Undated project", kind="project", skills=["Python"])
+    )
+    career.create_knowledge(
+        KnowledgeCreate(
+            title="Dated project", kind="project", dates={"kind": "single", "start": "2025"}
+        )
+    )
+    claim = career.create_claim(
+        ClaimCreate(knowledge_id=undated["id"], text="Synthetic claim", approved=True)
+    )
+    career.create_template(TemplateCreate(name="Synthetic CV", tex="Example", is_default=True))
+    job = workspace.ingest_job({"title": "Synthetic role", "posting": "Build reliable services."})
+    application = workspace.create_application({"job_id": job["id"]})
+    documents.prepare_context(ContextCreate(application_id=application["id"]))
+    with TestClient(app) as client:
+        assert client.get("/api/v1/export").status_code == 401
+        client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
+        archive = client.get("/api/v1/export").json()
+        grant = await app.state.mcp.call_tool("workspace_export", {})
+        ticket = app_module.json.loads(grant[0].text)
+        client.cookies.clear()
+        scoped = client.get(ticket["url"], headers=ticket["headers"])
+        assert scoped.status_code == 200
+        assert scoped.json() == archive
+        assert client.get("/api/v1/career/profile", headers=ticket["headers"]).status_code == 401
+    entries = {row["title"]: row for row in archive["knowledge"]}
+    assert entries["Undated project"]["dates"] is None
+    assert entries["Dated project"]["dates"]["start"] == "2025"
+    assert archive["claims"][0]["id"] == claim["id"]
+    assert archive["contexts"][0]["payload"]["knowledge"][0]["dates"] is None
+    assert "auth" not in archive["settings"]

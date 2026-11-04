@@ -12,7 +12,14 @@ import {
   useResource,
   useWorkspace,
 } from "./state";
-import { Button, ErrorBox, Icon, Loading, type IconName } from "./ui";
+import {
+  Button,
+  ErrorBox,
+  Icon,
+  Loading,
+  lockPageScroll,
+  type IconName,
+} from "./ui";
 import OverviewPage from "./pages/Overview";
 import { AddJob, JobDrawer, JobsPage } from "./pages/Jobs";
 import { ApplicationDrawer, ApplicationsPage } from "./pages/Applications";
@@ -186,6 +193,8 @@ function Auth({
 }
 function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
   useFormProtection();
+  const sidebar = useRef<HTMLElement>(null),
+    menuButton = useRef<HTMLButtonElement>(null);
   const lastRoute = useRef(location.hash);
   const [route, setRoute] = useState(readRoute),
     [mobile, setMobile] = useState(false),
@@ -211,7 +220,7 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
     });
   const { pending, refresh, notify } = useWorkspace();
   const profile = useResource<Partial<Profile>>("/career/profile", {}),
-    inbox = useResource<ListResult<never>>("/jobs?triage=inbox&limit=1", {
+    inbox = useResource<ListResult<never>>("/jobs?queue=inbox&limit=1", {
       items: [],
       total: 0,
     });
@@ -263,6 +272,22 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
     document.addEventListener("keydown", close);
     return () => document.removeEventListener("keydown", close);
   }, []);
+  useEffect(() => {
+    if (!mobile) return;
+    const unlock = lockPageScroll();
+    sidebar.current?.querySelector<HTMLElement>("a,button")?.focus();
+    const media = matchMedia("(min-width: 851px)");
+    const resize = () => {
+      if (media.matches) setMobile(false);
+    };
+    media.addEventListener("change", resize);
+    return () => {
+      unlock();
+      media.removeEventListener("change", resize);
+      if (menuButton.current?.getClientRects().length)
+        menuButton.current.focus({ preventScroll: true });
+    };
+  }, [mobile]);
   function navigate(id: string, next: Overlay = null) {
     if (!confirmLeave()) return;
     history.pushState(
@@ -311,7 +336,38 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
           onClick={() => setMobile(false)}
           tabIndex={-1}
         />
-        <aside className={`sidebar ${mobile ? "open" : ""}`}>
+        <aside
+          ref={sidebar}
+          className={`sidebar ${mobile ? "open" : ""}`}
+          role={mobile ? "dialog" : undefined}
+          aria-modal={mobile || undefined}
+          aria-label={mobile ? "Workspace navigation" : undefined}
+          onKeyDown={(event) => {
+            if (!mobile || event.key !== "Tab") return;
+            const targets = sidebar.current?.querySelectorAll<HTMLElement>(
+              "a[href],button:not([disabled])",
+            );
+            if (!targets?.length) return;
+            event.preventDefault();
+            const ordered = Array.from(targets);
+            const current = ordered.indexOf(
+              document.activeElement as HTMLElement,
+            );
+            ordered[
+              (current + (event.shiftKey ? -1 : 1) + ordered.length) %
+                ordered.length
+            ].focus();
+          }}
+        >
+          {mobile && (
+            <button
+              className="iconbtn nav-close"
+              aria-label="Close navigation"
+              onClick={() => setMobile(false)}
+            >
+              <Icon name="close" />
+            </button>
+          )}
           <a
             href="#overview"
             className="brand"
@@ -375,10 +431,11 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
             </div>
           </div>
         </aside>
-        <main className="main">
+        <main className="main" inert={mobile}>
           <div className="topbar">
             <div className="breadcrumb">
               <button
+                ref={menuButton}
                 className="iconbtn mobile-menu"
                 aria-label="Open navigation"
                 aria-expanded={mobile}

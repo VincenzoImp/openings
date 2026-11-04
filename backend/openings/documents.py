@@ -12,12 +12,12 @@ from typing import Any, Literal
 from urllib.parse import quote
 
 from fastapi import Request
-from fastapi.responses import StreamingResponse
 from pydantic import Field, field_validator
 
 from .career import DEFAULT_GUIDANCE, DEFAULT_PROFILE, Input, _get, _page, _setting
 from .common import decode_record, encode, new_id, now
 from .errors import DomainError, conflict, missing
+from .transfers import SnapshotResponse
 
 
 OwnerType = Literal["knowledge", "template", "document", "context", "job"]
@@ -313,6 +313,12 @@ class DocumentService:
         columns = "id,application_id,signature,created_at"
         if summary:
             columns += (
+                ",json_extract(payload,'$.job.title') AS job_title"
+                ",json_extract(payload,'$.job.company') AS company"
+                ",substr(json_extract(payload,'$.instructions.application_note'),1,160) AS note_preview"
+                ",json_array_length(payload,'$.knowledge') AS knowledge_count"
+                ",json_array_length(payload,'$.claims') AS claim_count"
+                ",json_extract(payload,'$.templates[0].name') AS template_name"
                 ",(SELECT COUNT(*) FROM files WHERE context_id=contexts.id) AS file_count"
                 ",(SELECT COUNT(*) FROM documents WHERE context_id=contexts.id) AS document_count"
             )
@@ -862,14 +868,14 @@ class DocumentService:
                     "SELECT rowid AS blob_rowid FROM blobs WHERE sha256=?", (row["sha256"],)
                 ).fetchone()
                 if not blob_row:
-                    return
+                    missing("File bytes")
                 with conn.blobopen(
                     "blobs", "content", blob_row["blob_rowid"], readonly=True
                 ) as blob:
                     while chunk := blob.read(64 * 1024):
                         yield chunk
 
-        return StreamingResponse(
+        return SnapshotResponse(
             chunks(),
             media_type=media_type,
             headers={

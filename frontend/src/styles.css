@@ -224,7 +224,7 @@ html[data-theme="dark"] .nav a.active {
 .nav a .navcount {
   font-size: 11px;
   margin-left: auto;
-  opacity: 0.7;
+  color: var(--muted);
 }
 .sidebar-bottom {
   margin-top: auto;
@@ -717,7 +717,7 @@ html[data-theme="dark"] .nav a.active {
 }
 .tag.amber {
   background: #f2ead6;
-  color: #9a7b36;
+  color: #795d20;
   border-color: transparent;
 }
 .tag.neutral {
@@ -1126,7 +1126,8 @@ html[data-theme="dark"] .nav a.active {
   border-bottom: 0;
   padding-bottom: 0;
 }
-.settingrow h3 {
+.settingrow h3,
+.settingrow .collection-control-title {
   font-size: 12px;
   margin-bottom: 4px;
   font-weight: 500;
@@ -1844,8 +1845,8 @@ html[data-theme="dark"] .nav a.active {
 /* React workspace layouts; no server-generated document styling. */
 :root {
   font-size: 14px;
-  --muted: #6d7065;
-  --faint: #8a8d80;
+  --muted: #5b5e54;
+  --faint: #696c61;
 }
 html[data-theme="dark"] {
   --muted: #bcc0af;
@@ -3244,10 +3245,7 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
 .context-history {
   margin-top: 18px;
 }
-.selection-box {
-  max-height: 260px;
-  overflow: auto;
-}
+
 .selection-box .checkline {
   align-items: start;
   margin: 12px 0;
@@ -3403,9 +3401,6 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
     width: calc(50% - 6px);
     flex: 1;
     min-width: 130px;
-  }
-  .selection-box {
-    max-height: 220px;
   }
   .settings-grid .settingrow {
     gap: 16px;
@@ -3996,4 +3991,170 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
   overflow: auto;
   line-height: 1.7;
   padding-left: 20px;
+}
+
+/* Preparation and review share the same revision-specific state in every view. */
+.preparation-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin: 12px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.preparation-item.approved {
+  color: var(--accent);
+}
+.application-next {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+  font-size: 12px;
+}
+.stage-overview {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.stage-overview .btn span {
+  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.stage-page-link {
+  padding: 8px 4px;
+  font-size: 12px;
+}
+.agent-preparation {
+  margin-bottom: 22px;
+}
+.agent-preparation > summary,
+.job-maintenance > summary,
+.global-instructions > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.agent-preparation[open] > summary,
+.global-instructions[open] > summary {
+  margin-bottom: 16px;
+}
+.job-maintenance {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+  margin-top: 24px;
+}
+.choice-options {
+  max-height: 260px;
+  overflow: auto;
+  margin-top: 12px;
+}
+.selection-actions {
+  margin-top: 12px;
+}
+.conflict-recovery {
+  display: block;
+  margin-top: 20px;
+}
+.conflict-recovery dd {
+  margin: 4px 0 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.inline-loading {
+  min-height: 0;
+  padding: 12px 0;
+  justify-content: flex-start;
+}
+.funnel-table .table-wrap {
+  max-width: 100%;
+  overflow: auto;
+}
+.file-preview-dialog {
+  width: min(900px, calc(100vw - 32px));
+}
+.file-image {
+  display: block;
+  max-width: 100%;
+  max-height: 65dvh;
+  object-fit: contain;
+  margin: auto;
+}
+.file-text {
+  max-height: 60dvh;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.mobile-template-picker {
+  display: none;
+}
+.nav-close {
+  align-self: flex-end;
+}
+.application-list {
+  overflow: auto;
+}
+@media (max-width: 600px) {
+  .mobile-template-picker {
+    display: block;
+    margin-bottom: 18px;
+  }
+  .templates-layout > .template-list {
+    display: none;
+  }
+  .global-instructions {
+    padding: 16px;
+  }
+  .application-list {
+    background: none;
+    border: none;
+    overflow: visible;
+  }
+  .application-list .table {
+    display: block;
+    min-width: 0;
+  }
+  .application-list thead {
+    display: none;
+  }
+  .application-list tbody {
+    display: grid;
+    gap: 14px;
+  }
+  .application-list tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card);
+  }
+  .application-list td {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    overflow-wrap: anywhere;
+  }
+  .application-list td:first-child {
+    grid-column: 1 / -1;
+  }
+  .application-list td::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    margin-bottom: 6px;
+  }
+  .application-list .preparation-summary {
+    margin: 0;
+  }
+  .stage-overview .btn {
+    flex: 1 0 29%;
+  }
+  .documentrow {
+    gap: 6px;
+  }
 }

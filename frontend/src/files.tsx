@@ -9,7 +9,16 @@ import {
   type WorkspaceFile,
 } from "./api";
 import { useDebounce, useResource, useWorkspace } from "./state";
-import { Button, Dialog, ErrorBox, Field, Icon, Pagination } from "./ui";
+import {
+  Button,
+  Dialog,
+  ErrorBox,
+  Field,
+  Icon,
+  Loading,
+  Pagination,
+  PendingResults,
+} from "./ui";
 export function FileManager({
   ownerType,
   ownerId,
@@ -29,6 +38,8 @@ export function FileManager({
     [offset, setOffset] = useState(0),
     [inspecting, setInspecting] = useState<WorkspaceFile | null>(null);
   const [mediaType, setMediaType] = useState("");
+  const [previewing, setPreviewing] = useState<WorkspaceFile | null>(null),
+    [removing, setRemoving] = useState<WorkspaceFile | null>(null);
   const debounced = useDebounce(query);
   const resource = useResource<ListResult<WorkspaceFile>>(
     files
@@ -49,6 +60,7 @@ export function FileManager({
     };
   }, [files, debounced, mediaType, offset, resource.data]);
   const { error, reload } = resource;
+  const updating = query !== debounced || (!files && resource.loading);
   const { mutate, pending, notify } = useWorkspace();
   const [pdf, setPdf] = useState<string | null>(null);
   useEffect(() => {
@@ -79,6 +91,7 @@ export function FileManager({
   return (
     <>
       {error && <ErrorBox message={error} retry={reload} />}
+      <PendingResults pending={updating} />
       {(data.total > 5 || query || mediaType) && (
         <div className="file-filters">
           <Field label="Find a file">
@@ -109,18 +122,14 @@ export function FileManager({
           </Field>
         </div>
       )}
-      <div className="document-files">
+      <div className="document-files" aria-busy={updating} inert={updating}>
         {data.items.map((file) => (
           <div className="documentrow" key={file.id}>
             <Icon name="file" />
             <div className="doccopy">
               <button
                 className="table-link"
-                onClick={() =>
-                  api<WorkspaceFile>(`/files/${file.id}`)
-                    .then(setInspecting)
-                    .catch((e) => notify(e.message, true))
-                }
+                onClick={() => setPreviewing(file)}
               >
                 <strong>{file.name}</strong>
               </button>
@@ -129,6 +138,17 @@ export function FileManager({
                 {date(file.created_at)}
               </small>
             </div>
+            <button
+              className="iconbtn"
+              aria-label={`Details for ${file.name}`}
+              onClick={() =>
+                api<WorkspaceFile>(`/files/${file.id}`)
+                  .then(setInspecting)
+                  .catch((e) => notify(e.message, true))
+              }
+            >
+              <Icon name="info" />
+            </button>
             <button
               className="iconbtn"
               aria-label={`Download ${file.name}`}
@@ -140,17 +160,12 @@ export function FileManager({
             >
               <Icon name="download" />
             </button>
-            {!immutable && (
+            {!immutable && !readOnly && (
               <button
                 className="iconbtn danger"
                 aria-label={`Delete ${file.name}`}
                 disabled={pending}
-                onClick={() =>
-                  mutate(
-                    () => api(`/files/${file.id}`, "DELETE"),
-                    "File removed.",
-                  )
-                }
+                onClick={() => setRemoving(file)}
               >
                 <Icon name="trash" />
               </button>
@@ -158,6 +173,35 @@ export function FileManager({
           </div>
         ))}
       </div>
+      {previewing && (
+        <FilePreview file={previewing} onClose={() => setPreviewing(null)} />
+      )}
+      {removing && (
+        <Dialog title="Delete this file?" onClose={() => setRemoving(null)}>
+          <p className="modal-intro">
+            Permanently remove {removing.name} from this record. Frozen
+            snapshots keep their own copies.
+          </p>
+          <div className="actions form-actions">
+            <Button onClick={() => setRemoving(null)}>Keep file</Button>
+            <Button
+              variant="danger-fill"
+              disabled={pending}
+              onClick={async () => {
+                if (
+                  await mutate(
+                    () => api(`/files/${removing.id}`, "DELETE"),
+                    "File removed.",
+                  )
+                )
+                  setRemoving(null);
+              }}
+            >
+              Delete file
+            </Button>
+          </div>
+        </Dialog>
+      )}
       {(data.total > 20 || offset > 0) && (
         <Pagination
           offset={offset}
@@ -224,5 +268,96 @@ export function FileManager({
         />
       )}
     </>
+  );
+}
+function FilePreview({
+  file,
+  onClose,
+}: {
+  file: WorkspaceFile;
+  onClose: () => void;
+}) {
+  const [url, setUrl] = useState(""),
+    [content, setContent] = useState<string | null>(null),
+    [error, setError] = useState("");
+  const { notify } = useWorkspace();
+  const pdf = file.media_type === "application/pdf",
+    image = ["image/png", "image/jpeg", "image/webp"].includes(file.media_type),
+    plain =
+      [
+        "text/plain",
+        "text/markdown",
+        "text/x-tex",
+        "application/x-tex",
+        "application/json",
+      ].includes(file.media_type) && file.size <= 1_000_000;
+  useEffect(() => {
+    const abort = new AbortController();
+    if (pdf || image || plain)
+      fileUrl(file)
+        .then(async (value) => {
+          if (plain) {
+            const response = await fetch(value, { signal: abort.signal });
+            if (!response.ok) throw Error("Unable to read this file.");
+            const text = await response.text();
+            if (!abort.signal.aborted) setContent(text);
+          } else if (!abort.signal.aborted) setUrl(value);
+        })
+        .catch((e) => {
+          if (!abort.signal.aborted)
+            setError(e instanceof Error ? e.message : "Preview failed.");
+        });
+    return () => abort.abort();
+  }, [file.id]);
+  return (
+    <Dialog className="file-preview-dialog" title={file.name} onClose={onClose}>
+      {error ? (
+        <ErrorBox message={error} />
+      ) : pdf || image ? (
+        url ? (
+          pdf ? (
+            <iframe
+              title={`Preview of ${file.name}`}
+              className="pdf-preview"
+              src={url}
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <img className="file-image" src={url} alt={file.name} />
+          )
+        ) : (
+          <Loading />
+        )
+      ) : plain ? (
+        content === null ? (
+          <Loading />
+        ) : (
+          <pre
+            className="file-text"
+            tabIndex={0}
+            role="region"
+            aria-label={file.name}
+          >
+            {content}
+          </pre>
+        )
+      ) : (
+        <p className="modal-intro">
+          Preview is unavailable for this file type or size. Download it to open
+          it on your device.
+        </p>
+      )}
+      <div className="actions form-actions">
+        <Button
+          icon="download"
+          onClick={() =>
+            downloadWorkspaceFile(file).catch((e) => notify(e.message, true))
+          }
+        >
+          Download file
+        </Button>
+        <Button onClick={onClose}>Close preview</Button>
+      </div>
+    </Dialog>
   );
 }

@@ -47,6 +47,14 @@ A PDF does not record submission. Changed content needs a new revision using
 changes increment versions: reread and review current files before approval.
 Prepare a new context when updated source knowledge is needed.
 
+Application list/detail `preparation` counts describe current revision leaves and
+their own PDFs/review state; they are not a submission or quality guarantee. Read
+the exact document/files before review. Context summaries include frozen labels
+and evidence/claim counts for discovery. Select claims only from selected entries;
+omitting selections uses defaults, while explicit empty evidence/claim lists
+include none. Updating questions preserves compatible live answers; incompatible
+answers reject the update unless deliberately changed or removed in `answers`.
+
 ## Manage collection and the archive
 
 Read `sources_schemas` for supported adapters, defaults and limits. Store one

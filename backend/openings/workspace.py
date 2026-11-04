@@ -543,7 +543,32 @@ class Workspace:
         row["documents_count"] = self.db.one(
             "SELECT count(*) n FROM documents WHERE application_id=?", (application_id,)
         )["n"]
+        with self.db.connect() as connection:
+            row["preparation"] = self._application_preparation(connection, [application_id])[
+                application_id
+            ]
         return row
+
+    @staticmethod
+    def _application_preparation(connection, application_ids):
+        """Summarize current revision leaves, never inheriting a parent's PDF/review."""
+        result = {identifier: [] for identifier in application_ids}
+        if not application_ids:
+            return result
+        placeholders = ",".join("?" for _ in application_ids)
+        rows = connection.execute(
+            "SELECT d.application_id,d.kind,COUNT(*) AS revisions,"
+            "SUM(EXISTS(SELECT 1 FROM files f WHERE f.document_id=d.id AND f.media_type='application/pdf')) AS pdf,"
+            "SUM(d.review_state='approved' AND EXISTS(SELECT 1 FROM files f WHERE f.document_id=d.id AND f.media_type='application/pdf')) AS approved "
+            f"FROM documents d WHERE d.application_id IN ({placeholders}) "
+            "AND NOT EXISTS(SELECT 1 FROM documents child WHERE child.previous_id=d.id) "
+            "GROUP BY d.application_id,d.kind ORDER BY d.kind",
+            application_ids,
+        )
+        for row in rows:
+            item = dict(row)
+            result[item.pop("application_id")].append(item)
+        return result
 
     def list_applications(
         self,
@@ -607,10 +632,12 @@ class Workspace:
                 "SELECT app.status,count(*) n" + base + where + " GROUP BY app.status", args
             ):
                 counts[row["status"]] = row["n"]
+            preparation = self._application_preparation(connection, [row["id"] for row in rows])
         items = []
         for raw in rows:
             item = {key: value for key, value in dict(raw).items() if not key.startswith("j_")}
             item["job"] = self._compact_job(raw)
+            item["preparation"] = preparation[item["id"]]
             items.append(item)
         return {"items": items, "total": total, "stage_counts": counts}
 
