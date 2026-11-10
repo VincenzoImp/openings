@@ -339,7 +339,8 @@ def test_heartbeat_keeps_a_long_task_leased(lane, clock, monkeypatch):
             if row(service, task["id"])["lease_until"] == expected:
                 return True
             beat.clear()
-            beat.wait(5)
+            if not beat.wait(5):
+                break  # no renewal arrived at all
         return False
 
     def feed(source):
