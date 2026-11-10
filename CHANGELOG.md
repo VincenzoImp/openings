@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add indexes for document revision leaves, activity, notes, job/source tasks, postings and file cascades; application lists on a large workspace drop from ~500 ms to ~20 ms. Indexes are created automatically at startup; schema remains 6.
+
 ## 0.12.0
 
 - Clarify application cards with current revision PDF/review state and direct next actions; keep postings accessible inside the application.
