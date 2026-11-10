@@ -351,7 +351,7 @@ def create_app(database=None, start_worker=True):
             name,
             media_type="application/vnd.sqlite3",
             filename="openings-backup.sqlite",
-            background=BackgroundTask(Path(name).unlink, missing_ok=True),
+            background=BackgroundTask(workspace.db.remove_temp, name),
         )
 
     @router.post("/backup/restore")
@@ -380,7 +380,7 @@ def create_app(database=None, start_worker=True):
                 raise DomainError(422, "backup_format", "This database backup could not be read.")
         finally:
             workspace.maintenance = False
-            Path(name).unlink(missing_ok=True)
+            workspace.db.remove_temp(name)
 
     @router.get("/examples")
     def examples():

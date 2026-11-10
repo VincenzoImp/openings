@@ -3,7 +3,6 @@
 import json
 import sqlite3
 import time
-from pathlib import Path
 
 from .common import now, encode
 from .errors import DomainError
@@ -117,7 +116,7 @@ def restore_database(workspace, source_path):
                         previous.backup(target)
                     raise
         finally:
-            Path(rollback_name).unlink(missing_ok=True)
+            workspace.db.remove_temp(rollback_name)
             if worker:
                 worker.start()
     return {
