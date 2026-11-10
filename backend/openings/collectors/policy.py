@@ -19,6 +19,7 @@ from ..common import check_version, encode, now
 from ..errors import DomainError, missing
 
 from .catalog import COMPANY_KINDS
+from .pinning import pin_session
 
 REQUEST_BATCH_SIZE = 40
 
@@ -217,11 +218,15 @@ class ProviderBudget:
     raise ProviderDeferred and are persisted on the task rather than sleeping.
     """
 
-    def __init__(self, store, provider, *, active=None, validate_url=None, max_wait=5):
+    def __init__(
+        self, store, provider, *, active=None, validate_url=None, resolve_host=None, max_wait=5
+    ):
         store._row(provider)
         self.store, self.provider = store, provider
         self.active = active
         self.validate_url = validate_url
+        # resolve_host(host, port) returns checked addresses; sessions connect only to those.
+        self.resolve_host = resolve_host
         self.max_wait = max_wait
         self.requests = 0
         self.responses = []
@@ -357,6 +362,8 @@ class ProviderBudget:
             # background stream queue. requests uses a synchronous bounded read.
             kwargs["content_callback" if is_curl else "stream"] = receive if is_curl else True
             try:
+                if self.resolve_host and owner is not None:
+                    pin_session(owner, current, self.resolve_host, is_curl=is_curl)
                 response = send(method, current, **kwargs)
             except Exception as error:
                 failed = getattr(error, "response", None)
