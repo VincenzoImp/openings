@@ -1,5 +1,9 @@
 name: Release images
 
+# Flow: version -> checks (CI) -> image (native amd64/arm64: build, push by digest,
+# smoke-test that digest) -> publish (multi-arch index from the tested digests,
+# tagged X.Y.Z and X.Y) -> release (GitHub Release from the CHANGELOG section).
+
 on:
   push:
     tags: ['v*']
@@ -27,6 +31,9 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       core: ${{ steps.version.outputs.core }}
+      image: ${{ steps.version.outputs.image }}
+      minor: ${{ steps.version.outputs.minor }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -41,52 +48,210 @@ jobs:
           import os, re, tomllib
           requested = os.environ['REQUESTED_VERSION'].removeprefix('v')
           actual = tomllib.load(open('pyproject.toml', 'rb'))['project']['version']
-          if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?', requested) or requested != actual:
+          match = re.fullmatch(r'([0-9]+)\.([0-9]+)\.[0-9]+(-[0-9A-Za-z.-]+)?', requested)
+          if not match or requested != actual:
               raise SystemExit('The explicit release version must match pyproject.toml.')
-          base = 'docker.io/' + os.environ['DOCKERHUB_NAMESPACE'].lower() + '/openings'
+          image = 'docker.io/' + os.environ['DOCKERHUB_NAMESPACE'].lower() + '/openings'
+          prerelease = bool(match.group(3))
+          # Only final releases move the X.Y tag.
+          minor = '' if prerelease else f'{match.group(1)}.{match.group(2)}'
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write(f'version={requested}\ncore={base}:{requested}\n')
+              output.write(
+                  f'version={requested}\ncore={image}:{requested}\nimage={image}\n'
+                  f'minor={minor}\nprerelease={str(prerelease).lower()}\n'
+              )
           PY
 
   checks:
     needs: version
     uses: ./.github/workflows/ci.yml
 
-  publish:
+  image:
+    name: image (${{ matrix.arch }})
     needs: [version, checks]
     if: github.event_name == 'push' || inputs.publish
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
-        with:
-          platforms: arm64
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Publish model-free core
+      - id: build
+        name: Build natively and push by digest (no tag)
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ needs.version.outputs.core }}
-          annotations: |
-            index:org.opencontainers.image.description=Job collection, career knowledge and application tracking with dashboard, REST and MCP
-            index:org.opencontainers.image.source=https://github.com/VincenzoImp/openings
-            index:org.opencontainers.image.licenses=MIT
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=${{ needs.version.outputs.image }},push-by-digest=true,name-canonical=true,push=true
           build-args: |
             VERSION=${{ needs.version.outputs.version }}
             VCS_REF=${{ github.sha }}
-          cache-from: |
-            type=gha,scope=core-amd64
-            type=gha,scope=core-arm64
-          cache-to: type=gha,mode=max,scope=core-release
+          cache-from: type=gha,scope=core-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=core-${{ matrix.arch }}
+      - name: Smoke the pushed digest
+        shell: bash
+        env:
+          ARCH: ${{ matrix.arch }}
+          REF: ${{ needs.version.outputs.image }}@${{ steps.build.outputs.digest }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          docker pull --platform "linux/$ARCH" "$REF"
+          docker volume create openings-release
+          trap 'docker logs openings-release; docker rm -f openings-release; docker volume rm openings-release' EXIT
+          docker run -d --name openings-release --init --cpus=0.5 --memory=512m \
+            --platform "linux/$ARCH" --publish 127.0.0.1:18080:8080 \
+            --mount source=openings-release,target=/data "$REF"
+          for _ in {1..60}; do
+            if curl --silent --fail http://127.0.0.1:18080/health > /tmp/openings-health.json; then break; fi
+            sleep 1
+          done
+          python -c "import json,os; h=json.load(open('/tmp/openings-health.json')); assert h['status']=='ok' and h['version']==os.environ['VERSION'], h"
+          test "$(docker exec openings-release id -u)" = 10001
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18080/api/v1/career/profile)" = 401
+          curl --silent --fail http://127.0.0.1:18080/api/v1/auth/setup \
+            --header 'Content-Type: application/json' --cookie-jar /tmp/openings-cookie \
+            --data '{"password":"synthetic-release-password"}' --output /dev/null
+          curl --silent --fail --cookie /tmp/openings-cookie \
+            http://127.0.0.1:18080/api/v1/capabilities --output /tmp/openings-capabilities.json
+          python -c "import json,os; p=json.load(open('/tmp/openings-capabilities.json')); assert p['version']==os.environ['VERSION']"
+          curl --silent --fail http://127.0.0.1:18080/ --output /tmp/openings-index.html
+          python -c "assert '<div id=\"root\"></div>' in open('/tmp/openings-index.html').read()"
+      - name: Record the tested digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: [version, image]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      digest: ${{ steps.index.outputs.digest }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digest-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - id: index
+        name: Tag the tested digests as one multi-arch image
+        shell: bash
+        env:
+          IMAGE: ${{ needs.version.outputs.image }}
+          VERSION: ${{ needs.version.outputs.version }}
+          MINOR: ${{ needs.version.outputs.minor }}
+        run: |
+          set -euo pipefail
+          sources=()
+          for file in "$RUNNER_TEMP"/digests/*; do
+            sources+=("$IMAGE@sha256:$(basename "$file")")
+          done
+          test "${#sources[@]}" -eq 2
+          tags=(--tag "$IMAGE:$VERSION")
+          if [ -n "$MINOR" ]; then tags+=(--tag "$IMAGE:$MINOR"); fi
+          docker buildx imagetools create "${tags[@]}" \
+            --annotation 'index:org.opencontainers.image.description=Job collection, career knowledge and application tracking with dashboard, REST and MCP' \
+            --annotation 'index:org.opencontainers.image.source=https://github.com/VincenzoImp/openings' \
+            --annotation 'index:org.opencontainers.image.licenses=MIT' \
+            --annotation "index:org.opencontainers.image.version=$VERSION" \
+            "${sources[@]}"
+          docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' \
+            > "$RUNNER_TEMP/index.json"
+          jq -e '[.manifests[].platform | "\(.os)/\(.architecture)"]
+            | index("linux/amd64") != null and index("linux/arm64") != null' \
+            "$RUNNER_TEMP/index.json"
+          digest="$(jq -r .digest "$RUNNER_TEMP/index.json")"
+          case "$digest" in sha256:*) ;; *) exit 1 ;; esac
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Published $IMAGE:$VERSION@$digest" >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    needs: [version, publish]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Extract release notes from CHANGELOG.md
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          IMAGE: ${{ needs.version.outputs.image }}
+          MINOR: ${{ needs.version.outputs.minor }}
+          DIGEST: ${{ needs.publish.outputs.digest }}
+        run: |
+          python - <<'PY'
+          import os, re
+          version, image = os.environ['VERSION'], os.environ['IMAGE']
+          lines = open('CHANGELOG.md', encoding='utf-8').read().splitlines()
+          heading = re.compile(r'^##\s+\[?v?' + re.escape(version) + r'\]?(\s|$)')
+          start = next((i for i, line in enumerate(lines) if heading.match(line)), None)
+          if start is None:
+              raise SystemExit(f'CHANGELOG.md has no "## {version}" section.')
+          end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith('## ')), len(lines))
+          body = '\n'.join(lines[start + 1:end]).strip()
+          if not body:
+              raise SystemExit(f'The CHANGELOG.md section for {version} is empty.')
+          tags = f'`{version}`' + (f' and `{os.environ["MINOR"]}`' if os.environ['MINOR'] else '')
+          notes = (
+              f'{body}\n\n## Container image\n\n'
+              f'Linux amd64/arm64, tagged {tags}:\n\n'
+              f'```\n{image}:{version}@{os.environ["DIGEST"]}\n```\n'
+          )
+          with open(os.path.join(os.environ['RUNNER_TEMP'], 'release-notes.md'), 'w', encoding='utf-8') as output:
+              output.write(notes)
+          PY
+      - name: Create or update the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          tag="v$VERSION"
+          notes="$RUNNER_TEMP/release-notes.md"
+          if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" > /dev/null 2>&1; then
+            echo "::warning::Tag $tag does not exist; push it to create the GitHub Release."
+            exit 0
+          fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes-file "$notes"
+          else
+            flags=()
+            if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --title "Openings $VERSION" --notes-file "$notes" "${flags[@]}"
+          fi
