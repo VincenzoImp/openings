@@ -56,6 +56,17 @@ checks and relative file-transfer links; it must match the client origin. Set th
 owner password before opening access to other devices. Use HTTPS through a
 trusted reverse proxy across untrusted networks.
 
+Behind a reverse proxy, list the proxy's address as seen by the container in
+`.env`, so sign-in limits and secure cookies use each browser's real address:
+
+```dotenv
+OPENINGS_TRUSTED_PROXIES=172.18.0.2
+```
+
+Use comma-separated IP addresses or CIDR ranges. When it is empty (the default),
+`X-Forwarded-For` and `X-Forwarded-Proto` are ignored and all proxied clients
+share the proxy's sign-in limit. Trust only proxies that overwrite these headers.
+
 The core listens on port 8080 inside its container. `OPENINGS_PORT` changes the
 host port; update `OPENINGS_PUBLIC_URL` to match.
 

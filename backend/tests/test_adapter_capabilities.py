@@ -28,7 +28,7 @@ def transport(monkeypatch, send):
     monkeypatch.setattr(
         module.httpx,
         "Client",
-        lambda **kwargs: original(transport=httpx.MockTransport(send), **kwargs),
+        lambda **kwargs: original(**{**kwargs, "transport": httpx.MockTransport(send)}),
     )
 
 

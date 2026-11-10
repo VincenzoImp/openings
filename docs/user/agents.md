@@ -136,8 +136,8 @@ The [Collection guide](sources.md) explains daily time slots, defaults and count
 
 REST supports the same workflow when scripting is more convenient. See the
 [API guide](api.md) for transfers and optimistic updates. `workspace_backup`,
-`workspace_restore_upload` and `workspace_export` return short-lived operational
-transfer instructions. Restore replaces workspace data.
+`workspace_restore_upload` and `workspace_export` return short-lived, single-use
+operational transfer instructions. Restore replaces workspace data.
 
 Your agent supplies its own model access and compilation tools. You can also
 prepare and upload documents manually.

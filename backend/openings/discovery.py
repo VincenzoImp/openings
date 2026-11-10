@@ -18,6 +18,7 @@ from html.parser import HTMLParser
 from typing import Any, Literal
 from urllib.parse import parse_qs, quote, urljoin, urlsplit
 
+import httpcore
 import httpx
 from fastapi import Query
 from mcp.types import ToolAnnotations
@@ -229,19 +230,61 @@ def public_url(value: str) -> str:
         raise DomainError(
             422, "invalid_url", "Use a public HTTP(S) URL without embedded credentials."
         )
+    public_addresses(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80))
+    return value
+
+
+def is_public_address(address: str) -> bool:
+    return ipaddress.ip_address(address).is_global
+
+
+def public_addresses(host: str, port: int) -> list[str]:
+    """Resolve a host once; every address must be public or the request is refused."""
     try:
-        addresses = socket.getaddrinfo(
-            parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80)
-        )
+        rows = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
     except OSError as error:
         raise DomainError(
             422, "unreachable_url", "The URL's host could not be resolved."
         ) from error
-    if not addresses or any(not ipaddress.ip_address(row[4][0]).is_global for row in addresses):
+    addresses = list(dict.fromkeys(str(row[4][0]) for row in rows))
+    if not addresses or not all(is_public_address(item) for item in addresses):
         raise DomainError(
             422, "private_url", "Collection URLs must resolve to public network addresses."
         )
-    return value
+    return addresses
+
+
+class PublicNetworkBackend(httpcore.SyncBackend):
+    """Connect only to the public addresses checked for this connection.
+
+    Resolving inside the connection and dialing the checked IP closes the DNS
+    rebinding window between the URL check and httpx's own name resolution. TLS
+    still verifies the certificate against the requested host name.
+    """
+
+    def connect_tcp(self, host, port, timeout=None, local_address=None, socket_options=None):
+        failure = None
+        for address in public_addresses(host, port):
+            try:
+                return super().connect_tcp(address, port, timeout, local_address, socket_options)
+            except (httpcore.ConnectError, httpcore.ConnectTimeout) as error:
+                failure = error
+        raise failure
+
+
+class PublicTransport(httpx.HTTPTransport):
+    """An httpx transport whose every connection, including redirect hops, is pinned."""
+
+    def __init__(self):
+        super().__init__(trust_env=False)
+        limits = httpx.Limits(max_connections=10, max_keepalive_connections=5)
+        self._pool = httpcore.ConnectionPool(
+            ssl_context=httpx.create_ssl_context(trust_env=False),
+            max_connections=limits.max_connections,
+            max_keepalive_connections=limits.max_keepalive_connections,
+            keepalive_expiry=limits.keepalive_expiry,
+            network_backend=PublicNetworkBackend(),
+        )
 
 
 def fetch_bytes(
@@ -261,6 +304,7 @@ def fetch_bytes(
             follow_redirects=False,
             trust_env=False,
             headers={"User-Agent": f"Openings/{__version__} (job archive)"},
+            transport=PublicTransport() if public else None,
         ) as client:
             for _ in range(5):
                 if public:
@@ -277,6 +321,11 @@ def fetch_bytes(
                 except httpx.HTTPError as error:
                     if budget:
                         budget.after(None, error=type(error).__name__)
+                    raise
+                except DomainError as error:
+                    # The connection-time address check refused this hop.
+                    if budget:
+                        budget.after(None, error=error.code)
                     raise
                 try:
                     if budget:
