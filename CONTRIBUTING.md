@@ -13,7 +13,7 @@ updated documentation.
 
 ## Run locally
 
-Requires Python 3.12+, Node 24 and [uv](https://docs.astral.sh/uv/).
+Requires Python 3.12+, Node 26 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync --locked --python 3.12
