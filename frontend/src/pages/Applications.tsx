@@ -15,7 +15,10 @@ import {
   version,
   type Activity,
   type Application,
+  type Consistency,
   type Document,
+  type StaleInput,
+  type Staleness,
   type Job,
   type ListResult,
   type Stage,
@@ -550,6 +553,117 @@ function Preparation({ application }: { application: Application }) {
       ) : (
         <span>No documents yet</span>
       )}
+      {!!application.stale_inputs?.length && (
+        <span
+          className="preparation-item stale"
+          title={`Changed since the context was frozen: ${application.stale_inputs
+            .map((input) => staleLabels[input])
+            .join(", ")}`}
+        >
+          <Icon name="refresh" /> Built on older inputs
+        </span>
+      )}
+    </div>
+  );
+}
+const staleLabels: Record<StaleInput, string> = {
+  profile: "Profile",
+  instructions: "General guidance",
+  template: "Template",
+  knowledge: "Career entry",
+  claim: "Claim",
+};
+const staleStates = {
+  changed: "changed",
+  deleted: "deleted",
+  unapproved: "no longer approved",
+};
+function StalenessNotice({ application }: { application: Application }) {
+  const report = useResource<Staleness | null>(
+    application.stale_inputs?.length
+      ? `/applications/${application.id}/staleness`
+      : null,
+    null,
+  );
+  if (!application.stale_inputs?.length) return null;
+  const stale = report.data?.documents.filter(
+    (item) => item.status === "stale",
+  );
+  return (
+    <section className="stale-notice" aria-label="Built on older inputs">
+      <h3>
+        <Icon name="refresh" /> Built on older inputs
+      </h3>
+      <p>
+        The current revisions were prepared from a frozen context. These inputs
+        changed afterwards. Frozen contexts stay unchanged; to refresh, prepare
+        a new context and save new revisions.
+      </p>
+      {report.error ? (
+        <ErrorBox message={report.error} retry={report.reload} />
+      ) : !report.data ? (
+        <Loading />
+      ) : (
+        <>
+          <ul>
+            {report.data.changes.map((change) => (
+              <li key={`${change.input}-${change.id ?? ""}`}>
+                <strong>{staleLabels[change.input]}</strong>
+                {change.label && change.id ? ` “${change.label}”` : ""}{" "}
+                {staleStates[change.state]}
+                {change.state === "changed" &&
+                change.frozen_version !== null &&
+                change.current_version !== null
+                  ? ` (version ${change.frozen_version} → ${change.current_version})`
+                  : ""}
+              </li>
+            ))}
+          </ul>
+          {!!stale?.length && (
+            <p className="hint">
+              Affected revisions:{" "}
+              {stale
+                .map((item) => item.title || kindLabels[item.kind] || item.kind)
+                .join(", ")}
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+const kindLabels: Record<string, string> = {
+  resume: "CV",
+  cover_letter: "Cover letter",
+  answers: "Form answers",
+  other: "Other",
+};
+function SourceCheck({ report }: { report: Consistency }) {
+  if (report.status === "consistent")
+    return (
+      <p className="source-check ok">
+        <Icon name="check" /> {report.reason}
+      </p>
+    );
+  if (report.status === "not_checked")
+    return <p className="source-check">{report.reason}</p>;
+  return (
+    <div className="source-check mismatch" role="status">
+      <p>
+        <Icon name="error" /> The saved content and the .tex source differ.{" "}
+        {report.reason}
+      </p>
+      <ul>
+        {report.mismatches.slice(0, 5).map((item) => (
+          <li key={item.path}>
+            <code>{item.path}</code> {item.text}
+          </li>
+        ))}
+      </ul>
+      <p className="hint">
+        Save the matching content as a new revision or upload the matching
+        source. Approve with differences only when they are intentional.
+      </p>
     </div>
   );
 }
@@ -787,6 +901,11 @@ function DocumentCard({
     null,
   );
   const document = detail.data || summary;
+  const consistency = useResource<Consistency | null>(
+    expanded ? `/documents/${summary.id}/consistency` : null,
+    null,
+  );
+  const mismatch = consistency.data?.status === "mismatch";
   return (
     <article className="document-card">
       <header>
@@ -843,6 +962,7 @@ function DocumentCard({
               preview
               readOnly={document.review_state === "approved"}
             />
+            {consistency.data && <SourceCheck report={consistency.data} />}
             <div className="actions form-actions">
               <Button icon="edit" onClick={() => setEdit(true)}>
                 New revision
@@ -856,21 +976,29 @@ function DocumentCard({
               </Button>
               {document.review_state !== "approved" && (
                 <Button
-                  variant="primary"
+                  variant={mismatch ? "danger" : "primary"}
                   icon="check"
-                  disabled={pending || detail.refreshing || !!detail.error}
+                  disabled={
+                    pending ||
+                    detail.refreshing ||
+                    !!detail.error ||
+                    consistency.loading
+                  }
                   onClick={() =>
                     mutate(
                       () =>
                         api(`/documents/${document.id}/review`, "POST", {
                           review_state: "approved",
                           expected_version: document.version,
+                          allow_content_mismatch: mismatch,
                         }),
                       "Document approved.",
                     )
                   }
                 >
-                  Approve this revision
+                  {mismatch
+                    ? "Approve with differences"
+                    : "Approve this revision"}
                 </Button>
               )}
             </div>
@@ -1181,6 +1309,7 @@ export function ApplicationDrawer({
                   )}
                 </details>
                 <Preparation application={app} />
+                <StalenessNotice application={app} />
                 <div className="sectiontitle">
                   <h3>Documents and revisions</h3>
                   <Button icon="plus" onClick={() => setAdd(true)}>

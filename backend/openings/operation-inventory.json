@@ -1010,6 +1010,38 @@
       "notes": "Select template_ids/knowledge_ids/claim_ids and note; optional idempotency_key. Unapproved/out-of-scope claims cannot enter context."
     },
     {
+      "id": "applications.staleness",
+      "group": "Applications and documents",
+      "operation": "Report whether an attempt's current revisions use outdated inputs",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/applications/{application_id}/staleness"
+        }
+      ],
+      "mcp": [
+        "application_staleness"
+      ],
+      "dashboard": "Applications: Built on older inputs indicator and detail",
+      "notes": "Compares the Profile, instructions, template, Career entry and claim versions frozen in each current leaf's context with the current records. Read-only; refreshing means preparing a new context and new revisions."
+    },
+    {
+      "id": "applications.staleness_list",
+      "group": "Applications and documents",
+      "operation": "List attempts whose current revisions use outdated inputs",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/staleness"
+        }
+      ],
+      "mcp": [
+        "applications_staleness"
+      ],
+      "dashboard": "Applications: Built on older inputs badges on cards and rows",
+      "notes": "status (default draft, or all), stale_only (default true), limit, offset. Application list/read summaries also include stale_inputs."
+    },
+    {
       "id": "documents.list",
       "group": "Applications and documents",
       "operation": "List/filter paginated revision summaries",
@@ -1070,7 +1102,23 @@
         "documents_review"
       ],
       "dashboard": "Applications: Approve revision",
-      "notes": "Required expected_version detects concurrent file/review changes. Approval blocks all further file uploads."
+      "notes": "Required expected_version detects concurrent file/review changes. Approval blocks all further file uploads. Refuses with 409 content_mismatch when the attached .tex text and structured content disagree; allow_content_mismatch=true approves an intentional difference."
+    },
+    {
+      "id": "documents.consistency",
+      "group": "Applications and documents",
+      "operation": "Compare structured content text with the attached .tex source",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/documents/{document_id}/consistency"
+        }
+      ],
+      "mcp": [
+        "documents_consistency"
+      ],
+      "dashboard": "Applications: approval reports content/source differences",
+      "notes": "Ignores case, whitespace, punctuation, accents and LaTeX markup; no TeX runtime. Status consistent, mismatch or not_checked (no .tex file or no text)."
     },
     {
       "id": "documents.delete",

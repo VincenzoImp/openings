@@ -320,7 +320,9 @@ def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_
             content={"text": "document " * 10000},
         )
     )
-    asset, _ = upload(documents, client, "document", first["id"], "candidate.tex", b"source")
+    asset, _ = upload(
+        documents, client, "document", first["id"], "candidate.tex", b"document " * 10000
+    )
     documents.review_document(
         first["id"], ReviewUpdate(expected_version=documents.get_document(first["id"])["version"])
     )

@@ -92,11 +92,17 @@ Inspect full PDFs and extracted text, fixed content, required terms, line/page
 geometry, links, factual scope and employer requirements. Use the template's
 checker where supplied; it does not replace factual or visual review.
 
-Find the intended current document leaf for each kind. Reuse matching work;
+Find the intended current document leaf for each kind. When resuming, check
+`application_staleness`: a leaf built on older inputs is refreshed with a new
+context and new revisions when the change matters. Reuse matching work;
 complete missing steps on a compatible incomplete revision. Save changed output
 as the appropriate new revision. An approved parent does not supply files or
 approval to a new child. Resolve concurrent branches explicitly.
 
+Keep the revision's structured `content` identical in wording to the uploaded
+`.tex` source and its PDF: when you edit the source after saving content, save the
+edited text as a new revision instead of uploading a diverging file. Run
+`documents_consistency` before review; `documents_review` refuses a mismatch.
 Upload exact source/PDF files and verify size and hashes. Download and validate
 the actual PDFs; a successful transfer is not a PDF-quality check. Read the
 post-upload document version, then mark document review approved only after the
@@ -105,7 +111,7 @@ agent checks pass. Do not attribute this review to a human.
 ## Readiness and handoff
 
 Re-read the intended CV and CL leaves and their files. Both must match the chosen
-context and content, have valid checked PDFs and exact sources, and have approved
+context and content, report `consistent` from `documents_consistency`, have valid checked PDFs and exact sources, and have approved
 review states. Only then report that Draft ready for the owner's review.
 Ready is not a separate API status. The application stays Draft; job interest
 stays saved. The owner submits on the company site and records Applied.
