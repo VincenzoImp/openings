@@ -326,7 +326,7 @@ def test_actual_requests_and_curl_transports_bound_bodies_and_record_integer_sta
             self.end_headers()
             try:
                 self.wfile.write(content)
-            except (BrokenPipeError, ConnectionResetError):
+            except BrokenPipeError, ConnectionResetError:
                 pass
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)

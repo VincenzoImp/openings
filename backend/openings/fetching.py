@@ -51,7 +51,7 @@ def structured_posting(body):
     for script in soup.find_all("script", type="application/ld+json"):
         try:
             candidates.append(json.loads(script.string or script.get_text()))
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             continue
     while candidates:
         node = candidates.popleft()
@@ -181,7 +181,7 @@ async def read_posting(url, discovery):
                 return {"metadata": {"extraction": "needs_text", "extraction_error": error.message}}
             if error.status == 429:
                 return {"metadata": {"extraction": "deferred", "extraction_error": error.message}}
-        except (ValueError, TypeError, AttributeError):
+        except ValueError, TypeError, AttributeError:
             continue
     return {
         "metadata": {
