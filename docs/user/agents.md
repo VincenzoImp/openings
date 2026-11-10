@@ -10,8 +10,12 @@ set `OPENINGS_PUBLIC_URL` to the address the agent can actually reach. The serve
 returns that origin from `workspace_info`; resolve relative transfer URLs against
 it. An agent's `localhost` refers to the agent machine, not necessarily the server.
 
-The repository ships workflow [skills](../../skills/) in the Agent Skills format,
-starting with [`openings-workspace`](../../skills/openings-workspace/SKILL.md).
+The server ships workflow [skills](../../skills/) in the Agent Skills format and
+serves them to connected agents: `skills_list`, `skill_get(name, path)` and one MCP
+prompt per skill, also at `GET /api/v1/skills`. Start with
+[`setup-openings`](../../skills/setup-openings/SKILL.md) for a new workspace or
+[`openings-workspace`](../../skills/openings-workspace/SKILL.md) for the basics.
+**Settings → Agent access** shows client configuration snippets and the skill list.
 To let an agent run the whole search for you, see
 [Agent-operated job search](agent-operated.md). MCP remains usable without the
 skills: discover the tools/resources and their typed input schemas.

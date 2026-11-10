@@ -34,6 +34,40 @@
       "dashboard": "Settings: capabilities/help"
     },
     {
+      "id": "skills.list",
+      "group": "Archive",
+      "operation": "List shipped agent workflow skills",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/skills"
+        }
+      ],
+      "mcp": [
+        "skills_list"
+      ],
+      "dashboard": "Settings: Connect an agent"
+    },
+    {
+      "id": "skills.read",
+      "group": "Archive",
+      "operation": "Read a skill or one of its reference files",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/skills/{name}"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/skills/{name}/files/{path}"
+        }
+      ],
+      "mcp": [
+        "skill_get"
+      ],
+      "dashboard": "Settings: Connect an agent"
+    },
+    {
       "id": "overview.read",
       "group": "Archive",
       "operation": "Read submitted-attempt funnel and activity for a period",
