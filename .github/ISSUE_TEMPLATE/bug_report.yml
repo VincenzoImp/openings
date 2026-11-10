@@ -1,0 +1,76 @@
+name: Bug report
+description: Something in Openings does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Use synthetic examples only: never paste
+        personal databases, CVs, API tokens, `.env` files or real postings you
+        cannot share. Report security vulnerabilities privately through
+        [SECURITY.md](https://github.com/VincenzoImp/openings/blob/main/SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: Openings version
+      description: Shown in Settings, by `GET /api/v1/capabilities`, or the image tag you run.
+      placeholder: "0.15.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Where does it happen?
+      multiple: true
+      options:
+        - Dashboard
+        - REST API
+        - MCP / external agent
+        - Workflow skills
+        - Collection (searches or company boards)
+        - Docker / installation
+        - Backup, restore or export
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: How you run Openings (Docker image, source checkout), host OS/architecture, browser or agent client.
+      placeholder: "Docker 28 on Linux arm64, Firefox 140"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The smallest sequence that shows the problem, with synthetic data.
+      placeholder: |
+        1. Open Applications
+        2. Filter by readiness "Ready"
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include error messages, HTTP status/`code`, or relevant `docker compose logs` lines with secrets removed.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues and the documentation.
+          required: true
+        - label: This report contains no personal data, credentials or private documents.
+          required: true

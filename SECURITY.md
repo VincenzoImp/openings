@@ -13,8 +13,12 @@ it on a LAN, and use HTTPS through a trusted proxy across untrusted networks.
 
 Passwords are hashed; API tokens are stored as hashes and are revocable. Browser
 writes require CSRF protection. File/operational transfers use short-lived scoped
-grants; keep their headers private. Grant URLs contain no secret. A dashboard
-shell and health/schema endpoints are public; personal data requires authentication.
+grants; operational grants are single-use. Keep their headers private. Grant URLs
+contain no secret. Sign-in is limited per client and slowed globally after repeated
+failures; behind a proxy, set `OPENINGS_TRUSTED_PROXIES` so limits apply per client.
+URL imports and feed/board fetches connect only to the public addresses checked for
+each request and redirect. A dashboard shell and health/schema endpoints are public;
+personal data requires authentication.
 
 SQLite and backups are not encrypted. Protect their host files and backups.
 External agents have the access you grant them and use their own AI services;

@@ -31,7 +31,7 @@ def test_cross_provider_redirect_is_rejected_before_destination_request(tmp_path
     monkeypatch.setattr(
         module.httpx,
         "Client",
-        lambda **kwargs: original(transport=httpx.MockTransport(send), **kwargs),
+        lambda **kwargs: original(**{**kwargs, "transport": httpx.MockTransport(send)}),
     )
     with pytest.raises(DomainError) as error:
         discovery.fetch_bytes("https://example.org/alias")

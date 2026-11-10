@@ -1,39 +1,58 @@
 # Openings
 
+[![CI](https://img.shields.io/github/actions/workflow/status/VincenzoImp/openings/ci.yml?branch=main&label=CI)](https://github.com/VincenzoImp/openings/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/VincenzoImp/openings?sort=semver)](https://github.com/VincenzoImp/openings/releases/latest)
+[![Docker image](https://img.shields.io/docker/v/vincenzoimp/openings?sort=semver&label=docker)](https://hub.docker.com/r/vincenzoimp/openings)
+[![License: MIT](https://img.shields.io/github/license/VincenzoImp/openings)](LICENSE)
+
 A self-hosted job search workspace. Collect offers, keep your career knowledge and
-templates together, and prepare applications with your own AI agent. Jobs,
-documents and file bytes live in one portable SQLite database.
+templates together, and let your own AI agent prepare applications that you review
+and submit. Jobs, documents and file bytes live in one portable SQLite database.
 
-[Get started](docs/user/getting-started.md) · [Documentation](docs/README.md) · [Agent-operated search](docs/user/agent-operated.md)
+**[Start with Docker](#start-with-docker)** · [Connect an agent](#connect-an-agent) ·
+[Documentation](docs/README.md) · [Changelog](CHANGELOG.md)
 
-![Workspace overview with application progress, outcomes and recent activity](docs/images/overview.png)
+![Workspace overview with application totals and the progress funnel](docs/images/overview.png)
 
-## From job search to application
+## Features
 
-- **Collect:** schedule keyword/location searches on LinkedIn, Indeed and Glassdoor,
-  or follow selected company ATS boards and feeds. Automatic results enter the
-  archive with their posting text; you can also add individual jobs yourself.
-- **Organize:** search, filter and shortlist offers individually or in bulk.
-  Inbox holds unreviewed jobs; Shortlist holds selected jobs awaiting preparation.
-  Starting an application moves the work to Applications. Dismissed jobs stay remembered.
-- **Prepare:** store career entries, approved claims, multiple LaTeX templates,
-  assets and writing instructions for your external agent.
-- **Review:** keep CVs, cover letters, form answers and their exact PDF/source
-  revisions with each application.
-- **Track:** move applications through a Kanban board and inspect their recorded
-  journey, outcomes and funnel.
-- **Automate:** use the dashboard, REST API or MCP with shared operations.
+- **Collect:** scheduled keyword/location searches on LinkedIn, Indeed and Glassdoor,
+  or selected company boards (Greenhouse, Lever, Ashby, Workday and more) and RSS
+  feeds. Role, location and `exclude_titles` filters skip noise before it reaches
+  your Inbox. You can also add any job by URL or pasted text.
+- **Triage:** review the Inbox, keep jobs on a Shortlist or dismiss them; dismissed
+  jobs stay remembered. **Possible duplicates** groups one vacancy collected from
+  several sources so you can merge verified copies; bulk actions work on up to 200 jobs.
+- **Prepare:** store your Profile, Career entries, approved claims, LaTeX templates
+  and writing instructions. Each application freezes the exact context its CV,
+  cover letter and form answers were written from, with PDF/source revisions and review.
+- **Plan:** give applications a priority, a deadline and the employer's requirements
+  (authorship rules, attachments, references, language, eligibility). Filter by
+  readiness (blocked, no documents, missing PDF, needs review, ready) and sort by
+  deadline or priority. Close, reopen or delete applications in bulk.
+- **Stay consistent:** applications built on older inputs are flagged after Profile,
+  template or Career changes, and review checks a document's content against its
+  `.tex` source.
+- **Track:** move applications through Preparing, Applied, Interview, Offer and
+  Closed with recorded outcomes, history and a progress funnel.
+- **Automate:** the dashboard, REST API and MCP share one service layer and the same
+  operations.
+
+![Applications sorted by deadline with priority, readiness, a blocking requirement and bulk actions](docs/images/applications-planning.png)
+
+## Agent-operated
+
+Openings works best when your own AI agent runs it. The server ships
+[workflow skills](skills/) and serves them to any connected agent (`skills_list`,
+`skill_get` and one MCP prompt per skill). With them, an agent reviews new jobs
+against your Profile, prepares a CV and letter for every shortlisted job, records
+employer requirements, tunes searches and keeps your Career record current. You
+answer its questions, apply to the prepared Drafts and mark them Applied.
+
+The agent uses its own model access and tools and never submits applications for
+you. Read [Agent-operated job search](docs/user/agent-operated.md).
 
 ![Collect jobs, organize career knowledge, prepare documents with your agent, and track applications](docs/images/workflow.svg)
-
-Openings works best when your own agent runs it. With the included
-[workflow skills](skills/), an agent reviews new jobs against your Profile,
-prepares a CV and letter for every shortlisted one, tunes searches and monitored
-companies, and keeps improving your Career record and templates. You answer its
-questions, apply to the prepared Drafts and mark them Applied. See
-[Agent-operated job search](docs/user/agent-operated.md); your agent supplies its
-own model access and tools, and never submits applications for you. Start from
-the [operator workspace template](examples/operator-workspace/README.md).
 
 ## Start with Docker
 
@@ -52,14 +71,34 @@ Open **http://127.0.0.1:8080**, choose an owner password and add your first job 
 paused. Build your **Career** and **Templates** library before preparing documents.
 
 The Compose limit is **0.5 CPU / 512 MiB**; allow host resources beyond this
-container budget. [Setup](docs/user/getting-started.md) covers LAN access and storage.
+container budget. [Setup and first use](docs/user/getting-started.md) covers LAN
+access, storage and upgrades.
 
-## Explore
+## Connect an agent
 
-[Collection and schedules](docs/user/sources.md) · [Career knowledge](docs/user/career.md) · [Application documents](docs/user/applications.md) · [REST API](docs/user/api.md) · [Operations](docs/user/operations.md)
+1. In **Settings → Agent access**, create an API token and copy the configuration
+   for Claude Code, Codex or another MCP client. The endpoint is
+   `http://127.0.0.1:8080/mcp` with `Authorization: Bearer <token>`.
+2. Ask the agent to load the `setup-openings` skill to onboard your career,
+   templates and first searches.
+3. For a persistent setup, copy the
+   [operator workspace template](examples/operator-workspace/README.md): it holds the
+   operating mandate and generates MCP configuration for six clients.
 
-![Job inbox with compact roles, shortlists and application stages](docs/images/inbox.png)
+[Agents and MCP](docs/user/agents.md) explains the tools, transfers and state rules.
 
-![Application board with preparing, submitted and interview stages](docs/images/applications.png)
+![Settings → Agent access with client configuration and the served skills](docs/images/agent-access.png)
 
-[Contributing](CONTRIBUTING.md) · [Architecture](docs/developer/architecture.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md) · [MIT license](LICENSE)
+## Documentation
+
+[Collection](docs/user/sources.md) · [Career](docs/user/career.md) ·
+[Applications](docs/user/applications.md) · [Agents and MCP](docs/user/agents.md) ·
+[REST API](docs/user/api.md) · [Operations](docs/user/operations.md)
+
+![Application board sorted by deadline, with plan tags and stages from Preparing to Closed](docs/images/applications.png)
+
+## Project
+
+[Contributing](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) ·
+[Architecture](docs/developer/architecture.md) · [Security](SECURITY.md) ·
+[Changelog](CHANGELOG.md) · [MIT license](LICENSE)

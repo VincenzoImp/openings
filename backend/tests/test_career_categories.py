@@ -18,6 +18,7 @@ def test_awards_and_publications_survive_import_filtering_and_frozen_context(tmp
         "Accept": "application/json, text/event-stream",
     }
     with TestClient(app, base_url="http://localhost:8080", headers=headers) as client:
+
         def call(tool, method, path, arguments):
             if transport == "rest":
                 response = client.request(
@@ -31,7 +32,9 @@ def test_awards_and_publications_survive_import_filtering_and_frozen_context(tmp
             response = client.post(
                 "/mcp",
                 json={
-                    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/call",
                     "params": {"name": tool, "arguments": arguments},
                 },
             )
@@ -54,42 +57,57 @@ def test_awards_and_publications_survive_import_filtering_and_frozen_context(tmp
             for entry in entries
         ]
         preview = call(
-            "career_preview_import", "POST", "/career/import/preview",
+            "career_preview_import",
+            "POST",
+            "/career/import/preview",
             {"value": {"text": json.dumps(entries)}},
         )
         assert [row["kind"] for row in preview["knowledge"]] == ["award", "publication"]
         before_import = call("knowledge_list", "GET", "/career/knowledge", {})
         assert before_import["total"] == 2
         imported = call(
-            "career_import", "POST", "/career/import", {"value": {"knowledge": preview["knowledge"]}}
+            "career_import",
+            "POST",
+            "/career/import",
+            {"value": {"knowledge": preview["knowledge"]}},
         )
         assert imported["total"] == 2
         for entry, record in zip(entries, created):
             listed = call(
-                "knowledge_list", "GET", "/career/knowledge",
+                "knowledge_list",
+                "GET",
+                "/career/knowledge",
                 {"kind": entry["kind"], "summary": True},
             )
             assert listed["total"] == 2
             assert {row["kind"] for row in listed["items"]} == {entry["kind"]}
             read = call(
-                "knowledge_get", "GET", f"/career/knowledge/{record['id']}",
+                "knowledge_get",
+                "GET",
+                f"/career/knowledge/{record['id']}",
                 {"knowledge_id": record["id"]},
             )
             assert all(read[key] == value for key, value in entry.items())
 
         template = call(
-            "templates_create", "POST", "/templates",
+            "templates_create",
+            "POST",
+            "/templates",
             {"value": {"name": "Example CV", "tex": "Synthetic template", "is_default": True}},
         )
         job = call(
-            "job_ingest", "POST", "/jobs",
+            "job_ingest",
+            "POST",
+            "/jobs",
             {"value": {"title": "Engineer", "company": "Example", "posting": "Build APIs."}},
         )
         application = call(
             "application_create", "POST", "/applications", {"value": {"job_id": job["id"]}}
         )
         context = call(
-            "application_prepare_context", "POST", "/contexts",
+            "application_prepare_context",
+            "POST",
+            "/contexts",
             {"value": {"application_id": application["id"], "template_id": template["id"]}},
         )
         frozen = {row["id"]: row for row in context["payload"]["knowledge"]}
@@ -101,15 +119,23 @@ def test_awards_and_publications_survive_import_filtering_and_frozen_context(tmp
 
         award = created[0]
         changed = call(
-            "knowledge_update", "PATCH", f"/career/knowledge/{award['id']}",
-            {"knowledge_id": award["id"], "value": {
-                "expected_version": award["version"], "kind": "publication",
-                "narrative": "Revised live evidence.",
-            }},
+            "knowledge_update",
+            "PATCH",
+            f"/career/knowledge/{award['id']}",
+            {
+                "knowledge_id": award["id"],
+                "value": {
+                    "expected_version": award["version"],
+                    "kind": "publication",
+                    "narrative": "Revised live evidence.",
+                },
+            },
         )
         assert changed["kind"] == "publication"
         saved = call(
-            "contexts_get", "GET", f"/contexts/{context['id']}",
+            "contexts_get",
+            "GET",
+            f"/contexts/{context['id']}",
             {"context_id": context["id"]},
         )
         retained = next(row for row in saved["payload"]["knowledge"] if row["id"] == award["id"])
@@ -119,8 +145,13 @@ def test_awards_and_publications_survive_import_filtering_and_frozen_context(tmp
         if transport == "rest":
             assert client.post("/api/v1/career/knowledge", json=invalid).status_code == 422
         else:
-            response = client.post("/mcp", json={
-                "jsonrpc": "2.0", "id": 2, "method": "tools/call",
-                "params": {"name": "knowledge_create", "arguments": {"value": invalid}},
-            })
+            response = client.post(
+                "/mcp",
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/call",
+                    "params": {"name": "knowledge_create", "arguments": {"value": invalid}},
+                },
+            )
             assert response.json()["result"]["isError"]

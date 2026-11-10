@@ -1,9 +1,34 @@
 import argparse
+import ipaddress
 import os
 
 import uvicorn
 
 from .app import create_app
+
+
+def trusted_proxies(value):
+    """Parse comma-separated proxy IPs/CIDRs; an empty value trusts no proxy."""
+    entries = []
+    for entry in (item.strip() for item in (value or "").split(",")):
+        if not entry:
+            continue
+        try:
+            network = ipaddress.ip_network(entry, strict=False)
+        except ValueError:
+            raise SystemExit(
+                f"OPENINGS_TRUSTED_PROXIES must list IP addresses or CIDR ranges, not {entry!r}."
+            ) from None
+        entries.append(str(network) if "/" in entry else str(network.network_address))
+    return entries
+
+
+def proxy_options(value):
+    """Uvicorn settings that accept forwarded client addresses only from trusted proxies."""
+    entries = trusted_proxies(value)
+    if not entries:
+        return {"proxy_headers": False, "forwarded_allow_ips": ""}
+    return {"proxy_headers": True, "forwarded_allow_ips": ",".join(entries)}
 
 
 def main():
@@ -13,8 +38,20 @@ def main():
     parser.add_argument(
         "--database", default=os.environ.get("OPENINGS_DATABASE", "data/openings.sqlite")
     )
+    parser.add_argument(
+        "--trusted-proxies",
+        default=os.environ.get("OPENINGS_TRUSTED_PROXIES", ""),
+        help="Comma-separated reverse-proxy IPs/CIDRs whose X-Forwarded-For/-Proto are trusted.",
+    )
     args = parser.parse_args()
-    uvicorn.run(create_app(args.database), host=args.host, port=args.port, log_level="info")
+    options = proxy_options(args.trusted_proxies)
+    uvicorn.run(
+        create_app(args.database),
+        host=args.host,
+        port=args.port,
+        log_level="info",
+        **options,
+    )
 
 
 if __name__ == "__main__":
