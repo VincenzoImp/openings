@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.15.2 — 2026-11-10
+
+Security hardening at the edges, a release pipeline that publishes exactly what it tested, and a repository that is easier to start with and contribute to.
+
+- **Sign-in behind a reverse proxy:** `OPENINGS_TRUSTED_PROXIES` (IPs or CIDRs, default none) lets the server see real client addresses only from listed proxies, so each client gets its own sign-in limit and forwarded headers from anyone else are ignored. A global backoff spaces sign-ins after repeated failures across all clients (1 s doubling to 5 s; 429 `login_backoff` with `Retry-After` beyond 30 s); a successful sign-in resets it. API and MCP tokens are unaffected.
+- **DNS rebinding:** URL fetches for job and feed imports resolve the host, require every address to be public and connect to the checked address on every redirect hop; TLS still verifies the host name.
+- **Operational grants:** export, backup and restore grants use their own signing salt and work once (a reuse returns 401 `transfer_used`). Request a new grant for each retry.
+- **Release pipeline:** each architecture is built natively, pushed by digest and smoke-tested from the registry; only those digests form the multi-arch image, tagged `X.Y.Z` and `X.Y`. The GitHub Release is created from this changelog section with the image digest.
+- **Repository:** current screenshots (including agent access, application planning, requirements and duplicates), a README with badges and a current feature list, issue and pull request templates, a Code of Conduct, Dependabot for uv, npm, GitHub Actions and Docker, `ruff format --check` in CI, `scripts/bump_version.py` with a CI version-consistency check, and dated changelog headings.
+
+**Deployers behind a reverse proxy** should set `OPENINGS_TRUSTED_PROXIES` to the proxy's address as the container sees it; without it all clients share one sign-in limit, as before. Workspace schema remains **7**.
+
 ## 0.15.1 — 2026-11-10
 
 - Fix slow application lists: staleness now reads input versions recorded once per immutable context instead of parsing every frozen context payload per request (200 Drafts on a real 538 MB workspace: 260 ms to 21 ms; about 3.6 s to well under a second on a one-CPU container). Existing contexts are summarized at the first start, in about a second.
