@@ -1,6 +1,9 @@
 """Release contract: every advertised operation resolves on REST and MCP."""
 
 import re
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -42,3 +45,14 @@ async def test_operation_inventory_covers_runtime_interfaces(tmp_path):
         name for operation in inventory["operations"] for name in operation["mcp"]
     }
     assert all(tool.annotations is not None for tool in tools.values())
+
+
+def test_parity_matrix_is_current():
+    """The committed matrix matches the inventory, contract and dashboard source."""
+    root = Path(__file__).resolve().parents[2]
+    result = subprocess.run(
+        [sys.executable, str(root / "scripts/parity_matrix.py"), "--check"],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr

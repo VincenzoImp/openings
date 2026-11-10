@@ -33,7 +33,9 @@ flowchart LR
 The [operation inventory](../../backend/openings/operation-inventory.json) is
 packaged with the app and served by authenticated `GET /api/v1/capabilities` and
 `capabilities_get`. OpenAPI at `/api/openapi.json` and discovered MCP schemas are
-authoritative for individual input fields. Read [REST](../user/api.md) and
+authoritative for individual input fields. The generated
+[parity matrix](parity.md) shows each operation's REST route, MCP tool and real
+dashboard path, and lists every gap. Read [REST](../user/api.md) and
 [agent](../user/agents.md) guides for usable examples.
 
 ## Data and workflow rules

@@ -1,0 +1,205 @@
+{
+  "format": "openings-parity-e2e-v1",
+  "project": "chromium",
+  "routes": {
+    "DELETE /api/v1/files/{}": [
+      "live file and note deletion identify the item before removal"
+    ],
+    "GET /api/v1/applications": [
+      "application plan, blocking requirements and a stale button action recover",
+      "context selection follows evidence and supports deliberate empty selections",
+      "document upload, revision ownership and safe file preview",
+      "live file and note deletion identify the item before removal",
+      "mobile applications, templates and funnel stay usable inside the viewport",
+      "question edits preserve compatible work and require deliberate incompatible removal"
+    ],
+    "GET /api/v1/applications/{}": [
+      "application plan, blocking requirements and a stale button action recover",
+      "context selection follows evidence and supports deliberate empty selections",
+      "document upload, revision ownership and safe file preview",
+      "question edits preserve compatible work and require deliberate incompatible removal"
+    ],
+    "GET /api/v1/applications/{}/events": [
+      "application plan, blocking requirements and a stale button action recover",
+      "context selection follows evidence and supports deliberate empty selections",
+      "document upload, revision ownership and safe file preview",
+      "question edits preserve compatible work and require deliberate incompatible removal"
+    ],
+    "GET /api/v1/auth/session": [
+      "application plan, blocking requirements and a stale button action recover",
+      "context selection follows evidence and supports deliberate empty selections",
+      "document upload, revision ownership and safe file preview",
+      "import protection and nested dialogs restore scroll after browser Back",
+      "independent career, source and provider editors recover their own concurrent versions",
+      "live file and note deletion identify the item before removal",
+      "mobile applications, templates and funnel stay usable inside the viewport",
+      "mobile navigation contains focus and releases the background on close and resize",
+      "question edits preserve compatible work and require deliberate incompatible removal",
+      "queue count, posting hierarchy and query-safe selection",
+      "records export downloads valid JSON with undated career entries",
+      "version conflict reviews latest values and reloads the editor with a usable version"
+    ],
+    "GET /api/v1/career/claims": [
+      "context selection follows evidence and supports deliberate empty selections",
+      "import protection and nested dialogs restore scroll after browser Back",
+      "independent career, source and provider editors recover their own concurrent versions"
+    ],
+    "GET /api/v1/career/knowledge": [
+      "context selection follows evidence and supports deliberate empty selections",
+      "import protection and nested dialogs restore scroll after browser Back",
+      "independent career, source and provider editors recover their own concurrent versions"
+    ],
+    "GET /api/v1/career/knowledge/{}": [
+      "import protection and nested dialogs restore scroll after browser Back",
+      "independent career, source and provider editors recover their own concurrent versions"
+    ],
+    "GET /api/v1/career/profile": [
+      "application plan, blocking requirements and a stale button action recover",
+      "context selection follows evidence and supports deliberate empty selections",
+      "document upload, revision ownership and safe file preview",
+      "import protection and nested dialogs restore scroll after browser Back",
+      "independent career, source and provider editors recover their own concurrent versions",
+      "live file and note deletion identify the item before removal",
+      "mobile applications, templates and funnel stay usable inside the viewport",
+      "mobile navigation contains focus and releases the background on close and resize",
+      "question edits preserve compatible work and require deliberate incompatible removal",
+      "queue count, posting hierarchy and query-safe selection",
+      "records export downloads valid JSON with undated career entries",
+      "version conflict reviews latest values and reloads the editor with a usable version"
+    ],
+    "GET /api/v1/collection": [
+      "independent career, source and provider editors recover their own concurrent versions"
+    ],
+    "GET /api/v1/contexts": [
+      "application plan, blocking requirements and a stale button action recover",
+      "context selection follows evidence and supports deliberate empty selections",
+      "document upload, revision ownership and safe file preview",
+      "question edits preserve compatible work and require deliberate incompatible removal"
+    ],
+    "GET /api/v1/documents": [
+      "application plan, blocking requirements and a stale button action recover",
+      "context selection follows evidence and supports deliberate empty selections",
+      "document upload, revision ownership and safe file preview",
+      "question edits preserve compatible work and require deliberate incompatible removal"
+    ],
+    "GET /api/v1/documents/{}": [
+      "document upload, revision ownership and safe file preview"
+    ],
+    "GET /api/v1/documents/{}/consistency": [
+      "document upload, revision ownership and safe file preview"
+    ],
+    "GET /api/v1/export": [
+      "records export downloads valid JSON with undated career entries"
+    ],
+    "GET /api/v1/files": [
+      "live file and note deletion identify the item before removal"
+    ],
+    "GET /api/v1/files/{}/content": [
+      "document upload, revision ownership and safe file preview",
+      "live file and note deletion identify the item before removal"
+    ],
+    "GET /api/v1/instructions": [
+      "mobile applications, templates and funnel stay usable inside the viewport"
+    ],
+    "GET /api/v1/jobs": [
+      "application plan, blocking requirements and a stale button action recover",
+      "context selection follows evidence and supports deliberate empty selections",
+      "document upload, revision ownership and safe file preview",
+      "import protection and nested dialogs restore scroll after browser Back",
+      "independent career, source and provider editors recover their own concurrent versions",
+      "live file and note deletion identify the item before removal",
+      "mobile applications, templates and funnel stay usable inside the viewport",
+      "mobile navigation contains focus and releases the background on close and resize",
+      "question edits preserve compatible work and require deliberate incompatible removal",
+      "queue count, posting hierarchy and query-safe selection",
+      "records export downloads valid JSON with undated career entries",
+      "version conflict reviews latest values and reloads the editor with a usable version"
+    ],
+    "GET /api/v1/jobs/{}": [
+      "live file and note deletion identify the item before removal",
+      "queue count, posting hierarchy and query-safe selection",
+      "version conflict reviews latest values and reloads the editor with a usable version"
+    ],
+    "GET /api/v1/jobs/{}/notes": [
+      "live file and note deletion identify the item before removal",
+      "queue count, posting hierarchy and query-safe selection",
+      "version conflict reviews latest values and reloads the editor with a usable version"
+    ],
+    "GET /api/v1/overview": [
+      "application plan, blocking requirements and a stale button action recover",
+      "context selection follows evidence and supports deliberate empty selections",
+      "document upload, revision ownership and safe file preview",
+      "independent career, source and provider editors recover their own concurrent versions",
+      "live file and note deletion identify the item before removal",
+      "mobile applications, templates and funnel stay usable inside the viewport",
+      "mobile navigation contains focus and releases the background on close and resize",
+      "question edits preserve compatible work and require deliberate incompatible removal",
+      "queue count, posting hierarchy and query-safe selection",
+      "version conflict reviews latest values and reloads the editor with a usable version"
+    ],
+    "GET /api/v1/providers": [
+      "independent career, source and provider editors recover their own concurrent versions"
+    ],
+    "GET /api/v1/sources": [
+      "independent career, source and provider editors recover their own concurrent versions"
+    ],
+    "GET /api/v1/sources/schemas": [
+      "independent career, source and provider editors recover their own concurrent versions"
+    ],
+    "GET /api/v1/sources/{}": [
+      "independent career, source and provider editors recover their own concurrent versions"
+    ],
+    "GET /api/v1/templates": [
+      "application plan, blocking requirements and a stale button action recover",
+      "context selection follows evidence and supports deliberate empty selections",
+      "document upload, revision ownership and safe file preview",
+      "mobile applications, templates and funnel stay usable inside the viewport",
+      "question edits preserve compatible work and require deliberate incompatible removal"
+    ],
+    "GET /api/v1/templates/{}": [
+      "mobile applications, templates and funnel stay usable inside the viewport"
+    ],
+    "GET /api/v1/workspace": [
+      "records export downloads valid JSON with undated career entries"
+    ],
+    "PATCH /api/v1/applications/{}": [
+      "application plan, blocking requirements and a stale button action recover",
+      "question edits preserve compatible work and require deliberate incompatible removal"
+    ],
+    "PATCH /api/v1/career/knowledge/{}": [
+      "independent career, source and provider editors recover their own concurrent versions"
+    ],
+    "PATCH /api/v1/jobs/{}": [
+      "version conflict reviews latest values and reloads the editor with a usable version"
+    ],
+    "PATCH /api/v1/providers/{}": [
+      "independent career, source and provider editors recover their own concurrent versions"
+    ],
+    "PATCH /api/v1/sources/{}": [
+      "independent career, source and provider editors recover their own concurrent versions"
+    ],
+    "POST /api/v1/auth/login": [
+      "queue count, posting hierarchy and query-safe selection"
+    ],
+    "POST /api/v1/contexts": [
+      "context selection follows evidence and supports deliberate empty selections"
+    ],
+    "POST /api/v1/documents": [
+      "document upload, revision ownership and safe file preview"
+    ],
+    "POST /api/v1/documents/{}/review": [
+      "document upload, revision ownership and safe file preview"
+    ],
+    "POST /api/v1/files/uploads": [
+      "document upload, revision ownership and safe file preview",
+      "live file and note deletion identify the item before removal"
+    ],
+    "POST /api/v1/jobs/{}/notes": [
+      "live file and note deletion identify the item before removal"
+    ],
+    "PUT /api/v1/transfers": [
+      "document upload, revision ownership and safe file preview",
+      "live file and note deletion identify the item before removal"
+    ]
+  }
+}
