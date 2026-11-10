@@ -32,7 +32,8 @@ prepares a CV and letter for every shortlisted one, tunes searches and monitored
 companies, and keeps improving your Career record and templates. You answer its
 questions, apply to the prepared Drafts and mark them Applied. See
 [Agent-operated job search](docs/user/agent-operated.md); your agent supplies its
-own model access and tools, and never submits applications for you.
+own model access and tools, and never submits applications for you. Start from
+the [operator workspace template](examples/operator-workspace/README.md).
 
 ## Start with Docker
 
