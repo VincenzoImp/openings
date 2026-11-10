@@ -41,7 +41,7 @@ NOTES = ROOT / "docs/developer/parity-notes.json"
 SETUP_HEADER = "x-openings-e2e-setup"
 METHODS = ("GET", "POST", "PATCH", "PUT", "DELETE")
 SUFFIX = re.compile(r"[^{}`]*\}((?:/(?:[\w-]+|\$\{[^}]*\}))+)")
-LITERAL = re.compile(r"""(["'`])(/(?:\\.|(?!\1).)*)\1""", re.S)
+LITERAL = re.compile(r"""(["'`])(/(?:\\.|(?!\1).)*)\1""", re.DOTALL)
 
 
 def route_key(path):
@@ -149,7 +149,9 @@ def dashboard_references(routes):
                         break
                     depth -= 1
                 index += 1
-            methods = set(re.findall(r'"(%s)"' % "|".join(METHODS), text[match.end() : index]))
+            methods = set(
+                re.findall(r'"({})"'.format("|".join(METHODS)), text[match.end() : index])
+            )
             for key in keys:
                 for method in methods or {"GET"}:
                     if method in routes[key]:
@@ -158,12 +160,12 @@ def dashboard_references(routes):
 
 
 def source_mentions(files, name):
-    pattern = re.compile(r"\b%s\b" % re.escape(name))
+    pattern = re.compile(rf"\b{re.escape(name)}\b")
     return any(pattern.search((SOURCES / file).read_text()) for file in files)
 
 
 def raw_json_editor(files, name):
-    pattern = re.compile(r"""jsonValue\(\s*\w+,\s*["']%s["']""" % re.escape(name))
+    pattern = re.compile(rf"""jsonValue\(\s*\w+,\s*["']{re.escape(name)}["']""")
     return any(pattern.search((SOURCES / file).read_text()) for file in files)
 
 
@@ -185,6 +187,7 @@ def record_e2e(routes):
             cwd=FRONTEND,
             env={**os.environ, "PLAYWRIGHT_JSON_OUTPUT_NAME": str(report)},
             stdout=subprocess.DEVNULL,
+            check=False,
         )
         if result.returncode:
             raise SystemExit("The e2e suite failed; evidence was not recorded.")
@@ -421,8 +424,7 @@ def build():
     ]
     for row in different:
         out.append(
-            "| `%s` | %s | %s |"
-            % (
+            "| `{}` | {} | {} |".format(
                 row["entry"]["id"],
                 ", ".join(f"`{name}`" for name in row["rest_only"]) or "—",
                 ", ".join(f"`{name}`" for name in row["mcp_only"]) or "—",
@@ -475,8 +477,7 @@ def build():
             if row["via"]:
                 code = "via " + ", ".join(f"`{name}`" for name in row["via"])
             out.append(
-                "| `%s`<br>%s | %s | %s | %s | %s | %s | %s |"
-                % (
+                "| `{}`<br>{} | {} | {} | {} | {} | {} | {} |".format(
                     entry["id"],
                     entry["operation"],
                     rest_cell(entry),
