@@ -29,6 +29,13 @@ employer. Keep factual limits in the supporting context; include them in public
 wording when needed for accuracy, rather than filling the narrative with generic
 caveats that obscure the contribution.
 
+Application documents sell the owner's strongest truthful case. Never volunteer
+weaknesses: do not name a missing requirement, a lack of experience, something
+"new to" the owner, a "transition" or years the owner lacks. Where the record does
+not cover a requirement, lead with the closest demonstrated, transferable work and
+leave the rest unmentioned. Never claim unsupported experience either. Internal
+caveats belong in the application note. Answer a direct form question truthfully.
+
 When maintaining Career records, integrate new information into the
 relevant existing passages, reconciling it with the full history, chronology and
 contribution scope. Replace superseded wording and remove repetition instead of
