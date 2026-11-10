@@ -11,5 +11,5 @@ def missing(resource="Record"):
     raise DomainError(404, "not_found", f"{resource} was not found.")
 
 
-def conflict(message="This record changed. Reload it before saving."):
-    raise DomainError(409, "conflict", message)
+def conflict(message="This record changed. Reload it before saving.", details=None):
+    raise DomainError(409, "conflict", message, details)
