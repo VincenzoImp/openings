@@ -296,8 +296,6 @@ def test_company_clients_fetch_all_details_and_reuse_complete_cached_bodies():
     assert len(calls) == 1
 
 
-
-
 def test_provider_list_excludes_unsupported_services_and_retry_after_is_not_guessed(collection):
     _, service = collection
     assert "google" not in {row["id"] for row in service.providers.list()["items"]}

@@ -38,3 +38,7 @@ asyncio_mode = "auto"
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+
+[tool.ruff.format]
+# Vendored code keeps its upstream formatting to simplify future updates.
+exclude = ["backend/openings/_vendor/**"]
