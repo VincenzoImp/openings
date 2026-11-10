@@ -52,7 +52,10 @@ CREATE TABLE IF NOT EXISTS applications (
  status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','applied','interview','offer','closed')),
  outcome TEXT CHECK(outcome IS NULL OR outcome IN ('accepted','rejected','not_pursued')),
  note TEXT NOT NULL DEFAULT '', questions TEXT NOT NULL DEFAULT '[]', answers TEXT NOT NULL DEFAULT '{}',
- version INTEGER NOT NULL DEFAULT 1, idempotency_key TEXT UNIQUE, applied_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+ version INTEGER NOT NULL DEFAULT 1, idempotency_key TEXT UNIQUE, applied_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ priority INTEGER CHECK(priority IS NULL OR priority BETWEEN 1 AND 5),
+ deadline TEXT CHECK(deadline IS NULL OR (length(deadline)=10 AND date(deadline)=deadline)),
+ requirements TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(requirements) AND json_type(requirements)='array')
 );
 CREATE TABLE IF NOT EXISTS events (
  id TEXT PRIMARY KEY, job_id TEXT REFERENCES jobs(id) ON DELETE CASCADE,
@@ -139,6 +142,7 @@ CREATE TABLE IF NOT EXISTS providers (
 CREATE INDEX IF NOT EXISTS applications_job ON applications(job_id,created_at DESC,id DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS applications_active_job ON applications(job_id) WHERE status<>'closed';
 CREATE INDEX IF NOT EXISTS applications_status ON applications(status,updated_at);
+CREATE INDEX IF NOT EXISTS applications_deadline ON applications(deadline);
 CREATE INDEX IF NOT EXISTS documents_app ON documents(application_id,created_at);
 CREATE INDEX IF NOT EXISTS documents_context ON documents(context_id);
 CREATE INDEX IF NOT EXISTS contexts_app ON contexts(application_id,created_at);
@@ -157,4 +161,4 @@ CREATE INDEX IF NOT EXISTS files_blob ON files(sha256);
 CREATE INDEX IF NOT EXISTS tasks_job ON tasks(job_id);
 CREATE INDEX IF NOT EXISTS tasks_source ON tasks(source_id);
 CREATE INDEX IF NOT EXISTS postings_source ON postings(source_id);
-PRAGMA user_version=6;
+PRAGMA user_version=7;

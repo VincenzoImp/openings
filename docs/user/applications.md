@@ -92,6 +92,32 @@ follows those recorded stages. The submission date can be corrected or cleared.
 On narrow screens the initial application view is a compact list. Choose **Board**
 or **List** to remember a preference. Stage shortcuts filter the whole result set;
 board columns show when only part of a stage is loaded and link to the full stage.
+## Plan and track requirements
+
+Each application can have a **priority** (P1 highest to P5 lowest) and the
+employer's **deadline**, set under **Details**. Cards and list rows show them;
+a past deadline on an application still in Preparing is marked overdue. Sort
+Applications by **Deadline** or **Priority**, and filter by **readiness**:
+
+| Readiness | Meaning |
+|---|---|
+| No documents | No document revision yet. |
+| Missing PDF | A current CV or cover letter revision has no PDF. |
+| Needs review | Every current revision has its files but one is not approved. |
+| Blocked by a requirement | An employer requirement is blocking and unresolved. |
+| Ready | Current revisions have their PDFs and are approved. |
+
+Readiness uses only the current revision of each document; an approved earlier
+revision does not count. It does not check the content or submit anything.
+
+**Requirements** records employer conditions: authorship rules (such as no
+AI-written applications), attachments, references, format, language, eligibility
+and dates. Mark a requirement **Blocking** when documents must not be prepared or
+submitted until it is settled, and **Resolved** with a note once you decide.
+Unresolved blocking requirements appear at the top of the application. They are
+stored on the application, not in job details, so source refreshes of the job
+continue.
+
 Open **Posting** in an application to read the job without leaving your current
 filters. Rare job maintenance actions live under **Job details, sources & maintenance**.
 

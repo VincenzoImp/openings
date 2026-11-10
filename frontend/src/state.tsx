@@ -62,14 +62,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         notify(message);
         return true;
       } catch (error) {
-        if (
-          error instanceof ApiError &&
-          error.status === 409 &&
-          submitted &&
-          error.path &&
-          !/\?/.test(error.path)
-        )
-          setConflict({ form: submitted.form, path: error.path });
+        if (error instanceof ApiError && error.status === 409) {
+          if (submitted && error.path && !/\?/.test(error.path))
+            setConflict({ form: submitted.form, path: error.path });
+          else {
+            // A button action has no draft to keep: reload the affected
+            // records so the next attempt uses their current version.
+            refresh();
+            // Views keep their data while another editor has unsaved edits.
+            const dirty = hasDirtyForms();
+            notify(
+              error.code === "conflict"
+                ? `This record changed in another session. ${dirty ? "Save or discard your open edits to load the latest version, then try again." : "The latest version is now shown; check it and try again."}`
+                : `${error.message}${dirty ? "" : " The view now shows the latest state."}`,
+              true,
+            );
+            return false;
+          }
+        }
         notify(
           error instanceof Error
             ? error.message
@@ -89,7 +99,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           });
       }
     },
-    [notify],
+    [notify, refresh],
   );
   return (
     <Context.Provider

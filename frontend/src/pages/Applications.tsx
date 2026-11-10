@@ -2,7 +2,14 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   api,
   ApiError,
+  calendarDate,
   formatTime,
+  localToday,
+  readinessLabels,
+  requirementKinds,
+  type Readiness,
+  type Requirement,
+  type RequirementKind,
   careerEntryLabel,
   date,
   download,
@@ -50,6 +57,54 @@ import {
   PendingResults,
 } from "../ui";
 const stages: Stage[] = ["draft", "applied", "interview", "offer", "closed"];
+const priorityLabels: Record<number, string> = {
+  1: "P1 · Highest",
+  2: "P2 · High",
+  3: "P3 · Normal",
+  4: "P4 · Low",
+  5: "P5 · Lowest",
+};
+/** Priority, deadline and blocking requirements, shown wherever an attempt is listed. */
+function PlanTags({ application }: { application: Application }) {
+  const today = localToday();
+  const open = application.status === "draft";
+  const overdue =
+    open && !!application.deadline && application.deadline < today;
+  const soon =
+    open &&
+    !!application.deadline &&
+    !overdue &&
+    application.deadline <= localToday(new Date(Date.now() + 7 * 86400000));
+  const blocking = application.blocking_requirements || 0;
+  if (!application.priority && !application.deadline && !blocking) return null;
+  return (
+    <span className="plan-tags">
+      {!!application.priority && (
+        <span
+          className={`tag ${application.priority <= 2 ? "amber" : "neutral"}`}
+          title={priorityLabels[application.priority]}
+        >
+          P{application.priority}
+        </span>
+      )}
+      {application.deadline && (
+        <span
+          className={`tag ${overdue ? "danger" : soon ? "amber" : "neutral"}`}
+        >
+          <Icon name="clock" />
+          {overdue ? "Overdue · " : "Due "}
+          {calendarDate(application.deadline)}
+        </span>
+      )}
+      {!!blocking && (
+        <span className="tag danger">
+          <Icon name="error" />
+          {blocking} blocking requirement{blocking === 1 ? "" : "s"}
+        </span>
+      )}
+    </span>
+  );
+}
 function useApplicationProgress() {
   const { mutate, pending } = useWorkspace();
   const [closing, setClosing] = useState<Application | null>(null);
@@ -176,6 +231,7 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
     q: "",
     status: "",
     outcome: "",
+    readiness: "",
     sort: "updated",
     offset: "0",
     view: (() => {
@@ -206,7 +262,12 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
     { items: [], total: 0 },
   );
   const updating = resource.loading || query !== filters.q;
-  const filtered = !!(filters.q || filters.status || filters.outcome);
+  const filtered = !!(
+    filters.q ||
+    filters.status ||
+    filters.outcome ||
+    filters.readiness
+  );
   const { pending } = useWorkspace();
   const progress = useApplicationProgress();
   const [dragged, setDragged] = useState<string | null>(null);
@@ -273,6 +334,20 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
           ))}
         </select>
         <select
+          aria-label="Filter preparation readiness"
+          value={filters.readiness}
+          onChange={(e) =>
+            setFilters({ readiness: e.target.value, offset: "0" })
+          }
+        >
+          <option value="">Any readiness</option>
+          {Object.entries(readinessLabels).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select
           aria-label="Sort applications"
           value={filters.sort}
           onChange={(e) => setFilters({ sort: e.target.value, offset: "0" })}
@@ -283,6 +358,8 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
           <option value="company">Company A–Z</option>
           <option value="stage">Stage</option>
           <option value="applied">Submission date</option>
+          <option value="deadline">Deadline (soonest)</option>
+          <option value="priority">Priority (highest)</option>
         </select>
       </div>
       {resource.error && (
@@ -328,7 +405,13 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
               filtered ? (
                 <Button
                   onClick={() =>
-                    setFilters({ q: "", status: "", outcome: "", offset: "0" })
+                    setFilters({
+                      q: "",
+                      status: "",
+                      outcome: "",
+                      readiness: "",
+                      offset: "0",
+                    })
                   }
                 >
                   Clear filters
@@ -414,6 +497,7 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                       <span className="application-location">
                         {app.job?.location || "Location not specified"}
                       </span>
+                      <PlanTags application={app} />
                       {app.outcome && (
                         <span className="tag neutral outcome">
                           {outcomeLabel(app.outcome)}
@@ -458,6 +542,7 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
               <tr>
                 <th scope="col">Company / role</th>
                 <th scope="col">Stage</th>
+                <th scope="col">Plan</th>
                 <th scope="col">Preparation</th>
                 <th scope="col">Outcome</th>
                 <th scope="col">Updated</th>
@@ -492,6 +577,14 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                         </option>
                       ))}
                     </select>
+                  </td>
+                  <td data-label="Plan">
+                    <PlanTags application={app} />
+                    {!app.priority &&
+                      !app.deadline &&
+                      !app.blocking_requirements && (
+                        <span className="muted">Not set</span>
+                      )}
                   </td>
                   <td data-label="Preparation">
                     <Preparation application={app} />
@@ -969,6 +1062,8 @@ export function ApplicationDrawer({
           "PATCH",
           version(app, {
             note: form.get("note"),
+            priority: Number(form.get("priority")) || null,
+            deadline: String(form.get("deadline") || "") || null,
             applied_at: form.get("applied_at")
               ? new Date(String(form.get("applied_at")) + "Z").toISOString()
               : null,
@@ -1040,6 +1135,35 @@ export function ApplicationDrawer({
               {app.job?.company} ·{" "}
               {app.job?.location || "Location not specified"}
             </div>
+            <PlanTags application={app} />
+            {!!app.blocking_requirements && (
+              <div className="note requirement-alert" role="status">
+                <Icon name="error" />
+                <div>
+                  <strong>
+                    Blocking requirements need an owner decision before
+                    documents are prepared or submitted.
+                  </strong>
+                  <ul>
+                    {(app.requirements || [])
+                      .filter((item) => item.blocking && !item.resolved)
+                      .map((item) => (
+                        <li key={item.id}>
+                          {requirementKinds[item.kind] || item.kind}:{" "}
+                          {item.text}
+                        </li>
+                      ))}
+                  </ul>
+                  <button
+                    type="button"
+                    className="textbutton"
+                    onClick={() => setTab("requirements")}
+                  >
+                    Review requirements
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="stage-control">
               <label htmlFor="application-stage">Stage</label>
               <select
@@ -1067,6 +1191,11 @@ export function ApplicationDrawer({
                   count: documents.data.total,
                 },
                 { id: "posting", label: "Posting" },
+                {
+                  id: "requirements",
+                  label: "Requirements",
+                  count: app.open_requirements || undefined,
+                },
                 { id: "answers", label: "Form answers" },
                 { id: "history", label: "History" },
                 { id: "details", label: "Details" },
@@ -1288,6 +1417,11 @@ export function ApplicationDrawer({
                   }
                 />
               </>
+            ) : tab === "requirements" ? (
+              <RequirementsEditor
+                key={`${app.id}-${app.version}`}
+                application={app}
+              />
             ) : tab === "answers" ? (
               <>
                 <QuestionEditor application={app} />
@@ -1422,6 +1556,34 @@ export function ApplicationDrawer({
                     </select>
                   </Field>
                 )}
+                <div className="formgrid">
+                  <Field
+                    label="Priority"
+                    hint="Orders preparation work. 1 is the highest."
+                  >
+                    <select
+                      name="priority"
+                      defaultValue={String(app.priority ?? "")}
+                    >
+                      <option value="">Not set</option>
+                      {Object.entries(priorityLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field
+                    label="Application deadline"
+                    hint="The employer's closing date, if known."
+                  >
+                    <input
+                      type="date"
+                      name="deadline"
+                      defaultValue={app.deadline || ""}
+                    />
+                  </Field>
+                </div>
                 <Field
                   label="Submission time (UTC)"
                   hint="Set a past submission time or leave blank to clear it. Moving to a submitted stage records the current time when no date is known."
@@ -1503,6 +1665,148 @@ export function ApplicationDrawer({
         <DocumentEditor application={app} onClose={() => setAdd(false)} />
       )}
     </>
+  );
+}
+function RequirementsEditor({ application }: { application: Application }) {
+  const { mutate, pending } = useWorkspace();
+  const [items, setItems] = useState<Requirement[]>(
+    application.requirements || [],
+  );
+  const change = (index: number, patch: Partial<Requirement>) =>
+    setItems((current) =>
+      current.map((item, i) => (i === index ? { ...item, ...patch } : item)),
+    );
+  async function save(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    await mutate(
+      () =>
+        api(
+          `/applications/${application.id}`,
+          "PATCH",
+          version(application, {
+            requirements: items.map((item) => ({
+              ...item,
+              text: item.text.trim(),
+              note: item.note.trim(),
+            })),
+          }),
+        ),
+      "Requirements saved.",
+    );
+  }
+  return (
+    <form onSubmit={save} className="stack requirements-editor">
+      <p className="hint">
+        Record employer conditions from the posting or application form:
+        authorship rules, attachments, references, format, language, eligibility
+        and dates. An unresolved blocking requirement keeps this application not
+        ready.
+      </p>
+      {!items.length && (
+        <p className="muted">No employer requirements recorded.</p>
+      )}
+      {items.map((item, index) => (
+        <fieldset
+          key={item.id}
+          className={`requirement-row ${item.blocking && !item.resolved ? "is-blocking" : ""} ${item.resolved ? "is-resolved" : ""}`}
+        >
+          <legend>
+            {requirementKinds[item.kind] || item.kind}
+            {item.blocking && !item.resolved
+              ? " · blocking"
+              : item.resolved
+                ? " · resolved"
+                : ""}
+          </legend>
+          <div className="requirement-head">
+            <Field label="Kind">
+              <select
+                value={item.kind}
+                onChange={(e) =>
+                  change(index, { kind: e.target.value as RequirementKind })
+                }
+              >
+                {Object.entries(requirementKinds).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <label className="checkline">
+              <input
+                type="checkbox"
+                checked={item.blocking}
+                onChange={(e) => change(index, { blocking: e.target.checked })}
+              />
+              Blocking
+            </label>
+            <label className="checkline">
+              <input
+                type="checkbox"
+                checked={item.resolved}
+                onChange={(e) => change(index, { resolved: e.target.checked })}
+              />
+              Resolved
+            </label>
+            <button
+              type="button"
+              className="iconbtn danger"
+              data-dirty-control
+              aria-label={`Remove requirement ${index + 1}`}
+              onClick={() =>
+                setItems((current) => current.filter((_, i) => i !== index))
+              }
+            >
+              <Icon name="trash" />
+            </button>
+          </div>
+          <Field label="Requirement">
+            <textarea
+              rows={2}
+              required
+              maxLength={2000}
+              value={item.text}
+              onChange={(e) => change(index, { text: e.target.value })}
+            />
+          </Field>
+          <Field label="Resolution or open question">
+            <input
+              maxLength={2000}
+              value={item.note}
+              placeholder="Owner decision, supplied file or question to ask"
+              onChange={(e) => change(index, { note: e.target.value })}
+            />
+          </Field>
+        </fieldset>
+      ))}
+      <div className="actions form-actions">
+        <Button
+          type="button"
+          icon="plus"
+          data-dirty-control
+          disabled={items.length >= 100}
+          onClick={() =>
+            setItems((current) => [
+              ...current,
+              {
+                id: newId().replace(/-/g, "").slice(0, 12),
+                kind: "other",
+                text: "",
+                blocking: false,
+                resolved: false,
+                note: "",
+              },
+            ])
+          }
+        >
+          Add requirement
+        </Button>
+        <Button variant="primary" disabled={pending}>
+          Save requirements
+        </Button>
+      </div>
+    </form>
   );
 }
 function QuestionEditor({

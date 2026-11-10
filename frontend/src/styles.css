@@ -4169,3 +4169,83 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
     gap: 6px;
   }
 }
+
+/* Application planning: priority, deadline and employer requirements. */
+.plan-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+.plan-tags .tag {
+  font-size: 10px;
+}
+.plan-tags .icon {
+  width: 11px;
+  height: 11px;
+}
+.tag.danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+}
+html[data-theme="dark"] .tag.amber {
+  background: #4a3f22;
+  color: #ead6a4;
+}
+.application-card .plan-tags {
+  margin-top: 0;
+}
+.drawer-meta + .plan-tags {
+  margin: 0 0 12px;
+}
+.requirement-alert {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--card));
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+  margin-bottom: 14px;
+}
+.requirement-alert ul {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+.requirement-row {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px 14px;
+  margin: 0;
+  min-width: 0;
+}
+.requirement-row legend {
+  padding: 0 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.requirement-row.is-blocking {
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+.requirement-row.is-blocking legend {
+  color: var(--danger);
+}
+.requirement-row.is-resolved legend {
+  color: var(--accent);
+}
+.requirement-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 16px;
+}
+.requirement-head .field {
+  flex: 1 1 160px;
+  margin: 0;
+}
+.requirement-head .checkline {
+  margin-bottom: 8px;
+}
+.requirement-head .iconbtn {
+  margin-left: auto;
+  margin-bottom: 4px;
+}

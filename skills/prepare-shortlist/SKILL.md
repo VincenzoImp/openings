@@ -52,12 +52,17 @@ and report them while independent jobs continue.
 Work through the cohort in a deliberate order: live deadlines first, then the
 strongest fit with the Profile policy, then the rest. A large cohort is prepared
 in that order so a partial run still leaves the most valuable Drafts complete.
+For existing Drafts, `applications_list` with `sort: "deadline"` or
+`sort: "priority"` gives that order, and `readiness` (`none`, `missing_pdf`,
+`unreviewed`, `blocked`, `ready`) finds the ones that still need work. Record a
+known closing date as the application `deadline` and the agreed order as
+`priority` (1 highest to 5); never invent either.
 
 Before freezing inputs for a job, run the
 [employer requirements preflight](../openings-workspace/references/employer-requirements.md).
 A blocking requirement, such as a ban on AI-written applications or a mandatory
 item that Career evidence cannot supply, stops document work for that job; record
-it in the application note and report it. Expired postings are reported, not prepared.
+it as a blocking entry in the application `requirements` and report it. Expired postings are reported, not prepared.
 
 ## Freeze and compose
 
