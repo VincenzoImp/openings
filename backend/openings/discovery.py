@@ -76,8 +76,9 @@ class Input(BaseModel):
 class Filters(Input):
     titles: list[str] = Field(default_factory=list, max_length=30)
     locations: list[str] = Field(default_factory=list, max_length=30)
+    exclude_titles: list[str] = Field(default_factory=list, max_length=50)
 
-    @field_validator("titles", "locations")
+    @field_validator("titles", "locations", "exclude_titles")
     @classmethod
     def clean_terms(cls, values):
         return list(dict.fromkeys(v.strip()[:150] for v in values if v.strip()))
@@ -490,7 +491,9 @@ def resolve_source(value: dict) -> dict:
             ) from error
     config["url"] = url
     config["filters"] = (
-        value.get("filters") or config.get("filters") or {"titles": [], "locations": []}
+        value.get("filters")
+        or config.get("filters")
+        or {"titles": [], "locations": [], "exclude_titles": []}
     )
     return {"kind": kind, "config": config, "url": url}
 
@@ -909,7 +912,12 @@ class DiscoveryService:
             row["enabled"] = bool(row["enabled"])
             row["automatic_collection"] = automatic_collection_supported(row["kind"])
             row["url"] = row["config"].get("url", "")
-            row["filters"] = row["config"].get("filters", {"titles": [], "locations": []})
+            row["filters"] = {
+                "titles": [],
+                "locations": [],
+                "exclude_titles": [],
+                **row["config"].get("filters", {}),
+            }
             run = latest.get(row["id"])
             row["last_run"] = run
             row["last_outcome"] = run["state"] if run else None

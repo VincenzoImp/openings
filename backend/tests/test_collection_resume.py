@@ -189,3 +189,13 @@ def test_workday_page_resume_reuses_prior_pages_after_provider_deferral():
     final = company.collect(source, request, html_text)
     assert len(final) == 21 and checkpoint["complete"]
     assert calls == [0, 20, 20]
+
+
+def test_excluded_title_terms_match_whole_words_before_role_filters():
+    filters = {"titles": ["engineer", "analyst"], "exclude_titles": ["sales", "SAP"]}
+    assert not matches_filters({"title": "Senior Sales Engineer"}, filters)
+    assert not matches_filters({"title": "SAP CRM Analyst"}, filters)
+    assert matches_filters({"title": "Wholesales Data Engineer"}, filters)
+    assert matches_filters({"title": "Sapling Research Engineer"}, filters)
+    assert not matches_filters({"title": "Sales Director"}, {"exclude_titles": ["sales"]})
+    assert matches_filters({"title": "Backend Engineer"}, {"exclude_titles": []})

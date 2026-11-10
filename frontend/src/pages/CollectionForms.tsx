@@ -462,6 +462,7 @@ function SourceEditorForm({
         ...source?.filters,
         titles: terms(f.get("titles")),
         locations: terms(f.get("locations")),
+        exclude_titles: terms(f.get("exclude_titles")),
       },
       schedule: scheduleValues(f),
     };
@@ -691,6 +692,16 @@ function SourceEditorForm({
                 name="locations"
                 defaultValue={filters("locations")}
                 placeholder="Germany, worldwide"
+              />
+            </Field>
+            <Field
+              label="Excluded role terms"
+              hint="Optional comma-separated whole words; skip any matching title."
+            >
+              <input
+                name="exclude_titles"
+                defaultValue={filters("exclude_titles")}
+                placeholder="sales, intern"
               />
             </Field>
           </div>
@@ -1051,6 +1062,7 @@ export function SourceBulkEditor({
             patch.filters = {
               titles: terms(f.get("titles")),
               locations: terms(f.get("locations")),
+              exclude_titles: terms(f.get("exclude_titles")),
             };
           if (await onSave(patch)) onClose();
         }}
@@ -1104,7 +1116,7 @@ export function SourceBulkEditor({
               checked={filters}
               onChange={(e) => setFilters(e.target.checked)}
             />
-            Replace role and location filters
+            Replace role, location and excluded-term filters
           </label>
           {filters && (
             <div className="formgrid">
@@ -1119,6 +1131,12 @@ export function SourceBulkEditor({
                 hint="Comma-separated; leave empty to clear."
               >
                 <input name="locations" />
+              </Field>
+              <Field
+                label="Excluded role terms"
+                hint="Comma-separated; leave empty to clear."
+              >
+                <input name="exclude_titles" />
               </Field>
             </div>
           )}

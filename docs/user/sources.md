@@ -57,6 +57,7 @@ the detected service and configuration.
 | Result limit | Up to **100 matching jobs per run** by default; range 1–2000. |
 | Candidate limit | Where supported: up to **2000 listings** inspected by default, range 20–10000, before local role/location filters. |
 | Title filters | Optional terms for matching roles on the selected board. Empty means unrestricted. |
+| Excluded role terms | Optional whole words; a title containing any of them is skipped (e.g. `sales`, `SAP`). Applied before role filters. |
 | Location filters | Optional locations; unknown or region-only remote eligibility needs review. Empty means unrestricted. |
 
 The form and discovered schema expose the options that each adapter uses. Lever,
