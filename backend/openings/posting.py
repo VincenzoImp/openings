@@ -38,7 +38,17 @@ def remote_scope(item):
     return "onsite" if place.strip() else "unknown"
 
 
+def excluded_title(title, terms):
+    """Match whole words so "SAP" does not exclude "Sapienza"."""
+    title = str(title or "").casefold()
+    return any(
+        re.search(r"(?<!\w)" + re.escape(term.casefold()) + r"(?!\w)", title) for term in terms
+    )
+
+
 def matches_filters(item, filters):
+    if excluded_title(item.get("title"), filters.get("exclude_titles") or []):
+        return False
     titles = filters.get("titles") or []
     if titles and not any(
         term.casefold() in str(item.get("title") or "").casefold() for term in titles
