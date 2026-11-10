@@ -4,8 +4,6 @@ import asyncio
 import json
 import os
 import sqlite3
-import time
-from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -22,7 +20,7 @@ from starlette.background import BackgroundTask
 from . import __version__
 from .api import register_core, register_core_mcp
 from .mcp_server import OpeningsMCP
-from .auth import COOKIE, MAX_AGE, Auth
+from .auth import COOKIE, MAX_AGE, Auth, LoginGuard
 from .limits import REQUEST_LIMIT, BodyLimit
 from .skills import (
     SkillLibrary,
@@ -86,9 +84,11 @@ def redact_secrets(value):
 
 
 def error_response(error):
+    retry = error.details.get("retry_after_seconds") if isinstance(error.details, dict) else None
     return JSONResponse(
         {"error": {"code": error.code, "message": error.message, "details": error.details}},
         status_code=error.status,
+        headers={"Retry-After": str(retry)} if retry else None,
     )
 
 
@@ -155,7 +155,9 @@ def create_app(database=None, start_worker=True):
     app.state.workspace, app.state.auth, app.state.mcp = workspace, auth, mcp
     app.state.career, app.state.documents, app.state.discovery = career, documents, discovery
     app.add_middleware(BodyLimit)
-    login_attempts = defaultdict(deque)
+    # The client address is the real one only when uvicorn trusts the proxy
+    # (OPENINGS_TRUSTED_PROXIES); otherwise every proxied client shares one bucket.
+    login_guard = app.state.login_guard = LoginGuard()
     semaphore = asyncio.Semaphore(24)
 
     @app.middleware("http")
@@ -192,21 +194,14 @@ def create_app(database=None, start_worker=True):
                     auth.authorize(request)
             if path.startswith("/mcp"):
                 auth.authorize(request, mcp=True)
+            sign_in = path == "/api/v1/auth/login" and request.method == "POST"
             if path.startswith("/api/v1/auth/") and request.method == "POST" and path in public:
                 if not request.headers.get("content-type", "").startswith("application/json"):
                     raise DomainError(415, "content_type", "Send JSON request data.")
                 ip = request.client.host if request.client else "unknown"
-                attempts = login_attempts[ip]
-                stamp = time.monotonic()
-                while attempts and attempts[0] < stamp - 60:
-                    attempts.popleft()
-                if len(attempts) >= 10:
-                    raise DomainError(
-                        429, "login_rate", "Too many attempts. Try again in a minute."
-                    )
-                attempts.append(stamp)
-                if len(login_attempts) > 1024:
-                    login_attempts.clear()
+                wait = login_guard.admit(ip, login=sign_in)
+                if wait:
+                    await asyncio.sleep(wait)
             if int(
                 request.headers.get("content-length", 0) or 0
             ) > REQUEST_LIMIT and not path.endswith("/restore"):
@@ -217,6 +212,11 @@ def create_app(database=None, start_worker=True):
                 request.scope["raw_path"] = request.scope.get("raw_path", b"/mcp") + b"/"
             async with semaphore:
                 response = await call_next(request)
+            if sign_in:
+                if response.status_code == 401:
+                    login_guard.failed()
+                elif response.status_code == 200:
+                    login_guard.succeeded()
             response.headers["X-Content-Type-Options"] = "nosniff"
             response.headers["Referrer-Policy"] = "same-origin"
             response.headers["X-Frame-Options"] = "SAMEORIGIN"

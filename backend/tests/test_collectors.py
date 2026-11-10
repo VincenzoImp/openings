@@ -91,7 +91,7 @@ def test_every_http_attempt_obeys_persisted_cooldown(collection, monkeypatch, he
     monkeypatch.setattr(
         module.httpx,
         "Client",
-        lambda **kwargs: original(transport=httpx.MockTransport(send), **kwargs),
+        lambda **kwargs: original(**{**kwargs, "transport": httpx.MockTransport(send)}),
     )
     with pytest.raises(ProviderDeferred):
         service.fetch_bytes("https://example.org/start")
@@ -209,7 +209,7 @@ def test_preview_manual_and_worker_share_provider_gate(collection, monkeypatch):
     monkeypatch.setattr(
         module.httpx,
         "Client",
-        lambda **kwargs: original(transport=httpx.MockTransport(send), **kwargs),
+        lambda **kwargs: original(**{**kwargs, "transport": httpx.MockTransport(send)}),
     )
     preview = service.preview_source(
         SourcePreview(name="Example", kind="greenhouse", config={"board": "example"})
@@ -393,7 +393,7 @@ def test_company_partial_rows_survive_detail_failure_and_keep_prior_metadata(
     monkeypatch.setattr(
         module.httpx,
         "Client",
-        lambda **kwargs: original(transport=httpx.MockTransport(send), **kwargs),
+        lambda **kwargs: original(**{**kwargs, "transport": httpx.MockTransport(send)}),
     )
     queued = service.queue_collection(source["id"])
     task = service.claim_task("worker", "collect")

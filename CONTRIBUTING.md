@@ -139,8 +139,12 @@ then tag `vX.Y.Z` after the release commit is on `main`.
 
 The release workflow publishes versioned core images to Docker Hub for a pushed
 `vX.Y.Z` tag, or a manual run with **publish** enabled. The requested version must
-match `pyproject.toml`; publication waits for CI. The versioned tags are
-`vincenzoimp/openings:X.Y.Z`. Branch/PR checks do not publish.
+match `pyproject.toml`; publication waits for CI. Each architecture is built on a
+native runner, pushed by digest and smoke-tested from the registry; only those
+digests are combined into the multi-arch image tagged `vincenzoimp/openings:X.Y.Z`
+and `X.Y` (final releases only). The workflow then creates the GitHub Release for
+an existing `vX.Y.Z` tag from the `## X.Y.Z` CHANGELOG section, adding the image
+digest, so write that section before pushing the tag. Branch/PR checks do not publish.
 
 Before a release, review the changelog and a practical collection → application →
 external-agent documents → review → backup/restore workflow. Hardware claims need
