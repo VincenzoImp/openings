@@ -11,6 +11,8 @@ LOG = logging.getLogger(__name__)
 
 
 class Worker:
+    heartbeat_seconds = 15  # lease renewals; a lease lasts 90 seconds
+
     def __init__(self, workspace, discovery=None):
         self.workspace = workspace
         self.discovery = discovery or workspace.discovery
@@ -58,7 +60,7 @@ class Worker:
         done = threading.Event()
 
         def heartbeat():
-            while not done.wait(15) and not stopping.is_set():
+            while not done.wait(self.heartbeat_seconds) and not stopping.is_set():
                 try:
                     if not self.discovery.heartbeat(task["id"], owner):
                         return
