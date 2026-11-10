@@ -126,6 +126,52 @@ class JobBulk(Input):
     items: list[BulkItem] = Field(min_length=1, max_length=200)
 
 
+def unique_items(items, label):
+    if len({item.id for item in items}) != len(items):
+        raise ValueError(f"Select each {label} once.")
+    return items
+
+
+class ApplicationBulk(Input):
+    action: Literal["close", "reopen", "delete"]
+    items: list[BulkItem] = Field(min_length=1, max_length=200)
+    outcome: Literal["accepted", "rejected", "not_pursued"] | None = None
+    status: Literal["draft", "applied", "interview", "offer"] | None = None
+
+    @model_validator(mode="after")
+    def valid_options(self):
+        if (self.action == "close") != (self.outcome is not None):
+            raise ValueError("An outcome is required only for close.")
+        if (self.action == "reopen") != (self.status is not None):
+            raise ValueError("A non-Closed stage is required only for reopen.")
+        unique_items(self.items, "application")
+        return self
+
+
+class JobResolve(Input):
+    url: str = Field(default="", max_length=4000)
+    source_key: str | None = Field(default=None, min_length=1, max_length=1000)
+
+    @field_validator("url")
+    @classmethod
+    def valid_url(cls, value):
+        return JobInput.valid_url(value) if value else value
+
+    @model_validator(mode="after")
+    def some_identity(self):
+        if not self.url and not self.source_key:
+            raise ValueError("Provide a job URL or source_key.")
+        return self
+
+
+class DuplicateQuery(Input):
+    queue: Literal["inbox", "shortlist", "applications", "dismissed"] | None = None
+    job_id: str | None = Field(default=None, max_length=100)
+    match_location: bool = False
+    limit: int = Field(default=20, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)
+
+
 def normalized_date(value, *, end=False):
     if not value:
         return value

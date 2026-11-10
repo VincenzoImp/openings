@@ -114,6 +114,17 @@ without losing documents, close it as **Not pursued**. Deleting the final attemp
 is permanent and deliberately returns a saved job to Shortlist; the confirmation
 explains this. Other retained attempts keep it out of pending queues.
 
+In the Applications **List** view, select attempts across pages to close them
+with one outcome, reopen Closed attempts to a stage, or delete them. Each attempt
+is checked separately; a failure, such as another open attempt for the same job,
+is listed without blocking the others.
+
+The **Possible duplicates** tab beside Inbox groups records that share a company
+and role or identical posting text, for example one vacancy collected from
+several job boards and the employer's site. It suggests a record to keep and
+never merges automatically. Open a job and expand **Job details, sources &
+maintenance** to see its possible duplicates and merge a verified copy.
+
 Dismissing a job preserves its applications. Restore it before preparing new
 documents. If you previously dismissed an applied job just to clear Shortlist,
 find it under Dismissed and choose **Restore job**. REST/MCP can set `triage=saved`

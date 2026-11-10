@@ -4,7 +4,9 @@ Step-by-step MCP/REST sequences behind the workflow skills: [Prepare Shortlist](
 
 ## Documents
 
-1. Find and read the job with `jobs_search` and `job_get`. Its `application`
+1. Find and read the job with `jobs_search` and `job_get`. Before ingesting a
+   URL, `jobs_resolve` reports any existing record and its attempts without
+   writing; `jobs_duplicates` lists candidate copies of the same vacancy. Its `application`
    summary identifies an open attempt or the latest closed one. Use
    `applications_list` with `value.job_id` for the full history. Continue an open
    attempt, or create Draft with `application_create` and an idempotency key.
@@ -85,7 +87,13 @@ Closing requires an explicit outcome. Creation or reopening cannot introduce a
 second open attempt; use the application identified by a conflict. Deleting an
 attempt preserves its job and other attempts; `application_delete` requires
 `application_id` and the current `expected_version`. Deleting the final attempt
-returns a saved job to Shortlist; only use this deliberately. To stop preparation
+returns a saved job to Shortlist; only use this deliberately.
+`applications_bulk` applies one action to at most 200 explicit
+`{id, expected_version}` items: `close` with `outcome`, `reopen` with a non-Closed
+`status`, or `delete`. Each item reports `ok` with a result or an error (code,
+status, message, details); reopening respects the one-open-attempt rule and only
+applies to Closed attempts. Bulk forget and delete collect orphaned file bytes once
+per call. To stop preparation
 and preserve its documents, close it with `not_pursued`. Restore known workaround
 dismissals explicitly to `saved`, using current versions: they remain in Applications
 when they have attempts and do not re-enter Inbox.
