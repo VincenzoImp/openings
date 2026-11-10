@@ -1,0 +1,6 @@
+# Local working space, secrets and generated per-machine files
+.local/
+.env
+.env.*
+certs/*.key
+.agents/skills/

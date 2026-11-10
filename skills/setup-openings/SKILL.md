@@ -38,11 +38,21 @@ The owner creates an API token in **Settings** and starts the agent client with
 server at `<origin>/mcp` with the bearer header in the client's own configuration.
 Confirm with `workspace_info` and `capabilities_get`.
 
-Suggest a small operator workspace: a directory with the client's instruction
-file stating the operating mandate and linking these skills, plus ignored local
-space for temporary files. Personal data stays in Openings.
+Suggest an operator workspace: copy the repository's
+`examples/operator-workspace/`, run its `sync.py --url <origin>`, and start the
+client through its `launch.py`. It states the operating mandate, generates MCP
+configuration for common clients and keeps personal data out of Git.
+
+Check the agent's own machine for `pdflatex` (and `pdftotext`/`pdfinfo` for
+checks). Openings does not compile documents. If they are missing, propose a
+user-level TeX distribution such as TinyTeX, install it with the owner's
+agreement, and report PDF preparation as blocked until a compiler works.
 
 ## Onboard the owner
+
+To try the workflow before sharing personal data, import the repository's
+synthetic `examples/career.json` and use `examples/resume.tex` and
+`examples/cover-letter.tex`; replace them with the owner's records afterwards.
 
 Work in this order; each step uses records the next ones need.
 
