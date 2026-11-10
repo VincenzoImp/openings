@@ -13,10 +13,10 @@ updated documentation.
 
 ## Run locally
 
-Requires Python 3.12+, Node 26 and [uv](https://docs.astral.sh/uv/).
+Requires Python 3.14+, Node 26 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-uv sync --locked --python 3.12
+uv sync --locked --python 3.14
 npm --prefix frontend ci
 npm --prefix frontend run build
 uv run openings --database data/development.sqlite

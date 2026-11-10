@@ -571,7 +571,7 @@ def normalize_posting(item: dict) -> dict:
                 .date()
                 .isoformat()
             )
-        except (ValueError, OverflowError, OSError):
+        except ValueError, OverflowError, OSError:
             date = None
     metadata["date_posted"] = (
         str(date)[:10] if date and re.match(r"\d{4}-\d{2}-\d{2}", str(date)) else None

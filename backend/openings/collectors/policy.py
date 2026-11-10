@@ -105,13 +105,13 @@ def retry_after(value: str | None, moment: float) -> float | None:
         seconds = float(value)
         if seconds >= 0 and seconds < float("inf"):
             return moment + seconds
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         try:
             parsed = parsedate_to_datetime(value)
             if parsed.tzinfo is None:
                 parsed = parsed.replace(tzinfo=UTC)
             return max(moment, parsed.timestamp())
-        except (ValueError, TypeError, OverflowError):
+        except ValueError, TypeError, OverflowError:
             pass
     return None
 
