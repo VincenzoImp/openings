@@ -1,20 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import ts from "typescript";
-const source = await readFile(
-  new URL("../src/api.ts", import.meta.url),
-  "utf8",
-);
-const { outputText } = ts.transpileModule(source, {
-  compilerOptions: {
-    target: ts.ScriptTarget.ES2022,
-    module: ts.ModuleKind.ESNext,
-  },
-});
-const { api, ApiError } = await import(
-  "data:text/javascript;base64," + Buffer.from(outputText).toString("base64")
-);
+// Node runs the source directly: built-in type stripping needs no compiler, and
+// "erasableSyntaxOnly" in tsconfig.json keeps src/api.ts strippable.
+const { api, ApiError } = await import("../src/api.ts");
 globalThis.window = { dispatchEvent() {} };
 test("an aborted response body is rejected, never accepted as an empty list", async () => {
   const abort = new AbortController();
