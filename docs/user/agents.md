@@ -10,10 +10,11 @@ set `OPENINGS_PUBLIC_URL` to the address the agent can actually reach. The serve
 returns that origin from `workspace_info`; resolve relative transfer URLs against
 it. An agent's `localhost` refers to the agent machine, not necessarily the server.
 
-The optional repository skill is
-[`skills/openings-workspace/SKILL.md`](../../skills/openings-workspace/SKILL.md).
-Install it using your agent's skill mechanism if desired. MCP remains usable
-without it: discover the tools/resources and their typed input schemas.
+The repository ships workflow [skills](../../skills/) in the Agent Skills format,
+starting with [`openings-workspace`](../../skills/openings-workspace/SKILL.md).
+To let an agent run the whole search for you, see
+[Agent-operated job search](agent-operated.md). MCP remains usable without the
+skills: discover the tools/resources and their typed input schemas.
 
 ## Working sequence
 
@@ -37,8 +38,9 @@ without it: discover the tools/resources and their typed input schemas.
 6. Call `documents_create`, then `files_reserve_upload` for each PDF/source file.
    Use the returned raw HTTP transfer URL/method/headers. MCP transports metadata,
    not base64 file bodies. Verify results with `documents_get` and scoped downloads.
-7. Leave reviewable drafts. Approve only when asked, and record Applied only after
-   actual submission. Portals and sending are outside Openings.
+7. Approve a document review only after the agent's own content and PDF checks;
+   it records an agent check, not human or employer approval. The owner submits
+   applications and records Applied. Portals and sending are outside Openings.
 
 Check the discovered input schemas. `jobs_search`, `applications_list` and `overview_get`
 accept an optional `value` DTO: for example, `jobs_search({"value":{"q":"Python",
