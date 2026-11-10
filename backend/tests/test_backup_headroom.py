@@ -30,6 +30,23 @@ def test_restore_recreates_indexes_missing_from_an_older_backup(tmp_path):
     assert not list(workspace.db.path.parent.glob(TEMP_PREFIX + "*"))
 
 
+def test_restore_route_leaves_no_wal_sidecars_of_its_upload(tmp_path):
+    data = tmp_path / "data"
+    app = create_app(data / "live.sqlite", start_worker=False)
+    app.state.workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build."})
+    with TestClient(app) as client:
+        session = client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
+        client.headers["X-CSRF-Token"] = session.json()["csrf_token"]
+        backup = client.get("/api/v1/backup").content
+        restored = client.post(
+            "/api/v1/backup/restore",
+            content=backup,
+            headers={"Content-Type": "application/vnd.sqlite3"},
+        )
+        assert restored.status_code == 200, restored.text
+    assert not list(data.glob(TEMP_PREFIX + "*"))
+
+
 def test_temp_copies_live_beside_the_database_and_stale_ones_are_removed(tmp_path):
     data = tmp_path / "data"
     data.mkdir()

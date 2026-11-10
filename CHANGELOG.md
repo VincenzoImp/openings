@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.13.0
 
 - Add indexes for document revision leaves, activity, notes, job/source tasks, postings and file cascades; application lists on a large workspace drop from ~500 ms to ~20 ms. Indexes are created automatically at startup; schema remains 6.
 - Add `exclude_titles` source filters: whole-word terms that skip matching titles before role and location filters, in REST, MCP and the source forms.
@@ -9,6 +9,9 @@
 - Enforce request size limits on the bytes actually received, including chunked bodies without `Content-Length`: 40 MiB for API requests and 16 KiB for sign-in/setup routes.
 - Write backup, restore-upload and rollback copies beside the database on the data volume instead of the container's temp directory, and remove copies left by a crash at startup.
 - Raise the default `OPENINGS_MAX_RESTORE_MB` from 512 to 2048 and recreate current indexes after a restore.
+- Remove the SQLite WAL sidecar files of temporary backup and restore copies with the copies themselves.
+
+Workspace schema remains 6. New indexes are created automatically at startup; existing data and frozen snapshots require no migration.
 
 ## 0.12.0
 
