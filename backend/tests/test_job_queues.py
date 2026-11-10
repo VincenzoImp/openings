@@ -132,6 +132,10 @@ def test_schema_five_upgrade_preserves_owned_records_and_versions(tmp_path):
     job = add(ws, "Existing engineer")
     application = ws.create_application({"job_id": job["id"]})
     with sqlite3.connect(path) as conn:
+        # Schema 5 also predates the schema 7 application planning fields.
+        conn.execute("DROP INDEX applications_deadline")
+        for column in ("requirements", "deadline", "priority"):
+            conn.execute(f"ALTER TABLE applications DROP COLUMN {column}")
         conn.execute("ALTER TABLE jobs ADD COLUMN initial_score_pending INTEGER NOT NULL DEFAULT 0")
         conn.execute("CREATE TABLE assessments (id TEXT PRIMARY KEY, job_id TEXT, score REAL)")
         conn.execute("INSERT INTO assessments VALUES (?,?,?)", ("derived", job["id"], 75))
@@ -145,7 +149,7 @@ def test_schema_five_upgrade_preserves_owned_records_and_versions(tmp_path):
     assert upgraded.get_application(application["id"]) == application
     assert upgraded.list_jobs(queue="shortlist")["total"] == 0
     with upgraded.db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 6
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 7
         assert not conn.execute(
             "SELECT name FROM sqlite_master WHERE name='assessments'"
         ).fetchall()
