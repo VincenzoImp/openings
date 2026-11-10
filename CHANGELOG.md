@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Ship the complete agent workflow skills: setup and onboarding, Inbox review, Shortlist preparation, source management, Career maintenance, application tracking, interview preparation and evidence-based writing, with shared references (operating mandate, employer requirements, vacancy identity, run report, tool reference).
+- Add the [agent-operated job search](docs/user/agent-operated.md) guide: the agent runs and improves the search; the owner applies to prepared Drafts and records Applied.
+
 ## 0.13.0
 
 - Add indexes for document revision leaves, activity, notes, job/source tasks, postings and file cascades; application lists on a large workspace drop from ~500 ms to ~20 ms. Indexes are created automatically at startup; schema remains 6.

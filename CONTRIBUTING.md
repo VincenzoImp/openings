@@ -73,7 +73,7 @@ uv run python backend/tests/agent_roundtrip.py --tectonic /path/to/tectonic
 | `backend/openings` | Shared SQLite services, REST, MCP, collection, worker and authentication |
 | `frontend` | React dashboard calling REST |
 | `examples` | Synthetic career data and LaTeX templates |
-| `skills/openings-workspace` | Optional external-agent workflow guidance |
+| `skills/` | Agent workflow skills (Agent Skills format) and their shared references |
 | `docs/user` | Setup, workflow and operator guides |
 | `docs/developer` | Architecture and extension boundaries |
 

@@ -4,7 +4,7 @@ A self-hosted job search workspace. Collect offers, keep your career knowledge a
 templates together, and prepare applications with your own AI agent. Jobs,
 documents and file bytes live in one portable SQLite database.
 
-[Get started](docs/user/getting-started.md) · [Documentation](docs/README.md) · [Connect your agent](docs/user/agents.md)
+[Get started](docs/user/getting-started.md) · [Documentation](docs/README.md) · [Agent-operated search](docs/user/agent-operated.md)
 
 ![Workspace overview with application progress, outcomes and recent activity](docs/images/overview.png)
 
@@ -26,11 +26,13 @@ documents and file bytes live in one portable SQLite database.
 
 ![Collect jobs, organize career knowledge, prepare documents with your agent, and track applications](docs/images/workflow.svg)
 
-Your agent reads a frozen application context, writes and compiles documents on
-its own machine, then uploads the result. You review the files and record the
-submission. The [agent guide](docs/user/agents.md) and optional
-[skill](skills/openings-workspace/SKILL.md) explain the workflow; your agent supplies
-its own model access and tools.
+Openings works best when your own agent runs it. With the included
+[workflow skills](skills/), an agent reviews new jobs against your Profile,
+prepares a CV and letter for every shortlisted one, tunes searches and monitored
+companies, and keeps improving your Career record and templates. You answer its
+questions, apply to the prepared Drafts and mark them Applied. See
+[Agent-operated job search](docs/user/agent-operated.md); your agent supplies its
+own model access and tools, and never submits applications for you.
 
 ## Start with Docker
 
