@@ -263,7 +263,7 @@ def test_partial_filter_patch_preserves_other_terms_and_explicit_empty_clears(co
             name="Example",
             kind="greenhouse",
             config={"board": "example"},
-            filters={"titles": ["engineer"], "locations": ["Canada"]},
+            filters={"titles": ["engineer"], "locations": ["Canada"], "exclude_titles": ["sales"]},
         )
     )
     changed = service.bulk_sources(
@@ -275,11 +275,19 @@ def test_partial_filter_patch_preserves_other_terms_and_explicit_empty_clears(co
             }
         )
     )["items"][0]["result"]
-    assert changed["filters"] == {"titles": ["developer"], "locations": ["Canada"]}
+    assert changed["filters"] == {
+        "titles": ["developer"],
+        "locations": ["Canada"],
+        "exclude_titles": ["sales"],
+    }
     cleared = service.update_source(
         source["id"],
         SourcePatch.model_validate(
             {"expected_version": changed["version"], "filters": {"locations": []}}
         ),
     )
-    assert cleared["filters"] == {"titles": ["developer"], "locations": []}
+    assert cleared["filters"] == {
+        "titles": ["developer"],
+        "locations": [],
+        "exclude_titles": ["sales"],
+    }
