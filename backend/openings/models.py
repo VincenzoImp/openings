@@ -155,6 +155,10 @@ class JobQuery(Input):
     sort: Literal["newest", "oldest", "company", "title"] = "newest"
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
+    include_facets: bool = Field(
+        default=False,
+        description="Also return up to 200 distinct companies/locations/sources/job types matching the filters.",
+    )
 
     @field_validator("created_since", "created_until")
     @classmethod

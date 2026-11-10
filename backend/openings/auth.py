@@ -60,27 +60,49 @@ class Auth:
             )
         return {"updated": True, "sign_in_required": True, "api_tokens_preserved": True}
 
-    def serializer(self):
-        data = self.workspace.get_settings("auth")["data"]
+    def serializer(self, data=None):
+        data = self.workspace.get_settings("auth")["data"] if data is None else data
         return URLSafeTimedSerializer(data.get("secret", "unconfigured"), salt="openings-owner-v1")
 
     def login(self, password):
-        if not password_matches(
-            password, self.workspace.get_settings("auth")["data"].get("password_hash", "")
-        ):
+        data = self.workspace.get_settings("auth")["data"]
+        if not password_matches(password, data.get("password_hash", "")):
             raise DomainError(401, "login_failed", "The password is incorrect.")
-        session = {"owner": True, "csrf": secrets.token_urlsafe(24)}
-        return self.serializer().dumps(session), session
+        session = {
+            "owner": True,
+            "csrf": secrets.token_urlsafe(24),
+            "generation": data.get("session_generation", 0),
+        }
+        return self.serializer(data).dumps(session), session
 
     def session(self, request):
         value = request.cookies.get(COOKIE)
-        if not value or not self.configured():
+        data = self.workspace.get_settings("auth")["data"]
+        if not value or not data.get("password_hash"):
             return None
         try:
-            data = self.serializer().loads(value, max_age=MAX_AGE)
-            return data if data.get("owner") else None
+            session = self.serializer(data).loads(value, max_age=MAX_AGE)
         except (BadSignature, SignatureExpired):
             return None
+        # A logout increments the stored generation, revoking every earlier cookie.
+        if not session.get("owner") or session.get("generation", 0) != data.get(
+            "session_generation", 0
+        ):
+            return None
+        return session
+
+    def logout(self):
+        """Revoke every browser session; API/MCP tokens remain valid."""
+        with self.workspace.db.lock:
+            setting = self.workspace.get_settings("auth")
+            data = setting["data"]
+            if data.get("password_hash"):
+                self.workspace.set_settings(
+                    "auth",
+                    {**data, "session_generation": data.get("session_generation", 0) + 1},
+                    setting["version"],
+                )
+        return {"authenticated": False, "sessions_revoked": True, "api_tokens_preserved": True}
 
     def bearer(self, request):
         header = request.headers.get("authorization", "")

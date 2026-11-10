@@ -94,7 +94,7 @@ def test_question_edits_retain_compatible_answers_and_reject_invalid_changes_ato
                 application["id"],
                 {"expected_version": application["version"], "questions": invalid},
             )
-        assert workspace.get_application(application["id"]) == application
+        assert workspace.get_application(application["id"], compact_job=True) == application
     # Only an explicit answers patch can clear an incompatible live answer.
     questions[0]["max_length"] = 5
     kept = {key: value for key, value in answers.items() if key != "text"}

@@ -314,7 +314,7 @@ class CareerService:
     def _apply_profile(self, conn, data, expected):
         setting = _setting(conn, "profile", DEFAULT_PROFILE)
         if setting["version"] != expected:
-            conflict()
+            conflict(details={"current_version": setting["version"]})
         previous = {**DEFAULT_PROFILE, **setting["data"]}
         merged = {**previous, **data}
         if previous != merged:
