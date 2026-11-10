@@ -38,11 +38,27 @@ asyncio_mode = "auto"
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+# Lets import sorting recognise `openings` and sibling test modules as first-party.
+src = ["backend", "backend/tests"]
 
 [tool.ruff.lint]
-# Keep the established rule set; Ruff 0.17 widened its defaults. Adopting more
-# rules is a separate cleanup, not part of a dependency update.
-select = ["E4", "E7", "E9", "F"]
+# No `select`: the project follows Ruff's default rule set (widened in 0.17).
+# Ruff is pinned in the dev group, so the set only changes with a reviewed
+# upgrade. Deviations are listed here with their reason; single call sites that
+# are deliberate carry an inline `# noqa: <rule>` with the reason next to it.
+
+[tool.ruff.lint.isort]
+# Keep `from x import (A, b as c)` in one statement, as the code is written.
+combine-as-imports = true
+
+[tool.ruff.lint.per-file-ignores]
+# Vendored code stays byte-identical to upstream to simplify future updates.
+# Correctness rules (pycodestyle errors, Pyflakes, bugbear, ...) still apply;
+# only the style and modernisation rules that would require edits are waived:
+# broad provider `except Exception` handlers (BLE001), import order (I001),
+# upstream `noqa` markers for rules this project does not enable (RUF100), and
+# pyupgrade rewrites (UP).
+"backend/openings/_vendor/**" = ["BLE001", "I001", "RUF100", "UP"]
 
 [tool.ruff.format]
 # Vendored code keeps its upstream formatting to simplify future updates.

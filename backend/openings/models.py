@@ -1,6 +1,6 @@
-from typing import Annotated, Any, Literal
-from datetime import date, datetime, timezone, timedelta
 import json
+from datetime import UTC, date, datetime, timedelta
+from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -250,14 +250,15 @@ def normalized_date(value, *, end=False):
     if not value:
         return value
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        # The replacement also accepts some malformed inputs; keep validation unchanged.
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))  # noqa: FURB162
     except ValueError as error:
         raise ValueError("Use an ISO8601 date or timestamp.") from error
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
     if end and len(value) == 10:
         parsed += timedelta(days=1, microseconds=-1)
-    return parsed.astimezone(timezone.utc).isoformat(timespec="microseconds")
+    return parsed.astimezone(UTC).isoformat(timespec="microseconds")
 
 
 class JobQuery(Input):

@@ -5,9 +5,9 @@ import sqlite3
 import time
 from contextlib import closing
 
-from .common import now, encode
-from .errors import DomainError
+from .common import encode, now
 from .db import MIGRATIONS, SCHEMA_VERSION, apply_schema, upgrade
+from .errors import DomainError
 
 
 def preserve_provider_runtime(restored, current):

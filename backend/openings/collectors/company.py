@@ -9,15 +9,15 @@ from __future__ import annotations
 import json
 import re
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta
 from copy import deepcopy
-from functools import lru_cache
+from datetime import datetime, timedelta
+from functools import cache
 from urllib.parse import quote, urlencode
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
-from ..errors import DomainError
 from ..common import now
+from ..errors import DomainError
 from ..posting import matches_filters
 from .catalog import COMPANY_ADAPTERS
 from .policy import ProviderDeferred
@@ -31,7 +31,7 @@ class BoardConfig(BaseModel):
     max_candidates: int = Field(default=2000, ge=20, le=10000)
 
 
-@lru_cache(maxsize=None)
+@cache
 def config_model(kind):
     adapter = COMPANY_ADAPTERS[kind]
     return create_model(
@@ -293,7 +293,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
             lambda row: row.findtext("office"),
         ):
 
-            def value(tag):
+            def value(tag, row=row):
                 return (row.findtext(tag) or "").strip()
 
             description = "\n\n".join(
@@ -552,7 +552,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
 
         def state(url):
             page = response(url).decode("utf-8", errors="replace")
-            match = re.search(r'id="__NEXT_DATA__"[^>]*>(.*?)</script>', page, re.S)
+            match = re.search(r'id="__NEXT_DATA__"[^>]*>(.*?)</script>', page, re.DOTALL)
             if not match:
                 raise DomainError(
                     502,
@@ -567,7 +567,7 @@ def collect(source, request, text, *, known=None, preview=False, on_item=None):
                     else page_props["pageData"]
                 )
                 if not isinstance(result, dict):
-                    raise ValueError()
+                    raise TypeError()
                 return result
             except (ValueError, KeyError, TypeError) as error:
                 raise DomainError(

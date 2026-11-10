@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .errors import DomainError
 
-FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.S)
+FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
 
 
 def skills_directory() -> Path:

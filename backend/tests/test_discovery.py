@@ -1,6 +1,6 @@
 """A few shared-service invariants for collection and task recovery."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -38,7 +38,7 @@ def run_next(service, owner="test-worker"):
 
 
 def test_user_completed_posting_survives_source_preview_refresh(case):
-    workspace, service = case
+    workspace, _ = case
     source = {
         "title": "Engineer",
         "company": "Example",
@@ -96,7 +96,7 @@ def test_source_failure_is_isolated(case, monkeypatch):
 
 def test_daily_schedule_avoids_double_run_during_fall_back():
     schedule = {"kind": "daily", "times": ["02:30"], "timezone": "Europe/Zurich"}
-    current = datetime(2026, 10, 25, 1, 45, tzinfo=timezone.utc)
+    current = datetime(2026, 10, 25, 1, 45, tzinfo=UTC)
     previous = "2026-10-25T00:30:00+00:00"
     assert next_due(schedule, previous, current).date().isoformat() == "2026-10-26"
 

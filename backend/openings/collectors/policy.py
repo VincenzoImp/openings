@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from urllib.parse import urljoin, urlsplit
 
@@ -17,7 +17,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..common import check_version, encode, now
 from ..errors import DomainError, missing
-
 from .catalog import COMPANY_KINDS
 
 REQUEST_BATCH_SIZE = 40
@@ -92,7 +91,7 @@ class ProviderPatch(BaseModel):
 
 
 def iso(moment: float) -> str:
-    return datetime.fromtimestamp(moment, timezone.utc).isoformat(timespec="microseconds")
+    return datetime.fromtimestamp(moment, UTC).isoformat(timespec="microseconds")
 
 
 def epoch(value) -> float:
@@ -110,7 +109,7 @@ def retry_after(value: str | None, moment: float) -> float | None:
         try:
             parsed = parsedate_to_datetime(value)
             if parsed.tzinfo is None:
-                parsed = parsed.replace(tzinfo=timezone.utc)
+                parsed = parsed.replace(tzinfo=UTC)
             return max(moment, parsed.timestamp())
         except (ValueError, TypeError, OverflowError):
             pass
@@ -347,10 +346,10 @@ class ProviderBudget:
                 nonlocal overflow
                 if self.active is not None and not self.active():
                     return 0xFFFFFFFF  # CURL_WRITEFUNC_ERROR; stop this transfer.
-                if len(content) + len(chunk) > 8 * 1024 * 1024:
+                if len(content) + len(chunk) > 8 * 1024 * 1024:  # noqa: B023 - used in this pass
                     overflow = True
                     return 0xFFFFFFFF
-                content.extend(chunk)
+                content.extend(chunk)  # noqa: B023 - used in this pass
                 return len(chunk)
 
             # curl's content callback bounds the transfer without an unbounded

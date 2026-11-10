@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from .db import decode_record, encode
@@ -6,7 +6,7 @@ from .errors import DomainError, conflict, missing
 
 
 def now():
-    return datetime.now(timezone.utc).isoformat(timespec="microseconds")
+    return datetime.now(UTC).isoformat(timespec="microseconds")
 
 
 def new_id():
@@ -21,12 +21,12 @@ def check_version(row, expected):
 
 
 __all__ = [
-    "now",
-    "new_id",
-    "check_version",
-    "encode",
-    "decode_record",
     "DomainError",
-    "missing",
+    "check_version",
     "conflict",
+    "decode_record",
+    "encode",
+    "missing",
+    "new_id",
+    "now",
 ]
