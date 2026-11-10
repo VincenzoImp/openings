@@ -34,11 +34,14 @@ An agent with shell access can do most of this for you with
 password and create the API token yourself.
 
 1. [Install Openings](getting-started.md) and create an API token in Settings.
-2. Give your agent the skills. Clients that support
-   [Agent Skills](https://agentskills.io/specification) can load the `skills/`
-   directory directly; otherwise point the agent at `skills/*/SKILL.md`.
-3. Connect the agent to MCP at `<origin>/mcp` with `Authorization: Bearer <token>`
-   (see [Agents and MCP](agents.md)). Set `OPENINGS_URL` and `OPENINGS_TOKEN` in
+2. Give your agent the skills. A connected agent gets them from the server
+   itself: `skills_list` and `skill_get` tools, and one MCP prompt per skill,
+   always matching the running version. Clients that support
+   [Agent Skills](https://agentskills.io/specification) can also load the
+   repository's `skills/` directory.
+3. Connect the agent to MCP at `<origin>/mcp` with `Authorization: Bearer <token>`.
+   **Settings → Agent access** shows ready-to-copy configuration for Claude Code,
+   Codex and JSON-based clients (see [Agents and MCP](agents.md)). Set `OPENINGS_URL` and `OPENINGS_TOKEN` in
    the agent's environment for REST and file transfers; set `OPENINGS_CA_FILE`
    when the server uses a private certificate authority.
 4. Keep a small operator workspace for the agent: a directory with an

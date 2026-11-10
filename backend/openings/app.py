@@ -24,6 +24,11 @@ from .api import register_core, register_core_mcp
 from .mcp_server import OpeningsMCP
 from .auth import COOKIE, MAX_AGE, Auth
 from .limits import REQUEST_LIMIT, BodyLimit
+from .skills import (
+    SkillLibrary,
+    register_api as register_skills_api,
+    register_mcp as register_skills_mcp,
+)
 from .career import (
     CareerService,
     register_api as register_career_api,
@@ -126,6 +131,8 @@ def create_app(database=None, start_worker=True):
     register_career_mcp(mcp, career)
     register_document_mcp(mcp, documents)
     register_discovery_mcp(mcp, discovery)
+    skills = SkillLibrary()
+    register_skills_mcp(mcp, skills)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -507,6 +514,7 @@ def create_app(database=None, start_worker=True):
         }
 
     register_core(router, workspace)
+    register_skills_api(router, skills)
     register_career_api(router, career)
     register_document_api(router, documents)
     register_discovery_api(router, discovery)
