@@ -54,5 +54,6 @@ def test_parity_matrix_is_current():
         [sys.executable, str(root / "scripts/parity_matrix.py"), "--check"],
         capture_output=True,
         text=True,
+        check=False,
     )
     assert result.returncode == 0, result.stderr
