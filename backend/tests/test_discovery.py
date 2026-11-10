@@ -13,6 +13,7 @@ from openings.discovery import (
 from openings.errors import DomainError
 from openings.workspace import Workspace
 
+
 @pytest.fixture
 def case(tmp_path, monkeypatch):
     workspace = Workspace(tmp_path / "workspace.sqlite")
@@ -28,11 +29,13 @@ def case(tmp_path, monkeypatch):
     )
     return workspace, service
 
+
 def run_next(service, owner="test-worker"):
     task = service.claim_task(owner)
     assert task is not None
     service.run_task(task, owner)
     return task
+
 
 def test_user_completed_posting_survives_source_preview_refresh(case):
     workspace, service = case
@@ -57,6 +60,7 @@ def test_user_completed_posting_survives_source_preview_refresh(case):
     assert workspace.overview()["incomplete"] == 0
     raw = workspace.db.one("SELECT payload FROM postings WHERE job_id=?", (preview["id"],))
     assert '"posting":"New source preview"' in raw["payload"]
+
 
 def test_source_failure_is_isolated(case, monkeypatch):
     workspace, service = case
@@ -89,11 +93,13 @@ def test_source_failure_is_isolated(case, monkeypatch):
     assert service.get_source(second["id"])["last_error"] is None
     assert workspace.list_jobs()["total"] == 1
 
+
 def test_daily_schedule_avoids_double_run_during_fall_back():
     schedule = {"kind": "daily", "times": ["02:30"], "timezone": "Europe/Zurich"}
     current = datetime(2026, 10, 25, 1, 45, tzinfo=timezone.utc)
     previous = "2026-10-25T00:30:00+00:00"
     assert next_due(schedule, previous, current).date().isoformat() == "2026-10-26"
+
 
 def test_cancel_between_claim_and_collection_does_not_touch_source(case, monkeypatch):
     _, service = case
