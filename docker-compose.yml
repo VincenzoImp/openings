@@ -13,7 +13,7 @@ services:
     environment:
       OPENINGS_PUBLIC_URL: ${OPENINGS_PUBLIC_URL:-http://127.0.0.1:8080}
       OPENINGS_PASSWORD: ${OPENINGS_PASSWORD:-}
-      OPENINGS_MAX_RESTORE_MB: ${OPENINGS_MAX_RESTORE_MB:-512}
+      OPENINGS_MAX_RESTORE_MB: ${OPENINGS_MAX_RESTORE_MB:-2048}
     volumes:
       - workspace:/data
     cpus: 0.5
