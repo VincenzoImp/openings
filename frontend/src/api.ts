@@ -53,6 +53,34 @@ export interface Question {
   options?: string[];
   max_length?: number;
 }
+export const requirementKinds = {
+  authorship: "Authorship",
+  attachment: "Attachment",
+  reference: "Reference",
+  format: "Format",
+  language: "Language",
+  eligibility: "Eligibility",
+  deadline: "Deadline",
+  other: "Other",
+} as const;
+export type RequirementKind = keyof typeof requirementKinds;
+export interface Requirement {
+  id?: string;
+  kind: RequirementKind;
+  text: string;
+  blocking: boolean;
+  resolved: boolean;
+  note: string;
+}
+export type Readiness =
+  "blocked" | "none" | "missing_pdf" | "unreviewed" | "ready";
+export const readinessLabels: Record<Readiness, string> = {
+  blocked: "Blocked by a requirement",
+  none: "No documents",
+  missing_pdf: "Missing PDF",
+  unreviewed: "Needs review",
+  ready: "Ready",
+};
 export interface Application extends Versioned {
   job_id: string;
   status: Stage;
@@ -62,6 +90,12 @@ export interface Application extends Versioned {
   answers: Record<string, unknown>;
   job?: Job;
   applied_at?: string | null;
+  priority?: number | null;
+  deadline?: string | null;
+  requirements?: Requirement[];
+  readiness?: Readiness;
+  open_requirements?: number;
+  blocking_requirements?: number;
   documents_count?: number;
   preparation?: {
     kind: string;
@@ -397,6 +431,26 @@ export function date(value?: string) {
   return Number.isNaN(d.valueOf())
     ? value
     : d.toLocaleDateString("en", { month: "short", day: "numeric" });
+}
+/** Format a calendar date (YYYY-MM-DD) without shifting it across time zones. */
+export function calendarDate(value?: string | null) {
+  if (!value) return "";
+  const d = new Date(value + "T00:00:00Z");
+  if (Number.isNaN(d.valueOf())) return value;
+  return d.toLocaleDateString("en", {
+    month: "short",
+    day: "numeric",
+    year:
+      d.getUTCFullYear() === new Date().getFullYear() ? undefined : "numeric",
+    timeZone: "UTC",
+  });
+}
+export function localToday(d = new Date()) {
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0"),
+  ].join("-");
 }
 export async function sha256(file: File) {
   if (!globalThis.crypto?.subtle) return undefined;

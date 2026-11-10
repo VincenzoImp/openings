@@ -83,9 +83,11 @@ ends that token’s access on its next request.
 
 For development commands and release gates, see [Contributing](../../CONTRIBUTING.md).
 
-## Upgrade from 0.10
+## Upgrade the workspace format
 
-Back up before starting 0.11. Schema 5 is upgraded automatically to schema 6,
-preserving jobs, application progress, versions, files and frozen contexts. Earlier
-backups remain usable with 0.10; open a copy with 0.11 to upgrade it before restoring
-into 0.11. Restore itself accepts schema 6.
+Back up before upgrading. On start, a schema 6 workspace is upgraded to schema 7
+in one transaction: applications gain empty priority, deadline and requirements,
+and jobs, application progress, versions, files and frozen contexts are kept.
+Schema 5 (0.10) is upgraded through schema 6 in the same step. Restore accepts a
+schema 7 backup and upgrades a copy of a schema 5 or 6 backup; the uploaded file
+is not changed. Older formats require their matching release.

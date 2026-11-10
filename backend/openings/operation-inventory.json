@@ -881,12 +881,12 @@
         "applications_list"
       ],
       "dashboard": "Applications: list/Kanban filters",
-      "notes": "q, job_id, status, outcome, company, sort, limit, offset; job_id is exact and stage_counts span all matching records."
+      "notes": "q, job_id, status, outcome, company, readiness (blocked/none/missing_pdf/unreviewed/ready), sort (updated/newest/oldest/company/stage/applied/deadline/priority), limit, offset; job_id is exact and stage_counts span all matching records. Rows include priority, deadline, readiness and unresolved/blocking requirement counts; full requirements are on the attempt read."
     },
     {
       "id": "applications.read",
       "group": "Applications and documents",
-      "operation": "Read full attempt, questions/answers and job",
+      "operation": "Read full attempt, questions/answers, requirements and job",
       "rest": [
         {
           "method": "GET",
@@ -896,7 +896,8 @@
       "mcp": [
         "application_get"
       ],
-      "dashboard": "Applications: attempt detail"
+      "dashboard": "Applications: attempt detail",
+      "notes": "readiness is derived from current revision leaves and unresolved blocking requirements."
     },
     {
       "id": "applications.create",
@@ -912,12 +913,12 @@
         "application_create"
       ],
       "dashboard": "Inbox: Start application",
-      "notes": "At most one non-Closed attempt per job. A conflicting new request reports the active application ID; idempotency keys support retries. Starting retains saved interest and leaves the pending Shortlist queue; it never submits or generates documents."
+      "notes": "At most one non-Closed attempt per job. A conflicting new request reports the active application ID; idempotency keys support retries. Starting retains saved interest and leaves the pending Shortlist queue; it never submits or generates documents. Optional priority (1 highest to 5), deadline (YYYY-MM-DD) and structured employer requirements."
     },
     {
       "id": "applications.update",
       "group": "Applications and documents",
-      "operation": "Record stage, outcome, questions/answers and application instructions",
+      "operation": "Record stage, outcome, priority, deadline, employer requirements, questions/answers and application instructions",
       "rest": [
         {
           "method": "PATCH",
@@ -927,8 +928,8 @@
       "mcp": [
         "application_update"
       ],
-      "dashboard": "Applications: progress and questions/answers",
-      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history. Entering Closed requires an explicit outcome. Reopening enforces one open attempt per job. applied_at:null clears the recorded submission date."
+      "dashboard": "Applications: progress, planning, requirements and questions/answers",
+      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history. Entering Closed requires an explicit outcome. Reopening enforces one open attempt per job. applied_at, priority or deadline null clears the value. requirements replaces the whole list; keep existing ids."
     },
     {
       "id": "applications.delete",

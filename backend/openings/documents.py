@@ -125,7 +125,7 @@ class DocumentService:
             job = _get(conn, "jobs", application["job_id"], "Job")
             if job["triage"] == "dismissed":
                 conflict("Restore this dismissed job before preparing an application.")
-            application = decode_record(application, ["questions", "answers"])
+            application = decode_record(application, ["questions", "answers", "requirements"])
             job = decode_record(job, ["metadata", "overrides"])
             profile = _setting(conn, "profile", DEFAULT_PROFILE)
             instructions = _setting(conn, "instructions", {"general": DEFAULT_GUIDANCE})
