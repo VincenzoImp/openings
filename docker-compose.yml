@@ -2,7 +2,7 @@ name: openings
 
 services:
   openings:
-    image: ${OPENINGS_IMAGE:-docker.io/vincenzoimp/openings:0.15.0}
+    image: ${OPENINGS_IMAGE:-docker.io/vincenzoimp/openings:0.15.1}
     build:
       context: .
       dockerfile: Dockerfile

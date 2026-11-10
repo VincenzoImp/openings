@@ -300,3 +300,49 @@ def test_review_conflict_reports_version_before_content(tmp_path):
     with pytest.raises(DomainError) as error:
         documents.review_document(document["id"], ReviewUpdate(expected_version=2))
     assert error.value.code == "conflict"
+
+
+def test_context_input_summaries_are_stored_and_rebuilt(tmp_path):
+    import sqlite3
+
+    from openings.db import Database
+
+    path = tmp_path / "summaries.sqlite"
+    app = create_app(path, start_worker=False)
+    workspace, career, documents = app.state.workspace, app.state.career, app.state.documents
+    template = career.create_template(
+        TemplateCreate(name="MASTER CV", kind="resume", tex=SOURCE, is_default=True)
+    )
+    entry = career.create_knowledge(KnowledgeCreate(title="Backend Engineer"))
+    job = workspace.ingest_job({"title": "Synthetic role", "posting": "Build services."})
+    application = workspace.create_application({"job_id": job["id"]})
+    context = documents.prepare_context(
+        ContextCreate(
+            application_id=application["id"],
+            template_ids=[template["id"]],
+            knowledge_ids=[entry["id"]],
+        )
+    )
+    documents.create_document(
+        DocumentCreate(
+            application_id=application["id"],
+            context_id=context["id"],
+            kind="resume",
+            content=content(),
+        )
+    )
+    with sqlite3.connect(path) as conn:
+        stored = conn.execute(
+            "SELECT profile_version,templates,knowledge FROM context_inputs WHERE context_id=?",
+            (context["id"],),
+        ).fetchone()
+        assert stored is not None and template["id"] in stored[1] and entry["id"] in stored[2]
+        # A restored or older workspace may lack summaries: reads and startup derive them.
+        conn.execute("DELETE FROM context_inputs")
+    assert documents.list_staleness(stale_only=False)["total"] == 1
+    with sqlite3.connect(path) as conn:
+        assert conn.execute("SELECT count(*) FROM context_inputs").fetchone()[0] == 1
+        conn.execute("DROP TABLE context_inputs")
+    Database(path)
+    with sqlite3.connect(path) as conn:
+        assert conn.execute("SELECT count(*) FROM context_inputs").fetchone()[0] == 1
