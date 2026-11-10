@@ -8,6 +8,8 @@ import {
   newId,
   version,
   type Application,
+  type DuplicateGroup,
+  type DuplicateJob,
   type Job,
   type ListResult,
   type Note,
@@ -146,7 +148,11 @@ export function JobsPage({
     if (!v) params.delete(k);
   });
   if (filters.queue === "all") params.delete("queue");
-  const resource = useResource<ListResult<Job>>(`/jobs?${params}`, blankJobs);
+  const duplicates = filters.queue === "duplicates";
+  const resource = useResource<ListResult<Job>>(
+    duplicates ? null : `/jobs?${params}`,
+    blankJobs,
+  );
   const [selection, setSelection] = useState<Record<string, number>>({}),
     [forget, setForget] = useState(false);
   const [batchErrors, setBatchErrors] = useState<
@@ -225,6 +231,38 @@ export function JobsPage({
         );
     }
   }
+  const tabs = (
+    <Tabs
+      label="Job triage"
+      value={filters.queue}
+      onChange={(value) => {
+        if (value === "inbox" || value === "shortlist") location.hash = value;
+        else change("queue", value);
+      }}
+      items={[
+        { id: "inbox", label: "Inbox" },
+        { id: "shortlist", label: "Shortlist" },
+        { id: "dismissed", label: "Dismissed" },
+        { id: "all", label: "All jobs" },
+        { id: "duplicates", label: "Possible duplicates" },
+      ]}
+    />
+  );
+  if (duplicates)
+    return (
+      <>
+        <Heading
+          title="Possible duplicates"
+          description="Records that may describe the same vacancy. Check each group, then merge verified duplicates from a job's details."
+        >
+          <Button variant="primary" icon="plus" onClick={onAdd}>
+            Add job
+          </Button>
+        </Heading>
+        {tabs}
+        <DuplicateGroups onOpen={onOpen} />
+      </>
+    );
   return (
     <>
       <Heading
@@ -251,20 +289,7 @@ export function JobsPage({
           Add job
         </Button>
       </Heading>
-      <Tabs
-        label="Job triage"
-        value={filters.queue}
-        onChange={(value) => {
-          if (value === "inbox" || value === "shortlist") location.hash = value;
-          else change("queue", value);
-        }}
-        items={[
-          { id: "inbox", label: "Inbox" },
-          { id: "shortlist", label: "Shortlist" },
-          { id: "dismissed", label: "Dismissed" },
-          { id: "all", label: "All jobs" },
-        ]}
-      />
+      {tabs}
       <div className="toolbar">
         <div className="search">
           <Icon name="search" />
@@ -653,7 +678,9 @@ export function JobDrawer({
     return () => window.removeEventListener("openings:record-reloaded", reload);
   }, [editingNote?.id]);
   const [forget, setForget] = useState(false),
-    [merging, setMerging] = useState(false);
+    [merging, setMerging] = useState(false),
+    [mergeTarget, setMergeTarget] = useState<DuplicateJob | null>(null),
+    [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false),
     [applicationOffset, setApplicationOffset] = useState(0);
   const applicationKey = useRef<string | null>(null);
@@ -930,7 +957,12 @@ export function JobDrawer({
                     </span>
                   </div>
                 )}
-                <details className="job-maintenance">
+                <details
+                  className="job-maintenance"
+                  onToggle={(event) =>
+                    setMaintenanceOpen(event.currentTarget.open)
+                  }
+                >
                   <summary>Job details, sources & maintenance</summary>{" "}
                   <dl className="detailfacts">
                     <div>
@@ -950,8 +982,22 @@ export function JobDrawer({
                       <dd>{date(job.created_at)}</dd>
                     </div>
                   </dl>
+                  {maintenanceOpen && (
+                    <DuplicatePanel
+                      job={job}
+                      onMerge={(target) => {
+                        setMergeTarget(target);
+                        setMerging(true);
+                      }}
+                    />
+                  )}
                   <div className="actions form-actions">
-                    <Button onClick={() => setMerging(true)}>
+                    <Button
+                      onClick={() => {
+                        setMergeTarget(null);
+                        setMerging(true);
+                      }}
+                    >
                       Merge duplicate
                     </Button>
                   </div>
@@ -1164,6 +1210,7 @@ export function JobDrawer({
       {merging && job && (
         <MergeJob
           job={job}
+          preset={mergeTarget}
           onClose={() => setMerging(false)}
           onMerged={onClose}
         />
@@ -1205,21 +1252,28 @@ export function JobDrawer({
 }
 function MergeJob({
   job,
+  preset,
   onClose,
   onMerged,
 }: {
   job: Job;
+  preset?: DuplicateJob | null;
   onClose: () => void;
   onMerged: () => void;
 }) {
   const [query, setQuery] = useState(job.title),
-    [selected, setSelected] = useState("");
+    [selected, setSelected] = useState(preset?.id || "");
   const candidates = useResource<ListResult<Job>>(
     `/jobs?limit=100&q=${encodeURIComponent(query)}`,
     blankJobs,
   );
   const { mutate, pending } = useWorkspace();
-  const target = candidates.data.items.find((item) => item.id === selected);
+  const options: (Job | DuplicateJob)[] = candidates.data.items.filter(
+    (item) => item.id !== job.id,
+  );
+  if (preset && !options.some((item) => item.id === preset.id))
+    options.unshift(preset);
+  const target = options.find((item) => item.id === selected);
   return (
     <Dialog title="Merge a verified duplicate." onClose={onClose}>
       <p className="modal-intro">
@@ -1241,13 +1295,11 @@ function MergeJob({
       <Field label="Keep this job">
         <select value={selected} onChange={(e) => setSelected(e.target.value)}>
           <option value="">Choose a matching record</option>
-          {candidates.data.items
-            .filter((item) => item.id !== job.id)
-            .map((item) => (
-              <option value={item.id} key={item.id}>
-                {item.company} · {item.title} · {date(item.created_at)}
-              </option>
-            ))}
+          {options.map((item) => (
+            <option value={item.id} key={item.id}>
+              {item.company} · {item.title} · {date(item.created_at)}
+            </option>
+          ))}
         </select>
       </Field>
       <p className="hint">
@@ -1280,5 +1332,211 @@ function MergeJob({
         </Button>
       </div>
     </Dialog>
+  );
+}
+
+const signalLabels: Record<string, string> = {
+  company_title: "Same company and role",
+  posting_text: "Identical posting text",
+};
+function DuplicateJobLine({
+  item,
+  reference,
+}: {
+  item: DuplicateJob;
+  reference: boolean;
+}) {
+  return (
+    <>
+      <strong className="jobtitle">{item.title}</strong>
+      <span className="duplicate-meta">
+        {item.company}
+        <span>·</span>
+        {item.source || "manual"}
+        <span>·</span>
+        {item.location || "Location not specified"}
+        {item.application ? (
+          <span className="tag neutral">
+            {stageLabels[item.application.status]}
+          </span>
+        ) : (
+          <span className="tag neutral">
+            {item.triage === "saved"
+              ? "Shortlist"
+              : item.triage === "dismissed"
+                ? "Dismissed"
+                : "Inbox"}
+          </span>
+        )}
+        {reference ? (
+          <span className="tag green">Likely record to keep</span>
+        ) : (
+          item.similarity !== null && (
+            <span title="Posting text overlap with the likely record to keep">
+              {Math.round(item.similarity * 100)}% same text
+            </span>
+          )
+        )}
+      </span>
+    </>
+  );
+}
+function DuplicateGroups({ onOpen }: { onOpen: (id: string) => void }) {
+  const [queue, setQueue] = useState(""),
+    [sameLocation, setSameLocation] = useState(false),
+    [offset, setOffset] = useState(0);
+  const params = new URLSearchParams({
+    limit: "20",
+    offset: String(offset),
+  });
+  if (queue) params.set("queue", queue);
+  if (sameLocation) params.set("match_location", "true");
+  const resource = useResource<ListResult<DuplicateGroup>>(
+    `/jobs/duplicates?${params}`,
+    { items: [], total: 0 },
+  );
+  return (
+    <>
+      <div className="toolbar duplicate-filters">
+        <select
+          aria-label="Groups containing"
+          value={queue}
+          onChange={(e) => {
+            setQueue(e.target.value);
+            setOffset(0);
+          }}
+        >
+          <option value="">Any job</option>
+          <option value="inbox">A job in Inbox</option>
+          <option value="shortlist">A job in Shortlist</option>
+          <option value="applications">A job with applications</option>
+          <option value="dismissed">A dismissed job</option>
+        </select>
+        <label className="checkline">
+          <input
+            type="checkbox"
+            checked={sameLocation}
+            onChange={(e) => {
+              setSameLocation(e.target.checked);
+              setOffset(0);
+            }}
+          />
+          Same location only
+        </label>
+      </div>
+      {resource.error && (
+        <ErrorBox message={resource.error} retry={resource.reload} />
+      )}
+      <PendingResults pending={resource.loading} />
+      {resource.loading ? (
+        <Loading />
+      ) : !resource.data.items.length ? (
+        <section className="card">
+          <Empty title="No possible duplicates">
+            No records share a company and role or identical posting text.
+          </Empty>
+        </section>
+      ) : (
+        <div className="duplicate-groups">
+          {resource.data.items.map((group) => (
+            <section
+              className="card duplicate-group"
+              key={group.job_ids.join()}
+              aria-label={`${group.size} possible duplicates`}
+            >
+              <header>
+                <strong>{group.size} records</strong>
+                {group.signals.map((signal) => (
+                  <span className="tag neutral" key={signal}>
+                    {signalLabels[signal] || signal}
+                  </span>
+                ))}
+                {group.merge_blocked && (
+                  <span className="tag amber">
+                    {group.open_application_ids.length} open applications
+                  </span>
+                )}
+              </header>
+              {group.items.map((item) => (
+                <button
+                  className="duplicate-row"
+                  key={item.id}
+                  onClick={() => onOpen(item.id)}
+                >
+                  <span>
+                    <DuplicateJobLine
+                      item={item}
+                      reference={item.id === group.reference_id}
+                    />
+                  </span>
+                  <Icon name="arrow" />
+                </button>
+              ))}
+            </section>
+          ))}
+        </div>
+      )}
+      <Pagination
+        offset={offset}
+        total={resource.data.total}
+        limit={20}
+        onChange={setOffset}
+      />
+      <p className="hint">
+        Groups are suggestions from matching company and role or identical
+        posting text. Nothing is merged automatically: compare employer,
+        requisition, location and level before merging.
+      </p>
+    </>
+  );
+}
+function DuplicatePanel({
+  job,
+  onMerge,
+}: {
+  job: Job;
+  onMerge: (target: DuplicateJob) => void;
+}) {
+  const resource = useResource<ListResult<DuplicateGroup>>(
+    `/jobs/duplicates?job_id=${encodeURIComponent(job.id)}&limit=1`,
+    { items: [], total: 0 },
+  );
+  const group = resource.data.items[0];
+  const others = group?.items.filter((item) => item.id !== job.id) || [];
+  return (
+    <section className="duplicate-panel" aria-label="Possible duplicates">
+      <strong>Possible duplicates</strong>
+      {resource.error ? (
+        <ErrorBox message={resource.error} retry={resource.reload} />
+      ) : resource.loading ? (
+        <Loading />
+      ) : !others.length ? (
+        <p className="muted smalltext">
+          No other records share this company and role or posting text.
+        </p>
+      ) : (
+        <>
+          {group.merge_blocked && (
+            <p className="smalltext">
+              More than one record has an open application. Close one before
+              merging.
+            </p>
+          )}
+          {others.map((item) => (
+            <div className="duplicate-row" key={item.id}>
+              <span>
+                <DuplicateJobLine
+                  item={item}
+                  reference={item.id === group.reference_id}
+                />
+              </span>
+              <Button className="small" onClick={() => onMerge(item)}>
+                Merge into this job
+              </Button>
+            </div>
+          ))}
+        </>
+      )}
+    </section>
   );
 }

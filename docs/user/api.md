@@ -29,9 +29,9 @@ Paste the posting when extraction cannot obtain the complete text.
 
 | Area | Routes under `/api/v1` |
 |---|---|
-| Archive | `GET/POST /jobs`, `POST /jobs/bulk`, `GET/PATCH/DELETE /jobs/{id}`, `POST /jobs/{id}/triage`, `/merge`, `GET/POST /jobs/{id}/notes` |
+| Archive | `GET/POST /jobs`, `GET /jobs/resolve`, `GET /jobs/duplicates`, `POST /jobs/bulk`, `GET/PATCH/DELETE /jobs/{id}`, `POST /jobs/{id}/triage`, `/merge`, `GET/POST /jobs/{id}/notes` |
 | Notes | `GET/PATCH/DELETE /notes/{id}` plus job-owned list/create routes |
-| Applications | `GET/POST /applications`, `GET/PATCH/DELETE /applications/{id}`, `GET /applications/{id}/events`, `GET /applications/{id}/staleness`, `GET /staleness` |
+| Applications | `GET/POST /applications`, `POST /applications/bulk`, `GET/PATCH/DELETE /applications/{id}`, `GET /applications/{id}/events`, `GET /applications/{id}/staleness`, `GET /staleness` |
 | Career | `GET/PATCH /career/profile`, CRUD `/career/knowledge` and `/career/claims`, `POST /career/import/preview` then `/career/import` |
 | Templates/guidance | CRUD `/templates`, `GET/PATCH /instructions` |
 | Collection | `GET/PATCH /collection`, `GET /providers`, `PATCH /providers/{id}`, CRUD `/sources`, `/sources/schemas`, preview/run, `/sources/bulk` and `/collection/runs` |
@@ -126,13 +126,43 @@ revisions retain their content; create a new revision/context for changed input.
 
 The authenticated `/capabilities` inventory maps all logical operations to REST,
 MCP and dashboard locations, with explicit bootstrap/transport exceptions. Lists
-support server filters; `/jobs/bulk` and `/sources/bulk` accept at most 200 versioned
-items and return per-item outcomes. Application `stage_counts` span all matching
+support server filters; `/jobs/bulk`, `/applications/bulk` and `/sources/bulk`
+accept at most 200 versioned items and return per-item outcomes. Application `stage_counts` span all matching
 attempts, independent of pagination. Overview accepts `since`/`until` for the
 submitted-attempt cohort. Career nonnullable PATCH fields reject explicit null:
 omit unchanged fields, or clear text/lists/objects with empty values. Entry dates
 are nullable; `dates: null` clears them. See [Career](career.md) for structured
 headers, partial dates, skills and ordering.
+
+## Identity and duplicates
+
+Both reads are side-effect free; neither fetches a page nor merges records.
+
+```text
+GET /jobs/resolve?url=https://jobs.example.test/123&source_key=linkedin:42
+GET /jobs/duplicates?queue=shortlist&limit=20&offset=0
+GET /jobs/duplicates?job_id=JOB_ID
+```
+
+`/jobs/resolve` normalizes the URL as ingestion does and returns `items` (job
+summaries with `matched_by`, triage and every attempt in `applications`),
+`identities` and `identity_conflict`. `/jobs/duplicates` returns candidate
+`items` groups with a `total` group count: `job_ids`, `signals`
+(`company_title`, `posting_text`), `identical_postings`, `reference_id`,
+`open_application_ids` and `merge_blocked`, plus per-job `posting_hash` and
+advisory `similarity`. Add `match_location=true` to require the same location.
+Verify a group, then merge with `POST /jobs/{source_id}/merge`.
+
+`POST /applications/bulk` closes, reopens or deletes selected attempts:
+
+```json
+{"action": "close", "outcome": "not_pursued",
+ "items": [{"id": "APPLICATION_ID", "expected_version": 3}]}
+```
+
+`reopen` takes `status` (`draft`, `applied`, `interview` or `offer`) and only
+applies to Closed attempts; `delete` takes neither field. Each result item has
+`ok` and either `result` or `error`.
 
 ## Collection recipes
 

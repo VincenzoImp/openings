@@ -29,7 +29,9 @@ skills: discover the tools/resources and their typed input schemas.
    skill tags from optional descriptions and ordered claims. Empty descriptions
    are valid. Templates determine the final document sections and layout.
 2. Find or ingest the job with `jobs_search`, `job_get` or `job_ingest`. You can
-   add a posting manually without setting up collection.
+   add a posting manually without setting up collection. `jobs_resolve` checks a
+   URL or source key without ingesting; `jobs_duplicates` lists candidate copies
+   of one vacancy across sources for review before `job_merge`.
 3. Inspect `job.application` or use `applications_list` with `value.job_id` to find
    its attempts. Continue the open application, or use `application_create` to
    start Preparing (`draft`) with questions, notes and an idempotency key. Starting removes it from the pending Shortlist queue. A later attempt is possible after the previous one closes.
@@ -110,7 +112,9 @@ The [Collection guide](sources.md) explains daily time slots, defaults and count
 - Each job has at most one non-Closed application. A creation/reopening conflict
   identifies its open attempt. Closing requires an explicit outcome; deleting
   an attempt leaves the job and other attempts intact. `application_delete`
-  takes `application_id` and the current `expected_version`.
+  takes `application_id` and the current `expected_version`. `applications_bulk`
+  closes (with `outcome`), reopens (with `status`) or deletes up to 200 versioned
+  attempts with per-item results.
 - Content revisions are immutable. Use `previous_id` for changed wording and
   upload the new revision's own PDF/source files. Approved revisions reject uploads.
   Approval requires the document's last read `expected_version`; attachment changes
