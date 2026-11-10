@@ -136,7 +136,12 @@ export function JobsPage({
   });
   const query = useDebounce(filters.q),
     offset = Number(filters.offset) || 0;
-  const params = new URLSearchParams({ ...filters, q: query, limit: "50" });
+  const params = new URLSearchParams({
+    ...filters,
+    q: query,
+    limit: "50",
+    include_facets: "true",
+  });
   Object.entries(filters).forEach(([k, v]) => {
     if (!v) params.delete(k);
   });

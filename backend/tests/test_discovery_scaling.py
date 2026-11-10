@@ -91,7 +91,7 @@ def test_source_page_batches_reads_and_preserves_provider_summaries(populated, m
             return original(sql, params)
 
         monkeypatch.setattr(workspace.db, name, read)
-    page = service.list_sources(limit=500)
+    page = service.list_sources(limit=500, summary=False)
     assert page["total"] == len(page["items"]) == 350
     assert len(reads) <= 5
     first = page["items"][0]

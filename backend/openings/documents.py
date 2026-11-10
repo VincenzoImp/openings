@@ -548,11 +548,11 @@ class DocumentService:
         kind: str = "",
         limit: int = 100,
         offset: int = 0,
-        summary: bool = False,
+        summary: bool = True,
         q: str = "",
         review_state: Literal["draft", "approved"] | None = None,
     ) -> dict:
-        """List revisions by application/kind/review state/title. summary=true omits structured content and file entries; retrieve a revision for exact content/files."""
+        """List revisions by application/kind/review state/title. summary=true (default) omits structured content and file entries; summary=false includes them; retrieve a revision for exact content/files."""
         _page(limit, offset)
         where, params = [], []
         if application_id:
@@ -589,7 +589,10 @@ class DocumentService:
         with self.db.transaction() as conn:
             row = _get(conn, "documents", document_id, "Document revision")
             if row["version"] != value.expected_version:
-                conflict("The document or its files changed. Reload it before approving.")
+                conflict(
+                    "The document or its files changed. Reload it before approving.",
+                    details={"current_version": row["version"]},
+                )
             if row["review_state"] != "approved":
                 conn.execute(
                     "UPDATE documents SET review_state='approved',version=version+1 WHERE id=?",
@@ -940,7 +943,7 @@ def register_api(router, documents: DocumentService):
         kind: str = "",
         limit: int = 100,
         offset: int = 0,
-        summary: bool = False,
+        summary: bool = True,
         q: str = "",
         review_state: Literal["draft", "approved"] | None = None,
     ):

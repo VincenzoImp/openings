@@ -137,7 +137,7 @@ def register_core_mcp(mcp, workspace):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def jobs_search(value: JobQuery | None = None) -> dict:
-        """Search compact paginated job summaries with location/source/remote/date/queue filters. Read job_get for full content."""
+        """Search compact paginated job summaries with location/source/remote/date/queue filters; include_facets=true adds filter value lists. Read job_get for full content."""
         return workspace.list_jobs(**(value or JobQuery()).model_dump())
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
@@ -160,12 +160,12 @@ def register_core_mcp(mcp, workspace):
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     def job_update(job_id: str, value: JobPatch) -> dict:
-        """Correct job fields using the version returned by job_get."""
+        """Correct job fields using the version returned by job_get. Returns the compact job summary; read job_get for full text."""
         return workspace.update_job(job_id, value)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     def job_triage(job_id: str, value: TriageInput) -> dict:
-        """Set inbox/saved/dismissed. Use queue=inbox/shortlist/applications for actionable queues; saved is retained interest."""
+        """Set inbox/saved/dismissed and return the compact job summary. Use queue=inbox/shortlist/applications for actionable queues; saved is retained interest."""
         return workspace.set_triage(job_id, value.triage, value.expected_version)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
@@ -227,7 +227,7 @@ def register_core_mcp(mcp, workspace):
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     def application_update(application_id: str, value: ApplicationPatch) -> dict:
-        """Record progress/questions/answers explicitly; editing documents never marks sent."""
+        """Record progress/questions/answers explicitly; editing documents never marks sent. The returned job is the compact summary."""
         return workspace.update_application(application_id, value)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))

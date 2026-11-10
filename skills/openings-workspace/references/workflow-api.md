@@ -8,8 +8,13 @@ mechanics, not personal selection or writing policy.
 
 - `GET /jobs?queue=inbox&limit=200&offset=0` and `jobs_search(value)` list a
   compact preview. `job_get` / `GET /jobs/{id}` supplies the full posting.
+  Filter value lists (`facets`) appear only with `include_facets: true`.
 - `job_triage(job_id, value)` / `POST /jobs/{id}/triage` takes `triage` and
   `expected_version`. Values are `inbox`, `saved` and `dismissed`, not `draft`.
+  It returns the compact job summary with the new `version`, not the posting.
+  `job_update` and `application_update` also return compact jobs.
+- A 409 version conflict carries `details.current_version`; read the record
+  again before retrying so concurrent edits are preserved.
 - Actionable `queue=shortlist` means saved with no application attempt. Raw
   `triage=saved` also includes jobs with open or closed attempts.
 - Snapshot the queue's IDs before mutating it, or repeatedly process offset zero.
@@ -50,6 +55,9 @@ mechanics, not personal selection or writing policy.
 - `documents_review` / `POST /documents/{id}/review` takes `expected_version`
   and `review_state: approved`. Uploads change the document version; read it again
   before review. Approval does not parse the PDF or establish human approval.
+- `documents_list` / `GET /documents` returns compact rows by default (file
+  counts, no content or files). Pass `summary: false`, or read `documents_get`,
+  for structured content and file entries.
 - Draft-ready is an agent assessment, not an API state or flag. It requires the
   intended current CV and CL leaf revisions, valid final PDFs and sources,
   complete content/layout checks and approved document review states.

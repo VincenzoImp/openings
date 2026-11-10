@@ -72,7 +72,7 @@ function searchProviders(source: Source) {
 }
 export default function CompaniesPage() {
   const resource = useResource<ListResult<Source>>(
-    "/sources",
+    "/sources?summary=false",
     { items: [], total: 0 },
     true,
   );
