@@ -180,6 +180,38 @@
       "notes": "At most 200 versioned items, with per-item results/errors. Error results include details such as current_version."
     },
     {
+      "id": "jobs.resolve",
+      "group": "Archive",
+      "operation": "Look up archived jobs by URL or source identity without ingesting",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/jobs/resolve"
+        }
+      ],
+      "mcp": [
+        "jobs_resolve"
+      ],
+      "dashboard": "Job details: Possible duplicates (identity matches are merged on ingestion)",
+      "notes": "Read-only. Matches retained identities and normalized job/posting URLs; returns triage and every attempt per job. More than one match is an identity conflict to merge."
+    },
+    {
+      "id": "jobs.duplicates",
+      "group": "Archive",
+      "operation": "List candidate duplicate job groups for review",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/jobs/duplicates"
+        }
+      ],
+      "mcp": [
+        "jobs_duplicates"
+      ],
+      "dashboard": "Jobs: Possible duplicates tab; Job details: Possible duplicates",
+      "notes": "Read-only and paginated by group. Signals: normalized company+title (optionally location) and identical posting text; similarity is advisory. Never merges."
+    },
+    {
       "id": "jobs.merge",
       "group": "Archive",
       "operation": "Merge verified duplicate jobs and retain history",
@@ -882,12 +914,12 @@
         "applications_list"
       ],
       "dashboard": "Applications: list/Kanban filters",
-      "notes": "q, job_id, status, outcome, company, sort, limit, offset; job_id is exact and stage_counts span all matching records."
+      "notes": "q, job_id, status, outcome, company, readiness (blocked/none/missing_pdf/unreviewed/ready), sort (updated/newest/oldest/company/stage/applied/deadline/priority), limit, offset; job_id is exact and stage_counts span all matching records. Rows include priority, deadline, readiness and unresolved/blocking requirement counts; full requirements are on the attempt read."
     },
     {
       "id": "applications.read",
       "group": "Applications and documents",
-      "operation": "Read full attempt, questions/answers and job",
+      "operation": "Read full attempt, questions/answers, requirements and job",
       "rest": [
         {
           "method": "GET",
@@ -897,7 +929,8 @@
       "mcp": [
         "application_get"
       ],
-      "dashboard": "Applications: attempt detail"
+      "dashboard": "Applications: attempt detail",
+      "notes": "readiness is derived from current revision leaves and unresolved blocking requirements."
     },
     {
       "id": "applications.create",
@@ -913,12 +946,12 @@
         "application_create"
       ],
       "dashboard": "Inbox: Start application",
-      "notes": "At most one non-Closed attempt per job. A conflicting new request reports the active application ID; idempotency keys support retries. Starting retains saved interest and leaves the pending Shortlist queue; it never submits or generates documents."
+      "notes": "At most one non-Closed attempt per job. A conflicting new request reports the active application ID; idempotency keys support retries. Starting retains saved interest and leaves the pending Shortlist queue; it never submits or generates documents. Optional priority (1 highest to 5), deadline (YYYY-MM-DD) and structured employer requirements."
     },
     {
       "id": "applications.update",
       "group": "Applications and documents",
-      "operation": "Record stage, outcome, questions/answers and application instructions",
+      "operation": "Record stage, outcome, priority, deadline, employer requirements, questions/answers and application instructions",
       "rest": [
         {
           "method": "PATCH",
@@ -928,8 +961,8 @@
       "mcp": [
         "application_update"
       ],
-      "dashboard": "Applications: progress and questions/answers",
-      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history. Entering Closed requires an explicit outcome. Reopening enforces one open attempt per job. applied_at:null clears the recorded submission date. The returned job is the compact job summary."
+      "dashboard": "Applications: progress, planning, requirements and questions/answers",
+      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history. Entering Closed requires an explicit outcome. Reopening enforces one open attempt per job. applied_at, priority or deadline null clears the value. requirements replaces the whole list; keep existing ids. The returned job is the compact job summary."
     },
     {
       "id": "applications.delete",
@@ -946,6 +979,22 @@
       ],
       "dashboard": "Applications: delete attempt",
       "notes": "expected_version is required. Keeps the archived job and other attempts; removes owned contexts/documents and their transfers."
+    },
+    {
+      "id": "applications.bulk",
+      "group": "Applications and documents",
+      "operation": "Close, reopen or delete selected application attempts",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/applications/bulk"
+        }
+      ],
+      "mcp": [
+        "applications_bulk"
+      ],
+      "dashboard": "Applications: list selection toolbar",
+      "notes": "At most 200 versioned items, with per-item results/errors. Close requires an outcome; reopen requires a non-Closed stage and respects one open attempt per job."
     },
     {
       "id": "applications.history",
@@ -1011,6 +1060,38 @@
       "notes": "Select template_ids/knowledge_ids/claim_ids and note; optional idempotency_key. Unapproved/out-of-scope claims cannot enter context."
     },
     {
+      "id": "applications.staleness",
+      "group": "Applications and documents",
+      "operation": "Report whether an attempt's current revisions use outdated inputs",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/applications/{application_id}/staleness"
+        }
+      ],
+      "mcp": [
+        "application_staleness"
+      ],
+      "dashboard": "Applications: Built on older inputs indicator and detail",
+      "notes": "Compares the Profile, instructions, template, Career entry and claim versions frozen in each current leaf's context with the current records. Read-only; refreshing means preparing a new context and new revisions."
+    },
+    {
+      "id": "applications.staleness_list",
+      "group": "Applications and documents",
+      "operation": "List attempts whose current revisions use outdated inputs",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/staleness"
+        }
+      ],
+      "mcp": [
+        "applications_staleness"
+      ],
+      "dashboard": "Applications: Built on older inputs badges on cards and rows",
+      "notes": "status (default draft, or all), stale_only (default true), limit, offset. Application list/read summaries also include stale_inputs."
+    },
+    {
       "id": "documents.list",
       "group": "Applications and documents",
       "operation": "List/filter paginated revision summaries",
@@ -1071,7 +1152,23 @@
         "documents_review"
       ],
       "dashboard": "Applications: Approve revision",
-      "notes": "Required expected_version detects concurrent file/review changes. Approval blocks all further file uploads."
+      "notes": "Required expected_version detects concurrent file/review changes. Approval blocks all further file uploads. Refuses with 409 content_mismatch when the attached .tex text and structured content disagree; allow_content_mismatch=true approves an intentional difference."
+    },
+    {
+      "id": "documents.consistency",
+      "group": "Applications and documents",
+      "operation": "Compare structured content text with the attached .tex source",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/documents/{document_id}/consistency"
+        }
+      ],
+      "mcp": [
+        "documents_consistency"
+      ],
+      "dashboard": "Applications: approval reports content/source differences",
+      "notes": "Ignores case, whitespace, punctuation, accents and LaTeX markup; no TeX runtime. Status consistent, mismatch or not_checked (no .tex file or no text)."
     },
     {
       "id": "documents.delete",

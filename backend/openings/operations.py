@@ -3,10 +3,11 @@
 import json
 import sqlite3
 import time
+from contextlib import closing
 
 from .common import now, encode
 from .errors import DomainError
-from .db import SCHEMA_VERSION, apply_schema
+from .db import MIGRATIONS, SCHEMA_VERSION, apply_schema, upgrade
 
 
 def preserve_provider_runtime(restored, current):
@@ -31,6 +32,30 @@ def preserve_provider_runtime(restored, current):
 
 
 def restore_database(workspace, source_path):
+    with sqlite3.connect(source_path) as source:
+        version = source.execute("PRAGMA user_version").fetchone()[0]
+    if version in MIGRATIONS:
+        # Upgrade a copy of an earlier supported backup; the uploaded file stays unchanged.
+        upgraded = workspace.db.temp_file("upgrade")
+        try:
+            with (
+                closing(sqlite3.connect(source_path)) as source,
+                closing(sqlite3.connect(upgraded)) as target,
+            ):
+                source.backup(target)
+                try:
+                    upgrade(target)
+                except sqlite3.Error as error:
+                    raise DomainError(
+                        422, "backup_integrity", "The backup could not be upgraded to this schema."
+                    ) from error
+            return _restore_current(workspace, upgraded)
+        finally:
+            workspace.db.remove_temp(upgraded)
+    return _restore_current(workspace, source_path)
+
+
+def _restore_current(workspace, source_path):
     with sqlite3.connect(source_path) as source:
         if source.execute("PRAGMA user_version").fetchone()[0] != SCHEMA_VERSION:
             raise DomainError(

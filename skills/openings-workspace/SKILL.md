@@ -97,6 +97,12 @@ prove a valid document. For a suitable unchanged PDF, verify its source/context
 compatibility and quality before reuse. If compilation or validation is not
 available, keep the task incomplete and report the missing capability.
 
+Keep the structured `content` and the uploaded source identical in wording: every
+text value in `content` must appear in the `.tex` file. `documents_consistency`
+reports differences, and `documents_review` refuses a mismatch with
+`content_mismatch`. Correct the content or source; use
+`allow_content_mismatch=true` only for an intentional, documented difference.
+
 Uploads change document versions. Read the new version before setting document
 review to approved. Approval records the completed agent check, not human or
 employer approval. Approved revisions reject file changes; changed content or

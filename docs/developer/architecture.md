@@ -57,7 +57,13 @@ authoritative for individual input fields. Read [REST](../user/api.md) and
   questions, selected templates and exact assets. Later profile edits affect new
   contexts. Changed document content creates a revision with its own uploaded files.
   Attachment changes increment the document version; approval checks that version
-  so concurrent uploads cannot be approved unseen.
+  so concurrent uploads cannot be approved unseen. Approval also compares the
+  structured content's text with the attached `.tex` source (`consistency.py`,
+  no TeX runtime) unless an explicit override is sent.
+- **Staleness:** contexts are never rewritten. `staleness.py` compares the Profile,
+  instructions, template, entry and claim versions recorded in each current
+  leaf's context with the live records on read; refreshing means a new context
+  and new revisions.
 - **Truth:** approved claims and narrative evidence guide an external agent;
   reference/length validation does not establish factual accuracy. Review outputs.
 - **Career:** entries have structured organizations, nullable partial dates, skill
@@ -71,15 +77,19 @@ authoritative for individual input fields. Read [REST](../user/api.md) and
 SQLite uses WAL and stores SHA-256-deduplicated BLOBs for attachments. Lists return
 compact paginated summaries; full postings, narratives, contexts and file bytes
 are separate reads. Application preparation summaries count current revision leaves
-and their exact PDF/review state. Byte downloads and record exports prepare a
+and their exact PDF/review state; derived readiness combines them with unresolved
+blocking employer requirements stored on the application. Byte downloads and record exports prepare a
 temporary snapshot on the database thread before streaming, preserving bounded
 memory and releasing SQLite readers before cancellation or thread changes.
 Backups use SQLite's online backup API. A restore preserves
 installation authentication, recent provider request history and later cooldowns.
 
-Workspaces and backups use schema 6. Opening schema 5 upgrades it transactionally,
-removing obsolete derived data and preserving owned records and immutable snapshots.
-Other historical formats require the matching release; restore accepts schema 6.
+Workspaces and backups use schema 7. Opening schema 6 upgrades it in one
+transaction, adding application priority, deadline and requirements while keeping
+records and versions. Schema 5 is upgraded through schema 6 in the same
+transaction, removing obsolete derived data and preserving owned records and
+immutable snapshots. Restore accepts schema 7 and upgrades a copy of a schema 5 or
+6 backup. Other historical formats require the matching release.
 
 ## Acquisition
 
