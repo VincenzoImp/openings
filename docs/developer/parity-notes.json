@@ -1,0 +1,41 @@
+{
+  "format": "openings-parity-notes-v1",
+  "operations": {
+    "skills.read": {
+      "note": "Settings lists the served skills by name and description; their text and reference files cannot be opened."
+    },
+    "jobs.resolve": {
+      "note": "No lookup of a job by URL, external key or title and company. Job details open Possible duplicates (`jobs.duplicates`) instead."
+    },
+    "sources.run": {
+      "via": ["sources.bulk"],
+      "note": "Run once, also for one source, sends a bulk action."
+    },
+    "sources.delete": {
+      "via": ["sources.bulk"],
+      "note": "Remove, also for one source, sends a bulk action."
+    },
+    "applications.staleness_list": {
+      "via": ["applications.list", "applications.staleness"],
+      "note": "Badges use `stale_inputs` in the application list; details use the per-application report. There is no workspace-wide staleness view."
+    },
+    "jobs.create": {
+      "note": "`raw` and `source_key` are collector fields for scripted imports."
+    },
+    "applications.create": {
+      "note": "Starting an application sends the job only; plan fields and questions are edited afterwards (`applications.update`)."
+    },
+    "contexts.create": {
+      "note": "The context dialog sends `template_ids`; `template_id` is the single-template form of the same input."
+    },
+    "profile.update": {
+      "note": "`metadata` holds the owner's decision policy and eligibility facts on real workspaces."
+    },
+    "templates.update": {
+      "note": "`rules` is free-form apart from three typed limits (pages, bullets, bullet length)."
+    },
+    "applications.update": {
+      "note": "Answers have one control per question; raw JSON is the advanced fallback."
+    }
+  }
+}

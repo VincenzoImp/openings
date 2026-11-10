@@ -68,6 +68,26 @@ npm run test:e2e
 The four projects cover Chromium and WebKit at desktop/mobile widths. CI runs
 Chromium at both widths. Browser binaries are development tools, outside the core.
 
+### Parity matrix
+
+[docs/developer/parity.md](docs/developer/parity.md) is generated from the operation
+inventory, the REST/MCP contract, the dashboard source and browser evidence. After
+changing an operation, a route, a tool or the dashboard's REST calls, regenerate it;
+`pytest` fails while it is out of date:
+
+```bash
+uv run python scripts/parity_matrix.py
+```
+
+After changing the browser tests, re-record which operations the dashboard really
+called (needs the built dashboard and Playwright Chromium):
+
+```bash
+uv run python scripts/parity_matrix.py --e2e
+```
+
+Remarks that code cannot derive live in `docs/developer/parity-notes.json`.
+
 ### Documentation screenshots
 
 `docs/images/*.png` come from a synthetic workspace (fictional people, companies
@@ -100,7 +120,7 @@ uv run python backend/tests/agent_roundtrip.py --tectonic /path/to/tectonic
 | `frontend` | React dashboard calling REST |
 | `examples` | Synthetic career data and LaTeX templates |
 | `skills/` | Agent workflow skills (Agent Skills format) and their shared references |
-| `scripts/` | Release version tool, package smoke check and documentation screenshots |
+| `scripts/` | Release version tool, package smoke check, parity matrix and documentation screenshots |
 | `docs/user` | Setup, workflow and operator guides |
 | `docs/developer` | Architecture and extension boundaries |
 
