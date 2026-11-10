@@ -9,6 +9,7 @@ three work with the same jobs, career knowledge, documents and collection settin
 | Search portals or follow chosen companies | [Collection](user/sources.md) |
 | Organize experience, skills and reusable wording | [Career entries and claims](user/career.md) |
 | Prepare a CV, letter or form answers | [Application documents](user/applications.md) |
+| Let an AI agent run and improve my search | [Agent-operated job search](user/agent-operated.md) |
 | Connect an AI agent | [Agents and MCP](user/agents.md) |
 | Write scripts | [REST API](user/api.md) |
 | Move, restore or operate a workspace | [Operations](user/operations.md) |

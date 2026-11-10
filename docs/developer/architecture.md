@@ -28,7 +28,7 @@ flowchart LR
 | `backend/openings/app.py`, `api.py` | Authentication, REST/MCP registration and dashboard hosting |
 | `backend/openings/schema.sql` | Relational ownership, SQLite indexes and JSON payloads |
 | `frontend/src` | Dashboard using REST; no duplicated domain decisions |
-| `skills/openings-workspace` | Optional external-agent workflow guidance |
+| `skills/` | Agent workflow skills (Agent Skills format) and their shared references |
 
 The [operation inventory](../../backend/openings/operation-inventory.json) is
 packaged with the app and served by authenticated `GET /api/v1/capabilities` and
