@@ -99,6 +99,12 @@ class Database:
         os.close(handle)
         return name
 
+    @staticmethod
+    def remove_temp(name):
+        """Remove a temporary copy and the WAL sidecars SQLite created beside it."""
+        for suffix in ("", "-wal", "-shm", "-journal"):
+            Path(str(name) + suffix).unlink(missing_ok=True)
+
     def backup(self, destination):
         with self.lock, self.connect() as source, sqlite3.connect(destination) as target:
             source.backup(target)
