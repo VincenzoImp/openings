@@ -1,12 +1,12 @@
 # Changelog
 
-## 0.15.1
+## 0.15.1 — 2026-11-10
 
 - Fix slow application lists: staleness now reads input versions recorded once per immutable context instead of parsing every frozen context payload per request (200 Drafts on a real 538 MB workspace: 260 ms to 21 ms; about 3.6 s to well under a second on a one-CPU container). Existing contexts are summarized at the first start, in about a second.
 
 No schema version change: the derived `context_inputs` table is created automatically and rebuilt when missing.
 
-## 0.15.0
+## 0.15.0 — 2026-11-10
 
 - Plan applications: optional `priority` (1–5) and `deadline`, a structured list of employer `requirements` (authorship, attachments, references, format, language, eligibility, deadline, other; blocking and resolved flags), sorting by deadline or priority, and a readiness filter (`blocked`, `none`, `missing_pdf`, `unreviewed`, `ready`) in REST, MCP and the dashboard.
 - Report applications built on older inputs: `application_staleness` and `applications_staleness` compare frozen contexts with the current Profile, instructions, templates and selected Career entries and claims; the dashboard marks them "Built on older inputs".
@@ -20,7 +20,7 @@ No schema version change: the derived `context_inputs` table is created automati
 
 **Schema 6 upgrades automatically to 7** on first start, in one transaction (new `applications.priority`, `deadline` and `requirements`). Schema 5 still upgrades through 6. Restore accepts schema 5–7 backups. Back up before upgrading: an older release cannot open a schema 7 workspace.
 
-## 0.14.0
+## 0.14.0 — 2026-11-10
 
 - Ship the complete agent workflow skills: setup and onboarding, Inbox review, Shortlist preparation, source management, Career maintenance, application tracking, interview preparation and evidence-based writing, with shared references (operating mandate, employer requirements, vacancy identity, run report, tool reference).
 - Serve the shipped skills to connected agents: `skills_list`, `skill_get` and one MCP prompt per skill, plus `GET /api/v1/skills` (the image now includes `skills/` at `OPENINGS_SKILLS`).
@@ -32,7 +32,7 @@ No schema version change: the derived `context_inputs` table is created automati
 
 No database change: workspace schema remains 6.
 
-## 0.13.0
+## 0.13.0 — 2026-11-10
 
 - Add indexes for document revision leaves, activity, notes, job/source tasks, postings and file cascades; application lists on a large workspace drop from ~500 ms to ~20 ms. Indexes are created automatically at startup; schema remains 6.
 - Add `exclude_titles` source filters: whole-word terms that skip matching titles before role and location filters, in REST, MCP and the source forms.
@@ -45,7 +45,7 @@ No database change: workspace schema remains 6.
 
 Workspace schema remains 6. New indexes are created automatically at startup; existing data and frozen snapshots require no migration.
 
-## 0.12.0
+## 0.12.0 — 2026-11-05
 
 - Clarify application cards with current revision PDF/review state and direct next actions; keep postings accessible inside the application.
 - Make mobile applications start in a compact list, remember the chosen view, and expose stage totals and partial board pages.
@@ -59,7 +59,7 @@ Workspace schema remains 6. New indexes are created automatically at startup; ex
 
 Workspace schema remains 6. Existing data and frozen snapshots require no migration.
 
-## 0.11.0
+## 0.11.0 — 2026-11-04
 
 - Give Inbox and Shortlist distinct actionable queues, excluding all jobs with application history.
 - Add direct Shortlist navigation and name application preparation clearly as Preparing.
@@ -72,7 +72,7 @@ ownership and immutable snapshots. Back up before upgrading. Restores require
 schema 6; upgrade a copy of an older schema-5 backup before restoring it.
 
 
-## 0.10.0
+## 0.10.0 — 2026-10-31
 
 - Archive automatic results only after usable posting text is available; resume pending details from collection checkpoints.
 - Simplify provider settings to enable/pause and request spacing, with automatic server cooldowns.
@@ -85,7 +85,7 @@ schema 6; upgrade a copy of an older schema-5 backup before restoring it.
 This release uses workspace schema 5. APIs and stored source/provider settings use
 the current contract; earlier workspace formats require separate conversion.
 
-## 0.9.1
+## 0.9.1 — 2026-10-31
 
 - Show and validate only acquisition options supported by each ATS adapter.
 - Align native source, bulk and run controls with discovered configuration schemas.
@@ -96,7 +96,7 @@ the current contract; earlier workspace formats require separate conversion.
 Workspace format remains schema 4. Saved company configurations must match their
 current adapter schema; remove options that the adapter does not use.
 
-## 0.9.0
+## 0.9.0 — 2026-10-30
 
 - Resume portal pagination and missing descriptions across bounded collection batches.
 - Freeze each collection run with its settings, optional overrides and cumulative progress.
@@ -109,7 +109,7 @@ current adapter schema; remove options that the adapter does not use.
 
 This release uses schema 4. Installation-specific conversion remains outside the application.
 
-## 0.8.0
+## 0.8.0 — 2026-10-30
 
 - Separate career titles, organizations, partial dates, skill tags and ordering.
 - Support single dates, periods and Present without requiring descriptions.
@@ -121,7 +121,7 @@ This release uses schema 4. Installation-specific conversion remains outside the
 This release uses schema 3. Earlier database formats require separate conversion
 outside the application.
 
-## 0.7.0
+## 0.7.0 — 2026-10-30
 
 - Fit long postings into the scorer token budget, retain original text and show shortened input.
 - Preserve dismissed jobs across changed URLs and report conflicting source identities.
@@ -134,16 +134,16 @@ outside the application.
 Document approval now requires `expected_version`. This release uses schema 2;
 earlier database formats require separate conversion outside the application.
 
-## 0.6.2
+## 0.6.2 — 2026-10-30
 
 - Display structured compensation ranges and preserve existing salary text.
 - Keep scorer dependency layers reusable across version changes.
 
-## 0.6.1
+## 0.6.1 — 2026-10-30
 
 - Remove manual fit assessments from the dashboard, REST and MCP.
 
-## 0.6.0
+## 0.6.0 — 2026-10-30
 
 - Record external fit reviews with scores, reasoning and frozen context through the dashboard, REST and MCP.
 - Choose whether automatic scoring includes updated jobs or only new arrivals.
@@ -151,29 +151,29 @@ earlier database formats require separate conversion outside the application.
 - Organize awards and publications as career knowledge categories.
 - Display exact numeric scores consistently with filters.
 
-## 0.5.4
+## 0.5.4 — 2026-10-30
 
 - Accept MCP requests at the endpoint advertised by the dashboard, with or without a trailing slash.
 
-## 0.5.3
+## 0.5.3 — 2026-10-30
 
 - Exclude partial previews and punctuation-only placeholders from scoring; align completeness filters and counts.
 - Read JobCloud template descriptions and preserve complete postings during bounded source refreshes.
 - Export large archives as a consistent snapshot with complete JSON and bounded memory use.
 
-## 0.5.2
+## 0.5.2 — 2026-10-30
 
 - Show saved scoring state and keep Save visible while editing; report skipped scoring requests.
 - Repair source edits, document refresh, context retry and application history in the dashboard.
 - Match new-search defaults across interfaces and link overview counts to filtered results.
 - Generalize public documentation and clarify container resource budgets.
 
-## 0.5.1
+## 0.5.1 — 2026-10-29
 
 - Restore join.com company listings and posting details for its current page data.
 - Keep source configuration and scheduling responsive with hundreds of saved searches.
 
-## 0.5.0
+## 0.5.0 — 2026-10-29
 
 A fresh job-search workspace with one portable SQLite database and shared
 English dashboard, REST and MCP interfaces. Previous Openings configuration and
