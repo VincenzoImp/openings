@@ -17,11 +17,6 @@ updates:
     directory: /frontend
     schedule:
       interval: weekly
-    ignore:
-      # Deferred to a dedicated upgrade: TypeScript 7 is the native compiler
-      # without the JavaScript compiler API used by the unit tests.
-      - dependency-name: typescript
-        update-types: ["version-update:semver-major"]
     groups:
       npm-minor-patch:
         update-types: [minor, patch]
