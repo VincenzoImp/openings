@@ -8,8 +8,10 @@ from openings.app import create_app
 
 QUERIES = [
     (
-        "SELECT d.id FROM documents d WHERE d.application_id=? "
-        "AND NOT EXISTS(SELECT 1 FROM documents child WHERE child.previous_id=d.id)",
+        (
+            "SELECT d.id FROM documents d WHERE d.application_id=? "
+            "AND NOT EXISTS(SELECT 1 FROM documents child WHERE child.previous_id=d.id)"
+        ),
         "child",
     ),
     ("SELECT * FROM events ORDER BY created_at DESC LIMIT 12", "events"),

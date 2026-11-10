@@ -5,9 +5,9 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-from datetime import datetime, timedelta, timezone
-from pathlib import PurePosixPath
 import secrets
+from datetime import UTC, datetime, timedelta
+from pathlib import PurePosixPath
 from typing import Any, Literal
 from urllib.parse import quote
 
@@ -20,7 +20,6 @@ from .consistency import compare as compare_content, is_tex_source
 from .errors import DomainError, conflict, missing
 from .staleness import application_staleness, store_context_inputs
 from .transfers import SnapshotResponse
-
 
 OwnerType = Literal["knowledge", "template", "document", "context", "job"]
 OWNER_COLUMNS = {
@@ -353,17 +352,16 @@ class DocumentService:
         def walk(item):
             if isinstance(item, dict):
                 supplied_evidence = item.get("evidence_ids", item.get("knowledge_ids"))
-                if supplied_evidence is not None:
-                    if (
-                        not isinstance(supplied_evidence, list)
-                        or any(not isinstance(key, str) for key in supplied_evidence)
-                        or not set(supplied_evidence) <= evidence
-                    ):
-                        raise DomainError(
-                            422,
-                            "unknown_evidence",
-                            "Content cites evidence outside its frozen context.",
-                        )
+                if supplied_evidence is not None and (
+                    not isinstance(supplied_evidence, list)
+                    or any(not isinstance(key, str) for key in supplied_evidence)
+                    or not set(supplied_evidence) <= evidence
+                ):
+                    raise DomainError(
+                        422,
+                        "unknown_evidence",
+                        "Content cites evidence outside its frozen context.",
+                    )
                 supplied_claims = item.get("claim_ids")
                 if supplied_claims is not None:
                     if (
@@ -812,7 +810,7 @@ class DocumentService:
 
     def _new_grant(self, conn, payload, method):
         token = secrets.token_urlsafe(32)
-        expires = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
+        expires = (datetime.now(UTC) + timedelta(minutes=10)).isoformat()
         conn.execute("DELETE FROM transfer_grants WHERE expires_at<?", (now(),))
         conn.execute(
             "INSERT INTO transfer_grants(token_hash,payload,method,expires_at) VALUES(?,?,?,?)",

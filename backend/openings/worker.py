@@ -62,7 +62,7 @@ class Worker:
                 try:
                     if not self.discovery.heartbeat(task["id"], owner):
                         return
-                except Exception:
+                except Exception:  # noqa: BLE001 - the heartbeat thread must survive
                     LOG.warning(
                         "Task heartbeat failed; the lease will expire if recovery is needed."
                     )
