@@ -1,0 +1,50 @@
+name: Feature request
+description: Suggest a capability or improvement for Openings.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Openings keeps one shared service layer behind the dashboard, REST and MCP,
+        and leaves model access, document generation and LaTeX compilation to your
+        own agent. Describe the job-search problem first; a proposed design is optional.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what makes it hard today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How it could work. Mention the dashboard, REST, MCP or skills where relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you use now, or other approaches you considered.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - Collection
+        - Inbox and Shortlist
+        - Applications and documents
+        - Career and templates
+        - Agents, MCP and skills
+        - REST API
+        - Installation and operations
+        - Documentation
+        - Other
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I would like to help implement this.
