@@ -78,7 +78,9 @@ rules. New wording from allowed evidence stays in this application's copy and
 uses its evidence links; it does not create an official bank claim.
 
 Write a letter for the actual role and company, with supported reasons and
-relevant examples. Check the CV and letter together for consistent positioning,
+relevant examples. Present the strongest truthful case and never volunteer gaps
+(see [Career claims](../career-claims/SKILL.md)); record gaps for the owner in
+the application note instead. Check the CV and letter together for consistent positioning,
 attribution and personal details. Resolve every placeholder. Do not use the
 general letter MASTER unchanged as if it addressed a specific employer.
 
