@@ -16,6 +16,9 @@ prompt per skill, also at `GET /api/v1/skills`. Start with
 [`setup-openings`](../../skills/setup-openings/SKILL.md) for a new workspace or
 [`openings-workspace`](../../skills/openings-workspace/SKILL.md) for the basics.
 **Settings → Agent access** shows client configuration snippets and the skill list.
+
+![Settings → Agent access with the MCP endpoint, a Claude Code configuration snippet and the served workflow skills](../images/agent-access.png)
+
 To let an agent run the whole search for you, see
 [Agent-operated job search](agent-operated.md). MCP remains usable without the
 skills: discover the tools/resources and their typed input schemas.
