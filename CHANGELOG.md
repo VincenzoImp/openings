@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.15.0
+
+- Plan applications: optional `priority` (1–5) and `deadline`, a structured list of employer `requirements` (authorship, attachments, references, format, language, eligibility, deadline, other; blocking and resolved flags), sorting by deadline or priority, and a readiness filter (`blocked`, `none`, `missing_pdf`, `unreviewed`, `ready`) in REST, MCP and the dashboard.
+- Report applications built on older inputs: `application_staleness` and `applications_staleness` compare frozen contexts with the current Profile, instructions, templates and selected Career entries and claims; the dashboard marks them "Built on older inputs".
+- Check document content against its `.tex` source: `documents_consistency`, and review approval refuses a mismatch (409 `content_mismatch`) unless `allow_content_mismatch` is set deliberately.
+- Find repeated vacancies without ingesting: `jobs_resolve` (by URL or source identity) and `jobs_duplicates` (candidate groups by company and title or identical posting text, never merged automatically), with a Possible duplicates view and a merge shortcut in job details.
+- Bulk actions for applications: `applications_bulk` closes with an outcome, reopens or deletes up to 200 versioned items; bulk forget and delete collect unused file data once per run.
+- Smaller agent responses: facets in `jobs_search` only with `include_facets`, summary defaults for `documents_list`, `sources_list` and collection runs, and compact job summaries from triage and update results.
+- Conflicts on Profile, instructions, collection settings and document review include `current_version`; bulk item errors include `details`.
+- Logout revokes every browser session; API tokens are unaffected.
+- After a version conflict from a button action, the dashboard reloads the affected data instead of retrying with a stale version.
+
+**Schema 6 upgrades automatically to 7** on first start, in one transaction (new `applications.priority`, `deadline` and `requirements`). Schema 5 still upgrades through 6. Restore accepts schema 5–7 backups. Back up before upgrading: an older release cannot open a schema 7 workspace.
+
 ## 0.14.0
 
 - Ship the complete agent workflow skills: setup and onboarding, Inbox review, Shortlist preparation, source management, Career maintenance, application tracking, interview preparation and evidence-based writing, with shared references (operating mandate, employer requirements, vacancy identity, run report, tool reference).
