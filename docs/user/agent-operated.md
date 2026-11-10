@@ -44,11 +44,14 @@ password and create the API token yourself.
    Codex and JSON-based clients (see [Agents and MCP](agents.md)). Set `OPENINGS_URL` and `OPENINGS_TOKEN` in
    the agent's environment for REST and file transfers; set `OPENINGS_CA_FILE`
    when the server uses a private certificate authority.
-4. Keep a small operator workspace for the agent: a directory with an
-   `AGENTS.md` (or your client's instruction file) that states the operating
-   mandate and links the skills, plus ignored local space for temporary files.
-   Keep personal data in Openings, not in that directory.
-5. Start by telling the agent about your career. It records facts in the Career
+4. Give the agent an operator workspace: copy
+   [`examples/operator-workspace`](../../examples/operator-workspace/README.md),
+   point it at your server with `sync.py --url`, and start your client with its
+   `launch.py`. It states the operating mandate, generates MCP configuration for
+   Claude Code, Codex, Cursor, VS Code, Gemini CLI and opencode, and keeps
+   personal data out of Git. The agent's machine needs `pdflatex` to compile PDFs.
+5. Start by asking the agent to set up your workspace, or to try it first with
+   the synthetic example career. Then tell it about your career. It records facts in the Career
    record and your preferences in the Profile, asks what is missing, and then
    runs the workflows above.
 
