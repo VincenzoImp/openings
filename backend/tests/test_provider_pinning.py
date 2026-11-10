@@ -199,7 +199,10 @@ def test_requests_adapter_is_mounted_once_and_tries_the_checked_addresses_in_tur
 
 def test_curl_entries_cover_every_checked_address_and_replace_the_previous_pin(gate):
     answers = {"a.test": ["203.0.113.7", "2001:db8::7"], "203.0.113.9": ["203.0.113.9"]}
-    resolve = lambda host, port: answers[host]  # noqa: E731
+
+    def resolve(host, port):
+        return answers[host]
+
     assert (
         curl_resolve_entry("https://a.test/jobs", resolve) == "a.test:443:203.0.113.7,[2001:db8::7]"
     )

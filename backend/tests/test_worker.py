@@ -5,7 +5,7 @@ Providers are synthetic and nothing sleeps: the lane's idle waits advance the cl
 
 import logging
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -17,7 +17,7 @@ from openings.errors import DomainError
 from openings.worker import Worker
 from openings.workspace import Workspace
 
-START = datetime(2026, 3, 2, 8, 0, tzinfo=timezone.utc)
+START = datetime(2026, 3, 2, 8, 0, tzinfo=UTC)
 BOARD_URL = "https://boards-api.greenhouse.io/v1/boards/example/jobs"
 
 
