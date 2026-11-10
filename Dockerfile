@@ -6,8 +6,8 @@ RUN --mount=type=cache,target=/root/.npm npm ci
 COPY frontend/ ./
 RUN npm run build
 
-FROM ghcr.io/astral-sh/uv:0.11.6 AS uv
-FROM python:3.12-slim-bookworm AS dependencies
+FROM ghcr.io/astral-sh/uv:0.13.7 AS uv
+FROM python:3.15-slim-bookworm AS dependencies
 COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /app
 ENV UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
@@ -15,7 +15,7 @@ COPY pyproject.toml uv.lock README.md ./
 COPY backend/ ./backend/
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-editable
 
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.15-slim-bookworm AS runtime
 ARG VERSION=0.15.2
 ARG VCS_REF=unknown
 LABEL org.opencontainers.image.title="Openings" \
