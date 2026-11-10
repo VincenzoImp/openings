@@ -1,5 +1,5 @@
-from typing import Any, Literal
-from datetime import datetime, timezone, timedelta
+from typing import Annotated, Any, Literal
+from datetime import date, datetime, timezone, timedelta
 import json
 from urllib.parse import urlsplit
 
@@ -85,11 +85,65 @@ class Question(Input):
     max_length: int | None = Field(default=None, ge=1, le=50_000)
 
 
+RequirementKind = Literal[
+    "authorship",
+    "attachment",
+    "reference",
+    "format",
+    "language",
+    "eligibility",
+    "deadline",
+    "other",
+]
+Priority = Annotated[int, Field(ge=1, le=5, description="1 is the highest priority, 5 the lowest.")]
+
+
+class Requirement(Input):
+    """One employer requirement found in a posting or application form."""
+
+    id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+        description="Stable identifier; assigned when omitted.",
+    )
+    kind: RequirementKind = "other"
+    text: str = Field(min_length=1, max_length=2000, description="The requirement as stated.")
+    blocking: bool = Field(
+        default=False,
+        description="True when documents must not be prepared or submitted until it is resolved.",
+    )
+    resolved: bool = False
+    note: str = Field(
+        default="", max_length=2000, description="Resolution, owner decision or open question."
+    )
+
+
+def valid_deadline(value):
+    if value is None:
+        return value
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError as error:
+        raise ValueError("Use an ISO date (YYYY-MM-DD).") from error
+    if len(value) != 10 or parsed.isoformat() != value:
+        raise ValueError("Use an ISO date (YYYY-MM-DD).")
+    return value
+
+
 class ApplicationInput(Input):
     job_id: str
     note: str = Field(default="", max_length=30_000)
     questions: list[Question] = Field(default_factory=list, max_length=100)
+    priority: Priority | None = None
+    deadline: str | None = Field(default=None, description="Closing date as YYYY-MM-DD.")
+    requirements: list[Requirement] = Field(default_factory=list, max_length=100)
     idempotency_key: str | None = Field(default=None, max_length=100)
+
+    @field_validator("deadline")
+    @classmethod
+    def valid_deadline(cls, value):
+        return valid_deadline(value)
 
 
 class ApplicationPatch(Versioned):
@@ -99,15 +153,35 @@ class ApplicationPatch(Versioned):
     questions: list[Question] | None = Field(default=None, max_length=100)
     answers: dict[str, Any] | None = None
     applied_at: str | None = None
+    priority: Priority | None = None
+    deadline: str | None = Field(
+        default=None, description="Closing date as YYYY-MM-DD; null clears it."
+    )
+    requirements: list[Requirement] | None = Field(
+        default=None,
+        max_length=100,
+        description="Replaces the whole requirement list; include existing ids to keep them.",
+    )
 
     @field_validator("applied_at")
     @classmethod
     def valid_applied_date(cls, value):
         return normalized_date(value)
 
+    @field_validator("deadline")
+    @classmethod
+    def valid_deadline(cls, value):
+        return valid_deadline(value)
+
     @model_validator(mode="after")
     def reject_null_fields(self):
-        for key in self.model_fields_set & {"status", "note", "questions", "answers"}:
+        for key in self.model_fields_set & {
+            "status",
+            "note",
+            "questions",
+            "answers",
+            "requirements",
+        }:
             if getattr(self, key) is None:
                 raise ValueError(f"{key} cannot be null; omit it to keep the existing value.")
         return self
@@ -178,7 +252,13 @@ class ApplicationQuery(Input):
     status: Literal["draft", "applied", "interview", "offer", "closed"] | None = None
     outcome: Literal["accepted", "rejected", "not_pursued"] | None = None
     company: str | None = Field(default=None, max_length=300)
-    sort: Literal["updated", "newest", "oldest", "company", "stage", "applied"] = "updated"
+    readiness: Literal["blocked", "none", "missing_pdf", "unreviewed", "ready"] | None = Field(
+        default=None,
+        description="Derived from current revision leaves and unresolved blocking requirements.",
+    )
+    sort: Literal[
+        "updated", "newest", "oldest", "company", "stage", "applied", "deadline", "priority"
+    ] = "updated"
     limit: int = Field(default=100, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
 

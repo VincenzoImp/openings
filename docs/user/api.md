@@ -94,6 +94,14 @@ non-Closed attempt. A conflicting creation or reopening returns 409
 `application_in_progress` with the active `application_id`; use that attempt or
 close it before starting another. Use `idempotency_key` for retries of one creation.
 `GET /applications?job_id=JOB_ID` lists the exact job's attempts with pagination.
+`readiness=none|missing_pdf|unreviewed|blocked|ready` filters by the derived
+preparation state, and `sort=deadline` or `sort=priority` lists planned attempts
+first. Rows include `priority`, `deadline`, `readiness`, `open_requirements` and
+`blocking_requirements`; the full `requirements` list is on the single read.
+Create and `PATCH` accept `priority` (1 highest to 5), `deadline` (`YYYY-MM-DD`)
+and `requirements`, a list of `{id, kind, text, blocking, resolved, note}`.
+A requirements patch replaces the whole list; keep existing `id` values. `null`
+clears `priority` or `deadline`.
 
 Application changes use `PATCH /applications/{id}` and its `expected_version`.
 Entering Closed requires an explicit outcome: `accepted`, `rejected` or

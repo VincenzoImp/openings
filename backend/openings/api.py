@@ -197,7 +197,7 @@ def register_core_mcp(mcp, workspace):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def applications_list(value: ApplicationQuery | None = None) -> dict:
-        """Read paginated application summaries and stage totals with exact job_id or query/stage/outcome/company filters."""
+        """Read paginated application summaries and stage totals. Filter by exact job_id, query, stage, outcome, company or readiness; sort by deadline or priority to order preparation work."""
         return workspace.list_applications(**(value or ApplicationQuery()).model_dump())
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
@@ -217,17 +217,17 @@ def register_core_mcp(mcp, workspace):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def application_get(application_id: str) -> dict:
-        """Read a single application and its job."""
+        """Read a single application, its job, employer requirements and derived readiness."""
         return workspace.get_application(application_id)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     def application_create(value: ApplicationInput) -> dict:
-        """Create a draft attempt. This never sends an application or generates documents."""
+        """Create a draft attempt, optionally with priority, deadline and employer requirements. This never sends an application or generates documents."""
         return workspace.create_application(value)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     def application_update(application_id: str, value: ApplicationPatch) -> dict:
-        """Record progress/questions/answers explicitly; editing documents never marks sent. The returned job is the compact summary."""
+        """Record progress, priority, deadline, employer requirements and questions/answers explicitly; editing documents never marks sent. The returned job is the compact summary."""
         return workspace.update_application(application_id, value)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))

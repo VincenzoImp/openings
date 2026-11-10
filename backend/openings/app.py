@@ -425,7 +425,7 @@ def create_app(database=None, start_worker=True):
             json_fields = {
                 "jobs": ["metadata", "overrides"],
                 "postings": ["payload"],
-                "applications": ["questions", "answers"],
+                "applications": ["questions", "answers", "requirements"],
                 "events": ["payload"],
                 "knowledge": ["metadata", "dates", "skills"],
                 "claims": ["metadata"],

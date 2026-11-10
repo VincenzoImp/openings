@@ -72,7 +72,9 @@ mechanics, not personal selection or writing policy.
 
 Use `applications_list(value: {status: "draft", limit: 200, offset: 0})` or
 `GET /applications?status=draft&limit=200&offset=0`, then paginate the stable
-read-only result. The field is `status`, not `stage`. Read each relevant
+read-only result. The field is `status`, not `stage`. Add `readiness`
+(`none`, `missing_pdf`, `unreviewed`, `blocked`, `ready`) to resume only
+incomplete or blocked Drafts, and `sort: "deadline"` to keep deadline order. Read each relevant
 application and its document revisions, contexts and files before resuming.
 A local checkpoint is optional. A compatible complete Draft needs no new work.
 

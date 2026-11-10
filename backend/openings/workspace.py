@@ -25,6 +25,25 @@ from .models import (
 from .posting import posting_complete, posting_complete_sql
 from .identities import job_identities, normalize_url
 
+# Current revision leaves only; a parent's PDF or approval never counts for its child.
+_LEAVES = (
+    "SELECT 1 FROM documents d WHERE d.application_id=app.id "
+    "AND NOT EXISTS(SELECT 1 FROM documents child WHERE child.previous_id=d.id)"
+)
+_UNRESOLVED = "SELECT 1 FROM json_each(app.requirements) r WHERE NOT coalesce(json_extract(r.value,'$.resolved'),0)"
+READINESS_SQL = (
+    "CASE WHEN EXISTS(" + _UNRESOLVED + " AND json_extract(r.value,'$.blocking')) THEN 'blocked' "
+    "WHEN NOT EXISTS(" + _LEAVES + ") THEN 'none' "
+    "WHEN EXISTS("
+    + _LEAVES
+    + " AND d.kind IN ('resume','cover_letter') AND NOT EXISTS(SELECT 1 FROM files f WHERE f.document_id=d.id AND f.media_type='application/pdf')) THEN 'missing_pdf' "
+    "WHEN EXISTS(" + _LEAVES + " AND d.review_state<>'approved') THEN 'unreviewed' ELSE 'ready' END"
+)
+REQUIREMENT_COUNTS_SQL = (
+    "(SELECT count(*) FROM json_each(app.requirements) r WHERE NOT coalesce(json_extract(r.value,'$.resolved'),0)) AS open_requirements,"
+    "(SELECT count(*) FROM json_each(app.requirements) r WHERE NOT coalesce(json_extract(r.value,'$.resolved'),0) AND json_extract(r.value,'$.blocking')) AS blocking_requirements"
+)
+
 
 class Workspace:
     def __init__(self, path):
@@ -546,10 +565,13 @@ class Workspace:
         return {"deleted": True}
 
     def get_application(self, application_id, compact_job=False):
-        row = self.db.one("SELECT * FROM applications WHERE id=?", (application_id,))
+        row = self.db.one(
+            f"SELECT app.*,{READINESS_SQL} AS readiness,{REQUIREMENT_COUNTS_SQL} FROM applications app WHERE app.id=?",
+            (application_id,),
+        )
         if not row:
             missing("Application")
-        row = decode_record(row, ("questions", "answers"))
+        row = decode_record(row, ("questions", "answers", "requirements"))
         row["job"] = (self.job_summary if compact_job else self.get_job)(row["job_id"])
         row["documents_count"] = self.db.one(
             "SELECT count(*) n FROM documents WHERE application_id=?", (application_id,)
@@ -591,8 +613,18 @@ class Workspace:
         company=None,
         sort="updated",
         job_id=None,
+        readiness=None,
     ):
         conditions, args = [], []
+        if readiness:
+            if readiness not in ("blocked", "none", "missing_pdf", "unreviewed", "ready"):
+                raise DomainError(
+                    422,
+                    "application_readiness",
+                    "Choose blocked, none, missing_pdf, unreviewed or ready.",
+                )
+            conditions.append(f"({READINESS_SQL})=?")
+            args.append(readiness)
         if job_id is not None:
             conditions.append("app.job_id=?")
             args.append(job_id)
@@ -620,9 +652,14 @@ class Workspace:
             "company": "j.company,j.title",
             "stage": "app.status,app.updated_at DESC",
             "applied": "app.applied_at DESC",
+            # Undated or unprioritized attempts follow the planned ones.
+            "deadline": "app.deadline IS NULL,app.deadline,app.priority IS NULL,app.priority,app.updated_at DESC",
+            "priority": "app.priority IS NULL,app.priority,app.deadline IS NULL,app.deadline,app.updated_at DESC",
         }.get(sort, "app.updated_at DESC")
         with self.db.connect() as connection:
             projection = "app.id,app.job_id,app.status,app.outcome,app.version,app.applied_at,app.created_at,app.updated_at,"
+            projection += "app.priority,app.deadline,"
+            projection += f"{READINESS_SQL} AS readiness,{REQUIREMENT_COUNTS_SQL},"
             projection += (
                 "(SELECT count(*) FROM documents WHERE application_id=app.id) AS documents_count,"
             )
@@ -755,12 +792,17 @@ class Workspace:
             self.validate_answers([q.model_dump() for q in value.questions], {})
             record_id, stamp = new_id(), now()
             c.execute(
-                "INSERT INTO applications(id,job_id,note,questions,created_at,updated_at,idempotency_key) VALUES(?,?,?,?,?,?,?)",
+                "INSERT INTO applications(id,job_id,note,questions,priority,deadline,requirements,created_at,updated_at,idempotency_key) VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (
                     record_id,
                     value.job_id,
                     value.note,
                     encode([q.model_dump() for q in value.questions]),
+                    value.priority,
+                    value.deadline,
+                    encode(
+                        self.normalize_requirements([r.model_dump() for r in value.requirements])
+                    ),
                     stamp,
                     stamp,
                     value.idempotency_key,
@@ -822,6 +864,11 @@ class Workspace:
                 else json.loads(row["answers"])
             )
             self.validate_answers(questions, answers)
+            if "requirements" in changes:
+                # Store every requirement field, including defaults the caller omitted.
+                changes["requirements"] = self.normalize_requirements(
+                    [item.model_dump() for item in value.requirements]
+                )
             if (
                 (
                     status in {"applied", "interview", "offer"}
@@ -835,9 +882,10 @@ class Workspace:
             for key, val in changes.items():
                 if key == "status" and val is None:
                     continue
-                previous = json.loads(row[key]) if key in {"questions", "answers"} else row[key]
+                structured = key in {"questions", "answers", "requirements"}
+                previous = json.loads(row[key]) if structured else row[key]
                 if previous != val:
-                    actual[key] = encode(val) if key in {"questions", "answers"} else val
+                    actual[key] = encode(val) if structured else val
             if actual:
                 c.execute(
                     "UPDATE applications SET "
@@ -853,6 +901,17 @@ class Workspace:
                     c,
                 )
         return self.get_application(application_id, compact_job=True)
+
+    @staticmethod
+    def normalize_requirements(requirements):
+        """Give each requirement a stable identifier and reject duplicate identifiers."""
+        seen = set()
+        for requirement in requirements:
+            requirement["id"] = requirement.get("id") or new_id()[:12]
+            if requirement["id"] in seen:
+                raise DomainError(422, "requirement_id", "Requirement IDs must be unique.")
+            seen.add(requirement["id"])
+        return requirements
 
     @staticmethod
     def validate_answers(questions, answers):
