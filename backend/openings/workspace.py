@@ -14,6 +14,7 @@ from .common import (
 from .db import Database, decode_record, encode
 from .errors import DomainError, conflict, missing
 from .models import (
+    ApplicationBulk,
     ApplicationInput,
     ApplicationPatch,
     JobInput,
@@ -21,7 +22,10 @@ from .models import (
     NoteInput,
     NotePatch,
     JobBulk,
+    JobResolve,
+    DuplicateQuery,
 )
+from .duplicates import candidate_groups, posting_fingerprint, posting_similarity
 from .posting import posting_complete, posting_complete_sql
 from .identities import job_identities, normalize_url
 from .staleness import application_staleness
@@ -44,6 +48,9 @@ REQUIREMENT_COUNTS_SQL = (
     "(SELECT count(*) FROM json_each(app.requirements) r WHERE NOT coalesce(json_extract(r.value,'$.resolved'),0)) AS open_requirements,"
     "(SELECT count(*) FROM json_each(app.requirements) r WHERE NOT coalesce(json_extract(r.value,'$.resolved'),0) AND json_extract(r.value,'$.blocking')) AS blocking_requirements"
 )
+
+
+COLLECT_BLOBS = "DELETE FROM blobs WHERE sha256 NOT IN (SELECT sha256 FROM files)"
 
 
 class Workspace:
@@ -484,7 +491,8 @@ class Workspace:
                 )
         return self.job_summary(job_id)
 
-    def forget_job(self, job_id, expected_version):
+    def forget_job(self, job_id, expected_version, collect=True):
+        """Delete a job; bulk callers pass collect=False and collect blobs once."""
         with self.db.transaction() as c:
             row = c.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
             check_version(row, expected_version)
@@ -492,8 +500,190 @@ class Workspace:
                 "DELETE FROM transfer_grants WHERE json_extract(payload,'$.job_id')=?", (job_id,)
             )
             c.execute("DELETE FROM jobs WHERE id=?", (job_id,))
-            c.execute("DELETE FROM blobs WHERE sha256 NOT IN (SELECT sha256 FROM files)")
+            if collect:
+                c.execute(COLLECT_BLOBS)
         return {"deleted": True, "id": job_id}
+
+    def resolve_jobs(self, value):
+        """Find archived jobs for a URL or source key without ingesting anything."""
+        value = value if isinstance(value, JobResolve) else JobResolve.model_validate(value)
+        url = normalize_url(value.url)
+        aliases = job_identities(url, value.source_key)
+        matched = {}
+        with self.db.connect() as connection:
+            placeholders = ",".join("?" for _ in aliases)
+            for row in connection.execute(
+                f"SELECT job_id,identity FROM job_identities WHERE identity IN ({placeholders})",
+                aliases,
+            ):
+                matched.setdefault(row["job_id"], set()).add(row["identity"])
+            if url:
+                for sql, label in (
+                    ("SELECT id AS job_id FROM jobs WHERE url=?", "job_url"),
+                    ("SELECT job_id FROM postings WHERE url=?", "posting_url"),
+                ):
+                    for row in connection.execute(sql, (url,)):
+                        matched.setdefault(row["job_id"], set()).add(label)
+            items = self._job_summaries(connection, list(matched))
+        for item in items:
+            item["matched_by"] = sorted(matched[item["id"]])
+        return {
+            "url": url,
+            "identities": aliases,
+            "items": items,
+            "total": len(items),
+            "identity_conflict": len(items) > 1,
+        }
+
+    def _job_summaries(self, connection, job_ids):
+        """Compact job rows plus every attempt's id/status/outcome/version."""
+        if not job_ids:
+            return []
+        placeholders = ",".join("?" for _ in job_ids)
+        rows = connection.execute(
+            "SELECT "
+            + self._job_columns()
+            + f" FROM jobs j WHERE j.id IN ({placeholders}) ORDER BY j.created_at,j.id",
+            job_ids,
+        ).fetchall()
+        attempts = {}
+        for row in connection.execute(
+            "SELECT id,job_id,status,outcome,version,applied_at FROM applications "
+            f"WHERE job_id IN ({placeholders}) ORDER BY created_at DESC,id DESC",
+            job_ids,
+        ):
+            attempt = dict(row)
+            attempts.setdefault(attempt.pop("job_id"), []).append(attempt)
+        items = []
+        for row in rows:
+            job = self._compact_job(row)
+            item = {
+                key: job.get(key)
+                for key in (
+                    "id",
+                    "title",
+                    "company",
+                    "location",
+                    "url",
+                    "source",
+                    "triage",
+                    "availability",
+                    "complete",
+                    "version",
+                    "created_at",
+                    "application",
+                    "application_count",
+                )
+            }
+            item["applications"] = attempts.get(job["id"], [])
+            items.append(item)
+        return items
+
+    def duplicate_jobs(self, value=None):
+        """Candidate duplicate groups for review. Never merges or changes records."""
+        value = (
+            value
+            if isinstance(value, DuplicateQuery)
+            else DuplicateQuery.model_validate(value or {})
+        )
+        with self.db.connect() as connection:
+            connection.create_function(
+                "posting_fingerprint", 1, posting_fingerprint, deterministic=True
+            )
+            if (
+                value.job_id
+                and not connection.execute(
+                    "SELECT 1 FROM jobs WHERE id=?", (value.job_id,)
+                ).fetchone()
+            ):
+                missing("Job")
+            rows = connection.execute(
+                "SELECT id,title,company,location,created_at,"
+                "posting_fingerprint(substr(posting,1,50000)) AS fingerprint FROM jobs"
+            ).fetchall()
+            fingerprints = {row["id"]: row["fingerprint"] for row in rows}
+            created = {row["id"]: row["created_at"] for row in rows}
+            groups = candidate_groups(rows, value.match_location)
+            if value.job_id:
+                groups = [group for group in groups if value.job_id in group["ids"]]
+            if value.queue:
+                where, args = self._job_filters(queue=value.queue)
+                in_queue = {
+                    row[0] for row in connection.execute("SELECT j.id FROM jobs j" + where, args)
+                }
+                groups = [group for group in groups if in_queue.intersection(group["ids"])]
+            with_attempts = {
+                row[0] for row in connection.execute("SELECT DISTINCT job_id FROM applications")
+            }
+            # Groups with application history first, then larger, then newest.
+            groups.sort(
+                key=lambda group: (max(created[i] for i in group["ids"]), min(group["ids"])),
+                reverse=True,
+            )
+            groups.sort(
+                key=lambda group: (
+                    not with_attempts.intersection(group["ids"]),
+                    -len(group["ids"]),
+                )
+            )
+            page = groups[value.offset : value.offset + value.limit]
+            ids = [job_id for group in page for job_id in group["ids"]]
+            summaries = {item["id"]: item for item in self._job_summaries(connection, ids)}
+            postings = {}
+            if ids:
+                placeholders = ",".join("?" for _ in ids)
+                postings = {
+                    row[0]: row[1]
+                    for row in connection.execute(
+                        f"SELECT id,substr(posting,1,50000) FROM jobs WHERE id IN ({placeholders})",
+                        ids,
+                    )
+                }
+        result = []
+        for group in page:
+            items = [summaries[job_id] for job_id in group["ids"]]
+            # Prefer the record a merge would most likely keep: an open attempt,
+            # then any attempt, then saved interest, then the oldest record.
+            reference = min(
+                items,
+                key=lambda item: (
+                    not any(a["status"] != "closed" for a in item["applications"]),
+                    not item["applications"],
+                    item["triage"] != "saved",
+                    item["created_at"],
+                    item["id"],
+                ),
+            )
+            for item in items:
+                item["posting_hash"] = fingerprints[item["id"]]
+                item["similarity"] = posting_similarity(
+                    postings[reference["id"]], postings[item["id"]]
+                )
+            hashes = {item["posting_hash"] for item in items}
+            open_attempts = [
+                attempt["id"]
+                for item in items
+                for attempt in item["applications"]
+                if attempt["status"] != "closed"
+            ]
+            result.append(
+                {
+                    "job_ids": [item["id"] for item in items],
+                    "signals": group["signals"],
+                    "size": len(items),
+                    "identical_postings": len(hashes) == 1 and None not in hashes,
+                    "reference_id": reference["id"],
+                    "open_application_ids": open_attempts,
+                    "merge_blocked": len(open_attempts) > 1,
+                    "items": [reference] + [item for item in items if item is not reference],
+                }
+            )
+        return {
+            "items": result,
+            "total": len(groups),
+            "limit": value.limit,
+            "offset": value.offset,
+        }
 
     def merge_jobs(self, source_id, target_id, expected_version, target_version):
         if source_id == target_id:
@@ -695,7 +885,7 @@ class Workspace:
             items.append(item)
         return {"items": items, "total": total, "stage_counts": counts}
 
-    def delete_application(self, application_id, expected_version):
+    def delete_application(self, application_id, expected_version, collect=True):
         with self.db.transaction() as connection:
             row = connection.execute(
                 "SELECT * FROM applications WHERE id=?", (application_id,)
@@ -712,7 +902,8 @@ class Workspace:
                 (application_id,) * 4,
             )
             connection.execute("DELETE FROM applications WHERE id=?", (application_id,))
-            connection.execute("DELETE FROM blobs WHERE sha256 NOT IN (SELECT sha256 FROM files)")
+            if collect:
+                connection.execute(COLLECT_BLOBS)
             self.event(
                 "application_deleted",
                 row["job_id"],
@@ -739,34 +930,31 @@ class Workspace:
                 )
         return self.get_note(note_id)
 
-    def bulk_jobs(self, value):
-        value = value if isinstance(value, JobBulk) else JobBulk.model_validate(value)
+    def _bulk(self, items, apply, deleting):
+        """Run each versioned item on its own; collect orphaned blobs once per run."""
         results = []
-        for item in value.items:
-            try:
-                with self.db.lock:
-                    row = self.db.one("SELECT id,version FROM jobs WHERE id=?", (item.id,))
-                    check_version(row, item.expected_version)
-                    if value.action == "forget":
-                        self.forget_job(item.id, item.expected_version)
-                        result = {"deleted": True}
-                    else:
-                        updated = self.set_triage(item.id, value.action, item.expected_version)
-                        result = {"triage": updated["triage"], "version": updated["version"]}
-                results.append({"id": item.id, "ok": True, "result": result})
-            except DomainError as error:
-                results.append(
-                    {
-                        "id": item.id,
-                        "ok": False,
-                        "error": {
-                            "code": error.code,
-                            "message": error.message,
-                            "status": error.status,
-                            "details": error.details,
-                        },
-                    }
-                )
+        try:
+            for item in items:
+                try:
+                    with self.db.lock:
+                        result = apply(item)
+                    results.append({"id": item.id, "ok": True, "result": result})
+                except DomainError as error:
+                    results.append(
+                        {
+                            "id": item.id,
+                            "ok": False,
+                            "error": {
+                                "code": error.code,
+                                "message": error.message,
+                                "status": error.status,
+                                "details": error.details,
+                            },
+                        }
+                    )
+        finally:
+            if deleting and any(result["ok"] for result in results):
+                self.db.collect_blobs()
         succeeded = sum(item["ok"] for item in results)
         return {
             "items": results,
@@ -774,6 +962,58 @@ class Workspace:
             "succeeded": succeeded,
             "failed": len(results) - succeeded,
         }
+
+    def bulk_jobs(self, value):
+        value = value if isinstance(value, JobBulk) else JobBulk.model_validate(value)
+
+        def apply(item):
+            row = self.db.one("SELECT id,version FROM jobs WHERE id=?", (item.id,))
+            check_version(row, item.expected_version)
+            if value.action == "forget":
+                self.forget_job(item.id, item.expected_version, collect=False)
+                return {"deleted": True}
+            updated = self.set_triage(item.id, value.action, item.expected_version)
+            return {"triage": updated["triage"], "version": updated["version"]}
+
+        return self._bulk(value.items, apply, value.action == "forget")
+
+    def bulk_applications(self, value):
+        """Close with an outcome, reopen to a stage, or delete versioned attempts."""
+        value = (
+            value if isinstance(value, ApplicationBulk) else ApplicationBulk.model_validate(value)
+        )
+
+        def apply(item):
+            row = self.db.one("SELECT id,status,version FROM applications WHERE id=?", (item.id,))
+            if row is None:
+                missing("Application")
+            check_version(row, item.expected_version)
+            if value.action == "delete":
+                self.delete_application(item.id, item.expected_version, collect=False)
+                return {"deleted": True}
+            if value.action == "reopen" and row["status"] != "closed":
+                raise DomainError(
+                    409,
+                    "application_open",
+                    "Only a Closed application can be reopened.",
+                    {"status": row["status"]},
+                )
+            patch = (
+                {"status": "closed", "outcome": value.outcome}
+                if value.action == "close"
+                else {"status": value.status}
+            )
+            updated = self.update_application(
+                item.id, ApplicationPatch(expected_version=item.expected_version, **patch)
+            )
+            return {
+                "job_id": updated["job_id"],
+                "status": updated["status"],
+                "outcome": updated["outcome"],
+                "version": updated["version"],
+            }
+
+        return self._bulk(value.items, apply, value.action == "delete")
 
     def create_application(self, value):
         value = (

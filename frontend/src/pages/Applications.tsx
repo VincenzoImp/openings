@@ -22,6 +22,7 @@ import {
   version,
   type Activity,
   type Application,
+  type BulkResult,
   type Consistency,
   type Document,
   type StaleInput,
@@ -35,6 +36,7 @@ import { FileManager } from "../files";
 import {
   useEditorRecord,
   confirmLeave,
+  selectRecords,
   useDebounce,
   useResource,
   useUrlFilters,
@@ -271,9 +273,69 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
     filters.outcome ||
     filters.readiness
   );
-  const { pending } = useWorkspace();
+  const { pending, mutate, notify } = useWorkspace();
   const progress = useApplicationProgress();
   const [dragged, setDragged] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Record<string, number>>({}),
+    [batchErrors, setBatchErrors] = useState<{ id: string; message: string }[]>(
+      [],
+    ),
+    [bulkAction, setBulkAction] = useState<"close" | "reopen" | "delete" | "">(
+      "",
+    ),
+    [bulkOutcome, setBulkOutcome] = useState(""),
+    [bulkStage, setBulkStage] = useState("draft");
+  const selected = Object.keys(selection);
+  const selectionScope = JSON.stringify([
+    query,
+    filters.status,
+    filters.outcome,
+    filters.readiness,
+    filters.view,
+  ]);
+  useEffect(() => {
+    setSelection({});
+    setBatchErrors([]);
+  }, [selectionScope]);
+  async function bulk() {
+    if (!bulkAction || updating || resource.error) return;
+    let result: BulkResult | undefined;
+    const ok = await mutate(
+      async () => {
+        result = await api<BulkResult>("/applications/bulk", "POST", {
+          action: bulkAction,
+          ...(bulkAction === "close" ? { outcome: bulkOutcome } : {}),
+          ...(bulkAction === "reopen" ? { status: bulkStage } : {}),
+          items: selected.map((id) => ({
+            id,
+            expected_version: selection[id],
+          })),
+        });
+      },
+      bulkAction === "delete"
+        ? "Selected applications deleted."
+        : "Selected applications updated.",
+    );
+    if (!ok) return;
+    setSelection((current) => {
+      const remaining = { ...current };
+      for (const item of result?.items || [])
+        if (item.ok) delete remaining[item.id];
+      return remaining;
+    });
+    setBatchErrors(
+      result?.items.flatMap((item) =>
+        item.error ? [{ id: item.id, message: item.error.message }] : [],
+      ) || [],
+    );
+    setBulkAction("");
+    if (result?.failed)
+      notify(
+        `${result.succeeded} completed; ${result.failed} failed. ${result.items.find((item) => item.error)?.error?.message || "Refresh and retry."}`,
+        true,
+      );
+  }
+  const bulkDisabled = pending || updating || !!resource.error;
   async function move(id: string, status: Stage) {
     const app = resource.data.items.find((a) => a.id === id);
     if (app) await progress.move(app, status);
@@ -367,6 +429,61 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
       </div>
       {resource.error && (
         <ErrorBox message={resource.error} retry={resource.reload} />
+      )}
+      {selected.length > 0 && (
+        <div className="bulkbar" aria-label="Selected applications">
+          <strong>{selected.length} selected across pages</strong>
+          <Button
+            disabled={bulkDisabled}
+            onClick={() => {
+              setBulkOutcome("");
+              setBulkAction("close");
+            }}
+          >
+            Close with outcome
+          </Button>
+          <Button
+            disabled={bulkDisabled}
+            onClick={() => setBulkAction("reopen")}
+          >
+            Reopen
+          </Button>
+          <Button
+            variant="danger"
+            disabled={bulkDisabled}
+            onClick={() => setBulkAction("delete")}
+          >
+            Delete
+          </Button>
+          <button
+            className="textbutton"
+            onClick={() => {
+              setSelection({});
+              setBatchErrors([]);
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      )}
+      {batchErrors.length > 0 && (
+        <div className="batch-errors" role="alert">
+          <strong>
+            {batchErrors.length} selected applications need attention.
+          </strong>
+          <ul>
+            {batchErrors.map((item) => (
+              <li key={item.id}>
+                {resource.data.items.find((app) => app.id === item.id)?.job
+                  ?.title || "Selected application"}
+                : {item.message}
+              </li>
+            ))}
+          </ul>
+          <Button className="small" onClick={resource.reload}>
+            Refresh applications
+          </Button>
+        </div>
       )}
       <PendingResults pending={updating} />
       <div className="stage-overview" aria-label="Application stage totals">
@@ -540,6 +657,30 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
         </div>
       ) : (
         <div className="card application-list">
+          <div className="selection-head">
+            <label className="checkline">
+              <input
+                type="checkbox"
+                aria-label="Select this page"
+                checked={resource.data.items.every(
+                  (app) => selection[app.id] !== undefined,
+                )}
+                onChange={(e) =>
+                  setSelection((current) =>
+                    selectRecords(
+                      current,
+                      resource.data.items,
+                      e.target.checked,
+                    ),
+                  )
+                }
+              />
+              Select this page
+            </label>
+            <span className="muted smalltext">
+              Up to 200 selected applications per action
+            </span>
+          </div>
           <table className="table">
             <thead>
               <tr>
@@ -555,17 +696,33 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
               {resource.data.items.map((app) => (
                 <tr key={app.id}>
                   <td>
-                    <button
-                      className="table-link"
-                      onClick={() => onOpen(app.id)}
-                    >
-                      <strong>{app.job?.title || "Application"}</strong>
-                      <small>
-                        {[app.job?.company, app.job?.location]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </small>
-                    </button>
+                    <div className="application-select">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${app.job?.title || "application"}`}
+                        checked={selection[app.id] !== undefined}
+                        disabled={
+                          selection[app.id] === undefined &&
+                          selected.length >= 200
+                        }
+                        onChange={(e) =>
+                          setSelection((current) =>
+                            selectRecords(current, [app], e.target.checked),
+                          )
+                        }
+                      />
+                      <button
+                        className="table-link"
+                        onClick={() => onOpen(app.id)}
+                      >
+                        <strong>{app.job?.title || "Application"}</strong>
+                        <small>
+                          {[app.job?.company, app.job?.location]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </small>
+                      </button>
+                    </div>
                   </td>
                   <td data-label="Stage">
                     <select
@@ -611,6 +768,73 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
         changes when they happen.
       </p>
       {progress.dialog}
+      {bulkAction && (
+        <Dialog
+          title={
+            bulkAction === "close"
+              ? `Close ${selected.length} applications?`
+              : bulkAction === "reopen"
+                ? `Reopen ${selected.length} applications?`
+                : `Delete ${selected.length} applications?`
+          }
+          onClose={() => setBulkAction("")}
+        >
+          <p className="modal-intro">
+            {bulkAction === "close"
+              ? "Record one outcome for every selected attempt. Documents and history are kept."
+              : bulkAction === "reopen"
+                ? "Move selected Closed attempts back to a stage. A job can have only one open application."
+                : "Permanently remove the selected attempts with their contexts, documents and files. Their jobs stay in your workspace."}
+          </p>
+          {bulkAction === "close" && (
+            <Field label="Outcome">
+              <select
+                value={bulkOutcome}
+                onChange={(event) => setBulkOutcome(event.target.value)}
+              >
+                <option value="">Choose an outcome</option>
+                {Object.entries(outcomeLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {bulkAction === "reopen" && (
+            <Field label="Stage">
+              <select
+                value={bulkStage}
+                onChange={(event) => setBulkStage(event.target.value)}
+              >
+                {stages
+                  .filter((stage) => stage !== "closed")
+                  .map((stage) => (
+                    <option key={stage} value={stage}>
+                      {stageLabels[stage]}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+          )}
+          <div className="actions form-actions">
+            <Button onClick={() => setBulkAction("")}>Cancel</Button>
+            <Button
+              variant={bulkAction === "delete" ? "danger-fill" : "primary"}
+              disabled={
+                bulkDisabled || (bulkAction === "close" && !bulkOutcome)
+              }
+              onClick={bulk}
+            >
+              {bulkAction === "close"
+                ? "Close applications"
+                : bulkAction === "reopen"
+                  ? "Reopen applications"
+                  : "Delete applications"}
+            </Button>
+          </div>
+        </Dialog>
+      )}
     </>
   );
 }

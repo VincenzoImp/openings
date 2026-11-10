@@ -180,6 +180,38 @@
       "notes": "At most 200 versioned items, with per-item results/errors. Error results include details such as current_version."
     },
     {
+      "id": "jobs.resolve",
+      "group": "Archive",
+      "operation": "Look up archived jobs by URL or source identity without ingesting",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/jobs/resolve"
+        }
+      ],
+      "mcp": [
+        "jobs_resolve"
+      ],
+      "dashboard": "Job details: Possible duplicates (identity matches are merged on ingestion)",
+      "notes": "Read-only. Matches retained identities and normalized job/posting URLs; returns triage and every attempt per job. More than one match is an identity conflict to merge."
+    },
+    {
+      "id": "jobs.duplicates",
+      "group": "Archive",
+      "operation": "List candidate duplicate job groups for review",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/jobs/duplicates"
+        }
+      ],
+      "mcp": [
+        "jobs_duplicates"
+      ],
+      "dashboard": "Jobs: Possible duplicates tab; Job details: Possible duplicates",
+      "notes": "Read-only and paginated by group. Signals: normalized company+title (optionally location) and identical posting text; similarity is advisory. Never merges."
+    },
+    {
       "id": "jobs.merge",
       "group": "Archive",
       "operation": "Merge verified duplicate jobs and retain history",
@@ -947,6 +979,22 @@
       ],
       "dashboard": "Applications: delete attempt",
       "notes": "expected_version is required. Keeps the archived job and other attempts; removes owned contexts/documents and their transfers."
+    },
+    {
+      "id": "applications.bulk",
+      "group": "Applications and documents",
+      "operation": "Close, reopen or delete selected application attempts",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/applications/bulk"
+        }
+      ],
+      "mcp": [
+        "applications_bulk"
+      ],
+      "dashboard": "Applications: list selection toolbar",
+      "notes": "At most 200 versioned items, with per-item results/errors. Close requires an outcome; reopen requires a non-Closed stage and respects one open attempt per job."
     },
     {
       "id": "applications.history",

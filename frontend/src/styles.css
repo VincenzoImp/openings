@@ -4163,6 +4163,9 @@ body:has(dialog[open]) .app-toast:not(.dialog-toast) {
 .application-list {
   overflow: auto;
 }
+.application-list td[data-label="Stage"] select {
+  min-width: 118px;
+}
 @media (max-width: 600px) {
   .mobile-template-picker {
     display: block;
@@ -4305,4 +4308,104 @@ html[data-theme="dark"] .tag.amber {
 .requirement-head .iconbtn {
   margin-left: auto;
   margin-bottom: 4px;
+}
+.duplicate-filters .checkline {
+  margin: 0;
+  font-size: 11px;
+}
+.duplicate-groups {
+  display: grid;
+  gap: 14px;
+}
+.duplicate-group {
+  overflow: hidden;
+}
+.duplicate-group > header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 10px 10px 0 0;
+  font-size: 12px;
+}
+.duplicate-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  text-align: left;
+}
+.duplicate-row:last-child {
+  border-bottom: none;
+}
+.duplicate-row > span:first-child {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+.duplicate-row .jobtitle {
+  margin: 0;
+}
+button.duplicate-row:hover {
+  background: var(--surface);
+}
+.duplicate-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.duplicate-panel {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  font-size: 12px;
+}
+.duplicate-panel .duplicate-row {
+  padding: 10px 0;
+}
+@media (max-width: 600px) {
+  .duplicate-filters {
+    flex-wrap: wrap;
+  }
+  .duplicate-row {
+    flex-wrap: wrap;
+    padding: 12px 14px;
+  }
+  .duplicate-row > span:first-child {
+    flex-basis: calc(100% - 40px);
+  }
+}
+.application-select {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.application-select > input {
+  width: 15px;
+  height: 15px;
+  margin-top: 3px;
+  flex: none;
+  accent-color: var(--accent);
+}
+.application-list .selection-head {
+  border-radius: 10px 10px 0 0;
+}
+@media (max-width: 600px) {
+  .application-list .selection-head {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
 }

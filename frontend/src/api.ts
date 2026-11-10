@@ -38,6 +38,40 @@ export interface Job extends Versioned {
   application: ApplicationSummary | null;
   application_count: number;
 }
+export interface DuplicateJob extends Versioned {
+  title: string;
+  company: string;
+  location: string;
+  url: string;
+  source?: string;
+  triage: Triage;
+  complete?: boolean;
+  application: ApplicationSummary | null;
+  application_count: number;
+  applications: ApplicationSummary[];
+  posting_hash: string | null;
+  similarity: number | null;
+}
+export interface DuplicateGroup {
+  job_ids: string[];
+  signals: ("company_title" | "posting_text")[];
+  size: number;
+  identical_postings: boolean;
+  reference_id: string;
+  open_application_ids: string[];
+  merge_blocked: boolean;
+  items: DuplicateJob[];
+}
+export interface BulkResult {
+  total: number;
+  succeeded: number;
+  failed: number;
+  items: {
+    id: string;
+    ok: boolean;
+    error?: { code: string; message: string; status: number };
+  }[];
+}
 export interface Note {
   id: string;
   body: string;
