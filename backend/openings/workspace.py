@@ -44,7 +44,7 @@ class Workspace:
             row = c.execute("SELECT version FROM settings WHERE key=?", (key,)).fetchone()
             version = row["version"] if row else 0
             if expected_version is not None and expected_version != version:
-                conflict()
+                conflict(details={"current_version": version})
             if row and self.get_settings(key)["data"] == data:
                 return {"data": data, "version": version}
             c.execute(
@@ -128,6 +128,13 @@ class Workspace:
     def get_job(self, job_id):
         return self._job(self.db.one("SELECT * FROM jobs WHERE id=?", (job_id,)))
 
+    def job_summary(self, job_id):
+        """Return the compact list-item shape of one job: no full posting or observations."""
+        row = self.db.one("SELECT " + self._job_columns() + " FROM jobs j WHERE j.id=?", (job_id,))
+        if not row:
+            missing("Job")
+        return self._compact_job(row)
+
     @staticmethod
     def _job_filters(
         q="",
@@ -209,6 +216,7 @@ class Workspace:
         created_until=None,
         complete=None,
         queue=None,
+        include_facets=False,
     ):
         limit, offset = min(max(int(limit), 1), 200), max(int(offset), 0)
         with self.db.connect() as connection:
@@ -242,6 +250,9 @@ class Workspace:
                 (*args, limit, offset),
             ).fetchall()
             total = connection.execute("SELECT count(*)" + base + where, args).fetchone()[0]
+            result = {"items": [self._compact_job(row) for row in rows], "total": total}
+            if not include_facets:
+                return result
             facets = {}
             for name, expression in (
                 ("companies", "j.company"),
@@ -262,7 +273,7 @@ class Workspace:
                     args,
                 )
                 facets[name] = [r[0] for r in facet_rows if r[0] not in (None, "")]
-        return {"items": [self._compact_job(row) for row in rows], "total": total, "facets": facets}
+        return {**result, "facets": facets}
 
     def ingest_job(self, value):
         value = value if isinstance(value, JobInput) else JobInput.model_validate(value)
@@ -430,7 +441,7 @@ class Workspace:
                         [(key, job_id) for key in job_identities(actual["url"])],
                     )
                 self.event("job_edited", job_id, payload={"fields": list(actual)}, conn=c)
-        return self.get_job(job_id)
+        return self.job_summary(job_id)
 
     def set_triage(self, job_id, triage, expected_version):
         if triage not in {"inbox", "saved", "dismissed"}:
@@ -451,7 +462,7 @@ class Workspace:
                     "UPDATE tasks SET state='cancelled',updated_at=? WHERE job_id=? AND state IN ('queued','running')",
                     (now(), job_id),
                 )
-        return self.get_job(job_id)
+        return self.job_summary(job_id)
 
     def forget_job(self, job_id, expected_version):
         with self.db.transaction() as c:
@@ -534,12 +545,12 @@ class Workspace:
             missing("Note")
         return {"deleted": True}
 
-    def get_application(self, application_id):
+    def get_application(self, application_id, compact_job=False):
         row = self.db.one("SELECT * FROM applications WHERE id=?", (application_id,))
         if not row:
             missing("Application")
         row = decode_record(row, ("questions", "answers"))
-        row["job"] = self.get_job(row["job_id"])
+        row["job"] = (self.job_summary if compact_job else self.get_job)(row["job_id"])
         row["documents_count"] = self.db.one(
             "SELECT count(*) n FROM documents WHERE application_id=?", (application_id,)
         )["n"]
@@ -709,6 +720,7 @@ class Workspace:
                             "code": error.code,
                             "message": error.message,
                             "status": error.status,
+                            "details": error.details,
                         },
                     }
                 )
@@ -840,7 +852,7 @@ class Workspace:
                     {"from": row["status"], "to": status, "fields": list(actual)},
                     c,
                 )
-        return self.get_application(application_id)
+        return self.get_application(application_id, compact_job=True)
 
     @staticmethod
     def validate_answers(questions, answers):

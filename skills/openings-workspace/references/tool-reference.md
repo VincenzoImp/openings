@@ -59,6 +59,11 @@ outcome.
 
 Runs freeze source settings at enqueue time. Use `collection_runs_list` and
 `collection_runs_get` to distinguish progress, provider waits and failure.
+`sources_list` and `collection_runs_list` return compact rows by default: a
+`last_diagnostic_count` instead of diagnostics, and task stubs (state, provider,
+attempts, error, next run) without payloads/results or the frozen source
+snapshot. Pass `summary: false`, or read `sources_get` / `collection_runs_get`,
+for diagnostics and full task records.
 `collection_runs_cancel` stops one run. Automatic collection pause preserves
 source settings and stops future enqueueing; queued/current runs need explicit
 cancellation. Previews, manual and scheduled work share provider request spacing

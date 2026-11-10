@@ -48,8 +48,16 @@ skills: discover the tools/resources and their typed input schemas.
 
 Check the discovered input schemas. `jobs_search`, `applications_list` and `overview_get`
 accept an optional `value` DTO: for example, `jobs_search({"value":{"q":"Python",
-"triage":"saved","limit":20}})`. Career lists keep flat filters and offer
+"triage":"saved","limit":20}})`. Set `include_facets: true` only when filter
+value lists are needed. Career lists keep flat filters and offer
 `summary=true`; fetch detail records before generating from evidence/templates.
+`documents_list`, `sources_list` and `collection_runs_list` default to compact
+rows; pass `summary: false` or read the single record for full content, files,
+diagnostics and task results. `job_triage`, `job_update` and
+`application_update` return the compact job summary (`posting_preview`, no
+full posting); read `job_get` for the text. Tool errors include `details`; a
+version conflict reports `details.current_version`, including for Profile,
+instructions and collection settings.
 Mutating service tools also commonly wrap fields in `value`. For example:
 
 ```json

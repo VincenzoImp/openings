@@ -7,6 +7,8 @@ for fields. All normal data operations require an owner session or bearer token.
 Create a token in **Settings** and store it outside source control. Tokens grant
 owner access and can be revoked independently. Browser session writes also need
 the `X-CSRF-Token` returned by `/auth/session`; scripts use bearer auth instead.
+`POST /auth/logout` revokes every browser session (all signed-in browsers must
+sign in again); API/MCP tokens stay valid.
 
 ```bash
 export OPENINGS_URL=http://127.0.0.1:8080
@@ -42,10 +44,29 @@ List routes return `{items,total}` and accept bounded `limit`/`offset` where
 applicable. Job rows include `application_count` and a compact `application`
 summary with `id`, `status`, `outcome` and `version`: the open attempt, otherwise
 the latest closed attempt, or null. Read detail records for full postings,
-questions or answers. Career/claims/templates/documents offer
-`summary=true` for bounded previews/counts without narratives, metadata, TeX or
-structured content. Context lists never return payloads; files contain metadata only.
+questions or answers. `GET /jobs` returns filter value lists in `facets` only
+with `include_facets=true` (up to 200 matching companies, locations, sources and
+job types each). Career/claims/templates offer `summary=true` for bounded
+previews/counts without narratives, metadata or TeX.
+
+Lists that agents read often are compact by default and take `summary=false`
+for full records:
+
+| List | Default `summary=true` | Added by `summary=false` |
+|---|---|---|
+| `GET /documents` | Revision metadata, `revision_number`, `file_count` | Structured `content` and `files` |
+| `GET /sources` | Source settings, outcome/counts, `last_diagnostic_count`, compact `last_run` | `last_diagnostics`, full `last_run` with `source_snapshot` and task payloads/results |
+| `GET /collection/runs` | Run state, counts, timing, compact `tasks` (`id`, `kind`, `provider`, `state`, `attempts`, `error`, `next_run_at`, `updated_at`) | `source_snapshot` and full task payloads/results |
+
+`GET /sources/{id}` and `GET /collection/runs/{id}` always return the full record.
+Context lists never return payloads; files contain metadata only.
 Versioned changes include the last read `expected_version`.
+
+Job mutations return the compact job summary used by list rows (with
+`posting_preview`, without `posting`, `postings` or `overrides`):
+`POST /jobs/{id}/triage` and `PATCH /jobs/{id}`. `PATCH /applications/{id}`
+embeds the same compact `job`. The new `version`, `triage` and `application`
+fields stay present; read `GET /jobs/{id}` for the full posting.
 Application list/detail records include `preparation`: per-kind counts of current
 revision leaves (`revisions`), leaves with their own PDF (`pdf`) and leaves with
 an approved PDF (`approved`). A new revision inherits neither files nor approval.
@@ -54,7 +75,9 @@ submission. Context lists with `summary=true` include frozen job/template labels
 evidence/claim counts and a bounded `note_preview`, alongside file/document counts.
 A version conflict returns HTTP 409 with the stored version, for example
 `{"error":{"code":"conflict","message":"…","details":{"current_version":4}}}`;
-reload before editing again. MCP tool errors carry the same `code`, `status`,
+reload before editing again. This includes settings records (profile,
+instructions, collection switch), document review and per-item errors from
+`/jobs/bulk` and `/sources/bulk`. MCP tool errors carry the same `code`, `status`,
 `message` and `details` as a JSON `{"error":{…}}` text result, including field
 lists for `validation` errors.
 

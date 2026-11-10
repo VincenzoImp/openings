@@ -97,7 +97,7 @@
         "jobs_search"
       ],
       "dashboard": "Inbox: search, filters, pagination",
-      "notes": "q, triage (including active), company, location, source, remote, job_type, complete, queue (inbox/shortlist/applications/dismissed), created_since/until, sort, limit, offset; includes facets, compact active-or-latest application and application_count."
+      "notes": "q, triage (including active), company, location, source, remote, job_type, complete, queue (inbox/shortlist/applications/dismissed), created_since/until, sort, limit, offset; include_facets=true adds facets (default false). Items include compact active-or-latest application and application_count."
     },
     {
       "id": "jobs.read",
@@ -145,7 +145,7 @@
         "job_update"
       ],
       "dashboard": "Inbox: edit job",
-      "notes": "expected_version prevents lost updates."
+      "notes": "expected_version prevents lost updates. Returns the compact job summary (posting_preview, no full posting); read the job for full text."
     },
     {
       "id": "jobs.triage",
@@ -161,7 +161,7 @@
         "job_triage"
       ],
       "dashboard": "Inbox: Add/remove shortlist, Dismiss, Restore",
-      "notes": "saved retains interest. queue=shortlist contains saved jobs without any application attempts; starting preparation removes them from that queue."
+      "notes": "saved retains interest. queue=shortlist contains saved jobs without any application attempts; starting preparation removes them from that queue. Returns the compact job summary (posting_preview, no full posting)."
     },
     {
       "id": "jobs.bulk",
@@ -177,7 +177,7 @@
         "jobs_bulk"
       ],
       "dashboard": "Inbox: selection toolbar",
-      "notes": "At most 200 versioned items, with per-item results/errors."
+      "notes": "At most 200 versioned items, with per-item results/errors. Error results include details such as current_version."
     },
     {
       "id": "jobs.merge",
@@ -315,7 +315,7 @@
         "collection_update"
       ],
       "dashboard": "Settings/Collection: scheduled collection",
-      "notes": "Preserves per-source settings. Pausing prevents future scheduled runs; queued/current runs continue until explicitly stopped. Manual runs remain available."
+      "notes": "Preserves per-source settings. Pausing prevents future scheduled runs; queued/current runs continue until explicitly stopped. Manual runs remain available. A stale version returns 409 with details.current_version."
     },
     {
       "id": "providers.list",
@@ -362,7 +362,8 @@
       "mcp": [
         "sources_list"
       ],
-      "dashboard": "Collection: Saved searches and Companies tabs"
+      "dashboard": "Collection: Saved searches and Companies tabs",
+      "notes": "limit, offset, summary (default true: compact last_run tasks and last_diagnostic_count; summary=false adds last_diagnostics and full task records)."
     },
     {
       "id": "sources.read",
@@ -471,7 +472,7 @@
         "sources_bulk"
       ],
       "dashboard": "Collection: selection toolbar",
-      "notes": "Versioned items and per-item outcomes."
+      "notes": "Versioned items and per-item outcomes. Error results include details such as current_version."
     },
     {
       "id": "tasks.list",
@@ -563,7 +564,7 @@
         "career_update_profile"
       ],
       "dashboard": "Career: profile and Advanced JSON",
-      "notes": "links is a list of string-valued objects; metadata is an arbitrary finite JSON object. expected_version required."
+      "notes": "links is a list of string-valued objects; metadata is an arbitrary finite JSON object. expected_version required. A stale version returns 409 with details.current_version."
     },
     {
       "id": "knowledge.list",
@@ -834,7 +835,7 @@
         "instructions_update"
       ],
       "dashboard": "Templates: general instructions",
-      "notes": "Template guidance and application notes append separately; prior contexts remain frozen."
+      "notes": "Template guidance and application notes append separately; prior contexts remain frozen. A stale version returns 409 with details.current_version."
     },
     {
       "id": "career.preview_import",
@@ -928,7 +929,7 @@
         "application_update"
       ],
       "dashboard": "Applications: progress and questions/answers",
-      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history. Entering Closed requires an explicit outcome. Reopening enforces one open attempt per job. applied_at:null clears the recorded submission date."
+      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history. Entering Closed requires an explicit outcome. Reopening enforces one open attempt per job. applied_at:null clears the recorded submission date. The returned job is the compact job summary."
     },
     {
       "id": "applications.delete",
@@ -1023,7 +1024,7 @@
         "documents_list"
       ],
       "dashboard": "Applications: documents/history",
-      "notes": "application_id, kind, q (title), review_state, summary, limit, offset. summary=true returns file counts without content/files."
+      "notes": "application_id, kind, q (title), review_state, summary, limit, offset. summary defaults to true and returns file counts without content/files; summary=false includes them."
     },
     {
       "id": "documents.read",
@@ -1320,7 +1321,8 @@
       "mcp": [
         "collection_runs_list"
       ],
-      "dashboard": "Collection: run history"
+      "dashboard": "Collection: run history",
+      "notes": "limit, offset, source_id, state, summary (default true: omits source_snapshot and task payload/result bodies; summary=false includes them)."
     },
     {
       "id": "collection.runs.read",
@@ -1376,7 +1378,7 @@
       ],
       "mcp": [],
       "dashboard": "Initial setup, login and logout",
-      "reason": "Credential bootstrap and browser session transport precede authenticated domain tools; MCP uses bearer authentication."
+      "reason": "Credential bootstrap and browser session transport precede authenticated domain tools; MCP uses bearer authentication. Logout revokes every browser session; API/MCP tokens remain valid."
     },
     {
       "id": "health.deployment",

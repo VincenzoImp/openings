@@ -294,7 +294,7 @@ def create_app(database=None, start_worker=True):
 
     @router.post("/auth/logout")
     def logout():
-        response = JSONResponse({"authenticated": False})
+        response = JSONResponse(auth.logout())
         response.delete_cookie(COOKIE, path="/")
         return response
 

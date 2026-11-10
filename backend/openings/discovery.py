@@ -32,7 +32,7 @@ from .common import (
     now,
 )
 from . import __version__
-from .errors import DomainError
+from .errors import DomainError, conflict
 from .posting import posting_complete, posting_complete_sql, matches_filters
 from .scheduling import Schedule, IntervalSchedule, schedule_adapter, next_due
 from .collectors import company as company_collectors
@@ -796,9 +796,11 @@ class DiscoveryService:
     def update_collection(self, value: CollectionWrite):
         with self.db.transaction() as connection:
             row = connection.execute("SELECT * FROM settings WHERE key='collection'").fetchone()
-            if (row["version"] if row else 0) != value.expected_version:
-                raise DomainError(
-                    409, "conflict", "Collection settings changed. Reload before saving."
+            current = row["version"] if row else 0
+            if current != value.expected_version:
+                conflict(
+                    "Collection settings changed. Reload before saving.",
+                    details={"current_version": current},
                 )
             stamp = now()
             connection.execute(
@@ -862,6 +864,7 @@ class DiscoveryService:
                             "code": error.code,
                             "message": error.message,
                             "status": error.status,
+                            "details": error.details,
                         },
                     }
                 )
@@ -879,7 +882,26 @@ class DiscoveryService:
             missing("Source")
         return self._source_records([row])[0]
 
-    def _source_records(self, rows):
+    @staticmethod
+    def _run_summary(record):
+        """Drop the frozen source snapshot and task payload/result bodies from a run record."""
+        summary = {key: value for key, value in record.items() if key != "source_snapshot"}
+        summary["tasks"] = [
+            {
+                "id": task["id"],
+                "kind": task["kind"],
+                "provider": task["payload"].get("provider"),
+                "state": task["state"],
+                "attempts": task["attempts"],
+                "error": task["error"],
+                "next_run_at": task["next_run_at"],
+                "updated_at": task["updated_at"],
+            }
+            for task in record["tasks"]
+        ]
+        return summary
+
+    def _source_records(self, rows, summary=False):
         if not rows:
             return []
         ids = [row["id"] for row in rows]
@@ -923,11 +945,15 @@ class DiscoveryService:
             row["last_outcome"] = run["state"] if run else None
             row["last_task_id"] = run["task_ids"][0] if run and run["task_ids"] else None
             row["last_counts"] = run["counts"] if run else {}
-            row["last_diagnostics"] = (
+            diagnostics = (
                 [diag for task in run["tasks"] for diag in task["result"].get("diagnostics", [])]
                 if run
                 else []
             )
+            if summary:
+                row["last_diagnostic_count"] = len(diagnostics)
+            else:
+                row["last_diagnostics"] = diagnostics
             row["last_error"] = (
                 "; ".join(
                     task["error"]
@@ -949,6 +975,8 @@ class DiscoveryService:
                     else None
                 )
             )
+            if summary and run:
+                row["last_run"] = self._run_summary(run)
             result.append(row)
         return result
 
@@ -1018,7 +1046,8 @@ class DiscoveryService:
             }
         return record
 
-    def list_runs(self, limit=50, offset=0, source_id=None, state=None):
+    def list_runs(self, limit=50, offset=0, source_id=None, state=None, summary=True):
+        """List collection runs; summary=true omits frozen source snapshots and task payload/result bodies."""
         if state not in (None, "queued", "running", "succeeded", "failed", "cancelled"):
             raise DomainError(422, "run_state", "Use a supported collection run state.")
         states_sql = (
@@ -1064,8 +1093,9 @@ class DiscoveryService:
         grouped = {run_id: [] for run_id in ids}
         for task in tasks:
             grouped[task["run_id"]].append(task)
+        records = [self._run_record(row, grouped[row["id"]]) for row in rows]
         return {
-            "items": [self._run_record(row, grouped[row["id"]]) for row in rows],
+            "items": [self._run_summary(record) for record in records] if summary else records,
             "total": self.db.one("SELECT COUNT(*) AS n FROM (" + query + ")" + where, params)["n"],
         }
 
@@ -1129,13 +1159,14 @@ class DiscoveryService:
             "run_overrides_schema": RunOverrides.model_json_schema(),
         }
 
-    def list_sources(self, limit=100, offset=0):
+    def list_sources(self, limit=100, offset=0, summary=True):
+        """List sources; summary=true returns a compact last run and a diagnostic count instead of diagnostics."""
         rows = self.db.all(
             "SELECT * FROM sources ORDER BY name,id LIMIT ? OFFSET ?",
             (min(max(limit, 1), 500), max(offset, 0)),
         )
         return {
-            "items": self._source_records(rows),
+            "items": self._source_records(rows, summary=summary),
             "total": self.db.one("SELECT COUNT(*) AS n FROM sources")["n"],
         }
 
@@ -1840,9 +1871,13 @@ def register_api(router, service: DiscoveryService):
 
     @router.get("/collection/runs")
     def collection_runs_list(
-        limit: int = 50, offset: int = 0, source_id: str | None = None, state: str | None = None
+        limit: int = 50,
+        offset: int = 0,
+        source_id: str | None = None,
+        state: str | None = None,
+        summary: bool = True,
     ):
-        return service.list_runs(limit, offset, source_id, state)
+        return service.list_runs(limit, offset, source_id, state, summary)
 
     @router.get("/collection/runs/{run_id}")
     def collection_runs_get(run_id: str):
@@ -1857,8 +1892,8 @@ def register_api(router, service: DiscoveryService):
         return service.source_schemas()
 
     @router.get("/sources")
-    def sources_list(limit: int = 100, offset: int = 0):
-        return service.list_sources(limit, offset)
+    def sources_list(limit: int = 100, offset: int = 0, summary: bool = True):
+        return service.list_sources(limit, offset, summary)
 
     @router.post("/sources/preview")
     def sources_preview(value: SourcePreview):
@@ -1926,10 +1961,14 @@ def register_mcp(mcp, service: DiscoveryService):
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
     )
     def collection_runs_list(
-        limit: int = 50, offset: int = 0, source_id: str | None = None, state: str | None = None
+        limit: int = 50,
+        offset: int = 0,
+        source_id: str | None = None,
+        state: str | None = None,
+        summary: bool = True,
     ) -> dict:
-        """List logical collections with cumulative provider counts, waiting and processing time."""
-        return service.list_runs(limit, offset, source_id, state)
+        """List logical collections with cumulative provider counts, waiting and processing time. summary=false adds frozen source snapshots and full task payloads/results."""
+        return service.list_runs(limit, offset, source_id, state, summary)
 
     @mcp.tool(
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
@@ -1983,9 +2022,9 @@ def register_mcp(mcp, service: DiscoveryService):
     @mcp.tool(
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
     )
-    def sources_list(limit: int = 100, offset: int = 0) -> dict:
-        """List saved portal searches and selected company/feed sources, schedules and outcomes."""
-        return service.list_sources(limit, offset)
+    def sources_list(limit: int = 100, offset: int = 0, summary: bool = True) -> dict:
+        """List saved portal searches and selected company/feed sources, schedules and outcomes. summary=false adds last-run diagnostics and full task records."""
+        return service.list_sources(limit, offset, summary)
 
     @mcp.tool(
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
