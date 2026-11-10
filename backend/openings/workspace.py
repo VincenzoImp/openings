@@ -24,6 +24,7 @@ from .models import (
 )
 from .posting import posting_complete, posting_complete_sql
 from .identities import job_identities, normalize_url
+from .staleness import application_staleness
 
 # Current revision leaves only; a parent's PDF or approval never counts for its child.
 _LEAVES = (
@@ -580,6 +581,9 @@ class Workspace:
             row["preparation"] = self._application_preparation(connection, [application_id])[
                 application_id
             ]
+            row["stale_inputs"] = application_staleness(connection, [application_id])[
+                application_id
+            ]["inputs"]
         return row
 
     @staticmethod
@@ -681,11 +685,13 @@ class Workspace:
             ):
                 counts[row["status"]] = row["n"]
             preparation = self._application_preparation(connection, [row["id"] for row in rows])
+            staleness = application_staleness(connection, [row["id"] for row in rows])
         items = []
         for raw in rows:
             item = {key: value for key, value in dict(raw).items() if not key.startswith("j_")}
             item["job"] = self._compact_job(raw)
             item["preparation"] = preparation[item["id"]]
+            item["stale_inputs"] = staleness[item["id"]]["inputs"]
             items.append(item)
         return {"items": items, "total": total, "stage_counts": counts}
 

@@ -419,7 +419,15 @@ function affected(read: string, changed: string) {
     return ["jobs", "applications", "career", "sources"].includes(b);
   if (a === "jobs") return ["applications", "career", "notes"].includes(b);
   if (a === "applications")
-    return ["jobs", "contexts", "documents"].includes(b);
+    return [
+      "jobs",
+      "contexts",
+      "documents",
+      "files",
+      "career",
+      "templates",
+      "instructions",
+    ].includes(b);
   if (a === "career" || a === "templates") return b === "files";
   if (a === "documents") return b === "files";
   if (

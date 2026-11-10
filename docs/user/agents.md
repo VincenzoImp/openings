@@ -43,7 +43,15 @@ skills: discover the tools/resources and their typed input schemas.
    Use the returned raw HTTP transfer URL/method/headers. MCP transports metadata,
    not base64 file bodies. Verify results with `documents_get` and scoped downloads.
 7. Approve a document review only after the agent's own content and PDF checks;
-   it records an agent check, not human or employer approval. The owner submits
+   it records an agent check, not human or employer approval. `documents_review`
+   refuses with `content_mismatch` when the structured content's text differs
+   from the attached `.tex` source; `documents_consistency` runs the same
+   read-only check. Fix the content or source, or pass
+   `value.allow_content_mismatch=true` only for an intentional difference.
+8. After a Profile, guidance, template or Career change, `applications_staleness`
+   lists Draft applications whose current revisions were built on older inputs and
+   `application_staleness` explains one. Contexts stay frozen: refresh by
+   preparing a new context and new revisions. The owner submits
    applications and records Applied. Portals and sending are outside Openings.
 
 Check the discovered input schemas. `jobs_search`, `applications_list` and `overview_get`
