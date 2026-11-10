@@ -18,7 +18,7 @@ from .career import DEFAULT_GUIDANCE, DEFAULT_PROFILE, Input, _get, _page, _sett
 from .common import decode_record, encode, new_id, now
 from .consistency import compare as compare_content, is_tex_source
 from .errors import DomainError, conflict, missing
-from .staleness import application_staleness
+from .staleness import application_staleness, store_context_inputs
 from .transfers import SnapshotResponse
 
 
@@ -267,6 +267,7 @@ class DocumentService:
                     timestamp,
                 ),
             )
+            store_context_inputs(conn, "id=?", (context_id,))
             for asset in assets:
                 conn.execute(
                     "INSERT INTO files(id,sha256,name,media_type,size,context_id,created_at) VALUES(?,?,?,?,?,?,?)",

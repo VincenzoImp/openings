@@ -12,7 +12,7 @@ import json
 INPUT_KINDS = ("profile", "instructions", "template", "knowledge", "claim")
 
 _CONTEXT_INPUTS = (
-    "SELECT id,created_at,"
+    "SELECT id AS context_id,created_at,"
     "json_extract(payload,'$.profile.version') AS profile_version,"
     "json_extract(payload,'$.instructions.version') AS instructions_version,"
     "(SELECT json_group_array(json_array(json_extract(value,'$.id'),json_extract(value,'$.version'),json_extract(value,'$.name')))"
@@ -21,8 +21,21 @@ _CONTEXT_INPUTS = (
     " FROM json_each(contexts.payload,'$.knowledge')) AS knowledge,"
     "(SELECT json_group_array(json_array(json_extract(value,'$.id'),json_extract(value,'$.version'),substr(json_extract(value,'$.text'),1,120)))"
     " FROM json_each(contexts.payload,'$.claims')) AS claims "
-    "FROM contexts WHERE id IN ({})"
+    "FROM contexts WHERE {}"
 )
+_COLUMNS = "context_id,created_at,profile_version,instructions_version,templates,knowledge,claims"
+
+
+def store_context_inputs(connection, where="id=?", params=()):
+    """Record the input versions of contexts; parsing payloads once keeps reads cheap."""
+    connection.execute(
+        f"INSERT OR IGNORE INTO context_inputs({_COLUMNS}) " + _CONTEXT_INPUTS.format(where),
+        params,
+    )
+
+
+def backfill_context_inputs(connection):
+    store_context_inputs(connection, "id NOT IN (SELECT context_id FROM context_inputs)")
 
 
 def _placeholders(values):
@@ -51,12 +64,23 @@ def context_changes(connection, context_ids) -> dict[str, dict]:
     context_ids = list(dict.fromkeys(identifier for identifier in context_ids if identifier))
     if not context_ids:
         return {}
-    frozen = [
-        dict(row)
-        for row in connection.execute(
-            _CONTEXT_INPUTS.format(_placeholders(context_ids)), context_ids
-        )
-    ]
+
+    def read():
+        return [
+            dict(row, id=row["context_id"])
+            for row in connection.execute(
+                f"SELECT {_COLUMNS} FROM context_inputs WHERE context_id IN "
+                f"({_placeholders(context_ids)})",
+                context_ids,
+            )
+        ]
+
+    frozen = read()
+    if len(frozen) < len(context_ids):
+        # Contexts restored or created without a summary: derive them once.
+        store_context_inputs(connection, f"id IN ({_placeholders(context_ids)})", context_ids)
+        connection.commit()
+        frozen = read()
     for row in frozen:
         for key in ("templates", "knowledge", "claims"):
             row[key] = json.loads(row[key] or "[]")

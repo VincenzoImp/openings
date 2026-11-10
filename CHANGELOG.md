@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.1
+
+- Fix slow application lists: staleness now reads input versions recorded once per immutable context instead of parsing every frozen context payload per request (200 Drafts on a real 538 MB workspace: 260 ms to 21 ms; about 3.6 s to well under a second on a one-CPU container). Existing contexts are summarized at the first start, in about a second.
+
+No schema version change: the derived `context_inputs` table is created automatically and rebuilt when missing.
+
 ## 0.15.0
 
 - Plan applications: optional `priority` (1–5) and `deadline`, a structured list of employer `requirements` (authorship, attachments, references, format, language, eligibility, deadline, other; blocking and resolved flags), sorting by deadline or priority, and a readiness filter (`blocked`, `none`, `missing_pdf`, `unreviewed`, `ready`) in REST, MCP and the dashboard.

@@ -143,8 +143,12 @@ def upgrade(conn):
 
 
 def apply_schema(conn):
-    """Create missing tables and indexes; existing data is unchanged."""
+    """Create missing tables and indexes and derive missing context summaries."""
+    from .staleness import backfill_context_inputs
+
     conn.executescript(SCHEMA_SQL.read_text())
+    backfill_context_inputs(conn)
+    conn.commit()
 
 
 def encode(value):
