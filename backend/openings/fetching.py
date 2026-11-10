@@ -69,21 +69,20 @@ def structured_posting(body):
                     continue
                 organization = node.get("hiringOrganization") or {}
                 locations = node.get("jobLocation") or []
-                if isinstance(locations, dict):
+                if isinstance(locations, (dict, str)):
                     locations = [locations]
                 labels = []
                 for location in locations:
-                    address = location.get("address", {}) if isinstance(location, dict) else {}
-                    if isinstance(address, str):
-                        labels.append(address)
-                    elif isinstance(address, dict):
-                        labels.append(
-                            ", ".join(
-                                str(address[key])
-                                for key in ("addressLocality", "addressRegion", "addressCountry")
-                                if isinstance(address.get(key), str)
-                            )
+                    # A place may be plain text, and one without a usable address adds nothing.
+                    address = location.get("address") if isinstance(location, dict) else location
+                    if isinstance(address, dict):
+                        address = ", ".join(
+                            str(address[key])
+                            for key in ("addressLocality", "addressRegion", "addressCountry")
+                            if isinstance(address.get(key), str)
                         )
+                    if isinstance(address, str) and address.strip():
+                        labels.append(address.strip())
                 return {
                     "title": str(node.get("title") or "")[:400],
                     "company": str(organization.get("name") or "")[:300]
