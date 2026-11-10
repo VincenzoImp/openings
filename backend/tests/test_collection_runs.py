@@ -114,8 +114,6 @@ def test_frozen_options_resume_with_cumulative_unique_observations(collection, m
     assert service.list_runs(state="succeeded")["total"] == 1
 
 
-
-
 def test_bulk_configuration_preserves_untouched_fields_and_service(collection):
     _, service = collection
     source = make_source(service)
@@ -252,8 +250,6 @@ def test_partial_refresh_keeps_complete_body_and_records_raw_observation(collect
     assert refreshed["content_version"] == original["content_version"]
     observation = workspace.db.one("SELECT payload FROM postings WHERE job_id=?", (original["id"],))
     assert '"description_complete":false' in observation["payload"]
-
-
 
 
 def test_partial_filter_patch_preserves_other_terms_and_explicit_empty_clears(collection):

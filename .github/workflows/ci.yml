@@ -28,6 +28,8 @@ jobs:
           enable-cache: true
       - run: uv sync --locked
       - run: uv run ruff check backend
+      - run: uv run ruff format --check backend
+      - run: python3 scripts/bump_version.py --check
       - run: uv run pytest
       - name: Smoke installed wheel and packaged resources
         run: |

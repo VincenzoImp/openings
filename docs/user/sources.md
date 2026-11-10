@@ -33,6 +33,9 @@ JobSpy searches **LinkedIn**, **Indeed** and **Glassdoor** through the attribute
 | Remote only | Off by default. Requests remote roles; eligibility still depends on each posting. |
 | Job type | No restriction by default; choose a supported type when useful. |
 
+Saved searches also accept the role, location and excluded role filters described
+for company boards below; they apply to the returned titles and locations.
+
 Description retrieval is automatic. LinkedIn and some other sources need an
 additional request for each posting; complete cached descriptions can be reused.
 
@@ -142,7 +145,7 @@ time and total elapsed time explain longer runs. Raw task diagnostics remain
 available for investigation. A **Partial** run reports bounded coverage or
 unavailable descriptions; completion does not imply every matching job was fetched.
 
-![Saved search form with query, portal selection and acquisition limits](../images/collection-settings.png)
+![Saved search form with query, portal selection, role filters and excluded role terms](../images/collection-settings.png)
 
 ## Request pacing
 

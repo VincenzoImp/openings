@@ -68,10 +68,26 @@ changes. A password change rotates browser sessions and retains existing API tok
 log in again after changing it in the dashboard. Revoking the token used by an agent
 ends that token’s access on its next request.
 
+Sign-in and setup allow 10 attempts per client address per minute. After more
+than 10 failed sign-ins across all clients within 15 minutes, sign-in attempts
+are spaced globally (1 s, doubling up to 5 s per attempt) until a successful
+sign-in; an attempt that would wait more than 30 s returns 429 with
+`Retry-After`. API/MCP tokens are not affected. Behind a reverse proxy, set
+`OPENINGS_TRUSTED_PROXIES` to the proxy's address as the container sees it (see
+[LAN access](getting-started.md#lan-access)); otherwise every client shares the
+proxy's limit. To find it, check the client address of proxied requests in
+`docker compose logs openings`.
+
+Operational grants from `workspace_backup`, `workspace_export` and
+`workspace_restore_upload` expire after 120 seconds and work once; request a new
+grant for each transfer or retry.
+
 ## Troubleshooting
 
 | Symptom | Check |
 |---|---|
+| Sign-in returns 429 for everyone behind a proxy | Set `OPENINGS_TRUSTED_PROXIES` to the proxy address and recreate the container. |
+| A backup/export grant returns `transfer_used` | Grants are single-use; request a new one. |
 | MCP rejects a host or download points to the wrong machine | Set `OPENINGS_PUBLIC_URL` to the client's reachable origin and recreate the container. |
 | URL import has incomplete text | Paste the full posting; login/JavaScript pages may not expose readable HTML. |
 | Collection is waiting | Read the displayed reason and resume time. Server cooldowns survive restarts and setting changes. |

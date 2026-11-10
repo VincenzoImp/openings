@@ -101,6 +101,7 @@ follows those recorded stages. The submission date can be corrected or cleared.
 On narrow screens the initial application view is a compact list. Choose **Board**
 or **List** to remember a preference. Stage shortcuts filter the whole result set;
 board columns show when only part of a stage is loaded and link to the full stage.
+
 ## Plan and track requirements
 
 Each application can have a **priority** (P1 highest to P5 lowest) and the
@@ -119,6 +120,8 @@ Applications by **Deadline** or **Priority**, and filter by **readiness**:
 Readiness uses only the current revision of each document; an approved earlier
 revision does not count. It does not check the content or submit anything.
 
+![Applications list sorted by deadline, with priority and deadline tags, readiness, a blocking requirement and the bulk action bar](../images/applications-planning.png)
+
 **Requirements** records employer conditions: authorship rules (such as no
 AI-written applications), attachments, references, format, language, eligibility
 and dates. Mark a requirement **Blocking** when documents must not be prepared or
@@ -126,6 +129,8 @@ submitted until it is settled, and **Resolved** with a note once you decide.
 Unresolved blocking requirements appear at the top of the application. They are
 stored on the application, not in job details, so source refreshes of the job
 continue.
+
+![Application Requirements tab with a blocking authorship requirement and a resolved eligibility requirement](../images/requirements.png)
 
 Open **Posting** in an application to read the job without leaving your current
 filters. Rare job maintenance actions live under **Job details, sources & maintenance**.
@@ -159,6 +164,8 @@ and role or identical posting text, for example one vacancy collected from
 several job boards and the employer's site. It suggests a record to keep and
 never merges automatically. Open a job and expand **Job details, sources &
 maintenance** to see its possible duplicates and merge a verified copy.
+
+![Possible duplicates grouping one vacancy collected from three sources and another from two](../images/duplicates.png)
 
 Dismissing a job preserves its applications. Restore it before preparing new
 documents. If you previously dismissed an applied job just to clear Shortlist,
