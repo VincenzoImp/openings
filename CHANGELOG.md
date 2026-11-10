@@ -7,6 +7,8 @@
 - Run synchronous MCP tools in worker threads so a slow tool no longer stalls REST, the dashboard or `/health`.
 - Return structured MCP errors (`code`, `status`, `message`, `details`) matching REST; version conflicts include `current_version` on both interfaces.
 - Enforce request size limits on the bytes actually received, including chunked bodies without `Content-Length`: 40 MiB for API requests and 16 KiB for sign-in/setup routes.
+- Write backup, restore-upload and rollback copies beside the database on the data volume instead of the container's temp directory, and remove copies left by a crash at startup.
+- Raise the default `OPENINGS_MAX_RESTORE_MB` from 512 to 2048 and recreate current indexes after a restore.
 
 ## 0.12.0
 

@@ -36,8 +36,10 @@ curl --fail "$OPENINGS_URL/api/v1/backup/restore" \
   --data-binary @openings-backup.sqlite
 ```
 
-The default restore limit is 512 MiB; configure `OPENINGS_MAX_RESTORE_MB` before
-uploading a larger backup. Allow disk space for the upload and rollback snapshot.
+The default restore limit is 2048 MiB; configure `OPENINGS_MAX_RESTORE_MB` before
+uploading a larger backup. Backup, restore upload and rollback copies are written
+beside the database on the data volume, so allow free space there of about three
+times the database size; copies left by a crash are removed at the next start.
 Enabled sources come from the restored workspace; inspect them when moving hosts. `.env` remains host-local.
 
 ## Service lifecycle

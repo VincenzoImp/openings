@@ -1,6 +1,7 @@
 """Consistent JSON exports survive streaming thread changes and failed downloads."""
 
 import asyncio
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
 from fastapi.testclient import TestClient
@@ -15,14 +16,14 @@ from openings.models import JobInput
 @pytest.fixture
 def snapshots(monkeypatch):
     files = []
-    create = app_module.tempfile.TemporaryFile
+    create = tempfile.TemporaryFile
 
     def tracked_file(*args, **kwargs):
         snapshot = create(*args, **kwargs)
         files.append(snapshot)
         return snapshot
 
-    monkeypatch.setattr(app_module.tempfile, "TemporaryFile", tracked_file)
+    monkeypatch.setattr(tempfile, "TemporaryFile", tracked_file)
     yield files
     for snapshot in files:
         snapshot.close()
