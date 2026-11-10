@@ -16,7 +16,9 @@ from pydantic import Field, field_validator
 
 from .career import DEFAULT_GUIDANCE, DEFAULT_PROFILE, Input, _get, _page, _setting
 from .common import decode_record, encode, new_id, now
+from .consistency import compare as compare_content, is_tex_source
 from .errors import DomainError, conflict, missing
+from .staleness import application_staleness
 from .transfers import SnapshotResponse
 
 
@@ -66,6 +68,13 @@ class DocumentCreate(Input):
 class ReviewUpdate(Input):
     review_state: Literal["approved"] = "approved"
     expected_version: int = Field(ge=1)
+    allow_content_mismatch: bool = Field(
+        default=False,
+        description="Approve although the structured content's text differs from the attached .tex source. Use only for an intentional, reviewed difference.",
+    )
+
+
+StalenessStage = Literal["draft", "applied", "interview", "offer", "closed", "all"]
 
 
 class UploadReservation(Input):
@@ -584,8 +593,34 @@ class DocumentService:
             "total": self.db.one(f"SELECT COUNT(*) AS n FROM documents{clause}", params)["n"],
         }
 
+    @staticmethod
+    def _consistency(conn, row) -> dict:
+        sources, names = [], []
+        for file in conn.execute(
+            "SELECT id,name,media_type,sha256 FROM files WHERE document_id=? ORDER BY name,id",
+            (row["id"],),
+        ).fetchall():
+            if not is_tex_source(file["name"], file["media_type"]):
+                continue
+            blob = conn.execute(
+                "SELECT content FROM blobs WHERE sha256=?", (file["sha256"],)
+            ).fetchone()
+            text = bytes(blob["content"]).decode("utf-8", "replace") if blob else ""
+            sources.append((file["name"], text))
+            names.append({"id": file["id"], "name": file["name"]})
+        report = compare_content(json.loads(row["content"]), sources)
+        return {"document_id": row["id"], "version": row["version"], "sources": names, **report}
+
+    def check_consistency(self, document_id: str) -> dict:
+        """Compare a revision's structured content text with its attached .tex source, ignoring case, whitespace, punctuation and LaTeX markup. Read-only; documents_review applies the same check."""
+        with self.db.connect() as conn:
+            row = conn.execute("SELECT * FROM documents WHERE id=?", (document_id,)).fetchone()
+            if not row:
+                missing("Document revision")
+            return self._consistency(conn, dict(row))
+
     def review_document(self, document_id: str, value: ReviewUpdate) -> dict:
-        """Approve exact document content/files; future changes require a new revision."""
+        """Approve exact document content/files; future changes require a new revision. Refuses with 409 content_mismatch when the attached .tex source disagrees with the structured content, unless allow_content_mismatch=true."""
         with self.db.transaction() as conn:
             row = _get(conn, "documents", document_id, "Document revision")
             if row["version"] != value.expected_version:
@@ -593,12 +628,74 @@ class DocumentService:
                     "The document or its files changed. Reload it before approving.",
                     details={"current_version": row["version"]},
                 )
+            if row["review_state"] != "approved" and not value.allow_content_mismatch:
+                report = self._consistency(conn, row)
+                if report["status"] == "mismatch":
+                    first = report["mismatches"][0]
+                    raise DomainError(
+                        409,
+                        "content_mismatch",
+                        f"{report['reason']} First difference at {first['path']}: "
+                        f'"{first["text"][:120]}". Save the matching content as a new revision '
+                        "or upload the matching source; set allow_content_mismatch only for an "
+                        "intentional difference.",
+                        report,
+                    )
             if row["review_state"] != "approved":
                 conn.execute(
                     "UPDATE documents SET review_state='approved',version=version+1 WHERE id=?",
                     (document_id,),
                 )
         return self.get_document(document_id)
+
+    def application_staleness(self, application_id: str) -> dict:
+        """Report whether an application's current revision leaves were built on a context older than the current Profile, instructions, templates or selected Career entries/claims. Read-only; contexts stay frozen."""
+        with self.db.connect() as conn:
+            row = conn.execute(
+                "SELECT id,status,version FROM applications WHERE id=?", (application_id,)
+            ).fetchone()
+            if not row:
+                missing("Application")
+            report = application_staleness(conn, [application_id])[application_id]
+        return {"application_id": application_id, "status": row["status"], **report}
+
+    def list_staleness(
+        self,
+        status: StalenessStage = "draft",
+        stale_only: bool = True,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict:
+        """List applications in one stage (default draft; "all" for every stage) whose current revisions use outdated contexts, with the changed inputs. stale_only=false also lists current ones. Read-only."""
+        _page(limit, offset)
+        where, params = ("AND a.status=?", [status]) if status != "all" else ("", [])
+        with self.db.connect() as conn:
+            rows = [
+                dict(row)
+                for row in conn.execute(
+                    "SELECT a.id,a.status,a.version,a.updated_at,j.id AS job_id,j.title,j.company "
+                    "FROM applications a JOIN jobs j ON j.id=a.job_id "
+                    f"WHERE EXISTS(SELECT 1 FROM documents d WHERE d.application_id=a.id) {where} "
+                    "ORDER BY a.updated_at DESC,a.id",
+                    params,
+                )
+            ]
+            reports = application_staleness(conn, [row["id"] for row in rows])
+        items = []
+        for row in rows:
+            report = reports[row["id"]]
+            if not report["documents"] or (stale_only and not report["stale"]):
+                continue
+            items.append(
+                {
+                    "application_id": row["id"],
+                    "status": row["status"],
+                    "version": row["version"],
+                    "job": {"id": row["job_id"], "title": row["title"], "company": row["company"]},
+                    **report,
+                }
+            )
+        return {"items": items[offset : offset + limit], "total": len(items)}
 
     def delete_document(self, document_id: str) -> dict:
         """Permanently remove one document revision and its attached files; other versions remain."""
@@ -959,6 +1056,23 @@ def register_api(router, documents: DocumentService):
     def get_document(document_id: str):
         return documents.get_document(document_id)
 
+    @router.get("/documents/{document_id}/consistency")
+    def check_consistency(document_id: str):
+        return documents.check_consistency(document_id)
+
+    @router.get("/staleness")
+    def list_staleness(
+        status: StalenessStage = "draft",
+        stale_only: bool = True,
+        limit: int = 50,
+        offset: int = 0,
+    ):
+        return documents.list_staleness(status, stale_only, limit, offset)
+
+    @router.get("/applications/{application_id}/staleness")
+    def application_staleness(application_id: str):
+        return documents.application_staleness(application_id)
+
     @router.post("/documents/{document_id}/review")
     def review_document(document_id: str, value: ReviewUpdate):
         return documents.review_document(document_id, value)
@@ -1023,13 +1137,16 @@ def register_mcp(mcp, documents: DocumentService):
         ("documents_list", documents.list_documents),
         ("documents_review", documents.review_document),
         ("documents_delete", documents.delete_document),
+        ("documents_consistency", documents.check_consistency),
+        ("application_staleness", documents.application_staleness),
+        ("applications_staleness", documents.list_staleness),
         ("files_list", documents.list_files),
         ("files_get", documents.get_file),
         ("files_reserve_upload", documents.reserve_upload),
         ("files_reserve_download", documents.reserve_download),
         ("files_delete", documents.delete_file),
     ]:
-        read_only = name.endswith(("_get", "_list"))
+        read_only = name.endswith(("_get", "_list", "_consistency", "_staleness"))
         mcp.add_tool(
             handler,
             name=name,

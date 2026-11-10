@@ -57,7 +57,13 @@ authoritative for individual input fields. Read [REST](../user/api.md) and
   questions, selected templates and exact assets. Later profile edits affect new
   contexts. Changed document content creates a revision with its own uploaded files.
   Attachment changes increment the document version; approval checks that version
-  so concurrent uploads cannot be approved unseen.
+  so concurrent uploads cannot be approved unseen. Approval also compares the
+  structured content's text with the attached `.tex` source (`consistency.py`,
+  no TeX runtime) unless an explicit override is sent.
+- **Staleness:** contexts are never rewritten. `staleness.py` compares the Profile,
+  instructions, template, entry and claim versions recorded in each current
+  leaf's context with the live records on read; refreshing means a new context
+  and new revisions.
 - **Truth:** approved claims and narrative evidence guide an external agent;
   reference/length validation does not establish factual accuracy. Review outputs.
 - **Career:** entries have structured organizations, nullable partial dates, skill

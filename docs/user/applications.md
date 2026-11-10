@@ -62,7 +62,11 @@ when you want to reuse them in the application form.
 ## Review and submit
 
 Open the uploaded PDF and check wording, dates, layout and page count. Approve the
-reviewed revision when ready. For changed content, create a new revision and upload
+reviewed revision when ready. An expanded revision with a `.tex` source shows
+whether its saved content appears in that source. When they differ, the
+differing values are listed and approval becomes **Approve with differences**,
+for intentional cases only; otherwise save a corrected revision or upload the
+matching source. For changed content, create a new revision and upload
 its new files. Approved revisions keep their content and attachments fixed.
 
 Cards and the document list distinguish **Needs PDF**, **PDF to review** and
@@ -70,6 +74,11 @@ Cards and the document list distinguish **Needs PDF**, **PDF to review** and
 and other content-only revisions can show **Content saved** without requiring a PDF.
 These labels
 describe stored files and review, not submission or an automatic quality check.
+**Built on older inputs** marks an application whose current revisions use a
+context frozen before a later change to the Profile, general guidance, a selected
+template, Career entry or claim. The application's Documents tab lists what
+changed. Frozen contexts never change; to refresh, prepare a new context and save
+new revisions.
 Click a filename to preview a supported PDF, image or text file; use **Details**
 for its hash and metadata. Unsupported formats remain downloadable.
 

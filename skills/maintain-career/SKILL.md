@@ -42,10 +42,15 @@ and record why. Compile and check the
 full PDF and extracted text, then update the template source, rules, guidance and
 assets together with the expected version.
 
-Existing Drafts keep their frozen contexts. List the Drafts whose context predates
-the change. Propagate it to Drafts the owner has not yet submitted when it improves
-them: prepare a new context and new revisions, check them like new work, keep
-earlier revisions and report each updated Draft.
+Existing Drafts keep their frozen contexts. After the change, list stale Drafts
+with `applications_staleness` (REST `GET /staleness`); each report names the
+changed Profile, guidance, template, entry or claim and the affected revisions.
+Propagate the change to Drafts the owner has not yet submitted when it improves
+them: prepare a new context with the same deliberate selections, save new
+revisions linked with `previous_id`, check them like new work, keep earlier
+revisions and report each updated Draft. Re-run `application_staleness` to confirm
+the new leaves are current. Leave a Draft stale when the change does not matter to
+it, and say so in the report.
 
 Report with the shared [run report](../openings-workspace/references/run-report.md),
 listing every record version changed.

@@ -29,7 +29,8 @@ review state, its `requirements` and its job posting. Classify:
 - **incomplete**: a document, file or review step is missing;
 - **blocked**: an employer requirement or open question needs the owner;
 - **stale**: the frozen context predates a relevant Profile, Career or template
-  change, or the posting changed after preparation;
+  change (`applications_staleness` lists these with the changed inputs), or the
+  posting changed after preparation;
 - **expired**: the posting is closed or past its deadline.
 
 Check stale and expired cases against current records before reporting them.

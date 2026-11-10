@@ -31,12 +31,12 @@ Paste the posting when extraction cannot obtain the complete text.
 |---|---|
 | Archive | `GET/POST /jobs`, `POST /jobs/bulk`, `GET/PATCH/DELETE /jobs/{id}`, `POST /jobs/{id}/triage`, `/merge`, `GET/POST /jobs/{id}/notes` |
 | Notes | `GET/PATCH/DELETE /notes/{id}` plus job-owned list/create routes |
-| Applications | `GET/POST /applications`, `GET/PATCH/DELETE /applications/{id}`, `GET /applications/{id}/events` |
+| Applications | `GET/POST /applications`, `GET/PATCH/DELETE /applications/{id}`, `GET /applications/{id}/events`, `GET /applications/{id}/staleness`, `GET /staleness` |
 | Career | `GET/PATCH /career/profile`, CRUD `/career/knowledge` and `/career/claims`, `POST /career/import/preview` then `/career/import` |
 | Templates/guidance | CRUD `/templates`, `GET/PATCH /instructions` |
 | Collection | `GET/PATCH /collection`, `GET /providers`, `PATCH /providers/{id}`, CRUD `/sources`, `/sources/schemas`, preview/run, `/sources/bulk` and `/collection/runs` |
 | Tasks | `GET /tasks`, `GET /tasks/{id}`, `POST /tasks/{id}/cancel` or `/retry` |
-| Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `POST /documents/{id}/review` |
+| Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `GET /documents/{id}/consistency`, `POST /documents/{id}/review` |
 | Files | `GET /files`, `GET/DELETE /files/{id}`, `GET /files/{id}/content`, `POST /files/uploads`, `POST /files/{id}/download` |
 | Operations | `GET /workspace`, `/capabilities`, `/overview`, `/export`, `/backup`; `POST /backup/restore`; `/tokens`; `POST /auth/password` |
 
@@ -71,7 +71,9 @@ Application list/detail records include `preparation`: per-kind counts of curren
 revision leaves (`revisions`), leaves with their own PDF (`pdf`) and leaves with
 an approved PDF (`approved`). A new revision inherits neither files nor approval.
 These counts do not certify content quality, required document completeness or
-submission. Context lists with `summary=true` include frozen job/template labels,
+submission. `stale_inputs` lists the input kinds (`profile`, `instructions`,
+`template`, `knowledge`, `claim`) that changed after the contexts of the current
+leaves were frozen; it is empty when they are current. Context lists with `summary=true` include frozen job/template labels,
 evidence/claim counts and a bounded `note_preview`, alongside file/document counts.
 A version conflict returns HTTP 409 with the stored version, for example
 `{"error":{"code":"conflict","message":"…","details":{"current_version":4}}}`;
@@ -199,6 +201,37 @@ settings, defaults, run counters and request pacing.
    An attachment change invalidates that version. Reload and review the current
    files before retrying a conflict. Approved revisions reject added files.
    Changed content belongs in a new revision.
+
+### Content and source consistency
+
+`GET /documents/{id}/consistency` compares the structured `content` with the text
+of the revision's attached `.tex` files (or a TeX media type). Every text value in
+`content` must appear as a contiguous word sequence in the source; case,
+whitespace, punctuation, accents and common LaTeX markup are ignored, and keys for
+identifiers or settings (`id`, `*_id`, `*_ids`, `kind`, `type`, `format`, `style`
+and similar) are skipped. No TeX runtime or PDF text extraction is used. The
+result has `status` (`consistent`, `mismatch` or `not_checked` when no source or
+text exists), `checked`, `mismatch_count` and up to 50 `mismatches` with JSON
+paths.
+
+Review applies the same check. A mismatch refuses approval with HTTP 409
+`content_mismatch`; `details` holds the full report. Save the matching content as
+a new revision or upload the matching source. For an intentional, reviewed
+difference, send `"allow_content_mismatch": true` with the review.
+
+### Stale contexts
+
+Contexts record the Profile, instructions, template, Career entry and claim
+versions they froze. `GET /applications/{id}/staleness` compares them with the
+current records for each current revision leaf and returns `stale`, `inputs`,
+`changes` (input, ID, label, `changed`/`deleted`/`unapproved`, frozen and current
+version) and per-document status (`current`, `stale` or `no_context`). Entries and
+claims that were not selected for the context are ignored.
+
+`GET /staleness` lists such reports across applications: `status` defaults to
+`draft` (`all` for every stage), `stale_only` defaults to `true`,
+with `limit`/`offset`. These reads never change a context. To refresh an
+application, prepare a new context and save new revisions linked with `previous_id`.
 
 For direct downloads, authenticated `GET /files/{id}/content` supports PDF/image
 preview. External agents can reserve a scoped download via `POST /files/{id}/download`.

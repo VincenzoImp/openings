@@ -103,6 +103,41 @@ export interface Application extends Versioned {
     pdf: number;
     approved: number;
   }[];
+  stale_inputs?: StaleInput[];
+}
+export type StaleInput =
+  "profile" | "instructions" | "template" | "knowledge" | "claim";
+export interface StaleChange {
+  input: StaleInput;
+  id: string | null;
+  label: string;
+  state: "changed" | "deleted" | "unapproved";
+  frozen_version: number | null;
+  current_version: number | null;
+}
+export interface Staleness {
+  application_id: string;
+  stale: boolean;
+  inputs: StaleInput[];
+  changes: StaleChange[];
+  documents: {
+    document_id: string;
+    kind: string;
+    title: string;
+    context_id: string | null;
+    context_created_at: string | null;
+    status: "current" | "stale" | "no_context";
+    changes: StaleChange[];
+  }[];
+}
+export interface Consistency {
+  document_id: string;
+  status: "consistent" | "mismatch" | "not_checked";
+  reason: string;
+  checked: number;
+  mismatch_count: number;
+  mismatches: { path: string; text: string }[];
+  sources: { id: string; name: string }[];
 }
 export interface Profile {
   name: string;
