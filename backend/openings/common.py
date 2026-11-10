@@ -17,7 +17,7 @@ def check_version(row, expected):
     if row is None:
         missing()
     if expected is not None and row["version"] != expected:
-        conflict()
+        conflict(details={"current_version": row["version"]})
 
 
 __all__ = [

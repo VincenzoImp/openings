@@ -52,8 +52,11 @@ an approved PDF (`approved`). A new revision inherits neither files nor approval
 These counts do not certify content quality, required document completeness or
 submission. Context lists with `summary=true` include frozen job/template labels,
 evidence/claim counts and a bounded `note_preview`, alongside file/document counts.
-A conflict returns HTTP 409; reload before editing again. A typical error is
-`{"error":{"code":"conflict","message":"…","details":null}}`.
+A version conflict returns HTTP 409 with the stored version, for example
+`{"error":{"code":"conflict","message":"…","details":{"current_version":4}}}`;
+reload before editing again. MCP tool errors carry the same `code`, `status`,
+`message` and `details` as a JSON `{"error":{…}}` text result, including field
+lists for `validation` errors.
 
 For Shortlist use `{"expected_version":3,"triage":"saved"}`; `inbox` returns a
 job without attempts to review and `dismissed` remembers it outside active review.

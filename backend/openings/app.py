@@ -15,7 +15,6 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import Field
@@ -23,6 +22,7 @@ from starlette.background import BackgroundTask
 
 from . import __version__
 from .api import register_core, register_core_mcp
+from .mcp_server import OpeningsMCP
 from .auth import COOKIE, MAX_AGE, Auth
 from .career import (
     CareerService,
@@ -113,7 +113,7 @@ def create_app(database=None, start_worker=True):
     if public_url:
         allowed_hosts.append(urlsplit(public_url).netloc)
         origins.append(public_url)
-    mcp = FastMCP(
+    mcp = OpeningsMCP(
         "Openings",
         stateless_http=True,
         json_response=True,
