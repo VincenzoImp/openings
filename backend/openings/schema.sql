@@ -91,6 +91,12 @@ CREATE TABLE IF NOT EXISTS contexts (
  id TEXT PRIMARY KEY, application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
  payload TEXT NOT NULL, signature TEXT NOT NULL, idempotency_key TEXT UNIQUE, created_at TEXT NOT NULL
 );
+-- Derived from immutable contexts: the input versions each context froze. Rebuildable.
+CREATE TABLE IF NOT EXISTS context_inputs (
+ context_id TEXT PRIMARY KEY REFERENCES contexts(id) ON DELETE CASCADE,
+ created_at TEXT NOT NULL, profile_version INTEGER, instructions_version INTEGER,
+ templates TEXT NOT NULL DEFAULT '[]', knowledge TEXT NOT NULL DEFAULT '[]', claims TEXT NOT NULL DEFAULT '[]'
+);
 CREATE TABLE IF NOT EXISTS documents (
  id TEXT PRIMARY KEY, application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
  context_id TEXT REFERENCES contexts(id) ON DELETE CASCADE, kind TEXT NOT NULL,
