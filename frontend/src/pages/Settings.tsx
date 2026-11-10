@@ -86,6 +86,127 @@ export default function SettingsPage({
     </>
   );
 }
+type SkillItem = { name: string; description: string; files: string[] };
+const AGENT_GUIDE =
+  "https://github.com/VincenzoImp/openings/blob/main/docs/user/agent-operated.md";
+function clientSnippets(endpoint: string): Record<string, string> {
+  return {
+    "claude-code": `claude mcp add --transport http openings ${endpoint} \\\n  --header 'Authorization: Bearer \${OPENINGS_TOKEN}'`,
+    codex: `# ~/.codex/config.toml\n[mcp_servers.openings]\nurl = "${endpoint}"\nbearer_token_env_var = "OPENINGS_TOKEN"`,
+    json: JSON.stringify(
+      {
+        mcpServers: {
+          openings: {
+            type: "http",
+            url: endpoint,
+            headers: { Authorization: "Bearer ${OPENINGS_TOKEN}" },
+          },
+        },
+      },
+      null,
+      2,
+    ),
+  };
+}
+function ClientSetup({ endpoint }: { endpoint: string }) {
+  const { notify } = useWorkspace();
+  const [client, setClient] = useState("claude-code");
+  const snippet = clientSnippets(endpoint)[client];
+  return (
+    <>
+      <Field
+        label="Client configuration"
+        hint="Keep the token in the OPENINGS_TOKEN environment variable, never in the file. Some clients write it as ${env:OPENINGS_TOKEN}."
+      >
+        <Tabs
+          label="MCP client"
+          value={client}
+          onChange={setClient}
+          items={[
+            { id: "claude-code", label: "Claude Code" },
+            { id: "codex", label: "Codex" },
+            { id: "json", label: "Other (JSON)" },
+          ]}
+        />
+        <pre className="snippet">
+          <code>{snippet}</code>
+        </pre>
+        <div className="actions">
+          <Button
+            icon="copy"
+            onClick={() =>
+              copyText(snippet)
+                .then(() => notify("Configuration copied."))
+                .catch(() => notify("Select and copy the configuration."))
+            }
+          >
+            Copy configuration
+          </Button>
+        </div>
+      </Field>
+      {[
+        [
+          "Connect your agent",
+          "Create an access token below, set OPENINGS_TOKEN (and OPENINGS_URL for file transfers), and add the configuration above to your client.",
+        ],
+        [
+          "Let it run the search",
+          "The agent loads the workflow skills from this server, onboards your career, reviews new jobs and prepares a CV and letter for every shortlisted one.",
+        ],
+        [
+          "Apply and record",
+          "Open ready Drafts, apply on the employer's site and mark each one Applied or close it. The agent never submits for you.",
+        ],
+      ].map(([title, body], i) => (
+        <div className="step" key={title}>
+          <span className="stepnum">{i + 1}</span>
+          <div>
+            <strong>{title}</strong>
+            <p>{body}</p>
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+function SkillsCard() {
+  const skills = useResource<{ items: SkillItem[] }>("/skills", { items: [] });
+  return (
+    <section className="card sectioncard">
+      <div className="sectiontitle">
+        <div>
+          <h2>Agent skills</h2>
+          <p>
+            Workflows this server ships for agents. Connected agents read them
+            with <code>skills_list</code> and <code>skill_get</code>, or as MCP
+            prompts. Start a new workspace with <code>setup-openings</code>.
+          </p>
+        </div>
+      </div>
+      {skills.error && (
+        <ErrorBox message={skills.error} retry={skills.reload} />
+      )}
+      {skills.data.items.map((item) => (
+        <div className="settingrow" key={item.name}>
+          <div>
+            <h3>{item.name}</h3>
+            <p>{item.description}</p>
+          </div>
+        </div>
+      ))}
+      <div className="actions form-actions">
+        <a
+          className="textbutton smalltext"
+          href={AGENT_GUIDE}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Agent-operated job search guide
+        </a>
+      </div>
+    </section>
+  );
+}
 function AgentSettings() {
   const resource = useResource<ListResult<Token>>("/tokens", {
     items: [],
@@ -151,29 +272,9 @@ function AgentSettings() {
             Available operations
           </a>
         </div>
-        {[
-          [
-            "Connect your assistant",
-            "Configure this HTTP MCP endpoint in Codex, Claude Code or another MCP client using an access token.",
-          ],
-          [
-            "Read application context",
-            "Your agent reads career evidence, the posting, templates and stored instructions through the same service as this dashboard.",
-          ],
-          [
-            "Prepare externally, review here",
-            "The agent compiles on its machine and uploads PDF, sources and answers. Review them before recording an application as sent.",
-          ],
-        ].map(([title, body], i) => (
-          <div className="step" key={title}>
-            <span className="stepnum">{i + 1}</span>
-            <div>
-              <strong>{title}</strong>
-              <p>{body}</p>
-            </div>
-          </div>
-        ))}
+        <ClientSetup endpoint={endpoint} />
       </section>
+      <SkillsCard />
       <section className="card sectioncard">
         <div className="sectiontitle">
           <div>

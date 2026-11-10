@@ -1182,6 +1182,17 @@ html[data-theme="dark"] .nav a.active {
   font-family: ui-monospace, monospace;
   overflow-wrap: anywhere;
 }
+.snippet {
+  background: var(--hover);
+  border: 1px solid var(--line);
+  padding: 12px 14px;
+  border-radius: 7px;
+  margin: 8px 0;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .step {
   display: flex;
   align-items: flex-start;
