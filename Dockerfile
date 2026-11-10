@@ -26,16 +26,18 @@ LABEL org.opencontainers.image.title="Openings" \
       org.opencontainers.image.revision="${VCS_REF}"
 RUN groupadd --gid 10001 openings \
     && useradd --uid 10001 --gid openings --no-create-home --shell /usr/sbin/nologin openings \
-    && install -d -o openings -g openings /data /app/frontend /app/examples
+    && install -d -o openings -g openings /data /app/frontend /app/examples /app/skills
 WORKDIR /app
 COPY --from=dependencies /app/.venv /app/.venv
 COPY --from=frontend /build/frontend/dist /app/frontend
 COPY examples/ /app/examples/
+COPY skills/ /app/skills/
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 TZ=UTC \
     OPENINGS_HOST=0.0.0.0 OPENINGS_PORT=8080 \
     OPENINGS_DATABASE=/data/openings.sqlite \
-    OPENINGS_FRONTEND=/app/frontend OPENINGS_EXAMPLES=/app/examples
+    OPENINGS_FRONTEND=/app/frontend OPENINGS_EXAMPLES=/app/examples \
+    OPENINGS_SKILLS=/app/skills
 USER 10001:10001
 EXPOSE 8080
 VOLUME ["/data"]
