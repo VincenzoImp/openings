@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.14.0
 
 - Ship the complete agent workflow skills: setup and onboarding, Inbox review, Shortlist preparation, source management, Career maintenance, application tracking, interview preparation and evidence-based writing, with shared references (operating mandate, employer requirements, vacancy identity, run report, tool reference).
 - Serve the shipped skills to connected agents: `skills_list`, `skill_get` and one MCP prompt per skill, plus `GET /api/v1/skills` (the image now includes `skills/` at `OPENINGS_SKILLS`).
@@ -8,6 +8,9 @@
 - `setup-openings` checks for a LaTeX compiler on the agent's machine and offers a synthetic trial with the bundled examples.
 - Settings → Agent access shows copy-ready MCP configuration for Claude Code, Codex and JSON clients, and lists the available skills.
 - Add the [agent-operated job search](docs/user/agent-operated.md) guide: the agent runs and improves the search; the owner applies to prepared Drafts and records Applied.
+- Career claims and Prepare Shortlist present the strongest truthful case and never volunteer gaps in application documents.
+
+No database change: workspace schema remains 6.
 
 ## 0.13.0
 
