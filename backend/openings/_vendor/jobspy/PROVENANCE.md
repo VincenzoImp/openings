@@ -24,6 +24,11 @@ Local changes:
 - Disable implicit environment proxy/auth configuration on the new sessions.
   The transport bounds decoded response bodies to 8 MiB: synchronous streaming
   for requests, a bounded receive callback for curl without a background queue.
+- The transport pins every attempt and redirect hop to a checked public address
+  from outside the subset: it mounts a connection adapter on the `requests`
+  sessions and sets `CurlOpt.RESOLVE` in the curl session's `curl_options`
+  (`openings/collectors/pinning.py`). No vendored file changed for this; an
+  upgrade must keep `curl_options` and adapter mounting available on the sessions.
 
 - Provider pagination and pending detail rows are checkpointed after each page or
   detail batch. Resumed tasks reuse that progress and fresh archived descriptions.

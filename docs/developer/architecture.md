@@ -122,6 +122,12 @@ Retry-After cooldowns, with increasing delays for a 429 lacking that header.
 Long waits release the collection lane. Provider-wide access challenges and
 individual unavailable postings have distinct diagnostics.
 
+All outbound fetch paths share one address policy. A host is resolved, every
+address must be public, and the connection is made to a checked address on each
+attempt and redirect hop: httpx through its network backend, provider `requests`
+sessions through a connection adapter and `curl_cffi` sessions through curl's
+resolve pinning. TLS still verifies the requested host name.
+
 The scheduler and collector progress independently. Network-capable MCP tools
 run outside the event loop. Queued tasks have leases and cancellation; stale work
 cannot overwrite a current result. See [source configuration](../user/sources.md).

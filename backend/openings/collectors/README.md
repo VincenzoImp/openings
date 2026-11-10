@@ -13,6 +13,11 @@ shares request spacing and server cooldowns. Provider settings contain enable/pa
 and the request interval. Internal bounded attempts yield without losing progress;
 long waits defer the task and release the collection lane.
 
+The gate also pins destinations. `ProviderBudget.request` connects `requests` and
+`curl_cffi` sessions only to addresses that passed the public-address check
+([pinning.py](pinning.py)), as `fetch_bytes` does for httpx. A new sender type
+needs the same pin before it may carry provider requests.
+
 `source['checkpoint']` contains durable pagination/detail state.
 `source['on_checkpoint'](state)` persists progress, while `source['on_item'](item)`
 offers observations to the complete-text admission rule. Save enough progress to

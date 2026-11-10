@@ -32,6 +32,8 @@ def collection(tmp_path, monkeypatch):
     service = DiscoveryService(workspace)
     workspace.discovery = service
     monkeypatch.setattr(module, "public_url", lambda url: url)
+    # Provider sessions connect only to checked addresses; every host is the local test server.
+    monkeypatch.setattr(module, "public_addresses", lambda host, port: ["127.0.0.1"])
     return workspace, service
 
 
