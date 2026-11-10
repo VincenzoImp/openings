@@ -18,6 +18,9 @@ from .models import (
     PeriodQuery,
     JobBulk,
     NotePatch,
+    ApplicationBulk,
+    JobResolve,
+    DuplicateQuery,
 )
 
 
@@ -44,6 +47,14 @@ def register_core(router: APIRouter, workspace):
     @router.post("/jobs/bulk")
     def bulk_jobs(value: JobBulk):
         return workspace.bulk_jobs(value)
+
+    @router.get("/jobs/resolve")
+    def resolve_jobs(value: Annotated[JobResolve, Query()]):
+        return workspace.resolve_jobs(value)
+
+    @router.get("/jobs/duplicates")
+    def duplicate_jobs(value: Annotated[DuplicateQuery, Query()]):
+        return workspace.duplicate_jobs(value)
 
     @router.post("/jobs")
     async def ingest(value: JobInput):
@@ -102,6 +113,10 @@ def register_core(router: APIRouter, workspace):
     def delete_application(application_id: str, expected_version: Annotated[int, Query(ge=1)]):
         return workspace.delete_application(application_id, expected_version)
 
+    @router.post("/applications/bulk")
+    def bulk_applications(value: ApplicationBulk):
+        return workspace.bulk_applications(value)
+
     @router.post("/applications")
     def create_application(value: ApplicationInput):
         return workspace.create_application(value)
@@ -144,6 +159,16 @@ def register_core_mcp(mcp, workspace):
     def jobs_bulk(value: JobBulk) -> dict:
         """Apply saved/dismissed/inbox/forget to at most 200 explicit job IDs/versions, with per-item results. Forget is permanent."""
         return workspace.bulk_jobs(value)
+
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
+    def jobs_resolve(value: JobResolve) -> dict:
+        """Read-only identity lookup: archived jobs matching a URL or source_key, with triage and every application attempt. Never ingests or fetches."""
+        return workspace.resolve_jobs(value)
+
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
+    def jobs_duplicates(value: DuplicateQuery | None = None) -> dict:
+        """Read-only candidate duplicate groups (same normalized company+title, optional location, or identical posting text) with triage, attempts and text similarity. Verify before job_merge; never merges."""
+        return workspace.duplicate_jobs(value or DuplicateQuery())
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def job_get(job_id: str) -> dict:
@@ -197,8 +222,13 @@ def register_core_mcp(mcp, workspace):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def applications_list(value: ApplicationQuery | None = None) -> dict:
-        """Read paginated application summaries and stage totals with exact job_id or query/stage/outcome/company filters."""
+        """Read paginated application summaries and stage totals. Filter by exact job_id, query, stage, outcome, company or readiness; sort by deadline or priority to order preparation work."""
         return workspace.list_applications(**(value or ApplicationQuery()).model_dump())
+
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
+    def applications_bulk(value: ApplicationBulk) -> dict:
+        """Close (with outcome), reopen (to a non-Closed stage) or delete at most 200 explicit application IDs/versions, with per-item results. Delete is permanent."""
+        return workspace.bulk_applications(value)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
     def application_delete(application_id: str, expected_version: int) -> dict:
@@ -217,17 +247,17 @@ def register_core_mcp(mcp, workspace):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def application_get(application_id: str) -> dict:
-        """Read a single application and its job."""
+        """Read a single application, its job, employer requirements and derived readiness."""
         return workspace.get_application(application_id)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     def application_create(value: ApplicationInput) -> dict:
-        """Create a draft attempt. This never sends an application or generates documents."""
+        """Create a draft attempt, optionally with priority, deadline and employer requirements. This never sends an application or generates documents."""
         return workspace.create_application(value)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     def application_update(application_id: str, value: ApplicationPatch) -> dict:
-        """Record progress/questions/answers explicitly; editing documents never marks sent. The returned job is the compact summary."""
+        """Record progress, priority, deadline, employer requirements and questions/answers explicitly; editing documents never marks sent. The returned job is the compact summary."""
         return workspace.update_application(application_id, value)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))

@@ -17,14 +17,20 @@ interest.
 
 ## Read the pipeline
 
-List applications by stage with complete pagination. For each Draft, read its
-current CV and letter leaves, files and review state, and its job posting. Classify:
+List applications by stage with complete pagination. Each row has a derived
+`readiness` from the current revision leaves and requirements: `none` (no
+documents), `missing_pdf` (a current CV or letter lacks its PDF), `unreviewed`,
+`blocked` (an unresolved blocking requirement) or `ready`; filter with
+`readiness` to find each group. Readiness does not check content, sources or
+staleness. For each Draft, read its current CV and letter leaves, files and
+review state, its `requirements` and its job posting. Classify:
 
 - **ready**: both current leaves have checked PDFs, exact sources and approved review;
 - **incomplete**: a document, file or review step is missing;
 - **blocked**: an employer requirement or open question needs the owner;
 - **stale**: the frozen context predates a relevant Profile, Career or template
-  change, or the posting changed after preparation;
+  change (`applications_staleness` lists these with the changed inputs), or the
+  posting changed after preparation;
 - **expired**: the posting is closed or past its deadline.
 
 Check stale and expired cases against current records before reporting them.
@@ -32,8 +38,10 @@ Check stale and expired cases against current records before reporting them.
 ## Prioritize Drafts
 
 Order ready Drafts for the owner: live deadlines first, then fit with the Profile
-decision policy, then posting age. Give one line per Draft with the reason.
-Do not invent deadlines; mark unknown ones as unknown.
+decision policy, then posting age. `sort: "deadline"` and `sort: "priority"` list
+dated or prioritized attempts first. Give one line per Draft with the reason.
+Do not invent deadlines; mark unknown ones as unknown. Record a deadline the
+posting or owner states, and an owner-agreed `priority`, on the application.
 
 ## Follow-ups and outcomes
 

@@ -62,7 +62,11 @@ when you want to reuse them in the application form.
 ## Review and submit
 
 Open the uploaded PDF and check wording, dates, layout and page count. Approve the
-reviewed revision when ready. For changed content, create a new revision and upload
+reviewed revision when ready. An expanded revision with a `.tex` source shows
+whether its saved content appears in that source. When they differ, the
+differing values are listed and approval becomes **Approve with differences**,
+for intentional cases only; otherwise save a corrected revision or upload the
+matching source. For changed content, create a new revision and upload
 its new files. Approved revisions keep their content and attachments fixed.
 
 Cards and the document list distinguish **Needs PDF**, **PDF to review** and
@@ -70,6 +74,11 @@ Cards and the document list distinguish **Needs PDF**, **PDF to review** and
 and other content-only revisions can show **Content saved** without requiring a PDF.
 These labels
 describe stored files and review, not submission or an automatic quality check.
+**Built on older inputs** marks an application whose current revisions use a
+context frozen before a later change to the Profile, general guidance, a selected
+template, Career entry or claim. The application's Documents tab lists what
+changed. Frozen contexts never change; to refresh, prepare a new context and save
+new revisions.
 Click a filename to preview a supported PDF, image or text file; use **Details**
 for its hash and metadata. Unsupported formats remain downloadable.
 
@@ -92,6 +101,32 @@ follows those recorded stages. The submission date can be corrected or cleared.
 On narrow screens the initial application view is a compact list. Choose **Board**
 or **List** to remember a preference. Stage shortcuts filter the whole result set;
 board columns show when only part of a stage is loaded and link to the full stage.
+## Plan and track requirements
+
+Each application can have a **priority** (P1 highest to P5 lowest) and the
+employer's **deadline**, set under **Details**. Cards and list rows show them;
+a past deadline on an application still in Preparing is marked overdue. Sort
+Applications by **Deadline** or **Priority**, and filter by **readiness**:
+
+| Readiness | Meaning |
+|---|---|
+| No documents | No document revision yet. |
+| Missing PDF | A current CV or cover letter revision has no PDF. |
+| Needs review | Every current revision has its files but one is not approved. |
+| Blocked by a requirement | An employer requirement is blocking and unresolved. |
+| Ready | Current revisions have their PDFs and are approved. |
+
+Readiness uses only the current revision of each document; an approved earlier
+revision does not count. It does not check the content or submit anything.
+
+**Requirements** records employer conditions: authorship rules (such as no
+AI-written applications), attachments, references, format, language, eligibility
+and dates. Mark a requirement **Blocking** when documents must not be prepared or
+submitted until it is settled, and **Resolved** with a note once you decide.
+Unresolved blocking requirements appear at the top of the application. They are
+stored on the application, not in job details, so source refreshes of the job
+continue.
+
 Open **Posting** in an application to read the job without leaving your current
 filters. Rare job maintenance actions live under **Job details, sources & maintenance**.
 
@@ -113,6 +148,17 @@ files. It never returns the job to Inbox or Shortlist. To cancel preparation
 without losing documents, close it as **Not pursued**. Deleting the final attempt
 is permanent and deliberately returns a saved job to Shortlist; the confirmation
 explains this. Other retained attempts keep it out of pending queues.
+
+In the Applications **List** view, select attempts across pages to close them
+with one outcome, reopen Closed attempts to a stage, or delete them. Each attempt
+is checked separately; a failure, such as another open attempt for the same job,
+is listed without blocking the others.
+
+The **Possible duplicates** tab beside Inbox groups records that share a company
+and role or identical posting text, for example one vacancy collected from
+several job boards and the employer's site. It suggests a record to keep and
+never merges automatically. Open a job and expand **Job details, sources &
+maintenance** to see its possible duplicates and merge a verified copy.
 
 Dismissing a job preserves its applications. Restore it before preparing new
 documents. If you previously dismissed an applied job just to clear Shortlist,

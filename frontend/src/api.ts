@@ -38,6 +38,40 @@ export interface Job extends Versioned {
   application: ApplicationSummary | null;
   application_count: number;
 }
+export interface DuplicateJob extends Versioned {
+  title: string;
+  company: string;
+  location: string;
+  url: string;
+  source?: string;
+  triage: Triage;
+  complete?: boolean;
+  application: ApplicationSummary | null;
+  application_count: number;
+  applications: ApplicationSummary[];
+  posting_hash: string | null;
+  similarity: number | null;
+}
+export interface DuplicateGroup {
+  job_ids: string[];
+  signals: ("company_title" | "posting_text")[];
+  size: number;
+  identical_postings: boolean;
+  reference_id: string;
+  open_application_ids: string[];
+  merge_blocked: boolean;
+  items: DuplicateJob[];
+}
+export interface BulkResult {
+  total: number;
+  succeeded: number;
+  failed: number;
+  items: {
+    id: string;
+    ok: boolean;
+    error?: { code: string; message: string; status: number };
+  }[];
+}
 export interface Note {
   id: string;
   body: string;
@@ -53,6 +87,34 @@ export interface Question {
   options?: string[];
   max_length?: number;
 }
+export const requirementKinds = {
+  authorship: "Authorship",
+  attachment: "Attachment",
+  reference: "Reference",
+  format: "Format",
+  language: "Language",
+  eligibility: "Eligibility",
+  deadline: "Deadline",
+  other: "Other",
+} as const;
+export type RequirementKind = keyof typeof requirementKinds;
+export interface Requirement {
+  id?: string;
+  kind: RequirementKind;
+  text: string;
+  blocking: boolean;
+  resolved: boolean;
+  note: string;
+}
+export type Readiness =
+  "blocked" | "none" | "missing_pdf" | "unreviewed" | "ready";
+export const readinessLabels: Record<Readiness, string> = {
+  blocked: "Blocked by a requirement",
+  none: "No documents",
+  missing_pdf: "Missing PDF",
+  unreviewed: "Needs review",
+  ready: "Ready",
+};
 export interface Application extends Versioned {
   job_id: string;
   status: Stage;
@@ -62,6 +124,12 @@ export interface Application extends Versioned {
   answers: Record<string, unknown>;
   job?: Job;
   applied_at?: string | null;
+  priority?: number | null;
+  deadline?: string | null;
+  requirements?: Requirement[];
+  readiness?: Readiness;
+  open_requirements?: number;
+  blocking_requirements?: number;
   documents_count?: number;
   preparation?: {
     kind: string;
@@ -69,6 +137,41 @@ export interface Application extends Versioned {
     pdf: number;
     approved: number;
   }[];
+  stale_inputs?: StaleInput[];
+}
+export type StaleInput =
+  "profile" | "instructions" | "template" | "knowledge" | "claim";
+export interface StaleChange {
+  input: StaleInput;
+  id: string | null;
+  label: string;
+  state: "changed" | "deleted" | "unapproved";
+  frozen_version: number | null;
+  current_version: number | null;
+}
+export interface Staleness {
+  application_id: string;
+  stale: boolean;
+  inputs: StaleInput[];
+  changes: StaleChange[];
+  documents: {
+    document_id: string;
+    kind: string;
+    title: string;
+    context_id: string | null;
+    context_created_at: string | null;
+    status: "current" | "stale" | "no_context";
+    changes: StaleChange[];
+  }[];
+}
+export interface Consistency {
+  document_id: string;
+  status: "consistent" | "mismatch" | "not_checked";
+  reason: string;
+  checked: number;
+  mismatch_count: number;
+  mismatches: { path: string; text: string }[];
+  sources: { id: string; name: string }[];
 }
 export interface Profile {
   name: string;
@@ -397,6 +500,26 @@ export function date(value?: string) {
   return Number.isNaN(d.valueOf())
     ? value
     : d.toLocaleDateString("en", { month: "short", day: "numeric" });
+}
+/** Format a calendar date (YYYY-MM-DD) without shifting it across time zones. */
+export function calendarDate(value?: string | null) {
+  if (!value) return "";
+  const d = new Date(value + "T00:00:00Z");
+  if (Number.isNaN(d.valueOf())) return value;
+  return d.toLocaleDateString("en", {
+    month: "short",
+    day: "numeric",
+    year:
+      d.getUTCFullYear() === new Date().getFullYear() ? undefined : "numeric",
+    timeZone: "UTC",
+  });
+}
+export function localToday(d = new Date()) {
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0"),
+  ].join("-");
 }
 export async function sha256(file: File) {
   if (!globalThis.crypto?.subtle) return undefined;

@@ -2,7 +2,14 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   api,
   ApiError,
+  calendarDate,
   formatTime,
+  localToday,
+  readinessLabels,
+  requirementKinds,
+  type Readiness,
+  type Requirement,
+  type RequirementKind,
   careerEntryLabel,
   date,
   download,
@@ -15,7 +22,11 @@ import {
   version,
   type Activity,
   type Application,
+  type BulkResult,
+  type Consistency,
   type Document,
+  type StaleInput,
+  type Staleness,
   type Job,
   type ListResult,
   type Stage,
@@ -25,6 +36,7 @@ import { FileManager } from "../files";
 import {
   useEditorRecord,
   confirmLeave,
+  selectRecords,
   useDebounce,
   useResource,
   useUrlFilters,
@@ -50,6 +62,54 @@ import {
   PendingResults,
 } from "../ui";
 const stages: Stage[] = ["draft", "applied", "interview", "offer", "closed"];
+const priorityLabels: Record<number, string> = {
+  1: "P1 · Highest",
+  2: "P2 · High",
+  3: "P3 · Normal",
+  4: "P4 · Low",
+  5: "P5 · Lowest",
+};
+/** Priority, deadline and blocking requirements, shown wherever an attempt is listed. */
+function PlanTags({ application }: { application: Application }) {
+  const today = localToday();
+  const open = application.status === "draft";
+  const overdue =
+    open && !!application.deadline && application.deadline < today;
+  const soon =
+    open &&
+    !!application.deadline &&
+    !overdue &&
+    application.deadline <= localToday(new Date(Date.now() + 7 * 86400000));
+  const blocking = application.blocking_requirements || 0;
+  if (!application.priority && !application.deadline && !blocking) return null;
+  return (
+    <span className="plan-tags">
+      {!!application.priority && (
+        <span
+          className={`tag ${application.priority <= 2 ? "amber" : "neutral"}`}
+          title={priorityLabels[application.priority]}
+        >
+          P{application.priority}
+        </span>
+      )}
+      {application.deadline && (
+        <span
+          className={`tag ${overdue ? "danger" : soon ? "amber" : "neutral"}`}
+        >
+          <Icon name="clock" />
+          {overdue ? "Overdue · " : "Due "}
+          {calendarDate(application.deadline)}
+        </span>
+      )}
+      {!!blocking && (
+        <span className="tag danger">
+          <Icon name="error" />
+          {blocking} blocking requirement{blocking === 1 ? "" : "s"}
+        </span>
+      )}
+    </span>
+  );
+}
 function useApplicationProgress() {
   const { mutate, pending } = useWorkspace();
   const [closing, setClosing] = useState<Application | null>(null);
@@ -176,6 +236,7 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
     q: "",
     status: "",
     outcome: "",
+    readiness: "",
     sort: "updated",
     offset: "0",
     view: (() => {
@@ -206,10 +267,75 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
     { items: [], total: 0 },
   );
   const updating = resource.loading || query !== filters.q;
-  const filtered = !!(filters.q || filters.status || filters.outcome);
-  const { pending } = useWorkspace();
+  const filtered = !!(
+    filters.q ||
+    filters.status ||
+    filters.outcome ||
+    filters.readiness
+  );
+  const { pending, mutate, notify } = useWorkspace();
   const progress = useApplicationProgress();
   const [dragged, setDragged] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Record<string, number>>({}),
+    [batchErrors, setBatchErrors] = useState<{ id: string; message: string }[]>(
+      [],
+    ),
+    [bulkAction, setBulkAction] = useState<"close" | "reopen" | "delete" | "">(
+      "",
+    ),
+    [bulkOutcome, setBulkOutcome] = useState(""),
+    [bulkStage, setBulkStage] = useState("draft");
+  const selected = Object.keys(selection);
+  const selectionScope = JSON.stringify([
+    query,
+    filters.status,
+    filters.outcome,
+    filters.readiness,
+    filters.view,
+  ]);
+  useEffect(() => {
+    setSelection({});
+    setBatchErrors([]);
+  }, [selectionScope]);
+  async function bulk() {
+    if (!bulkAction || updating || resource.error) return;
+    let result: BulkResult | undefined;
+    const ok = await mutate(
+      async () => {
+        result = await api<BulkResult>("/applications/bulk", "POST", {
+          action: bulkAction,
+          ...(bulkAction === "close" ? { outcome: bulkOutcome } : {}),
+          ...(bulkAction === "reopen" ? { status: bulkStage } : {}),
+          items: selected.map((id) => ({
+            id,
+            expected_version: selection[id],
+          })),
+        });
+      },
+      bulkAction === "delete"
+        ? "Selected applications deleted."
+        : "Selected applications updated.",
+    );
+    if (!ok) return;
+    setSelection((current) => {
+      const remaining = { ...current };
+      for (const item of result?.items || [])
+        if (item.ok) delete remaining[item.id];
+      return remaining;
+    });
+    setBatchErrors(
+      result?.items.flatMap((item) =>
+        item.error ? [{ id: item.id, message: item.error.message }] : [],
+      ) || [],
+    );
+    setBulkAction("");
+    if (result?.failed)
+      notify(
+        `${result.succeeded} completed; ${result.failed} failed. ${result.items.find((item) => item.error)?.error?.message || "Refresh and retry."}`,
+        true,
+      );
+  }
+  const bulkDisabled = pending || updating || !!resource.error;
   async function move(id: string, status: Stage) {
     const app = resource.data.items.find((a) => a.id === id);
     if (app) await progress.move(app, status);
@@ -273,6 +399,20 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
           ))}
         </select>
         <select
+          aria-label="Filter preparation readiness"
+          value={filters.readiness}
+          onChange={(e) =>
+            setFilters({ readiness: e.target.value, offset: "0" })
+          }
+        >
+          <option value="">Any readiness</option>
+          {Object.entries(readinessLabels).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select
           aria-label="Sort applications"
           value={filters.sort}
           onChange={(e) => setFilters({ sort: e.target.value, offset: "0" })}
@@ -283,10 +423,67 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
           <option value="company">Company A–Z</option>
           <option value="stage">Stage</option>
           <option value="applied">Submission date</option>
+          <option value="deadline">Deadline (soonest)</option>
+          <option value="priority">Priority (highest)</option>
         </select>
       </div>
       {resource.error && (
         <ErrorBox message={resource.error} retry={resource.reload} />
+      )}
+      {selected.length > 0 && (
+        <div className="bulkbar" aria-label="Selected applications">
+          <strong>{selected.length} selected across pages</strong>
+          <Button
+            disabled={bulkDisabled}
+            onClick={() => {
+              setBulkOutcome("");
+              setBulkAction("close");
+            }}
+          >
+            Close with outcome
+          </Button>
+          <Button
+            disabled={bulkDisabled}
+            onClick={() => setBulkAction("reopen")}
+          >
+            Reopen
+          </Button>
+          <Button
+            variant="danger"
+            disabled={bulkDisabled}
+            onClick={() => setBulkAction("delete")}
+          >
+            Delete
+          </Button>
+          <button
+            className="textbutton"
+            onClick={() => {
+              setSelection({});
+              setBatchErrors([]);
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      )}
+      {batchErrors.length > 0 && (
+        <div className="batch-errors" role="alert">
+          <strong>
+            {batchErrors.length} selected applications need attention.
+          </strong>
+          <ul>
+            {batchErrors.map((item) => (
+              <li key={item.id}>
+                {resource.data.items.find((app) => app.id === item.id)?.job
+                  ?.title || "Selected application"}
+                : {item.message}
+              </li>
+            ))}
+          </ul>
+          <Button className="small" onClick={resource.reload}>
+            Refresh applications
+          </Button>
+        </div>
       )}
       <PendingResults pending={updating} />
       <div className="stage-overview" aria-label="Application stage totals">
@@ -328,7 +525,13 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
               filtered ? (
                 <Button
                   onClick={() =>
-                    setFilters({ q: "", status: "", outcome: "", offset: "0" })
+                    setFilters({
+                      q: "",
+                      status: "",
+                      outcome: "",
+                      readiness: "",
+                      offset: "0",
+                    })
                   }
                 >
                   Clear filters
@@ -414,6 +617,7 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                       <span className="application-location">
                         {app.job?.location || "Location not specified"}
                       </span>
+                      <PlanTags application={app} />
                       {app.outcome && (
                         <span className="tag neutral outcome">
                           {outcomeLabel(app.outcome)}
@@ -453,11 +657,36 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
         </div>
       ) : (
         <div className="card application-list">
+          <div className="selection-head">
+            <label className="checkline">
+              <input
+                type="checkbox"
+                aria-label="Select this page"
+                checked={resource.data.items.every(
+                  (app) => selection[app.id] !== undefined,
+                )}
+                onChange={(e) =>
+                  setSelection((current) =>
+                    selectRecords(
+                      current,
+                      resource.data.items,
+                      e.target.checked,
+                    ),
+                  )
+                }
+              />
+              Select this page
+            </label>
+            <span className="muted smalltext">
+              Up to 200 selected applications per action
+            </span>
+          </div>
           <table className="table">
             <thead>
               <tr>
                 <th scope="col">Company / role</th>
                 <th scope="col">Stage</th>
+                <th scope="col">Plan</th>
                 <th scope="col">Preparation</th>
                 <th scope="col">Outcome</th>
                 <th scope="col">Updated</th>
@@ -467,17 +696,33 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
               {resource.data.items.map((app) => (
                 <tr key={app.id}>
                   <td>
-                    <button
-                      className="table-link"
-                      onClick={() => onOpen(app.id)}
-                    >
-                      <strong>{app.job?.title || "Application"}</strong>
-                      <small>
-                        {[app.job?.company, app.job?.location]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </small>
-                    </button>
+                    <div className="application-select">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${app.job?.title || "application"}`}
+                        checked={selection[app.id] !== undefined}
+                        disabled={
+                          selection[app.id] === undefined &&
+                          selected.length >= 200
+                        }
+                        onChange={(e) =>
+                          setSelection((current) =>
+                            selectRecords(current, [app], e.target.checked),
+                          )
+                        }
+                      />
+                      <button
+                        className="table-link"
+                        onClick={() => onOpen(app.id)}
+                      >
+                        <strong>{app.job?.title || "Application"}</strong>
+                        <small>
+                          {[app.job?.company, app.job?.location]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </small>
+                      </button>
+                    </div>
                   </td>
                   <td data-label="Stage">
                     <select
@@ -492,6 +737,14 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                         </option>
                       ))}
                     </select>
+                  </td>
+                  <td data-label="Plan">
+                    <PlanTags application={app} />
+                    {!app.priority &&
+                      !app.deadline &&
+                      !app.blocking_requirements && (
+                        <span className="muted">Not set</span>
+                      )}
                   </td>
                   <td data-label="Preparation">
                     <Preparation application={app} />
@@ -515,6 +768,73 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
         changes when they happen.
       </p>
       {progress.dialog}
+      {bulkAction && (
+        <Dialog
+          title={
+            bulkAction === "close"
+              ? `Close ${selected.length} applications?`
+              : bulkAction === "reopen"
+                ? `Reopen ${selected.length} applications?`
+                : `Delete ${selected.length} applications?`
+          }
+          onClose={() => setBulkAction("")}
+        >
+          <p className="modal-intro">
+            {bulkAction === "close"
+              ? "Record one outcome for every selected attempt. Documents and history are kept."
+              : bulkAction === "reopen"
+                ? "Move selected Closed attempts back to a stage. A job can have only one open application."
+                : "Permanently remove the selected attempts with their contexts, documents and files. Their jobs stay in your workspace."}
+          </p>
+          {bulkAction === "close" && (
+            <Field label="Outcome">
+              <select
+                value={bulkOutcome}
+                onChange={(event) => setBulkOutcome(event.target.value)}
+              >
+                <option value="">Choose an outcome</option>
+                {Object.entries(outcomeLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {bulkAction === "reopen" && (
+            <Field label="Stage">
+              <select
+                value={bulkStage}
+                onChange={(event) => setBulkStage(event.target.value)}
+              >
+                {stages
+                  .filter((stage) => stage !== "closed")
+                  .map((stage) => (
+                    <option key={stage} value={stage}>
+                      {stageLabels[stage]}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+          )}
+          <div className="actions form-actions">
+            <Button onClick={() => setBulkAction("")}>Cancel</Button>
+            <Button
+              variant={bulkAction === "delete" ? "danger-fill" : "primary"}
+              disabled={
+                bulkDisabled || (bulkAction === "close" && !bulkOutcome)
+              }
+              onClick={bulk}
+            >
+              {bulkAction === "close"
+                ? "Close applications"
+                : bulkAction === "reopen"
+                  ? "Reopen applications"
+                  : "Delete applications"}
+            </Button>
+          </div>
+        </Dialog>
+      )}
     </>
   );
 }
@@ -550,6 +870,117 @@ function Preparation({ application }: { application: Application }) {
       ) : (
         <span>No documents yet</span>
       )}
+      {!!application.stale_inputs?.length && (
+        <span
+          className="preparation-item stale"
+          title={`Changed since the context was frozen: ${application.stale_inputs
+            .map((input) => staleLabels[input])
+            .join(", ")}`}
+        >
+          <Icon name="refresh" /> Built on older inputs
+        </span>
+      )}
+    </div>
+  );
+}
+const staleLabels: Record<StaleInput, string> = {
+  profile: "Profile",
+  instructions: "General guidance",
+  template: "Template",
+  knowledge: "Career entry",
+  claim: "Claim",
+};
+const staleStates = {
+  changed: "changed",
+  deleted: "deleted",
+  unapproved: "no longer approved",
+};
+function StalenessNotice({ application }: { application: Application }) {
+  const report = useResource<Staleness | null>(
+    application.stale_inputs?.length
+      ? `/applications/${application.id}/staleness`
+      : null,
+    null,
+  );
+  if (!application.stale_inputs?.length) return null;
+  const stale = report.data?.documents.filter(
+    (item) => item.status === "stale",
+  );
+  return (
+    <section className="stale-notice" aria-label="Built on older inputs">
+      <h3>
+        <Icon name="refresh" /> Built on older inputs
+      </h3>
+      <p>
+        The current revisions were prepared from a frozen context. These inputs
+        changed afterwards. Frozen contexts stay unchanged; to refresh, prepare
+        a new context and save new revisions.
+      </p>
+      {report.error ? (
+        <ErrorBox message={report.error} retry={report.reload} />
+      ) : !report.data ? (
+        <Loading />
+      ) : (
+        <>
+          <ul>
+            {report.data.changes.map((change) => (
+              <li key={`${change.input}-${change.id ?? ""}`}>
+                <strong>{staleLabels[change.input]}</strong>
+                {change.label && change.id ? ` “${change.label}”` : ""}{" "}
+                {staleStates[change.state]}
+                {change.state === "changed" &&
+                change.frozen_version !== null &&
+                change.current_version !== null
+                  ? ` (version ${change.frozen_version} → ${change.current_version})`
+                  : ""}
+              </li>
+            ))}
+          </ul>
+          {!!stale?.length && (
+            <p className="hint">
+              Affected revisions:{" "}
+              {stale
+                .map((item) => item.title || kindLabels[item.kind] || item.kind)
+                .join(", ")}
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+const kindLabels: Record<string, string> = {
+  resume: "CV",
+  cover_letter: "Cover letter",
+  answers: "Form answers",
+  other: "Other",
+};
+function SourceCheck({ report }: { report: Consistency }) {
+  if (report.status === "consistent")
+    return (
+      <p className="source-check ok">
+        <Icon name="check" /> {report.reason}
+      </p>
+    );
+  if (report.status === "not_checked")
+    return <p className="source-check">{report.reason}</p>;
+  return (
+    <div className="source-check mismatch" role="status">
+      <p>
+        <Icon name="error" /> The saved content and the .tex source differ.{" "}
+        {report.reason}
+      </p>
+      <ul>
+        {report.mismatches.slice(0, 5).map((item) => (
+          <li key={item.path}>
+            <code>{item.path}</code> {item.text}
+          </li>
+        ))}
+      </ul>
+      <p className="hint">
+        Save the matching content as a new revision or upload the matching
+        source. Approve with differences only when they are intentional.
+      </p>
     </div>
   );
 }
@@ -787,6 +1218,11 @@ function DocumentCard({
     null,
   );
   const document = detail.data || summary;
+  const consistency = useResource<Consistency | null>(
+    expanded ? `/documents/${summary.id}/consistency` : null,
+    null,
+  );
+  const mismatch = consistency.data?.status === "mismatch";
   return (
     <article className="document-card">
       <header>
@@ -843,6 +1279,7 @@ function DocumentCard({
               preview
               readOnly={document.review_state === "approved"}
             />
+            {consistency.data && <SourceCheck report={consistency.data} />}
             <div className="actions form-actions">
               <Button icon="edit" onClick={() => setEdit(true)}>
                 New revision
@@ -856,21 +1293,29 @@ function DocumentCard({
               </Button>
               {document.review_state !== "approved" && (
                 <Button
-                  variant="primary"
+                  variant={mismatch ? "danger" : "primary"}
                   icon="check"
-                  disabled={pending || detail.refreshing || !!detail.error}
+                  disabled={
+                    pending ||
+                    detail.refreshing ||
+                    !!detail.error ||
+                    consistency.loading
+                  }
                   onClick={() =>
                     mutate(
                       () =>
                         api(`/documents/${document.id}/review`, "POST", {
                           review_state: "approved",
                           expected_version: document.version,
+                          allow_content_mismatch: mismatch,
                         }),
                       "Document approved.",
                     )
                   }
                 >
-                  Approve this revision
+                  {mismatch
+                    ? "Approve with differences"
+                    : "Approve this revision"}
                 </Button>
               )}
             </div>
@@ -969,6 +1414,8 @@ export function ApplicationDrawer({
           "PATCH",
           version(app, {
             note: form.get("note"),
+            priority: Number(form.get("priority")) || null,
+            deadline: String(form.get("deadline") || "") || null,
             applied_at: form.get("applied_at")
               ? new Date(String(form.get("applied_at")) + "Z").toISOString()
               : null,
@@ -1040,6 +1487,35 @@ export function ApplicationDrawer({
               {app.job?.company} ·{" "}
               {app.job?.location || "Location not specified"}
             </div>
+            <PlanTags application={app} />
+            {!!app.blocking_requirements && (
+              <div className="note requirement-alert" role="status">
+                <Icon name="error" />
+                <div>
+                  <strong>
+                    Blocking requirements need an owner decision before
+                    documents are prepared or submitted.
+                  </strong>
+                  <ul>
+                    {(app.requirements || [])
+                      .filter((item) => item.blocking && !item.resolved)
+                      .map((item) => (
+                        <li key={item.id}>
+                          {requirementKinds[item.kind] || item.kind}:{" "}
+                          {item.text}
+                        </li>
+                      ))}
+                  </ul>
+                  <button
+                    type="button"
+                    className="textbutton"
+                    onClick={() => setTab("requirements")}
+                  >
+                    Review requirements
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="stage-control">
               <label htmlFor="application-stage">Stage</label>
               <select
@@ -1067,6 +1543,11 @@ export function ApplicationDrawer({
                   count: documents.data.total,
                 },
                 { id: "posting", label: "Posting" },
+                {
+                  id: "requirements",
+                  label: "Requirements",
+                  count: app.open_requirements || undefined,
+                },
                 { id: "answers", label: "Form answers" },
                 { id: "history", label: "History" },
                 { id: "details", label: "Details" },
@@ -1181,6 +1662,7 @@ export function ApplicationDrawer({
                   )}
                 </details>
                 <Preparation application={app} />
+                <StalenessNotice application={app} />
                 <div className="sectiontitle">
                   <h3>Documents and revisions</h3>
                   <Button icon="plus" onClick={() => setAdd(true)}>
@@ -1288,6 +1770,11 @@ export function ApplicationDrawer({
                   }
                 />
               </>
+            ) : tab === "requirements" ? (
+              <RequirementsEditor
+                key={`${app.id}-${app.version}`}
+                application={app}
+              />
             ) : tab === "answers" ? (
               <>
                 <QuestionEditor application={app} />
@@ -1422,6 +1909,34 @@ export function ApplicationDrawer({
                     </select>
                   </Field>
                 )}
+                <div className="formgrid">
+                  <Field
+                    label="Priority"
+                    hint="Orders preparation work. 1 is the highest."
+                  >
+                    <select
+                      name="priority"
+                      defaultValue={String(app.priority ?? "")}
+                    >
+                      <option value="">Not set</option>
+                      {Object.entries(priorityLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field
+                    label="Application deadline"
+                    hint="The employer's closing date, if known."
+                  >
+                    <input
+                      type="date"
+                      name="deadline"
+                      defaultValue={app.deadline || ""}
+                    />
+                  </Field>
+                </div>
                 <Field
                   label="Submission time (UTC)"
                   hint="Set a past submission time or leave blank to clear it. Moving to a submitted stage records the current time when no date is known."
@@ -1503,6 +2018,148 @@ export function ApplicationDrawer({
         <DocumentEditor application={app} onClose={() => setAdd(false)} />
       )}
     </>
+  );
+}
+function RequirementsEditor({ application }: { application: Application }) {
+  const { mutate, pending } = useWorkspace();
+  const [items, setItems] = useState<Requirement[]>(
+    application.requirements || [],
+  );
+  const change = (index: number, patch: Partial<Requirement>) =>
+    setItems((current) =>
+      current.map((item, i) => (i === index ? { ...item, ...patch } : item)),
+    );
+  async function save(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    await mutate(
+      () =>
+        api(
+          `/applications/${application.id}`,
+          "PATCH",
+          version(application, {
+            requirements: items.map((item) => ({
+              ...item,
+              text: item.text.trim(),
+              note: item.note.trim(),
+            })),
+          }),
+        ),
+      "Requirements saved.",
+    );
+  }
+  return (
+    <form onSubmit={save} className="stack requirements-editor">
+      <p className="hint">
+        Record employer conditions from the posting or application form:
+        authorship rules, attachments, references, format, language, eligibility
+        and dates. An unresolved blocking requirement keeps this application not
+        ready.
+      </p>
+      {!items.length && (
+        <p className="muted">No employer requirements recorded.</p>
+      )}
+      {items.map((item, index) => (
+        <fieldset
+          key={item.id}
+          className={`requirement-row ${item.blocking && !item.resolved ? "is-blocking" : ""} ${item.resolved ? "is-resolved" : ""}`}
+        >
+          <legend>
+            {requirementKinds[item.kind] || item.kind}
+            {item.blocking && !item.resolved
+              ? " · blocking"
+              : item.resolved
+                ? " · resolved"
+                : ""}
+          </legend>
+          <div className="requirement-head">
+            <Field label="Kind">
+              <select
+                value={item.kind}
+                onChange={(e) =>
+                  change(index, { kind: e.target.value as RequirementKind })
+                }
+              >
+                {Object.entries(requirementKinds).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <label className="checkline">
+              <input
+                type="checkbox"
+                checked={item.blocking}
+                onChange={(e) => change(index, { blocking: e.target.checked })}
+              />
+              Blocking
+            </label>
+            <label className="checkline">
+              <input
+                type="checkbox"
+                checked={item.resolved}
+                onChange={(e) => change(index, { resolved: e.target.checked })}
+              />
+              Resolved
+            </label>
+            <button
+              type="button"
+              className="iconbtn danger"
+              data-dirty-control
+              aria-label={`Remove requirement ${index + 1}`}
+              onClick={() =>
+                setItems((current) => current.filter((_, i) => i !== index))
+              }
+            >
+              <Icon name="trash" />
+            </button>
+          </div>
+          <Field label="Requirement">
+            <textarea
+              rows={2}
+              required
+              maxLength={2000}
+              value={item.text}
+              onChange={(e) => change(index, { text: e.target.value })}
+            />
+          </Field>
+          <Field label="Resolution or open question">
+            <input
+              maxLength={2000}
+              value={item.note}
+              placeholder="Owner decision, supplied file or question to ask"
+              onChange={(e) => change(index, { note: e.target.value })}
+            />
+          </Field>
+        </fieldset>
+      ))}
+      <div className="actions form-actions">
+        <Button
+          type="button"
+          icon="plus"
+          data-dirty-control
+          disabled={items.length >= 100}
+          onClick={() =>
+            setItems((current) => [
+              ...current,
+              {
+                id: newId().replace(/-/g, "").slice(0, 12),
+                kind: "other",
+                text: "",
+                blocking: false,
+                resolved: false,
+                note: "",
+              },
+            ])
+          }
+        >
+          Add requirement
+        </Button>
+        <Button variant="primary" disabled={pending}>
+          Save requirements
+        </Button>
+      </div>
+    </form>
   );
 }
 function QuestionEditor({

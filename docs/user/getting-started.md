@@ -74,5 +74,6 @@ curl --fail http://127.0.0.1:8080/health
 Health checks the core and SQLite. [Operations](operations.md) covers
 backups, restore and service lifecycle. Before upgrading, read the release notes:
 pre-1.0 releases can change APIs and database format, and the app accepts its
-current workspace format. Version 0.11 upgrades schema 5 to 6 automatically; back
-up before upgrading. Older formats still require their matching release.
+current workspace format. Schema 5 and 6 workspaces are upgraded to schema 7
+automatically on start; back up before upgrading. Older formats still require
+their matching release.

@@ -11,7 +11,7 @@ from pathlib import Path
 from .errors import DomainError
 from .posting import posting_complete
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 SCHEMA_SQL = Path(__file__).with_name("schema.sql")
 TEMP_PREFIX = ".openings-temp-"
 
@@ -35,23 +35,11 @@ class Database:
                     "schema_version",
                     "Use an empty database or a current-format Openings workspace. Existing unrelated databases are not modified.",
                 )
-            if version not in (0, 5, SCHEMA_VERSION):
+            if version not in (0, *MIGRATIONS, SCHEMA_VERSION):
                 raise DomainError(400, "schema_version", "Unsupported workspace database version.")
             conn.execute("PRAGMA journal_mode=WAL")
-            if version == 5:
-                # Only obsolete derived data is removed; owned documents and snapshots stay intact.
-                with conn:
-                    conn.execute("BEGIN IMMEDIATE")
-                    conn.execute("DROP TABLE IF EXISTS assessments")
-                    conn.execute("ALTER TABLE jobs DROP COLUMN initial_score_pending")
-                    conn.execute("DELETE FROM tasks WHERE kind='score'")
-                    conn.execute(
-                        "DELETE FROM settings WHERE key IN ('scoring','scoring_profile_revision','scoring_config_revision','scoring_periodic_last_run')"
-                    )
-                    conn.execute(
-                        "UPDATE settings SET data=json_remove(data,'$.scoring_summary') WHERE key='profile'"
-                    )
-                    conn.execute("PRAGMA user_version=6")
+            if version in MIGRATIONS:
+                upgrade(conn)
             apply_schema(conn)
         self.path.chmod(0o600)
 
@@ -111,6 +99,47 @@ class Database:
 
     def collect_blobs(self):
         return self.execute("DELETE FROM blobs WHERE sha256 NOT IN (SELECT sha256 FROM files)")
+
+
+def _migrate_5_to_6(conn):
+    # Only obsolete derived data is removed; owned documents and snapshots stay intact.
+    conn.execute("DROP TABLE IF EXISTS assessments")
+    conn.execute("ALTER TABLE jobs DROP COLUMN initial_score_pending")
+    conn.execute("DELETE FROM tasks WHERE kind='score'")
+    conn.execute(
+        "DELETE FROM settings WHERE key IN ('scoring','scoring_profile_revision','scoring_config_revision','scoring_periodic_last_run')"
+    )
+    conn.execute(
+        "UPDATE settings SET data=json_remove(data,'$.scoring_summary') WHERE key='profile'"
+    )
+
+
+def _migrate_6_to_7(conn):
+    # Application planning fields; existing attempts keep their versions and gain empty values.
+    conn.execute(
+        "ALTER TABLE applications ADD COLUMN priority INTEGER CHECK(priority IS NULL OR priority BETWEEN 1 AND 5)"
+    )
+    conn.execute(
+        "ALTER TABLE applications ADD COLUMN deadline TEXT CHECK(deadline IS NULL OR (length(deadline)=10 AND date(deadline)=deadline))"
+    )
+    conn.execute(
+        "ALTER TABLE applications ADD COLUMN requirements TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(requirements) AND json_type(requirements)='array')"
+    )
+
+
+# Each step upgrades from its key to the next version; steps chain inside one transaction.
+MIGRATIONS = {5: _migrate_5_to_6, 6: _migrate_6_to_7}
+
+
+def upgrade(conn):
+    """Upgrade an older supported workspace to the current schema, all or nothing."""
+    with conn:
+        conn.execute("BEGIN IMMEDIATE")
+        version = conn.execute("PRAGMA user_version").fetchone()[0]
+        while version in MIGRATIONS:
+            MIGRATIONS[version](conn)
+            version += 1
+        conn.execute(f"PRAGMA user_version={version}")
 
 
 def apply_schema(conn):

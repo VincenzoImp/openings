@@ -637,3 +637,112 @@ test("live file and note deletion identify the item before removal", async ({
     top(page).getByRole("button", { name: "safe-text.txt", exact: true }),
   ).toHaveCount(0);
 });
+
+test("application plan, blocking requirements and a stale button action recover", async ({
+  page,
+}, info) => {
+  const title = `Planned role ${info.project.name}`;
+  const job = await call(page, "/jobs", "POST", {
+    title,
+    company: "Deadline Labs",
+    posting: "Build services.",
+  });
+  const application = await call(page, "/applications", "POST", {
+    job_id: job.id,
+    priority: 1,
+    deadline: "2026-12-01",
+    requirements: [
+      {
+        kind: "authorship",
+        text: "Applications must be written without AI tools.",
+        blocking: true,
+      },
+    ],
+  });
+  await go(
+    page,
+    `applications?view=list&readiness=blocked&q=${encodeURIComponent(title)}`,
+  );
+  const row = page.locator(".application-list tbody tr", { hasText: title });
+  await expect(row).toContainText("P1");
+  await expect(row).toContainText("1 blocking requirement");
+  await expect(
+    page.getByRole("combobox", { name: "Filter preparation readiness" }),
+  ).toHaveValue("blocked");
+
+  // Another session changes the attempt; the stale button action reloads it.
+  await call(page, `/applications/${application.id}`, "PATCH", {
+    expected_version: application.version,
+    note: "Changed in another session",
+  });
+  const stage = row.getByRole("combobox", { name: `Stage for ${title}` });
+  const reloaded = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/v1/applications?") &&
+      response.request().method() === "GET",
+  );
+  await stage.selectOption("applied");
+  await expect(page.locator(".app-toast")).toContainText(
+    "changed in another session",
+  );
+  await reloaded;
+  await expect(stage).toHaveValue("draft");
+  await stage.selectOption("applied");
+  await expect
+    .poll(
+      async () => (await call(page, `/applications/${application.id}`)).status,
+    )
+    .toBe("applied");
+
+  await row.getByRole("button", { name: new RegExp(title) }).click();
+  await expect(top(page).locator(".requirement-alert")).toContainText(
+    "Applications must be written without AI tools.",
+  );
+  await top(page)
+    .getByRole("tab", { name: /Requirements/ })
+    .click();
+  const requirement = top(page).locator(".requirement-row").first();
+  await requirement.getByRole("checkbox", { name: "Resolved" }).check();
+  await requirement
+    .getByRole("textbox", { name: "Resolution or open question" })
+    .fill("The owner writes this letter.");
+  await top(page)
+    .getByRole("button", { name: "Add requirement", exact: true })
+    .click();
+  const added = top(page).locator(".requirement-row").last();
+  await added.getByRole("combobox", { name: "Kind" }).selectOption("reference");
+  await added
+    .getByRole("textbox", { name: "Requirement", exact: true })
+    .fill("Two professional references.");
+  await top(page)
+    .getByRole("button", { name: "Save requirements", exact: true })
+    .click();
+  await expect(top(page).locator(".requirement-alert")).toHaveCount(0);
+  const saved = await call(page, `/applications/${application.id}`);
+  expect(saved.readiness).toBe("none");
+  expect(saved.requirements).toEqual([
+    expect.objectContaining({
+      kind: "authorship",
+      resolved: true,
+      note: "The owner writes this letter.",
+    }),
+    expect.objectContaining({
+      kind: "reference",
+      text: "Two professional references.",
+      blocking: false,
+    }),
+  ]);
+
+  await top(page).getByRole("tab", { name: "Details", exact: true }).click();
+  await top(page).getByRole("combobox", { name: "Priority" }).selectOption("3");
+  await top(page).getByLabel("Application deadline").fill("2027-01-15");
+  await top(page)
+    .getByRole("button", { name: "Save details", exact: true })
+    .click();
+  await expect
+    .poll(async () => {
+      const value = await call(page, `/applications/${application.id}`);
+      return [value.priority, value.deadline];
+    })
+    .toEqual([3, "2027-01-15"]);
+});
