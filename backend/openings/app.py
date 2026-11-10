@@ -24,6 +24,7 @@ from . import __version__
 from .api import register_core, register_core_mcp
 from .mcp_server import OpeningsMCP
 from .auth import COOKIE, MAX_AGE, Auth
+from .limits import REQUEST_LIMIT, BodyLimit
 from .career import (
     CareerService,
     register_api as register_career_api,
@@ -147,6 +148,7 @@ def create_app(database=None, start_worker=True):
     )
     app.state.workspace, app.state.auth, app.state.mcp = workspace, auth, mcp
     app.state.career, app.state.documents, app.state.discovery = career, documents, discovery
+    app.add_middleware(BodyLimit)
     login_attempts = defaultdict(deque)
     semaphore = asyncio.Semaphore(24)
 
@@ -201,7 +203,7 @@ def create_app(database=None, start_worker=True):
                     login_attempts.clear()
             if int(
                 request.headers.get("content-length", 0) or 0
-            ) > 40 * 1024**2 and not path.endswith("/restore"):
+            ) > REQUEST_LIMIT and not path.endswith("/restore"):
                 raise DomainError(413, "request_size", "This request exceeds the upload limit.")
             # Route the advertised URL directly to the mounted transport without a redirect.
             if request.scope["path"] == "/mcp":

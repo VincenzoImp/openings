@@ -6,6 +6,7 @@
 - Add `exclude_titles` source filters: whole-word terms that skip matching titles before role and location filters, in REST, MCP and the source forms.
 - Run synchronous MCP tools in worker threads so a slow tool no longer stalls REST, the dashboard or `/health`.
 - Return structured MCP errors (`code`, `status`, `message`, `details`) matching REST; version conflicts include `current_version` on both interfaces.
+- Enforce request size limits on the bytes actually received, including chunked bodies without `Content-Length`: 40 MiB for API requests and 16 KiB for sign-in/setup routes.
 
 ## 0.12.0
 
