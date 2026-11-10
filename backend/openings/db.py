@@ -1,7 +1,9 @@
 """Small connection-per-operation SQLite store; no connections cross worker threads."""
 
 import json
+import os
 import sqlite3
+import tempfile
 import threading
 from contextlib import contextmanager
 from pathlib import Path
@@ -10,12 +12,17 @@ from .errors import DomainError
 from .posting import posting_complete
 
 SCHEMA_VERSION = 6
+SCHEMA_SQL = Path(__file__).with_name("schema.sql")
+TEMP_PREFIX = ".openings-temp-"
 
 
 class Database:
     def __init__(self, path):
         self.path = Path(path).resolve()
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        # No backup or restore survives a restart; remove copies left by a crash.
+        for stale in self.path.parent.glob(TEMP_PREFIX + "*"):
+            stale.unlink(missing_ok=True)
         self.lock = threading.RLock()
         with self.connect() as conn:
             version = conn.execute("PRAGMA user_version").fetchone()[0]
@@ -45,7 +52,7 @@ class Database:
                         "UPDATE settings SET data=json_remove(data,'$.scoring_summary') WHERE key='profile'"
                     )
                     conn.execute("PRAGMA user_version=6")
-            conn.executescript(Path(__file__).with_name("schema.sql").read_text())
+            apply_schema(conn)
         self.path.chmod(0o600)
 
     @contextmanager
@@ -84,12 +91,25 @@ class Database:
         with self.transaction() as conn:
             return conn.execute(sql, params).rowcount
 
+    def temp_file(self, purpose):
+        """Reserve a private file beside the database, on the same data volume."""
+        handle, name = tempfile.mkstemp(
+            prefix=TEMP_PREFIX + purpose + "-", suffix=".sqlite", dir=self.path.parent
+        )
+        os.close(handle)
+        return name
+
     def backup(self, destination):
         with self.lock, self.connect() as source, sqlite3.connect(destination) as target:
             source.backup(target)
 
     def collect_blobs(self):
         return self.execute("DELETE FROM blobs WHERE sha256 NOT IN (SELECT sha256 FROM files)")
+
+
+def apply_schema(conn):
+    """Create missing tables and indexes; existing data is unchanged."""
+    conn.executescript(SCHEMA_SQL.read_text())
 
 
 def encode(value):

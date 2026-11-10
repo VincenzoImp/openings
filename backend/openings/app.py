@@ -4,7 +4,6 @@ import asyncio
 import json
 import os
 import sqlite3
-import tempfile
 import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
@@ -346,8 +345,7 @@ def create_app(database=None, start_worker=True):
 
     @router.get("/backup")
     def backup():
-        handle, name = tempfile.mkstemp(suffix=".sqlite", prefix="openings-backup-")
-        os.close(handle)
+        name = workspace.db.temp_file("backup")
         workspace.db.backup(name)
         return FileResponse(
             name,
@@ -358,13 +356,13 @@ def create_app(database=None, start_worker=True):
 
     @router.post("/backup/restore")
     async def restore(request: Request):
-        handle, name = tempfile.mkstemp(suffix=".sqlite", prefix="openings-restore-")
+        name = workspace.db.temp_file("restore")
         count = 0
         try:
-            with os.fdopen(handle, "wb") as upload:
+            with open(name, "wb") as upload:
                 async for chunk in request.stream():
                     count += len(chunk)
-                    if count > int(os.environ.get("OPENINGS_MAX_RESTORE_MB", "512")) * 1024**2:
+                    if count > int(os.environ.get("OPENINGS_MAX_RESTORE_MB", "2048")) * 1024**2:
                         raise DomainError(
                             413,
                             "backup_size",

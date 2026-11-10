@@ -1,15 +1,13 @@
 """Consistent portable snapshots and validated in-place restore."""
 
-import os
 import json
 import sqlite3
-import tempfile
 import time
 from pathlib import Path
 
 from .common import now, encode
 from .errors import DomainError
-from .db import SCHEMA_VERSION
+from .db import SCHEMA_VERSION, apply_schema
 
 
 def preserve_provider_runtime(restored, current):
@@ -62,10 +60,7 @@ def restore_database(workspace, source_path):
         worker = getattr(workspace, "worker", None)
         if worker:
             worker.stop()
-        rollback_handle, rollback_name = tempfile.mkstemp(
-            prefix="openings-rollback-", suffix=".sqlite"
-        )
-        os.close(rollback_handle)
+        rollback_name = workspace.db.temp_file("rollback")
         try:
             with workspace.db.lock:
                 auth = workspace.db.one("SELECT * FROM settings WHERE key='auth'")
@@ -112,6 +107,8 @@ def restore_database(workspace, source_path):
                             (now(),),
                         )
                         target.commit()
+                        # A backup may predate current indexes.
+                        apply_schema(target)
                 except BaseException:
                     with (
                         sqlite3.connect(rollback_name) as previous,
