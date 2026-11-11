@@ -40,6 +40,9 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   Closed with recorded outcomes, history and a progress funnel.
 - **See what the agent did:** every change records who made it. An agent works in
   runs with a stored report, and asks you questions that you answer under **Activity**.
+- **Tell the agent what to do next:** write a request under **Activity**, or
+  **Ask your agent** on a job or an application. The agent picks it up at its next
+  run and reports the result.
 - **Automate:** the dashboard, REST API and MCP share one service layer and the same
   operations.
 

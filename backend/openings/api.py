@@ -27,7 +27,7 @@ from .models import (
 )
 
 
-def register_core(router: APIRouter, workspace):
+def register_core(router: APIRouter, workspace, requests):
     @router.get("/workspace")
     def info(request: Request):
         return {
@@ -38,6 +38,7 @@ def register_core(router: APIRouter, workspace):
             "mcp_endpoint": "/mcp",
             "single_owner": True,
             "actor": current_actor().describe(),
+            "open_requests": requests.count_open(),
         }
 
     @router.get("/overview")
@@ -142,10 +143,10 @@ def register_core(router: APIRouter, workspace):
         return workspace.application_events(application_id)
 
 
-def register_core_mcp(mcp, workspace):
+def register_core_mcp(mcp, workspace, requests):
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def workspace_info(ctx: Context) -> dict:
-        """Read workspace capabilities and who this token is (actor, with token_kind owner or agent). Use REST transfer grants for file bytes."""
+        """Read workspace capabilities, who this token is (actor, with token_kind owner or agent) and open_requests, the number of owner requests waiting for an agent (requests_list). Use REST transfer grants for file bytes."""
         request = ctx.request_context.request
         origin = os.environ.get("OPENINGS_PUBLIC_URL") or (
             str(request.base_url).rstrip("/") if request else None
@@ -156,7 +157,8 @@ def register_core_mcp(mcp, workspace):
             "origin": origin,
             "api_base": "/api/v1",
             "actor": current_actor().describe(),
-            "workflow": "Read career, templates and stored instructions; prepare a frozen context; write and compile externally; submit document revisions and PDF/source files; track progress explicitly.",
+            "open_requests": requests.count_open(),
+            "workflow": "Read open requests for the agent first. Read career, templates and stored instructions; prepare a frozen context; write and compile externally; submit document revisions and PDF/source files; track progress explicitly.",
         }
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))

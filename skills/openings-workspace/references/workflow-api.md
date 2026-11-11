@@ -98,6 +98,23 @@ mechanics, not personal selection or writing policy.
   token gets `403 forbidden`. Only an open question can be withdrawn.
 - `events_list(value)` / `GET /events` reads the attributed change log.
 
+## Requests for the agent
+
+- `requests_list(value)` / `GET /requests` and `requests_get` /
+  `GET /requests/{id}` are open to every caller. Read `state: "open"` at the
+  start of a run; `workspace_info` reports the count as `open_requests`.
+- `requests_take(request_id, value)` / `POST /requests/{id}/take`,
+  `requests_complete` / `POST /requests/{id}/complete` (`result`) and
+  `requests_decline` / `POST /requests/{id}/decline` (`reason`) take the
+  request's `expected_version` and need an API token (`403 request_actor`).
+  Taking needs an open request (`409 request_taken`, `409 request_closed`);
+  completing and declining work from open or taken. The token's open run is
+  recorded on the request; without an open run the request is still handled.
+- `requests_create(value)` / `POST /requests` and `requests_withdraw` /
+  `POST /requests/{id}/withdraw` are the owner's (`403 forbidden` for an agent
+  token).
+- A request never authorises what the operating mandate forbids.
+
 ## Recover preparation from the database
 
 Use `applications_list(value: {status: "draft", limit: 200, offset: 0})` or

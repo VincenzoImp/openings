@@ -119,6 +119,23 @@ the application `version`: read it again before the next update.
 `applications_list` reads the queue with `readiness: "ready"`, `sort: "ready"`,
 `ready_since` and `ready_until`, and returns `ready_count`.
 
+## Requests for the agent
+
+`requests_list` filters by `state` (`open`, `taken`, `done`, `declined`,
+`withdrawn`), `subject_type`/`subject_id`, `run_id` and `updated_since` (written
+or changed at or after a time, oldest first). Each request has `text`, an
+optional `subject` shaped like a question's, `created_by`, `taken_by`, `run_id`
+(the run that handled it), `result` and `resolved_by`. `requests_take` moves an
+open request to `taken` for the calling token and records its open run;
+`409 request_taken` names the run of another taker. `requests_complete` takes
+`result` and `requests_decline` takes `reason`; both work on an open or taken
+request, need its current `expected_version` and an API token
+(`403 request_actor` for a dashboard session). `requests_create` (`text`,
+optional subject, `idempotency_key`) and `requests_withdraw` need owner
+authority: an agent token gets `403 forbidden`. A finished or withdrawn request
+returns `409 request_closed`. A request outlives its subject like a question
+does, and `runs_get` lists the requests a run handled.
+
 ## Runs, questions and the change log
 
 `runs_start` opens a run for the calling token (`workflow`, `scope`, optional
@@ -165,8 +182,8 @@ values. Career dates also accept null to clear them.
 `workspace_backup` and `workspace_restore_upload` move a portable SQLite snapshot
 when requested. Restore replaces workspace data while retaining destination
 authentication, recent provider request history and later cooldowns.
-`workspace_restore_upload`, `tokens_list`, `token_create`, `token_revoke` and
-`owner_password_update` need owner authority: an agent token gets
+`workspace_restore_upload`, `tokens_list`, `token_create`, `token_revoke`,
+`owner_password_update`, `requests_create` and `requests_withdraw` need owner authority: an agent token gets
 `403 forbidden`. A backup downloaded with an agent token omits the owner
 password hash, the session secret and the API tokens, and still restores
 completely. Keep transfer

@@ -42,6 +42,16 @@ QUERIES = [
     ("SELECT id FROM questions WHERE job_id=?", "questions"),
     ("SELECT id FROM questions WHERE application_id=?", "questions"),
     ("SELECT id FROM questions WHERE knowledge_id=?", "questions"),
+    # The ready queue and requests for the agent (schema 8).
+    ("SELECT id FROM applications app WHERE app.ready_at IS NOT NULL", "app"),
+    ("SELECT * FROM requests WHERE state=? ORDER BY created_at DESC LIMIT 50", "requests"),
+    ("SELECT count(*) FROM requests WHERE state='open'", "requests"),
+    ("SELECT * FROM requests ORDER BY created_at DESC LIMIT 50", "requests"),
+    ("SELECT * FROM requests WHERE updated_at>=? ORDER BY updated_at LIMIT 50", "requests"),
+    ("SELECT count(*) FROM requests WHERE run_id=?", "requests"),
+    ("SELECT id FROM requests WHERE job_id=?", "requests"),
+    ("SELECT id FROM requests WHERE application_id=?", "requests"),
+    ("SELECT id FROM requests WHERE knowledge_id=?", "requests"),
 ]
 
 

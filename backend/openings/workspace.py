@@ -815,7 +815,15 @@ class Workspace:
             )
             c.execute("DELETE FROM job_identities WHERE job_id=?", (source_id,))
             c.execute("UPDATE posting_details SET job_id=? WHERE job_id=?", (target_id, source_id))
-            for table in ("postings", "applications", "events", "notes", "tasks", "questions"):
+            for table in (
+                "postings",
+                "applications",
+                "events",
+                "notes",
+                "tasks",
+                "questions",
+                "requests",
+            ):
                 c.execute(f"UPDATE {table} SET job_id=? WHERE job_id=?", (target_id, source_id))
             c.execute("UPDATE files SET job_id=? WHERE job_id=?", (target_id, source_id))
             c.execute("DELETE FROM jobs WHERE id=?", (source_id,))

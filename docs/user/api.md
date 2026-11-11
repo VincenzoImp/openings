@@ -6,8 +6,9 @@ for fields. All normal data operations require an owner session or bearer token.
 
 Create a token in **Settings** and store it outside source control. A token is
 an **owner** token (full access) or an **agent** token, which is refused with
-`403 forbidden` for the owner password, token management, restore and answering
-a question (see [token kinds](agents.md#token-kinds)). `POST /tokens` takes
+`403 forbidden` for the owner password, token management, restore, answering
+a question and writing or withdrawing a request (see
+[token kinds](agents.md#token-kinds)). `POST /tokens` takes
 `{"name": "...", "kind": "agent"}`; `kind` defaults to `owner`. Tokens can be
 revoked independently. Browser session writes also need
 the `X-CSRF-Token` returned by `/auth/session`; scripts use bearer auth instead.
@@ -42,7 +43,7 @@ Paste the posting when extraction cannot obtain the complete text.
 | Tasks | `GET /tasks`, `GET /tasks/{id}`, `POST /tasks/{id}/cancel` or `/retry` |
 | Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `GET /documents/{id}/consistency`, `POST /documents/{id}/review` |
 | Files | `GET /files`, `GET/DELETE /files/{id}`, `GET /files/{id}/content`, `POST /files/uploads`, `POST /files/{id}/download` |
-| Agent activity | `GET /events`; `GET/POST /runs`, `GET/PATCH /runs/{id}`, `POST /runs/{id}/finish`; `GET/POST /questions`, `GET /questions/{id}`, `POST /questions/{id}/answer`, `POST /questions/{id}/withdraw` |
+| Agent activity | `GET /events`; `GET/POST /runs`, `GET/PATCH /runs/{id}`, `POST /runs/{id}/finish`; `GET/POST /questions`, `GET /questions/{id}`, `POST /questions/{id}/answer`, `POST /questions/{id}/withdraw`; `GET/POST /requests`, `GET /requests/{id}`, `POST /requests/{id}/take`, `/complete`, `/decline`, `/withdraw` |
 | Operations | `GET /workspace`, `/capabilities`, `/overview`, `/export`, `/backup`; `POST /backup/restore`; `/tokens`; `POST /auth/password` |
 
 List routes return `{items,total}` and accept bounded `limit`/`offset` where
@@ -201,6 +202,38 @@ filters by `run_id`, `job_id`, `application_id`, `subject_type`, `subject_id`,
 A question keeps its text, state and a `subject.label` after its job,
 application or Career entry is deleted. Deleting an application or forgetting a
 job removes that record's own history and leaves one attributed entry.
+
+## Requests for the agent
+
+The owner writes a request; an agent reads it at the start of its next run.
+
+```bash
+# The owner (session or owner token) writes a request about a job.
+curl -sS -X POST "$OPENINGS_URL/api/v1/requests" -H "Authorization: Bearer $OWNER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Prepare this one too.", "subject_type": "job", "subject_id": "JOB_ID"}'
+
+# The agent reads the open requests, takes one and reports the result.
+curl -sS "$OPENINGS_URL/api/v1/requests?state=open" -H "Authorization: Bearer $OPENINGS_TOKEN"
+curl -sS -X POST "$OPENINGS_URL/api/v1/requests/REQUEST_ID/take" \
+  -H "Authorization: Bearer $OPENINGS_TOKEN" -H "Content-Type: application/json" \
+  -d '{"expected_version": 1}'
+curl -sS -X POST "$OPENINGS_URL/api/v1/requests/REQUEST_ID/complete" \
+  -H "Authorization: Bearer $OPENINGS_TOKEN" -H "Content-Type: application/json" \
+  -d '{"expected_version": 2, "result": "Draft prepared and marked ready."}'
+```
+
+States are `open`, `taken`, `done`, `declined` and `withdrawn`. `take` needs an
+open request (`409 request_taken` with the taker's `run_id`, or
+`409 request_closed`); `complete` (`result`) and `decline` (`reason`) work from
+`open` or `taken`. These three need an API token (`403 request_actor` for a
+dashboard session) and record the token's open run on the request, when it has
+one. `POST /requests` (`text`, optional `subject_type` and `subject_id`,
+`idempotency_key`) and `withdraw` need owner authority. `GET /requests` filters
+by `state`, `subject_type`, `subject_id`, `run_id` and `updated_since`.
+`GET /workspace` returns `open_requests`, and `GET /runs/{id}` the requests the
+run handled. A request keeps its text, state and `subject.label` after its
+subject is deleted, and follows a job through a merge.
 
 ## Identity and duplicates
 

@@ -27,16 +27,16 @@ How to read the evidence:
 
 | Measure | Operations |
 |---|---|
-| Logical operations in the inventory | 103 |
+| Logical operations in the inventory | 110 |
 | Without REST or without MCP | 0 |
-| Owner only (refused for an agent token) | 6 |
-| Without a working dashboard path | 6 |
-| Reached only through another operation | 4 |
-| With inputs the dashboard never mentions | 7 |
+| Owner only (refused for an agent token) | 8 |
+| Without a working dashboard path | 9 |
+| Reached only through another operation | 5 |
+| With inputs the dashboard never mentions | 9 |
 | With free-form JSON edited as raw JSON | 13 |
 | With different REST and MCP input names | 1 |
 | With a dashboard path exercised by e2e | 43 |
-| With a dashboard path but no e2e evidence | 50 |
+| With a dashboard path but no e2e evidence | 53 |
 
 ## Gaps
 
@@ -53,6 +53,9 @@ code calls the route and no browser test reached it.
 | `runs.update` | `PATCH /runs/{run_id}` | `runs_update` | Activity: run detail (read only) | Runs belong to API tokens: a dashboard session has no runs. |
 | `runs.finish` | `POST /runs/{run_id}/finish` | `runs_finish` | Activity: run detail (read only) | Runs belong to API tokens: a dashboard session has no runs. |
 | `questions.ask` | `POST /questions` | `questions_ask` | Activity: Questions (answer only) | Agents ask questions for the owner; the dashboard answers and withdraws them. |
+| `requests.take` | `POST /requests/{request_id}/take` | `requests_take` | Activity: Requests (read only) | Agents take, complete and decline requests with an API token; the dashboard writes and withdraws them. |
+| `requests.complete` | `POST /requests/{request_id}/complete` | `requests_complete` | Activity: Requests (read only) | Agents take, complete and decline requests with an API token; the dashboard writes and withdraws them. |
+| `requests.decline` | `POST /requests/{request_id}/decline` | `requests_decline` | Activity: Requests (read only) | Agents take, complete and decline requests with an API token; the dashboard writes and withdraws them. |
 
 ### Operations reached only through another operation
 
@@ -65,6 +68,7 @@ The route itself is never called from the dashboard.
 | `sources.run` | `sources.bulk` | Run once, also for one source, sends a bulk action. |
 | `applications.staleness_list` | `applications.list`, `applications.staleness` | Badges use `stale_inputs` in the application list; details use the per-application report. There is no workspace-wide staleness view. |
 | `questions.read` | `questions.list` | Activity renders questions from the list, which returns complete records. |
+| `requests.read` | `requests.list` | Activity renders requests from the list, which returns complete records. |
 
 ### Inputs the dashboard never mentions
 
@@ -80,6 +84,8 @@ operation. They can be set over REST or MCP only.
 | `events.list` | `since`, `token_id`, `until` | Activity filters changes by who made them and by run; the other filters serve agents and scripts. |
 | `runs.list` | `started_since`, `started_until`, `token_id` | Activity filters runs by status only. |
 | `questions.list` | `answered_since` | Activity filters questions by state; `answered_since` and the subject filters serve the agent's next run. |
+| `requests.list` | `updated_since` | Activity filters requests by state and the Ask your agent dialog by subject; `run_id` and `updated_since` serve agents. |
+| `requests.create` | `idempotency_key` | — |
 
 ### Free-form JSON edited as raw JSON
 
@@ -119,6 +125,8 @@ with `403 forbidden` on REST and MCP; `test_interfaces.py` checks each one.
 |---|---|---|---|
 | `backup.restore` | `POST /backup/restore` | `workspace_restore_upload` | MCP obtains a scoped raw HTTP upload grant. Validated restore preserves installation authentication; no arbitrary SQL endpoint. Recent destination provider HTTP usage and later cooldowns survive older-backup restore; saved policy settings are restored. |
 | `questions.answer` | `POST /questions/{question_id}/answer` | `questions_answer` | An answer is the owner's. An owner token records it only when the owner gave it. |
+| `requests.create` | `POST /requests` | `requests_create` | The owner writes; an agent never writes requests for itself. A request never authorises what the operating mandate forbids. |
+| `requests.withdraw` | `POST /requests/{request_id}/withdraw` | `requests_withdraw` | The owner withdraws; the record stays readable. |
 | `tokens.list` | `GET /tokens` | `tokens_list` | Token secrets are not returned after creation. Each token has a kind: owner (full access) or agent. |
 | `tokens.create` | `POST /tokens` | `token_create` | kind is owner (default, full access) or agent (scoped). The secret is returned once. The dashboard form defaults to agent. |
 | `tokens.revoke` | `DELETE /tokens/{token_id}` | `token_revoke` | May revoke the caller token; subsequent requests require another valid credential. |
@@ -137,7 +145,7 @@ missing from the inventory.
 
 ### Dashboard paths without e2e evidence
 
-`workspace.capabilities`, `skills.list`, `jobs.create`, `jobs.triage`, `jobs.bulk`, `jobs.duplicates`, `jobs.merge`, `jobs.delete`, `notes.read`, `notes.update`, `notes.delete`, `collection.update`, `sources.preview`, `sources.create`, `sources.bulk`, `tasks.list`, `tasks.read`, `tasks.cancel`, `tasks.retry`, `profile.update`, `knowledge.create`, `knowledge.delete`, `claims.read`, `claims.create`, `claims.update`, `claims.delete`, `templates.create`, `templates.update`, `templates.delete`, `instructions.update`, `career.preview_import`, `career.import`, `applications.create`, `applications.ready`, `applications.delete`, `applications.bulk`, `contexts.read`, `applications.staleness`, `documents.delete`, `files.read`, `backup.download`, `backup.restore`, `questions.withdraw`, `tokens.list`, `tokens.create`, `tokens.revoke`, `password.update`, `collection.runs.list`, `collection.runs.read`, `collection.runs.cancel`
+`workspace.capabilities`, `skills.list`, `jobs.create`, `jobs.triage`, `jobs.bulk`, `jobs.duplicates`, `jobs.merge`, `jobs.delete`, `notes.read`, `notes.update`, `notes.delete`, `collection.update`, `sources.preview`, `sources.create`, `sources.bulk`, `tasks.list`, `tasks.read`, `tasks.cancel`, `tasks.retry`, `profile.update`, `knowledge.create`, `knowledge.delete`, `claims.read`, `claims.create`, `claims.update`, `claims.delete`, `templates.create`, `templates.update`, `templates.delete`, `instructions.update`, `career.preview_import`, `career.import`, `applications.create`, `applications.ready`, `applications.delete`, `applications.bulk`, `contexts.read`, `applications.staleness`, `documents.delete`, `files.read`, `backup.download`, `backup.restore`, `questions.withdraw`, `requests.list`, `requests.create`, `requests.withdraw`, `tokens.list`, `tokens.create`, `tokens.revoke`, `password.update`, `collection.runs.list`, `collection.runs.read`, `collection.runs.cancel`
 
 ## Matrix
 
@@ -273,3 +281,10 @@ missing from the inventory.
 | `questions.ask`<br>Ask the owner a question tied to a job, application, Career entry or nothing | `POST /questions` | `questions_ask` | any | Activity: Questions (answer only) | **none** | — | — |
 | `questions.answer`<br>Answer a question for the owner | `POST /questions/{question_id}/answer` | `questions_answer` | owner | Activity: Questions: answer | pages/Activity.tsx | structured | 1 |
 | `questions.withdraw`<br>Withdraw an open question | `POST /questions/{question_id}/withdraw` | `questions_withdraw` | any | Activity: Questions: withdraw | pages/Activity.tsx | structured | **0** |
+| `requests.list`<br>List requests for the agent by state, subject, run or change time | `GET /requests` | `requests_list` | any | Activity: Requests; job and application: Ask your agent | pages/Requests.tsx | structured | **0** |
+| `requests.read`<br>Read one request for the agent | `GET /requests/{request_id}` | `requests_get` | any | Activity: Requests | via `requests.list` | — | — |
+| `requests.create`<br>Write a request for the agent tied to a job, application, Career entry or nothing | `POST /requests` | `requests_create` | owner | Activity: Requests: write a request; job and application: Ask your agent | pages/Requests.tsx | structured | **0** |
+| `requests.take`<br>Take an open request for the calling token's run | `POST /requests/{request_id}/take` | `requests_take` | any | Activity: Requests (read only) | **none** | — | — |
+| `requests.complete`<br>Complete a request with its result | `POST /requests/{request_id}/complete` | `requests_complete` | any | Activity: Requests (read only) | **none** | — | — |
+| `requests.decline`<br>Decline a request with a reason | `POST /requests/{request_id}/decline` | `requests_decline` | any | Activity: Requests (read only) | **none** | — | — |
+| `requests.withdraw`<br>Withdraw an open or taken request | `POST /requests/{request_id}/withdraw` | `requests_withdraw` | owner | Activity: Requests: withdraw | pages/Requests.tsx | structured | **0** |

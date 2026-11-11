@@ -21,7 +21,7 @@
         "workspace_info"
       ],
       "dashboard": "Settings: workspace information",
-      "notes": "actor describes the caller; for an API token, token_kind is owner or agent."
+      "notes": "actor describes the caller; for an API token, token_kind is owner or agent. open_requests counts owner requests no agent has taken."
     },
     {
       "id": "workspace.capabilities",
@@ -1518,6 +1518,119 @@
         "questions_withdraw"
       ],
       "dashboard": "Activity: Questions: withdraw"
+    },
+    {
+      "id": "requests.list",
+      "group": "Agent activity",
+      "operation": "List requests for the agent by state, subject, run or change time",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/requests"
+        }
+      ],
+      "mcp": [
+        "requests_list"
+      ],
+      "dashboard": "Activity: Requests; job and application: Ask your agent",
+      "notes": "state (open/taken/done/declined/withdrawn), subject_type, subject_id, run_id, updated_since, limit, offset. Agents read state=open at the start of a run."
+    },
+    {
+      "id": "requests.read",
+      "group": "Agent activity",
+      "operation": "Read one request for the agent",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/requests/{request_id}"
+        }
+      ],
+      "mcp": [
+        "requests_get"
+      ],
+      "dashboard": "Activity: Requests"
+    },
+    {
+      "id": "requests.create",
+      "group": "Agent activity",
+      "operation": "Write a request for the agent tied to a job, application, Career entry or nothing",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/requests"
+        }
+      ],
+      "mcp": [
+        "requests_create"
+      ],
+      "dashboard": "Activity: Requests: write a request; job and application: Ask your agent",
+      "notes": "The owner writes; an agent never writes requests for itself. A request never authorises what the operating mandate forbids.",
+      "access": "owner"
+    },
+    {
+      "id": "requests.take",
+      "group": "Agent activity",
+      "operation": "Take an open request for the calling token's run",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/requests/{request_id}/take"
+        }
+      ],
+      "mcp": [
+        "requests_take"
+      ],
+      "dashboard": "Activity: Requests (read only)",
+      "notes": "API tokens only (403 request_actor for a dashboard session). Records the token's open run when there is one."
+    },
+    {
+      "id": "requests.complete",
+      "group": "Agent activity",
+      "operation": "Complete a request with its result",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/requests/{request_id}/complete"
+        }
+      ],
+      "mcp": [
+        "requests_complete"
+      ],
+      "dashboard": "Activity: Requests (read only)",
+      "notes": "API tokens only. From open or taken; the result is shown to the owner with the run."
+    },
+    {
+      "id": "requests.decline",
+      "group": "Agent activity",
+      "operation": "Decline a request with a reason",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/requests/{request_id}/decline"
+        }
+      ],
+      "mcp": [
+        "requests_decline"
+      ],
+      "dashboard": "Activity: Requests (read only)",
+      "notes": "API tokens only. From open or taken."
+    },
+    {
+      "id": "requests.withdraw",
+      "group": "Agent activity",
+      "operation": "Withdraw an open or taken request",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/requests/{request_id}/withdraw"
+        }
+      ],
+      "mcp": [
+        "requests_withdraw"
+      ],
+      "dashboard": "Activity: Requests: withdraw",
+      "notes": "The owner withdraws; the record stays readable.",
+      "access": "owner"
     },
     {
       "id": "tokens.list",

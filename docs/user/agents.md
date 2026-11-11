@@ -22,7 +22,9 @@ An agent token is refused, with `403 forbidden` on REST and MCP, when it tries t
 - change the owner password;
 - list, create or revoke API tokens;
 - restore a backup;
-- answer a question for the owner (it can ask and withdraw questions).
+- answer a question for the owner (it can ask and withdraw questions);
+- write or withdraw a request for the agent (it takes, completes and declines
+  the requests you write).
 
 An agent token can still download a backup and a records export, because the
 operating mandate has the agent back up before broad changes. A backup taken
@@ -60,6 +62,10 @@ skills: discover the tools/resources and their typed input schemas.
 
 ## Working sequence
 
+0. Read the owner's open requests with `requests_list` (`state: "open"`;
+   `workspace_info` returns their number as `open_requests`). Take the ones you
+   will handle with `requests_take` and report with `requests_complete` or
+   `requests_decline`. See [Ask your agent](agent-operated.md#ask-your-agent).
 1. Call `workspace_info`, `capabilities_get`, `career_get_profile`, `knowledge_list`, `claims_list`,
    `templates_list` and `instructions_get` as needed. Detailed narratives explain
    the facts; approved claims are reusable wording, not the only allowed wording.

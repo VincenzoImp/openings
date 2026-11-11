@@ -41,6 +41,7 @@ import {
   Tabs,
   PendingResults,
 } from "../ui";
+import { AskAgent } from "./Requests";
 
 const blankJobs: ListResult<Job> = { items: [], total: 0 };
 export function AddJob({
@@ -838,6 +839,11 @@ export function JobDrawer({
                 {job.company} · {job.location || "Location not specified"}
               </span>
             </div>
+            <AskAgent
+              subjectType="job"
+              subjectId={job.id}
+              name={`${job.title} at ${job.company}`}
+            />
             {application && (
               <section
                 className="job-application-summary"

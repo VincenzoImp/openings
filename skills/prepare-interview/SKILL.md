@@ -18,6 +18,11 @@ and [Career claims](../career-claims/SKILL.md) for evidence-led wording.
 Open a run before the first write: `runs_start` with `workflow: "prepare-interview"` and the scope; writes made
 with this token then attach to the run. First read the owner's answers given
 since the previous run (`questions_list` with `answered_since`) and act on them.
+Then read the owner's open requests (`requests_list` with `state: "open"`): take
+the ones in this workflow's scope (`requests_take`), do the work, and report on
+each with `requests_complete` and a short result, or `requests_decline` and the
+reason. Leave requests for other workflows open. A request never authorises
+submitting an application, contacting an employer or recording Applied.
 Ask each new question as a record tied to its job, application or Career entry
 (`questions_ask`), not only in chat. Close the run with `runs_finish` and the
 stored [run report](../openings-workspace/references/run-report.md).

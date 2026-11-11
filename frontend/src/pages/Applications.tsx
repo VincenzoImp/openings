@@ -35,6 +35,7 @@ import {
 } from "../api";
 import { FileManager } from "../files";
 import { ReadyPanel, ReadyTag, readyReason } from "./ApplicationReady";
+import { AskAgent } from "./Requests";
 import {
   useEditorRecord,
   confirmLeave,
@@ -1564,6 +1565,11 @@ export function ApplicationDrawer({
               </select>
             </div>
             <ReadyPanel application={app} />
+            <AskAgent
+              subjectType="application"
+              subjectId={app.id}
+              name={`the application for ${app.job?.title || "this job"}`}
+            />
             <Tabs
               label="Application workspace"
               value={tab}

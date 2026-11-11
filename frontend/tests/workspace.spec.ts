@@ -1178,3 +1178,110 @@ test("Settings creates an agent token that is refused token management", async (
   }
   expect(await attempt("/jobs?limit=1")).toEqual([401, "unauthorized"]);
 });
+
+test("the owner writes a request and reads the agent's result with its run", async ({
+  page,
+}, info) => {
+  const stamp = `${info.project.name} ${Date.now()}`;
+  const agent = await call(page, "/tokens", "POST", {
+    name: `Synthetic agent ${stamp}`,
+    kind: "agent",
+  });
+  const job = await call(page, "/jobs", "POST", {
+    title: `Requested role ${stamp}`,
+    company: "Example Labs",
+    posting: "Build reliable services.",
+  });
+
+  // Write a general request in Activity with the keyboard.
+  const general = `Stop preparing consultancy roles ${stamp}`;
+  await go(page, "activity?section=requests");
+  await page.getByLabel("Ask your agent", { exact: true }).fill(general);
+  await page.getByRole("button", { name: "Send request", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".app-toast")).toContainText("Request saved.");
+  const card = page.getByRole("article", { name: general, exact: true });
+  await expect(card).toContainText("Waiting for the agent");
+  await expect(card).toContainText("Written by Owner (dashboard)");
+  await fitsViewport(page);
+
+  // Ask about one job from the job itself.
+  const about = `Prepare this one too ${stamp}`;
+  await go(page, `inbox?job=${job.id}`);
+  await top(page)
+    .getByRole("button", { name: "Ask your agent", exact: true })
+    .click();
+  await expect(top(page)).toContainText(`About Requested role ${stamp}`);
+  await top(page)
+    .getByLabel("Request for your agent", { exact: true })
+    .fill(about);
+  await top(page)
+    .getByRole("button", { name: "Send request", exact: true })
+    .click();
+  await expect(
+    top(page).getByRole("article", { name: about, exact: true }),
+  ).toContainText("Waiting for the agent");
+  await fitsViewport(page);
+  await top(page)
+    .getByRole("button", { name: "Close dialog", exact: true })
+    .click();
+  await expect(top(page).locator(".ask-agent")).toContainText(
+    "1 request waiting",
+  );
+
+  // The agent reads the open requests, takes one in a run and reports the result.
+  const info_ = await agentCall(page, agent.token, "/workspace");
+  expect(info_.open_requests).toBeGreaterThanOrEqual(2);
+  const waiting = await agentCall(
+    page,
+    agent.token,
+    `/requests?state=open&subject_type=job&subject_id=${job.id}`,
+  );
+  expect(waiting.items.map((item: { text: string }) => item.text)).toEqual([
+    about,
+  ]);
+  const run = await agentCall(page, agent.token, "/runs", "POST", {
+    workflow: `prepare-shortlist ${stamp}`,
+  });
+  const taken = await agentCall(
+    page,
+    agent.token,
+    `/requests/${waiting.items[0].id}/take`,
+    "POST",
+    { expected_version: waiting.items[0].version },
+  );
+  await agentCall(page, agent.token, `/requests/${taken.id}/complete`, "POST", {
+    expected_version: taken.version,
+    result: `Draft prepared and marked ready ${stamp}`,
+  });
+
+  await go(page, "activity?section=requests");
+  await page.getByLabel("State", { exact: true }).selectOption("done");
+  const done = page.getByRole("article", { name: about, exact: true });
+  await expect(done).toContainText(`Draft prepared and marked ready ${stamp}`);
+  await expect(done).toContainText(
+    `Completed by Synthetic agent ${stamp} (agent token)`,
+  );
+  await expect(
+    done.getByRole("button", { name: /^Job: Requested role/ }),
+  ).toBeVisible();
+  await fitsViewport(page);
+  // The result links to the run that handled the request.
+  await done.getByRole("button", { name: "View run", exact: true }).click();
+  const report = page.locator(".run-detail");
+  await expect(
+    report.locator(".report-section", {
+      has: page.getByRole("heading", { name: "Requests handled", exact: true }),
+    }),
+  ).toContainText(about);
+  await fitsViewport(page);
+
+  // The owner withdraws the request nobody took.
+  await page.getByRole("tab", { name: "Requests", exact: true }).click();
+  await page.getByLabel("State", { exact: true }).selectOption("open");
+  await card.getByRole("button", { name: "Withdraw", exact: true }).click();
+  await expect(card).toHaveCount(0);
+  await page.getByLabel("State", { exact: true }).selectOption("withdrawn");
+  await expect(card).toContainText("Withdrawn by Owner (dashboard)");
+  await call(page, "/tokens/" + agent.id, "DELETE");
+});

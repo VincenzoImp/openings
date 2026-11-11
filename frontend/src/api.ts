@@ -389,9 +389,24 @@ export interface Run extends Versioned {
   change_counts: Record<string, number>;
   changes_total: number;
   questions_count: number;
+  requests_count?: number;
   report?: RunReport | null;
   changes?: ListResult<Activity>;
   questions?: OwnerQuestion[];
+  requests?: AgentRequest[];
+}
+export type RequestState = "open" | "taken" | "done" | "declined" | "withdrawn";
+export interface AgentRequest extends Versioned {
+  text: string;
+  state: RequestState;
+  result: string;
+  subject: OwnerQuestion["subject"];
+  created_by: Actor;
+  run_id: string | null;
+  taken_by: Actor | null;
+  taken_at: string | null;
+  resolved_by: Actor | null;
+  resolved_at: string | null;
 }
 export interface OwnerQuestion extends Versioned {
   question: string;
