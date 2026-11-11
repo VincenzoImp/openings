@@ -1,10 +1,10 @@
 """Synthetic, isolated server for browser workflows; no acquisition workers."""
 
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
-from fastapi.testclient import TestClient
 import uvicorn
+from fastapi.testclient import TestClient
 
 from openings.app import create_app
 from openings.career import ClaimCreate, KnowledgeCreate, TemplateCreate

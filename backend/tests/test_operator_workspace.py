@@ -37,6 +37,7 @@ def test_plain_http_is_only_accepted_for_localhost(tmp_path):
     result = subprocess.run(
         [sys.executable, SYNC, "--url", "http://openings.example"],
         cwd=workspace,
+        check=False,
         capture_output=True,
         text=True,
     )

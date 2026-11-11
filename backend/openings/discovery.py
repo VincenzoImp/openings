@@ -13,7 +13,7 @@ import socket
 import time
 import xml.etree.ElementTree as ET
 from contextvars import ContextVar
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from html.parser import HTMLParser
 from typing import Any, Literal
 from urllib.parse import parse_qs, quote, urljoin, urlsplit
@@ -24,20 +24,8 @@ from fastapi import Query
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
-from .common import (
-    check_version,
-    decode_record,
-    encode,
-    missing,
-    new_id,
-    now,
-)
 from . import __version__
-from .errors import DomainError, conflict
-from .posting import posting_complete, posting_complete_sql, matches_filters
-from .scheduling import Schedule, IntervalSchedule, schedule_adapter, next_due
-from .collectors import company as company_collectors
-from .collectors import jobspy as jobspy_collector
+from .collectors import company as company_collectors, jobspy as jobspy_collector
 from .collectors.catalog import COMPANY_ADAPTERS, COMPANY_KINDS
 from .collectors.policy import (
     ProviderBudget,
@@ -46,6 +34,17 @@ from .collectors.policy import (
     ProviderStore,
     provider_for_url,
 )
+from .common import (
+    check_version,
+    decode_record,
+    encode,
+    missing,
+    new_id,
+    now,
+)
+from .errors import DomainError, conflict
+from .posting import matches_filters, posting_complete, posting_complete_sql
+from .scheduling import IntervalSchedule, Schedule, next_due, schedule_adapter
 
 LOG = logging.getLogger(__name__)
 SourceKind = Literal["auto", "jobspy", "rss", *COMPANY_KINDS]
@@ -568,7 +567,7 @@ def normalize_posting(item: dict) -> dict:
     if isinstance(date, (int, float)) and not isinstance(date, bool):
         try:
             date = (
-                datetime.fromtimestamp(date / 1000 if date > 100000000000 else date, timezone.utc)
+                datetime.fromtimestamp(date / 1000 if date > 100000000000 else date, UTC)
                 .date()
                 .isoformat()
             )
@@ -726,7 +725,7 @@ def fetch_postings(source: dict) -> list[dict]:
             root.findall("{http://www.w3.org/2005/Atom}entry")
         ):
 
-            def text(tag):
+            def text(tag, row=row):
                 element = row.find(tag)
                 if element is None:
                     element = row.find("{http://www.w3.org/2005/Atom}" + tag)
@@ -1063,7 +1062,7 @@ class DiscoveryService:
             if not states.intersection(("queued", "running"))
             else None
         )
-        ending = parse_time(record["finished_at"]) or datetime.now(timezone.utc)
+        ending = parse_time(record["finished_at"]) or datetime.now(UTC)
         record["total_seconds"] = max(
             0, round((ending - parse_time(record["created_at"])).total_seconds(), 3)
         )
@@ -1575,7 +1574,7 @@ class DiscoveryService:
         return self.get_task(task_id)
 
     def schedule_due(self, stopping=None):
-        moment = datetime.now(timezone.utc)
+        moment = datetime.now(UTC)
         for row in (
             self.db.all("SELECT * FROM sources WHERE enabled=1 ORDER BY created_at LIMIT 2000")
             if (self.workspace.get_settings("collection", {"enabled": True})["data"] or {}).get(
@@ -1614,9 +1613,7 @@ class DiscoveryService:
             ).fetchone()
             if row is None:
                 return None
-            expiry = (datetime.now(timezone.utc) + timedelta(seconds=90)).isoformat(
-                timespec="microseconds"
-            )
+            expiry = (datetime.now(UTC) + timedelta(seconds=90)).isoformat(timespec="microseconds")
             connection.execute(
                 "UPDATE tasks SET state='running',attempts=attempts+1,lease_owner=?,lease_until=?,updated_at=? WHERE id=?",
                 (owner, expiry, stamp, row["id"]),
@@ -1624,9 +1621,7 @@ class DiscoveryService:
         return self.get_task(row["id"], include_checkpoint=True)
 
     def heartbeat(self, task_id, owner):
-        expiry = (datetime.now(timezone.utc) + timedelta(seconds=90)).isoformat(
-            timespec="microseconds"
-        )
+        expiry = (datetime.now(UTC) + timedelta(seconds=90)).isoformat(timespec="microseconds")
         return bool(
             self.db.execute(
                 "UPDATE tasks SET lease_until=? WHERE id=? AND state='running' AND lease_owner=?",
@@ -1836,10 +1831,10 @@ class DiscoveryService:
                 else "succeeded"
             )
             if state == "queued":
-                next_run = (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat(
+                next_run = (datetime.now(UTC) + timedelta(seconds=1)).isoformat(
                     timespec="microseconds"
                 )
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - task boundary records any failure
             message = (
                 error.message
                 if isinstance(error, DomainError)
@@ -1856,7 +1851,7 @@ class DiscoveryService:
             if deferred and error.code == "collection_batch":
                 delay = 1
             next_run = getattr(error, "next_run_at", None) or (
-                datetime.now(timezone.utc) + timedelta(seconds=delay)
+                datetime.now(UTC) + timedelta(seconds=delay)
             ).isoformat(timespec="microseconds")
             result = task.get("partial_result", dict(task.get("result", {})))
             result["failure_attempts"] = failures

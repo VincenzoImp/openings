@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 
 class SnapshotResponse(StreamingResponse):
     def __init__(self, content, *, media_type, headers=None):
-        self.snapshot = tempfile.TemporaryFile()
+        self.snapshot = tempfile.TemporaryFile()  # noqa: SIM115 - closed after streaming
         try:
             for chunk in content:
                 self.snapshot.write(chunk)

@@ -12,25 +12,23 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from mcp.types import ToolAnnotations
 from mcp.server.transport_security import TransportSecuritySettings
+from mcp.types import ToolAnnotations
 from pydantic import Field
 from starlette.background import BackgroundTask
 
 from . import __version__
 from .api import register_core, register_core_mcp
-from .mcp_server import OpeningsMCP
 from .auth import COOKIE, MAX_AGE, Auth, LoginGuard
-from .limits import REQUEST_LIMIT, BodyLimit
-from .skills import (
-    SkillLibrary,
-    register_api as register_skills_api,
-    register_mcp as register_skills_mcp,
-)
 from .career import (
     CareerService,
     register_api as register_career_api,
     register_mcp as register_career_mcp,
+)
+from .discovery import (
+    DiscoveryService,
+    register_api as register_discovery_api,
+    register_mcp as register_discovery_mcp,
 )
 from .documents import (
     DocumentService,
@@ -38,16 +36,18 @@ from .documents import (
     register_mcp as register_document_mcp,
 )
 from .errors import DomainError
-from .discovery import (
-    DiscoveryService,
-    register_api as register_discovery_api,
-    register_mcp as register_discovery_mcp,
-)
-from .worker import Worker
+from .limits import REQUEST_LIMIT, BodyLimit
+from .mcp_server import OpeningsMCP
 from .models import Input
 from .operations import restore_database
-from .workspace import Workspace
+from .skills import (
+    SkillLibrary,
+    register_api as register_skills_api,
+    register_mcp as register_skills_mcp,
+)
 from .transfers import SnapshotResponse
+from .worker import Worker
+from .workspace import Workspace
 
 
 class PasswordInput(Input):
@@ -366,7 +366,7 @@ def create_app(database=None, start_worker=True):
         name = workspace.db.temp_file("restore")
         count = 0
         try:
-            with open(name, "wb") as upload:
+            with open(name, "wb") as upload:  # noqa: ASYNC230 - local temp file, bounded chunks
                 async for chunk in request.stream():
                     count += len(chunk)
                     if count > int(os.environ.get("OPENINGS_MAX_RESTORE_MB", "2048")) * 1024**2:
@@ -376,7 +376,7 @@ def create_app(database=None, start_worker=True):
                             "The backup exceeds this installation's restore limit.",
                         )
                     upload.write(chunk)
-            with open(name, "rb") as check_file:
+            with open(name, "rb") as check_file:  # noqa: ASYNC230 - 16-byte local read
                 header = check_file.read(16)
             if header != b"SQLite format 3\x00":
                 raise DomainError(422, "backup_format", "Select a SQLite database backup.")

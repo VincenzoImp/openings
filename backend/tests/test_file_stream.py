@@ -3,8 +3,8 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 from starlette.requests import ClientDisconnect
 
 from openings.app import create_app
