@@ -2,15 +2,34 @@
   "format": "openings-parity-e2e-v1",
   "project": "chromium",
   "routes": {
+    "DELETE /api/v1/career/claims/{}": [
+      "a career entry with claims, typed selection, files and import is managed end to end"
+    ],
+    "DELETE /api/v1/career/knowledge/{}": [
+      "a career entry with claims, typed selection, files and import is managed end to end"
+    ],
     "DELETE /api/v1/files/{}": [
+      "a career entry with claims, typed selection, files and import is managed end to end",
+      "a template's source, typed rules, assets and sample are managed end to end",
       "live file and note deletion identify the item before removal"
+    ],
+    "DELETE /api/v1/policy/items/{}": [
+      "a policy conflict reloads the section and keeps the unsaved text",
+      "keyboard only: a policy item is edited, saved and moved",
+      "policy items are added, edited, confirmed, switched, moved, reordered and removed"
+    ],
+    "DELETE /api/v1/templates/{}": [
+      "a template's source, typed rules, assets and sample are managed end to end"
     ],
     "DELETE /api/v1/tokens/{}": [
       "Settings creates an agent token that is refused token management"
     ],
     "GET /api/v1/applications": [
       "Settings creates an agent token that is refused token management",
+      "a career entry with claims, typed selection, files and import is managed end to end",
+      "a policy conflict reloads the section and keeps the unsaved text",
       "a screen that fails to load offers a reload",
+      "a template's source, typed rules, assets and sample are managed end to end",
       "activity has no serious accessibility finding",
       "activity?section=changes has no serious accessibility finding",
       "activity?section=requests has no serious accessibility finding",
@@ -38,14 +57,18 @@
       "inbox?queue=duplicates has no serious accessibility finding",
       "independent career, source and provider editors recover their own concurrent versions",
       "keyboard only: More opens, keeps focus, closes with Escape and navigates",
+      "keyboard only: a policy item is edited, saved and moved",
       "keyboard only: skip link, navigation, theme and density",
       "keyboard only: the sidebar reaches every destination in its group",
+      "links of earlier versions open the rebuilt screens",
       "live file and note deletion identify the item before removal",
       "mobile applications, templates and funnel stay usable inside the viewport",
       "mobile navigation contains focus and releases the background on close and resize",
       "navigation counts come from the workspace and the agent line shows an open run",
       "no horizontal page scroll from 360 to 1600 px on every screen",
       "overview has no serious accessibility finding",
+      "policy has no serious accessibility finding",
+      "policy items are added, edited, confirmed, switched, moved, reordered and removed",
       "question edits preserve compatible work and require deliberate incompatible removal",
       "queue count, posting hierarchy and query-safe selection",
       "records export downloads valid JSON with undated career entries",
@@ -55,8 +78,12 @@
       "settings?section=workspace has no serious accessibility finding",
       "shortlist has no serious accessibility finding",
       "templates has no serious accessibility finding",
+      "templates?section=assets has no serious accessibility finding",
+      "templates?section=preview has no serious accessibility finding",
+      "templates?section=rules has no serious accessibility finding",
       "the owner answers an agent's question and the agent can read the answer",
       "the owner writes a request and reads the agent's result with its run",
+      "the profile is saved with typed fields and free-form details edited as rows",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/applications/{}": [
@@ -79,7 +106,10 @@
     ],
     "GET /api/v1/auth/session": [
       "Settings creates an agent token that is refused token management",
+      "a career entry with claims, typed selection, files and import is managed end to end",
+      "a policy conflict reloads the section and keeps the unsaved text",
       "a screen that fails to load offers a reload",
+      "a template's source, typed rules, assets and sample are managed end to end",
       "activity has no serious accessibility finding",
       "activity?section=changes has no serious accessibility finding",
       "activity?section=requests has no serious accessibility finding",
@@ -107,14 +137,18 @@
       "inbox?queue=duplicates has no serious accessibility finding",
       "independent career, source and provider editors recover their own concurrent versions",
       "keyboard only: More opens, keeps focus, closes with Escape and navigates",
+      "keyboard only: a policy item is edited, saved and moved",
       "keyboard only: skip link, navigation, theme and density",
       "keyboard only: the sidebar reaches every destination in its group",
+      "links of earlier versions open the rebuilt screens",
       "live file and note deletion identify the item before removal",
       "mobile applications, templates and funnel stay usable inside the viewport",
       "mobile navigation contains focus and releases the background on close and resize",
       "navigation counts come from the workspace and the agent line shows an open run",
       "no horizontal page scroll from 360 to 1600 px on every screen",
       "overview has no serious accessibility finding",
+      "policy has no serious accessibility finding",
+      "policy items are added, edited, confirmed, switched, moved, reordered and removed",
       "question edits preserve compatible work and require deliberate incompatible removal",
       "queue count, posting hierarchy and query-safe selection",
       "records export downloads valid JSON with undated career entries",
@@ -124,31 +158,63 @@
       "settings?section=workspace has no serious accessibility finding",
       "shortlist has no serious accessibility finding",
       "templates has no serious accessibility finding",
+      "templates?section=assets has no serious accessibility finding",
+      "templates?section=preview has no serious accessibility finding",
+      "templates?section=rules has no serious accessibility finding",
       "the owner answers an agent's question and the agent can read the answer",
       "the owner writes a request and reads the agent's result with its run",
+      "the profile is saved with typed fields and free-form details edited as rows",
       "the sign-in screen has no serious accessibility finding",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/career/claims": [
-      "career?section=claims has no serious accessibility finding",
-      "context selection follows evidence and supports deliberate empty selections",
-      "import protection and nested dialogs restore scroll after browser Back",
-      "independent career, source and provider editors recover their own concurrent versions"
-    ],
-    "GET /api/v1/career/knowledge": [
+      "a career entry with claims, typed selection, files and import is managed end to end",
+      "career has no serious accessibility finding",
       "career?section=claims has no serious accessibility finding",
       "career?section=knowledge has no serious accessibility finding",
       "context selection follows evidence and supports deliberate empty selections",
       "import protection and nested dialogs restore scroll after browser Back",
       "independent career, source and provider editors recover their own concurrent versions",
-      "no horizontal page scroll from 360 to 1600 px on every screen"
+      "links of earlier versions open the rebuilt screens",
+      "no horizontal page scroll from 360 to 1600 px on every screen",
+      "the profile is saved with typed fields and free-form details edited as rows"
+    ],
+    "GET /api/v1/career/claims/{}": [
+      "a career entry with claims, typed selection, files and import is managed end to end",
+      "import protection and nested dialogs restore scroll after browser Back"
+    ],
+    "GET /api/v1/career/knowledge": [
+      "a career entry with claims, typed selection, files and import is managed end to end",
+      "career has no serious accessibility finding",
+      "career?section=claims has no serious accessibility finding",
+      "career?section=knowledge has no serious accessibility finding",
+      "context selection follows evidence and supports deliberate empty selections",
+      "import protection and nested dialogs restore scroll after browser Back",
+      "independent career, source and provider editors recover their own concurrent versions",
+      "links of earlier versions open the rebuilt screens",
+      "no horizontal page scroll from 360 to 1600 px on every screen",
+      "the profile is saved with typed fields and free-form details edited as rows"
     ],
     "GET /api/v1/career/knowledge/{}": [
+      "a career entry with claims, typed selection, files and import is managed end to end",
+      "career has no serious accessibility finding",
+      "career?section=knowledge has no serious accessibility finding",
       "import protection and nested dialogs restore scroll after browser Back",
-      "independent career, source and provider editors recover their own concurrent versions"
+      "independent career, source and provider editors recover their own concurrent versions",
+      "links of earlier versions open the rebuilt screens",
+      "no horizontal page scroll from 360 to 1600 px on every screen",
+      "the profile is saved with typed fields and free-form details edited as rows"
     ],
     "GET /api/v1/career/profile": [
-      "career has no serious accessibility finding"
+      "a career entry with claims, typed selection, files and import is managed end to end",
+      "career has no serious accessibility finding",
+      "career?section=claims has no serious accessibility finding",
+      "career?section=knowledge has no serious accessibility finding",
+      "import protection and nested dialogs restore scroll after browser Back",
+      "independent career, source and provider editors recover their own concurrent versions",
+      "links of earlier versions open the rebuilt screens",
+      "no horizontal page scroll from 360 to 1600 px on every screen",
+      "the profile is saved with typed fields and free-form details edited as rows"
     ],
     "GET /api/v1/collection": [
       "collection has no serious accessibility finding",
@@ -195,22 +261,42 @@
       "records export downloads valid JSON with undated career entries"
     ],
     "GET /api/v1/files": [
-      "live file and note deletion identify the item before removal"
+      "a career entry with claims, typed selection, files and import is managed end to end",
+      "a screen that fails to load offers a reload",
+      "a template's source, typed rules, assets and sample are managed end to end",
+      "career has no serious accessibility finding",
+      "career?section=knowledge has no serious accessibility finding",
+      "import protection and nested dialogs restore scroll after browser Back",
+      "independent career, source and provider editors recover their own concurrent versions",
+      "links of earlier versions open the rebuilt screens",
+      "live file and note deletion identify the item before removal",
+      "mobile applications, templates and funnel stay usable inside the viewport",
+      "no horizontal page scroll from 360 to 1600 px on every screen",
+      "templates has no serious accessibility finding",
+      "templates?section=assets has no serious accessibility finding",
+      "templates?section=preview has no serious accessibility finding",
+      "templates?section=rules has no serious accessibility finding",
+      "the profile is saved with typed fields and free-form details edited as rows"
+    ],
+    "GET /api/v1/files/{}": [
+      "a career entry with claims, typed selection, files and import is managed end to end"
     ],
     "GET /api/v1/files/{}/content": [
+      "a career entry with claims, typed selection, files and import is managed end to end",
+      "a template's source, typed rules, assets and sample are managed end to end",
       "an application is marked ready and a new revision clears the step",
       "document upload, revision ownership and safe file preview",
       "live file and note deletion identify the item before removal"
     ],
     "GET /api/v1/instructions": [
-      "a screen that fails to load offers a reload",
-      "mobile applications, templates and funnel stay usable inside the viewport",
-      "no horizontal page scroll from 360 to 1600 px on every screen",
-      "templates has no serious accessibility finding"
+      "a template's source, typed rules, assets and sample are managed end to end"
     ],
     "GET /api/v1/jobs": [
       "Settings creates an agent token that is refused token management",
+      "a career entry with claims, typed selection, files and import is managed end to end",
+      "a policy conflict reloads the section and keeps the unsaved text",
       "a screen that fails to load offers a reload",
+      "a template's source, typed rules, assets and sample are managed end to end",
       "activity has no serious accessibility finding",
       "activity?section=changes has no serious accessibility finding",
       "activity?section=requests has no serious accessibility finding",
@@ -238,14 +324,18 @@
       "inbox?queue=duplicates has no serious accessibility finding",
       "independent career, source and provider editors recover their own concurrent versions",
       "keyboard only: More opens, keeps focus, closes with Escape and navigates",
+      "keyboard only: a policy item is edited, saved and moved",
       "keyboard only: skip link, navigation, theme and density",
       "keyboard only: the sidebar reaches every destination in its group",
+      "links of earlier versions open the rebuilt screens",
       "live file and note deletion identify the item before removal",
       "mobile applications, templates and funnel stay usable inside the viewport",
       "mobile navigation contains focus and releases the background on close and resize",
       "navigation counts come from the workspace and the agent line shows an open run",
       "no horizontal page scroll from 360 to 1600 px on every screen",
       "overview has no serious accessibility finding",
+      "policy has no serious accessibility finding",
+      "policy items are added, edited, confirmed, switched, moved, reordered and removed",
       "question edits preserve compatible work and require deliberate incompatible removal",
       "queue count, posting hierarchy and query-safe selection",
       "records export downloads valid JSON with undated career entries",
@@ -255,8 +345,12 @@
       "settings?section=workspace has no serious accessibility finding",
       "shortlist has no serious accessibility finding",
       "templates has no serious accessibility finding",
+      "templates?section=assets has no serious accessibility finding",
+      "templates?section=preview has no serious accessibility finding",
+      "templates?section=rules has no serious accessibility finding",
       "the owner answers an agent's question and the agent can read the answer",
       "the owner writes a request and reads the agent's result with its run",
+      "the profile is saved with typed fields and free-form details edited as rows",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/jobs/duplicates": [
@@ -283,7 +377,10 @@
     ],
     "GET /api/v1/overview": [
       "Settings creates an agent token that is refused token management",
+      "a career entry with claims, typed selection, files and import is managed end to end",
+      "a policy conflict reloads the section and keeps the unsaved text",
       "a screen that fails to load offers a reload",
+      "a template's source, typed rules, assets and sample are managed end to end",
       "an agent opens a run and the navigation shows its status line",
       "an agent run, its report and its changes are readable",
       "an application is marked ready and a new revision clears the step",
@@ -295,20 +392,32 @@
       "import protection and nested dialogs restore scroll after browser Back",
       "independent career, source and provider editors recover their own concurrent versions",
       "keyboard only: More opens, keeps focus, closes with Escape and navigates",
+      "keyboard only: a policy item is edited, saved and moved",
       "keyboard only: skip link, navigation, theme and density",
       "keyboard only: the sidebar reaches every destination in its group",
+      "links of earlier versions open the rebuilt screens",
       "live file and note deletion identify the item before removal",
       "mobile applications, templates and funnel stay usable inside the viewport",
       "mobile navigation contains focus and releases the background on close and resize",
       "navigation counts come from the workspace and the agent line shows an open run",
       "no horizontal page scroll from 360 to 1600 px on every screen",
       "overview has no serious accessibility finding",
+      "policy items are added, edited, confirmed, switched, moved, reordered and removed",
       "question edits preserve compatible work and require deliberate incompatible removal",
       "queue count, posting hierarchy and query-safe selection",
       "records export downloads valid JSON with undated career entries",
       "the owner answers an agent's question and the agent can read the answer",
       "the owner writes a request and reads the agent's result with its run",
+      "the profile is saved with typed fields and free-form details edited as rows",
       "version conflict reviews latest values and reloads the editor with a usable version"
+    ],
+    "GET /api/v1/policy": [
+      "a policy conflict reloads the section and keeps the unsaved text",
+      "keyboard only: a policy item is edited, saved and moved",
+      "links of earlier versions open the rebuilt screens",
+      "no horizontal page scroll from 360 to 1600 px on every screen",
+      "policy has no serious accessibility finding",
+      "policy items are added, edited, confirmed, switched, moved, reordered and removed"
     ],
     "GET /api/v1/providers": [
       "independent career, source and provider editors recover their own concurrent versions",
@@ -316,7 +425,10 @@
     ],
     "GET /api/v1/questions": [
       "Settings creates an agent token that is refused token management",
+      "a career entry with claims, typed selection, files and import is managed end to end",
+      "a policy conflict reloads the section and keeps the unsaved text",
       "a screen that fails to load offers a reload",
+      "a template's source, typed rules, assets and sample are managed end to end",
       "activity has no serious accessibility finding",
       "activity?section=changes has no serious accessibility finding",
       "activity?section=requests has no serious accessibility finding",
@@ -344,14 +456,18 @@
       "inbox?queue=duplicates has no serious accessibility finding",
       "independent career, source and provider editors recover their own concurrent versions",
       "keyboard only: More opens, keeps focus, closes with Escape and navigates",
+      "keyboard only: a policy item is edited, saved and moved",
       "keyboard only: skip link, navigation, theme and density",
       "keyboard only: the sidebar reaches every destination in its group",
+      "links of earlier versions open the rebuilt screens",
       "live file and note deletion identify the item before removal",
       "mobile applications, templates and funnel stay usable inside the viewport",
       "mobile navigation contains focus and releases the background on close and resize",
       "navigation counts come from the workspace and the agent line shows an open run",
       "no horizontal page scroll from 360 to 1600 px on every screen",
       "overview has no serious accessibility finding",
+      "policy has no serious accessibility finding",
+      "policy items are added, edited, confirmed, switched, moved, reordered and removed",
       "question edits preserve compatible work and require deliberate incompatible removal",
       "queue count, posting hierarchy and query-safe selection",
       "records export downloads valid JSON with undated career entries",
@@ -361,8 +477,12 @@
       "settings?section=workspace has no serious accessibility finding",
       "shortlist has no serious accessibility finding",
       "templates has no serious accessibility finding",
+      "templates?section=assets has no serious accessibility finding",
+      "templates?section=preview has no serious accessibility finding",
+      "templates?section=rules has no serious accessibility finding",
       "the owner answers an agent's question and the agent can read the answer",
       "the owner writes a request and reads the agent's result with its run",
+      "the profile is saved with typed fields and free-form details edited as rows",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/requests": [
@@ -383,7 +503,10 @@
     ],
     "GET /api/v1/runs": [
       "Settings creates an agent token that is refused token management",
+      "a career entry with claims, typed selection, files and import is managed end to end",
+      "a policy conflict reloads the section and keeps the unsaved text",
       "a screen that fails to load offers a reload",
+      "a template's source, typed rules, assets and sample are managed end to end",
       "activity has no serious accessibility finding",
       "activity?section=changes has no serious accessibility finding",
       "activity?section=requests has no serious accessibility finding",
@@ -411,14 +534,18 @@
       "inbox?queue=duplicates has no serious accessibility finding",
       "independent career, source and provider editors recover their own concurrent versions",
       "keyboard only: More opens, keeps focus, closes with Escape and navigates",
+      "keyboard only: a policy item is edited, saved and moved",
       "keyboard only: skip link, navigation, theme and density",
       "keyboard only: the sidebar reaches every destination in its group",
+      "links of earlier versions open the rebuilt screens",
       "live file and note deletion identify the item before removal",
       "mobile applications, templates and funnel stay usable inside the viewport",
       "mobile navigation contains focus and releases the background on close and resize",
       "navigation counts come from the workspace and the agent line shows an open run",
       "no horizontal page scroll from 360 to 1600 px on every screen",
       "overview has no serious accessibility finding",
+      "policy has no serious accessibility finding",
+      "policy items are added, edited, confirmed, switched, moved, reordered and removed",
       "question edits preserve compatible work and require deliberate incompatible removal",
       "queue count, posting hierarchy and query-safe selection",
       "records export downloads valid JSON with undated career entries",
@@ -428,8 +555,12 @@
       "settings?section=workspace has no serious accessibility finding",
       "shortlist has no serious accessibility finding",
       "templates has no serious accessibility finding",
+      "templates?section=assets has no serious accessibility finding",
+      "templates?section=preview has no serious accessibility finding",
+      "templates?section=rules has no serious accessibility finding",
       "the owner answers an agent's question and the agent can read the answer",
       "the owner writes a request and reads the agent's result with its run",
+      "the profile is saved with typed fields and free-form details edited as rows",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/runs/{}": [
@@ -457,22 +588,32 @@
     ],
     "GET /api/v1/templates": [
       "a screen that fails to load offers a reload",
+      "a template's source, typed rules, assets and sample are managed end to end",
       "an application is marked ready and a new revision clears the step",
       "an open job, an open application and the add-job dialog have no serious accessibility finding",
       "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
       "document upload, revision ownership and safe file preview",
+      "links of earlier versions open the rebuilt screens",
       "mobile applications, templates and funnel stay usable inside the viewport",
       "no horizontal page scroll from 360 to 1600 px on every screen",
       "question edits preserve compatible work and require deliberate incompatible removal",
-      "templates has no serious accessibility finding"
+      "templates has no serious accessibility finding",
+      "templates?section=assets has no serious accessibility finding",
+      "templates?section=preview has no serious accessibility finding",
+      "templates?section=rules has no serious accessibility finding"
     ],
     "GET /api/v1/templates/{}": [
       "a screen that fails to load offers a reload",
+      "a template's source, typed rules, assets and sample are managed end to end",
+      "links of earlier versions open the rebuilt screens",
       "mobile applications, templates and funnel stay usable inside the viewport",
       "no horizontal page scroll from 360 to 1600 px on every screen",
-      "templates has no serious accessibility finding"
+      "templates has no serious accessibility finding",
+      "templates?section=assets has no serious accessibility finding",
+      "templates?section=preview has no serious accessibility finding",
+      "templates?section=rules has no serious accessibility finding"
     ],
     "GET /api/v1/tokens": [
       "Settings creates an agent token that is refused token management",
@@ -488,11 +629,25 @@
       "application plan, blocking requirements and a stale button action recover",
       "question edits preserve compatible work and require deliberate incompatible removal"
     ],
+    "PATCH /api/v1/career/claims/{}": [
+      "a career entry with claims, typed selection, files and import is managed end to end"
+    ],
     "PATCH /api/v1/career/knowledge/{}": [
       "independent career, source and provider editors recover their own concurrent versions"
     ],
+    "PATCH /api/v1/career/profile": [
+      "the profile is saved with typed fields and free-form details edited as rows"
+    ],
+    "PATCH /api/v1/instructions": [
+      "a template's source, typed rules, assets and sample are managed end to end"
+    ],
     "PATCH /api/v1/jobs/{}": [
       "version conflict reviews latest values and reloads the editor with a usable version"
+    ],
+    "PATCH /api/v1/policy/items/{}": [
+      "a policy conflict reloads the section and keeps the unsaved text",
+      "keyboard only: a policy item is edited, saved and moved",
+      "policy items are added, edited, confirmed, switched, moved, reordered and removed"
     ],
     "PATCH /api/v1/providers/{}": [
       "independent career, source and provider editors recover their own concurrent versions"
@@ -500,11 +655,26 @@
     "PATCH /api/v1/sources/{}": [
       "independent career, source and provider editors recover their own concurrent versions"
     ],
+    "PATCH /api/v1/templates/{}": [
+      "a template's source, typed rules, assets and sample are managed end to end"
+    ],
     "POST /api/v1/applications/{}/ready": [
       "an application is marked ready and a new revision clears the step"
     ],
     "POST /api/v1/auth/login": [
       "queue count, posting hierarchy and query-safe selection"
+    ],
+    "POST /api/v1/career/claims": [
+      "a career entry with claims, typed selection, files and import is managed end to end"
+    ],
+    "POST /api/v1/career/import": [
+      "a career entry with claims, typed selection, files and import is managed end to end"
+    ],
+    "POST /api/v1/career/import/preview": [
+      "a career entry with claims, typed selection, files and import is managed end to end"
+    ],
+    "POST /api/v1/career/knowledge": [
+      "a career entry with claims, typed selection, files and import is managed end to end"
     ],
     "POST /api/v1/contexts": [
       "context selection follows evidence and supports deliberate empty selections"
@@ -518,12 +688,27 @@
       "document upload, revision ownership and safe file preview"
     ],
     "POST /api/v1/files/uploads": [
+      "a career entry with claims, typed selection, files and import is managed end to end",
+      "a template's source, typed rules, assets and sample are managed end to end",
       "an application is marked ready and a new revision clears the step",
       "document upload, revision ownership and safe file preview",
       "live file and note deletion identify the item before removal"
     ],
     "POST /api/v1/jobs/{}/notes": [
       "live file and note deletion identify the item before removal"
+    ],
+    "POST /api/v1/policy/items/{}/confirm": [
+      "policy items are added, edited, confirmed, switched, moved, reordered and removed"
+    ],
+    "POST /api/v1/policy/items/{}/move": [
+      "policy items are added, edited, confirmed, switched, moved, reordered and removed"
+    ],
+    "POST /api/v1/policy/{}/items": [
+      "policy items are added, edited, confirmed, switched, moved, reordered and removed"
+    ],
+    "POST /api/v1/policy/{}/reorder": [
+      "keyboard only: a policy item is edited, saved and moved",
+      "policy items are added, edited, confirmed, switched, moved, reordered and removed"
     ],
     "POST /api/v1/questions/{}/answer": [
       "the owner answers an agent's question and the agent can read the answer"
@@ -534,10 +719,15 @@
     "POST /api/v1/requests/{}/withdraw": [
       "the owner writes a request and reads the agent's result with its run"
     ],
+    "POST /api/v1/templates": [
+      "a template's source, typed rules, assets and sample are managed end to end"
+    ],
     "POST /api/v1/tokens": [
       "Settings creates an agent token that is refused token management"
     ],
     "PUT /api/v1/transfers": [
+      "a career entry with claims, typed selection, files and import is managed end to end",
+      "a template's source, typed rules, assets and sample are managed end to end",
       "an application is marked ready and a new revision clears the step",
       "document upload, revision ownership and safe file preview",
       "live file and note deletion identify the item before removal"
