@@ -328,8 +328,7 @@ def test_rest_and_mcp_parity(tmp_path):
 
     async def call(name, arguments):
         result = await app.state.mcp.call_tool(name, arguments)
-        content = result[0] if isinstance(result, tuple) else result
-        return json.loads(content[0].text)
+        return json.loads(result.content[0].text)
 
     import asyncio
 
