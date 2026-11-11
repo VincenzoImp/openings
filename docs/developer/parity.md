@@ -12,8 +12,9 @@ How to read the evidence:
 
 - **Dashboard code** lists the dashboard source files that name the operation's
   REST route. **E2E** counts the browser tests in which the dashboard itself
-  called the route successfully (Chromium desktop; setup calls made by the test
-  helper are excluded). An operation with neither has no working dashboard path.
+  called the route without an error response (Chromium desktop; setup calls made
+  by the test helper are excluded). An operation with neither has no working
+  dashboard path.
 - **Editor** is `raw JSON` when a free-form JSON input is edited as JSON text.
 - Input comparisons use names from OpenAPI and the MCP tool schemas. A name the
   dashboard files never mention cannot be set there; a mentioned name may still
@@ -121,7 +122,7 @@ missing from the inventory.
 | `workspace.capabilities`<br>Read supported logical operations and transport exceptions | `GET /capabilities` | `capabilities_get` | Settings: capabilities/help | pages/Settings.tsx | structured | **0** |
 | `skills.list`<br>List shipped agent workflow skills | `GET /skills` | `skills_list` | Settings: Connect an agent | pages/Settings.tsx | structured | **0** |
 | `skills.read`<br>Read a skill or one of its reference files | `GET /skills/{name}`<br>`GET /skills/{name}/files/{path}` | `skill_get` | Settings: Connect an agent | **none** | — | — |
-| `overview.read`<br>Read submitted-attempt funnel and activity for a period | `GET /overview` | `overview_get` | Overview: period selector and funnel | pages/Overview.tsx | structured | 10 |
+| `overview.read`<br>Read submitted-attempt funnel and activity for a period | `GET /overview` | `overview_get` | Overview: period selector and funnel | pages/Overview.tsx | structured | 12 |
 | `jobs.list`<br>Search/filter/sort paginated job summaries | `GET /jobs` | `jobs_search` | Inbox: search, filters, pagination | App.tsx<br>pages/Jobs.tsx<br>pages/Settings.tsx | structured | 12 |
 | `jobs.read`<br>Read full posting, metadata and source provenance | `GET /jobs/{job_id}` | `job_get` | Inbox: job detail | pages/Jobs.tsx | structured | 3 |
 | `jobs.create`<br>Import a URL, pasted posting or structured job | `POST /jobs` | `job_ingest` | Inbox: Add job | pages/Jobs.tsx | raw JSON: metadata | **0** |
