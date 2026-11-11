@@ -101,13 +101,29 @@ For development commands and release gates, see [Contributing](../../CONTRIBUTIN
 
 ## Upgrade the workspace format
 
-Back up before upgrading. On start, a schema 7 workspace is upgraded to schema 8
-in one transaction: changes gain their actor and run, notes gain an author, and
+Back up before upgrading. On start, a schema 8 workspace is upgraded to schema 9
+in one transaction. Schema 9 changes storage only: the frozen contexts, which each
+held a full copy of your Career record, now share one stored copy of every entry,
+claim and template, and their asset files no longer add file rows. Every context
+still reads back byte for byte with the same signature, and file ids and links
+stay valid; the upgrade checks each context and changes nothing if one differs.
+
+Right after that upgrade the start takes longer once: the database file is
+rewritten without the freed space (seconds on an SSD, longer on slow storage). This needs free
+space on the data volume of about twice the database's new, smaller size plus
+64 MiB. Without it the step is skipped with a log message, the file keeps its
+size and the freed space is reused by later writes; the next start tries again.
+The same rewrite runs at any start when at least a quarter of the file and
+`OPENINGS_COMPACT_MIN_MB` (default 32) are free, for example after forgetting many
+jobs. An interruption leaves the previous file intact.
+
+A schema 7 workspace is upgraded to schema 8 in the same
+transaction: changes gain their actor and run, notes gain an author, and
 the tables for agent runs and questions for the owner are added. Every existing
 record, version, file and frozen context is kept. Changes recorded before the
 upgrade keep their content and show the actor "unknown (before 0.17)". Schema 6
 (applications gain empty priority, deadline and requirements) and schema 5 (0.10)
-are upgraded through the same chain in the same step. Restore accepts a schema 8
-backup and upgrades a copy of a schema 5, 6 or 7 backup; the uploaded file is
-not changed. A schema 8 workspace cannot be opened by an earlier release. Older
+are upgraded through the same chain in the same step. Restore accepts a schema 9
+backup and upgrades a copy of a schema 5, 6, 7 or 8 backup; the uploaded file is
+not changed. A schema 9 workspace cannot be opened by an earlier release. Older
 formats require their matching release.

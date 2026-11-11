@@ -22,6 +22,7 @@ flowchart LR
 | `backend/openings/workspace.py` | Job identities, triage, notes, application attempts and reporting |
 | `backend/openings/career.py` | Profile, detailed evidence, claims, templates and instructions |
 | `backend/openings/documents.py` | Frozen contexts, document revisions and scoped file transfers |
+| `backend/openings/snapshots.py`, `compaction.py` | Content-addressed storage of frozen contexts; giving freed pages back to the data volume |
 | `backend/openings/activity.py`, `actors.py` | Actor of each change, agent runs with reports, questions for the owner, change log |
 | `backend/openings/discovery.py` | Typed sources, schedules and queue operations |
 | `backend/openings/collectors` | Adapter capability catalog, typed options and shared HTTP policy/runtime |
@@ -63,6 +64,19 @@ dashboard path, and lists every gap. Read [REST](../user/api.md) and
   so concurrent uploads cannot be approved unseen. Approval also compares the
   structured content's text with the attached `.tex` source (`consistency.py`,
   no TeX runtime) unless an explicit override is sent.
+- **Snapshot storage:** a context's payload is one canonical JSON text, and its
+  signature is the SHA-256 of that text. `snapshots.py` stores the text as a frame
+  of literals with one part between each pair: every Career entry, claim and
+  template, the Profile, the job and the general instructions are parts, stored
+  once in `snapshot_parts` under the SHA-256 of their own text and shared by all
+  contexts (`context_parts`; a list part names its items in `snapshot_list_items`).
+  Reading a context concatenates frame and parts, so payload and signature are
+  reproduced byte for byte without re-encoding; a payload without the canonical
+  form is kept whole. A context's asset files are parts too: the part names the
+  blob, the reference keeps the file id the payload exposes, and the `all_files`
+  view serves them beside the rows of `files`. Deleting an application or job
+  removes the parts and bytes nothing references any more, in the same transaction
+  or once per bulk run. Foreign keys make a dangling reference impossible.
 - **Staleness:** contexts are never rewritten. `staleness.py` compares the Profile,
   instructions, template, entry and claim versions recorded in each current
   leaf's context with the live records on read; refreshing means a new context
@@ -99,14 +113,23 @@ memory and releasing SQLite readers before cancellation or thread changes.
 Backups use SQLite's online backup API. A restore preserves
 installation authentication, recent provider request history and later cooldowns.
 
-Workspaces and backups use schema 8. Opening schema 7 upgrades it in one
+Workspaces and backups use schema 9, a storage-only change: opening schema 8
+moves every frozen context into content-addressed parts and its asset files out of
+`files`, compares each rebuilt payload with the stored text, and then drops the
+old column, all in the upgrade transaction; contexts gain summary columns for
+lists. When at least a quarter of the file (and `OPENINGS_COMPACT_MIN_MB`, default
+32) is free afterwards, or after large deletions, `compaction.py` rewrites the file
+at start: a compact copy beside the database is copied back in one transaction, so
+an interruption leaves the previous file valid and the next start tries again.
+
+Schema 8 came with 0.17. Opening schema 7 upgrades it in the same
 transaction: events gain a subject, an actor and a run, notes gain an author, and
 the `runs` and `questions` tables are added; existing rows keep every value and
 read as "unknown (before 0.17)". Schema 6 is upgraded through schema 7 in the same
 transaction (application priority, deadline and requirements), and schema 5
 through schema 6 (removing obsolete derived data and preserving owned records and
-immutable snapshots). Restore accepts schema 8 and upgrades a copy of a schema 5,
-6 or 7 backup. Other historical formats require the matching release.
+immutable snapshots). Restore accepts schema 9 and upgrades a copy of a schema 5,
+6, 7 or 8 backup. Other historical formats require the matching release.
 
 ## Acquisition
 
