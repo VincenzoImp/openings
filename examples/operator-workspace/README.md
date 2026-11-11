@@ -37,8 +37,8 @@ from disk, run `python3 .agents/scripts/fetch_skills.py` from a launched shell.
 
 Ask the agent to set up your workspace. It follows the `setup-openings` skill:
 it imports your CV or LinkedIn export into the Career record, asks about your
-target roles, locations and constraints, writes your Profile and decision
-policy, builds your CV and letter templates, adds searches and companies to
+target roles, locations and constraints, writes your Profile, proposes the
+items of your policy for you to confirm, builds your CV and letter templates, adds searches and companies to
 follow, and prepares a first Draft so you can see the result.
 
 Afterwards, ask in plain language: "what should I apply to today?", "I have an

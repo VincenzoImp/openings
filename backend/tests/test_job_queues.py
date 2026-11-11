@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openings.app import create_app
+from openings.db import SCHEMA_VERSION
 from openings.errors import DomainError
 from openings.workspace import Workspace
 from schema_fixtures import make_schema_seven
@@ -152,7 +153,7 @@ def test_schema_five_upgrade_preserves_owned_records_and_versions(tmp_path):
     assert upgraded.get_application(application["id"]) == application
     assert upgraded.list_jobs(queue="shortlist")["total"] == 0
     with upgraded.db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         assert not conn.execute(
             "SELECT name FROM sqlite_master WHERE name='assessments'"
         ).fetchall()

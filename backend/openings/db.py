@@ -11,7 +11,7 @@ from pathlib import Path
 from .errors import DomainError
 from .posting import posting_complete
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 SCHEMA_SQL = Path(__file__).with_name("schema.sql")
 TEMP_PREFIX = ".openings-temp-"
 
@@ -232,8 +232,45 @@ def _migrate_8_to_9(conn):
     trim_history(conn)
 
 
+# Claim metadata keys copied to the typed selection fields: the key has the field's
+# name and its value is already a valid value of the field. Nothing else is guessed.
+CLAIM_FIELDS_FROM_METADATA = {
+    "default_in_cv": "json_type(metadata,'$.default_in_cv') IN ('true','false')",
+    "role": "json_type(metadata,'$.role')='text' AND json_extract(metadata,'$.role') IN ('core','supporting','bench')",
+    "group": "json_type(metadata,'$.group')='text' AND length(json_extract(metadata,'$.group'))<=100",
+}
+
+
+def _migrate_9_to_10(conn):
+    # Additive: the typed policy, typed claim selection fields and the policy versions
+    # a context froze. Profile metadata, preferences and roles are copied into
+    # unconfirmed policy items and stay where they are; no existing value changes.
+    from .policy import migrate_profile
+
+    for column in (
+        "default_in_cv INTEGER NOT NULL DEFAULT 0 CHECK(default_in_cv IN (0,1))",
+        "role TEXT NOT NULL DEFAULT 'supporting' CHECK(role IN ('core','supporting','bench'))",
+        "\"group\" TEXT NOT NULL DEFAULT ''",
+    ):
+        conn.execute("ALTER TABLE claims ADD COLUMN " + column)
+    for name, exact in CLAIM_FIELDS_FROM_METADATA.items():
+        conn.execute(
+            f"UPDATE claims SET \"{name}\"=json_extract(metadata,'$.{name}') "
+            f"WHERE json_valid(metadata) AND {exact}"
+        )
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='context_inputs'").fetchone():
+        conn.execute("ALTER TABLE context_inputs ADD COLUMN policy TEXT")
+    migrate_profile(conn)
+
+
 # Each step upgrades from its key to the next version; steps chain inside one transaction.
-MIGRATIONS = {5: _migrate_5_to_6, 6: _migrate_6_to_7, 7: _migrate_7_to_8, 8: _migrate_8_to_9}
+MIGRATIONS = {
+    5: _migrate_5_to_6,
+    6: _migrate_6_to_7,
+    7: _migrate_7_to_8,
+    8: _migrate_8_to_9,
+    9: _migrate_9_to_10,
+}
 
 
 def upgrade(conn):

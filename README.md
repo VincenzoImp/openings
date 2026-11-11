@@ -23,8 +23,11 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
 - **Triage:** review the Inbox, keep jobs on a Shortlist or dismiss them; dismissed
   jobs stay remembered. **Possible duplicates** groups one vacancy collected from
   several sources so you can merge verified copies; bulk actions work on up to 200 jobs.
-- **Prepare:** store your Profile, Career entries, approved claims, LaTeX templates
-  and writing instructions. Each application freezes the exact context its CV,
+- **Decide once:** a **Policy** of short statements holds your rules for
+  shortlisting and dismissing, the facts employers ask about and your writing
+  rules. Your agent proposes items; they count after you confirm them.
+- **Prepare:** store your Profile, Career entries, approved claims with typed
+  selection fields, LaTeX templates with typed rules and writing instructions. Each application freezes the exact context its CV,
   cover letter and form answers were written from, with PDF/source revisions and review.
 - **Plan:** give applications a priority, a deadline and the employer's requirements
   (authorship rules, attachments, references, language, eligibility). Filter by
@@ -53,7 +56,7 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
 Openings works best when your own AI agent runs it. The server ships
 [workflow skills](skills/) and serves them to any connected agent (`skills_list`,
 `skill_get` and one MCP prompt per skill). With them, an agent reviews new jobs
-against your Profile, prepares a CV and letter for every shortlisted job, records
+against your policy, prepares a CV and letter for every shortlisted job, records
 employer requirements, tunes searches and keeps your Career record current. You
 answer its questions, apply to the prepared Drafts and mark them Applied.
 

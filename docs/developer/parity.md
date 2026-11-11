@@ -27,16 +27,16 @@ How to read the evidence:
 
 | Measure | Operations |
 |---|---|
-| Logical operations in the inventory | 110 |
+| Logical operations in the inventory | 117 |
 | Without REST or without MCP | 0 |
-| Owner only (refused for an agent token) | 8 |
+| Owner only (refused for an agent token) | 9 |
 | Without a working dashboard path | 9 |
 | Reached only through another operation | 5 |
-| With inputs the dashboard never mentions | 9 |
-| With free-form JSON edited as raw JSON | 13 |
+| With inputs the dashboard never mentions | 10 |
+| With free-form JSON edited as raw JSON | 6 |
 | With different REST and MCP input names | 1 |
-| With a dashboard path exercised by e2e | 53 |
-| With a dashboard path but no e2e evidence | 43 |
+| With a dashboard path exercised by e2e | 74 |
+| With a dashboard path but no e2e evidence | 29 |
 
 ## Gaps
 
@@ -78,6 +78,7 @@ operation. They can be set over REST or MCP only.
 | Operation | Inputs | Remark |
 |---|---|---|
 | `jobs.create` | `raw`, `source_key` | `raw` and `source_key` are collector fields for scripted imports. |
+| `policy.add` | `idempotency_key`, `position` | The form sends the fields it shows; `position` and `idempotency_key` serve agents and scripts (a new item goes to the end, then the arrows move it). |
 | `applications.list` | `ready_since`, `ready_until` | The Ready to apply queue filters by `readiness=ready` with `sort=ready`; the time range serves agents and scripts. |
 | `applications.create` | `deadline`, `priority`, `questions`, `requirements` | Starting an application sends the job only; plan fields and questions are edited afterwards (`applications.update`). |
 | `contexts.create` | `template_id` | The context dialog sends `template_ids`; `template_id` is the single-template form of the same input. |
@@ -98,13 +99,6 @@ Structured data the owner can change only by editing JSON text.
 | `sources.preview` | `config` | pages/CollectionForms.tsx | — |
 | `sources.create` | `config` | pages/CollectionForms.tsx | — |
 | `sources.update` | `config` | pages/CollectionForms.tsx<br>pages/Companies.tsx | — |
-| `profile.update` | `metadata` | pages/Career.tsx | `metadata` holds the owner's decision policy and eligibility facts on real workspaces. |
-| `knowledge.create` | `metadata` | pages/Career.tsx | — |
-| `knowledge.update` | `metadata` | pages/Career.tsx | — |
-| `claims.create` | `metadata` | pages/Career.tsx | — |
-| `claims.update` | `metadata` | pages/Career.tsx | — |
-| `templates.create` | `rules` | pages/Templates.tsx | — |
-| `templates.update` | `rules` | pages/Templates.tsx | `rules` is free-form apart from three typed limits (pages, bullets, bullet length). |
 | `applications.update` | `answers` | pages/Applications.tsx | Answers have one control per question; raw JSON is the advanced fallback. |
 
 ### REST and MCP input differences
@@ -123,6 +117,7 @@ with `403 forbidden` on REST and MCP; `test_interfaces.py` checks each one.
 
 | Operation | REST | MCP | Remark |
 |---|---|---|---|
+| `policy.confirm` | `POST /policy/items/{item_id}/confirm` | `policy_confirm` | expected_version is the section's version; a stale one returns 409 with details.current_version. Confirms the item as it stands and records who confirmed it. An agent proposes and asks; it never confirms. |
 | `backup.restore` | `POST /backup/restore` | `workspace_restore_upload` | MCP obtains a scoped raw HTTP upload grant. Validated restore preserves installation authentication; no arbitrary SQL endpoint. Recent destination provider HTTP usage and later cooldowns survive older-backup restore; saved policy settings are restored. |
 | `questions.answer` | `POST /questions/{question_id}/answer` | `questions_answer` | An answer is the owner's. An owner token records it only when the owner gave it. |
 | `requests.create` | `POST /requests` | `requests_create` | The owner writes; an agent never writes requests for itself. A request never authorises what the operating mandate forbids. |
@@ -142,10 +137,11 @@ missing from the inventory.
 | Exception | Dashboard code | MCP | Reason |
 |---|---|---|---|
 | `auth.bootstrap_session` | App.tsx<br>api.ts<br>shell/Auth.tsx | — | Credential bootstrap and browser session transport precede authenticated domain tools; MCP uses bearer authentication. Logout revokes every browser session; API/MCP tokens remain valid. |
+| `reference.examples` | pages/career/ImportDialog.tsx<br>pages/templates/Dialogs.tsx | — | Shipped static reference files are convenience downloads, not private workspace records; agents may use REST or repository examples. |
 
 ### Dashboard paths without e2e evidence
 
-`workspace.capabilities`, `jobs.create`, `jobs.triage`, `jobs.bulk`, `jobs.merge`, `jobs.delete`, `notes.read`, `notes.update`, `notes.delete`, `collection.update`, `sources.preview`, `sources.create`, `sources.bulk`, `tasks.list`, `tasks.read`, `tasks.cancel`, `tasks.retry`, `profile.update`, `knowledge.create`, `knowledge.delete`, `claims.read`, `claims.create`, `claims.update`, `claims.delete`, `templates.create`, `templates.update`, `templates.delete`, `instructions.update`, `career.preview_import`, `career.import`, `applications.create`, `applications.delete`, `applications.bulk`, `contexts.read`, `applications.staleness`, `documents.delete`, `files.read`, `backup.download`, `backup.restore`, `questions.withdraw`, `password.update`, `collection.runs.read`, `collection.runs.cancel`
+`workspace.capabilities`, `jobs.create`, `jobs.triage`, `jobs.bulk`, `jobs.merge`, `jobs.delete`, `notes.read`, `notes.update`, `notes.delete`, `collection.update`, `sources.preview`, `sources.create`, `sources.bulk`, `tasks.list`, `tasks.read`, `tasks.cancel`, `tasks.retry`, `applications.create`, `applications.delete`, `applications.bulk`, `contexts.read`, `applications.staleness`, `documents.delete`, `backup.download`, `backup.restore`, `questions.withdraw`, `password.update`, `collection.runs.read`, `collection.runs.cancel`
 
 ## Matrix
 
@@ -157,8 +153,8 @@ missing from the inventory.
 | `workspace.capabilities`<br>Read supported logical operations and transport exceptions | `GET /capabilities` | `capabilities_get` | any | Settings: capabilities/help | pages/Settings.tsx | structured | **0** |
 | `skills.list`<br>List shipped agent workflow skills | `GET /skills` | `skills_list` | any | Settings: Connect an agent | pages/Settings.tsx | structured | 4 |
 | `skills.read`<br>Read a skill or one of its reference files | `GET /skills/{name}`<br>`GET /skills/{name}/files/{path}` | `skill_get` | any | Settings: Connect an agent | **none** | — | — |
-| `overview.read`<br>Read submitted-attempt funnel and activity for a period | `GET /overview` | `overview_get` | any | Overview: period selector and funnel | pages/Overview.tsx | structured | 27 |
-| `jobs.list`<br>Search/filter/sort paginated job summaries | `GET /jobs` | `jobs_search` | any | Inbox: search, filters, pagination | pages/Jobs.tsx<br>pages/Settings.tsx<br>shell/Shell.tsx | structured | 49 |
+| `overview.read`<br>Read submitted-attempt funnel and activity for a period | `GET /overview` | `overview_get` | any | Overview: period selector and funnel | pages/Overview.tsx | structured | 34 |
+| `jobs.list`<br>Search/filter/sort paginated job summaries | `GET /jobs` | `jobs_search` | any | Inbox: search, filters, pagination | pages/Jobs.tsx<br>pages/Settings.tsx<br>shell/Shell.tsx | structured | 60 |
 | `jobs.read`<br>Read full posting, metadata and source provenance | `GET /jobs/{job_id}` | `job_get` | any | Inbox: job detail | pages/Jobs.tsx | structured | 8 |
 | `jobs.create`<br>Import a URL, pasted posting or structured job | `POST /jobs` | `job_ingest` | any | Inbox: Add job | pages/Jobs.tsx | raw JSON: metadata | **0** |
 | `jobs.update`<br>Correct job fields and metadata | `PATCH /jobs/{job_id}` | `job_update` | any | Inbox: edit job | pages/Jobs.tsx | raw JSON: metadata | 1 |
@@ -203,33 +199,40 @@ missing from the inventory.
 
 | Operation | REST | MCP | Access | Dashboard location | Dashboard code | Editor | E2E |
 |---|---|---|---|---|---|---|---|
-| `profile.read`<br>Read profile, links, metadata and version | `GET /career/profile` | `career_get_profile` | any | Career: profile | pages/Career.tsx | structured | 1 |
-| `profile.update`<br>Edit profile/preferences/contact | `PATCH /career/profile` | `career_update_profile` | any | Career: profile and Advanced JSON | pages/Career.tsx | raw JSON: metadata | **0** |
-| `knowledge.list`<br>Search/filter paginated career entries summaries | `GET /career/knowledge` | `knowledge_list` | any | Career: career entries: list/search | pages/Applications.tsx<br>pages/Career.tsx | structured | 6 |
-| `knowledge.read`<br>Read full career entries | `GET /career/knowledge/{knowledge_id}` | `knowledge_get` | any | Career: career entries: detail | pages/Career.tsx | structured | 2 |
-| `knowledge.create`<br>Create career entries | `POST /career/knowledge` | `knowledge_create` | any | Career: career entries: add | pages/Career.tsx | raw JSON: metadata | **0** |
-| `knowledge.update`<br>Edit career entries with version protection | `PATCH /career/knowledge/{knowledge_id}` | `knowledge_update` | any | Career: career entries: edit and Advanced JSON | pages/Career.tsx | raw JSON: metadata | 1 |
-| `knowledge.delete`<br>Delete live career entries | `DELETE /career/knowledge/{knowledge_id}` | `knowledge_delete` | any | Career: career entries: remove | pages/Career.tsx | structured | **0** |
-| `claims.list`<br>Search/filter paginated claims summaries | `GET /career/claims` | `claims_list` | any | Career: reusable claims: list/search | pages/Applications.tsx<br>pages/Career.tsx | structured | 4 |
-| `claims.read`<br>Read full claim | `GET /career/claims/{claim_id}` | `claims_get` | any | Career: reusable claims: detail | pages/Career.tsx | structured | **0** |
-| `claims.create`<br>Create claim | `POST /career/claims` | `claims_create` | any | Career: reusable claims: add | pages/Career.tsx | raw JSON: metadata | **0** |
-| `claims.update`<br>Edit claim with version protection | `PATCH /career/claims/{claim_id}` | `claims_update` | any | Career: reusable claims: edit and Advanced JSON | pages/Career.tsx | raw JSON: metadata | **0** |
-| `claims.delete`<br>Delete live claim | `DELETE /career/claims/{claim_id}` | `claims_delete` | any | Career: reusable claims: remove | pages/Career.tsx | structured | **0** |
-| `templates.list`<br>Search/filter paginated templates summaries | `GET /templates` | `templates_list` | any | Templates: packages/defaults: list/search | pages/Applications.tsx<br>pages/Templates.tsx | structured | 11 |
-| `templates.read`<br>Read full template | `GET /templates/{template_id}` | `templates_get` | any | Templates: packages/defaults: detail | pages/Templates.tsx | structured | 4 |
-| `templates.create`<br>Create template | `POST /templates` | `templates_create` | any | Templates: packages/defaults: add | pages/Templates.tsx | raw JSON: rules | **0** |
-| `templates.update`<br>Edit template with version protection | `PATCH /templates/{template_id}` | `templates_update` | any | Templates: packages/defaults: edit and Advanced JSON | pages/Templates.tsx | raw JSON: rules | **0** |
-| `templates.delete`<br>Delete live template | `DELETE /templates/{template_id}` | `templates_delete` | any | Templates: packages/defaults: remove | pages/Templates.tsx | structured | **0** |
-| `instructions.read`<br>Read general document writing instructions | `GET /instructions` | `instructions_get` | any | Templates: general instructions | pages/Templates.tsx | structured | 4 |
-| `instructions.update`<br>Edit general document writing instructions | `PATCH /instructions` | `instructions_update` | any | Templates: general instructions | pages/Templates.tsx | structured | **0** |
-| `career.preview_import`<br>Preview JSON/text career import without mutation | `POST /career/import/preview` | `career_preview_import` | any | Career: import preview | pages/Career.tsx | structured | **0** |
-| `career.import`<br>Confirm append-only evidence and optional versioned profile import | `POST /career/import` | `career_import` | any | Career: confirm import | pages/Career.tsx | structured | **0** |
+| `profile.read`<br>Read profile, links, metadata and version | `GET /career/profile` | `career_get_profile` | any | Career: profile | pages/career/ProfileCard.tsx | structured | 9 |
+| `profile.update`<br>Edit profile/preferences/contact | `PATCH /career/profile` | `career_update_profile` | any | Career: profile and Other details | pages/career/ProfileCard.tsx | structured | 1 |
+| `knowledge.list`<br>Search/filter paginated career entries summaries | `GET /career/knowledge` | `knowledge_list` | any | Career: career entries: list/search | pages/Applications.tsx<br>pages/Career.tsx | structured | 10 |
+| `knowledge.read`<br>Read full career entries | `GET /career/knowledge/{knowledge_id}` | `knowledge_get` | any | Career: career entries: detail | pages/career/EntryEditor.tsx | structured | 8 |
+| `knowledge.create`<br>Create career entries | `POST /career/knowledge` | `knowledge_create` | any | Career: career entries: add | pages/career/EntryEditor.tsx | structured | 1 |
+| `knowledge.update`<br>Edit career entries with version protection | `PATCH /career/knowledge/{knowledge_id}` | `knowledge_update` | any | Career: career entries: edit and Other details | pages/career/EntryEditor.tsx | structured | 1 |
+| `knowledge.delete`<br>Delete live career entries | `DELETE /career/knowledge/{knowledge_id}` | `knowledge_delete` | any | Career: career entries: remove | pages/career/EntryEditor.tsx | structured | 1 |
+| `claims.list`<br>Search/filter paginated claims summaries | `GET /career/claims` | `claims_list` | any | Career: reusable claims: list/search | pages/Applications.tsx<br>pages/Career.tsx<br>pages/career/Claims.tsx<br>pages/career/Record.tsx | structured | 10 |
+| `claims.read`<br>Read full claim | `GET /career/claims/{claim_id}` | `claims_get` | any | Career: reusable claims: detail | pages/career/ClaimDialog.tsx<br>pages/career/Claims.tsx | structured | 2 |
+| `claims.create`<br>Create claim | `POST /career/claims` | `claims_create` | any | Career: reusable claims: add | pages/career/ClaimDialog.tsx | structured | 1 |
+| `claims.update`<br>Edit claim with version protection | `PATCH /career/claims/{claim_id}` | `claims_update` | any | Career: reusable claims: selection controls, edit and Other details | pages/career/ClaimDialog.tsx<br>pages/career/Claims.tsx | structured | 1 |
+| `claims.delete`<br>Delete live claim | `DELETE /career/claims/{claim_id}` | `claims_delete` | any | Career: reusable claims: remove | pages/career/Claims.tsx | structured | 1 |
+| `templates.list`<br>Search/filter paginated templates summaries | `GET /templates` | `templates_list` | any | Templates: packages/defaults: list/search | pages/Applications.tsx<br>pages/Templates.tsx | structured | 16 |
+| `templates.read`<br>Read full template | `GET /templates/{template_id}` | `templates_get` | any | Templates: packages/defaults: detail | pages/Templates.tsx | structured | 9 |
+| `templates.create`<br>Create template | `POST /templates` | `templates_create` | any | Templates: packages/defaults: add | pages/templates/Dialogs.tsx | structured | 1 |
+| `templates.update`<br>Edit template with version protection | `PATCH /templates/{template_id}` | `templates_update` | any | Templates: packages/defaults: Source, Rules and Assets | pages/templates/Detail.tsx<br>pages/templates/Dialogs.tsx<br>pages/templates/Rules.tsx | structured | 1 |
+| `templates.delete`<br>Delete live template | `DELETE /templates/{template_id}` | `templates_delete` | any | Templates: packages/defaults: remove | pages/templates/Detail.tsx | structured | 1 |
+| `instructions.read`<br>Read general document writing instructions | `GET /instructions` | `instructions_get` | any | Templates: general instructions | pages/templates/Dialogs.tsx | structured | 1 |
+| `instructions.update`<br>Edit general document writing instructions | `PATCH /instructions` | `instructions_update` | any | Templates: general instructions | pages/templates/Dialogs.tsx | structured | 1 |
+| `career.preview_import`<br>Preview JSON/text career import without mutation | `POST /career/import/preview` | `career_preview_import` | any | Career: import preview | pages/career/ImportDialog.tsx | structured | 1 |
+| `career.import`<br>Confirm append-only evidence and optional versioned profile import | `POST /career/import` | `career_import` | any | Career: confirm import | pages/career/ImportDialog.tsx | structured | 1 |
+| `policy.read`<br>Read the owner's policy, or one section | `GET /policy`<br>`GET /policy/{section}` | `policy_get` | any | Policy: sections and items | pages/Policy.tsx | structured | 6 |
+| `policy.add`<br>Add a policy item | `POST /policy/{section}/items` | `policy_add` | any | Policy: Add a rule / Add a fact | pages/policy/Section.tsx | structured | 1 |
+| `policy.update`<br>Edit a policy item | `PATCH /policy/items/{item_id}` | `policy_update` | any | Policy: Edit; the rule switch | pages/policy/Section.tsx | structured | 3 |
+| `policy.move`<br>Move a policy item to another section | `POST /policy/items/{item_id}/move` | `policy_move` | any | Policy: Move to section | — | structured | 1 |
+| `policy.reorder`<br>Reorder a section's policy items | `POST /policy/{section}/reorder` | `policy_reorder` | any | Policy: Move up / Move down | — | structured | 2 |
+| `policy.confirm`<br>Confirm a proposed policy item | `POST /policy/items/{item_id}/confirm` | `policy_confirm` | owner | Policy: Confirm | — | structured | 1 |
+| `policy.remove`<br>Remove a policy item | `DELETE /policy/items/{item_id}` | `policy_remove` | any | Policy: Remove | pages/policy/Section.tsx | structured | 3 |
 
 ### Applications and documents
 
 | Operation | REST | MCP | Access | Dashboard location | Dashboard code | Editor | E2E |
 |---|---|---|---|---|---|---|---|
-| `applications.list`<br>Search/filter/sort paginated application summaries | `GET /applications` | `applications_list` | any | Applications: list/Kanban filters | pages/Applications.tsx<br>pages/Jobs.tsx<br>shell/Shell.tsx | structured | 49 |
+| `applications.list`<br>Search/filter/sort paginated application summaries | `GET /applications` | `applications_list` | any | Applications: list/Kanban filters | pages/Applications.tsx<br>pages/Jobs.tsx<br>shell/Shell.tsx | structured | 60 |
 | `applications.read`<br>Read full attempt, questions/answers, requirements and job | `GET /applications/{application_id}` | `application_get` | any | Applications: attempt detail | pages/Applications.tsx | structured | 7 |
 | `applications.create`<br>Start application preparation (draft) | `POST /applications` | `application_create` | any | Inbox: Start application | pages/Jobs.tsx | structured | **0** |
 | `applications.update`<br>Record stage, outcome, priority, deadline, employer requirements, questions/answers and application instructions | `PATCH /applications/{application_id}` | `application_update` | any | Applications: progress, planning, requirements and questions/answers | pages/Applications.tsx | raw JSON: answers | 2 |
@@ -248,11 +251,11 @@ missing from the inventory.
 | `documents.review`<br>Approve the exact revision content/files | `POST /documents/{document_id}/review` | `documents_review` | any | Applications: Approve revision | pages/Applications.tsx | structured | 2 |
 | `documents.consistency`<br>Compare structured content text with the attached .tex source | `GET /documents/{document_id}/consistency` | `documents_consistency` | any | Applications: approval reports content/source differences | pages/Applications.tsx | structured | 2 |
 | `documents.delete`<br>Delete an entire revision and its files | `DELETE /documents/{document_id}` | `documents_delete` | any | Applications: delete revision | pages/Applications.tsx | structured | **0** |
-| `files.list`<br>List/filter paginated file metadata | `GET /files` | `files_list` | any | Career/Templates/Applications/Inbox: assets and files | api.ts<br>files.tsx | structured | 1 |
-| `files.read`<br>Read immutable file metadata and content URL | `GET /files/{file_id}` | `files_get` | any | Career/Templates/Applications/Inbox: file details | files.tsx | structured | **0** |
-| `files.upload`<br>Upload exact raw bytes to a mutable owner | `POST /files/uploads`<br>`PUT /transfers` | `files_reserve_upload` | any | Career/Templates/Applications/Inbox: upload file | api.ts | structured | 3 |
-| `files.download`<br>Download/preview exact file bytes | `GET /files/{file_id}/content`<br>`POST /files/{file_id}/download`<br>`GET /transfers` | `files_reserve_download` | any | Career/Templates/Applications/Inbox: preview/download | api.ts | structured | 3 |
-| `files.delete`<br>Delete a live knowledge/template/job asset | `DELETE /files/{file_id}` | `files_delete` | any | Career/Templates/Inbox: remove asset | files.tsx | structured | 1 |
+| `files.list`<br>List/filter paginated file metadata | `GET /files` | `files_list` | any | Career/Templates/Applications/Inbox: assets and files | api.ts<br>files.tsx<br>library/Assets.tsx | structured | 16 |
+| `files.read`<br>Read immutable file metadata and content URL | `GET /files/{file_id}` | `files_get` | any | Career/Templates/Applications/Inbox: file details | files.tsx<br>library/Assets.tsx | structured | 1 |
+| `files.upload`<br>Upload exact raw bytes to a mutable owner | `POST /files/uploads`<br>`PUT /transfers` | `files_reserve_upload` | any | Career/Templates/Applications/Inbox: upload file | api.ts | structured | 5 |
+| `files.download`<br>Download/preview exact file bytes | `GET /files/{file_id}/content`<br>`POST /files/{file_id}/download`<br>`GET /transfers` | `files_reserve_download` | any | Career/Templates/Applications/Inbox: preview/download | api.ts | structured | 5 |
+| `files.delete`<br>Delete a live knowledge/template/job asset | `DELETE /files/{file_id}` | `files_delete` | any | Career/Templates/Inbox: remove asset | files.tsx<br>library/Assets.tsx | structured | 3 |
 
 ### Workspace access and portability
 
@@ -271,12 +274,12 @@ missing from the inventory.
 | Operation | REST | MCP | Access | Dashboard location | Dashboard code | Editor | E2E |
 |---|---|---|---|---|---|---|---|
 | `events.list`<br>List recorded changes with actor, run and subject | `GET /events` | `events_list` | any | Activity: Changes; run detail | pages/Activity.tsx | structured | 3 |
-| `runs.list`<br>List agent runs by status, workflow, token or start time | `GET /runs` | `runs_list` | any | Activity: Runs | pages/Activity.tsx<br>shell/Shell.tsx | structured | 49 |
+| `runs.list`<br>List agent runs by status, workflow, token or start time | `GET /runs` | `runs_list` | any | Activity: Runs | pages/Activity.tsx<br>shell/Shell.tsx | structured | 60 |
 | `runs.read`<br>Read an agent run with its report, questions and changes | `GET /runs/{run_id}` | `runs_get` | any | Activity: run detail | pages/Activity.tsx | structured | 2 |
 | `runs.start`<br>Open an agent run for the calling API token | `POST /runs` | `runs_start` | any | Activity: Runs (read only) | **none** | — | — |
 | `runs.update`<br>Record a progress note on the calling token's open run | `PATCH /runs/{run_id}` | `runs_update` | any | Activity: run detail (read only) | **none** | — | — |
 | `runs.finish`<br>Close the calling token's run with its report | `POST /runs/{run_id}/finish` | `runs_finish` | any | Activity: run detail (read only) | **none** | — | — |
-| `questions.list`<br>List questions for the owner by state, subject, run or answer time | `GET /questions` | `questions_list` | any | Activity: Questions; navigation count | pages/Activity.tsx<br>shell/Shell.tsx | structured | 49 |
+| `questions.list`<br>List questions for the owner by state, subject, run or answer time | `GET /questions` | `questions_list` | any | Activity: Questions; navigation count | pages/Activity.tsx<br>shell/Shell.tsx | structured | 60 |
 | `questions.read`<br>Read one question for the owner | `GET /questions/{question_id}` | `questions_get` | any | Activity: Questions | via `questions.list` | — | — |
 | `questions.ask`<br>Ask the owner a question tied to a job, application, Career entry or nothing | `POST /questions` | `questions_ask` | any | Activity: Questions (answer only) | **none** | — | — |
 | `questions.answer`<br>Answer a question for the owner | `POST /questions/{question_id}/answer` | `questions_answer` | owner | Activity: Questions: answer | pages/Activity.tsx | structured | 1 |

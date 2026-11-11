@@ -128,7 +128,18 @@ await dialog().waitFor();
 await shot("collection-settings");
 
 await open("career?section=knowledge");
+// Show the record with one entry open; the Profile is above it.
+await page
+  .getByRole("heading", { name: "Career record" })
+  .evaluate((heading) => heading.scrollIntoView({ block: "start" }));
+await page.evaluate(() => window.scrollBy(0, -72));
 await shot("career");
+
+await open("policy");
+await shot("policy");
+
+await open("templates?section=rules");
+await shot("templates");
 
 await open("settings?section=agents");
 await shot("agent-access");

@@ -19,6 +19,7 @@ from .career import DEFAULT_GUIDANCE, DEFAULT_PROFILE, Input, _get, _page, _sett
 from .common import decode_record, encode, new_id, now
 from .consistency import compare as compare_content, is_tex_source
 from .errors import DomainError, conflict, missing
+from .policy import frozen_policy
 from .snapshots import payload_text, store_context
 from .staleness import application_staleness, store_context_inputs
 from .transfers import SnapshotResponse
@@ -160,6 +161,7 @@ class DocumentService:
             ]
             for claim in claims:
                 claim["approved"] = bool(claim["approved"])
+                claim["default_in_cv"] = bool(claim["default_in_cv"])
             if value.claim_ids is not None:
                 selected = set(value.claim_ids)
                 if selected - {row["id"] for row in claims}:
@@ -254,6 +256,8 @@ class DocumentService:
                 },
                 "questions": application["questions"],
                 "files": assets,
+                # Each policy section with its version; an unconfirmed item says so.
+                "policy": frozen_policy(conn),
             }
             encoded = encode(snapshot)
             signature = hashlib.sha256(encoded.encode()).hexdigest()

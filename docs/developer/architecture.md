@@ -22,6 +22,7 @@ flowchart LR
 | `backend/openings/workspace.py` | Job identities, triage, notes, application attempts and reporting |
 | `backend/openings/duplicates.py`, `duplicate_signals.py` | Read-only duplicate candidates: per-job signals, pair confidence and groups |
 | `backend/openings/career.py` | Profile, detailed evidence, claims, templates and instructions |
+| `backend/openings/policy.py` | The owner's policy: four sections of items, section versions, owner confirmation, signal rules |
 | `backend/openings/documents.py` | Frozen contexts, document revisions and scoped file transfers |
 | `backend/openings/snapshots.py`, `compaction.py` | Content-addressed storage of frozen contexts; giving freed pages back to the data volume |
 | `backend/openings/retention.py` | Refresh events, what an observation stores, pruning of finished collection runs and tasks |
@@ -94,7 +95,22 @@ dashboard path, and lists every gap. Read [REST](../user/api.md) and
 - **Staleness:** contexts are never rewritten. `staleness.py` compares the Profile,
   instructions, template, entry and claim versions recorded in each current
   leaf's context with the live records on read; refreshing means a new context
-  and new revisions.
+  and new revisions. `context_inputs.policy` records the policy section
+  versions a context froze (NULL before schema 10); the report does not compare
+  them yet.
+- **Policy:** `policy_sections` holds one version per section (`decision`,
+  `eligibility`, `writing`, `facts`) and `policy_items` their items in a dense
+  order. An item write names its section's version and bumps it by one; a move
+  names and bumps both sections. `confirmed_at` is set only by owner authority:
+  a content write (label, statement, value, scope, rule) by the session or an
+  owner token confirms, the same write by an agent token clears the
+  confirmation and switches the rule off, and `policy_confirm` and enabling a
+  rule call `actors.require_owner`. A value is typed (text, number, date,
+  boolean, list); `structured` exists only for a value copied by the upgrade and
+  cannot be written. A decision rule `{signal, condition, action}` is validated
+  against the registry `policy.SIGNALS`; nothing applies it at ingest yet.
+  Preparing a context freezes the four sections (`payload.policy`), each as its
+  own content-addressed part, so a section is stored again only when it changes.
 - **Truth:** approved claims and narrative evidence guide an external agent;
   reference/length validation does not establish factual accuracy. Review outputs.
 - **Career:** entries have structured organizations, nullable partial dates, skill
@@ -149,7 +165,17 @@ memory and releasing SQLite readers before cancellation or thread changes.
 Backups use SQLite's online backup API. A restore preserves
 installation authentication, recent provider request history and later cooldowns.
 
-Workspaces and backups use schema 9 (0.18), a storage-only change: opening schema 8
+Workspaces and backups use schema 10 (0.19), an additive change. Opening schema 9
+creates the policy tables, adds `default_in_cv`, `role` and `group` to `claims`
+and `policy` to `context_inputs`, and copies the Profile's free-form values:
+one unconfirmed `facts` item per top-level `metadata` key, holding the original
+value (`origin`, `origin_key`), and one unconfirmed `decision` item each for the
+`preferences` and `roles` text. The Profile row, every Career entry, claim and
+template and every frozen context are left as they were. A claim field is
+filled from `metadata` only when a key has the field's name and a valid value
+of the field (`db.CLAIM_FIELDS_FROM_METADATA`).
+
+Schema 9 (0.18) was a storage-only change: opening schema 8
 moves every frozen context into content-addressed parts and its asset files out of
 `files`, compares each rebuilt payload with the stored text, and then drops the
 old column, all in the upgrade transaction; contexts gain summary columns for
@@ -188,8 +214,8 @@ applications gain `ready_at` with who set it, API tokens gain a kind, and the
 owner tokens with unchanged access. Schema 6 is upgraded through schema 7 in the same
 transaction (application priority, deadline and requirements), and schema 5
 through schema 6 (removing obsolete derived data and preserving owned records and
-immutable snapshots). Restore accepts schema 9 and upgrades a copy of a schema 5,
-6, 7 or 8 backup. Other historical formats require the matching release.
+immutable snapshots). Restore accepts schema 10 and upgrades a copy of a schema 5,
+6, 7, 8 or 9 backup. Other historical formats require the matching release.
 
 ## Acquisition
 

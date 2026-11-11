@@ -72,11 +72,22 @@ class ProfileUpdate(NonNullUpdate):
     location: str | None = Field(default=None, max_length=300)
     email: str | None = Field(default=None, max_length=300)
     phone: str | None = Field(default=None, max_length=100)
-    roles: str | None = Field(default=None, max_length=3000)
-    preferences: str | None = Field(default=None, max_length=10000)
+    roles: str | None = Field(
+        default=None,
+        max_length=3000,
+        description="Deprecated: record target roles as decision items of the policy (policy_add). Still stored and returned until the breaking release.",
+    )
+    preferences: str | None = Field(
+        default=None,
+        max_length=10000,
+        description="Deprecated: record preferences as decision items of the policy (policy_add). Still stored and returned until the breaking release.",
+    )
     summary: str | None = Field(default=None, max_length=20000)
     links: list[dict[str, str]] | None = Field(default=None, max_length=50)
-    metadata: dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = Field(
+        default=None,
+        description="Free-form extension values. Decision rules, eligibility, writing rules and confirmed facts belong in the policy.",
+    )
 
 
 KnowledgeKind = Literal[
@@ -180,12 +191,34 @@ class KnowledgeUpdate(KnowledgeFields, NonNullUpdate):
     metadata: dict[str, Any] | None = None
 
 
+# How strongly a claim is preferred when a CV is assembled: core claims carry the
+# account, supporting claims are used when the job calls for them, bench claims are
+# kept in reserve.
+ClaimRole = Literal["core", "supporting", "bench"]
+CLAIM_FIELDS = ("default_in_cv", "role", "group")
+
+
 class ClaimCreate(Input):
     knowledge_id: str
     text: str = Field(min_length=1, max_length=5000)
     approved: bool = False
     position: int | None = Field(default=None, ge=0, strict=True)
+    default_in_cv: bool = Field(
+        default=False, description="In the CV unless the job gives a reason to leave it out."
+    )
+    role: ClaimRole = Field(
+        default="supporting",
+        description="core carries the account, supporting is used when the job calls for it, bench is kept in reserve.",
+    )
+    group: str = Field(
+        default="", max_length=100, description="A free short name for claims that belong together."
+    )
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("group")
+    @classmethod
+    def trimmed_group(cls, value):
+        return value.strip()
 
 
 class ClaimUpdate(NonNullUpdate):
@@ -194,7 +227,22 @@ class ClaimUpdate(NonNullUpdate):
     text: str | None = Field(default=None, min_length=1, max_length=5000)
     approved: bool | None = None
     position: int | None = Field(default=None, ge=0, strict=True)
+    default_in_cv: bool | None = None
+    role: ClaimRole | None = None
+    group: str | None = Field(default=None, max_length=100)
     metadata: dict[str, Any] | None = None
+
+    @field_validator("group")
+    @classmethod
+    def trimmed_group(cls, value):
+        return value.strip() if value is not None else value
+
+
+RULES_DESCRIPTION = (
+    "Typed limits max_pages, max_bullets and max_bullet_chars; statements, a list of rule "
+    "statements {id, label, statement, scope, position} (id and position are filled in); "
+    "any other key is free-form."
+)
 
 
 class TemplateCreate(Input):
@@ -202,7 +250,7 @@ class TemplateCreate(Input):
     kind: Literal["resume", "cover_letter"] = "resume"
     tex: str = Field(default="", max_length=1000000)
     guidance: str = Field(default="", max_length=20000)
-    rules: dict[str, Any] = Field(default_factory=dict)
+    rules: dict[str, Any] = Field(default_factory=dict, description=RULES_DESCRIPTION)
     is_default: bool = False
 
     @field_validator("rules")
@@ -217,7 +265,7 @@ class TemplateUpdate(NonNullUpdate):
     kind: Literal["resume", "cover_letter"] | None = None
     tex: str | None = Field(default=None, max_length=1000000)
     guidance: str | None = Field(default=None, max_length=20000)
-    rules: dict[str, Any] | None = None
+    rules: dict[str, Any] | None = Field(default=None, description=RULES_DESCRIPTION)
     is_default: bool | None = None
 
     @field_validator("rules")
@@ -254,7 +302,54 @@ def validate_rules(value):
             or not low <= value[key] <= high
         ):
             raise ValueError(f"{key} must be an integer between {low} and {high}.")
+    if "statements" in value:
+        value = {**value, "statements": _rule_statements(value["statements"])}
     return value
+
+
+def _rule_statements(items):
+    """The typed list of a template's rule statements, in order, each with an id."""
+    if not isinstance(items, list) or len(items) > 200:
+        raise ValueError("statements is a list of at most 200 rule statements.")
+    result, seen = [], set()
+    for position, item in enumerate(items):
+        if not isinstance(item, dict) or set(item) - {
+            "id",
+            "label",
+            "statement",
+            "scope",
+            "position",
+        }:
+            raise ValueError("A rule statement has id, label, statement, scope and position.")
+        statement, label, scope = item.get("statement"), item.get("label", ""), item.get("scope")
+        if not isinstance(statement, str) or not statement.strip() or len(statement) > 4000:
+            raise ValueError("A rule statement has 1–4000 characters.")
+        if not isinstance(label, str) or len(label) > 200:
+            raise ValueError("A rule statement's label has at most 200 characters.")
+        if scope is not None and (not isinstance(scope, str) or len(scope) > 100):
+            raise ValueError("A rule statement's scope is a short text.")
+        identifier = item.get("id") or new_id()
+        if not isinstance(identifier, str) or len(identifier) > 100 or identifier in seen:
+            raise ValueError("Rule statement ids are distinct short texts.")
+        seen.add(identifier)
+        result.append(
+            {
+                "id": identifier,
+                "label": label.strip(),
+                "statement": statement.strip(),
+                "scope": (scope.strip() or None) if scope else None,
+                "position": position,
+            }
+        )
+    return result
+
+
+def _claim(row, *, full=True):
+    """A claim row as returned by reads."""
+    row = decode_record(row, ["metadata"]) if full else dict(row)
+    row["approved"] = bool(row["approved"])
+    row["default_in_cv"] = bool(row["default_in_cv"])
+    return row
 
 
 def values(value):
@@ -516,7 +611,7 @@ class CareerService:
         summary: bool = False,
         q: str = "",
     ) -> dict:
-        """List reusable claims by evidence, approval or text. summary=true omits metadata and bounds wording previews."""
+        """List reusable claims by evidence, approval or text. summary=true omits metadata and bounds wording previews; the typed selection fields (default_in_cv, role, group) are always returned."""
         _page(limit, offset)
         where, params = [], []
         if knowledge_id:
@@ -532,7 +627,7 @@ class CareerService:
             params.extend([f"%{q}%"] * 3)
         clause = " WHERE " + " AND ".join(where) if where else ""
         columns = (
-            "id,knowledge_id,approved,position,version,created_at,updated_at,substr(text,1,240) AS text_preview,"
+            'id,knowledge_id,approved,position,default_in_cv,role,"group",version,created_at,updated_at,substr(text,1,240) AS text_preview,'
             "(SELECT title FROM knowledge WHERE knowledge.id=claims.knowledge_id) AS knowledge_title,"
             "(SELECT organization FROM knowledge WHERE knowledge.id=claims.knowledge_id) AS knowledge_organization"
             if summary
@@ -542,13 +637,8 @@ class CareerService:
             f"SELECT {columns} FROM claims{clause} ORDER BY position,created_at,id LIMIT ? OFFSET ?",
             (*params, limit, offset),
         )
-        result = []
-        for row in rows:
-            row = row if summary else decode_record(row, ["metadata"])
-            row["approved"] = bool(row["approved"])
-            result.append(row)
         return {
-            "items": result,
+            "items": [_claim(row, full=not summary) for row in rows],
             "total": self.db.one(f"SELECT COUNT(*) AS n FROM claims{clause}", params)["n"],
         }
 
@@ -557,17 +647,15 @@ class CareerService:
         row = self.db.one("SELECT * FROM claims WHERE id=?", (claim_id,))
         if not row:
             missing("Claim")
-        row = decode_record(row, ["metadata"])
-        row["approved"] = bool(row["approved"])
-        return row
+        return _claim(row)
 
     def create_claim(self, value: ClaimCreate) -> dict:
-        """Create reusable claim wording tied to evidence. Approval defaults to false."""
+        """Create reusable claim wording tied to evidence. Approval defaults to false. Selection is typed: default_in_cv, role (core, supporting, bench) and group."""
         record_id, timestamp = new_id(), now()
         with self.db.transaction() as conn:
             _get(conn, "knowledge", value.knowledge_id, "Career knowledge")
             conn.execute(
-                "INSERT INTO claims(id,knowledge_id,text,approved,position,metadata,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+                'INSERT INTO claims(id,knowledge_id,text,approved,position,default_in_cv,role,"group",metadata,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
                 (
                     record_id,
                     value.knowledge_id,
@@ -576,6 +664,9 @@ class CareerService:
                     value.position
                     if value.position is not None
                     else self._next_position(conn, "claims", value.knowledge_id),
+                    int(value.default_in_cv),
+                    value.role,
+                    value.group,
                     encode(value.metadata),
                     timestamp,
                     timestamp,
@@ -598,15 +689,21 @@ class CareerService:
         with self.db.transaction() as conn:
             row = _get(conn, "claims", claim_id, "Claim")
             check_version(row, expected)
-            previous = decode_record(row, ["metadata"])
-            previous["approved"] = bool(previous["approved"])
+            previous = _claim(row)
             merged = {**previous, **data}
             _get(conn, "knowledge", merged["knowledge_id"], "Career knowledge")
             if previous["knowledge_id"] != merged["knowledge_id"] and "position" not in data:
                 merged["position"] = self._next_position(conn, "claims", merged["knowledge_id"])
             changed = [
                 key
-                for key in ["knowledge_id", "text", "approved", "position", "metadata"]
+                for key in [
+                    "knowledge_id",
+                    "text",
+                    "approved",
+                    "position",
+                    *CLAIM_FIELDS,
+                    "metadata",
+                ]
                 if previous[key] != merged[key]
             ]
             if changed:
@@ -620,12 +717,15 @@ class CareerService:
                     version=row["version"] + 1,
                 )
                 conn.execute(
-                    "UPDATE claims SET knowledge_id=?,text=?,approved=?,position=?,metadata=?,version=version+1,updated_at=? WHERE id=?",
+                    'UPDATE claims SET knowledge_id=?,text=?,approved=?,position=?,default_in_cv=?,role=?,"group"=?,metadata=?,version=version+1,updated_at=? WHERE id=?',
                     (
                         merged["knowledge_id"],
                         merged["text"],
                         int(merged["approved"]),
                         merged["position"],
+                        int(merged["default_in_cv"]),
+                        merged["role"],
+                        merged["group"],
                         encode(merged["metadata"]),
                         now(),
                         claim_id,
@@ -681,7 +781,7 @@ class CareerService:
         }
 
     def get_template(self, template_id: str) -> dict:
-        """Read raw template source, guidance and typed limits; fetch attached assets separately."""
+        """Read raw template source, guidance and rules (typed limits, rule statements, free-form rest); fetch attached assets separately."""
         row = self.db.one("SELECT * FROM templates WHERE id=?", (template_id,))
         if not row:
             missing("Template")

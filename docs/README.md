@@ -8,6 +8,7 @@ three work with the same jobs, career knowledge, documents and collection settin
 | Install Openings and add a first job | [Setup and first use](user/getting-started.md) |
 | Search portals or follow chosen companies | [Collection](user/sources.md) |
 | Organize experience, skills and reusable wording | [Career entries and claims](user/career.md) |
+| State my rules for jobs and documents, and the facts employers ask about | [Policy](user/policy.md) |
 | Prepare a CV, letter or form answers | [Application documents](user/applications.md) |
 | Plan deadlines, priorities and employer requirements | [Plan and track requirements](user/applications.md#plan-and-track-requirements) |
 | Close, reopen or delete several applications, or merge repeated vacancies | [Keep, dismiss or delete](user/applications.md#keep-dismiss-or-delete) |

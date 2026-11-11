@@ -22,9 +22,16 @@ _CONTEXT_INPUTS = (
     "(SELECT json_group_array(json_array(json_extract(value,'$.id'),json_extract(value,'$.version'),json_extract(value,'$.title')))"
     " FROM json_each(?3,'$.knowledge')),"
     "(SELECT json_group_array(json_array(json_extract(value,'$.id'),json_extract(value,'$.version'),substr(json_extract(value,'$.text'),1,120)))"
-    " FROM json_each(?3,'$.claims'))"
+    " FROM json_each(?3,'$.claims')),"
+    # The policy section versions a context froze, {"decision":3,...}. A context from
+    # before schema 10 froze no policy and keeps NULL. The report does not compare
+    # them yet; they are recorded so that it can (staleness by section).
+    "CASE WHEN json_type(?3,'$.policy')='object' THEN"
+    " (SELECT json_group_object(key,json_extract(value,'$.version')) FROM json_each(?3,'$.policy')) END"
 )
-_COLUMNS = "context_id,created_at,profile_version,instructions_version,templates,knowledge,claims"
+_COLUMNS = (
+    "context_id,created_at,profile_version,instructions_version,templates,knowledge,claims,policy"
+)
 
 
 def store_context_inputs(connection, context_id, created_at, payload):
