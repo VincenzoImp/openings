@@ -75,7 +75,8 @@ skills: discover the tools/resources and their typed input schemas.
 2. Find or ingest the job with `jobs_search`, `job_get` or `job_ingest`. You can
    add a posting manually without setting up collection. `jobs_resolve` checks a
    URL or source key without ingesting; `jobs_duplicates` lists candidate copies
-   of one vacancy across sources for review before `job_merge`.
+   of one vacancy across sources, with a confidence, tier and reasons, for review
+   before `job_merge` (`min_confidence` defaults to 0.5; 0 lists every candidate).
 3. Inspect `job.application` or use `applications_list` with `value.job_id` to find
    its attempts. Continue the open application, or use `application_create` to
    start Preparing (`draft`) with questions, notes and an idempotency key. Starting removes it from the pending Shortlist queue. A later attempt is possible after the previous one closes.

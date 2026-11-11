@@ -243,16 +243,26 @@ Both reads are side-effect free; neither fetches a page nor merges records.
 GET /jobs/resolve?url=https://jobs.example.test/123&source_key=linkedin:42
 GET /jobs/duplicates?queue=shortlist&limit=20&offset=0
 GET /jobs/duplicates?job_id=JOB_ID
+GET /jobs/duplicates?min_confidence=0.85
 ```
 
 `/jobs/resolve` normalizes the URL as ingestion does and returns `items` (job
 summaries with `matched_by`, triage and every attempt in `applications`),
 `identities` and `identity_conflict`. `/jobs/duplicates` returns candidate
-`items` groups with a `total` group count: `job_ids`, `signals`
-(`company_title`, `posting_text`), `identical_postings`, `reference_id`,
-`open_application_ids` and `merge_blocked`, plus per-job `posting_hash` and
-advisory `similarity`. Add `match_location=true` to require the same location.
-Verify a group, then merge with `POST /jobs/{source_id}/merge`.
+`items` groups, most confident first, with a `total` group count: `job_ids`,
+`confidence` (0 to 1), `tier` (`high`, `medium` or `low`), `reasons` (`matched`
+and `conflicts` signal names), `signals` (the matched names), `identical_postings`,
+`reference_id`, `open_application_ids` and `merge_blocked`, plus per-job
+`posting_hash`, advisory `similarity` and the job's own `confidence` and `reasons`
+against the reference record. `min_confidence` (default `0.5`) is the lowest
+group confidence returned: `0.85` keeps the high tier, `0` adds records that
+share only a company and title. The response repeats `min_confidence` and the
+`tiers` thresholds. Add `match_location=true` to require agreeing locations.
+Signals come from requisition IDs, apply links and ATS posting IDs, posting text,
+company, title and location; the
+[vacancy identity reference](../../skills/openings-workspace/references/job-deduplication.md)
+lists them. Verify a group, then merge with `POST /jobs/{source_id}/merge`;
+nothing is merged automatically.
 
 `POST /applications/bulk` closes, reopens or deletes selected attempts:
 
