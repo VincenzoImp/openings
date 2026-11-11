@@ -59,6 +59,7 @@ jobs:
       - run: uv sync --locked
       - run: npm --prefix frontend ci
       - run: npm --prefix frontend run build
+      - run: npm --prefix frontend run budget
       - run: npm --prefix frontend run format:check
       - run: npm --prefix frontend test
       - run: npx playwright install --with-deps chromium

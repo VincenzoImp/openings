@@ -3,6 +3,9 @@
 Listens on 127.0.0.1:$OPENINGS_E2E_PORT (a free port when unset) and answers
 `/__e2e__/run` with $OPENINGS_E2E_TOKEN, so a Playwright run can verify that it
 reached the server it started. The route exists only in this test server.
+
+$OPENINGS_E2E_JOBS and $OPENINGS_E2E_APPLICATIONS set the size of the workspace
+(60 jobs and 53 applications by default).
 """
 
 import os
@@ -43,6 +46,10 @@ def identified(app, token):
 def main():
     port = int(os.environ.get("OPENINGS_E2E_PORT") or free_port())
     token = os.environ.get("OPENINGS_E2E_TOKEN", "")
+    # The default workspace is small; a performance check sets a large one, for
+    # example OPENINGS_E2E_JOBS=5000 OPENINGS_E2E_APPLICATIONS=500.
+    jobs = int(os.environ.get("OPENINGS_E2E_JOBS") or 60)
+    applications = int(os.environ.get("OPENINGS_E2E_APPLICATIONS") or 53)
     with tempfile.TemporaryDirectory(prefix="openings-dashboard-") as directory:
         path = Path(directory) / "workspace.sqlite"
         app = create_app(path, start_worker=False)
@@ -69,7 +76,7 @@ def main():
                     name=f"Synthetic CV {index:02d}", tex="Synthetic TeX", is_default=index == 0
                 )
             )
-        for index in range(60):
+        for index in range(jobs):
             job = workspace.ingest_job(
                 {
                     "title": f"Synthetic engineer {index:02d}",
@@ -79,7 +86,7 @@ def main():
                     "url": f"https://example.test/jobs/{index}",
                 }
             )
-            if index < 53:
+            if index < applications:
                 application = workspace.create_application(
                     {
                         "job_id": job["id"],
@@ -109,7 +116,7 @@ def main():
                     app.state.documents.prepare_context(
                         ContextCreate(application_id=application["id"])
                     )
-            elif index < 56:
+            elif index < applications + 3:
                 workspace.set_triage(job["id"], "saved", job["version"])
         print(f"Synthetic workspace at http://127.0.0.1:{port}", flush=True)
         uvicorn.run(
