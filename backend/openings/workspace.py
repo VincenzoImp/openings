@@ -39,6 +39,7 @@ from .models import (
     NotePatch,
 )
 from .posting import posting_complete, posting_complete_sql
+from .snapshots import collect_unused
 from .staleness import application_staleness
 
 # Current revision leaves only; a parent's PDF or approval never counts for its child.
@@ -69,9 +70,6 @@ REQUIREMENT_COUNTS_SQL = (
     "(SELECT count(*) FROM json_each(app.requirements) r WHERE NOT coalesce(json_extract(r.value,'$.resolved'),0)) AS open_requirements,"
     "(SELECT count(*) FROM json_each(app.requirements) r WHERE NOT coalesce(json_extract(r.value,'$.resolved'),0) AND json_extract(r.value,'$.blocking')) AS blocking_requirements"
 )
-
-
-COLLECT_BLOBS = "DELETE FROM blobs WHERE sha256 NOT IN (SELECT sha256 FROM files)"
 
 
 LOG = logging.getLogger(__name__)
@@ -607,7 +605,7 @@ class Workspace:
             )
             c.execute("DELETE FROM jobs WHERE id=?", (job_id,))
             if collect:
-                c.execute(COLLECT_BLOBS)
+                collect_unused(c)
             # The job's own history is deleted with it; this record keeps only its id.
             self.event("job_forgotten", conn=c, subject=("job", job_id))
         return {"deleted": True, "id": job_id}
@@ -1184,7 +1182,7 @@ class Workspace:
             ).fetchone()
             check_version(row, expected_version)
             owned = "SELECT id FROM documents WHERE application_id=? UNION SELECT id FROM contexts WHERE application_id=?"
-            owned_files = "SELECT id FROM files WHERE document_id IN (SELECT id FROM documents WHERE application_id=?) OR context_id IN (SELECT id FROM contexts WHERE application_id=?)"
+            owned_files = "SELECT id FROM all_files WHERE document_id IN (SELECT id FROM documents WHERE application_id=?) OR context_id IN (SELECT id FROM contexts WHERE application_id=?)"
             connection.execute(
                 "DELETE FROM transfer_grants WHERE json_extract(payload,'$.owner_id') IN ("
                 + owned
@@ -1195,7 +1193,7 @@ class Workspace:
             )
             connection.execute("DELETE FROM applications WHERE id=?", (application_id,))
             if collect:
-                connection.execute(COLLECT_BLOBS)
+                collect_unused(connection)
             self.event(
                 "application_deleted",
                 row["job_id"],
