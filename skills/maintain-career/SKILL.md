@@ -37,16 +37,48 @@ happened. Keep dates, contribution scope, maturity and source confidence, with
 provenance in metadata rather than dated appendices. Use import preview before
 an import, and inspect every created or changed record.
 
-Keep the Profile for career direction, preferences, dated personal facts and a
-decision policy. Keep document rules in templates. Remove a rule from one place
-when it is moved to the other.
+## Policy
+
+The owner's rules and facts live in the policy (`policy_get`), not in Profile
+metadata: `decision` (what to shortlist and dismiss), `eligibility` (facts
+employers ask about), `writing` (document rules with scope `cv`, `letter` or
+`all`) and `facts` (anything else the owner confirmed). Each section has its own
+version; every write sends the current version of the section it changes.
+
+- Add a rule or fact the owner stated with `policy_add`: a short label, the
+  statement in the owner's words, a typed value when there is one (a number, a
+  date, a list). Your item is a proposal until the owner confirms it in the
+  dashboard under **Policy**; an agent token cannot call `policy_confirm`. Say
+  in the report which items wait, and ask with `questions_ask` when a decision
+  depends on one.
+- After the upgrade to 0.19 the `facts` section holds the old Profile metadata,
+  one unconfirmed item per key (`origin.source: "profile_metadata"`), and
+  `decision` holds the old `preferences` and `roles` text. Sort them with the
+  owner: split a block into single statements (`policy_add`), move an item to
+  its section (`policy_move`), give it a label and a typed value
+  (`policy_update`), and remove what is obsolete (`policy_remove`). The Profile
+  keeps its copy until the owner removes it; do not delete it for them.
+- Changing the content of a confirmed item makes it a proposal again. Change
+  wording only when the owner asked for it or the fact changed.
+- A decision item may carry a `rule` on a collection signal. Propose it with
+  `enabled` left false: only the owner enables a rule, and no rule is applied
+  at collection yet.
+
+Keep the Profile for who the owner is: name, contact, headline, summary and
+links. Keep rules of one document layout in its template (`rules.statements`
+beside the typed limits). Remove a rule from one place when it is moved to the
+other.
 
 ## Claim hygiene
 
 Compare claims within and across entries. Merge exact duplicates unless they
 serve distinct template slots; correct claims that exceed their entry's evidence;
 keep each claim attached to the entry where the work occurred, with source
-links in metadata. New claims must follow from recorded evidence; ask the owner
+links in metadata. Selection is typed, not metadata: `default_in_cv` (in the CV
+unless the job gives a reason to leave it out), `role` (`core` carries the
+account, `supporting` is used when the job calls for it, `bench` is kept in
+reserve) and `group` (a free short name for claims that belong together). Move
+selection values an earlier run wrote into metadata to these fields. New claims must follow from recorded evidence; ask the owner
 for any new fact.
 
 ## MASTER and template changes
@@ -59,6 +91,7 @@ assets together with the expected version.
 Existing Drafts keep their frozen contexts. After the change, list stale Drafts
 with `applications_staleness` (REST `GET /staleness`); each report names the
 changed Profile, guidance, template, entry or claim and the affected revisions.
+Contexts prepared since 0.19 also record the policy section versions they froze.
 Propagate the change to Drafts the owner has not yet submitted when it improves
 them: prepare a new context with the same deliberate selections, save new
 revisions linked with `previous_id`, check them like new work, keep earlier

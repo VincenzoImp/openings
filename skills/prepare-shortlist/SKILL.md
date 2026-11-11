@@ -16,7 +16,8 @@ The owner submits each ready Draft manually and then marks it Applied or closes 
 Read [Openings workspace](../openings-workspace/SKILL.md) for transport, exact
 schemas, contexts, document revisions, transfers and review. Use
 [Career claims](../career-claims/SKILL.md) for writing. Personal preferences and
-all document-selection rules come from current Openings records and templates.
+all document-selection rules come from current Openings records: the owner's
+policy (`policy_get`), the typed claim fields and the templates.
 
 ## Run and questions
 
@@ -41,8 +42,13 @@ well as the actionable Shortlist. Inspect their contexts, revision leaves and
 files to recover progress from the database. Keep an already complete compatible
 Draft unchanged; do not generate another application or documents just to rerun.
 
-For each job, read the full posting, current Profile/preferences, Career evidence,
-general guidance and both selected templates. Check its application attempts.
+For each job, read the full posting, the current Profile, the policy (`decision`
+for fit, `eligibility` for what the employer asks, `writing` for the documents),
+Career evidence, general guidance and both selected templates. Check its
+application attempts. A prepared context freezes the policy sections with their
+versions (`payload.policy`): write from that copy, follow the confirmed
+`writing` items whose scope is `all` or matches the document (`cv`, `letter`),
+and never rely on an item with `confirmed: false`.
 Resume the intended open Draft or the attempt returned by a concurrent-creation
 conflict. Use an idempotency key for retryable creation. Do not reset other stages
 or start another attempt after Closed without the requested authority.
@@ -65,7 +71,7 @@ and report them while independent jobs continue.
 ## Order and employer requirements
 
 Work through the cohort in a deliberate order: live deadlines first, then the
-strongest fit with the Profile policy, then the rest. A large cohort is prepared
+strongest fit with the policy's decision items, then the rest. A large cohort is prepared
 in that order so a partial run still leaves the most valuable Drafts complete.
 For existing Drafts, `applications_list` with `sort: "deadline"` or
 `sort: "priority"` gives that order, and `readiness` (`none`, `missing_pdf`,

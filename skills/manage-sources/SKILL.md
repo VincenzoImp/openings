@@ -13,7 +13,7 @@ effect of triage or preparation; record each change and its reason.
 
 Read [Openings workspace](../openings-workspace/SKILL.md) for transport, source
 schemas, provider limits and optimistic versions. Read the current Profile and
-its decision policy: they define what a useful job is. Keep no personal search
+the policy's decision items (`policy_get`): they define what a useful job is. Keep no personal search
 criteria in this skill.
 
 ## Run and questions
@@ -37,10 +37,10 @@ yield from server data over a stated period: jobs collected, saved, dismissed,
 still in Inbox, and jobs that reached an application. Separate history from the
 current filters: jobs collected before a filter change do not describe it.
 
-Dismissals were made by agents applying the Profile policy, so a high dismissal
+Dismissals were made by agents applying the policy, so a high dismissal
 rate measures collected text outside that policy, not the owner's taste. Drafts
 the owner closed without applying are not preference evidence either: postings
-close or become unfeasible. Derive every filter from the Profile and Career
+close or become unfeasible. Derive every filter from the policy and Career
 records, and use dismissed titles only to find recurring clear mismatches
 (unrelated domains, sales, roles the policy excludes). Check each candidate term
 against saved jobs so a filter never removes work the policy includes.
