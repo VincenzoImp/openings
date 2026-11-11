@@ -13,10 +13,10 @@ updated documentation.
 
 ## Run locally
 
-Requires Python 3.12+, Node 26 and [uv](https://docs.astral.sh/uv/).
+Requires Python 3.14+, Node 26 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-uv sync --locked --python 3.12
+uv sync --locked --python 3.14
 npm --prefix frontend ci
 npm --prefix frontend run build
 uv run openings --database data/development.sqlite
@@ -74,6 +74,26 @@ or worktrees can overlap. Set `OPENINGS_E2E_PORT` to choose the port, for exampl
 token and stops before the first test if the port is already in use or the server
 that answers there is not the one it started.
 
+### Parity matrix
+
+[docs/developer/parity.md](docs/developer/parity.md) is generated from the operation
+inventory, the REST/MCP contract, the dashboard source and browser evidence. After
+changing an operation, a route, a tool or the dashboard's REST calls, regenerate it;
+`pytest` fails while it is out of date:
+
+```bash
+uv run python scripts/parity_matrix.py
+```
+
+After changing the browser tests, re-record which operations the dashboard really
+called (needs the built dashboard and Playwright Chromium):
+
+```bash
+uv run python scripts/parity_matrix.py --e2e
+```
+
+Remarks that code cannot derive live in `docs/developer/parity-notes.json`.
+
 ### Documentation screenshots
 
 `docs/images/*.png` come from a synthetic workspace (fictional people, companies
@@ -106,7 +126,7 @@ uv run python backend/tests/agent_roundtrip.py --tectonic /path/to/tectonic
 | `frontend` | React dashboard calling REST |
 | `examples` | Synthetic career data and LaTeX templates |
 | `skills/` | Agent workflow skills (Agent Skills format) and their shared references |
-| `scripts/` | Release version tool, package smoke check and documentation screenshots |
+| `scripts/` | Release version tool, package smoke check, parity matrix and documentation screenshots |
 | `docs/user` | Setup, workflow and operator guides |
 | `docs/developer` | Architecture and extension boundaries |
 

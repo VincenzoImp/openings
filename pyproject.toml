@@ -3,7 +3,7 @@ name = "openings"
 version = "0.15.2"
 description = "A portable, agent-friendly job-search workspace."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 license = {text = "MIT"}
 dependencies = [
   "fastapi==0.162.2", "uvicorn==0.54.0", "mcp==1.30.0",
@@ -36,7 +36,7 @@ testpaths = ["backend/tests"]
 asyncio_mode = "auto"
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 100
 # Lets import sorting recognise `openings` and sibling test modules as first-party.
 src = ["backend", "backend/tests"]

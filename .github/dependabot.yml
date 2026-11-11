@@ -17,11 +17,6 @@ updates:
     directory: /frontend
     schedule:
       interval: weekly
-    ignore:
-      # Deferred to a dedicated upgrade: TypeScript 7 is the native compiler
-      # without the JavaScript compiler API used by the unit tests.
-      - dependency-name: typescript
-        update-types: ["version-update:semver-major"]
     groups:
       npm-minor-patch:
         update-types: [minor, patch]
@@ -39,9 +34,10 @@ updates:
     schedule:
       interval: weekly
     ignore:
-      # The runtime Python matches CI and the locked wheels (3.12). Moving to a
-      # new Python minor is a deliberate change: every compiled dependency, such
-      # as pydantic-core, must publish wheels for it first.
+      # The runtime Python matches CI, requires-python and the locked wheels
+      # (3.14). Moving to a new Python minor is a deliberate change made in all
+      # of them together: every compiled dependency, such as pydantic-core, must
+      # publish wheels for it first.
       - dependency-name: python
         update-types: ["version-update:semver-minor"]
     groups:

@@ -571,7 +571,7 @@ def normalize_posting(item: dict) -> dict:
                 .date()
                 .isoformat()
             )
-        except (ValueError, OverflowError, OSError):
+        except ValueError, OverflowError, OSError:
             date = None
     metadata["date_posted"] = (
         str(date)[:10] if date and re.match(r"\d{4}-\d{2}-\d{2}", str(date)) else None
@@ -782,7 +782,13 @@ class DiscoveryService:
 
     def http_budget(self, provider_id, active=None):
         """Shared per-request gate for collectors, previews and manual URL import."""
-        return ProviderBudget(self.providers, provider_id, active=active, validate_url=public_url)
+        return ProviderBudget(
+            self.providers,
+            provider_id,
+            active=active,
+            validate_url=public_url,
+            resolve_host=public_addresses,
+        )
 
     provider_for_url = staticmethod(provider_for_url)
 

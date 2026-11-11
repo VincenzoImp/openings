@@ -33,7 +33,9 @@ flowchart LR
 The [operation inventory](../../backend/openings/operation-inventory.json) is
 packaged with the app and served by authenticated `GET /api/v1/capabilities` and
 `capabilities_get`. OpenAPI at `/api/openapi.json` and discovered MCP schemas are
-authoritative for individual input fields. Read [REST](../user/api.md) and
+authoritative for individual input fields. The generated
+[parity matrix](parity.md) shows each operation's REST route, MCP tool and real
+dashboard path, and lists every gap. Read [REST](../user/api.md) and
 [agent](../user/agents.md) guides for usable examples.
 
 ## Data and workflow rules
@@ -119,6 +121,12 @@ ordered by next execution time. Actual 429/503 responses can set durable
 Retry-After cooldowns, with increasing delays for a 429 lacking that header.
 Long waits release the collection lane. Provider-wide access challenges and
 individual unavailable postings have distinct diagnostics.
+
+All outbound fetch paths share one address policy. A host is resolved, every
+address must be public, and the connection is made to a checked address on each
+attempt and redirect hop: httpx through its network backend, provider `requests`
+sessions through a connection adapter and `curl_cffi` sessions through curl's
+resolve pinning. TLS still verifies the requested host name.
 
 The scheduler and collector progress independently. Network-capable MCP tools
 run outside the event loop. Queued tasks have leases and cancellation; stale work
