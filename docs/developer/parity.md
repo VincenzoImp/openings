@@ -12,8 +12,9 @@ How to read the evidence:
 
 - **Dashboard code** lists the dashboard source files that name the operation's
   REST route. **E2E** counts the browser tests in which the dashboard itself
-  called the route successfully (Chromium desktop; setup calls made by the test
-  helper are excluded). An operation with neither has no working dashboard path.
+  called the route without an error response (Chromium desktop; setup calls made
+  by the test helper are excluded). An operation with neither has no working
+  dashboard path.
 - **Editor** is `raw JSON` when a free-form JSON input is edited as JSON text.
 - Input comparisons use names from OpenAPI and the MCP tool schemas. A name the
   dashboard files never mention cannot be set there; a mentioned name may still
