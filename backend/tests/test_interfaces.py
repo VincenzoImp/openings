@@ -75,6 +75,14 @@ OWNER_ONLY_CALLS = {
         {"json": {"expected_version": 1, "answer": "Synthetic"}},
         {"question_id": "missing", "value": {"expected_version": 1, "answer": "Synthetic"}},
     ),
+    "requests.create": (
+        {"json": {"text": "Prepare this one too."}},
+        {"value": {"text": "Prepare this one too."}},
+    ),
+    "requests.withdraw": (
+        {"json": {"expected_version": 1}},
+        {"request_id": "missing", "value": {"expected_version": 1}},
+    ),
 }
 
 

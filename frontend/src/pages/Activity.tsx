@@ -12,6 +12,13 @@ import {
 import { useResource, useUrlState, useWorkspace } from "../state";
 import { readyReason } from "./ApplicationReady";
 import {
+  RecordLink,
+  subjectNames,
+  type Links,
+  type Open,
+} from "./ActivityLinks";
+import { Requests, RunRequests } from "./Requests";
+import {
   Button,
   Empty,
   ErrorBox,
@@ -27,50 +34,10 @@ import {
 
 const PAGE = 30;
 const empty = { items: [], total: 0 };
-type Open = (id: string) => void;
-interface Links {
-  onOpenJob: Open;
-  onOpenApplication: Open;
-}
 const runStatus: Record<RunStatus, { label: string; tone: string }> = {
   open: { label: "Open", tone: "green" },
   finished: { label: "Finished", tone: "neutral" },
   interrupted: { label: "Interrupted", tone: "amber" },
-};
-const subjectNames: Record<string, string> = {
-  job: "Job",
-  application: "Application",
-  knowledge: "Career entry",
-  claim: "Claim",
-  template: "Template",
-  source: "Source",
-  collection_run: "Collection run",
-  collection: "Collection settings",
-  provider: "Provider",
-  task: "Collection task",
-  profile: "Profile",
-  instructions: "Instructions",
-  note: "Note",
-  context: "Context",
-  document: "Document",
-  file: "File",
-  question: "Question",
-  token: "API token",
-  workspace: "Workspace",
-};
-const sections: Record<string, string> = {
-  knowledge: "#career?section=knowledge",
-  claim: "#career?section=claims",
-  profile: "#career",
-  template: "#templates?section=templates",
-  instructions: "#templates",
-  source: "#collection",
-  collection: "#collection",
-  collection_run: "#collection",
-  provider: "#collection",
-  task: "#collection",
-  token: "#settings?section=agents",
-  workspace: "#settings",
 };
 export function changeLabel(kind?: string) {
   const text = (kind || "updated").replaceAll("_", " ");
@@ -86,51 +53,6 @@ function changeDetail(event: Activity) {
     return "Fields: " + payload.fields.join(", ").replaceAll("_", " ");
   if (event.kind === "application_ready_cleared") return readyReason(payload);
   return "";
-}
-function RecordLink({
-  type,
-  id,
-  jobId,
-  applicationId,
-  label,
-  onOpenJob,
-  onOpenApplication,
-}: Links & {
-  type?: string | null;
-  id?: string | null;
-  jobId?: string | null;
-  applicationId?: string | null;
-  label?: string;
-}) {
-  const name = subjectNames[type || ""] || "Record";
-  const text = label ? `${name}: ${label}` : name;
-  if (applicationId)
-    return (
-      <button
-        type="button"
-        className="inline-link"
-        onClick={() => onOpenApplication(applicationId)}
-      >
-        {text}
-      </button>
-    );
-  if (jobId)
-    return (
-      <button
-        type="button"
-        className="inline-link"
-        onClick={() => onOpenJob(jobId)}
-      >
-        {text}
-      </button>
-    );
-  if (id && sections[type || ""])
-    return (
-      <a className="inline-link" href={sections[type || ""]}>
-        {text}
-      </a>
-    );
-  return <span>{type ? text : ""}</span>;
 }
 function Changes({
   items,
@@ -470,6 +392,9 @@ function Runs({ onRun }: { onRun: Open }) {
                   {run.questions_count
                     ? ` · ${run.questions_count} ${run.questions_count === 1 ? "question" : "questions"}`
                     : ""}
+                  {run.requests_count
+                    ? ` · ${run.requests_count} ${run.requests_count === 1 ? "request" : "requests"}`
+                    : ""}
                 </span>
               </span>
             </button>
@@ -696,6 +621,9 @@ function RunDetail({
                   </button>
                 )}
               </ReportSection>
+              <ReportSection title="Requests handled">
+                <RunRequests items={run.requests} />
+              </ReportSection>
             </section>
             <section className="card sectioncard">
               <div className="sectiontitle">
@@ -814,7 +742,7 @@ export default function ActivityPage({
     <>
       <Heading
         title="Activity"
-        description="Answer your agent's questions and review what each run changed."
+        description="Answer your agent's questions, tell it what to do next and review what each run changed."
       />
       <Tabs
         label="Activity sections"
@@ -822,6 +750,7 @@ export default function ActivityPage({
         onChange={(next) => show(next)}
         items={[
           { id: "questions", label: "Questions", count: openQuestions },
+          { id: "requests", label: "Requests" },
           { id: "runs", label: "Runs" },
           { id: "changes", label: "Changes" },
         ]}
@@ -840,6 +769,8 @@ export default function ActivityPage({
         )
       ) : section === "changes" ? (
         <AllChanges onRun={onRun} {...links} />
+      ) : section === "requests" ? (
+        <Requests onRun={onRun} {...links} />
       ) : (
         <Questions onRun={onRun} {...links} />
       )}

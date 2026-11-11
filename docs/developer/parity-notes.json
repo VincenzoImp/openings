@@ -61,6 +61,22 @@
     "questions.ask": {
       "note": "Agents ask questions for the owner; the dashboard answers and withdraws them."
     },
+    "requests.take": {
+      "note": "Agents take, complete and decline requests with an API token; the dashboard writes and withdraws them."
+    },
+    "requests.complete": {
+      "note": "Agents take, complete and decline requests with an API token; the dashboard writes and withdraws them."
+    },
+    "requests.decline": {
+      "note": "Agents take, complete and decline requests with an API token; the dashboard writes and withdraws them."
+    },
+    "requests.list": {
+      "note": "Activity filters requests by state and the Ask your agent dialog by subject; `run_id` and `updated_since` serve agents."
+    },
+    "requests.read": {
+      "via": ["requests.list"],
+      "note": "Activity renders requests from the list, which returns complete records."
+    },
     "questions.read": {
       "via": ["questions.list"],
       "note": "Activity renders questions from the list, which returns complete records."

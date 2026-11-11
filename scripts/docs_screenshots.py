@@ -642,6 +642,29 @@ def activity(s: Seeder, lumen, cedar, orbit):
             "why": "Two application forms ask for the earliest start date.",
         },
     )
+    # The owner's requests: the agent handles one in this run, one still waits.
+    asked = s.owner(
+        "POST",
+        "/requests",
+        json={
+            "text": "Check whether the Orbit Works documents still fit after the template change.",
+            "subject_type": "application",
+            "subject_id": orbit["id"],
+        },
+    )
+    s.owner("POST", "/requests", json={"text": "Do not prepare roles at consultancies."})
+    taken = s.call(
+        "POST", f"/requests/{asked['id']}/take", json={"expected_version": asked["version"]}
+    )
+    s.call(
+        "POST",
+        f"/requests/{taken['id']}/complete",
+        json={
+            "expected_version": taken["version"],
+            "result": "The CV and letter still match the role; only the page limit changed in "
+            "the template. Marked the Draft ready to apply.",
+        },
+    )
     # The agent hands a complete Draft to the owner: both documents approved, no blocker.
     current = s.call("GET", f"/applications/{orbit['id']}")
     s.call(

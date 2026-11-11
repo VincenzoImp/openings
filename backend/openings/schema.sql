@@ -207,6 +207,25 @@ CREATE TABLE IF NOT EXISTS questions (
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
  CHECK((job_id IS NOT NULL)+(application_id IS NOT NULL)+(knowledge_id IS NOT NULL)<=1)
 );
+-- A request for the agent: an owner instruction read at the start of the next run.
+-- Like a question, it outlives its subject through subject_type and subject_label.
+CREATE TABLE IF NOT EXISTS requests (
+ id TEXT PRIMARY KEY, subject_type TEXT CHECK(subject_type IS NULL OR subject_type IN ('job','application','knowledge')),
+ job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL,
+ application_id TEXT REFERENCES applications(id) ON DELETE SET NULL,
+ knowledge_id TEXT REFERENCES knowledge(id) ON DELETE SET NULL,
+ subject_label TEXT NOT NULL DEFAULT '', text TEXT NOT NULL,
+ state TEXT NOT NULL DEFAULT 'open' CHECK(state IN ('open','taken','done','declined','withdrawn')),
+ result TEXT NOT NULL DEFAULT '',
+ created_by_kind TEXT NOT NULL, created_by_id TEXT, created_by_name TEXT, created_by_token_kind TEXT,
+ taken_by_kind TEXT, taken_by_id TEXT, taken_by_name TEXT, taken_by_token_kind TEXT, taken_at TEXT,
+ run_id TEXT REFERENCES runs(id) ON DELETE SET NULL,
+ resolved_by_kind TEXT, resolved_by_id TEXT, resolved_by_name TEXT, resolved_by_token_kind TEXT,
+ resolved_at TEXT,
+ idempotency_key TEXT UNIQUE, version INTEGER NOT NULL DEFAULT 1,
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ CHECK((job_id IS NOT NULL)+(application_id IS NOT NULL)+(knowledge_id IS NOT NULL)<=1)
+);
 CREATE UNIQUE INDEX IF NOT EXISTS runs_open_token ON runs(token_id) WHERE status='open';
 CREATE INDEX IF NOT EXISTS runs_token ON runs(token_id,started_at);
 CREATE INDEX IF NOT EXISTS runs_status ON runs(status,started_at);
@@ -219,4 +238,11 @@ CREATE INDEX IF NOT EXISTS questions_job ON questions(job_id);
 CREATE INDEX IF NOT EXISTS questions_application ON questions(application_id);
 CREATE INDEX IF NOT EXISTS questions_knowledge ON questions(knowledge_id);
 CREATE INDEX IF NOT EXISTS questions_run ON questions(run_id);
+CREATE INDEX IF NOT EXISTS requests_state ON requests(state,created_at);
+CREATE INDEX IF NOT EXISTS requests_created ON requests(created_at);
+CREATE INDEX IF NOT EXISTS requests_updated ON requests(updated_at);
+CREATE INDEX IF NOT EXISTS requests_job ON requests(job_id);
+CREATE INDEX IF NOT EXISTS requests_application ON requests(application_id);
+CREATE INDEX IF NOT EXISTS requests_knowledge ON requests(knowledge_id);
+CREATE INDEX IF NOT EXISTS requests_run ON requests(run_id);
 PRAGMA user_version=8;

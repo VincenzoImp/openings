@@ -46,7 +46,7 @@ interface Token {
 }
 const tokenAccess: Record<TokenKind, string> = {
   agent:
-    "Runs the job search. Cannot change your password, manage tokens, restore a backup or answer its own questions.",
+    "Runs the job search. Cannot change your password, manage tokens, restore a backup, answer its own questions or write requests for itself.",
   owner: "Full access, the same as your dashboard session.",
 };
 export default function SettingsPage({

@@ -23,6 +23,7 @@ flowchart LR
 | `backend/openings/career.py` | Profile, detailed evidence, claims, templates and instructions |
 | `backend/openings/documents.py` | Frozen contexts, document revisions and scoped file transfers |
 | `backend/openings/activity.py`, `actors.py` | Actor of each change, agent runs with reports, questions for the owner, change log |
+| `backend/openings/agent_requests.py`, `subjects.py` | Requests for the agent; the subject reference shared with questions |
 | `backend/openings/discovery.py` | Typed sources, schedules and queue operations |
 | `backend/openings/collectors` | Adapter capability catalog, typed options and shared HTTP policy/runtime |
 | `backend/openings/worker.py` | Independent scheduling and acquisition lanes |
@@ -84,6 +85,13 @@ dashboard path, and lists every gap. Read [REST](../user/api.md) and
   only an explicit supersede closes it. A finished run stores its report and
   change counts. Questions reference a job, application or Career entry with
   `ON DELETE SET NULL` and keep a label, so they outlive their subject.
+- **Requests:** the mirror of questions. The owner writes a request (owner
+  authority), an API token takes it and completes or declines it, and the owner
+  may withdraw it until then. The request records the run of the token that
+  handled it when that token has an open run; taking without a run is allowed.
+  Like questions, requests reference a job, application or Career entry with
+  `ON DELETE SET NULL`, keep a label and follow a job through a merge. The
+  server runs no agent: a request is only read.
 - **Token scope:** a token is `owner` or `agent`. Owner-only operations call
   `actors.require_owner` in the shared service, so REST and MCP refuse an agent
   token alike with `403 forbidden`; the inventory marks them `access: owner` and
@@ -117,7 +125,7 @@ installation authentication, recent provider request history and later cooldowns
 Workspaces and backups use schema 8. Opening schema 7 upgrades it in one
 transaction: events gain a subject, an actor and a run, notes gain an author,
 applications gain `ready_at` with who set it, API tokens gain a kind, and the
-`runs` and `questions` tables are added; existing rows keep every value, read as
+`runs`, `questions` and `requests` tables are added; existing rows keep every value, read as
 "unknown (before 0.17)" and are not marked ready, and existing tokens become
 owner tokens with unchanged access. Schema 6 is upgraded through schema 7 in the same
 transaction (application priority, deadline and requirements), and schema 5

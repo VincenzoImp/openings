@@ -140,6 +140,10 @@ await open("activity");
 await page.getByRole("heading", { name: "Activity", exact: true }).waitFor();
 await shot("activity-questions");
 
+await open("activity?section=requests");
+await page.getByRole("article").first().waitFor();
+await shot("activity-requests");
+
 await open("activity?section=runs");
 await page.getByRole("button", { name: /review-inbox/ }).click();
 await page.getByRole("heading", { name: "Changes made" }).waitFor();

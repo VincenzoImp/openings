@@ -4271,6 +4271,77 @@ html[data-theme="dark"] .tag.amber {
   margin-top: 0;
 }
 
+/* Requests for the agent. */
+.request-form textarea {
+  width: 100%;
+}
+.request-form .actions {
+  margin-top: 10px;
+}
+.request-card + .request-card {
+  margin-top: 14px;
+}
+.request-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.request-head .tag {
+  flex: none;
+  margin-top: 2px;
+}
+.request-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.request-card .smalltext {
+  margin: 6px 0 0;
+}
+.request-result {
+  margin-top: 10px;
+}
+.request-result strong {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.request-card > .actions {
+  margin-top: 10px;
+}
+.ask-agent {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+.request-history {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.request-history h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+.request-history .request-card {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.request-history .request-card:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+@media (max-width: 600px) {
+  .request-head {
+    flex-direction: column-reverse;
+    gap: 6px;
+  }
+}
+
 /* Ready as a stored step of a Preparing application. */
 .ready-tag {
   align-self: flex-start;

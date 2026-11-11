@@ -25,6 +25,11 @@ from .activity import (
     register_mcp as register_activity_mcp,
 )
 from .actors import SYSTEM, acting_as, current_actor, require_owner
+from .agent_requests import (
+    RequestService,
+    register_api as register_request_api,
+    register_mcp as register_request_mcp,
+)
 from .api import register_core, register_core_mcp
 from .auth import COOKIE, MAX_AGE, Auth, LoginGuard
 from .career import (
@@ -65,7 +70,7 @@ class TokenInput(Input):
     name: str = Field(min_length=1, max_length=100)
     kind: Literal["owner", "agent"] = Field(
         default="owner",
-        description="owner has full access; agent cannot change the owner password, manage tokens, restore a backup or answer questions for the owner.",
+        description="owner has full access; agent cannot change the owner password, manage tokens, restore a backup, answer questions for the owner or write requests for the agent.",
     )
 
 
@@ -122,6 +127,7 @@ def create_app(database=None, start_worker=True):
     documents = DocumentService(workspace)
     discovery = DiscoveryService(workspace)
     activity = ActivityService(workspace)
+    requests = RequestService(workspace)
     workspace.discovery = discovery
     workspace.worker = Worker(workspace, discovery) if start_worker else None
     allowed_hosts = ["localhost:*", "127.0.0.1:*", "[::1]:*"]
@@ -133,11 +139,12 @@ def create_app(database=None, start_worker=True):
     # Tools, prompts and resources never change at runtime, so no notification
     # stream is offered: every exchange stays one request and one JSON response.
     mcp = OpeningsMCP("Openings", version=__version__, subscriptions=False)
-    register_core_mcp(mcp, workspace)
+    register_core_mcp(mcp, workspace, requests)
     register_career_mcp(mcp, career)
     register_document_mcp(mcp, documents)
     register_discovery_mcp(mcp, discovery)
     register_activity_mcp(mcp, activity)
+    register_request_mcp(mcp, requests)
     skills = SkillLibrary()
     register_skills_mcp(mcp, skills)
 
@@ -161,7 +168,7 @@ def create_app(database=None, start_worker=True):
     )
     app.state.workspace, app.state.auth, app.state.mcp = workspace, auth, mcp
     app.state.career, app.state.documents, app.state.discovery = career, documents, discovery
-    app.state.activity = activity
+    app.state.activity, app.state.requests = activity, requests
     app.add_middleware(BodyLimit)
     # The client address is the real one only when uvicorn trusts the proxy
     # (OPENINGS_TRUSTED_PROXIES); otherwise every proxied client shares one bucket.
@@ -469,6 +476,7 @@ def create_app(database=None, start_worker=True):
                 "events",
                 "runs",
                 "questions",
+                "requests",
                 "knowledge",
                 "claims",
                 "templates",
@@ -542,12 +550,13 @@ def create_app(database=None, start_worker=True):
             "expires_in": 120,
         }
 
-    register_core(router, workspace)
+    register_core(router, workspace, requests)
     register_skills_api(router, skills)
     register_career_api(router, career)
     register_document_api(router, documents)
     register_discovery_api(router, discovery)
     register_activity_api(router, activity)
+    register_request_api(router, requests)
     app.include_router(router)
     # Building the transport also creates the session manager the lifespan runs.
     app.mount(
