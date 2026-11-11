@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dashboard prototypes · Openings</title>
+    <link rel="stylesheet" href="prototype.css" />
+    <style>
+      body {
+        background: var(--surface);
+      }
+      .gallery {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: var(--s7) var(--s4);
+      }
+      .gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: var(--s4);
+        margin: var(--s3) 0 var(--s6);
+        padding: 0;
+        list-style: none;
+      }
+      .gallery-grid a {
+        display: block;
+        height: 100%;
+        padding: var(--s4);
+        text-decoration: none;
+      }
+      .gallery-grid a:hover {
+        background: var(--hover);
+        border-radius: var(--radius);
+      }
+      .gallery-grid strong {
+        display: block;
+        font: 400 var(--t-xl) / 1.3 var(--serif);
+      }
+      .gallery-grid .file {
+        display: block;
+        margin-top: var(--s2);
+      }
+      @media (max-width: 860px) {
+        .gallery {
+          padding-top: var(--s5);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="gallery">
+      <p class="eyebrow">Openings · issue #150</p>
+      <h1 style="margin-top: var(--s2)">Dashboard prototypes</h1>
+      <p class="muted" style="margin-top: var(--s3); max-width: 70ch">
+        These are static design prototypes for the redesigned dashboard: plain
+        HTML and CSS with synthetic data, no build step and no network resource.
+        They show the information architecture, the design system and the main
+        states of each screen. Tabs, the theme and the density switch work; the
+        other controls only show their state.
+      </p>
+      <p class="row" style="margin-top: var(--s4)">
+        <a class="btn" href="index.html?theme=light">Light theme</a>
+        <a class="btn" href="index.html?theme=dark">Dark theme</a>
+        <span class="caption"
+          >The choice is kept for every screen you open from here.</span
+        >
+      </p>
+
+      <h2 style="margin-top: var(--s6)">Work</h2>
+      <ul class="gallery-grid">
+        <li class="card">
+          <a href="today.html">
+            <strong>Today</strong>
+            The home screen: what is ready to apply to, what needs your
+            decision, what happened since your last visit.
+            <span class="file caption mono">today.html</span>
+          </a>
+        </li>
+        <li class="card">
+          <a href="review.html">
+            <strong>Review and apply</strong>
+            One ready application: the posting, the CV and the letter side by
+            side, download, mark applied or close.
+            <span class="file caption mono">review.html</span>
+          </a>
+        </li>
+        <li class="card">
+          <a href="applications.html">
+            <strong>Applications</strong>
+            The pipeline by stage as a list or a board, recording employer
+            responses, and Insights with response rates.
+            <span class="file caption mono">applications.html</span>
+          </a>
+        </li>
+        <li class="card">
+          <a href="jobs.html">
+            <strong>Jobs</strong>
+            Triage: the agent's queue with ingest signals, the shortlist,
+            dismissed jobs with their reason and Restore.
+            <span class="file caption mono">jobs.html</span>
+          </a>
+        </li>
+        <li class="card">
+          <a href="activity.html">
+            <strong>Activity</strong>
+            Questions from the agent, runs with their reports, and one timeline
+            of every change with its actor.
+            <span class="file caption mono">activity.html</span>
+          </a>
+        </li>
+      </ul>
+
+      <h2>Library</h2>
+      <ul class="gallery-grid">
+        <li class="card">
+          <a href="career.html">
+            <strong>Career</strong>
+            The Profile and the career record: entries, skills and claims with
+            typed fields, and a key and value editor instead of JSON.
+            <span class="file caption mono">career.html</span>
+          </a>
+        </li>
+        <li class="card">
+          <a href="policy.html">
+            <strong>Policy</strong>
+            The owner's policy as four lists of statements: decision,
+            eligibility, writing and facts, with rules that use ingest signals.
+            <span class="file caption mono">policy.html</span>
+          </a>
+        </li>
+        <li class="card">
+          <a href="templates.html">
+            <strong>Templates</strong>
+            CV and letter templates: source file, typed limits and rule
+            statements, assets and a preview.
+            <span class="file caption mono">templates.html</span>
+          </a>
+        </li>
+      </ul>
+
+      <h2>System</h2>
+      <ul class="gallery-grid">
+        <li class="card">
+          <a href="collection.html">
+            <strong>Collection</strong>
+            Sources and schedules, yield per source, runs and tasks, and
+            provider request limits.
+            <span class="file caption mono">collection.html</span>
+          </a>
+        </li>
+        <li class="card">
+          <a href="settings.html">
+            <strong>Settings</strong>
+            Agent access with scoped tokens, readable skills with local notes,
+            backup and restore, and the workspace.
+            <span class="file caption mono">settings.html</span>
+          </a>
+        </li>
+        <li class="card">
+          <a href="onboarding.html">
+            <strong>First run</strong>
+            A new workspace: connect the agent, watch it build the record, and
+            learn what happens next.
+            <span class="file caption mono">onboarding.html</span>
+          </a>
+        </li>
+      </ul>
+
+      <p class="caption">
+        Shared files: <span class="mono">prototype.css</span> (tokens and
+        components), <span class="mono">prototype.js</span> (navigation, theme,
+        density, tabs) and <span class="mono">screenshots.mjs</span> (captures
+        and checks). Every name, company and address is invented.
+      </p>
+    </main>
+    <script defer src="prototype.js"></script>
+  </body>
+</html>
