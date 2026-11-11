@@ -27,12 +27,12 @@ How to read the evidence:
 
 | Measure | Operations |
 |---|---|
-| Logical operations in the inventory | 110 |
+| Logical operations in the inventory | 117 |
 | Without REST or without MCP | 0 |
-| Owner only (refused for an agent token) | 8 |
-| Without a working dashboard path | 9 |
+| Owner only (refused for an agent token) | 9 |
+| Without a working dashboard path | 16 |
 | Reached only through another operation | 5 |
-| With inputs the dashboard never mentions | 9 |
+| With inputs the dashboard never mentions | 11 |
 | With free-form JSON edited as raw JSON | 13 |
 | With different REST and MCP input names | 1 |
 | With a dashboard path exercised by e2e | 53 |
@@ -49,6 +49,13 @@ code calls the route and no browser test reached it.
 |---|---|---|---|---|
 | `skills.read` | `GET /skills/{name}`<br>`GET /skills/{name}/files/{path}` | `skill_get` | Settings: Connect an agent | Settings lists the served skills by name and description; their text and reference files cannot be opened. |
 | `jobs.resolve` | `GET /jobs/resolve` | `jobs_resolve` | Job details: Possible duplicates (identity matches are merged on ingestion) | No lookup of a job by URL, external key or title and company. Job details open Possible duplicates (`jobs.duplicates`) instead. |
+| `policy.read` | `GET /policy`<br>`GET /policy/{section}` | `policy_get` | Policy: sections and items | — |
+| `policy.add` | `POST /policy/{section}/items` | `policy_add` | Policy: Add a rule / Add a fact | — |
+| `policy.update` | `PATCH /policy/items/{item_id}` | `policy_update` | Policy: Edit; the rule switch | — |
+| `policy.move` | `POST /policy/items/{item_id}/move` | `policy_move` | Policy: Move to section | — |
+| `policy.reorder` | `POST /policy/{section}/reorder` | `policy_reorder` | Policy: Move up / Move down | — |
+| `policy.confirm` | `POST /policy/items/{item_id}/confirm` | `policy_confirm` | Policy: Confirm | — |
+| `policy.remove` | `DELETE /policy/items/{item_id}` | `policy_remove` | Policy: Remove | — |
 | `runs.start` | `POST /runs` | `runs_start` | Activity: Runs (read only) | Runs belong to API tokens: a dashboard session has no runs. Activity shows runs, their reports and their changes read-only. |
 | `runs.update` | `PATCH /runs/{run_id}` | `runs_update` | Activity: run detail (read only) | Runs belong to API tokens: a dashboard session has no runs. |
 | `runs.finish` | `POST /runs/{run_id}/finish` | `runs_finish` | Activity: run detail (read only) | Runs belong to API tokens: a dashboard session has no runs. |
@@ -78,6 +85,8 @@ operation. They can be set over REST or MCP only.
 | Operation | Inputs | Remark |
 |---|---|---|
 | `jobs.create` | `raw`, `source_key` | `raw` and `source_key` are collector fields for scripted imports. |
+| `claims.create` | `default_in_cv`, `role` | — |
+| `claims.update` | `default_in_cv`, `role` | — |
 | `applications.list` | `ready_since`, `ready_until` | The Ready to apply queue filters by `readiness=ready` with `sort=ready`; the time range serves agents and scripts. |
 | `applications.create` | `deadline`, `priority`, `questions`, `requirements` | Starting an application sends the job only; plan fields and questions are edited afterwards (`applications.update`). |
 | `contexts.create` | `template_id` | The context dialog sends `template_ids`; `template_id` is the single-template form of the same input. |
@@ -123,6 +132,7 @@ with `403 forbidden` on REST and MCP; `test_interfaces.py` checks each one.
 
 | Operation | REST | MCP | Remark |
 |---|---|---|---|
+| `policy.confirm` | `POST /policy/items/{item_id}/confirm` | `policy_confirm` | expected_version is the section's version; a stale one returns 409 with details.current_version. Confirms the item as it stands and records who confirmed it. An agent proposes and asks; it never confirms. |
 | `backup.restore` | `POST /backup/restore` | `workspace_restore_upload` | MCP obtains a scoped raw HTTP upload grant. Validated restore preserves installation authentication; no arbitrary SQL endpoint. Recent destination provider HTTP usage and later cooldowns survive older-backup restore; saved policy settings are restored. |
 | `questions.answer` | `POST /questions/{question_id}/answer` | `questions_answer` | An answer is the owner's. An owner token records it only when the owner gave it. |
 | `requests.create` | `POST /requests` | `requests_create` | The owner writes; an agent never writes requests for itself. A request never authorises what the operating mandate forbids. |
@@ -204,26 +214,33 @@ missing from the inventory.
 | Operation | REST | MCP | Access | Dashboard location | Dashboard code | Editor | E2E |
 |---|---|---|---|---|---|---|---|
 | `profile.read`<br>Read profile, links, metadata and version | `GET /career/profile` | `career_get_profile` | any | Career: profile | pages/Career.tsx | structured | 1 |
-| `profile.update`<br>Edit profile/preferences/contact | `PATCH /career/profile` | `career_update_profile` | any | Career: profile and Advanced JSON | pages/Career.tsx | raw JSON: metadata | **0** |
+| `profile.update`<br>Edit profile/preferences/contact | `PATCH /career/profile` | `career_update_profile` | any | Career: profile and Other details | pages/Career.tsx | raw JSON: metadata | **0** |
 | `knowledge.list`<br>Search/filter paginated career entries summaries | `GET /career/knowledge` | `knowledge_list` | any | Career: career entries: list/search | pages/Applications.tsx<br>pages/Career.tsx | structured | 6 |
 | `knowledge.read`<br>Read full career entries | `GET /career/knowledge/{knowledge_id}` | `knowledge_get` | any | Career: career entries: detail | pages/Career.tsx | structured | 2 |
 | `knowledge.create`<br>Create career entries | `POST /career/knowledge` | `knowledge_create` | any | Career: career entries: add | pages/Career.tsx | raw JSON: metadata | **0** |
-| `knowledge.update`<br>Edit career entries with version protection | `PATCH /career/knowledge/{knowledge_id}` | `knowledge_update` | any | Career: career entries: edit and Advanced JSON | pages/Career.tsx | raw JSON: metadata | 1 |
+| `knowledge.update`<br>Edit career entries with version protection | `PATCH /career/knowledge/{knowledge_id}` | `knowledge_update` | any | Career: career entries: edit and Other details | pages/Career.tsx | raw JSON: metadata | 1 |
 | `knowledge.delete`<br>Delete live career entries | `DELETE /career/knowledge/{knowledge_id}` | `knowledge_delete` | any | Career: career entries: remove | pages/Career.tsx | structured | **0** |
 | `claims.list`<br>Search/filter paginated claims summaries | `GET /career/claims` | `claims_list` | any | Career: reusable claims: list/search | pages/Applications.tsx<br>pages/Career.tsx | structured | 4 |
 | `claims.read`<br>Read full claim | `GET /career/claims/{claim_id}` | `claims_get` | any | Career: reusable claims: detail | pages/Career.tsx | structured | **0** |
 | `claims.create`<br>Create claim | `POST /career/claims` | `claims_create` | any | Career: reusable claims: add | pages/Career.tsx | raw JSON: metadata | **0** |
-| `claims.update`<br>Edit claim with version protection | `PATCH /career/claims/{claim_id}` | `claims_update` | any | Career: reusable claims: edit and Advanced JSON | pages/Career.tsx | raw JSON: metadata | **0** |
+| `claims.update`<br>Edit claim with version protection | `PATCH /career/claims/{claim_id}` | `claims_update` | any | Career: reusable claims: selection controls, edit and Other details | pages/Career.tsx | raw JSON: metadata | **0** |
 | `claims.delete`<br>Delete live claim | `DELETE /career/claims/{claim_id}` | `claims_delete` | any | Career: reusable claims: remove | pages/Career.tsx | structured | **0** |
 | `templates.list`<br>Search/filter paginated templates summaries | `GET /templates` | `templates_list` | any | Templates: packages/defaults: list/search | pages/Applications.tsx<br>pages/Templates.tsx | structured | 11 |
 | `templates.read`<br>Read full template | `GET /templates/{template_id}` | `templates_get` | any | Templates: packages/defaults: detail | pages/Templates.tsx | structured | 4 |
 | `templates.create`<br>Create template | `POST /templates` | `templates_create` | any | Templates: packages/defaults: add | pages/Templates.tsx | raw JSON: rules | **0** |
-| `templates.update`<br>Edit template with version protection | `PATCH /templates/{template_id}` | `templates_update` | any | Templates: packages/defaults: edit and Advanced JSON | pages/Templates.tsx | raw JSON: rules | **0** |
+| `templates.update`<br>Edit template with version protection | `PATCH /templates/{template_id}` | `templates_update` | any | Templates: packages/defaults: Source, Rules and Assets | pages/Templates.tsx | raw JSON: rules | **0** |
 | `templates.delete`<br>Delete live template | `DELETE /templates/{template_id}` | `templates_delete` | any | Templates: packages/defaults: remove | pages/Templates.tsx | structured | **0** |
 | `instructions.read`<br>Read general document writing instructions | `GET /instructions` | `instructions_get` | any | Templates: general instructions | pages/Templates.tsx | structured | 4 |
 | `instructions.update`<br>Edit general document writing instructions | `PATCH /instructions` | `instructions_update` | any | Templates: general instructions | pages/Templates.tsx | structured | **0** |
 | `career.preview_import`<br>Preview JSON/text career import without mutation | `POST /career/import/preview` | `career_preview_import` | any | Career: import preview | pages/Career.tsx | structured | **0** |
 | `career.import`<br>Confirm append-only evidence and optional versioned profile import | `POST /career/import` | `career_import` | any | Career: confirm import | pages/Career.tsx | structured | **0** |
+| `policy.read`<br>Read the owner's policy, or one section | `GET /policy`<br>`GET /policy/{section}` | `policy_get` | any | Policy: sections and items | **none** | — | — |
+| `policy.add`<br>Add a policy item | `POST /policy/{section}/items` | `policy_add` | any | Policy: Add a rule / Add a fact | **none** | — | — |
+| `policy.update`<br>Edit a policy item | `PATCH /policy/items/{item_id}` | `policy_update` | any | Policy: Edit; the rule switch | **none** | — | — |
+| `policy.move`<br>Move a policy item to another section | `POST /policy/items/{item_id}/move` | `policy_move` | any | Policy: Move to section | **none** | — | — |
+| `policy.reorder`<br>Reorder a section's policy items | `POST /policy/{section}/reorder` | `policy_reorder` | any | Policy: Move up / Move down | **none** | — | — |
+| `policy.confirm`<br>Confirm a proposed policy item | `POST /policy/items/{item_id}/confirm` | `policy_confirm` | owner | Policy: Confirm | **none** | — | — |
+| `policy.remove`<br>Remove a policy item | `DELETE /policy/items/{item_id}` | `policy_remove` | any | Policy: Remove | **none** | — | — |
 
 ### Applications and documents
 
