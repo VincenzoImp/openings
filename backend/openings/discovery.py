@@ -861,13 +861,35 @@ class DiscoveryService:
                 "INSERT INTO settings(key,data,version,updated_at) VALUES('collection',?,1,?) ON CONFLICT(key) DO UPDATE SET data=excluded.data,version=settings.version+1,updated_at=excluded.updated_at",
                 (encode({"enabled": value.enabled}), stamp),
             )
+            self._record(
+                connection,
+                "collection_updated",
+                "collection",
+                "collection",
+                enabled=value.enabled,
+                version=current + 1,
+            )
         return self.get_collection()
+
+    def _record(self, connection, event, subject_type, subject_id, /, **payload):
+        """Leave an attributed record of a collection change: identifiers and field names only."""
+        self.workspace.event(
+            event, payload=payload, conn=connection, subject=(subject_type, subject_id)
+        )
 
     def list_providers(self):
         return self.providers.list()
 
     def update_provider(self, provider_id, value: ProviderPatch):
         result = self.providers.update(provider_id, value)
+        self._record(
+            None,
+            "provider_updated",
+            "provider",
+            provider_id,
+            fields=sorted(value.model_dump(exclude_unset=True, exclude={"expected_version"})),
+            version=result["version"],
+        )
         if result["policy"]["enabled"]:
             # Policy changes may make a previously deferred queued request eligible.
             self.db.execute(
@@ -1162,11 +1184,20 @@ class DiscoveryService:
         )
 
     def cancel_run(self, run_id):
-        self.get_run(run_id)
-        self.db.execute(
-            "UPDATE tasks SET state='cancelled',error=NULL,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE run_id=? AND state IN ('queued','running')",
-            (now(), run_id),
-        )
+        run = self.get_run(run_id)
+        with self.db.transaction() as connection:
+            changed = connection.execute(
+                "UPDATE tasks SET state='cancelled',error=NULL,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE run_id=? AND state IN ('queued','running')",
+                (now(), run_id),
+            ).rowcount
+            if changed:
+                self._record(
+                    connection,
+                    "collection_run_cancelled",
+                    "collection_run",
+                    run_id,
+                    source_id=run.get("source_id"),
+                )
         return self.get_run(run_id)
 
     def source_schemas(self):
@@ -1301,6 +1332,7 @@ class DiscoveryService:
                     stamp,
                 ),
             )
+            self._record(connection, "source_created", "source", record_id, kind=resolved["kind"])
         return self._source(record_id)
 
     def update_source(self, source_id, value: SourcePatch):
@@ -1350,6 +1382,14 @@ class DiscoveryService:
                     source_id,
                 ),
             )
+            self._record(
+                connection,
+                "source_updated",
+                "source",
+                source_id,
+                fields=sorted(key for key in updates if key != "expected_version"),
+                version=row["version"] + 1,
+            )
         return self._source(source_id)
 
     def delete_source(self, source_id, expected_version=None):
@@ -1363,6 +1403,7 @@ class DiscoveryService:
                 (now(), source_id),
             )
             connection.execute("DELETE FROM sources WHERE id=?", (source_id,))
+            self._record(connection, "source_deleted", "source", source_id)
         return {"deleted": True, "id": source_id}
 
     def queue_collection(
@@ -1488,6 +1529,16 @@ class DiscoveryService:
                     "UPDATE sources SET last_scheduled_at=? WHERE id=?",
                     (planned_at or stamp, source_id),
                 )
+            else:
+                # Scheduled runs are routine; only a requested run is a recorded change.
+                self._record(
+                    connection,
+                    "collection_queued",
+                    "collection_run",
+                    run_id,
+                    source_id=source_id,
+                    overrides=sorted(options),
+                )
         task_ids.sort()
         return {**self.get_task(task_ids[0]), "task_ids": task_ids, "run_id": run_id}
 
@@ -1545,11 +1596,21 @@ class DiscoveryService:
         return self._task_record(row, include_checkpoint)
 
     def cancel_task(self, task_id):
-        self.get_task(task_id)
-        self.db.execute(
-            "UPDATE tasks SET state='cancelled',error=NULL,lease_until=NULL,lease_owner=NULL,updated_at=? WHERE id=? AND state IN ('queued','running')",
-            (now(), task_id),
-        )
+        task = self.get_task(task_id)
+        with self.db.transaction() as connection:
+            changed = connection.execute(
+                "UPDATE tasks SET state='cancelled',error=NULL,lease_until=NULL,lease_owner=NULL,updated_at=? WHERE id=? AND state IN ('queued','running')",
+                (now(), task_id),
+            ).rowcount
+            if changed:
+                self._record(
+                    connection,
+                    "task_cancelled",
+                    "task",
+                    task_id,
+                    source_id=task["source_id"],
+                    run_id=task.get("run_id"),
+                )
         return self.get_task(task_id)
 
     def retry_task(self, task_id):
@@ -1567,16 +1628,26 @@ class DiscoveryService:
         )
         if active:
             raise DomainError(409, "task_active", "Equivalent work is already queued or running.")
-        self.db.execute(
-            "UPDATE tasks SET state='queued',payload=?,result=?,next_run_at=?,lease_until=NULL,lease_owner=NULL,error=NULL,updated_at=? WHERE id=? AND state IN ('failed','cancelled')",
-            (
-                encode(payload),
-                encode({**task["result"], "failure_attempts": 0}),
-                now(),
-                now(),
-                task_id,
-            ),
-        )
+        with self.db.transaction() as connection:
+            changed = connection.execute(
+                "UPDATE tasks SET state='queued',payload=?,result=?,next_run_at=?,lease_until=NULL,lease_owner=NULL,error=NULL,updated_at=? WHERE id=? AND state IN ('failed','cancelled')",
+                (
+                    encode(payload),
+                    encode({**task["result"], "failure_attempts": 0}),
+                    now(),
+                    now(),
+                    task_id,
+                ),
+            ).rowcount
+            if changed:
+                self._record(
+                    connection,
+                    "task_retried",
+                    "task",
+                    task_id,
+                    source_id=task["source_id"],
+                    run_id=task.get("run_id"),
+                )
         return self.get_task(task_id)
 
     def schedule_due(self, stopping=None):
