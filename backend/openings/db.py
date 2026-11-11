@@ -11,7 +11,7 @@ from pathlib import Path
 from .errors import DomainError
 from .posting import posting_complete
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 SCHEMA_SQL = Path(__file__).with_name("schema.sql")
 TEMP_PREFIX = ".openings-temp-"
 
@@ -41,6 +41,9 @@ class Database:
             if version in MIGRATIONS:
                 upgrade(conn)
             apply_schema(conn)
+        from .compaction import compact
+
+        compact(self)  # an upgrade or large deletions may have left most of the file free
         self.path.chmod(0o600)
 
     @contextmanager
@@ -98,7 +101,11 @@ class Database:
             source.backup(target)
 
     def collect_blobs(self):
-        return self.execute("DELETE FROM blobs WHERE sha256 NOT IN (SELECT sha256 FROM files)")
+        """Remove snapshot parts and file bytes that nothing references any more."""
+        from .snapshots import collect_unused
+
+        with self.transaction() as conn:
+            collect_unused(conn)
 
 
 def _migrate_5_to_6(conn):
@@ -214,8 +221,16 @@ def _migrate_7_to_8(conn):
     )
 
 
+def _migrate_8_to_9(conn):
+    # Storage only: frozen payloads become shared content-addressed parts and context
+    # asset files leave the files table. Every context reads back byte for byte.
+    from .snapshots import migrate_contexts
+
+    migrate_contexts(conn)
+
+
 # Each step upgrades from its key to the next version; steps chain inside one transaction.
-MIGRATIONS = {5: _migrate_5_to_6, 6: _migrate_6_to_7, 7: _migrate_7_to_8}
+MIGRATIONS = {5: _migrate_5_to_6, 6: _migrate_6_to_7, 7: _migrate_7_to_8, 8: _migrate_8_to_9}
 
 
 def upgrade(conn):
