@@ -40,6 +40,7 @@ uv run ruff format --check backend
 uv run pytest
 python3 scripts/bump_version.py --check
 npm --prefix frontend run build
+npm --prefix frontend run budget
 npm --prefix frontend run format:check
 npm --prefix frontend test
 npm --prefix frontend audit --audit-level=moderate
@@ -67,6 +68,31 @@ npm run test:e2e
 
 The four projects cover Chromium and WebKit at desktop/mobile widths. CI runs
 Chromium at both widths. Browser binaries are development tools, outside the core.
+
+### Dashboard budgets
+
+The [dashboard design](docs/developer/dashboard-design.md) sets budgets that CI
+checks:
+
+- **Size.** `npm --prefix frontend run budget` reads the build and fails when the
+  first screen's compressed JavaScript exceeds 110 kB, a later screen adds more
+  than 40 kB, or the stylesheets exceed 15 kB. A page that cannot meet its budget
+  yet gets a named, temporary allowance in `frontend/scripts/budget.mjs` with the
+  stage that removes it; never raise a budget.
+- **Accessibility.** `frontend/tests/accessibility.spec.ts` runs axe on every
+  screen in both themes at both widths: no serious or critical finding against
+  WCAG 2.2 AA. Add a new screen or tab to its list. Fix a finding in the shell or
+  a component; a finding inside a page that a later stage rebuilds may be listed
+  as an exclusion for that rule and that part of the page, with its stage.
+- **Contrast.** `frontend/tests/contrast.test.mjs` computes the contrast of every
+  token pair in the design document's colour table from
+  `frontend/src/design/tokens.css`. Change a colour in both places.
+- **Keyboard.** `frontend/tests/shell.spec.ts` operates the navigation, the More
+  sheet, the theme and the density from the keyboard alone.
+
+New screens use the components in `frontend/src/design` and add no global styles.
+`frontend/src/legacy.css` belongs to the pages written before the design system:
+do not add rules to it.
 
 Each run starts its own server on a free local port, so runs in several checkouts
 or worktrees can overlap. Set `OPENINGS_E2E_PORT` to choose the port, for example

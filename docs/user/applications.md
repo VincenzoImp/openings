@@ -17,7 +17,7 @@ layout. Your external agent fills it using the selected facts and instructions.
 
 ## Start an application
 
-Review new jobs in **Inbox**. Choose **Shortlist** to save an opportunity for
+Review new jobs in **Jobs**, which opens on the **Inbox** queue. Choose **Shortlist** to save an opportunity for
 later, or **Dismiss** to reject it reversibly. Inbox and Shortlist contain only
 jobs without application attempts. Shortlist is your ready-to-prepare queue.
 
