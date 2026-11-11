@@ -108,7 +108,7 @@ For development commands and release gates, see [Contributing](../../CONTRIBUTIN
 
 ## Upgrade the workspace format
 
-Back up before upgrading. On start, a schema 8 workspace is upgraded to schema 9
+Back up before upgrading. On start, a schema 8 workspace (0.17.0) is upgraded to schema 9 (0.18)
 in one transaction. Schema 9 changes storage only: the frozen contexts, which each
 held a full copy of your Career record, now share one stored copy of every entry,
 claim and template, and their asset files no longer add file rows. Every context
@@ -124,7 +124,7 @@ The same rewrite runs at any start when at least a quarter of the file and
 `OPENINGS_COMPACT_MIN_MB` (default 32) are free, for example after forgetting many
 jobs. An interruption leaves the previous file intact.
 
-A schema 7 workspace is upgraded to schema 8 in the same
+A schema 7 workspace is upgraded to schema 8, which shipped with 0.17.0, in the same
 transaction: changes gain their actor and run, notes gain an author, and
 the tables for agent runs and questions for the owner are added. Every existing
 record, version, file and frozen context is kept. Changes recorded before the
