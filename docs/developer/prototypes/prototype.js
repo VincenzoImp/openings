@@ -29,11 +29,11 @@ const NAV = [
     group: "System",
     items: [
       { id: "collection", label: "Collection", href: "collection.html" },
-      { id: "settings", label: "Settings", href: "index.html" },
+      { id: "settings", label: "Settings", href: "settings.html" },
     ],
   },
 ];
-// Narrow screens: four destinations and "More" (the remaining pages).
+// Narrow screens: four destinations and "More", which opens the remaining pages.
 const TABS = ["today", "applications", "jobs", "activity"];
 
 function setTheme(theme) {
@@ -95,7 +95,15 @@ function shell() {
         .filter((item) => TABS.includes(item.id))
         .map(link)
         .join("")}
-      <a href="index.html"${TABS.includes(page) ? "" : ' aria-current="page"'}>More</a>
+      <button type="button" id="more" aria-expanded="false" aria-controls="more-sheet"${
+        TABS.includes(page) ? "" : ' aria-current="page"'
+      }>More</button>
+    </nav>
+    <nav class="more-sheet nav" id="more-sheet" aria-label="More" hidden>
+      ${flat
+        .filter((item) => !TABS.includes(item.id))
+        .map(link)
+        .join("")}
     </nav>`;
   content.replaceWith(app);
   app.querySelector(".main").append(content);
@@ -103,6 +111,12 @@ function shell() {
     setTheme(
       document.documentElement.dataset.theme === "dark" ? "light" : "dark",
     );
+  });
+  const more = document.getElementById("more");
+  more.addEventListener("click", () => {
+    const sheet = document.getElementById("more-sheet");
+    sheet.hidden = !sheet.hidden;
+    more.setAttribute("aria-expanded", String(!sheet.hidden));
   });
   document.getElementById("density").addEventListener("click", () => {
     const root = document.documentElement;
