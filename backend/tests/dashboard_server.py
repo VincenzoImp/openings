@@ -17,7 +17,6 @@ from openings.app import create_app
 from openings.career import ClaimCreate, KnowledgeCreate, TemplateCreate
 from openings.documents import ContextCreate
 
-
 RUN_PATH = "/__e2e__/run"
 
 
