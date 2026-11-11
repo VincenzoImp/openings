@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
+  actorLabel,
   api,
   ApiError,
   calendarDate,
@@ -33,6 +34,8 @@ import {
   type Template,
 } from "../api";
 import { FileManager } from "../files";
+import { ReadyPanel, ReadyTag, readyReason } from "./ApplicationReady";
+import { AskAgent } from "./Requests";
 import {
   useEditorRecord,
   confirmLeave,
@@ -280,9 +283,9 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
     [batchErrors, setBatchErrors] = useState<{ id: string; message: string }[]>(
       [],
     ),
-    [bulkAction, setBulkAction] = useState<"close" | "reopen" | "delete" | "">(
-      "",
-    ),
+    [bulkAction, setBulkAction] = useState<
+      "close" | "reopen" | "delete" | "mark_ready" | ""
+    >(""),
     [bulkOutcome, setBulkOutcome] = useState(""),
     [bulkStage, setBulkStage] = useState("draft");
   const selected = Object.keys(selection);
@@ -425,6 +428,7 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
           <option value="applied">Submission date</option>
           <option value="deadline">Deadline (soonest)</option>
           <option value="priority">Priority (highest)</option>
+          <option value="ready">Ready (longest waiting)</option>
         </select>
       </div>
       {resource.error && (
@@ -447,6 +451,12 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
             onClick={() => setBulkAction("reopen")}
           >
             Reopen
+          </Button>
+          <Button
+            disabled={bulkDisabled}
+            onClick={() => setBulkAction("mark_ready")}
+          >
+            Mark ready
           </Button>
           <Button
             variant="danger"
@@ -502,6 +512,20 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
             <span>{resource.data.stage_counts?.[stage] ?? 0}</span>
           </Button>
         ))}
+        <Button
+          className="ready-queue"
+          variant={filters.readiness === "ready" ? "selected" : ""}
+          icon="check"
+          onClick={() =>
+            setFilters(
+              filters.readiness === "ready"
+                ? { readiness: "", sort: "updated", offset: "0" }
+                : { readiness: "ready", sort: "ready", offset: "0" },
+            )
+          }
+        >
+          Ready to apply <span>{resource.data.ready_count ?? 0}</span>
+        </Button>
       </div>
       <div className="boardcaption">
         <span>{resource.data.total} application attempts</span>
@@ -623,6 +647,7 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                           {outcomeLabel(app.outcome)}
                         </span>
                       )}
+                      <ReadyTag application={app} />
                       <Preparation application={app} />
                       <span className="application-next">
                         {app.status === "draft"
@@ -747,6 +772,7 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                       )}
                   </td>
                   <td data-label="Preparation">
+                    <ReadyTag application={app} />
                     <Preparation application={app} />
                   </td>
                   <td data-label="Outcome">{outcomeLabel(app.outcome)}</td>
@@ -775,7 +801,9 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
               ? `Close ${selected.length} applications?`
               : bulkAction === "reopen"
                 ? `Reopen ${selected.length} applications?`
-                : `Delete ${selected.length} applications?`
+                : bulkAction === "mark_ready"
+                  ? `Mark ${selected.length} applications ready?`
+                  : `Delete ${selected.length} applications?`
           }
           onClose={() => setBulkAction("")}
         >
@@ -784,7 +812,9 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
               ? "Record one outcome for every selected attempt. Documents and history are kept."
               : bulkAction === "reopen"
                 ? "Move selected Closed attempts back to a stage. A job can have only one open application."
-                : "Permanently remove the selected attempts with their contexts, documents and files. Their jobs stay in your workspace."}
+                : bulkAction === "mark_ready"
+                  ? "Mark the selected Preparing attempts ready to apply. An attempt with a missing PDF, an unapproved revision or a blocking requirement is refused and listed."
+                  : "Permanently remove the selected attempts with their contexts, documents and files. Their jobs stay in your workspace."}
           </p>
           {bulkAction === "close" && (
             <Field label="Outcome">
@@ -830,7 +860,9 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                 ? "Close applications"
                 : bulkAction === "reopen"
                   ? "Reopen applications"
-                  : "Delete applications"}
+                  : bulkAction === "mark_ready"
+                    ? "Mark ready"
+                    : "Delete applications"}
             </Button>
           </div>
         </Dialog>
@@ -1532,6 +1564,12 @@ export function ApplicationDrawer({
                 ))}
               </select>
             </div>
+            <ReadyPanel application={app} />
+            <AskAgent
+              subjectType="application"
+              subjectId={app.id}
+              name={`the application for ${app.job?.title || "this job"}`}
+            />
             <Tabs
               label="Application workspace"
               value={tab}
@@ -1881,11 +1919,11 @@ export function ApplicationDrawer({
                             ? `${e.payload.from ? `${stageLabels[String(e.payload.from) as Stage] || String(e.payload.from)} → ` : ""}${stageLabels[String(e.payload.to) as Stage] || String(e.payload.to)}`
                             : e.payload?.status
                               ? String(e.payload.status)
-                              : ""}
+                              : readyReason(e.payload)}
                         </p>
                         <time>
                           {date(e.created_at)}
-                          {e.actor && ` · ${e.actor.label}`}
+                          {e.actor && ` · ${actorLabel(e.actor)}`}
                         </time>
                       </div>
                     </article>

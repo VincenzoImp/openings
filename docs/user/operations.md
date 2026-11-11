@@ -14,6 +14,9 @@ curl --fail "$OPENINGS_URL/api/v1/backup" \
 ```
 
 Keep backups private: they contain personal information and stored credentials.
+A backup downloaded with an agent token omits the owner password hash, the
+session secret and the API tokens, and restores like any other backup. To start
+a server directly on such a file, set the owner password again.
 The database is not encrypted. A JSON export is useful for reading records, but
 omits binary file contents and is not a restorable backup. Download it through
 Settings, `GET /api/v1/export`, or the scoped `workspace_export` MCP grant. Use the
@@ -23,7 +26,8 @@ backup action to capture changes from an active WAL journal consistently.
 
 On the destination host, install the same Openings release and set its owner
 password. Restore through Settings or `POST /api/v1/backup/restore` with the raw
-SQLite body. Restore accepts the current database format and checks integrity and
+SQLite body, as the owner or with an owner token; an agent token is refused.
+Restore accepts the current database format and checks integrity and
 foreign keys before replacement. It preserves the destination installation's owner credentials/API tokens, clears
 pending transfer grants and recovers interrupted tasks. Provider policy settings are
 restored, while recent request history and later cooldowns already recorded on
@@ -63,10 +67,13 @@ runs continue until stopped; manual runs share provider spacing and cooldowns.
 
 ## Access controls
 
-Settings supports named owner tokens, independent token revocation and owner password
-changes. A password change rotates browser sessions and retains existing API tokens;
-log in again after changing it in the dashboard. Revoking the token used by an agent
-ends that token’s access on its next request.
+Settings supports named API tokens of two kinds, independent token revocation and
+owner password changes. An **agent** token cannot change the password, manage
+tokens, restore a backup or answer a question for the owner; an **owner** token
+has full access ([token kinds](agents.md#token-kinds)). Tokens created before
+version 0.17 are owner tokens. A password change rotates browser sessions and
+retains existing API tokens; log in again after changing it in the dashboard.
+Revoking the token used by an agent ends that token’s access on its next request.
 
 Sign-in and setup allow 10 attempts per client address per minute. After more
 than 10 failed sign-ins across all clients within 15 minutes, sign-in attempts

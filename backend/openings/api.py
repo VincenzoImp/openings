@@ -6,11 +6,13 @@ from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 
 from . import __version__
+from .actors import current_actor
 from .models import (
     ApplicationBulk,
     ApplicationInput,
     ApplicationPatch,
     ApplicationQuery,
+    ApplicationReady,
     DuplicateQuery,
     JobBulk,
     JobInput,
@@ -25,7 +27,7 @@ from .models import (
 )
 
 
-def register_core(router: APIRouter, workspace):
+def register_core(router: APIRouter, workspace, requests):
     @router.get("/workspace")
     def info(request: Request):
         return {
@@ -35,6 +37,8 @@ def register_core(router: APIRouter, workspace):
             "api_base": "/api/v1",
             "mcp_endpoint": "/mcp",
             "single_owner": True,
+            "actor": current_actor().describe(),
+            "open_requests": requests.count_open(),
         }
 
     @router.get("/overview")
@@ -130,15 +134,19 @@ def register_core(router: APIRouter, workspace):
     def edit_application(application_id: str, value: ApplicationPatch):
         return workspace.update_application(application_id, value)
 
+    @router.post("/applications/{application_id}/ready")
+    def ready_application(application_id: str, value: ApplicationReady):
+        return workspace.set_ready(application_id, value)
+
     @router.get("/applications/{application_id}/events")
     def events(application_id: str):
         return workspace.application_events(application_id)
 
 
-def register_core_mcp(mcp, workspace):
+def register_core_mcp(mcp, workspace, requests):
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def workspace_info(ctx: Context) -> dict:
-        """Read workspace capabilities. Use REST transfer grants for file bytes."""
+        """Read workspace capabilities, who this token is (actor, with token_kind owner or agent) and open_requests, the number of owner requests waiting for an agent (requests_list). Use REST transfer grants for file bytes."""
         request = ctx.request_context.request
         origin = os.environ.get("OPENINGS_PUBLIC_URL") or (
             str(request.base_url).rstrip("/") if request else None
@@ -148,7 +156,9 @@ def register_core_mcp(mcp, workspace):
             "version": __version__,
             "origin": origin,
             "api_base": "/api/v1",
-            "workflow": "Read career, templates and stored instructions; prepare a frozen context; write and compile externally; submit document revisions and PDF/source files; track progress explicitly.",
+            "actor": current_actor().describe(),
+            "open_requests": requests.count_open(),
+            "workflow": "Read open requests for the agent first. Read career, templates and stored instructions; prepare a frozen context; write and compile externally; submit document revisions and PDF/source files; track progress explicitly.",
         }
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
@@ -168,7 +178,7 @@ def register_core_mcp(mcp, workspace):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def jobs_duplicates(value: DuplicateQuery | None = None) -> dict:
-        """Read-only candidate duplicate groups (same normalized company+title, optional location, or identical posting text) with triage, attempts and text similarity. Verify before job_merge; never merges."""
+        """Read-only candidate duplicate groups, most confident first: each has a confidence in [0,1], a tier and the signals that matched or conflicted (requisition id, apply target, posting text, company and title, location), with triage and attempts. min_confidence defaults to 0.5; 0 lists every candidate. Verify before job_merge; never merges."""
         return workspace.duplicate_jobs(value or DuplicateQuery())
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
@@ -223,12 +233,12 @@ def register_core_mcp(mcp, workspace):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def applications_list(value: ApplicationQuery | None = None) -> dict:
-        """Read paginated application summaries and stage totals. Filter by exact job_id, query, stage, outcome, company or readiness; sort by deadline or priority to order preparation work."""
+        """Read paginated application summaries, stage totals and the ready count. Filter by exact job_id, query, stage, outcome, company or readiness (readiness=ready is the stored Ready step; reviewed passes every check but is not marked); sort by deadline, priority or ready time."""
         return workspace.list_applications(**(value or ApplicationQuery()).model_dump())
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
     def applications_bulk(value: ApplicationBulk) -> dict:
-        """Close (with outcome), reopen (to a non-Closed stage) or delete at most 200 explicit application IDs/versions, with per-item results. Delete is permanent."""
+        """Close (with outcome), reopen (to a non-Closed stage), mark_ready, unmark_ready or delete at most 200 explicit application IDs/versions, with per-item results. Delete is permanent."""
         return workspace.bulk_applications(value)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
@@ -248,7 +258,7 @@ def register_core_mcp(mcp, workspace):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def application_get(application_id: str) -> dict:
-        """Read a single application, its job, employer requirements and derived readiness."""
+        """Read a single application, its job, employer requirements, derived readiness and the stored Ready step (ready_at, ready_by)."""
         return workspace.get_application(application_id)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
@@ -260,6 +270,11 @@ def register_core_mcp(mcp, workspace):
     def application_update(application_id: str, value: ApplicationPatch) -> dict:
         """Record progress, priority, deadline, employer requirements and questions/answers explicitly; editing documents never marks sent. The returned job is the compact summary."""
         return workspace.update_application(application_id, value)
+
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
+    def application_ready(application_id: str, value: ApplicationReady) -> dict:
+        """Mark a Preparing application ready to apply (ready=true) or clear the mark (ready=false), using its current version. Refused with application_not_ready naming the failed check (stage, blocked, none, missing_pdf, unreviewed). The mark is cleared automatically when a revision, context, file or blocking requirement changes. This never submits anything."""
+        return workspace.set_ready(application_id, value)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def application_history(application_id: str) -> dict:

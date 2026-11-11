@@ -4,8 +4,13 @@ Base path: **`/api/v1`**. The running server exposes interactive reference at
 `/api/docs` and schemas at `/api/openapi.json`; those schemas are authoritative
 for fields. All normal data operations require an owner session or bearer token.
 
-Create a token in **Settings** and store it outside source control. Tokens grant
-owner access and can be revoked independently. Browser session writes also need
+Create a token in **Settings** and store it outside source control. A token is
+an **owner** token (full access) or an **agent** token, which is refused with
+`403 forbidden` for the owner password, token management, restore, answering
+a question and writing or withdrawing a request (see
+[token kinds](agents.md#token-kinds)). `POST /tokens` takes
+`{"name": "...", "kind": "agent"}`; `kind` defaults to `owner`. Tokens can be
+revoked independently. Browser session writes also need
 the `X-CSRF-Token` returned by `/auth/session`; scripts use bearer auth instead.
 `POST /auth/logout` revokes every browser session (all signed-in browsers must
 sign in again); API/MCP tokens stay valid.
@@ -38,7 +43,7 @@ Paste the posting when extraction cannot obtain the complete text.
 | Tasks | `GET /tasks`, `GET /tasks/{id}`, `POST /tasks/{id}/cancel` or `/retry` |
 | Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `GET /documents/{id}/consistency`, `POST /documents/{id}/review` |
 | Files | `GET /files`, `GET/DELETE /files/{id}`, `GET /files/{id}/content`, `POST /files/uploads`, `POST /files/{id}/download` |
-| Agent activity | `GET /events`; `GET/POST /runs`, `GET/PATCH /runs/{id}`, `POST /runs/{id}/finish`; `GET/POST /questions`, `GET /questions/{id}`, `POST /questions/{id}/answer`, `POST /questions/{id}/withdraw` |
+| Agent activity | `GET /events`; `GET/POST /runs`, `GET/PATCH /runs/{id}`, `POST /runs/{id}/finish`; `GET/POST /questions`, `GET /questions/{id}`, `POST /questions/{id}/answer`, `POST /questions/{id}/withdraw`; `GET/POST /requests`, `GET /requests/{id}`, `POST /requests/{id}/take`, `/complete`, `/decline`, `/withdraw` |
 | Operations | `GET /workspace`, `/capabilities`, `/overview`, `/export`, `/backup`; `POST /backup/restore`; `/tokens`; `POST /auth/password` |
 
 List routes return `{items,total}` and accept bounded `limit`/`offset` where
@@ -97,10 +102,23 @@ non-Closed attempt. A conflicting creation or reopening returns 409
 `application_in_progress` with the active `application_id`; use that attempt or
 close it before starting another. Use `idempotency_key` for retries of one creation.
 `GET /applications?job_id=JOB_ID` lists the exact job's attempts with pagination.
-`readiness=none|missing_pdf|unreviewed|blocked|ready` filters by the derived
+`readiness=none|missing_pdf|unreviewed|blocked|reviewed|ready` filters by the
 preparation state, and `sort=deadline` or `sort=priority` lists planned attempts
-first. Rows include `priority`, `deadline`, `readiness`, `open_requirements` and
-`blocking_requirements`; the full `requirements` list is on the single read.
+first. Rows include `priority`, `deadline`, `readiness`, `ready_at`, `ready_by`,
+`open_requirements` and `blocking_requirements`; the full `requirements` list is
+on the single read.
+
+`ready` is a stored step: `POST /applications/{id}/ready` with
+`{"expected_version":4}` marks a Preparing application ready and
+`{"expected_version":5,"ready":false}` clears the mark. Marking is refused with
+409 `application_not_ready` while a check fails; `details.check` names it
+(`stage`, `blocked`, `none`, `missing_pdf` or `unreviewed`). `reviewed` means
+that every check passes and nobody marked the application. The mark is cleared
+automatically, with an `application_ready_cleared` event and its `reason`, by a
+new revision or context, a deleted revision, a file added to a current revision,
+an unresolved blocking requirement or leaving Preparing. `readiness=ready`,
+`sort=ready` (longest waiting first), `ready_since` and `ready_until` read the
+queue; the list also returns `ready_count`, and the overview `ready`.
 Create and `PATCH` accept `priority` (1 highest to 5), `deadline` (`YYYY-MM-DD`)
 and `requirements`, a list of `{id, kind, text, blocking, resolved, note}`.
 A requirements patch replaces the whole list; keep existing `id` values. `null`
@@ -138,7 +156,7 @@ headers, partial dates, skills and ordering.
 ## Runs, questions and the change log
 
 Each write records its actor: `owner` for the dashboard session, `token` with the
-token's id and name, or `system`. History entries (`GET /applications/{id}/events`,
+token's id, name and `token_kind` (`owner` or `agent`), or `system`. History entries (`GET /applications/{id}/events`,
 `GET /events`, the overview activity) return `actor`, `run_id` and `subject`;
 notes return `author`. Entries from before version 0.17 have
 `actor.kind = "unknown"`.
@@ -176,13 +194,46 @@ stores a progress `note`. `GET /runs/{id}?changes_limit=50&changes_offset=0`
 returns the report, the questions asked and the changes made; `GET /runs` filters
 by `status`, `workflow`, `token_id`, `started_since` and `started_until`.
 `GET /questions` filters by `state`, `subject_type`, `subject_id`, `run_id` and
-`answered_since`; answer and withdraw take `expected_version`. `GET /events`
+`answered_since`; answer and withdraw take `expected_version`, and answering
+needs owner authority (an agent token gets `403 forbidden`). `GET /events`
 filters by `run_id`, `job_id`, `application_id`, `subject_type`, `subject_id`,
 `actor`, `token_id`, `kind`, `since` and `until`.
 
 A question keeps its text, state and a `subject.label` after its job,
 application or Career entry is deleted. Deleting an application or forgetting a
 job removes that record's own history and leaves one attributed entry.
+
+## Requests for the agent
+
+The owner writes a request; an agent reads it at the start of its next run.
+
+```bash
+# The owner (session or owner token) writes a request about a job.
+curl -sS -X POST "$OPENINGS_URL/api/v1/requests" -H "Authorization: Bearer $OWNER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Prepare this one too.", "subject_type": "job", "subject_id": "JOB_ID"}'
+
+# The agent reads the open requests, takes one and reports the result.
+curl -sS "$OPENINGS_URL/api/v1/requests?state=open" -H "Authorization: Bearer $OPENINGS_TOKEN"
+curl -sS -X POST "$OPENINGS_URL/api/v1/requests/REQUEST_ID/take" \
+  -H "Authorization: Bearer $OPENINGS_TOKEN" -H "Content-Type: application/json" \
+  -d '{"expected_version": 1}'
+curl -sS -X POST "$OPENINGS_URL/api/v1/requests/REQUEST_ID/complete" \
+  -H "Authorization: Bearer $OPENINGS_TOKEN" -H "Content-Type: application/json" \
+  -d '{"expected_version": 2, "result": "Draft prepared and marked ready."}'
+```
+
+States are `open`, `taken`, `done`, `declined` and `withdrawn`. `take` needs an
+open request (`409 request_taken` with the taker's `run_id`, or
+`409 request_closed`); `complete` (`result`) and `decline` (`reason`) work from
+`open` or `taken`. These three need an API token (`403 request_actor` for a
+dashboard session) and record the token's open run on the request, when it has
+one. `POST /requests` (`text`, optional `subject_type` and `subject_id`,
+`idempotency_key`) and `withdraw` need owner authority. `GET /requests` filters
+by `state`, `subject_type`, `subject_id`, `run_id` and `updated_since`.
+`GET /workspace` returns `open_requests`, and `GET /runs/{id}` the requests the
+run handled. A request keeps its text, state and `subject.label` after its
+subject is deleted, and follows a job through a merge.
 
 ## Identity and duplicates
 
@@ -192,16 +243,26 @@ Both reads are side-effect free; neither fetches a page nor merges records.
 GET /jobs/resolve?url=https://jobs.example.test/123&source_key=linkedin:42
 GET /jobs/duplicates?queue=shortlist&limit=20&offset=0
 GET /jobs/duplicates?job_id=JOB_ID
+GET /jobs/duplicates?min_confidence=0.85
 ```
 
 `/jobs/resolve` normalizes the URL as ingestion does and returns `items` (job
 summaries with `matched_by`, triage and every attempt in `applications`),
 `identities` and `identity_conflict`. `/jobs/duplicates` returns candidate
-`items` groups with a `total` group count: `job_ids`, `signals`
-(`company_title`, `posting_text`), `identical_postings`, `reference_id`,
-`open_application_ids` and `merge_blocked`, plus per-job `posting_hash` and
-advisory `similarity`. Add `match_location=true` to require the same location.
-Verify a group, then merge with `POST /jobs/{source_id}/merge`.
+`items` groups, most confident first, with a `total` group count: `job_ids`,
+`confidence` (0 to 1), `tier` (`high`, `medium` or `low`), `reasons` (`matched`
+and `conflicts` signal names), `signals` (the matched names), `identical_postings`,
+`reference_id`, `open_application_ids` and `merge_blocked`, plus per-job
+`posting_hash`, advisory `similarity` and the job's own `confidence` and `reasons`
+against the reference record. `min_confidence` (default `0.5`) is the lowest
+group confidence returned: `0.85` keeps the high tier, `0` adds records that
+share only a company and title. The response repeats `min_confidence` and the
+`tiers` thresholds. Add `match_location=true` to require agreeing locations.
+Signals come from requisition IDs, apply links and ATS posting IDs, posting text,
+company, title and location; the
+[vacancy identity reference](../../skills/openings-workspace/references/job-deduplication.md)
+lists them. Verify a group, then merge with `POST /jobs/{source_id}/merge`;
+nothing is merged automatically.
 
 `POST /applications/bulk` closes, reopens or deletes selected attempts:
 

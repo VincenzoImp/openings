@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openings.app import create_app
-from openings.duplicates import normalize_company, normalize_title, posting_fingerprint
+from openings.duplicate_signals import normalize_company, normalize_title, posting_fingerprint
 from openings.workspace import Workspace
 
 BODY = " ".join(
@@ -111,28 +111,45 @@ def test_duplicate_groups_are_annotated_filtered_and_read_only(workspace):
     attempt = workspace.create_application({"job_id": ats["id"]})
     before = (count(workspace, "jobs"), count(workspace, "events"))
 
-    result = workspace.duplicate_jobs({})
+    # Shared text under another title, or company and title alone, stay in the low
+    # tier, hidden unless asked for.
+    likely = workspace.duplicate_jobs({})
+    assert likely["total"] == 1 and likely["min_confidence"] == 0.5
+    assert set(likely["items"][0]["job_ids"]) == {linkedin["id"], indeed["id"]}
+    assert likely["items"][0]["tier"] == "medium"
+
+    result = workspace.duplicate_jobs({"min_confidence": 0})
     assert result["total"] == 1 and result["limit"] == 20
     group = result["items"][0]
     expected = {linkedin["id"], indeed["id"], ats["id"], other_city["id"]}
     assert set(group["job_ids"]) == expected and unrelated["id"] not in group["job_ids"]
-    assert group["signals"] == ["company_title", "posting_text"]
+    assert group["signals"] == ["company", "company_title", "posting_text"]
+    assert group["confidence"] == 0.32 and group["tier"] == "low"
+    assert group["reasons"] == {"matched": group["signals"], "conflicts": []}
     assert group["reference_id"] == ats["id"] and group["items"][0]["id"] == ats["id"]
     assert group["open_application_ids"] == [attempt["id"]] and not group["merge_blocked"]
     assert not group["identical_postings"]
     by_id = {item["id"]: item for item in group["items"]}
     assert by_id[indeed["id"]]["similarity"] == 1.0
+    assert by_id[ats["id"]]["confidence"] is None and by_id[ats["id"]]["reasons"] is None
+    assert by_id[indeed["id"]]["confidence"] == 0.32
+    assert by_id[indeed["id"]]["reasons"] == {
+        "matched": ["posting_text", "company"],
+        "conflicts": [],
+    }
     assert by_id[other_city["id"]]["similarity"] is None
     assert by_id[ats["id"]]["applications"][0]["status"] == "draft"
     assert by_id[linkedin["id"]]["source"] == "linkedin"
 
-    by_location = workspace.duplicate_jobs({"match_location": True})["items"][0]
-    assert other_city["id"] not in by_location["job_ids"]
+    by_location = workspace.duplicate_jobs({"match_location": True, "min_confidence": 0})
+    assert other_city["id"] not in by_location["items"][0]["job_ids"]
     assert workspace.duplicate_jobs({"job_id": unrelated["id"]})["total"] == 0
     assert workspace.duplicate_jobs({"job_id": indeed["id"]})["total"] == 1
+    assert workspace.duplicate_jobs({"job_id": other_city["id"]})["total"] == 0
     assert workspace.duplicate_jobs({"queue": "inbox"})["total"] == 1
     assert workspace.duplicate_jobs({"queue": "dismissed"})["total"] == 0
     assert workspace.duplicate_jobs({"offset": 1})["items"] == []
+    assert workspace.duplicate_jobs({"min_confidence": 0.85})["total"] == 0
     assert (count(workspace, "jobs"), count(workspace, "events")) == before
 
 

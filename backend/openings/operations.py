@@ -32,6 +32,23 @@ def preserve_provider_runtime(restored, current):
     return result
 
 
+def remove_installation_credentials(path):
+    """Remove the owner password hash, the session secret and API tokens from a backup copy.
+
+    A backup taken with an agent token must not carry what would grant owner
+    access. Restore keeps the destination's own authentication, so the copy
+    still restores completely.
+    """
+    with closing(sqlite3.connect(path)) as conn:
+        conn.execute("PRAGMA journal_mode=DELETE")
+        # Overwrite the deleted rows instead of leaving them in free pages.
+        conn.execute("PRAGMA secure_delete=ON")
+        conn.execute("DELETE FROM settings WHERE key='auth'")
+        conn.execute("DELETE FROM api_tokens")
+        conn.execute("DELETE FROM transfer_grants")
+        conn.commit()
+
+
 def restore_database(workspace, source_path):
     with sqlite3.connect(source_path) as source:
         version = source.execute("PRAGMA user_version").fetchone()[0]
@@ -105,11 +122,12 @@ def _restore_current(workspace, source_path):
                                 (auth["key"], auth["data"], auth["version"], auth["updated_at"]),
                             )
                         target.executemany(
-                            "INSERT INTO api_tokens(id,name,token_hash,created_at,last_used_at) VALUES(?,?,?,?,?)",
+                            "INSERT INTO api_tokens(id,name,kind,token_hash,created_at,last_used_at) VALUES(?,?,?,?,?,?)",
                             [
                                 (
                                     t["id"],
                                     t["name"],
+                                    t["kind"],
                                     t["token_hash"],
                                     t["created_at"],
                                     t["last_used_at"],

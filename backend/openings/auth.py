@@ -12,7 +12,14 @@ from collections import deque
 
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
-from .actors import OWNER, current_actor, from_columns, token_actor
+from .actors import (
+    OWNER,
+    TOKEN_KINDS,
+    current_actor,
+    from_columns,
+    require_owner,
+    token_actor,
+)
 from .common import new_id, now
 from .errors import DomainError
 
@@ -57,6 +64,7 @@ class Auth:
             )
 
     def change_password(self, password):
+        require_owner("change the owner password")
         if not 10 <= len(password) <= 1024:
             raise DomainError(422, "password_length", "Use a password of at least 10 characters.")
         with self.workspace.db.lock:
@@ -119,7 +127,7 @@ class Auth:
             return None
         token_hash = hashlib.sha256(header[7:].encode()).hexdigest()
         row = self.workspace.db.one(
-            "SELECT id,name,last_used_at FROM api_tokens WHERE token_hash=?", (token_hash,)
+            "SELECT id,name,kind,last_used_at FROM api_tokens WHERE token_hash=?", (token_hash,)
         )
         if row:
             stamp = now()
@@ -128,7 +136,7 @@ class Auth:
                 self.workspace.db.execute(
                     "UPDATE api_tokens SET last_used_at=? WHERE id=?", (stamp, row["id"])
                 )
-        return token_actor(row["id"], row["name"]) if row else None
+        return token_actor(row["id"], row["name"], row["kind"]) if row else None
 
     def authorize(self, request, mcp=False):
         """Authenticate the request and return who is acting: a token or the owner session."""
@@ -145,24 +153,33 @@ class Auth:
         return OWNER
 
     def list_tokens(self):
+        require_owner("list API tokens")
         rows = self.workspace.db.all(
-            "SELECT id,name,created_at,last_used_at FROM api_tokens ORDER BY created_at DESC"
+            "SELECT id,name,kind,created_at,last_used_at FROM api_tokens ORDER BY created_at DESC"
         )
         return {"items": rows, "total": len(rows)}
 
-    def create_token(self, name):
-        token, record_id = "op_" + secrets.token_urlsafe(32), new_id()
+    def create_token(self, name, kind="owner"):
+        """Create an ``owner`` token (full access) or a scoped ``agent`` token."""
+        require_owner("create API tokens")
+        if kind not in TOKEN_KINDS:
+            raise DomainError(422, "token_kind", "Choose an owner or an agent token.")
+        token, record_id, stamp = "op_" + secrets.token_urlsafe(32), new_id(), now()
         with self.workspace.db.transaction() as conn:
             conn.execute(
-                "INSERT INTO api_tokens(id,name,token_hash,created_at) VALUES(?,?,?,?)",
-                (record_id, name, hashlib.sha256(token.encode()).hexdigest(), now()),
+                "INSERT INTO api_tokens(id,name,kind,token_hash,created_at) VALUES(?,?,?,?,?)",
+                (record_id, name, kind, hashlib.sha256(token.encode()).hexdigest(), stamp),
             )
             self.workspace.event(
-                "token_created", payload={"name": name}, conn=conn, subject=("token", record_id)
+                "token_created",
+                payload={"name": name, "kind": kind},
+                conn=conn,
+                subject=("token", record_id),
             )
-        return {"id": record_id, "name": name, "token": token, "created_at": now()}
+        return {"id": record_id, "name": name, "kind": kind, "token": token, "created_at": stamp}
 
     def revoke_token(self, record_id):
+        require_owner("revoke API tokens")
         with self.workspace.db.transaction() as conn:
             row = conn.execute("SELECT name FROM api_tokens WHERE id=?", (record_id,)).fetchone()
             conn.execute("DELETE FROM api_tokens WHERE id=?", (record_id,))
@@ -200,7 +217,7 @@ class Auth:
         if not isinstance(value, dict) or value.get("operation") != operation:
             raise DomainError(403, "transfer_scope", "This grant does not allow that operation.")
         self.used_operations.consume(str(value.get("nonce", "")))
-        return from_columns(*(value.get("actor") or (None, None, None)))
+        return from_columns(*(value.get("actor") or ()))
 
 
 class UsedNonces:

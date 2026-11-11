@@ -1,4 +1,8 @@
-"""Agent runs with stored reports, questions for the owner and the attributed change log."""
+"""Agent runs with stored reports, questions for the owner and the attributed change log.
+
+Requests for the agent, the other direction of the same exchange, live in
+``agent_requests.py``; both use the subject helpers in ``subjects.py``.
+"""
 
 from __future__ import annotations
 
@@ -9,18 +13,19 @@ from typing import Annotated, Literal
 from fastapi import Query
 from pydantic import Field, field_validator, model_validator
 
-from .actors import current_actor, describe, describe_row
+from . import subjects
+from .actors import current_actor, describe, pop_actor, require_owner
+from .agent_requests import REQUESTS, request_record
 from .common import check_version, encode, new_id, now
 from .errors import DomainError, conflict, missing
 from .models import Input, normalized_date
+from .subjects import SubjectType
 
 # An open run without a write or progress note for this long is reported as
 # interrupted. The stored status stays open: a later write by the same token
 # attaches to the run and makes it current again.
 RUN_IDLE_SECONDS = 2 * 3600
 
-SubjectType = Literal["job", "application", "knowledge"]
-SUBJECT_COLUMNS = {"job": "job_id", "application": "application_id", "knowledge": "knowledge_id"}
 RunStatus = Literal["open", "finished", "interrupted"]
 
 
@@ -202,10 +207,6 @@ class EventQuery(Input):
         return self
 
 
-def _label(*parts):
-    return " · ".join(part for part in parts if part)
-
-
 class ActivityService:
     def __init__(self, workspace):
         self.workspace = workspace
@@ -258,7 +259,7 @@ class ActivityService:
         labels = self._subject_labels(conn, items)
         for item in items:
             subject = item["subject"]
-            job = _label(item.pop("job_title"), item.pop("job_company"))
+            job = subjects.label(item.pop("job_title"), item.pop("job_company"))
             subject["label"] = labels.get((subject["type"], subject["id"])) or job
         return {"items": items, "total": total, "limit": limit, "offset": offset}
 
@@ -271,6 +272,7 @@ class ActivityService:
             "template": "SELECT id,name,'' FROM templates WHERE id IN ({})",
             "source": "SELECT id,name,'' FROM sources WHERE id IN ({})",
             "question": "SELECT id,substr(question,1,120),'' FROM questions WHERE id IN ({})",
+            "request": "SELECT id,substr(text,1,120),'' FROM requests WHERE id IN ({})",
             "collection_run": "SELECT id,source_name,'' FROM collection_runs WHERE id IN ({})",
         }
         wanted = {}
@@ -282,7 +284,7 @@ class ActivityService:
         for kind, identifiers in wanted.items():
             sql = queries[kind].format(",".join("?" for _ in identifiers))
             for row in conn.execute(sql, sorted(identifiers)):
-                labels[(kind, row[0])] = _label(row[1], row[2])
+                labels[(kind, row[0])] = subjects.label(row[1], row[2])
         return labels
 
     # Runs
@@ -323,16 +325,19 @@ class ActivityService:
             else "superseded"
             if stored == "interrupted"
             else None,
-            "actor": describe("token", row.pop("token_id"), row.pop("token_name")),
+            "actor": describe(
+                "token", row.pop("token_id"), row.pop("token_name"), row.pop("token_kind")
+            ),
             "change_counts": counts,
             "changes_total": sum(counts.values()),
             "questions_count": conn.execute(
                 "SELECT count(*) FROM questions WHERE run_id=?", (row["id"],)
             ).fetchone()[0],
+            "requests_count": conn.execute(
+                "SELECT count(*) FROM requests WHERE run_id=?", (row["id"],)
+            ).fetchone()[0],
             "summary": report.get("summary", ""),
         }
-        for key in ("token_id", "token_name"):
-            result.pop(key, None)
         if full:
             result["report"] = report or None
         return result
@@ -379,11 +384,12 @@ class ActivityService:
                     (stamp, run_id, encode(self._counts(conn, superseded)), stamp, superseded),
                 )
             conn.execute(
-                "INSERT INTO runs(id,token_id,token_name,workflow,scope,idempotency_key,started_at,last_activity_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO runs(id,token_id,token_name,token_kind,workflow,scope,idempotency_key,started_at,last_activity_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (
                     run_id,
                     actor.id,
                     actor.name,
+                    actor.token_kind,
                     value.workflow.strip(),
                     value.scope,
                     value.idempotency_key,
@@ -468,7 +474,7 @@ class ActivityService:
         return self.get_run(run_id)
 
     def get_run(self, run_id: str, changes_limit: int = 50, changes_offset: int = 0) -> dict:
-        """Read one run with its report, the questions it asked and a page of the changes it made."""
+        """Read one run with its report, the questions it asked, the requests it handled and a page of the changes it made."""
         if not 1 <= changes_limit <= 200 or changes_offset < 0:
             raise DomainError(
                 422, "pagination", "Limit must be 1–200 and offset must be nonnegative."
@@ -484,6 +490,12 @@ class ActivityService:
                 self._question(row)
                 for row in conn.execute(
                     self._QUESTIONS + " WHERE q.run_id=? ORDER BY q.created_at", (run_id,)
+                )
+            ]
+            result["requests"] = [
+                request_record(row)
+                for row in conn.execute(
+                    REQUESTS + " WHERE r.run_id=? ORDER BY r.created_at", (run_id,)
                 )
             ]
         return result
@@ -520,77 +532,25 @@ class ActivityService:
 
     # Questions for the owner
 
-    _QUESTIONS = (
-        "SELECT q.*,j.title AS job_title,j.company AS job_company,a.job_id AS application_job_id,"
-        "aj.title AS application_title,aj.company AS application_company,"
-        "k.title AS knowledge_title,k.organization AS knowledge_organization FROM questions q "
-        "LEFT JOIN jobs j ON j.id=q.job_id LEFT JOIN applications a ON a.id=q.application_id "
-        "LEFT JOIN jobs aj ON aj.id=a.job_id LEFT JOIN knowledge k ON k.id=q.knowledge_id"
-    )
-
-    @staticmethod
-    def _subject(conn, subject_type, subject_id, *, required=True):
-        """The owning job (for the timeline) and the current name of a question subject."""
-        if subject_type == "job":
-            row = conn.execute(
-                "SELECT id AS job_id,title,company FROM jobs WHERE id=?", (subject_id,)
-            ).fetchone()
-        elif subject_type == "application":
-            row = conn.execute(
-                "SELECT j.id AS job_id,j.title,j.company FROM applications a JOIN jobs j ON j.id=a.job_id WHERE a.id=?",
-                (subject_id,),
-            ).fetchone()
-        else:
-            row = conn.execute(
-                "SELECT NULL AS job_id,title,organization FROM knowledge WHERE id=?", (subject_id,)
-            ).fetchone()
-        if row is None:
-            if required:
-                missing(
-                    {"job": "Job", "application": "Application", "knowledge": "Career knowledge"}[
-                        subject_type
-                    ]
-                )
-            return None, ""
-        return row[0], _label(row[1], row[2])
+    _QUESTIONS = subjects.select("questions", "q")
+    _subject = staticmethod(subjects.resolve)
 
     @staticmethod
     def _question(row):
         if row is None:
             missing("Question")
         row = dict(row)
-        kind = row.pop("subject_type")
-        snapshot = row.pop("subject_label")
-        references = {key: row.pop(column) for key, column in SUBJECT_COLUMNS.items()}
-        live = {
-            "job": _label(row.pop("job_title"), row.pop("job_company")),
-            "application": _label(row.pop("application_title"), row.pop("application_company")),
-            "knowledge": _label(row.pop("knowledge_title"), row.pop("knowledge_organization")),
-        }
-        application_job = row.pop("application_job_id")
-        row["subject"] = (
-            {
-                "type": kind,
-                "id": references[kind],
-                # The name at the time of asking outlives the record it named.
-                "label": live[kind] if references[kind] else snapshot,
-                "deleted": references[kind] is None,
-                "job_id": references["job"] if kind == "job" else application_job,
-            }
-            if kind
-            else None
-        )
+        row["subject"] = subjects.pop(row)
         row["choices"] = json.loads(row["choices"])
-        row["asked_by"] = describe_row(row, "asked_by")
-        resolved = describe_row(row, "resolved_by") if row["resolved_by_kind"] else None
+        row["asked_by"] = pop_actor(row, "asked_by")
+        resolved = pop_actor(row, "resolved_by")
+        if resolved["kind"] == "unknown":
+            resolved = None
         stamp = row.pop("resolved_at")
         for name in ("answered", "withdrawn"):
             current = row["state"] == name
             row[name + "_by"] = resolved if current else None
             row[name + "_at"] = stamp if current else None
-        for prefix in ("asked_by", "resolved_by"):
-            for suffix in ("kind", "id", "name"):
-                row.pop(f"{prefix}_{suffix}")
         row.pop("idempotency_key")
         return row
 
@@ -628,12 +588,9 @@ class ActivityService:
                 if value.subject_type
                 else (None, "")
             )
-            references = {
-                column: value.subject_id if key == value.subject_type else None
-                for key, column in SUBJECT_COLUMNS.items()
-            }
+            references = subjects.references(value.subject_type, value.subject_id)
             conn.execute(
-                "INSERT INTO questions(id,subject_type,job_id,application_id,knowledge_id,subject_label,question,why,choices,asked_by_kind,asked_by_id,asked_by_name,run_id,idempotency_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO questions(id,subject_type,job_id,application_id,knowledge_id,subject_label,question,why,choices,asked_by_kind,asked_by_id,asked_by_name,asked_by_token_kind,run_id,idempotency_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     question_id,
                     value.subject_type,
@@ -670,19 +627,18 @@ class ActivityService:
         actor = current_actor()
         stamp = now()
         conn.execute(
-            "UPDATE questions SET state=?,answer=?,answer_choice=?,resolved_by_kind=?,resolved_by_id=?,resolved_by_name=?,resolved_at=?,version=version+1,updated_at=? WHERE id=?",
+            "UPDATE questions SET state=?,answer=?,answer_choice=?,resolved_by_kind=?,resolved_by_id=?,resolved_by_name=?,resolved_by_token_kind=?,resolved_at=?,version=version+1,updated_at=? WHERE id=?",
             (state, answer, choice, *actor.columns(), stamp, stamp, row["id"]),
         )
-        job_id = row["job_id"]
-        if row["application_id"]:
-            job_id = conn.execute(
-                "SELECT job_id FROM applications WHERE id=?", (row["application_id"],)
-            ).fetchone()[0]
-        self._question_event(conn, kind, row["id"], job_id, row["application_id"])
+        self._question_event(conn, kind, row["id"], *subjects.timeline(conn, row))
         return self._read_question(conn, row["id"])
 
     def answer_question(self, question_id: str, value: QuestionAnswer) -> dict:
-        """Answer an open question, or correct an earlier answer, with free text and/or one of its choices."""
+        """Answer an open question, or correct an earlier answer, with free text and/or one of its choices.
+
+        An answer is the owner's: the dashboard session or an owner token records it.
+        """
+        require_owner("answer a question for the owner")
         value = value if isinstance(value, QuestionAnswer) else QuestionAnswer.model_validate(value)
         answer = value.answer.strip()
         with self.db.transaction() as conn:
@@ -735,12 +691,7 @@ class ActivityService:
         if value.answered_since:
             where.append("q.resolved_at>=?")
             params.append(value.answered_since)
-        if value.subject_type:
-            where.append("q.subject_type=?")
-            params.append(value.subject_type)
-            if value.subject_id is not None:
-                where.append(f"q.{SUBJECT_COLUMNS[value.subject_type]}=?")
-                params.append(value.subject_id)
+        subjects.add_filter("q", value.subject_type, value.subject_id, where, params)
         if value.run_id is not None:
             where.append("q.run_id=?")
             params.append(value.run_id)
@@ -858,7 +809,7 @@ def register_mcp(mcp, activity: ActivityService):
 
     @mcp.tool(annotations=write)
     def questions_answer(question_id: str, value: QuestionAnswer) -> dict:
-        """Record the owner's answer (text and/or one of the choices) using the question's current version. Agents record an answer only when the owner gave it."""
+        """Record the owner's answer (text and/or one of the choices) using the question's current version. Owner only: an agent token is refused with forbidden; an owner token records an answer only when the owner gave it."""
         return activity.answer_question(question_id, value)
 
     @mcp.tool(annotations=write)

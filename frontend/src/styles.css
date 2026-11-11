@@ -2548,6 +2548,17 @@ html[data-theme="dark"] {
 .token-form button {
   flex-shrink: 0;
 }
+.token-form select {
+  flex: 0 1 auto;
+  width: auto;
+}
+.token-kind-hint {
+  margin-top: 8px;
+}
+.token-list h3 .tag {
+  margin-left: 4px;
+  vertical-align: middle;
+}
 .new-token {
   padding: 17px;
   border: 1px solid var(--accent);
@@ -2801,6 +2812,9 @@ html[data-theme="dark"] {
   }
   .token-form input {
     flex-basis: 100%;
+  }
+  .token-form select {
+    flex: 1 1 auto;
   }
   .auth-shell {
     padding: 18px;
@@ -4255,6 +4269,130 @@ html[data-theme="dark"] .tag.amber {
 }
 .application-card .plan-tags {
   margin-top: 0;
+}
+
+/* Requests for the agent. */
+.request-form textarea {
+  width: 100%;
+}
+.request-form .actions {
+  margin-top: 10px;
+}
+.request-card + .request-card {
+  margin-top: 14px;
+}
+.request-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.request-head .tag {
+  flex: none;
+  margin-top: 2px;
+}
+.request-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.request-card .smalltext {
+  margin: 6px 0 0;
+}
+.request-result {
+  margin-top: 10px;
+}
+.request-result strong {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.request-card > .actions {
+  margin-top: 10px;
+}
+.ask-agent {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+.request-history {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.request-history h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+.request-history .request-card {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.request-history .request-card:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+@media (max-width: 600px) {
+  .request-head {
+    flex-direction: column-reverse;
+    gap: 6px;
+  }
+}
+
+/* Ready as a stored step of a Preparing application. */
+.ready-tag {
+  align-self: flex-start;
+  font-size: 10px;
+}
+.ready-tag .icon {
+  width: 11px;
+  height: 11px;
+}
+td .ready-tag {
+  margin-bottom: 5px;
+}
+.ready-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+.ready-panel.is-ready {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--card));
+}
+.ready-panel strong {
+  font-size: 13px;
+}
+.ready-panel p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.ready-panel .btn {
+  flex: none;
+}
+.stage-overview .ready-queue {
+  margin-left: auto;
+}
+@media (max-width: 600px) {
+  .ready-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .stage-overview .ready-queue {
+    margin-left: 0;
+    flex: 1 0 100%;
+  }
 }
 .drawer-meta + .plan-tags {
   margin: 0 0 12px;

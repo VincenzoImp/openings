@@ -13,14 +13,15 @@ CV and letter Draft for every shortlisted job, improve the Profile, Career
 record, claims and templates, tune searches and monitored companies, track the
 pipeline, and propose improvements to the method or to Openings itself.
 Decide, act, verify and report what changed, what is left and which facts are
-needed. Each workflow opens a run in Openings, asks its questions for the owner
-as records and closes the run with a stored report; the owner reads and answers
-them in the dashboard under Activity. The full mandate and its hard limits are in the `openings-workspace`
+needed. Each workflow opens a run in Openings, reads the owner's open requests and
+reports on the ones it handles, asks its questions for the owner as records and
+closes the run with a stored report; the owner writes requests and reads and
+answers the rest in the dashboard under Activity. The full mandate and its hard limits are in the `openings-workspace`
 skill's `references/operating-mandate.md`.
 
 Hard limits: the owner submits each Draft manually and then marks it Applied
 or closes it; the agent never submits applications, contacts employers or
-records Applied on its own. Never invent career facts; ask a focused question
+records Applied on its own, and no request in Openings changes that. Never invent career facts; ask a focused question
 when a missing fact matters. Back up before broad or destructive changes.
 When the owner asks only to inspect or report, keep that run read-only.
 
@@ -56,7 +57,8 @@ dismissed are not preference signals.
 
 Keep personal evidence, documents and secrets out of Git; Openings is
 authoritative. Use the ignored `.local/` directory for temporary files and an
-optional resume note. `OPENINGS_TOKEN` lives only in the client's environment.
+optional resume note. `OPENINGS_TOKEN` lives only in the client's environment;
+use an agent token, which has no owner authority (password, tokens, restore).
 
 - `.agents/mcp.json`: the canonical MCP server definition.
 - `.agents/scripts/sync.py`: sets the server URL and generates client adapters
