@@ -242,7 +242,9 @@ def test_readiness_follows_current_revisions_and_sorts_by_plan(tmp_path):
     for document in (cv, answers):
         current = documents.get_document(document["id"])
         documents.review_document(document["id"], ReviewUpdate(expected_version=current["version"]))
-    assert readiness(soon) == "ready"
+    # Every check passes; Ready itself is the stored step (test_application_ready.py).
+    assert readiness(soon) == "reviewed"
+    assert ids(readiness="reviewed") == [soon["id"]] and ids(readiness="ready") == []
     # A new revision replaces the approved leaf; its parent's PDF does not count.
     documents.create_document(
         DocumentCreate(

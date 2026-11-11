@@ -11,6 +11,7 @@ from .models import (
     ApplicationInput,
     ApplicationPatch,
     ApplicationQuery,
+    ApplicationReady,
     DuplicateQuery,
     JobBulk,
     JobInput,
@@ -130,6 +131,10 @@ def register_core(router: APIRouter, workspace):
     def edit_application(application_id: str, value: ApplicationPatch):
         return workspace.update_application(application_id, value)
 
+    @router.post("/applications/{application_id}/ready")
+    def ready_application(application_id: str, value: ApplicationReady):
+        return workspace.set_ready(application_id, value)
+
     @router.get("/applications/{application_id}/events")
     def events(application_id: str):
         return workspace.application_events(application_id)
@@ -223,12 +228,12 @@ def register_core_mcp(mcp, workspace):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def applications_list(value: ApplicationQuery | None = None) -> dict:
-        """Read paginated application summaries and stage totals. Filter by exact job_id, query, stage, outcome, company or readiness; sort by deadline or priority to order preparation work."""
+        """Read paginated application summaries, stage totals and the ready count. Filter by exact job_id, query, stage, outcome, company or readiness (readiness=ready is the stored Ready step; reviewed passes every check but is not marked); sort by deadline, priority or ready time."""
         return workspace.list_applications(**(value or ApplicationQuery()).model_dump())
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
     def applications_bulk(value: ApplicationBulk) -> dict:
-        """Close (with outcome), reopen (to a non-Closed stage) or delete at most 200 explicit application IDs/versions, with per-item results. Delete is permanent."""
+        """Close (with outcome), reopen (to a non-Closed stage), mark_ready, unmark_ready or delete at most 200 explicit application IDs/versions, with per-item results. Delete is permanent."""
         return workspace.bulk_applications(value)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
@@ -248,7 +253,7 @@ def register_core_mcp(mcp, workspace):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def application_get(application_id: str) -> dict:
-        """Read a single application, its job, employer requirements and derived readiness."""
+        """Read a single application, its job, employer requirements, derived readiness and the stored Ready step (ready_at, ready_by)."""
         return workspace.get_application(application_id)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
@@ -260,6 +265,11 @@ def register_core_mcp(mcp, workspace):
     def application_update(application_id: str, value: ApplicationPatch) -> dict:
         """Record progress, priority, deadline, employer requirements and questions/answers explicitly; editing documents never marks sent. The returned job is the compact summary."""
         return workspace.update_application(application_id, value)
+
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
+    def application_ready(application_id: str, value: ApplicationReady) -> dict:
+        """Mark a Preparing application ready to apply (ready=true) or clear the mark (ready=false), using its current version. Refused with application_not_ready naming the failed check (stage, blocked, none, missing_pdf, unreviewed). The mark is cleared automatically when a revision, context, file or blocking requirement changes. This never submits anything."""
+        return workspace.set_ready(application_id, value)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def application_history(application_id: str) -> dict:

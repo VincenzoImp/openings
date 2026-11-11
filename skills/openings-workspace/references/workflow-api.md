@@ -58,9 +58,17 @@ mechanics, not personal selection or writing policy.
 - `documents_list` / `GET /documents` returns compact rows by default (file
   counts, no content or files). Pass `summary: false`, or read `documents_get`,
   for structured content and file entries.
-- Draft-ready is an agent assessment, not an API state or flag. It requires the
-  intended current CV and CL leaf revisions, valid final PDFs and sources,
-  complete content/layout checks and approved document review states.
+- Ready is a stored step of a Draft, set with `application_ready(application_id,
+  value)` / `POST /applications/{id}/ready` (`expected_version`, `ready`). The
+  agent's assessment comes first: the intended current CV and CL leaf revisions,
+  valid final PDFs and sources, complete content/layout checks and approved
+  document review states. The server then checks files, review states and
+  blocking requirements and refuses with `409 application_not_ready` and
+  `details.check`. `readiness` is `ready` only for a marked Draft whose checks
+  still pass, and `reviewed` when they pass without the mark.
+- A new revision or context, a deleted revision, a file added to a current
+  revision, an unresolved blocking requirement or leaving Draft clears the mark
+  and changes the application version; mark it again after the rework is checked.
 - The UI projects current leaves as Needs PDF, PDF to review or Approved PDF.
   A newer incomplete leaf is not covered by an approved parent. Resolve ambiguous
   branches rather than selecting an arbitrary ancestor.
@@ -94,7 +102,7 @@ mechanics, not personal selection or writing policy.
 Use `applications_list(value: {status: "draft", limit: 200, offset: 0})` or
 `GET /applications?status=draft&limit=200&offset=0`, then paginate the stable
 read-only result. The field is `status`, not `stage`. Add `readiness`
-(`none`, `missing_pdf`, `unreviewed`, `blocked`, `ready`) to resume only
+(`none`, `missing_pdf`, `unreviewed`, `blocked`, `reviewed`, `ready`) to resume only
 incomplete or blocked Drafts, and `sort: "deadline"` to keep deadline order. Read each relevant
 application and its document revisions, contexts and files before resuming.
 A local checkpoint is optional. A compatible complete Draft needs no new work.

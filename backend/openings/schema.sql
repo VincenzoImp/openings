@@ -55,7 +55,8 @@ CREATE TABLE IF NOT EXISTS applications (
  version INTEGER NOT NULL DEFAULT 1, idempotency_key TEXT UNIQUE, applied_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
  priority INTEGER CHECK(priority IS NULL OR priority BETWEEN 1 AND 5),
  deadline TEXT CHECK(deadline IS NULL OR (length(deadline)=10 AND date(deadline)=deadline)),
- requirements TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(requirements) AND json_type(requirements)='array')
+ requirements TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(requirements) AND json_type(requirements)='array'),
+ ready_at TEXT, ready_by_kind TEXT, ready_by_id TEXT, ready_by_name TEXT
 );
 -- An agent run: opened by an API token, closed with a stored report.
 CREATE TABLE IF NOT EXISTS runs (
@@ -165,6 +166,7 @@ CREATE INDEX IF NOT EXISTS applications_job ON applications(job_id,created_at DE
 CREATE UNIQUE INDEX IF NOT EXISTS applications_active_job ON applications(job_id) WHERE status<>'closed';
 CREATE INDEX IF NOT EXISTS applications_status ON applications(status,updated_at);
 CREATE INDEX IF NOT EXISTS applications_deadline ON applications(deadline);
+CREATE INDEX IF NOT EXISTS applications_ready ON applications(ready_at) WHERE ready_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS documents_app ON documents(application_id,created_at);
 CREATE INDEX IF NOT EXISTS documents_context ON documents(context_id);
 CREATE INDEX IF NOT EXISTS contexts_app ON contexts(application_id,created_at);

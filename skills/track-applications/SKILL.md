@@ -26,15 +26,23 @@ stored [run report](../openings-workspace/references/run-report.md). A run asked
 
 ## Read the pipeline
 
-List applications by stage with complete pagination. Each row has a derived
+List applications by stage with complete pagination. Each row has a
 `readiness` from the current revision leaves and requirements: `none` (no
 documents), `missing_pdf` (a current CV or letter lacks its PDF), `unreviewed`,
-`blocked` (an unresolved blocking requirement) or `ready`; filter with
-`readiness` to find each group. Readiness does not check content, sources or
-staleness. For each Draft, read its current CV and letter leaves, files and
-review state, its `requirements` and its job posting. Classify:
+`blocked` (an unresolved blocking requirement), `reviewed` (every check passes,
+not marked ready) or `ready` (the stored step: marked ready with `ready_at` and
+`ready_by`, and every check still passes); filter with `readiness` to find each
+group. Read the ready queue with `readiness: "ready"` and `sort: "ready"`
+(longest waiting first); the list's `ready_count` is its size. Readiness does not
+check content, sources or staleness. For each Draft, read its current CV and
+letter leaves, files and review state, its `requirements` and its job posting.
+Classify:
 
-- **ready**: both current leaves have checked PDFs, exact sources and approved review;
+- **ready**: marked ready, and both current leaves still have checked PDFs, exact
+  sources and approved review;
+- **reviewed, not marked**: the checks pass but nobody judged the Draft complete;
+  report it, and mark it ready (`application_ready`) only after the full
+  [Prepare Shortlist](../prepare-shortlist/SKILL.md) readiness checks;
 - **incomplete**: a document, file or review step is missing;
 - **blocked**: an employer requirement or open question needs the owner;
 - **stale**: the frozen context predates a relevant Profile, Career or template
@@ -43,12 +51,17 @@ review state, its `requirements` and its job posting. Classify:
 - **expired**: the posting is closed or past its deadline.
 
 Check stale and expired cases against current records before reporting them.
+A ready Draft that is stale or expired stays in the owner's queue until someone
+acts: report it first, and clear the mark (`application_ready` with
+`ready: false`) when the owner should not apply with the current documents.
+An `application_ready_cleared` event in `application_history` gives the reason a
+Draft left the queue.
 
 ## Prioritize Drafts
 
 Order ready Drafts for the owner: live deadlines first, then fit with the Profile
 decision policy, then posting age. `sort: "deadline"` and `sort: "priority"` list
-dated or prioritized attempts first. Give one line per Draft with the reason.
+dated or prioritized attempts first, combined with `readiness: "ready"`. Give one line per Draft with the reason.
 Do not invent deadlines; mark unknown ones as unknown. Record a deadline the
 posting or owner states, and an owner-agreed `priority`, on the application.
 

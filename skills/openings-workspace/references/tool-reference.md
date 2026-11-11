@@ -95,13 +95,29 @@ attempt preserves its job and other attempts; `application_delete` requires
 returns a saved job to Shortlist; only use this deliberately.
 `applications_bulk` applies one action to at most 200 explicit
 `{id, expected_version}` items: `close` with `outcome`, `reopen` with a non-Closed
-`status`, or `delete`. Each item reports `ok` with a result or an error (code,
+`status`, `mark_ready`, `unmark_ready` or `delete`. Each item reports `ok` with a result or an error (code,
 status, message, details); reopening respects the one-open-attempt rule and only
 applies to Closed attempts. Bulk forget and delete collect orphaned file bytes once
 per call. To stop preparation
 and preserve its documents, close it with `not_pursued`. Restore known workaround
 dismissals explicitly to `saved`, using current versions: they remain in Applications
 when they have attempts and do not re-enter Inbox.
+
+## Ready
+
+`application_ready(application_id, value)` takes the application's current
+`expected_version` and `ready` (default true). Marking needs a Preparing
+application whose derived checks pass; otherwise it returns
+`409 application_not_ready` with `details.check`: `stage` (not Preparing),
+`blocked`, `none`, `missing_pdf` or `unreviewed`. The application then reports
+`readiness: "ready"`, `ready_at` and `ready_by`; marking twice changes nothing,
+and `ready: false` clears the mark. Openings clears it automatically and records
+an `application_ready_cleared` event with `reason`: `document_created`,
+`document_deleted`, `context_prepared`, `file_uploaded`, `blocking_requirement`
+or `left_preparing` (`unmarked` for an explicit clear). Every clearing changes
+the application `version`: read it again before the next update.
+`applications_list` reads the queue with `readiness: "ready"`, `sort: "ready"`,
+`ready_since` and `ready_until`, and returns `ready_count`.
 
 ## Runs, questions and the change log
 

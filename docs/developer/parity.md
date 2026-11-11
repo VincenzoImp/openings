@@ -24,15 +24,15 @@ How to read the evidence:
 
 | Measure | Operations |
 |---|---|
-| Logical operations in the inventory | 102 |
+| Logical operations in the inventory | 103 |
 | Without REST or without MCP | 0 |
 | Without a working dashboard path | 6 |
 | Reached only through another operation | 4 |
-| With inputs the dashboard never mentions | 6 |
+| With inputs the dashboard never mentions | 7 |
 | With free-form JSON edited as raw JSON | 13 |
 | With different REST and MCP input names | 1 |
 | With a dashboard path exercised by e2e | 43 |
-| With a dashboard path but no e2e evidence | 49 |
+| With a dashboard path but no e2e evidence | 50 |
 
 ## Gaps
 
@@ -70,6 +70,7 @@ operation. They can be set over REST or MCP only.
 | Operation | Inputs | Remark |
 |---|---|---|
 | `jobs.create` | `raw`, `source_key` | `raw` and `source_key` are collector fields for scripted imports. |
+| `applications.list` | `ready_since`, `ready_until` | The Ready to apply queue filters by `readiness=ready` with `sort=ready`; the time range serves agents and scripts. |
 | `applications.create` | `deadline`, `priority`, `questions`, `requirements` | Starting an application sends the job only; plan fields and questions are edited afterwards (`applications.update`). |
 | `contexts.create` | `template_id` | The context dialog sends `template_ids`; `template_id` is the single-template form of the same input. |
 | `events.list` | `since`, `token_id`, `until` | Activity filters changes by who made them and by run; the other filters serve agents and scripts. |
@@ -118,7 +119,7 @@ missing from the inventory.
 
 ### Dashboard paths without e2e evidence
 
-`workspace.capabilities`, `skills.list`, `jobs.create`, `jobs.triage`, `jobs.bulk`, `jobs.duplicates`, `jobs.merge`, `jobs.delete`, `notes.read`, `notes.update`, `notes.delete`, `collection.update`, `sources.preview`, `sources.create`, `sources.bulk`, `tasks.list`, `tasks.read`, `tasks.cancel`, `tasks.retry`, `profile.update`, `knowledge.create`, `knowledge.delete`, `claims.read`, `claims.create`, `claims.update`, `claims.delete`, `templates.create`, `templates.update`, `templates.delete`, `instructions.update`, `career.preview_import`, `career.import`, `applications.create`, `applications.delete`, `applications.bulk`, `contexts.read`, `applications.staleness`, `documents.delete`, `files.read`, `backup.download`, `backup.restore`, `questions.withdraw`, `tokens.list`, `tokens.create`, `tokens.revoke`, `password.update`, `collection.runs.list`, `collection.runs.read`, `collection.runs.cancel`
+`workspace.capabilities`, `skills.list`, `jobs.create`, `jobs.triage`, `jobs.bulk`, `jobs.duplicates`, `jobs.merge`, `jobs.delete`, `notes.read`, `notes.update`, `notes.delete`, `collection.update`, `sources.preview`, `sources.create`, `sources.bulk`, `tasks.list`, `tasks.read`, `tasks.cancel`, `tasks.retry`, `profile.update`, `knowledge.create`, `knowledge.delete`, `claims.read`, `claims.create`, `claims.update`, `claims.delete`, `templates.create`, `templates.update`, `templates.delete`, `instructions.update`, `career.preview_import`, `career.import`, `applications.create`, `applications.ready`, `applications.delete`, `applications.bulk`, `contexts.read`, `applications.staleness`, `documents.delete`, `files.read`, `backup.download`, `backup.restore`, `questions.withdraw`, `tokens.list`, `tokens.create`, `tokens.revoke`, `password.update`, `collection.runs.list`, `collection.runs.read`, `collection.runs.cancel`
 
 ## Matrix
 
@@ -206,8 +207,9 @@ missing from the inventory.
 | `applications.read`<br>Read full attempt, questions/answers, requirements and job | `GET /applications/{application_id}` | `application_get` | Applications: attempt detail | pages/Applications.tsx | structured | 5 |
 | `applications.create`<br>Start application preparation (draft) | `POST /applications` | `application_create` | Inbox: Start application | pages/Jobs.tsx | structured | **0** |
 | `applications.update`<br>Record stage, outcome, priority, deadline, employer requirements, questions/answers and application instructions | `PATCH /applications/{application_id}` | `application_update` | Applications: progress, planning, requirements and questions/answers | pages/Applications.tsx | raw JSON: answers | 2 |
+| `applications.ready`<br>Mark a Preparing application ready to apply, or clear the mark | `POST /applications/{application_id}/ready` | `application_ready` | Applications: Mark ready / Not ready in the attempt; Ready badge, filter and queue | pages/ApplicationReady.tsx | structured | **0** |
 | `applications.delete`<br>Delete one attempt and its owned history/files | `DELETE /applications/{application_id}` | `application_delete` | Applications: delete attempt | pages/Applications.tsx | structured | **0** |
-| `applications.bulk`<br>Close, reopen or delete selected application attempts | `POST /applications/bulk` | `applications_bulk` | Applications: list selection toolbar | pages/Applications.tsx | structured | **0** |
+| `applications.bulk`<br>Close, reopen, mark ready, unmark ready or delete selected application attempts | `POST /applications/bulk` | `applications_bulk` | Applications: list selection toolbar | pages/Applications.tsx | structured | **0** |
 | `applications.history`<br>Read immutable lifecycle history | `GET /applications/{application_id}/events` | `application_history` | Applications: history | pages/Applications.tsx | structured | 5 |
 | `contexts.list`<br>List/filter compact frozen-context metadata | `GET /contexts` | `contexts_list` | Applications: prepared contexts | pages/Applications.tsx | structured | 5 |
 | `contexts.read`<br>Read full frozen context and signature | `GET /contexts/{context_id}` | `contexts_get` | Applications: context detail | pages/Applications.tsx | structured | **0** |

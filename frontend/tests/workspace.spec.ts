@@ -996,3 +996,103 @@ test("application history shows who made each change", async ({
     outcome: "not_pursued",
   });
 });
+
+test("an application is marked ready and a new revision clears the step", async ({
+  page,
+}, info) => {
+  const stamp = `${info.project.name} ${Date.now()}`;
+  const title = `Ready role ${stamp}`;
+  const job = await call(page, "/jobs", "POST", {
+    title,
+    company: "Example Labs",
+    posting: "Build reliable services.",
+  });
+  const application = await call(page, "/applications", "POST", {
+    job_id: job.id,
+  });
+  await go(page, `applications?application=${application.id}`);
+  const panel = top(page).getByRole("region", { name: "Ready to apply" });
+  const mark = panel.getByRole("button", { name: "Mark ready", exact: true });
+  await expect(panel).toContainText("No documents");
+  await expect(mark).toBeDisabled();
+
+  await top(page)
+    .getByRole("button", { name: "Add document", exact: true })
+    .click();
+  await top(page).locator("input[name=title]").fill("Ready CV");
+  await top(page).locator("textarea[name=text]").fill("Synthetic CV text.");
+  await top(page).locator("input[type=file]").setInputFiles({
+    name: "ready.pdf",
+    mimeType: "application/pdf",
+    buffer: syntheticPdf(),
+  });
+  await top(page)
+    .getByRole("button", { name: "Save revision", exact: true })
+    .click();
+  await expect(page.locator("dialog[open]")).toHaveCount(1);
+  await expect(panel).toContainText("Needs review");
+  await expect(mark).toBeDisabled();
+  await top(page)
+    .getByRole("button", { name: "Show Ready CV", exact: true })
+    .click();
+  await top(page)
+    .getByRole("button", { name: "Approve this revision", exact: true })
+    .click();
+  await expect(panel).toContainText("Reviewed, not marked ready");
+
+  // Mark ready with the keyboard.
+  await mark.focus();
+  await page.keyboard.press("Enter");
+  await expect(top(page).locator(".app-toast")).toContainText(
+    "Marked ready to apply.",
+  );
+  await expect(panel).toContainText("Marked by Owner (dashboard)");
+  await expect(
+    panel.getByRole("button", { name: "Not ready", exact: true }),
+  ).toBeVisible();
+  await fitsViewport(page);
+  expect((await call(page, `/applications/${application.id}`)).readiness).toBe(
+    "ready",
+  );
+
+  // The ready queue lists it with its badge.
+  await go(
+    page,
+    `applications?view=list&readiness=ready&sort=ready&q=${encodeURIComponent(title)}`,
+  );
+  const row = page.locator("tbody tr", { hasText: title });
+  await expect(row.locator(".ready-tag")).toHaveText("Ready to apply");
+  await expect(
+    page.getByRole("button", { name: /^Ready to apply \d+$/ }),
+  ).toHaveClass(/selected/);
+  await fitsViewport(page);
+
+  // A new revision changes what was judged, so the step is cleared.
+  await row.getByRole("button", { name: new RegExp(title) }).click();
+  await top(page)
+    .getByRole("button", { name: "Show Ready CV", exact: true })
+    .click();
+  await top(page)
+    .getByRole("button", { name: "New revision", exact: true })
+    .click();
+  await top(page).locator("textarea[name=text]").fill("Changed synthetic CV.");
+  await top(page)
+    .getByRole("button", { name: "Save revision", exact: true })
+    .click();
+  await expect(page.locator("dialog[open]")).toHaveCount(1);
+  await expect(panel).toContainText("Missing PDF");
+  await expect(mark).toBeDisabled();
+  await top(page).getByRole("tab", { name: "History", exact: true }).click();
+  const cleared = top(page).locator(".activity", {
+    hasText: "application ready cleared",
+  });
+  await expect(cleared).toContainText("A new document revision was saved");
+  await expect(cleared).toContainText("Owner (dashboard)");
+  const current = await call(page, `/applications/${application.id}`);
+  expect([current.readiness, current.ready_at]).toEqual(["missing_pdf", null]);
+  await call(page, `/applications/${application.id}`, "PATCH", {
+    expected_version: current.version,
+    status: "closed",
+    outcome: "not_pursued",
+  });
+});
