@@ -41,6 +41,9 @@ class Database:
             if version in MIGRATIONS:
                 upgrade(conn)
             apply_schema(conn)
+        from .compaction import compact
+
+        compact(self)  # an upgrade or large deletions may have left most of the file free
         self.path.chmod(0o600)
 
     @contextmanager
