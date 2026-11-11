@@ -57,7 +57,7 @@ def contract():
     with tempfile.TemporaryDirectory(prefix="openings-parity-") as directory:
         app = create_app(Path(directory) / "workspace.sqlite", start_worker=False)
         tools = asyncio.run(app.state.mcp.list_tools())
-        return app.openapi(), {tool.name: tool.inputSchema for tool in tools}
+        return app.openapi(), {tool.name: tool.input_schema for tool in tools}
 
 
 def resolve(schema, components):
