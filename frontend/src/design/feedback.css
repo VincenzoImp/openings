@@ -1,0 +1,133 @@
+/* Banner, empty state, loading state and toast. */
+.banner {
+  display: flex;
+  gap: var(--s3);
+  align-items: flex-start;
+  padding: var(--s3) var(--s4);
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  background: var(--hover);
+  color: var(--ink);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.banner.attention {
+  background: var(--attention-soft);
+  color: var(--attention);
+}
+.banner.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.banner.info {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.banner > .icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+.banner .title {
+  font-weight: 600;
+}
+.banner .link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.empty {
+  padding: var(--s6) var(--s4);
+  color: var(--ink-2);
+  text-align: center;
+}
+.empty .title {
+  margin: 0 0 var(--s1);
+  color: var(--ink);
+  font: 600 var(--t-lg) / 1.4 var(--sans);
+  letter-spacing: 0;
+}
+.empty p {
+  max-width: 60ch;
+  margin: 0 auto;
+  color: var(--ink-2);
+  font-size: var(--t-md);
+}
+.empty .row {
+  justify-content: center;
+  margin-top: var(--s4);
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s3);
+  padding: var(--s7) var(--s4);
+  color: var(--ink-2);
+}
+
+/* One message at a time, above the bottom bar on narrow screens. Inside an
+   open dialog the dialog shows its own copy, because a modal dialog covers
+   the page. */
+.toast {
+  position: fixed;
+  bottom: var(--s5);
+  left: calc(50% + var(--sidebar) / 2);
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  max-width: min(600px, calc(100vw - 32px));
+  padding: var(--s3) var(--s3) var(--s3) var(--s4);
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: var(--card);
+  box-shadow: var(--shadow);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.toast.error {
+  background: var(--danger);
+}
+.toast button {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.toast button:focus-visible {
+  outline-color: currentColor;
+}
+body:has(dialog[open]) .toast:not(.dialog-toast) {
+  display: none;
+}
+.dialog .dialog-toast {
+  position: static;
+  transform: none;
+  flex: none;
+  max-width: none;
+  margin: var(--s3) var(--s4);
+}
+@media (max-width: 860px) {
+  .toast {
+    left: 50%;
+    bottom: calc(var(--tabbar) + var(--s3) + env(safe-area-inset-bottom));
+    width: max-content;
+  }
+}

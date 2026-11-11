@@ -1,0 +1,121 @@
+/* Field (label, control, hint), plain inputs and the on/off switch. */
+.field {
+  display: grid;
+  gap: var(--s1);
+  min-width: 0;
+}
+.field > span,
+.field-label {
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--ink);
+}
+/* :where keeps the specificity of one class, so a screen can still size a
+   control of its own. */
+.input,
+.field
+  :where(
+    input:not([type="checkbox"], [type="radio"], [type="file"]),
+    select,
+    textarea
+  ) {
+  width: 100%;
+  min-height: 36px;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--control);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--ink);
+}
+.field textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+.field :where(input, select, textarea)::placeholder,
+.input::placeholder {
+  color: var(--ink-3);
+  opacity: 1;
+}
+.field :where(input, select, textarea):disabled,
+.input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.field :where(input, select, textarea)[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+.field .hint {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: var(--t-xs);
+  font-weight: 400;
+  line-height: 1.5;
+}
+.field .error {
+  color: var(--danger);
+  font-size: var(--t-xs);
+}
+
+/* On/off switch: <input type="checkbox" role="switch" class="switch">.
+   The thumb position carries the state; the colour only supports it. */
+.switch {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink-3);
+  cursor: pointer;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--card);
+}
+.switch:checked {
+  background: var(--accent);
+}
+.switch:checked::after {
+  left: 19px;
+}
+.switch:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+/* A control with its visible label, sized as a touch target on narrow screens */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  cursor: pointer;
+}
+@media (max-width: 860px) {
+  .toggle {
+    min-height: 44px;
+  }
+  /* 16px text stops iOS from zooming the page when a control takes focus. */
+  .input,
+  .field
+    :where(
+      input:not([type="checkbox"], [type="radio"], [type="file"]),
+      select,
+      textarea
+    ) {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .switch::after {
+    transition: left 0.12s;
+  }
+}

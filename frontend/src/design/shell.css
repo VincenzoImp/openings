@@ -1,0 +1,304 @@
+/* Application shell: sidebar, top bar, page frame and the narrow-screen
+   bottom bar with its "More" sheet. One breakpoint at 860px. */
+.skip-link {
+  position: fixed;
+  top: var(--s2);
+  left: var(--s2);
+  z-index: 40;
+  padding: var(--s2) var(--s4);
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+.skip-link:focus {
+  transform: none;
+  outline-color: var(--ink);
+}
+.app {
+  display: grid;
+  grid-template-columns: var(--sidebar) minmax(0, 1fr);
+  min-height: 100vh;
+}
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: var(--s5) var(--s3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+  overflow-y: auto;
+}
+.brand {
+  font: 400 1.375rem var(--serif);
+  padding: 0 var(--s3);
+  text-decoration: none;
+  align-self: flex-start;
+  border-radius: var(--radius-sm);
+}
+.nav-group {
+  display: grid;
+  gap: 2px;
+}
+.nav-group + .nav-group {
+  margin-top: var(--s5);
+}
+.nav-group > .eyebrow {
+  padding: 0 var(--s3) var(--s2);
+  display: block;
+}
+.nav a {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 36px;
+  padding: 0 var(--s3);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+.nav a:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.nav a[aria-current="page"] {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.nav .count {
+  margin-left: auto;
+}
+.sidebar-foot {
+  margin-top: auto;
+  padding: 0 var(--s3);
+  overflow-wrap: anywhere;
+}
+.sidebar-foot .actor {
+  display: flex;
+}
+.main {
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  min-width: 0;
+  min-height: 100vh;
+}
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: var(--topbar);
+  padding: 0 var(--s6);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.crumb {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+  white-space: nowrap;
+}
+.crumb [aria-current] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topbar .status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+}
+.page {
+  max-width: 1240px;
+  padding: var(--s6);
+}
+.page:focus {
+  outline: none;
+}
+.page-head {
+  margin-bottom: var(--s5);
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.page-head h1 {
+  font: 400 var(--t-2xl) / 1.15 var(--serif);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.page-head > .grow {
+  flex-basis: min(100%, 320px);
+}
+.page-head p {
+  margin-top: var(--s2);
+  max-width: 68ch;
+  font-size: var(--t-md);
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.tabbar,
+.more-sheet,
+.sheet-shade {
+  display: none;
+}
+
+/* Sign in and first-run password: one card on the shell background. */
+.auth {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--s5) var(--s4);
+}
+.auth-card {
+  width: min(440px, 100%);
+  padding: var(--s6);
+}
+.auth-card .brand {
+  display: inline-block;
+  padding: 0;
+  margin-bottom: var(--s5);
+}
+.auth-card h1 {
+  margin: var(--s2) 0 var(--s3);
+}
+.auth-card form {
+  margin-top: var(--s5);
+}
+.auth-card form > .btn {
+  width: 100%;
+}
+.auth-note {
+  margin-top: var(--s5);
+  text-align: center;
+}
+
+@media (min-width: 861px) {
+  /* Wide pages keep the old pages' working width until each is rebuilt. */
+  .page:has(> .legacy) {
+    max-width: 1400px;
+  }
+}
+@media (max-width: 860px) {
+  .app {
+    display: block;
+  }
+  .sidebar {
+    display: none;
+  }
+  .main {
+    border-left: 0;
+    padding-bottom: calc(var(--tabbar) + 8px + env(safe-area-inset-bottom));
+  }
+  .topbar,
+  .page {
+    padding-left: var(--s4);
+    padding-right: var(--s4);
+  }
+  .topbar {
+    gap: 0;
+  }
+  .page {
+    padding-top: var(--s5);
+  }
+  .page-head h1 {
+    font-size: 1.5rem;
+  }
+  .auth-card {
+    padding: var(--s5);
+  }
+  /* Bottom bar: labels sit on one baseline, the count badge above its label. */
+  .tabbar {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 10;
+    display: flex;
+    background: var(--card);
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tabbar a,
+  .tabbar button {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: var(--tabbar);
+    padding: 0 var(--s1) 9px;
+    border: 0;
+    background: none;
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--ink-2);
+    text-decoration: none;
+    position: relative;
+    cursor: pointer;
+  }
+  .tabbar :focus-visible {
+    outline-offset: -3px;
+  }
+  .tabbar a[aria-current="page"],
+  .tabbar button[aria-current="page"],
+  .tabbar button[aria-expanded="true"] {
+    color: var(--accent);
+    box-shadow: inset 0 2px 0 var(--accent);
+  }
+  .tabbar .count {
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 20px;
+  }
+  /* "More": the destinations that do not fit in the bottom bar. */
+  .sheet-shade {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 9;
+    background: var(--backdrop);
+  }
+  .more-sheet {
+    display: block;
+    position: fixed;
+    inset: auto 0 calc(var(--tabbar) + env(safe-area-inset-bottom)) 0;
+    z-index: 10;
+    max-height: calc(100dvh - var(--tabbar) - var(--s7));
+    overflow-y: auto;
+    padding: var(--s4) var(--s4) var(--s4);
+    background: var(--card);
+    border-top: 1px solid var(--line);
+    border-radius: var(--radius) var(--radius) 0 0;
+    box-shadow: var(--shadow);
+  }
+  .more-sheet a {
+    min-height: 44px;
+  }
+  .more-sheet .sidebar-foot {
+    margin-top: var(--s4);
+    padding-top: var(--s3);
+    border-top: 1px solid var(--line);
+  }
+  .more-sheet a[aria-current="page"] {
+    background: var(--accent-soft);
+    color: var(--accent);
+    box-shadow: none;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .nav a {
+    transition: background-color 0.12s;
+  }
+  .skip-link {
+    transition: transform 0.12s;
+  }
+}
