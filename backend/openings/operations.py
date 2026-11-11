@@ -6,6 +6,7 @@ import time
 from contextlib import closing
 
 from .common import encode, now
+from .compaction import compact
 from .db import MIGRATIONS, SCHEMA_VERSION, apply_schema, upgrade
 from .errors import DomainError
 
@@ -49,9 +50,11 @@ def restore_database(workspace, source_path):
                     raise DomainError(
                         422, "backup_integrity", "The backup could not be upgraded to this schema."
                     ) from error
-            return _restore_current(workspace, upgraded)
+            result = _restore_current(workspace, upgraded)
         finally:
             workspace.db.remove_temp(upgraded)
+        compact(workspace.db)  # an upgrade can leave most of the copied file free
+        return result
     return _restore_current(workspace, source_path)
 
 
