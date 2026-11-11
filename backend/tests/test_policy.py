@@ -623,6 +623,11 @@ def test_a_context_freezes_the_sections_as_shared_parts(tmp_path):
         "confirmed_at",
         "origin",
     }
+    # A frozen item is the item as every read returns it, without who wrote it.
+    for section in policy.get_policy()["sections"]:
+        assert frozen[section["section"]]["items"] == [
+            {key: item[key] for key in proposal} for item in section["items"]
+        ]
     with workspace.db.connect() as conn:
         text = payload_text(conn, first["id"])
         assert hashlib.sha256(text.encode()).hexdigest() == first["signature"]

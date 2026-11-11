@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { api, version, type Json, type Profile } from "../../api";
+import { api, type Json, type Profile } from "../../api";
 import {
   Button,
   ErrorBanner,
@@ -60,22 +60,19 @@ function ProfileForm({ profile }: { profile: Profile }) {
     const text = (name: string) => String(form.get(name) ?? "");
     await mutate(
       () =>
-        api(
-          "/career/profile",
-          "PATCH",
-          version(profile, {
-            name: text("name"),
-            headline: text("headline"),
-            location: text("location"),
-            email: text("email"),
-            phone: text("phone"),
-            summary: text("summary"),
-            roles: text("roles"),
-            preferences: text("preferences"),
-            links: links.filter((link) => link.url.trim()),
-            metadata: details.value,
-          }),
-        ),
+        api("/career/profile", "PATCH", {
+          expected_version: profile.version,
+          name: text("name"),
+          headline: text("headline"),
+          location: text("location"),
+          email: text("email"),
+          phone: text("phone"),
+          summary: text("summary"),
+          roles: text("roles"),
+          preferences: text("preferences"),
+          links: links.filter((link) => link.url.trim()),
+          metadata: details.value,
+        }),
       "Profile saved.",
     );
   }

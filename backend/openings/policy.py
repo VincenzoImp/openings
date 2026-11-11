@@ -296,27 +296,6 @@ def item_record(row):
     return row
 
 
-def frozen_item(item):
-    """What a context keeps of an item; an unconfirmed item says so."""
-    return {
-        key: item[key]
-        for key in (
-            "id",
-            "label",
-            "statement",
-            "value",
-            "value_type",
-            "note",
-            "scope",
-            "rule",
-            "enabled",
-            "confirmed",
-            "confirmed_at",
-            "origin",
-        )
-    }
-
-
 def _items(conn, section):
     return [
         item_record(row)
@@ -352,14 +331,39 @@ def section_record(conn, section):
 
 
 def frozen_policy(conn):
-    """The four sections as a context freezes them: version and items."""
-    return {
-        section: {
-            "version": _section_row(conn, section)["version"],
-            "items": [frozen_item(item) for item in _items(conn, section)],
-        }
-        for section in SECTIONS
-    }
+    """The four sections as a context freezes them: version and items.
+
+    Two queries for the whole policy: this runs for every prepared context. An
+    item keeps what an agent writes from; an unconfirmed item says so.
+    """
+    versions = dict(
+        tuple(row) for row in conn.execute("SELECT section,version FROM policy_sections")
+    )
+    frozen = {section: {"version": versions.get(section, 0), "items": []} for section in SECTIONS}
+    for row in conn.execute(
+        "SELECT section,id,label,statement,value,value_type,note,scope,rule,enabled,"
+        "confirmed_at,origin,origin_key FROM policy_items ORDER BY section,position,created_at,id"
+    ):
+        section, value, rule, confirmed_at, origin = row[0], row[4], row[8], row[10], row[11]
+        frozen[section]["items"].append(
+            {
+                "id": row[1],
+                "label": row[2],
+                "statement": row[3],
+                "value": json.loads(value) if value is not None else None,
+                "value_type": row[5],
+                "note": row[6],
+                "scope": row[7],
+                "rule": json.loads(rule) if rule is not None else None,
+                "enabled": bool(row[9]),
+                "confirmed": confirmed_at is not None,
+                "confirmed_at": confirmed_at,
+                "origin": {"source": origin, "key": row[12], "note": ORIGIN_NOTES.get(origin, "")}
+                if origin
+                else None,
+            }
+        )
+    return frozen
 
 
 def signal_registry():
