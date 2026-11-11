@@ -360,13 +360,19 @@ export function setCsrf(value: string) {
   csrfToken = value;
 }
 export class ApiError extends Error {
+  status: number;
+  code: string;
+  path: string;
   constructor(
     message: string,
-    public status: number,
-    public code = "request_failed",
-    public path = "",
+    status: number,
+    code = "request_failed",
+    path = "",
   ) {
     super(message);
+    this.status = status;
+    this.code = code;
+    this.path = path;
   }
 }
 export async function api<T>(

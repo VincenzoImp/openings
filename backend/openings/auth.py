@@ -30,7 +30,7 @@ def password_matches(password, encoded):
     try:
         salt = base64.b64decode(encoded.split(":")[0])
         return hmac.compare_digest(password_hash(password, salt), encoded)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return False
 
 
@@ -88,7 +88,7 @@ class Auth:
             return None
         try:
             session = self.serializer(data).loads(value, max_age=MAX_AGE)
-        except (BadSignature, SignatureExpired):
+        except BadSignature, SignatureExpired:
             return None
         # A logout increments the stored generation, revoking every earlier cookie.
         if not session.get("owner") or session.get("generation", 0) != data.get(
@@ -169,7 +169,7 @@ class Auth:
     def authorize_operation(self, token, operation):
         try:
             value = self.operation_serializer().loads(token, max_age=OPERATION_MAX_AGE)
-        except (BadSignature, SignatureExpired):
+        except BadSignature, SignatureExpired:
             raise DomainError(
                 401, "transfer_expired", "The operation grant expired. Request another."
             )

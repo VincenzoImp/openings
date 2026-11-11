@@ -51,7 +51,7 @@ def structured_posting(body):
     for script in soup.find_all("script", type="application/ld+json"):
         try:
             candidates.append(json.loads(script.string or script.get_text()))
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             continue
     while candidates:
         node = candidates.popleft()
@@ -69,21 +69,20 @@ def structured_posting(body):
                     continue
                 organization = node.get("hiringOrganization") or {}
                 locations = node.get("jobLocation") or []
-                if isinstance(locations, dict):
+                if isinstance(locations, (dict, str)):
                     locations = [locations]
                 labels = []
                 for location in locations:
-                    address = location.get("address", {}) if isinstance(location, dict) else {}
-                    if isinstance(address, str):
-                        labels.append(address)
-                    elif isinstance(address, dict):
-                        labels.append(
-                            ", ".join(
-                                str(address[key])
-                                for key in ("addressLocality", "addressRegion", "addressCountry")
-                                if isinstance(address.get(key), str)
-                            )
+                    # A place may be plain text, and one without a usable address adds nothing.
+                    address = location.get("address") if isinstance(location, dict) else location
+                    if isinstance(address, dict):
+                        address = ", ".join(
+                            str(address[key])
+                            for key in ("addressLocality", "addressRegion", "addressCountry")
+                            if isinstance(address.get(key), str)
                         )
+                    if isinstance(address, str) and address.strip():
+                        labels.append(address.strip())
                 return {
                     "title": str(node.get("title") or "")[:400],
                     "company": str(organization.get("name") or "")[:300]
@@ -181,7 +180,7 @@ async def read_posting(url, discovery):
                 return {"metadata": {"extraction": "needs_text", "extraction_error": error.message}}
             if error.status == 429:
                 return {"metadata": {"extraction": "deferred", "extraction_error": error.message}}
-        except (ValueError, TypeError, AttributeError):
+        except ValueError, TypeError, AttributeError:
             continue
     return {
         "metadata": {
