@@ -23,9 +23,9 @@ How to read the evidence:
 
 | Measure | Operations |
 |---|---|
-| Logical operations in the inventory | 91 |
+| Logical operations in the inventory | 102 |
 | Without REST or without MCP | 0 |
-| Without a working dashboard path | 2 |
+| Without a working dashboard path | 13 |
 | Reached only through another operation | 3 |
 | With inputs the dashboard never mentions | 3 |
 | With free-form JSON edited as raw JSON | 13 |
@@ -44,6 +44,17 @@ code calls the route and no browser test reached it.
 |---|---|---|---|---|
 | `skills.read` | `GET /skills/{name}`<br>`GET /skills/{name}/files/{path}` | `skill_get` | Settings: Connect an agent | Settings lists the served skills by name and description; their text and reference files cannot be opened. |
 | `jobs.resolve` | `GET /jobs/resolve` | `jobs_resolve` | Job details: Possible duplicates (identity matches are merged on ingestion) | No lookup of a job by URL, external key or title and company. Job details open Possible duplicates (`jobs.duplicates`) instead. |
+| `events.list` | `GET /events` | `events_list` | Activity: Changes; run detail | — |
+| `runs.list` | `GET /runs` | `runs_list` | Activity: Runs | — |
+| `runs.read` | `GET /runs/{run_id}` | `runs_get` | Activity: run detail | — |
+| `runs.start` | `POST /runs` | `runs_start` | Activity: Runs (read only) | — |
+| `runs.update` | `PATCH /runs/{run_id}` | `runs_update` | Activity: run detail (read only) | — |
+| `runs.finish` | `POST /runs/{run_id}/finish` | `runs_finish` | Activity: run detail (read only) | — |
+| `questions.list` | `GET /questions` | `questions_list` | Activity: Questions; navigation count | — |
+| `questions.read` | `GET /questions/{question_id}` | `questions_get` | Activity: Questions | — |
+| `questions.ask` | `POST /questions` | `questions_ask` | Activity: Questions (answer only) | — |
+| `questions.answer` | `POST /questions/{question_id}/answer` | `questions_answer` | Activity: Questions: answer | — |
+| `questions.withdraw` | `POST /questions/{question_id}/withdraw` | `questions_withdraw` | Activity: Questions: withdraw | — |
 
 ### Operations reached only through another operation
 
@@ -228,3 +239,19 @@ missing from the inventory.
 | `tokens.create`<br>Create a named owner API token | `POST /tokens` | `token_create` | Settings: create agent token | pages/Settings.tsx | structured | **0** |
 | `tokens.revoke`<br>Revoke an owner API token | `DELETE /tokens/{token_id}` | `token_revoke` | Settings: revoke agent token | pages/Settings.tsx | structured | **0** |
 | `password.update`<br>Change owner password and rotate owner sessions | `POST /auth/password` | `owner_password_update` | Settings: change password | pages/Settings.tsx | structured | **0** |
+
+### Agent activity
+
+| Operation | REST | MCP | Dashboard location | Dashboard code | Editor | E2E |
+|---|---|---|---|---|---|---|
+| `events.list`<br>List recorded changes with actor, run and subject | `GET /events` | `events_list` | Activity: Changes; run detail | **none** | — | — |
+| `runs.list`<br>List agent runs by status, workflow, token or start time | `GET /runs` | `runs_list` | Activity: Runs | **none** | — | — |
+| `runs.read`<br>Read an agent run with its report, questions and changes | `GET /runs/{run_id}` | `runs_get` | Activity: run detail | **none** | — | — |
+| `runs.start`<br>Open an agent run for the calling API token | `POST /runs` | `runs_start` | Activity: Runs (read only) | **none** | — | — |
+| `runs.update`<br>Record a progress note on the calling token's open run | `PATCH /runs/{run_id}` | `runs_update` | Activity: run detail (read only) | **none** | — | — |
+| `runs.finish`<br>Close the calling token's run with its report | `POST /runs/{run_id}/finish` | `runs_finish` | Activity: run detail (read only) | **none** | — | — |
+| `questions.list`<br>List questions for the owner by state, subject, run or answer time | `GET /questions` | `questions_list` | Activity: Questions; navigation count | **none** | — | — |
+| `questions.read`<br>Read one question for the owner | `GET /questions/{question_id}` | `questions_get` | Activity: Questions | **none** | — | — |
+| `questions.ask`<br>Ask the owner a question tied to a job, application, Career entry or nothing | `POST /questions` | `questions_ask` | Activity: Questions (answer only) | **none** | — | — |
+| `questions.answer`<br>Answer a question for the owner | `POST /questions/{question_id}/answer` | `questions_answer` | Activity: Questions: answer | **none** | — | — |
+| `questions.withdraw`<br>Withdraw an open question | `POST /questions/{question_id}/withdraw` | `questions_withdraw` | Activity: Questions: withdraw | **none** | — | — |

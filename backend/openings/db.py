@@ -11,7 +11,7 @@ from pathlib import Path
 from .errors import DomainError
 from .posting import posting_complete
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 SCHEMA_SQL = Path(__file__).with_name("schema.sql")
 TEMP_PREFIX = ".openings-temp-"
 
@@ -127,8 +127,53 @@ def _migrate_6_to_7(conn):
     )
 
 
+def _migrate_7_to_8(conn):
+    # Attribution, agent runs and questions for the owner. Existing rows keep every
+    # value; their new actor columns stay NULL, which reads as "unknown (before 0.17)".
+    conn.execute(
+        """CREATE TABLE runs (
+ id TEXT PRIMARY KEY, token_id TEXT NOT NULL, token_name TEXT NOT NULL,
+ workflow TEXT NOT NULL, scope TEXT NOT NULL DEFAULT '',
+ status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','finished','interrupted')),
+ note TEXT NOT NULL DEFAULT '', report TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(report)),
+ change_counts TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(change_counts)),
+ superseded_by TEXT, idempotency_key TEXT UNIQUE, version INTEGER NOT NULL DEFAULT 1,
+ started_at TEXT NOT NULL, last_activity_at TEXT NOT NULL, ended_at TEXT, updated_at TEXT NOT NULL
+)"""
+    )
+    conn.execute(
+        """CREATE TABLE questions (
+ id TEXT PRIMARY KEY, subject_type TEXT CHECK(subject_type IS NULL OR subject_type IN ('job','application','knowledge')),
+ job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL,
+ application_id TEXT REFERENCES applications(id) ON DELETE SET NULL,
+ knowledge_id TEXT REFERENCES knowledge(id) ON DELETE SET NULL,
+ subject_label TEXT NOT NULL DEFAULT '', question TEXT NOT NULL, why TEXT NOT NULL DEFAULT '',
+ choices TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(choices) AND json_type(choices)='array'),
+ state TEXT NOT NULL DEFAULT 'open' CHECK(state IN ('open','answered','withdrawn')),
+ answer TEXT NOT NULL DEFAULT '', answer_choice TEXT,
+ asked_by_kind TEXT NOT NULL, asked_by_id TEXT, asked_by_name TEXT,
+ run_id TEXT REFERENCES runs(id) ON DELETE SET NULL,
+ resolved_by_kind TEXT, resolved_by_id TEXT, resolved_by_name TEXT, resolved_at TEXT,
+ idempotency_key TEXT UNIQUE, version INTEGER NOT NULL DEFAULT 1,
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ CHECK((job_id IS NOT NULL)+(application_id IS NOT NULL)+(knowledge_id IS NOT NULL)<=1)
+)"""
+    )
+    for column in (
+        "subject_type TEXT",
+        "subject_id TEXT",
+        "actor_kind TEXT",
+        "actor_id TEXT",
+        "actor_name TEXT",
+        "run_id TEXT REFERENCES runs(id) ON DELETE SET NULL",
+    ):
+        conn.execute("ALTER TABLE events ADD COLUMN " + column)
+    for column in ("author_kind TEXT", "author_id TEXT", "author_name TEXT"):
+        conn.execute("ALTER TABLE notes ADD COLUMN " + column)
+
+
 # Each step upgrades from its key to the next version; steps chain inside one transaction.
-MIGRATIONS = {5: _migrate_5_to_6, 6: _migrate_6_to_7}
+MIGRATIONS = {5: _migrate_5_to_6, 6: _migrate_6_to_7, 7: _migrate_7_to_8}
 
 
 def upgrade(conn):

@@ -57,16 +57,32 @@ CREATE TABLE IF NOT EXISTS applications (
  deadline TEXT CHECK(deadline IS NULL OR (length(deadline)=10 AND date(deadline)=deadline)),
  requirements TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(requirements) AND json_type(requirements)='array')
 );
+-- An agent run: opened by an API token, closed with a stored report.
+CREATE TABLE IF NOT EXISTS runs (
+ id TEXT PRIMARY KEY, token_id TEXT NOT NULL, token_name TEXT NOT NULL,
+ workflow TEXT NOT NULL, scope TEXT NOT NULL DEFAULT '',
+ status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','finished','interrupted')),
+ note TEXT NOT NULL DEFAULT '', report TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(report)),
+ change_counts TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(change_counts)),
+ superseded_by TEXT, idempotency_key TEXT UNIQUE, version INTEGER NOT NULL DEFAULT 1,
+ started_at TEXT NOT NULL, last_activity_at TEXT NOT NULL, ended_at TEXT, updated_at TEXT NOT NULL
+);
+-- One record per change. job_id/application_id keep the owning timeline (and its
+-- deletion); subject_* names the changed record of any type; actor_* and run_id
+-- say who changed it. Rows written before schema 8 have no actor.
 CREATE TABLE IF NOT EXISTS events (
  id TEXT PRIMARY KEY, job_id TEXT REFERENCES jobs(id) ON DELETE CASCADE,
  application_id TEXT REFERENCES applications(id) ON DELETE CASCADE,
- kind TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL
+ kind TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL,
+ subject_type TEXT, subject_id TEXT, actor_kind TEXT, actor_id TEXT, actor_name TEXT,
+ run_id TEXT REFERENCES runs(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS events_app ON events(application_id,created_at);
 CREATE TABLE IF NOT EXISTS notes (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
  application_id TEXT REFERENCES applications(id) ON DELETE CASCADE, body TEXT NOT NULL,
- version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+ version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ author_kind TEXT, author_id TEXT, author_name TEXT
 );
 CREATE TABLE IF NOT EXISTS knowledge (
  id TEXT PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL, organization TEXT NOT NULL DEFAULT '',
@@ -167,4 +183,34 @@ CREATE INDEX IF NOT EXISTS files_blob ON files(sha256);
 CREATE INDEX IF NOT EXISTS tasks_job ON tasks(job_id);
 CREATE INDEX IF NOT EXISTS tasks_source ON tasks(source_id);
 CREATE INDEX IF NOT EXISTS postings_source ON postings(source_id);
-PRAGMA user_version=7;
+-- A question for the owner. The subject reference becomes NULL when its record is
+-- deleted; subject_type and subject_label keep the question readable.
+CREATE TABLE IF NOT EXISTS questions (
+ id TEXT PRIMARY KEY, subject_type TEXT CHECK(subject_type IS NULL OR subject_type IN ('job','application','knowledge')),
+ job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL,
+ application_id TEXT REFERENCES applications(id) ON DELETE SET NULL,
+ knowledge_id TEXT REFERENCES knowledge(id) ON DELETE SET NULL,
+ subject_label TEXT NOT NULL DEFAULT '', question TEXT NOT NULL, why TEXT NOT NULL DEFAULT '',
+ choices TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(choices) AND json_type(choices)='array'),
+ state TEXT NOT NULL DEFAULT 'open' CHECK(state IN ('open','answered','withdrawn')),
+ answer TEXT NOT NULL DEFAULT '', answer_choice TEXT,
+ asked_by_kind TEXT NOT NULL, asked_by_id TEXT, asked_by_name TEXT,
+ run_id TEXT REFERENCES runs(id) ON DELETE SET NULL,
+ resolved_by_kind TEXT, resolved_by_id TEXT, resolved_by_name TEXT, resolved_at TEXT,
+ idempotency_key TEXT UNIQUE, version INTEGER NOT NULL DEFAULT 1,
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ CHECK((job_id IS NOT NULL)+(application_id IS NOT NULL)+(knowledge_id IS NOT NULL)<=1)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS runs_open_token ON runs(token_id) WHERE status='open';
+CREATE INDEX IF NOT EXISTS runs_token ON runs(token_id,started_at);
+CREATE INDEX IF NOT EXISTS runs_status ON runs(status,started_at);
+CREATE INDEX IF NOT EXISTS runs_started ON runs(started_at);
+CREATE INDEX IF NOT EXISTS events_run ON events(run_id,created_at);
+CREATE INDEX IF NOT EXISTS events_subject ON events(subject_type,subject_id,created_at);
+CREATE INDEX IF NOT EXISTS questions_state ON questions(state,created_at);
+CREATE INDEX IF NOT EXISTS questions_resolved ON questions(state,resolved_at);
+CREATE INDEX IF NOT EXISTS questions_job ON questions(job_id);
+CREATE INDEX IF NOT EXISTS questions_application ON questions(application_id);
+CREATE INDEX IF NOT EXISTS questions_knowledge ON questions(knowledge_id);
+CREATE INDEX IF NOT EXISTS questions_run ON questions(run_id);
+PRAGMA user_version=8;

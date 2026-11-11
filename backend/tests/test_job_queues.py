@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from openings.app import create_app
 from openings.errors import DomainError
 from openings.workspace import Workspace
+from schema_fixtures import make_schema_seven
 
 
 def add(workspace, title):
@@ -131,6 +132,8 @@ def test_schema_five_upgrade_preserves_owned_records_and_versions(tmp_path):
     ws = Workspace(path)
     job = add(ws, "Existing engineer")
     application = ws.create_application({"job_id": job["id"]})
+    # Schema 5 also predates attribution, runs and questions (schema 8).
+    make_schema_seven(path)
     with sqlite3.connect(path) as conn:
         # Schema 5 also predates the schema 7 application planning fields.
         conn.execute("DROP INDEX applications_deadline")
@@ -149,7 +152,7 @@ def test_schema_five_upgrade_preserves_owned_records_and_versions(tmp_path):
     assert upgraded.get_application(application["id"]) == application
     assert upgraded.list_jobs(queue="shortlist")["total"] == 0
     with upgraded.db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 7
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 8
         assert not conn.execute(
             "SELECT name FROM sqlite_master WHERE name='assessments'"
         ).fetchall()
