@@ -1,0 +1,12 @@
+/* The dashboard's stylesheet: tokens first, then elements, the shell and one
+   file per component group. Screens add no global styles of their own. */
+@import "./tokens.css";
+@import "./base.css";
+@import "./shell.css";
+@import "./button.css";
+@import "./tag.css";
+@import "./card.css";
+@import "./tabs.css";
+@import "./field.css";
+@import "./feedback.css";
+@import "./dialog.css";

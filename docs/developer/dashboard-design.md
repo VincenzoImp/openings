@@ -183,6 +183,32 @@ documentation screenshots and a regenerated parity matrix.
 A stage whose backend issue is not ready ships with what exists and gains the rest
 when that issue lands; the table says which parts those are.
 
+### Implemented
+
+**Stage 1, Foundation.**
+
+- `frontend/src/design` holds the tokens (`tokens.css`, the single source, with
+  the values of the table above), the element defaults, the shell styles and the
+  core components: button, tag, count, card, list row, tabs, segmented switch,
+  field, switch, banner, actor chip, empty state, action bar, dialog and toast.
+  The remaining components of the list above are added by the stage that first
+  uses them.
+- `frontend/src/shell` holds the navigation (three groups; bottom bar and More
+  sheet up to 860 px), the top bar with theme and density, the agent's status
+  line, the routes and the screens loaded on demand.
+- The pages written before the design system keep their own stylesheet,
+  `frontend/src/legacy.css`. Its rules apply only inside `.legacy` and its
+  colours come from the tokens. A rebuilt page leaves that wrapper; stage 7
+  deletes the file.
+- Until their stage, Today is still Overview, and Jobs opens the existing Inbox
+  and Shortlist pages. `#today` and `#jobs` are aliases; every earlier route
+  works.
+- Checks: `npm run budget` (first screen, each later screen, stylesheet),
+  axe on every screen in both themes at both widths, the contrast of every pair
+  of the colour table, and a keyboard-only test of the shell. The performance
+  check of the Applications list belongs to stage 3; the browser test server
+  already takes `OPENINGS_E2E_JOBS` and `OPENINGS_E2E_APPLICATIONS` for it.
+
 ## Not decided here
 
 - Charts beyond simple rate bars. Insights starts with tables and bars.

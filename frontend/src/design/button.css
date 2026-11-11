@@ -1,0 +1,128 @@
+/* Button: default, primary, quiet and danger; two sizes; icon-only. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  min-height: 36px;
+  padding: 0 var(--s4);
+  border: 1px solid var(--control);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--ink);
+  font: 500 var(--t-md) / 1.2 var(--sans);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover {
+  background: var(--hover);
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.btn.primary:hover {
+  filter: brightness(1.08);
+}
+.btn.quiet {
+  border-color: transparent;
+  background: none;
+  color: var(--ink-2);
+}
+.btn.quiet:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.btn.danger {
+  color: var(--danger);
+}
+.btn.sm {
+  min-height: 28px;
+  padding: 0 var(--s3);
+  font-size: var(--t-sm);
+}
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: none;
+}
+.btn:disabled:hover {
+  background: var(--card);
+}
+.btn.primary:disabled:hover {
+  background: var(--accent);
+}
+.btn.quiet:disabled:hover {
+  background: none;
+  color: var(--ink-2);
+}
+.btn[aria-busy="true"] {
+  cursor: progress;
+}
+.btn .icon,
+.icon-btn .icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+/* Icon-only button; the accessible name comes from aria-label. */
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.icon-btn:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.icon-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.spinner {
+  display: inline-block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+.btn.primary .spinner {
+  border-color: color-mix(in srgb, var(--on-accent) 40%, transparent);
+  border-top-color: var(--on-accent);
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 860px) {
+  /* Every control is a 44px touch target on narrow screens. */
+  .btn,
+  .btn.sm {
+    min-height: 44px;
+  }
+  .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .btn,
+  .icon-btn {
+    transition: background-color 0.12s;
+  }
+}
