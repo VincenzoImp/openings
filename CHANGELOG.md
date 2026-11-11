@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.18.0 — 2026-11-11
+
+A much smaller database and the first stage of the new dashboard.
+
+- **Smaller database:** frozen application contexts are stored as shared content-addressed parts, so each Career entry, claim, template, Profile, job and instruction text is kept once instead of once per context. Context reads, signatures, file ids and links are unchanged, byte for byte. On a real workspace with 670 contexts the file shrank from 535 MiB to 269 MiB together with the cleanup below.
+- **Less noise in the change log:** a source refresh no longer writes a `posting_updated` event. Seeing a posting again updates its `last_seen_at`; a refresh that changes the title, company, location or posting text records one `job_refreshed` event naming the changed fields.
+- **Stored observations:** postings keep only the source key and the employer's apply link instead of the provider's full response. Identity lookup, duplicate candidates, job sources and run summaries are unchanged. In the JSON export, `postings[].payload` contains only those two values.
+- **Retention:** finished collection runs and tasks are removed after 90 days (`OPENINGS_RETENTION_DAYS`, `0` keeps everything). The 20 most recent finished runs of each source, queued and running work, and all job and application history are kept.
+- **Restore limit from free space:** restoring needs 3 × the backup + the current database + 64 MiB free on the data volume. `OPENINGS_MAX_RESTORE_MB` is now an optional upper bound, unset by default. A backup that does not fit is refused before upload with `413 backup_size` and the sizes in the error details. `GET /workspace` and `workspace_info` return `storage` (database size, free space, restore limit, retention); Settings → Workspace shows it.
+- **New dashboard shell:** navigation in three groups (Work, Library, System), a bottom bar with More on phones, and a top bar with theme and density. Inbox and Shortlist are under Jobs. All earlier links keep working. The pages themselves are redesigned in the following releases.
+- **Readable in both themes:** text meets WCAG AA contrast and buttons and inputs have a visible border. The theme follows the system until you choose one; compact density is new and remembered.
+- **Navigation shows what waits for you:** the number of applications ready to apply and of open questions, and the agent's name while a run is open.
+- **Faster start of the dashboard:** screens load on demand; the first screen needs 90 kB of compressed JavaScript instead of 133 kB.
+- **Duplicates after a restart:** the server prepares duplicate scoring in the background at start. On a small host the first listing after a restart took about 18 seconds.
+- **Context lists** with `summary=true` read stored columns instead of parsing every payload (about 150 ms to 2 ms for 100 contexts).
+
+**Database schema 9 (storage only).** A schema 5–8 workspace is upgraded automatically at start in one transaction; every context is compared with its stored form before the old copy is dropped, and nothing changes if one differs. Restore accepts schema 9 and upgrades a copy of an older backup. A schema 9 workspace or backup cannot be opened by 0.17 or earlier: back up before upgrading.
+
+**Operators.** After the upgrade, and at any start when at least a quarter of the file and `OPENINGS_COMPACT_MIN_MB` (default 32) are free, the database file is rewritten without free space. This needs free disk on the data volume of about twice the new database size plus 64 MiB; without it the step is skipped with a log message and retried at the next start. An interruption leaves the previous file intact. Remove `OPENINGS_MAX_RESTORE_MB` from `.env` unless you want a cap.
+
 ## 0.17.0 — 2026-11-11
 
 The owner and the agent can now hand work to each other inside the product: every change says who made it, an agent's runs and reports are stored, and questions and requests travel in both directions.
