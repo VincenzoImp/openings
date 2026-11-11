@@ -19,7 +19,9 @@ git init                                    # optional: keep your method under v
 python3 .agents/scripts/sync.py --url http://127.0.0.1:8080   # your Openings address
 ```
 
-Create an access token in Openings under **Settings → Agent access**. Then start
+Create an **Agent** token in Openings under **Settings → Agent access**: it runs
+the whole job search and cannot change your password, manage tokens or restore a
+backup. Then start
 your client through the launcher, which asks for the token once, checks it and
 passes `OPENINGS_URL` and `OPENINGS_TOKEN` to the client without writing them:
 

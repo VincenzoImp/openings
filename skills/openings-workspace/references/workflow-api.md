@@ -58,9 +58,17 @@ mechanics, not personal selection or writing policy.
 - `documents_list` / `GET /documents` returns compact rows by default (file
   counts, no content or files). Pass `summary: false`, or read `documents_get`,
   for structured content and file entries.
-- Draft-ready is an agent assessment, not an API state or flag. It requires the
-  intended current CV and CL leaf revisions, valid final PDFs and sources,
-  complete content/layout checks and approved document review states.
+- Ready is a stored step of a Draft, set with `application_ready(application_id,
+  value)` / `POST /applications/{id}/ready` (`expected_version`, `ready`). The
+  agent's assessment comes first: the intended current CV and CL leaf revisions,
+  valid final PDFs and sources, complete content/layout checks and approved
+  document review states. The server then checks files, review states and
+  blocking requirements and refuses with `409 application_not_ready` and
+  `details.check`. `readiness` is `ready` only for a marked Draft whose checks
+  still pass, and `reviewed` when they pass without the mark.
+- A new revision or context, a deleted revision, a file added to a current
+  revision, an unresolved blocking requirement or leaving Draft clears the mark
+  and changes the application version; mark it again after the rework is checked.
 - The UI projects current leaves as Needs PDF, PDF to review or Approved PDF.
   A newer incomplete leaf is not covered by an approved parent. Resolve ambiguous
   branches rather than selecting an arbitrary ancestor.
@@ -86,15 +94,33 @@ mechanics, not personal selection or writing policy.
   `questions_answer(question_id, value)` / `POST /questions/{id}/answer` and
   `questions_withdraw(question_id, value)` / `POST /questions/{id}/withdraw`.
   An answer needs text or one of the listed choices; answering again corrects
-  the answer and renews `answered_at`. Only an open question can be withdrawn.
+  the answer and renews `answered_at`. Answering needs owner authority: an agent
+  token gets `403 forbidden`. Only an open question can be withdrawn.
 - `events_list(value)` / `GET /events` reads the attributed change log.
+
+## Requests for the agent
+
+- `requests_list(value)` / `GET /requests` and `requests_get` /
+  `GET /requests/{id}` are open to every caller. Read `state: "open"` at the
+  start of a run; `workspace_info` reports the count as `open_requests`.
+- `requests_take(request_id, value)` / `POST /requests/{id}/take`,
+  `requests_complete` / `POST /requests/{id}/complete` (`result`) and
+  `requests_decline` / `POST /requests/{id}/decline` (`reason`) take the
+  request's `expected_version` and need an API token (`403 request_actor`).
+  Taking needs an open request (`409 request_taken`, `409 request_closed`);
+  completing and declining work from open or taken. The token's open run is
+  recorded on the request; without an open run the request is still handled.
+- `requests_create(value)` / `POST /requests` and `requests_withdraw` /
+  `POST /requests/{id}/withdraw` are the owner's (`403 forbidden` for an agent
+  token).
+- A request never authorises what the operating mandate forbids.
 
 ## Recover preparation from the database
 
 Use `applications_list(value: {status: "draft", limit: 200, offset: 0})` or
 `GET /applications?status=draft&limit=200&offset=0`, then paginate the stable
 read-only result. The field is `status`, not `stage`. Add `readiness`
-(`none`, `missing_pdf`, `unreviewed`, `blocked`, `ready`) to resume only
+(`none`, `missing_pdf`, `unreviewed`, `blocked`, `reviewed`, `ready`) to resume only
 incomplete or blocked Drafts, and `sort: "deadline"` to keep deadline order. Read each relevant
 application and its document revisions, contexts and files before resuming.
 A local checkpoint is optional. A compatible complete Draft needs no new work.

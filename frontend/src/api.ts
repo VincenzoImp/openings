@@ -3,6 +3,7 @@ export interface ListResult<T> {
   items: T[];
   total: number;
   stage_counts?: Record<string, number>;
+  ready_count?: number;
   facets?: Record<string, string[]>;
 }
 export interface Versioned {
@@ -117,13 +118,14 @@ export interface Requirement {
   note: string;
 }
 export type Readiness =
-  "blocked" | "none" | "missing_pdf" | "unreviewed" | "ready";
+  "blocked" | "none" | "missing_pdf" | "unreviewed" | "reviewed" | "ready";
 export const readinessLabels: Record<Readiness, string> = {
   blocked: "Blocked by a requirement",
   none: "No documents",
   missing_pdf: "Missing PDF",
   unreviewed: "Needs review",
-  ready: "Ready",
+  reviewed: "Reviewed, not marked ready",
+  ready: "Ready to apply",
 };
 export interface Application extends Versioned {
   job_id: string;
@@ -138,6 +140,8 @@ export interface Application extends Versioned {
   deadline?: string | null;
   requirements?: Requirement[];
   readiness?: Readiness;
+  ready_at?: string | null;
+  ready_by?: Actor | null;
   open_requirements?: number;
   blocking_requirements?: number;
   documents_count?: number;
@@ -332,11 +336,24 @@ export interface CollectionRun {
   task_ids: string[];
   tasks?: BackgroundTask[];
 }
+export type TokenKind = "owner" | "agent";
+export const tokenKinds: Record<TokenKind, string> = {
+  agent: "Agent",
+  owner: "Owner",
+};
 export interface Actor {
   kind: "owner" | "token" | "system" | "unknown";
   id: string | null;
   name: string | null;
+  token_kind?: TokenKind | null;
   label: string;
+}
+/** Who made a change; an API token is shown with its kind. */
+export function actorLabel(actor?: Actor | null) {
+  if (!actor) return "";
+  return actor.kind === "token" && actor.token_kind
+    ? `${actor.label} (${actor.token_kind} token)`
+    : actor.label;
 }
 export interface Activity {
   id?: string;
@@ -382,9 +399,24 @@ export interface Run extends Versioned {
   change_counts: Record<string, number>;
   changes_total: number;
   questions_count: number;
+  requests_count?: number;
   report?: RunReport | null;
   changes?: ListResult<Activity>;
   questions?: OwnerQuestion[];
+  requests?: AgentRequest[];
+}
+export type RequestState = "open" | "taken" | "done" | "declined" | "withdrawn";
+export interface AgentRequest extends Versioned {
+  text: string;
+  state: RequestState;
+  result: string;
+  subject: OwnerQuestion["subject"];
+  created_by: Actor;
+  run_id: string | null;
+  taken_by: Actor | null;
+  taken_at: string | null;
+  resolved_by: Actor | null;
+  resolved_at: string | null;
 }
 export interface OwnerQuestion extends Versioned {
   question: string;
@@ -418,6 +450,7 @@ export interface Overview {
   offers: number;
   active: number;
   drafts: number;
+  ready?: number;
   inbox: number;
   incomplete: number;
   funnel: FunnelStep[];

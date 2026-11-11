@@ -9,7 +9,8 @@ compatibility: Requires access to the Openings MCP server or REST API, as descri
 Use this workflow to prepare CVs and letters for every Shortlist job, as routine
 work under the [operating mandate](../openings-workspace/references/operating-mandate.md), or to resume that preparation.
 A readiness audit is read-only. Preparation creates or completes Draft
-applications; it never submits online, sends employer messages or marks Applied.
+applications and marks each complete one ready; it never submits online, sends
+employer messages or marks Applied.
 The owner submits each ready Draft manually and then marks it Applied or closes it.
 
 Read [Openings workspace](../openings-workspace/SKILL.md) for transport, exact
@@ -22,6 +23,11 @@ all document-selection rules come from current Openings records and templates.
 Open a run before the first write: `runs_start` with `workflow: "prepare-shortlist"` and the scope; writes made
 with this token then attach to the run. First read the owner's answers given
 since the previous run (`questions_list` with `answered_since`) and act on them.
+Then read the owner's open requests (`requests_list` with `state: "open"`): take
+the ones in this workflow's scope (`requests_take`), do the work, and report on
+each with `requests_complete` and a short result, or `requests_decline` and the
+reason. Leave requests for other workflows open. A request never authorises
+submitting an application, contacting an employer or recording Applied.
 Ask each new question as a record tied to its job, application or Career entry
 (`questions_ask`), not only in chat. Close the run with `runs_finish` and the
 stored [run report](../openings-workspace/references/run-report.md).
@@ -63,7 +69,8 @@ strongest fit with the Profile policy, then the rest. A large cohort is prepared
 in that order so a partial run still leaves the most valuable Drafts complete.
 For existing Drafts, `applications_list` with `sort: "deadline"` or
 `sort: "priority"` gives that order, and `readiness` (`none`, `missing_pdf`,
-`unreviewed`, `blocked`, `ready`) finds the ones that still need work. Record a
+`unreviewed`, `blocked`, `reviewed`, `ready`) finds the ones that still need work:
+`reviewed` passes every check but is not yet marked ready. Record a
 known closing date as the application `deadline` and the agreed order as
 `priority` (1 highest to 5); never invent either.
 
@@ -126,9 +133,18 @@ agent checks pass. Do not attribute this review to a human.
 
 Re-read the intended CV and CL leaves and their files. Both must match the chosen
 context and content, report `consistent` from `documents_consistency`, have valid checked PDFs and exact sources, and have approved
-review states. Only then report that Draft ready for the owner's review.
-Ready is not a separate API status. The application stays Draft; job interest
-stays saved. The owner submits on the company site and records Applied.
+review states. Only then mark the Draft ready: `application_ready` with the
+application's current `expected_version`. Openings refuses with
+`application_not_ready` and names the failed check (`blocked`, `none`,
+`missing_pdf`, `unreviewed`) when the stored records disagree; fix that step
+instead of retrying. The server checks files, review states and blocking
+requirements only: your content, layout and consistency checks come first.
+Ready is a stored step, not a stage. The application stays Draft; job interest
+stays saved. The owner finds it under **Ready to apply**, submits on the company
+site and records Applied. Openings clears the mark when a revision, context, file
+or blocking requirement changes afterwards; after such rework, repeat the checks
+and mark it ready again. Do not mark a Draft ready while a question about it is
+open or its inputs are stale in a way that matters.
 
 If a tool, source, upload or check fails, keep the actual Draft incomplete.
 Record the precise failed step and continue independent jobs where possible.
