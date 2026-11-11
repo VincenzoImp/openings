@@ -64,6 +64,7 @@ import {
   Tabs,
   PendingResults,
 } from "../ui";
+import { SegmentedControl } from "../design";
 const stages: Stage[] = ["draft", "applied", "interview", "offer", "closed"];
 const priorityLabels: Record<number, string> = {
   1: "P1 · Highest",
@@ -349,23 +350,20 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
         title="Applications"
         description="Track application attempts, documents and recorded progress."
       >
-        <div className="segmented" aria-label="Application view">
-          {["board", "list"].map((view) => (
-            <Button
-              key={view}
-              variant={filters.view === view ? "selected" : ""}
-              icon={view === "board" ? "board" : "list"}
-              onClick={() => {
-                setFilters({ view });
-                try {
-                  localStorage.setItem("openings-application-view", view);
-                } catch {}
-              }}
-            >
-              {view === "board" ? "Board" : "List"}
-            </Button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Application view"
+          value={filters.view}
+          options={[
+            { id: "board", label: "Board", icon: "board" },
+            { id: "list", label: "List", icon: "list" },
+          ]}
+          onChange={(view) => {
+            setFilters({ view });
+            try {
+              localStorage.setItem("openings-application-view", view);
+            } catch {}
+          }}
+        />
       </Heading>
       <div className="toolbar application-filters">
         <div className="search">

@@ -9,6 +9,7 @@ import {
 } from "react";
 import { ApiError, api, copyText, type ListResult } from "./api";
 import { createPortal } from "react-dom";
+import { Toast } from "./design/Toast";
 interface Store {
   revision: number;
   refresh: () => void;
@@ -278,15 +279,12 @@ export function useEditorRecord<T extends { version?: number }>(
 export function Notification({ inDialog = false }: { inDialog?: boolean }) {
   const { toast, dismiss } = useWorkspace();
   return toast ? (
-    <div
-      className={`app-toast ${inDialog ? "dialog-toast" : ""} ${toast.error ? "error" : ""}`}
-      role={toast.error ? "alert" : "status"}
-    >
-      {toast.message}
-      <button aria-label="Dismiss notification" onClick={dismiss}>
-        ×
-      </button>
-    </div>
+    <Toast
+      message={toast.message}
+      error={toast.error}
+      inDialog={inDialog}
+      onDismiss={dismiss}
+    />
   ) : null;
 }
 export function useWorkspace() {
