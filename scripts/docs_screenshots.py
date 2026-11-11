@@ -76,14 +76,26 @@ This is a fictional posting created for the Openings documentation."""
 
 
 class Seeder:
+    """Seeds as the agent (API token); `owner` is the dashboard session for the owner's part."""
+
     def __init__(self, base, token):
         self.http = httpx.Client(
             base_url=base + "/api/v1", headers={"Authorization": f"Bearer {token}"}, timeout=30
         )
+        self.session = httpx.Client(base_url=base + "/api/v1", timeout=30)
+        login = self.session.post("/auth/login", json={"password": PASSWORD})
+        self.session.headers["X-CSRF-Token"] = login.json()["csrf_token"]
         self.base = base
 
     def call(self, method, path, **kwargs):
-        response = self.http.request(method, path, **kwargs)
+        return self._request(self.http, method, path, **kwargs)
+
+    def owner(self, method, path, **kwargs):
+        return self._request(self.session, method, path, **kwargs)
+
+    @staticmethod
+    def _request(client, method, path, **kwargs):
+        response = client.request(method, path, **kwargs)
         if response.status_code >= 400:
             raise RuntimeError(f"{method} {path}: {response.status_code} {response.text}")
         return response.json() if response.content else None
@@ -123,7 +135,8 @@ class Seeder:
         return app
 
     def patch_application(self, app, **fields):
-        return self.call(
+        # The owner applies and records each stage.
+        return self.owner(
             "PATCH",
             f"/applications/{app['id']}",
             json={"expected_version": app["version"], **fields},
@@ -465,8 +478,6 @@ def seed(s: Seeder):
             {"kind": "deadline", "text": "Applications close on the stated date."},
         ],
     )
-    del lumen
-
     s.application(
         s.job("Data Platform Engineer", "Fjord Analytics", "Remote, Europe", "linkedin"),
         priority=3,
@@ -523,7 +534,122 @@ def seed(s: Seeder):
         outcome="not_pursued",
     )
 
-    s.call("POST", "/tokens", json={"name": "Agent on laptop"})
+    activity(s, lumen, cedar)
+
+
+def activity(s: Seeder, lumen, cedar):
+    """Two agent runs with their changes, a stored report and questions for the owner."""
+    review = s.call(
+        "POST",
+        "/runs",
+        json={
+            "workflow": "review-inbox",
+            "scope": "Routine Inbox review: every unreviewed job collected this week.",
+        },
+    )
+    kept = s.job("Senior Backend Engineer", "Tidewater Energy", "Bern, Switzerland", "greenhouse")
+    s.triage(kept, "saved")
+    dropped = s.job("Sales Engineer", "Harbor Studio", "Geneva, Switzerland", "linkedin")
+    s.triage(dropped, "dismissed")
+    unclear = s.job("Staff Engineer", "Kestrel Robotics", "Zurich, Switzerland", "greenhouse")
+    s.call(
+        "POST",
+        f"/jobs/{kept['id']}/notes",
+        json={"body": "Matches the backend and data platform roles in the Profile."},
+    )
+    s.call(
+        "POST",
+        "/questions",
+        json={
+            "question": "Is working from Bern three days a week acceptable?",
+            "why": "Tidewater Energy asks for three office days. The Profile names Zurich, "
+            "Basel or remote, so the job stays on the Shortlist without a Draft until you decide.",
+            "subject_type": "job",
+            "subject_id": kept["id"],
+            "choices": ["Yes", "No", "Only for the first six months"],
+        },
+    )
+    letter = s.call(
+        "POST",
+        "/questions",
+        json={
+            "question": "Do you want to write the Lumen Health letter yourself?",
+            "why": "The employer accepts only applications written without AI writing tools.",
+            "subject_type": "application",
+            "subject_id": lumen["id"],
+            "choices": ["Yes, I will write it", "No, close this application"],
+        },
+    )
+    s.call(
+        "POST",
+        f"/runs/{review['id']}/finish",
+        json={
+            "expected_version": review["version"],
+            "summary": "Reviewed three new jobs: one shortlisted, one dismissed, one left "
+            "in the Inbox. Two questions need your answer.",
+            "changes": "Shortlisted Senior Backend Engineer at Tidewater Energy and dismissed "
+            "Sales Engineer at Harbor Studio (a sales role, outside the Profile).",
+            "not_done": [
+                {
+                    "item": "Staff Engineer at Kestrel Robotics",
+                    "reason": "The posting does not say whether the role includes on-call "
+                    "duty; it stays in the Inbox.",
+                    "subject_type": "job",
+                    "subject_id": unclear["id"],
+                }
+            ],
+            "checks": [
+                {"check": "Final Inbox query re-read after the last decision."},
+                {"check": "Each decision compared with the full posting text."},
+                {"check": "Salary range for Tidewater Energy", "verified": False},
+            ],
+            "limits": "No application was submitted, no employer was contacted and no "
+            "application was marked Applied.",
+            "method": "The posting text has no structured on-call field, so that criterion "
+            "needs a manual read of every posting.",
+        },
+    )
+    s.owner(
+        "POST",
+        f"/questions/{letter['id']}/answer",
+        json={
+            "expected_version": letter["version"],
+            "choice": "Yes, I will write it",
+            "answer": "I will send it before the deadline.",
+        },
+    )
+    drafts = s.call(
+        "POST",
+        "/runs",
+        json={
+            "workflow": "prepare-shortlist",
+            "scope": "Drafts for the two Shortlist jobs without an application.",
+        },
+    )
+    s.call(
+        "POST",
+        f"/jobs/{cedar['job_id']}/notes",
+        json={
+            "body": "The CV still needs its PDF; the letter follows once the CV is approved.",
+            "application_id": cedar["id"],
+        },
+    )
+    s.call(
+        "POST",
+        "/questions",
+        json={
+            "question": "Which notice period should applications state?",
+            "why": "Two application forms ask for the earliest start date.",
+        },
+    )
+    s.call(
+        "PATCH",
+        f"/runs/{drafts['id']}",
+        json={
+            "expected_version": drafts["version"],
+            "note": "First Draft prepared; the second waits for the notice period.",
+        },
+    )
 
 
 def free_port(preferred):
@@ -547,7 +673,7 @@ def main():
     try:
         app = create_app(directory / "workspace.sqlite", start_worker=False)
         app.state.auth.setup(PASSWORD)
-        token = app.state.auth.create_token("Screenshot seeding")["token"]
+        token = app.state.auth.create_token("Agent on laptop")["token"]
         port = free_port(args.port)
         base = f"http://127.0.0.1:{port}"
         server = uvicorn.Server(
@@ -563,10 +689,6 @@ def main():
                 time.sleep(0.1)
         seeder = Seeder(base, token)
         seed(seeder)
-        current = seeder.call("GET", "/tokens")
-        for item in current.get("items", []):
-            if item["name"] == "Screenshot seeding":
-                seeder.call("DELETE", f"/tokens/{item['id']}")
         print(f"Synthetic workspace at {base} (password: {PASSWORD})")
         if args.keep_running:
             thread.join()

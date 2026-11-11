@@ -36,6 +36,31 @@
     },
     "applications.update": {
       "note": "Answers have one control per question; raw JSON is the advanced fallback."
+    },
+    "runs.start": {
+      "note": "Runs belong to API tokens: a dashboard session has no runs. Activity shows runs, their reports and their changes read-only."
+    },
+    "runs.update": {
+      "note": "Runs belong to API tokens: a dashboard session has no runs."
+    },
+    "runs.finish": {
+      "note": "Runs belong to API tokens: a dashboard session has no runs."
+    },
+    "events.list": {
+      "note": "Activity filters changes by who made them and by run; the other filters serve agents and scripts."
+    },
+    "runs.list": {
+      "note": "Activity filters runs by status only."
+    },
+    "questions.list": {
+      "note": "Activity filters questions by state; `answered_since` and the subject filters serve the agent's next run."
+    },
+    "questions.ask": {
+      "note": "Agents ask questions for the owner; the dashboard answers and withdraws them."
+    },
+    "questions.read": {
+      "via": ["questions.list"],
+      "note": "Activity renders questions from the list, which returns complete records."
     }
   }
 }

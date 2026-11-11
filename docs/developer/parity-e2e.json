@@ -6,6 +6,7 @@
       "live file and note deletion identify the item before removal"
     ],
     "GET /api/v1/applications": [
+      "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
       "document upload, revision ownership and safe file preview",
@@ -14,18 +15,22 @@
       "question edits preserve compatible work and require deliberate incompatible removal"
     ],
     "GET /api/v1/applications/{}": [
+      "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
       "document upload, revision ownership and safe file preview",
       "question edits preserve compatible work and require deliberate incompatible removal"
     ],
     "GET /api/v1/applications/{}/events": [
+      "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
       "document upload, revision ownership and safe file preview",
       "question edits preserve compatible work and require deliberate incompatible removal"
     ],
     "GET /api/v1/auth/session": [
+      "an agent run, its report and its changes are readable",
+      "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
       "document upload, revision ownership and safe file preview",
@@ -37,6 +42,7 @@
       "question edits preserve compatible work and require deliberate incompatible removal",
       "queue count, posting hierarchy and query-safe selection",
       "records export downloads valid JSON with undated career entries",
+      "the owner answers an agent's question and the agent can read the answer",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/career/claims": [
@@ -54,6 +60,8 @@
       "independent career, source and provider editors recover their own concurrent versions"
     ],
     "GET /api/v1/career/profile": [
+      "an agent run, its report and its changes are readable",
+      "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
       "document upload, revision ownership and safe file preview",
@@ -65,18 +73,21 @@
       "question edits preserve compatible work and require deliberate incompatible removal",
       "queue count, posting hierarchy and query-safe selection",
       "records export downloads valid JSON with undated career entries",
+      "the owner answers an agent's question and the agent can read the answer",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/collection": [
       "independent career, source and provider editors recover their own concurrent versions"
     ],
     "GET /api/v1/contexts": [
+      "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
       "document upload, revision ownership and safe file preview",
       "question edits preserve compatible work and require deliberate incompatible removal"
     ],
     "GET /api/v1/documents": [
+      "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
       "document upload, revision ownership and safe file preview",
@@ -87,6 +98,9 @@
     ],
     "GET /api/v1/documents/{}/consistency": [
       "document upload, revision ownership and safe file preview"
+    ],
+    "GET /api/v1/events": [
+      "an agent run, its report and its changes are readable"
     ],
     "GET /api/v1/export": [
       "records export downloads valid JSON with undated career entries"
@@ -102,6 +116,8 @@
       "mobile applications, templates and funnel stay usable inside the viewport"
     ],
     "GET /api/v1/jobs": [
+      "an agent run, its report and its changes are readable",
+      "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
       "document upload, revision ownership and safe file preview",
@@ -113,32 +129,65 @@
       "question edits preserve compatible work and require deliberate incompatible removal",
       "queue count, posting hierarchy and query-safe selection",
       "records export downloads valid JSON with undated career entries",
+      "the owner answers an agent's question and the agent can read the answer",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/jobs/{}": [
+      "an agent run, its report and its changes are readable",
       "live file and note deletion identify the item before removal",
       "queue count, posting hierarchy and query-safe selection",
+      "the owner answers an agent's question and the agent can read the answer",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/jobs/{}/notes": [
+      "an agent run, its report and its changes are readable",
       "live file and note deletion identify the item before removal",
       "queue count, posting hierarchy and query-safe selection",
+      "the owner answers an agent's question and the agent can read the answer",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/overview": [
+      "an agent run, its report and its changes are readable",
+      "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
       "document upload, revision ownership and safe file preview",
+      "import protection and nested dialogs restore scroll after browser Back",
       "independent career, source and provider editors recover their own concurrent versions",
       "live file and note deletion identify the item before removal",
       "mobile applications, templates and funnel stay usable inside the viewport",
       "mobile navigation contains focus and releases the background on close and resize",
       "question edits preserve compatible work and require deliberate incompatible removal",
       "queue count, posting hierarchy and query-safe selection",
+      "records export downloads valid JSON with undated career entries",
+      "the owner answers an agent's question and the agent can read the answer",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/providers": [
       "independent career, source and provider editors recover their own concurrent versions"
+    ],
+    "GET /api/v1/questions": [
+      "an agent run, its report and its changes are readable",
+      "application history shows who made each change",
+      "application plan, blocking requirements and a stale button action recover",
+      "context selection follows evidence and supports deliberate empty selections",
+      "document upload, revision ownership and safe file preview",
+      "import protection and nested dialogs restore scroll after browser Back",
+      "independent career, source and provider editors recover their own concurrent versions",
+      "live file and note deletion identify the item before removal",
+      "mobile applications, templates and funnel stay usable inside the viewport",
+      "mobile navigation contains focus and releases the background on close and resize",
+      "question edits preserve compatible work and require deliberate incompatible removal",
+      "queue count, posting hierarchy and query-safe selection",
+      "records export downloads valid JSON with undated career entries",
+      "the owner answers an agent's question and the agent can read the answer",
+      "version conflict reviews latest values and reloads the editor with a usable version"
+    ],
+    "GET /api/v1/runs": [
+      "an agent run, its report and its changes are readable"
+    ],
+    "GET /api/v1/runs/{}": [
+      "an agent run, its report and its changes are readable"
     ],
     "GET /api/v1/sources": [
       "independent career, source and provider editors recover their own concurrent versions"
@@ -150,6 +199,7 @@
       "independent career, source and provider editors recover their own concurrent versions"
     ],
     "GET /api/v1/templates": [
+      "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
       "document upload, revision ownership and safe file preview",
@@ -196,6 +246,9 @@
     ],
     "POST /api/v1/jobs/{}/notes": [
       "live file and note deletion identify the item before removal"
+    ],
+    "POST /api/v1/questions/{}/answer": [
+      "the owner answers an agent's question and the agent can read the answer"
     ],
     "PUT /api/v1/transfers": [
       "document upload, revision ownership and safe file preview",
