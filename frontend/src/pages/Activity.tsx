@@ -1,5 +1,6 @@
 import { type FormEvent, type ReactNode } from "react";
 import {
+  actorLabel,
   api,
   formatTime,
   type Activity,
@@ -9,6 +10,14 @@ import {
   type RunStatus,
 } from "../api";
 import { useResource, useUrlState, useWorkspace } from "../state";
+import { readyReason } from "./ApplicationReady";
+import {
+  RecordLink,
+  subjectNames,
+  type Links,
+  type Open,
+} from "./ActivityLinks";
+import { Requests, RunRequests } from "./Requests";
 import {
   Button,
   Empty,
@@ -25,50 +34,10 @@ import {
 
 const PAGE = 30;
 const empty = { items: [], total: 0 };
-type Open = (id: string) => void;
-interface Links {
-  onOpenJob: Open;
-  onOpenApplication: Open;
-}
 const runStatus: Record<RunStatus, { label: string; tone: string }> = {
   open: { label: "Open", tone: "green" },
   finished: { label: "Finished", tone: "neutral" },
   interrupted: { label: "Interrupted", tone: "amber" },
-};
-const subjectNames: Record<string, string> = {
-  job: "Job",
-  application: "Application",
-  knowledge: "Career entry",
-  claim: "Claim",
-  template: "Template",
-  source: "Source",
-  collection_run: "Collection run",
-  collection: "Collection settings",
-  provider: "Provider",
-  task: "Collection task",
-  profile: "Profile",
-  instructions: "Instructions",
-  note: "Note",
-  context: "Context",
-  document: "Document",
-  file: "File",
-  question: "Question",
-  token: "API token",
-  workspace: "Workspace",
-};
-const sections: Record<string, string> = {
-  knowledge: "#career?section=knowledge",
-  claim: "#career?section=claims",
-  profile: "#career",
-  template: "#templates?section=templates",
-  instructions: "#templates",
-  source: "#collection",
-  collection: "#collection",
-  collection_run: "#collection",
-  provider: "#collection",
-  task: "#collection",
-  token: "#settings?section=agents",
-  workspace: "#settings",
 };
 export function changeLabel(kind?: string) {
   const text = (kind || "updated").replaceAll("_", " ");
@@ -82,52 +51,8 @@ function changeDetail(event: Activity) {
     return `${payload.from ? stage(payload.from) + " → " : ""}${stage(payload.to)}`;
   if (Array.isArray(payload.fields) && payload.fields.length)
     return "Fields: " + payload.fields.join(", ").replaceAll("_", " ");
+  if (event.kind === "application_ready_cleared") return readyReason(payload);
   return "";
-}
-function RecordLink({
-  type,
-  id,
-  jobId,
-  applicationId,
-  label,
-  onOpenJob,
-  onOpenApplication,
-}: Links & {
-  type?: string | null;
-  id?: string | null;
-  jobId?: string | null;
-  applicationId?: string | null;
-  label?: string;
-}) {
-  const name = subjectNames[type || ""] || "Record";
-  const text = label ? `${name}: ${label}` : name;
-  if (applicationId)
-    return (
-      <button
-        type="button"
-        className="inline-link"
-        onClick={() => onOpenApplication(applicationId)}
-      >
-        {text}
-      </button>
-    );
-  if (jobId)
-    return (
-      <button
-        type="button"
-        className="inline-link"
-        onClick={() => onOpenJob(jobId)}
-      >
-        {text}
-      </button>
-    );
-  if (id && sections[type || ""])
-    return (
-      <a className="inline-link" href={sections[type || ""]}>
-        {text}
-      </a>
-    );
-  return <span>{type ? text : ""}</span>;
 }
 function Changes({
   items,
@@ -164,7 +89,7 @@ function Changes({
               )}
             </p>
             <time>
-              {formatTime(event.created_at)} · {event.actor?.label}
+              {formatTime(event.created_at)} · {actorLabel(event.actor)}
               {event.run_id && onRun && (
                 <>
                   {" · "}
@@ -187,7 +112,8 @@ function Changes({
 function Asked({ question, onRun }: { question: OwnerQuestion; onRun: Open }) {
   return (
     <p className="muted smalltext">
-      Asked by {question.asked_by.label} · {formatTime(question.created_at)}
+      Asked by {actorLabel(question.asked_by)} ·{" "}
+      {formatTime(question.created_at)}
       {question.run_id && (
         <>
           {" · "}
@@ -319,7 +245,7 @@ function QuestionCard({
                   .join(" · ")}
               </strong>
               <br />
-              Answered by {question.answered_by?.label} ·{" "}
+              Answered by {actorLabel(question.answered_by)} ·{" "}
               {formatTime(question.answered_at || undefined)}
             </div>
           </div>
@@ -331,7 +257,7 @@ function QuestionCard({
       )}
       {question.state === "withdrawn" && (
         <p className="muted">
-          Withdrawn by {question.withdrawn_by?.label} ·{" "}
+          Withdrawn by {actorLabel(question.withdrawn_by)} ·{" "}
           {formatTime(question.withdrawn_at || undefined)}
         </p>
       )}
@@ -460,11 +386,14 @@ function Runs({ onRun }: { onRun: Open }) {
               <span className="run-row-meta">
                 <RunStatusTag run={run} />
                 <span className="muted smalltext">
-                  {run.actor.label} · {formatTime(run.started_at)} ·{" "}
+                  {actorLabel(run.actor)} · {formatTime(run.started_at)} ·{" "}
                   {run.changes_total}{" "}
                   {run.changes_total === 1 ? "change" : "changes"}
                   {run.questions_count
                     ? ` · ${run.questions_count} ${run.questions_count === 1 ? "question" : "questions"}`
+                    : ""}
+                  {run.requests_count
+                    ? ` · ${run.requests_count} ${run.requests_count === 1 ? "request" : "requests"}`
                     : ""}
                 </span>
               </span>
@@ -539,7 +468,8 @@ function RunDetail({
                 <div>
                   <h2>{run.workflow}</h2>
                   <p className="muted">
-                    {run.actor.label} · started {formatTime(run.started_at)}
+                    {actorLabel(run.actor)} · started{" "}
+                    {formatTime(run.started_at)}
                     {run.ended_at
                       ? ` · ended ${formatTime(run.ended_at)}`
                       : ` · last activity ${formatTime(run.last_activity_at)}`}
@@ -691,6 +621,9 @@ function RunDetail({
                   </button>
                 )}
               </ReportSection>
+              <ReportSection title="Requests handled">
+                <RunRequests items={run.requests} />
+              </ReportSection>
             </section>
             <section className="card sectioncard">
               <div className="sectiontitle">
@@ -809,7 +742,7 @@ export default function ActivityPage({
     <>
       <Heading
         title="Activity"
-        description="Answer your agent's questions and review what each run changed."
+        description="Answer your agent's questions, tell it what to do next and review what each run changed."
       />
       <Tabs
         label="Activity sections"
@@ -817,6 +750,7 @@ export default function ActivityPage({
         onChange={(next) => show(next)}
         items={[
           { id: "questions", label: "Questions", count: openQuestions },
+          { id: "requests", label: "Requests" },
           { id: "runs", label: "Runs" },
           { id: "changes", label: "Changes" },
         ]}
@@ -835,6 +769,8 @@ export default function ActivityPage({
         )
       ) : section === "changes" ? (
         <AllChanges onRun={onRun} {...links} />
+      ) : section === "requests" ? (
+        <Requests onRun={onRun} {...links} />
       ) : (
         <Questions onRun={onRun} {...links} />
       )}

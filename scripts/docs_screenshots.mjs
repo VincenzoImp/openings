@@ -117,6 +117,10 @@ await open(
 await dialog().waitFor();
 await shot("requirements");
 
+await open(`applications?application=${await applicationId("Orbit Works")}`);
+await dialog().getByRole("region", { name: "Ready to apply" }).waitFor();
+await shot("application-ready");
+
 await open("collection");
 await shot("collection");
 await page.getByRole("button", { name: "Edit settings" }).first().click();
@@ -128,10 +132,18 @@ await shot("career");
 
 await open("settings?section=agents");
 await shot("agent-access");
+await page
+  .getByRole("heading", { name: "Access tokens." })
+  .scrollIntoViewIfNeeded();
+await shot("access-tokens");
 
 await open("activity");
 await page.getByRole("heading", { name: "Activity", exact: true }).waitFor();
 await shot("activity-questions");
+
+await open("activity?section=requests");
+await page.getByRole("article").first().waitFor();
+await shot("activity-requests");
 
 await open("activity?section=runs");
 await page.getByRole("button", { name: /review-inbox/ }).click();

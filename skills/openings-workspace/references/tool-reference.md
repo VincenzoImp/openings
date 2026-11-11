@@ -96,13 +96,46 @@ attempt preserves its job and other attempts; `application_delete` requires
 returns a saved job to Shortlist; only use this deliberately.
 `applications_bulk` applies one action to at most 200 explicit
 `{id, expected_version}` items: `close` with `outcome`, `reopen` with a non-Closed
-`status`, or `delete`. Each item reports `ok` with a result or an error (code,
+`status`, `mark_ready`, `unmark_ready` or `delete`. Each item reports `ok` with a result or an error (code,
 status, message, details); reopening respects the one-open-attempt rule and only
 applies to Closed attempts. Bulk forget and delete collect orphaned file bytes once
 per call. To stop preparation
 and preserve its documents, close it with `not_pursued`. Restore known workaround
 dismissals explicitly to `saved`, using current versions: they remain in Applications
 when they have attempts and do not re-enter Inbox.
+
+## Ready
+
+`application_ready(application_id, value)` takes the application's current
+`expected_version` and `ready` (default true). Marking needs a Preparing
+application whose derived checks pass; otherwise it returns
+`409 application_not_ready` with `details.check`: `stage` (not Preparing),
+`blocked`, `none`, `missing_pdf` or `unreviewed`. The application then reports
+`readiness: "ready"`, `ready_at` and `ready_by`; marking twice changes nothing,
+and `ready: false` clears the mark. Openings clears it automatically and records
+an `application_ready_cleared` event with `reason`: `document_created`,
+`document_deleted`, `context_prepared`, `file_uploaded`, `blocking_requirement`
+or `left_preparing` (`unmarked` for an explicit clear). Every clearing changes
+the application `version`: read it again before the next update.
+`applications_list` reads the queue with `readiness: "ready"`, `sort: "ready"`,
+`ready_since` and `ready_until`, and returns `ready_count`.
+
+## Requests for the agent
+
+`requests_list` filters by `state` (`open`, `taken`, `done`, `declined`,
+`withdrawn`), `subject_type`/`subject_id`, `run_id` and `updated_since` (written
+or changed at or after a time, oldest first). Each request has `text`, an
+optional `subject` shaped like a question's, `created_by`, `taken_by`, `run_id`
+(the run that handled it), `result` and `resolved_by`. `requests_take` moves an
+open request to `taken` for the calling token and records its open run;
+`409 request_taken` names the run of another taker. `requests_complete` takes
+`result` and `requests_decline` takes `reason`; both work on an open or taken
+request, need its current `expected_version` and an API token
+(`403 request_actor` for a dashboard session). `requests_create` (`text`,
+optional subject, `idempotency_key`) and `requests_withdraw` need owner
+authority: an agent token gets `403 forbidden`. A finished or withdrawn request
+returns `409 request_closed`. A request outlives its subject like a question
+does, and `runs_get` lists the requests a run handled.
 
 ## Runs, questions and the change log
 
@@ -123,15 +156,17 @@ reported as `interrupted`; it stays open, and a later write revives it.
 `idempotency_key`. `questions_list` filters by `state` (`open`, `answered`,
 `withdrawn`), subject, `run_id` and `answered_since`, which returns answers
 given at or after a time, oldest first. `questions_answer` and
-`questions_withdraw` take the question's current `expected_version`. A question
+`questions_withdraw` take the question's current `expected_version`;
+`questions_answer` needs owner authority and returns `403 forbidden` to an agent
+token. A question
 outlives its subject: after the job, application or entry is deleted,
 `subject.id` is null, `subject.deleted` is true and `subject.label` keeps the
 name.
 
 `events_list` reads the change log, newest first, by `run_id`, `job_id`,
 `application_id`, `subject_type`/`subject_id`, `actor` (`owner`, `token`,
-`system`, `unknown`), `kind` or time. Every entry carries `actor`, `run_id` and
-`subject`; `application_history` returns the same fields. Changes recorded
+`system`, `unknown`), `kind` or time. Every entry carries `actor` (for a token,
+with `token_kind` `owner` or `agent`), `run_id` and `subject`; `application_history` returns the same fields. Changes recorded
 before version 0.17 have the actor `unknown (before 0.17)`. Payloads hold
 identifiers, changed field names and versions, never record content. Deleting an
 application or forgetting a job removes that record's own history and leaves one
@@ -147,5 +182,10 @@ values. Career dates also accept null to clear them.
 `workspace_export` returns readable JSON without file bytes. Scoped
 `workspace_backup` and `workspace_restore_upload` move a portable SQLite snapshot
 when requested. Restore replaces workspace data while retaining destination
-authentication, recent provider request history and later cooldowns. Keep transfer
+authentication, recent provider request history and later cooldowns.
+`workspace_restore_upload`, `tokens_list`, `token_create`, `token_revoke`,
+`owner_password_update`, `requests_create` and `requests_withdraw` need owner authority: an agent token gets
+`403 forbidden`. A backup downloaded with an agent token omits the owner
+password hash, the session secret and the API tokens, and still restores
+completely. Keep transfer
 headers, credentials and personal data out of logs and repository examples.

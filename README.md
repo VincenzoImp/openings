@@ -28,8 +28,11 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   cover letter and form answers were written from, with PDF/source revisions and review.
 - **Plan:** give applications a priority, a deadline and the employer's requirements
   (authorship rules, attachments, references, language, eligibility). Filter by
-  readiness (blocked, no documents, missing PDF, needs review, ready) and sort by
-  deadline or priority. Close, reopen or delete applications in bulk.
+  readiness (blocked, no documents, missing PDF, needs review, reviewed, ready) and
+  sort by deadline or priority. Close, reopen or delete applications in bulk.
+- **Hand over:** an application is marked **Ready** once its documents are approved
+  and nothing blocks it. Ready to apply is your queue, and a later change to the
+  documents clears the mark.
 - **Stay consistent:** applications built on older inputs are flagged after Profile,
   template or Career changes, and review checks a document's content against its
   `.tex` source.
@@ -37,6 +40,9 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   Closed with recorded outcomes, history and a progress funnel.
 - **See what the agent did:** every change records who made it. An agent works in
   runs with a stored report, and asks you questions that you answer under **Activity**.
+- **Tell the agent what to do next:** write a request under **Activity**, or
+  **Ask your agent** on a job or an application. The agent picks it up at its next
+  run and reports the result.
 - **Automate:** the dashboard, REST API and MCP share one service layer and the same
   operations.
 
@@ -78,8 +84,9 @@ access, storage and upgrades.
 
 ## Connect an agent
 
-1. In **Settings → Agent access**, create an API token and copy the configuration
-   for Claude Code, Codex or another MCP client. The endpoint is
+1. In **Settings → Agent access**, create an agent token and copy the configuration
+   for Claude Code, Codex or another MCP client. An agent token cannot change
+   your password, manage tokens or restore a backup. The endpoint is
    `http://127.0.0.1:8080/mcp` with `Authorization: Bearer <token>`.
 2. Ask the agent to load the `setup-openings` skill to onboard your career,
    templates and first searches.

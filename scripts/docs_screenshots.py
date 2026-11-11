@@ -534,10 +534,10 @@ def seed(s: Seeder):
         outcome="not_pursued",
     )
 
-    activity(s, lumen, cedar)
+    activity(s, lumen, cedar, orbit)
 
 
-def activity(s: Seeder, lumen, cedar):
+def activity(s: Seeder, lumen, cedar, orbit):
     """Two agent runs with their changes, a stored report and questions for the owner."""
     review = s.call(
         "POST",
@@ -642,6 +642,36 @@ def activity(s: Seeder, lumen, cedar):
             "why": "Two application forms ask for the earliest start date.",
         },
     )
+    # The owner's requests: the agent handles one in this run, one still waits.
+    asked = s.owner(
+        "POST",
+        "/requests",
+        json={
+            "text": "Check whether the Orbit Works documents still fit after the template change.",
+            "subject_type": "application",
+            "subject_id": orbit["id"],
+        },
+    )
+    s.owner("POST", "/requests", json={"text": "Do not prepare roles at consultancies."})
+    taken = s.call(
+        "POST", f"/requests/{asked['id']}/take", json={"expected_version": asked["version"]}
+    )
+    s.call(
+        "POST",
+        f"/requests/{taken['id']}/complete",
+        json={
+            "expected_version": taken["version"],
+            "result": "The CV and letter still match the role; only the page limit changed in "
+            "the template. Marked the Draft ready to apply.",
+        },
+    )
+    # The agent hands a complete Draft to the owner: both documents approved, no blocker.
+    current = s.call("GET", f"/applications/{orbit['id']}")
+    s.call(
+        "POST",
+        f"/applications/{orbit['id']}/ready",
+        json={"expected_version": current["version"]},
+    )
     s.call(
         "PATCH",
         f"/runs/{drafts['id']}",
@@ -673,7 +703,8 @@ def main():
     try:
         app = create_app(directory / "workspace.sqlite", start_worker=False)
         app.state.auth.setup(PASSWORD)
-        token = app.state.auth.create_token("Agent on laptop")["token"]
+        app.state.auth.create_token("Backup script")  # an owner token, for the token list
+        token = app.state.auth.create_token("Agent on laptop", "agent")["token"]
         port = free_port(args.port)
         base = f"http://127.0.0.1:{port}"
         server = uvicorn.Server(

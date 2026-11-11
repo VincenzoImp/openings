@@ -14,7 +14,7 @@ from urllib.parse import quote
 from fastapi import Request
 from pydantic import Field, field_validator
 
-from .actors import current_actor, from_columns
+from .actors import acting_as, current_actor, from_columns
 from .career import DEFAULT_GUIDANCE, DEFAULT_PROFILE, Input, _get, _page, _setting
 from .common import decode_record, encode, new_id, now
 from .consistency import compare as compare_content, is_tex_source
@@ -294,6 +294,7 @@ class DocumentService:
                 conn,
                 subject=("context", context_id),
             )
+            self.workspace.clear_ready(conn, value.application_id, "context_prepared")
         return self.get_context(context_id)
 
     def _context_record(self, row):
@@ -518,6 +519,7 @@ class DocumentService:
                     conn,
                     subject=("document", document_id),
                 )
+                self.workspace.clear_ready(conn, value.application_id, "document_created")
         return self.get_document(document_id)
 
     def _document_records(self, rows, *, summary=False):
@@ -758,6 +760,7 @@ class DocumentService:
                     conn,
                     subject=("document", document_id),
                 )
+                self.workspace.clear_ready(conn, document["application_id"], "document_deleted")
         self.db.collect_blobs()
         return {"deleted": True, "id": document_id}
 
@@ -976,6 +979,7 @@ class DocumentService:
                     conn.execute(
                         "UPDATE documents SET version=version+1 WHERE id=?", (current["owner_id"],)
                     )
+                uploader = from_columns(*(current.get("actor") or ()))
                 self._file_event(
                     conn,
                     "file_uploaded",
@@ -983,8 +987,10 @@ class DocumentService:
                     current["owner_type"],
                     current["owner_id"],
                     current.get("job_id"),
-                    from_columns(*(current.get("actor") or (None, None, None))),
+                    uploader,
                 )
+                if current["owner_type"] == "document":
+                    self._clear_ready_for_file(conn, current["owner_id"], uploader)
             current["file_id"] = file_id
             conn.execute(
                 "UPDATE transfer_grants SET used=1,payload=? WHERE token_hash=?",
@@ -992,6 +998,17 @@ class DocumentService:
             )
             result = _get(conn, "files", file_id, "File")
         return self._file_record(result)
+
+    def _clear_ready_for_file(self, conn, document_id, actor):
+        """A file added to a current revision changes what Ready was judged on."""
+        row = conn.execute(
+            "SELECT application_id FROM documents d WHERE d.id=? AND NOT EXISTS("
+            "SELECT 1 FROM documents child WHERE child.previous_id=d.id)",
+            (document_id,),
+        ).fetchone()
+        if row:
+            with acting_as(actor):
+                self.workspace.clear_ready(conn, row["application_id"], "file_uploaded")
 
     def _file_event(self, conn, kind, file_id, owner_type, owner_id, job_id, actor=None):
         application_id = None

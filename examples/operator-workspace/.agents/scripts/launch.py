@@ -7,7 +7,8 @@ Example: python3 .agents/scripts/launch.py codex
 Sets OPENINGS_URL from .agents/mcp.json, points each runtime's CA variable at
 OPENINGS_CA_FILE (or certs/openings-ca.pem when present) for a private CA, asks
 for OPENINGS_TOKEN when the environment lacks it, and checks the token against
-Openings before starting the client. A rejected token is asked for again.
+Openings before starting the client. A rejected token is asked for again, and
+an owner token is accepted with a note that an agent token is enough.
 The token stays in the client's process environment and is never written.
 """
 from pathlib import Path
@@ -42,7 +43,14 @@ def accepted(token):
     """Return True or False for the server's answer, None if it cannot be reached."""
     request = urllib.request.Request(workspace, headers={'Authorization': f'Bearer {token}'})
     try:
-        with urllib.request.urlopen(request, timeout=10, context=context):
+        with urllib.request.urlopen(request, timeout=10, context=context) as response:
+            try:
+                kind = json.load(response).get('actor', {}).get('token_kind')
+            except ValueError:
+                kind = None
+            if kind == 'owner':
+                print('This is an owner token with full access. An agent token '
+                      '(Settings → Agent access) is enough for an agent.', file=sys.stderr)
             return True
     except urllib.error.HTTPError as error:
         if error.code in (401, 403):
