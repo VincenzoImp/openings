@@ -20,10 +20,12 @@ flowchart LR
 | Location | Responsibility |
 |---|---|
 | `backend/openings/workspace.py` | Job identities, triage, notes, application attempts and reporting |
+| `backend/openings/duplicates.py`, `duplicate_signals.py` | Read-only duplicate candidates: per-job signals, pair confidence and groups |
 | `backend/openings/career.py` | Profile, detailed evidence, claims, templates and instructions |
 | `backend/openings/documents.py` | Frozen contexts, document revisions and scoped file transfers |
 | `backend/openings/snapshots.py`, `compaction.py` | Content-addressed storage of frozen contexts; giving freed pages back to the data volume |
 | `backend/openings/activity.py`, `actors.py` | Actor of each change, agent runs with reports, questions for the owner, change log |
+| `backend/openings/agent_requests.py`, `subjects.py` | Requests for the agent; the subject reference shared with questions |
 | `backend/openings/discovery.py` | Typed sources, schedules and queue operations |
 | `backend/openings/collectors` | Adapter capability catalog, typed options and shared HTTP policy/runtime |
 | `backend/openings/worker.py` | Independent scheduling and acquisition lanes |
@@ -44,7 +46,11 @@ dashboard path, and lists every gap. Read [REST](../user/api.md) and
 
 - **Identity:** normalized URLs and stable external keys resolve through retained
   aliases. Conflicting identities require explicit Merge; title/company similarity
-  alone never merges jobs. Dismissal survives URL changes.
+  alone never merges jobs. Dismissal survives URL changes. Duplicate candidates
+  are a separate, read-only suggestion: deterministic signals (requisition IDs,
+  apply targets, location, posting text, company and title) give each pair a
+  confidence in [0, 1], and nothing is merged or stored. Per-job signals are kept
+  in memory and recomputed only for jobs whose version changed.
 - **Corrections:** source refreshes preserve user edits, triage and application
   attempts.
 - **Lifecycle:** triage (`inbox`/`saved`/`dismissed`) stores interest independently.
@@ -87,8 +93,8 @@ dashboard path, and lists every gap. Read [REST](../user/api.md) and
   tags and ordering. Descriptions are optional; claims contain free reusable text.
   Reserved structured fields are stored once, outside arbitrary metadata.
 - **Attribution:** authentication sets the actor (owner session, named API token
-  or system) in a context variable (`actors.py`) that reaches the shared services
-  through thread offloading; worker threads start with an empty context and
+  with its kind, or system) in a context variable (`actors.py`) that reaches the
+  shared services through thread offloading; worker threads start with an empty context and
   record the system. Every write leaves one event with its subject, actor and,
   for a token with an open run, that run. Payloads hold identifiers, field names
   and versions, never content. Events of a job or application are deleted with
@@ -98,6 +104,25 @@ dashboard path, and lists every gap. Read [REST](../user/api.md) and
   only an explicit supersede closes it. A finished run stores its report and
   change counts. Questions reference a job, application or Career entry with
   `ON DELETE SET NULL` and keep a label, so they outlive their subject.
+- **Requests:** the mirror of questions. The owner writes a request (owner
+  authority), an API token takes it and completes or declines it, and the owner
+  may withdraw it until then. The request records the run of the token that
+  handled it when that token has an open run; taking without a run is allowed.
+  Like questions, requests reference a job, application or Career entry with
+  `ON DELETE SET NULL`, keep a label and follow a job through a merge. The
+  server runs no agent: a request is only read.
+- **Token scope:** a token is `owner` or `agent`. Owner-only operations call
+  `actors.require_owner` in the shared service, so REST and MCP refuse an agent
+  token alike with `403 forbidden`; the inventory marks them `access: owner` and
+  `test_interfaces.py` calls each one. Scoped operational grants (backup, export,
+  restore) carry the requesting actor. A backup made for an agent token has the
+  installation's password hash, session secret and tokens removed from the copy.
+- **Ready:** every shared service that changes what Ready was judged on clears it
+  in its own transaction through `Workspace.clear_ready`: a new revision or
+  context, a deleted revision, a file added to a current revision, an unresolved
+  blocking requirement, leaving Preparing. Each clearing bumps the application
+  version and leaves an attributed `application_ready_cleared` event with its
+  reason. A new operation that changes current revisions must call it too.
 - **Concurrency:** typed inputs, optimistic versions, idempotency keys, foreign
   keys and short transactions protect shared state. Run one application process
   per workspace; database connections do not cross threads. Mutable job and
@@ -107,13 +132,16 @@ SQLite uses WAL and stores SHA-256-deduplicated BLOBs for attachments. Lists ret
 compact paginated summaries; full postings, narratives, contexts and file bytes
 are separate reads. Application preparation summaries count current revision leaves
 and their exact PDF/review state; derived readiness combines them with unresolved
-blocking employer requirements stored on the application. Byte downloads and record exports prepare a
+blocking employer requirements stored on the application. Ready is a stored step
+on top of that derivation (`ready_at` and who set it): marking is refused while a
+check fails, `readiness` reports `ready` only while the mark and every check hold,
+and `reviewed` when the checks pass without the mark. Byte downloads and record exports prepare a
 temporary snapshot on the database thread before streaming, preserving bounded
 memory and releasing SQLite readers before cancellation or thread changes.
 Backups use SQLite's online backup API. A restore preserves
 installation authentication, recent provider request history and later cooldowns.
 
-Workspaces and backups use schema 9, a storage-only change: opening schema 8
+Workspaces and backups use schema 9 (0.18), a storage-only change: opening schema 8
 moves every frozen context into content-addressed parts and its asset files out of
 `files`, compares each rebuilt payload with the stored text, and then drops the
 old column, all in the upgrade transaction; contexts gain summary columns for
@@ -122,10 +150,12 @@ lists. When at least a quarter of the file (and `OPENINGS_COMPACT_MIN_MB`, defau
 at start: a compact copy beside the database is copied back in one transaction, so
 an interruption leaves the previous file valid and the next start tries again.
 
-Schema 8 came with 0.17. Opening schema 7 upgrades it in the same
-transaction: events gain a subject, an actor and a run, notes gain an author, and
-the `runs` and `questions` tables are added; existing rows keep every value and
-read as "unknown (before 0.17)". Schema 6 is upgraded through schema 7 in the same
+Schema 8 shipped with 0.17.0. Opening schema 7 upgrades it in the same
+transaction: events gain a subject, an actor and a run, notes gain an author,
+applications gain `ready_at` with who set it, API tokens gain a kind, and the
+`runs`, `questions` and `requests` tables are added; existing rows keep every value, read as
+"unknown (before 0.17)" and are not marked ready, and existing tokens become
+owner tokens with unchanged access. Schema 6 is upgraded through schema 7 in the same
 transaction (application priority, deadline and requirements), and schema 5
 through schema 6 (removing obsolete derived data and preserving owned records and
 immutable snapshots). Restore accepts schema 9 and upgrades a copy of a schema 5,

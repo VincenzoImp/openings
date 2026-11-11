@@ -438,7 +438,7 @@ test("mobile applications, templates and funnel stay usable inside the viewport"
   await page.setViewportSize({ width: 390, height: 844 });
   await go(page, "applications");
   await expect(page.locator(".application-list")).toBeVisible();
-  await expect(page.locator(".stage-overview .btn")).toHaveCount(5);
+  await expect(page.locator(".stage-overview .btn")).toHaveCount(6);
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(390);
@@ -995,4 +995,293 @@ test("application history shows who made each change", async ({
     status: "closed",
     outcome: "not_pursued",
   });
+});
+
+test("an application is marked ready and a new revision clears the step", async ({
+  page,
+}, info) => {
+  const stamp = `${info.project.name} ${Date.now()}`;
+  const title = `Ready role ${stamp}`;
+  const job = await call(page, "/jobs", "POST", {
+    title,
+    company: "Example Labs",
+    posting: "Build reliable services.",
+  });
+  const application = await call(page, "/applications", "POST", {
+    job_id: job.id,
+  });
+  await go(page, `applications?application=${application.id}`);
+  const panel = top(page).getByRole("region", { name: "Ready to apply" });
+  const mark = panel.getByRole("button", { name: "Mark ready", exact: true });
+  await expect(panel).toContainText("No documents");
+  await expect(mark).toBeDisabled();
+
+  await top(page)
+    .getByRole("button", { name: "Add document", exact: true })
+    .click();
+  await top(page).locator("input[name=title]").fill("Ready CV");
+  await top(page).locator("textarea[name=text]").fill("Synthetic CV text.");
+  await top(page).locator("input[type=file]").setInputFiles({
+    name: "ready.pdf",
+    mimeType: "application/pdf",
+    buffer: syntheticPdf(),
+  });
+  await top(page)
+    .getByRole("button", { name: "Save revision", exact: true })
+    .click();
+  await expect(page.locator("dialog[open]")).toHaveCount(1);
+  await expect(panel).toContainText("Needs review");
+  await expect(mark).toBeDisabled();
+  await top(page)
+    .getByRole("button", { name: "Show Ready CV", exact: true })
+    .click();
+  await top(page)
+    .getByRole("button", { name: "Approve this revision", exact: true })
+    .click();
+  await expect(panel).toContainText("Reviewed, not marked ready");
+
+  // Mark ready with the keyboard.
+  await mark.focus();
+  await page.keyboard.press("Enter");
+  await expect(top(page).locator(".app-toast")).toContainText(
+    "Marked ready to apply.",
+  );
+  await expect(panel).toContainText("Marked by Owner (dashboard)");
+  await expect(
+    panel.getByRole("button", { name: "Not ready", exact: true }),
+  ).toBeVisible();
+  await fitsViewport(page);
+  expect((await call(page, `/applications/${application.id}`)).readiness).toBe(
+    "ready",
+  );
+
+  // The ready queue lists it with its badge.
+  await go(
+    page,
+    `applications?view=list&readiness=ready&sort=ready&q=${encodeURIComponent(title)}`,
+  );
+  const row = page.locator("tbody tr", { hasText: title });
+  await expect(row.locator(".ready-tag")).toHaveText("Ready to apply");
+  await expect(
+    page.getByRole("button", { name: /^Ready to apply \d+$/ }),
+  ).toHaveClass(/selected/);
+  await fitsViewport(page);
+
+  // A new revision changes what was judged, so the step is cleared.
+  await row.getByRole("button", { name: new RegExp(title) }).click();
+  await top(page)
+    .getByRole("button", { name: "Show Ready CV", exact: true })
+    .click();
+  await top(page)
+    .getByRole("button", { name: "New revision", exact: true })
+    .click();
+  await top(page).locator("textarea[name=text]").fill("Changed synthetic CV.");
+  await top(page)
+    .getByRole("button", { name: "Save revision", exact: true })
+    .click();
+  await expect(page.locator("dialog[open]")).toHaveCount(1);
+  await expect(panel).toContainText("Missing PDF");
+  await expect(mark).toBeDisabled();
+  await top(page).getByRole("tab", { name: "History", exact: true }).click();
+  const cleared = top(page).locator(".activity", {
+    hasText: "application ready cleared",
+  });
+  await expect(cleared).toContainText("A new document revision was saved");
+  await expect(cleared).toContainText("Owner (dashboard)");
+  const current = await call(page, `/applications/${application.id}`);
+  expect([current.readiness, current.ready_at]).toEqual(["missing_pdf", null]);
+  await call(page, `/applications/${application.id}`, "PATCH", {
+    expected_version: current.version,
+    status: "closed",
+    outcome: "not_pursued",
+  });
+});
+
+test("Settings creates an agent token that is refused token management", async ({
+  page,
+}, info) => {
+  const stamp = `${info.project.name} ${Date.now()}`;
+  const name = `Scoped agent ${stamp}`;
+  await go(page, "settings?section=agents");
+  // The form offers an agent token first; the owner chooses the kind.
+  const kind = page.getByLabel("Token kind", { exact: true });
+  await expect(kind).toHaveValue("agent");
+  await expect(page.locator(".token-kind-hint")).toContainText(
+    "Cannot change your password, manage tokens, restore a backup",
+  );
+  await page.getByLabel("Token name", { exact: true }).fill(name);
+  await page.getByLabel("Token name", { exact: true }).press("Enter");
+  const secret = await page.locator(".new-token code").innerText();
+  expect(secret).toMatch(/^op_/);
+  const row = page.locator(".token-list .settingrow", { hasText: name });
+  await expect(row.locator(".tag")).toHaveText("Agent");
+  await kind.selectOption("owner");
+  await expect(page.locator(".token-kind-hint")).toContainText("Full access");
+  await page.getByLabel("Token name", { exact: true }).fill(`Owner ${stamp}`);
+  await page.getByRole("button", { name: "Create token", exact: true }).click();
+  const ownerRow = page.locator(".token-list .settingrow", {
+    hasText: `Owner ${stamp}`,
+  });
+  await expect(ownerRow.locator(".tag")).toHaveText("Owner");
+  await fitsViewport(page);
+
+  // The agent token works for the job search and is refused owner operations.
+  const attempt = (path: string, method = "GET", body?: unknown) =>
+    page.evaluate(
+      async ({ secret, path, method, body }) => {
+        const response = await fetch("/api/v1" + path, {
+          method,
+          credentials: "omit",
+          headers: {
+            "X-Openings-E2E-Setup": "1",
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + secret,
+          },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        const value = await response.json();
+        return [response.status, value.error?.code ?? null];
+      },
+      { secret, path, method, body },
+    );
+  expect(await attempt("/jobs?limit=1")).toEqual([200, null]);
+  expect(await attempt("/tokens")).toEqual([403, "forbidden"]);
+  expect(await attempt("/tokens", "POST", { name: "Escalation" })).toEqual([
+    403,
+    "forbidden",
+  ]);
+  expect(
+    await attempt("/auth/password", "POST", { password: "changed-password" }),
+  ).toEqual([403, "forbidden"]);
+  const job = await call(page, "/jobs", "POST", {
+    title: `Scoped token job ${stamp}`,
+    company: "Example Labs",
+    posting: "Build reliable services.",
+  });
+  expect(
+    await attempt(`/jobs/${job.id}/notes`, "POST", { body: "Synthetic note." }),
+  ).toEqual([200, null]);
+
+  // Activity names the token with its kind.
+  await go(page, "activity?section=changes");
+  await expect(
+    page.locator(".change-list .activity", { hasText: "Note added" }).first(),
+  ).toContainText(`${name} (agent token)`);
+  await fitsViewport(page);
+
+  // Revoke both tokens from Settings with the keyboard.
+  await go(page, "settings?section=agents");
+  for (const item of [row, ownerRow]) {
+    await item.getByRole("button", { name: "Revoke", exact: true }).focus();
+    await page.keyboard.press("Enter");
+    await expect(item).toHaveCount(0);
+  }
+  expect(await attempt("/jobs?limit=1")).toEqual([401, "unauthorized"]);
+});
+
+test("the owner writes a request and reads the agent's result with its run", async ({
+  page,
+}, info) => {
+  const stamp = `${info.project.name} ${Date.now()}`;
+  const agent = await call(page, "/tokens", "POST", {
+    name: `Synthetic agent ${stamp}`,
+    kind: "agent",
+  });
+  const job = await call(page, "/jobs", "POST", {
+    title: `Requested role ${stamp}`,
+    company: "Example Labs",
+    posting: "Build reliable services.",
+  });
+
+  // Write a general request in Activity with the keyboard.
+  const general = `Stop preparing consultancy roles ${stamp}`;
+  await go(page, "activity?section=requests");
+  await page.getByLabel("Ask your agent", { exact: true }).fill(general);
+  await page.getByRole("button", { name: "Send request", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".app-toast")).toContainText("Request saved.");
+  const card = page.getByRole("article", { name: general, exact: true });
+  await expect(card).toContainText("Waiting for the agent");
+  await expect(card).toContainText("Written by Owner (dashboard)");
+  await fitsViewport(page);
+
+  // Ask about one job from the job itself.
+  const about = `Prepare this one too ${stamp}`;
+  await go(page, `inbox?job=${job.id}`);
+  await top(page)
+    .getByRole("button", { name: "Ask your agent", exact: true })
+    .click();
+  await expect(top(page)).toContainText(`About Requested role ${stamp}`);
+  await top(page)
+    .getByLabel("Request for your agent", { exact: true })
+    .fill(about);
+  await top(page)
+    .getByRole("button", { name: "Send request", exact: true })
+    .click();
+  await expect(
+    top(page).getByRole("article", { name: about, exact: true }),
+  ).toContainText("Waiting for the agent");
+  await fitsViewport(page);
+  await top(page)
+    .getByRole("button", { name: "Close dialog", exact: true })
+    .click();
+  await expect(top(page).locator(".ask-agent")).toContainText(
+    "1 request waiting",
+  );
+
+  // The agent reads the open requests, takes one in a run and reports the result.
+  const info_ = await agentCall(page, agent.token, "/workspace");
+  expect(info_.open_requests).toBeGreaterThanOrEqual(2);
+  const waiting = await agentCall(
+    page,
+    agent.token,
+    `/requests?state=open&subject_type=job&subject_id=${job.id}`,
+  );
+  expect(waiting.items.map((item: { text: string }) => item.text)).toEqual([
+    about,
+  ]);
+  const run = await agentCall(page, agent.token, "/runs", "POST", {
+    workflow: `prepare-shortlist ${stamp}`,
+  });
+  const taken = await agentCall(
+    page,
+    agent.token,
+    `/requests/${waiting.items[0].id}/take`,
+    "POST",
+    { expected_version: waiting.items[0].version },
+  );
+  await agentCall(page, agent.token, `/requests/${taken.id}/complete`, "POST", {
+    expected_version: taken.version,
+    result: `Draft prepared and marked ready ${stamp}`,
+  });
+
+  await go(page, "activity?section=requests");
+  await page.getByLabel("State", { exact: true }).selectOption("done");
+  const done = page.getByRole("article", { name: about, exact: true });
+  await expect(done).toContainText(`Draft prepared and marked ready ${stamp}`);
+  await expect(done).toContainText(
+    `Completed by Synthetic agent ${stamp} (agent token)`,
+  );
+  await expect(
+    done.getByRole("button", { name: /^Job: Requested role/ }),
+  ).toBeVisible();
+  await fitsViewport(page);
+  // The result links to the run that handled the request.
+  await done.getByRole("button", { name: "View run", exact: true }).click();
+  const report = page.locator(".run-detail");
+  await expect(
+    report.locator(".report-section", {
+      has: page.getByRole("heading", { name: "Requests handled", exact: true }),
+    }),
+  ).toContainText(about);
+  await fitsViewport(page);
+
+  // The owner withdraws the request nobody took.
+  await page.getByRole("tab", { name: "Requests", exact: true }).click();
+  await page.getByLabel("State", { exact: true }).selectOption("open");
+  await card.getByRole("button", { name: "Withdraw", exact: true }).click();
+  await expect(card).toHaveCount(0);
+  await page.getByLabel("State", { exact: true }).selectOption("withdrawn");
+  await expect(card).toContainText("Withdrawn by Owner (dashboard)");
+  await call(page, "/tokens/" + agent.id, "DELETE");
 });

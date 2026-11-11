@@ -141,12 +141,14 @@ def test_changes_record_the_owner_session_the_named_token_and_the_system(app):
         "kind": "token",
         "id": token["id"],
         "name": "Synthetic agent",
+        "token_kind": "owner",
         "label": "Synthetic agent",
     }
     assert actors[("job_added", job["id"])] == {
         "kind": "owner",
         "id": None,
         "name": None,
+        "token_kind": None,
         "label": "Owner (dashboard)",
     }
     assert actors[("triage_changed", job["id"])] == agent
@@ -652,6 +654,7 @@ def test_schema_seven_upgrade_preserves_rows_and_matches_a_new_workspace(tmp_pat
         "kind": "unknown",
         "id": None,
         "name": None,
+        "token_kind": None,
         "label": "unknown (before 0.17)",
     }
     assert history[0]["subject"] == {"type": "application", "id": application["id"]}

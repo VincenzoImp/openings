@@ -223,6 +223,14 @@ export default function OverviewPage({
   );
   const attention = [
     {
+      count: data.ready || 0,
+      title: "application ready to apply",
+      plural: "applications ready to apply",
+      description: "Apply on the employer's site, then record it as Applied.",
+      route: "applications?readiness=ready&sort=ready&view=list",
+      icon: "check" as const,
+    },
+    {
       count: data.drafts,
       title: "application in preparation",
       plural: "applications in preparation",

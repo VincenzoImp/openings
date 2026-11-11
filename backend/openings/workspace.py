@@ -4,22 +4,30 @@ import hashlib
 import json
 import math
 import re
+import threading
 from urllib.parse import urlsplit
 
-from .actors import current_actor, describe_row
+from .actors import current_actor, pop_actor
 from .common import (
     check_version,
     new_id,
     now,
 )
 from .db import Database, decode_record, encode
-from .duplicates import candidate_groups, posting_fingerprint, posting_similarity
+from .duplicate_signals import job_features, posting_similarity
+from .duplicates import (
+    DEFAULT_MIN_CONFIDENCE,
+    HIGH_CONFIDENCE,
+    DuplicateIndex,
+    confidence_tier,
+)
 from .errors import DomainError, conflict, missing
 from .identities import job_identities, normalize_url
 from .models import (
     ApplicationBulk,
     ApplicationInput,
     ApplicationPatch,
+    ApplicationReady,
     DuplicateQuery,
     JobBulk,
     JobInput,
@@ -44,8 +52,18 @@ READINESS_SQL = (
     "WHEN EXISTS("
     + _LEAVES
     + " AND d.kind IN ('resume','cover_letter') AND NOT EXISTS(SELECT 1 FROM files f WHERE f.document_id=d.id AND f.media_type='application/pdf')) THEN 'missing_pdf' "
-    "WHEN EXISTS(" + _LEAVES + " AND d.review_state<>'approved') THEN 'unreviewed' ELSE 'ready' END"
+    "WHEN EXISTS(" + _LEAVES + " AND d.review_state<>'approved') THEN 'unreviewed' "
+    # Every check passes: "reviewed" until someone marks the application ready.
+    "WHEN app.ready_at IS NULL THEN 'reviewed' ELSE 'ready' END"
 )
+READINESS = ("blocked", "none", "missing_pdf", "unreviewed", "reviewed", "ready")
+# Why an application whose checks fail cannot be marked ready, by derived readiness.
+NOT_READY = {
+    "blocked": "Resolve every blocking requirement before marking this application ready.",
+    "none": "Save the application documents before marking this application ready.",
+    "missing_pdf": "Attach a PDF to every current CV and cover letter revision before marking this application ready.",
+    "unreviewed": "Approve every current document revision before marking this application ready.",
+}
 REQUIREMENT_COUNTS_SQL = (
     "(SELECT count(*) FROM json_each(app.requirements) r WHERE NOT coalesce(json_extract(r.value,'$.resolved'),0)) AS open_requirements,"
     "(SELECT count(*) FROM json_each(app.requirements) r WHERE NOT coalesce(json_extract(r.value,'$.resolved'),0) AND json_extract(r.value,'$.blocking')) AS blocking_requirements"
@@ -56,6 +74,9 @@ class Workspace:
     def __init__(self, path):
         self.db = Database(path)
         self.discovery = None
+        # Duplicate features per job, reused until that job changes.
+        self._duplicates = ({}, {}, None)
+        self._duplicates_lock = threading.Lock()
 
     def get_settings(self, key, default=None):
         row = self.db.one("SELECT * FROM settings WHERE key=?", (key,))
@@ -114,7 +135,7 @@ class Workspace:
                 else (None, None)
             )
         conn.execute(
-            "INSERT INTO events(id,job_id,application_id,kind,payload,created_at,subject_type,subject_id,actor_kind,actor_id,actor_name,run_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO events(id,job_id,application_id,kind,payload,created_at,subject_type,subject_id,actor_kind,actor_id,actor_name,actor_token_kind,run_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 new_id(),
                 job_id,
@@ -155,9 +176,7 @@ class Workspace:
                 else (None, None)
             )
         item["subject"] = {"type": kind, "id": identifier}
-        item["actor"] = describe_row(item)
-        for key in ("actor_kind", "actor_id", "actor_name"):
-            item.pop(key, None)
+        item["actor"] = pop_actor(item)
         return item
 
     @staticmethod
@@ -165,9 +184,7 @@ class Workspace:
         if row is None:
             missing("Note")
         row = dict(row)
-        row["author"] = describe_row(row, "author")
-        for key in ("author_kind", "author_id", "author_name"):
-            row.pop(key)
+        row["author"] = pop_actor(row, "author")
         return row
 
     @staticmethod
@@ -663,6 +680,91 @@ class Workspace:
             items.append(item)
         return items
 
+    def _duplicate_index(self, connection):
+        """Duplicate features of every job; only new or changed jobs are read again."""
+        stamps = {
+            row[0]: tuple(row)[1:]
+            for row in connection.execute(
+                "SELECT j.id,j.version,j.updated_at,"
+                "(SELECT count(*) FROM job_identities i WHERE i.job_id=j.id) "
+                "FROM jobs j ORDER BY j.rowid"
+            )
+        }
+        with self._duplicates_lock:
+            known, features, index = self._duplicates
+            stale = [job_id for job_id, stamp in stamps.items() if known.get(job_id) != stamp]
+            if index is not None and not stale and len(known) == len(stamps):
+                return index
+            features = {
+                job_id: features[job_id] for job_id in stamps if known.get(job_id) == stamps[job_id]
+            }
+            for start in range(0, len(stale), 400):
+                chunk = stale[start : start + 400]
+                placeholders = ",".join("?" for _ in chunk)
+                identities, urls = {}, {}
+                for job_id, identity in connection.execute(
+                    f"SELECT job_id,identity FROM job_identities WHERE job_id IN ({placeholders})",
+                    chunk,
+                ):
+                    identities.setdefault(job_id, []).append(identity)
+                # The employer's own apply link, when a job board reported one.
+                for job_id, url in connection.execute(
+                    "SELECT job_id,json_extract(payload,'$.raw.job_url_direct') FROM postings "
+                    f"WHERE job_id IN ({placeholders}) AND instr(payload,'job_url_direct')",
+                    chunk,
+                ):
+                    if isinstance(url, str):
+                        urls.setdefault(job_id, []).append(url)
+                for row in connection.execute(
+                    "SELECT id,title,company,location,url,substr(posting,1,50000) AS posting,"
+                    f"metadata,created_at FROM jobs WHERE id IN ({placeholders})",
+                    chunk,
+                ):
+                    job = dict(row)
+                    job["metadata"] = json.loads(job["metadata"])
+                    job["identities"] = identities.get(job["id"], ())
+                    job["urls"] = urls.get(job["id"], ())
+                    features[job["id"]] = job_features(job)
+            index = DuplicateIndex(features[job_id] for job_id in stamps if job_id in features)
+            self._duplicates = (stamps, features, index)
+            return index
+
+    def likely_duplicates(self, job, min_confidence=DEFAULT_MIN_CONFIDENCE, limit=5):
+        """Archived jobs most likely to be the same vacancy as one job, best first.
+
+        `job` is an archived job ID, or the fields of a posting that is not archived
+        yet (title, company, location, url, posting, metadata, source_key, raw).
+        Read-only: a signal for review, never a merge.
+        """
+        with self.db.connect() as connection:
+            index = self._duplicate_index(connection)
+        if isinstance(job, str):
+            features = index.jobs.get(job) or missing("Job")
+        else:
+            url = normalize_url(job.get("url") or "")
+            features = job_features(
+                {
+                    **job,
+                    "id": None,
+                    "url": url,
+                    "identities": job_identities(url, job.get("source_key")),
+                    "urls": [(job.get("raw") or {}).get("job_url_direct")],
+                    "created_at": job.get("created_at") or now(),
+                }
+            )
+        return [
+            {
+                "job_id": job_id,
+                "confidence": evidence.score,
+                "tier": confidence_tier(evidence.score),
+                "reasons": {
+                    "matched": list(evidence.matched),
+                    "conflicts": list(evidence.conflicts),
+                },
+            }
+            for job_id, evidence in index.matches(features, min_confidence, limit)
+        ]
+
     def duplicate_jobs(self, value=None):
         """Candidate duplicate groups for review. Never merges or changes records."""
         value = (
@@ -671,9 +773,6 @@ class Workspace:
             else DuplicateQuery.model_validate(value or {})
         )
         with self.db.connect() as connection:
-            connection.create_function(
-                "posting_fingerprint", 1, posting_fingerprint, deterministic=True
-            )
             if (
                 value.job_id
                 and not connection.execute(
@@ -681,13 +780,8 @@ class Workspace:
                 ).fetchone()
             ):
                 missing("Job")
-            rows = connection.execute(
-                "SELECT id,title,company,location,created_at,"
-                "posting_fingerprint(substr(posting,1,50000)) AS fingerprint FROM jobs"
-            ).fetchall()
-            fingerprints = {row["id"]: row["fingerprint"] for row in rows}
-            created = {row["id"]: row["created_at"] for row in rows}
-            groups = candidate_groups(rows, value.match_location)
+            index = self._duplicate_index(connection)
+            groups = index.groups(value.min_confidence, value.match_location)
             if value.job_id:
                 groups = [group for group in groups if value.job_id in group["ids"]]
             if value.queue:
@@ -699,13 +793,17 @@ class Workspace:
             with_attempts = {
                 row[0] for row in connection.execute("SELECT DISTINCT job_id FROM applications")
             }
-            # Groups with application history first, then larger, then newest.
+            # Most confident first, then application history, larger and newest groups.
             groups.sort(
-                key=lambda group: (max(created[i] for i in group["ids"]), min(group["ids"])),
+                key=lambda group: (
+                    max(index.jobs[i].created_at for i in group["ids"]),
+                    min(group["ids"]),
+                ),
                 reverse=True,
             )
             groups.sort(
                 key=lambda group: (
+                    -group["confidence"],
                     not with_attempts.intersection(group["ids"]),
                     -len(group["ids"]),
                 )
@@ -739,9 +837,19 @@ class Workspace:
                 ),
             )
             for item in items:
-                item["posting_hash"] = fingerprints[item["id"]]
+                item["posting_hash"] = index.jobs[item["id"]].fingerprint
                 item["similarity"] = posting_similarity(
                     postings[reference["id"]], postings[item["id"]]
+                )
+                evidence = index.evidence(reference["id"], item["id"])
+                item["confidence"] = None if item is reference else evidence.score
+                item["reasons"] = (
+                    None
+                    if item is reference
+                    else {
+                        "matched": list(evidence.matched),
+                        "conflicts": list(evidence.conflicts),
+                    }
                 )
             hashes = {item["posting_hash"] for item in items}
             open_attempts = [
@@ -753,7 +861,10 @@ class Workspace:
             result.append(
                 {
                     "job_ids": [item["id"] for item in items],
-                    "signals": group["signals"],
+                    "signals": group["matched"],
+                    "confidence": group["confidence"],
+                    "tier": confidence_tier(group["confidence"]),
+                    "reasons": {"matched": group["matched"], "conflicts": group["conflicts"]},
                     "size": len(items),
                     "identical_postings": len(hashes) == 1 and None not in hashes,
                     "reference_id": reference["id"],
@@ -767,6 +878,8 @@ class Workspace:
             "total": len(groups),
             "limit": value.limit,
             "offset": value.offset,
+            "min_confidence": value.min_confidence,
+            "tiers": {"high": HIGH_CONFIDENCE, "medium": DEFAULT_MIN_CONFIDENCE},
         }
 
     def merge_jobs(self, source_id, target_id, expected_version, target_version):
@@ -806,7 +919,15 @@ class Workspace:
             )
             c.execute("DELETE FROM job_identities WHERE job_id=?", (source_id,))
             c.execute("UPDATE posting_details SET job_id=? WHERE job_id=?", (target_id, source_id))
-            for table in ("postings", "applications", "events", "notes", "tasks", "questions"):
+            for table in (
+                "postings",
+                "applications",
+                "events",
+                "notes",
+                "tasks",
+                "questions",
+                "requests",
+            ):
                 c.execute(f"UPDATE {table} SET job_id=? WHERE job_id=?", (target_id, source_id))
             c.execute("UPDATE files SET job_id=? WHERE job_id=?", (target_id, source_id))
             c.execute("DELETE FROM jobs WHERE id=?", (source_id,))
@@ -834,7 +955,7 @@ class Workspace:
         note_id, stamp = new_id(), now()
         with self.db.transaction() as c:
             c.execute(
-                "INSERT INTO notes(id,job_id,application_id,body,created_at,updated_at,author_kind,author_id,author_name) VALUES(?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO notes(id,job_id,application_id,body,created_at,updated_at,author_kind,author_id,author_name,author_token_kind) VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (
                     note_id,
                     job_id,
@@ -872,7 +993,7 @@ class Workspace:
         )
         if not row:
             missing("Application")
-        row = decode_record(row, ("questions", "answers", "requirements"))
+        row = self._ready_by(decode_record(row, ("questions", "answers", "requirements")))
         row["job"] = (self.job_summary if compact_job else self.get_job)(row["job_id"])
         row["documents_count"] = self.db.one(
             "SELECT count(*) n FROM documents WHERE application_id=?", (application_id,)
@@ -884,6 +1005,13 @@ class Workspace:
             row["stale_inputs"] = application_staleness(connection, [application_id])[
                 application_id
             ]["inputs"]
+        return row
+
+    @staticmethod
+    def _ready_by(row):
+        """Replace the stored actor columns with who marked the application ready."""
+        marked_by = pop_actor(row, "ready_by")
+        row["ready_by"] = marked_by if row["ready_at"] else None
         return row
 
     @staticmethod
@@ -918,17 +1046,26 @@ class Workspace:
         sort="updated",
         job_id=None,
         readiness=None,
+        ready_since=None,
+        ready_until=None,
     ):
         conditions, args = [], []
         if readiness:
-            if readiness not in ("blocked", "none", "missing_pdf", "unreviewed", "ready"):
+            if readiness not in READINESS:
                 raise DomainError(
                     422,
                     "application_readiness",
-                    "Choose blocked, none, missing_pdf, unreviewed or ready.",
+                    "Choose blocked, none, missing_pdf, unreviewed, reviewed or ready.",
                 )
+            if readiness == "ready":
+                # The stored step first, so the partial index narrows the candidates.
+                conditions.append("app.ready_at IS NOT NULL")
             conditions.append(f"({READINESS_SQL})=?")
             args.append(readiness)
+        for value, operator in ((ready_since, ">="), (ready_until, "<=")):
+            if value:
+                conditions.append("app.ready_at" + operator + "?")
+                args.append(value)
         if job_id is not None:
             conditions.append("app.job_id=?")
             args.append(job_id)
@@ -959,10 +1096,14 @@ class Workspace:
             # Undated or unprioritized attempts follow the planned ones.
             "deadline": "app.deadline IS NULL,app.deadline,app.priority IS NULL,app.priority,app.updated_at DESC",
             "priority": "app.priority IS NULL,app.priority,app.deadline IS NULL,app.deadline,app.updated_at DESC",
+            # The ready queue: longest waiting first, then everything not marked ready.
+            "ready": "app.ready_at IS NULL,app.ready_at,app.updated_at DESC",
         }.get(sort, "app.updated_at DESC")
         with self.db.connect() as connection:
             projection = "app.id,app.job_id,app.status,app.outcome,app.version,app.applied_at,app.created_at,app.updated_at,"
             projection += "app.priority,app.deadline,"
+            projection += "app.ready_at,app.ready_by_kind,app.ready_by_id,app.ready_by_name,"
+            projection += "app.ready_by_token_kind,"
             projection += f"{READINESS_SQL} AS readiness,{REQUIREMENT_COUNTS_SQL},"
             projection += (
                 "(SELECT count(*) FROM documents WHERE application_id=app.id) AS documents_count,"
@@ -980,20 +1121,33 @@ class Workspace:
             ).fetchall()
             total = connection.execute("SELECT count(*)" + base + where, args).fetchone()[0]
             counts = {stage: 0 for stage in ("draft", "applied", "interview", "offer", "closed")}
+            ready_count = 0
             for row in connection.execute(
-                "SELECT app.status,count(*) n" + base + where + " GROUP BY app.status", args
+                "SELECT app.status,count(*) n,count(app.ready_at) ready"
+                + base
+                + where
+                + " GROUP BY app.status",
+                args,
             ):
                 counts[row["status"]] = row["n"]
+                ready_count += row["ready"]
             preparation = self._application_preparation(connection, [row["id"] for row in rows])
             staleness = application_staleness(connection, [row["id"] for row in rows])
         items = []
         for raw in rows:
-            item = {key: value for key, value in dict(raw).items() if not key.startswith("j_")}
+            item = self._ready_by(
+                {key: value for key, value in dict(raw).items() if not key.startswith("j_")}
+            )
             item["job"] = self._compact_job(raw)
             item["preparation"] = preparation[item["id"]]
             item["stale_inputs"] = staleness[item["id"]]["inputs"]
             items.append(item)
-        return {"items": items, "total": total, "stage_counts": counts}
+        return {
+            "items": items,
+            "total": total,
+            "stage_counts": counts,
+            "ready_count": ready_count,
+        }
 
     def delete_application(self, application_id, expected_version, collect=True):
         with self.db.transaction() as connection:
@@ -1094,7 +1248,7 @@ class Workspace:
         return self._bulk(value.items, apply, value.action == "forget")
 
     def bulk_applications(self, value):
-        """Close with an outcome, reopen to a stage, or delete versioned attempts."""
+        """Close with an outcome, reopen to a stage, mark or unmark ready, or delete versioned attempts."""
         value = (
             value if isinstance(value, ApplicationBulk) else ApplicationBulk.model_validate(value)
         )
@@ -1107,6 +1261,19 @@ class Workspace:
             if value.action == "delete":
                 self.delete_application(item.id, item.expected_version, collect=False)
                 return {"deleted": True}
+            if value.action in {"mark_ready", "unmark_ready"}:
+                updated = self.set_ready(
+                    item.id,
+                    ApplicationReady(
+                        expected_version=item.expected_version, ready=value.action == "mark_ready"
+                    ),
+                )
+                return {
+                    "job_id": updated["job_id"],
+                    "readiness": updated["readiness"],
+                    "ready_at": updated["ready_at"],
+                    "version": updated["version"],
+                }
             if value.action == "reopen" and row["status"] != "closed":
                 raise DomainError(
                     409,
@@ -1262,7 +1429,85 @@ class Workspace:
                     {"from": row["status"], "to": status, "fields": list(actual)},
                     c,
                 )
+                # Ready is a judgement on a Preparing attempt without blocking requirements.
+                if status != "draft":
+                    self.clear_ready(c, application_id, "left_preparing")
+                elif "requirements" in actual and any(
+                    item["blocking"] and not item["resolved"] for item in changes["requirements"]
+                ):
+                    self.clear_ready(c, application_id, "blocking_requirement")
         return self.get_application(application_id, compact_job=True)
+
+    def set_ready(self, application_id, value):
+        """Mark a Preparing application ready to apply, or clear the mark.
+
+        Marking is refused while a derived readiness check fails; the error names it.
+        """
+        value = (
+            value if isinstance(value, ApplicationReady) else ApplicationReady.model_validate(value)
+        )
+        with self.db.transaction() as c:
+            row = c.execute(
+                f"SELECT app.*,{READINESS_SQL} AS readiness,{REQUIREMENT_COUNTS_SQL} FROM applications app WHERE app.id=?",
+                (application_id,),
+            ).fetchone()
+            if row is None:
+                missing("Application")
+            check_version(row, value.expected_version)
+            if not value.ready:
+                self.clear_ready(c, application_id, "unmarked")
+            elif row["ready_at"] is None:
+                details = {
+                    "readiness": row["readiness"],
+                    "status": row["status"],
+                    "blocking_requirements": row["blocking_requirements"],
+                    "current_version": row["version"],
+                }
+                if row["status"] != "draft":
+                    raise DomainError(
+                        409,
+                        "application_not_ready",
+                        "Only a Preparing application can be marked ready.",
+                        {"check": "stage", **details},
+                    )
+                if row["readiness"] in NOT_READY:
+                    raise DomainError(
+                        409,
+                        "application_not_ready",
+                        NOT_READY[row["readiness"]],
+                        {"check": row["readiness"], **details},
+                    )
+                stamp = now()
+                c.execute(
+                    "UPDATE applications SET ready_at=?,ready_by_kind=?,ready_by_id=?,ready_by_name=?,ready_by_token_kind=?,version=version+1,updated_at=? WHERE id=?",
+                    (stamp, *current_actor().columns(), stamp, application_id),
+                )
+                self.event("application_marked_ready", row["job_id"], application_id, conn=c)
+        return self.get_application(application_id, compact_job=True)
+
+    def clear_ready(self, conn, application_id, reason):
+        """Clear the stored Ready step once its judgement no longer holds, recording why.
+
+        Every shared service that changes what Ready was judged on calls this in its
+        own transaction. Returns whether the application was ready.
+        """
+        row = conn.execute(
+            "SELECT job_id FROM applications WHERE id=? AND ready_at IS NOT NULL", (application_id,)
+        ).fetchone()
+        if row is None:
+            return False
+        conn.execute(
+            "UPDATE applications SET ready_at=NULL,ready_by_kind=NULL,ready_by_id=NULL,ready_by_name=NULL,ready_by_token_kind=NULL,version=version+1,updated_at=? WHERE id=?",
+            (now(), application_id),
+        )
+        self.event(
+            "application_ready_cleared",
+            row["job_id"],
+            application_id,
+            {"reason": reason, "automatic": reason != "unmarked"},
+            conn,
+        )
+        return True
 
     @staticmethod
     def normalize_requirements(requirements):
@@ -1331,7 +1576,9 @@ class Workspace:
             " WHERE " + " AND ".join(conditions) if conditions else ""
         )
         apps = self.db.all(
-            "SELECT id,status,outcome,applied_at FROM applications WHERE id IN (" + cohort + ")",
+            "SELECT id,status,outcome,applied_at,ready_at FROM applications WHERE id IN ("
+            + cohort
+            + ")",
             bounds,
         )
         stages = ["applied", "interview", "offer"]
@@ -1379,6 +1626,7 @@ class Workspace:
             "offers": funnel[2]["count"],
             "active": sum(a["status"] not in {"draft", "closed"} for a in apps),
             "drafts": sum(a["status"] == "draft" for a in apps),
+            "ready": sum(a["status"] == "draft" and a["ready_at"] is not None for a in apps),
             "inbox": counts["inbox"],
             "incomplete": counts["incomplete"],
             "funnel": funnel,

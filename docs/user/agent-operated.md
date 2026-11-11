@@ -33,7 +33,10 @@ An agent with shell access can do most of this for you with
 [setup-openings](../../skills/setup-openings/SKILL.md); you choose the owner
 password and create the API token yourself.
 
-1. [Install Openings](getting-started.md) and create an API token in Settings.
+1. [Install Openings](getting-started.md) and create an **Agent** token in
+   Settings. An agent token runs the whole search but cannot change your
+   password, manage tokens, restore a backup or answer its own questions
+   (see [token kinds](agents.md#token-kinds)).
 2. Give your agent the skills. A connected agent gets them from the server
    itself: `skills_list` and `skill_get` tools, and one MCP prompt per skill,
    always matching the running version. Clients that support
@@ -70,17 +73,40 @@ job, application or Career entry concerned. Open **Activity** in the dashboard:
 - **Questions** lists the open questions with an answer form; the navigation
   shows how many are open. The agent reads your answers at the start of its
   next run. You can change an answer or withdraw a question.
-- **Runs** lists the runs; a run shows its report and every record it changed,
-  with links.
+- **Requests** is where you tell the agent what to do next (see below).
+- **Runs** lists the runs; a run shows its report, the requests it handled and
+  every record it changed, with links.
 - **Changes** lists every change with who made it.
 
 ![Activity with two open questions from the agent, one with answer choices](../images/activity-questions.png)
 
 ![A finished run with its stored report: scope, summary, changes, not done and checks](../images/activity-run.png)
 
+## Ask your agent
+
+You do not need a chat session to give the agent an instruction. Write a
+**request** under **Activity → Requests**, or choose **Ask your agent** on a job
+or an application to write one about that record: "prepare this one too",
+"rewrite the letter with more focus on data pipelines", "stop preparing
+consultancy roles".
+
+![Activity → Requests with the form, a request waiting for the agent and a completed one with its result](../images/activity-requests.png)
+
+Openings runs no agent itself, so a request waits until the agent's next run.
+Every workflow starts by reading the open requests. The agent takes the ones it
+can handle, does the work and writes a short result on the request, or declines
+it with the reason. You see the state of each request (waiting, taken, done,
+declined, withdrawn), who handled it and a link to the run. You can withdraw a
+request until the agent has finished it.
+
+A request directs the agent inside its mandate. It cannot make the agent submit
+an application, contact an employer or record Applied: the agent declines that
+part and says so. Only you, in the dashboard or with an owner token, write and
+withdraw requests; an agent token cannot write requests for itself.
+
 Give each agent, and each parallel worker that should report separately, its
-own API token: a token has one open run at a time and its name is what you see
-next to each change.
+own agent token: a token has one open run at a time, and its name and kind are
+what you see next to each change.
 
 ## Working with the agent
 
