@@ -6,10 +6,11 @@ focused questions, apply to prepared Drafts and mark each one Applied or close i
 
 ## What the agent does without waiting for a request
 
-- Review the Inbox and shortlist credible opportunities under the Profile policy.
+- Review the Inbox and shortlist credible opportunities under the owner's policy.
 - Prepare a CV and letter Draft for every shortlisted job.
-- Improve the Profile and its decision policy, the Career record, claims, CV
-  MASTER and letter template as evidence and results accumulate.
+- Improve the Profile, the Career record, claims, CV MASTER and letter template
+  as evidence and results accumulate, and propose policy items for the owner
+  to confirm.
 - Keep collection effective: tune searches and filters, add companies worth
   monitoring, retire noisy sources.
 - Track the pipeline: stale or expired Drafts, follow-ups, employer responses.
@@ -47,4 +48,5 @@ the work inside this mandate; it never lifts a hard limit below.
 - Keep application documents separate from bank and template maintenance, and
   never change sources as a side effect of triage or preparation.
 - Closed Drafts and agent dismissals are not owner preferences; preferences live
-  in the Profile and Career records.
+  in the policy and the Career record. Only the owner confirms a policy item or
+  enables a rule; never ask for an owner token to confirm your own proposal.

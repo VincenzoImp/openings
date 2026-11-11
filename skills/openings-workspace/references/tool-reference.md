@@ -13,8 +13,9 @@ Step-by-step MCP/REST sequences behind the workflow skills: [Prepare Shortlist](
    attempt, or create Draft with `application_create` and an idempotency key.
    Starting retains saved interest and removes the job from the pending Shortlist queue. A separate later attempt requires the
    previous one to be closed. Retain the attempt ID for subsequent writes.
-2. Read profile, detailed career entries, approved claims, selected templates and
-   writing instructions. Summary lists help discovery; fetch the full records
+2. Read profile, the policy (`policy_get`), detailed career entries, approved
+   claims with their typed selection fields, selected templates and writing
+   instructions. Summary lists help discovery; fetch the full records
    before writing. Ask for missing facts and keep qualifications accurate.
 3. Call `application_prepare_context` with the application, selected templates
    and relevant evidence/claims. Omitted selections use available defaults. Use
@@ -49,6 +50,29 @@ and evidence/claim counts for discovery. Select claims only from selected entrie
 omitting selections uses defaults, while explicit empty evidence/claim lists
 include none. Updating questions preserves compatible live answers; incompatible
 answers reject the update unless deliberately changed or removed in `answers`.
+
+## Policy
+
+`policy_get` returns the four sections (`decision`, `eligibility`, `writing`,
+`facts`) with their versions and items, and the signals a decision rule may
+name; `policy_get({"section": "writing"})` returns one section. Every write
+takes the current version of the section as `expected_version` and answers with
+the section as it is afterwards; a stale version is `409 conflict` with
+`details.current_version`.
+
+- `policy_add(section, value)`: `label`, `statement`, optional `value` (text, a
+  number, true/false or a short list; `value_type: "date"` for a date), `note`,
+  `scope` (`writing` only) and `rule` (`decision` only). Use an
+  `idempotency_key` for retries.
+- `policy_update(item_id, value)`: omitted fields stay; `value`, `scope` and
+  `rule` accept null. `policy_move(item_id, {expected_version, section,
+  target_version})` moves an item to another section.
+  `policy_reorder(section, {expected_version, item_ids})` takes every id of the
+  section in the new order. `policy_remove(item_id, expected_version)` deletes.
+- With an agent token an added or changed item has `confirmed: false`.
+  `policy_confirm` and `enabled: true` on a rule are the owner's (`403
+  forbidden`). A rule is stored and validated; nothing applies it at collection
+  yet (`signals_applied: false`).
 
 ## Manage collection and the archive
 

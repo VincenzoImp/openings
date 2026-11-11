@@ -1,7 +1,7 @@
 # Job search operator workspace
 
 This directory is where an AI agent operates the owner's Openings workspace.
-Openings holds the professional record: Profile and decision policy, Career
+Openings holds the professional record: Profile, the owner's policy, Career
 evidence, claims, templates, writing rules, jobs and applications. This
 directory holds only the operating method and the connection setup.
 
@@ -10,7 +10,7 @@ directory holds only the operating method and the connection setup.
 The owner hands the job search to the agent, to run and to improve. Without
 waiting for a request, the agent may review the Inbox and shortlist, prepare a
 CV and letter Draft for every shortlisted job, improve the Profile, Career
-record, claims and templates, tune searches and monitored companies, track the
+record, claims and templates, propose policy items for the owner to confirm, tune searches and monitored companies, track the
 pipeline, and propose improvements to the method or to Openings itself.
 Decide, act, verify and report what changed, what is left and which facts are
 needed. Each workflow opens a run in Openings, reads the owner's open requests and
@@ -47,10 +47,11 @@ copies them into `.agents/skills/`.
 ## Writing and evidence
 
 Write professional text in clear international English unless a posting or
-the owner's Profile asks otherwise; speak with the owner in their language.
+the owner's policy asks otherwise; speak with the owner in their language.
 Keep personal work, team work, system capabilities and measured results
 distinct. Preserve dates, contribution scope and source confidence. Preferences
-live in the Profile and Career records; Drafts the owner closes and jobs agents
+live in the policy and the Career record, and only the owner confirms a policy
+item; Drafts the owner closes and jobs agents
 dismissed are not preference signals.
 
 ## Directory boundary

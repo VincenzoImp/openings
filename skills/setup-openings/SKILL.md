@@ -69,8 +69,9 @@ stored [run report](../openings-workspace/references/run-report.md).
 ## Onboard the owner
 
 To try the workflow before sharing personal data, import the repository's
-synthetic `examples/career.json` and use `examples/resume.tex` and
-`examples/cover-letter.tex`; replace them with the owner's records afterwards.
+synthetic `examples/career.json`, add the items of `examples/policy.json` and use
+`examples/resume.tex` and `examples/cover-letter.tex`; replace them with the
+owner's records afterwards.
 
 Work in this order; each step uses records the next ones need.
 
@@ -79,11 +80,17 @@ Work in this order; each step uses records the next ones need.
    inspect every created entry. Then follow
    [Maintain Career](../maintain-career/SKILL.md): integrated descriptions, dates,
    personal versus team scope, approved claims. Ask focused questions for gaps.
-2. **Profile and policy.** Ask about target roles, seniority, locations and
-   remote work, work authorization, availability, languages, and hard
-   exclusions. Record the owner's words in `preferences` and a structured
-   `metadata.decision_policy` (include, exclude, eligibility, geography, stretch,
-   uncertainty rules), each fact dated with its source.
+2. **Profile and policy.** Fill the Profile's typed fields (name, contact,
+   headline, summary, links). Ask about target roles, seniority, locations and
+   remote work, work authorization, availability, languages, hard exclusions
+   and how documents should read. Record each answer as one policy item in the
+   owner's words (`policy_add`): rules for shortlisting and dismissing in
+   `decision`, facts employers ask about in `eligibility`, document rules in
+   `writing` with a scope, anything else in `facts`. Your items are proposals:
+   ask the owner to open **Policy** in the dashboard and confirm them, and do
+   not rely on an unconfirmed item. In a workspace upgraded from an earlier
+   version, sort the copied items first as
+   [Maintain Career](../maintain-career/SKILL.md) describes.
 3. **Templates.** Start from the repository `examples/resume.tex` and
    `examples/cover-letter.tex` or the owner's own documents. Build a one-page CV
    MASTER from the Career record, compile it, check the PDF, and store source,
@@ -92,7 +99,7 @@ Work in this order; each step uses records the next ones need.
    language register, evidence rules, what never to claim.
 5. **Searches.** Follow [Manage sources](../manage-sources/SKILL.md): keyword
    searches for the target roles and locations, plus company boards for
-   employers that match the Profile. Preview, then enable schedules.
+   employers that match the policy. Preview, then enable schedules.
 
 ## Hand over
 

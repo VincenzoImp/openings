@@ -35,6 +35,8 @@ import {
   Rows3,
   Rows4,
   TriangleAlert,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 
 const icons = {
@@ -74,6 +76,8 @@ const icons = {
   comfortable: Rows3,
   compact: Rows4,
   warning: TriangleAlert,
+  up: ChevronUp,
+  down: ChevronDown,
 };
 export type IconName = keyof typeof icons;
 

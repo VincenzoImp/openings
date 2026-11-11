@@ -399,9 +399,6 @@
   gap: 7px;
   flex-wrap: wrap;
 }
-:where(.legacy) .jobmeta .sep {
-  opacity: 0.45;
-}
 :where(.legacy) .date {
   font-size: 10px;
   color: var(--muted);
@@ -421,12 +418,6 @@
   overflow-x: auto;
   padding-bottom: 12px;
   min-height: 410px;
-}
-:where(.legacy) .column {
-  background: color-mix(in srgb, var(--shell) 40%, transparent);
-  border-radius: 8px;
-  min-height: 390px;
-  padding: 10px;
 }
 :where(.legacy) .application-card {
   background: var(--card);
@@ -509,75 +500,6 @@
   padding-top: 18px;
   font-size: 10px;
   color: var(--muted);
-}
-:where(.legacy) .narrative {
-  font-size: 12px;
-  line-height: 1.9;
-  color: var(--muted);
-  max-width: 800px;
-}
-:where(.legacy) .claimrow {
-  padding: 19px 23px;
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  gap: 18px;
-}
-:where(.legacy) .claimrow:last-child {
-  border-bottom: 0;
-}
-:where(.legacy) .claimrow p {
-  font-size: 12px;
-  color: var(--ink);
-  margin-bottom: 5px;
-}
-:where(.legacy) .claimrow small {
-  font-size: 10px;
-  color: var(--muted);
-}
-:where(.legacy) .claimrow .claimcopy {
-  flex: 1;
-}
-:where(.legacy) .templates-layout {
-  display: grid;
-  grid-template-columns: 235px minmax(0, 1fr);
-  gap: 22px;
-}
-:where(.legacy) .template-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-:where(.legacy) .template-option {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 17px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--card);
-}
-:where(.legacy) .template-option.active {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-:where(.legacy) .template-option strong {
-  font-size: 11px;
-  font-weight: 500;
-  display: block;
-}
-:where(.legacy) .template-option small {
-  display: block;
-  font-size: 9px;
-  color: var(--muted);
-  margin-top: 6px;
-}
-:where(.legacy) .template-option .tag {
-  margin-top: 12px;
-}
-:where(.legacy) .code {
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 10px;
 }
 :where(.legacy) .source-editor {
   background: var(--paper);
@@ -798,9 +720,6 @@
   flex-direction: column;
   gap: 14px;
 }
-:where(.legacy) .hide {
-  display: none !important;
-}
 @media (max-width: 1120px) {
   :where(.legacy) .jobrow {
     grid-template-columns: 35px minmax(150px, 1fr) 110px 30px;
@@ -809,9 +728,6 @@
   }
   :where(.legacy) .jobrow .location-col {
     font-size: 9px;
-  }
-  :where(.legacy) .templates-layout {
-    grid-template-columns: 200px minmax(0, 1fr);
   }
   :where(.legacy) .stats {
     gap: 11px;
@@ -832,9 +748,6 @@
   }
   :where(.legacy) .stat {
     padding: 17px;
-  }
-  :where(.legacy) .templates-layout {
-    grid-template-columns: 190px minmax(0, 1fr);
   }
   :where(.legacy) .toolbar {
     flex-wrap: wrap;
@@ -954,38 +867,6 @@
   }
   :where(.legacy) .section-footer {
     align-items: flex-start;
-  }
-  :where(.legacy) .templates-layout {
-    display: block;
-  }
-  :where(.legacy) .template-list {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin-bottom: 18px;
-  }
-  :where(.legacy) .template-option {
-    padding: 11px;
-  }
-  :where(.legacy) .template-option strong {
-    font-size: 10px;
-  }
-  :where(.legacy) .template-option small {
-    font-size: 8px;
-  }
-  :where(.legacy) .template-option .tag {
-    font-size: 7px;
-    padding: 2px 4px;
-  }
-  :where(.legacy) .claimrow {
-    padding: 16px;
-    gap: 10px;
-  }
-  :where(.legacy) .claimrow p {
-    font-size: 11px;
-  }
-  :where(.legacy) .claimrow .tag {
-    display: none;
   }
   :where(.legacy) .table-wrap {
     overflow: auto;
@@ -1426,64 +1307,6 @@
   flex-shrink: 0;
   accent-color: var(--accent);
 }
-:where(.legacy) .global-instructions {
-  margin-bottom: 25px;
-}
-:where(.legacy) .evidence-files {
-  font-size: 12px;
-  margin-top: 19px;
-  color: var(--muted);
-}
-:where(.legacy) .evidence-files summary {
-  cursor: pointer;
-  padding: 7px 0;
-}
-:where(.legacy) .claim-approval input {
-  width: 17px;
-  height: 17px;
-  accent-color: var(--accent);
-}
-:where(.legacy) .claimrow .claimcopy {
-  min-width: 0;
-}
-:where(.legacy) .claimrow p {
-  font-size: 13px;
-  line-height: 1.8;
-  color: var(--ink);
-}
-:where(.legacy) .claimrow small {
-  font-size: 11px;
-}
-:where(.legacy) .import-preview {
-  max-height: 360px;
-  overflow: auto;
-  display: grid;
-  gap: 12px;
-}
-:where(.legacy) .import-preview article {
-  padding: 17px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-:where(.legacy) .import-preview h3 {
-  margin: 10px 0 7px;
-}
-:where(.legacy) .import-preview p {
-  font-size: 12px;
-  line-height: 1.8;
-}
-:where(.legacy) .template-option.active {
-  border-color: var(--accent);
-  background: var(--accent-bg);
-}
-:where(.legacy) .template-option strong {
-  font-size: 13px;
-  line-height: 1.6;
-}
-:where(.legacy) .template-option small {
-  font-size: 11px;
-  line-height: 1.7;
-}
 :where(.legacy) .source-editor {
   font-size: 12px;
   line-height: 1.8;
@@ -1654,34 +1477,6 @@
     flex-wrap: wrap;
     gap: 7px;
   }
-  :where(.legacy) .claimrow {
-    flex-wrap: wrap;
-  }
-  :where(.legacy) .claimrow .claimcopy {
-    flex: 1;
-    min-width: 190px;
-  }
-  :where(.legacy) .claimrow > .tag {
-    display: none;
-  }
-  :where(.legacy) .template-list {
-    grid-template-columns: 1fr 1fr;
-  }
-  :where(.legacy) .templates-layout {
-    display: block;
-  }
-  :where(.legacy) .template-list {
-    margin-bottom: 18px;
-  }
-  :where(.legacy) .template-option {
-    padding: 13px;
-  }
-  :where(.legacy) .template-option strong {
-    font-size: 12px;
-  }
-  :where(.legacy) .template-option small {
-    font-size: 10px;
-  }
   :where(.legacy) .token-form {
     flex-wrap: wrap;
   }
@@ -1712,25 +1507,6 @@
   :where(.legacy) .new-token .actions .btn {
     flex: 1;
   }
-}
-:where(.legacy) .import-profile {
-  padding: 17px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  margin-bottom: 15px;
-}
-:where(.legacy) .import-profile dl {
-  font-size: 12px;
-  line-height: 1.8;
-}
-:where(.legacy) .import-profile dt {
-  text-transform: capitalize;
-  color: var(--muted);
-}
-:where(.legacy) .import-profile dd {
-  margin: 0 0 12px;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }
 :where(.legacy) .manage-questions {
   margin-bottom: 22px;
@@ -1778,28 +1554,25 @@
     display: block;
   }
 }
-:where(.legacy) .profile-layout,
+
 :where(.legacy) .settings-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 22px;
   align-items: stretch;
 }
-:where(.legacy) .profile-layout {
-  grid-template-columns: minmax(0, 1fr);
-}
-:where(.legacy) .profile-layout > .form-section,
+
 :where(.legacy) .settings-grid > .form-section {
   margin-top: 0;
 }
-:where(.legacy) .profile-layout > .card,
+
 :where(.legacy) .settings-grid > .card {
   min-width: 0;
 }
 :where(.legacy) .settings-content {
   max-width: none;
 }
-:where(.legacy) .profile-links,
+
 :where(.legacy) .provider-choices,
 :where(.legacy) .selection-box {
   border: 1px solid var(--line);
@@ -1808,22 +1581,12 @@
   margin: 0 0 18px;
   min-width: 0;
 }
-:where(.legacy) .profile-links legend,
+
 :where(.legacy) .provider-choices legend,
 :where(.legacy) .selection-box legend {
   padding: 0 6px;
   color: var(--muted);
   font-size: 12px;
-}
-:where(.legacy) .link-editor {
-  display: grid;
-  grid-template-columns: minmax(95px, 0.7fr) minmax(120px, 1.3fr) 30px;
-  gap: 8px;
-  margin-bottom: 10px;
-  align-items: center;
-}
-:where(.legacy) .profile-links .btn {
-  margin-top: 5px;
 }
 :where(.legacy) .provider-choices {
   display: flex;
@@ -2150,7 +1913,6 @@
   }
 }
 @media (max-width: 950px) {
-  :where(.legacy) .profile-layout,
   :where(.legacy) .settings-grid {
     grid-template-columns: 1fr;
   }
@@ -2179,7 +1941,6 @@
   }
 }
 @media (max-width: 600px) {
-  :where(.legacy) .profile-layout,
   :where(.legacy) .settings-grid,
   :where(.legacy) .provider-grid {
     grid-template-columns: 1fr;
@@ -2241,12 +2002,6 @@
   }
   :where(.legacy) .period-controls .btn {
     margin-bottom: 0;
-  }
-  :where(.legacy) .link-editor {
-    grid-template-columns: minmax(0, 1fr) 30px;
-  }
-  :where(.legacy) .link-editor > input:first-child {
-    grid-column: 1/-1;
   }
   :where(.legacy) .provider-choices {
     gap: 12px;
@@ -2346,214 +2101,6 @@
 }
 :where(.legacy) .password-form .form-actions {
   justify-content: flex-end;
-}
-/* Career headers remain compact; descriptions and claims open on demand. */
-:where(.legacy) .career-entry-list {
-  display: grid;
-  gap: 10px;
-}
-:where(.legacy) .career-entry-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 20px;
-  align-items: center;
-  padding: 18px 22px;
-}
-:where(.legacy) .career-entry-copy {
-  min-width: 0;
-}
-:where(.legacy) .career-entry-copy h3 {
-  margin: 5px 0;
-  line-height: 1.5;
-}
-:where(.legacy) .career-entry-title {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--ink);
-  font: inherit;
-  font-size: 15px;
-  font-weight: 550;
-  text-align: left;
-  overflow-wrap: anywhere;
-  cursor: pointer;
-}
-:where(.legacy) .career-entry-title:hover {
-  color: var(--accent);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-:where(.legacy) .career-entry-organization {
-  font-size: 12px;
-  color: var(--muted);
-  overflow-wrap: anywhere;
-}
-:where(.legacy) .career-entry-preview {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.7;
-  margin-top: 8px;
-}
-:where(.legacy) .career-preview-label {
-  font-size: 11px;
-  font-weight: 550;
-}
-:where(.legacy) .career-entry-meta {
-  align-self: start;
-  padding-top: 22px;
-  display: grid;
-  gap: 5px;
-  text-align: right;
-}
-:where(.legacy) .career-entry-meta small {
-  color: var(--muted);
-  font-size: 11px;
-}
-:where(.legacy) .career-entry-dates {
-  font-size: 12px;
-}
-:where(.legacy) .career-entry-actions {
-  align-self: start;
-  margin-top: 17px;
-  gap: 4px;
-}
-:where(.legacy) .career-detail-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-:where(.legacy) .career-detail-organization {
-  margin: 8px 0;
-  font-size: 16px;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
-}
-:where(.legacy) .career-detail-header .muted {
-  font-size: 13px;
-}
-:where(.legacy) .career-skill-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin: 20px 0 26px;
-}
-:where(.legacy) .career-skill-tags .tag {
-  max-width: 100%;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-:where(.legacy) .career-description {
-  padding-bottom: 24px;
-  margin-bottom: 24px;
-  border-bottom: 1px solid var(--line);
-}
-:where(.legacy) .career-description h3,
-:where(.legacy) .career-entry-claims h3 {
-  font-size: 17px;
-}
-:where(.legacy) .career-description .narrative {
-  white-space: pre-wrap;
-  margin-top: 10px;
-  overflow-wrap: anywhere;
-}
-:where(.legacy) .career-entry-claims {
-  margin-top: 26px;
-}
-:where(.legacy) .career-entry-claims .sectiontitle {
-  margin-bottom: 14px;
-}
-:where(.legacy) .career-entry-claims .sectiontitle p {
-  line-height: 1.7;
-}
-:where(.legacy) .entry-scoped-claims .claimrow {
-  align-items: flex-start;
-  padding: 16px 12px;
-  gap: 10px;
-}
-:where(.legacy) .claim-actions {
-  flex-shrink: 0;
-  gap: 3px;
-}
-:where(.legacy) .career-date-fields {
-  border: 1px solid var(--line);
-  padding: 16px;
-  border-radius: 8px;
-  margin: 0 0 18px;
-}
-:where(.legacy) .career-date-fields legend {
-  padding: 0 6px;
-  font-size: 12px;
-  font-weight: 550;
-}
-:where(.legacy) .career-date-parts {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 14px;
-}
-:where(.legacy) .career-date-parts > .field + .field {
-  margin-top: 0;
-}
-:where(.legacy) .career-date-fields .field {
-  min-width: 0;
-}
-:where(.legacy) .career-date-fields .field:last-child {
-  margin-bottom: 0;
-}
-:where(.legacy) .career-date-fields .checkline {
-  margin: 12px 0 18px;
-}
-@media (max-width: 700px) {
-  :where(.legacy) .career-entry-card {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 12px;
-    padding: 16px;
-  }
-  :where(.legacy) .career-entry-meta {
-    padding-top: 0;
-    grid-column: 1;
-    grid-row: 2;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px 14px;
-    text-align: left;
-    align-items: baseline;
-  }
-  :where(.legacy) .career-entry-actions {
-    grid-column: 2;
-    grid-row: 1 / 3;
-  }
-  :where(.legacy) .career-entry-title {
-    font-size: 14px;
-  }
-  :where(.legacy) .career-detail-header {
-    flex-wrap: wrap;
-  }
-  :where(.legacy) .career-detail-header .btn {
-    flex-shrink: 0;
-  }
-  :where(.legacy) .career-claims-list .claimrow {
-    display: grid;
-    grid-template-columns: 20px minmax(0, 1fr);
-    gap: 8px 10px;
-    padding: 16px 12px;
-  }
-  :where(.legacy) .career-claims-list .claimrow .claimcopy {
-    min-width: 0;
-  }
-  :where(.legacy) .career-claims-list .claim-actions {
-    grid-column: 2;
-    justify-self: end;
-  }
-  :where(.legacy) .career-date-fields {
-    padding: 12px;
-  }
 }
 /* Collection forms keep acquisition choices separate from schedules and HTTP policy. */
 :where(.legacy) .collection-form-section {
@@ -2911,13 +2458,11 @@
   margin-bottom: 22px;
 }
 :where(.legacy) .agent-preparation > summary,
-:where(.legacy) .job-maintenance > summary,
-:where(.legacy) .global-instructions > summary {
+:where(.legacy) .job-maintenance > summary {
   cursor: pointer;
   font-weight: 600;
 }
-:where(.legacy) .agent-preparation[open] > summary,
-:where(.legacy) .global-instructions[open] > summary {
+:where(.legacy) .agent-preparation[open] > summary {
   margin-bottom: 16px;
 }
 :where(.legacy) .job-maintenance {
@@ -2967,9 +2512,6 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-:where(.legacy) .mobile-template-picker {
-  display: none;
-}
 :where(.legacy) .application-list {
   overflow: auto;
 }
@@ -2977,16 +2519,6 @@
   min-width: 118px;
 }
 @media (max-width: 600px) {
-  :where(.legacy) .mobile-template-picker {
-    display: block;
-    margin-bottom: 18px;
-  }
-  :where(.legacy) .templates-layout > .template-list {
-    display: none;
-  }
-  :where(.legacy) .global-instructions {
-    padding: 16px;
-  }
   :where(.legacy) .application-list {
     background: none;
     border: none;

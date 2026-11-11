@@ -64,8 +64,8 @@ Draft left the queue.
 
 ## Prioritize Drafts
 
-Order ready Drafts for the owner: live deadlines first, then fit with the Profile
-decision policy, then posting age. `sort: "deadline"` and `sort: "priority"` list
+Order ready Drafts for the owner: live deadlines first, then fit with the
+policy's decision items, then posting age. `sort: "deadline"` and `sort: "priority"` list
 dated or prioritized attempts first, combined with `readiness: "ready"`. Give one line per Draft with the reason.
 Do not invent deadlines; mark unknown ones as unknown. Record a deadline the
 posting or owner states, and an owner-agreed `priority`, on the application.
@@ -86,5 +86,5 @@ When enough outcomes exist, summarize employer responses (interview, offer,
 rejection, no reply) by role type, seniority, location and source, with counts.
 Do not read Drafts the owner closed without applying as preferences: the owner
 applies to every feasible prepared Draft, and closures record feasibility. Present patterns as observations for the owner to weigh, not
-as changes to the Profile policy. Report using the shared
+as changes to the policy. Report using the shared
 [run report](../openings-workspace/references/run-report.md).

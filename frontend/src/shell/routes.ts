@@ -38,6 +38,7 @@ export const NAV: NavGroup[] = [
     group: "Library",
     items: [
       { id: "career", label: "Career" },
+      { id: "policy", label: "Policy" },
       { id: "templates", label: "Templates" },
     ],
   },
@@ -61,6 +62,7 @@ export const SCREENS: Record<string, string> = {
   shortlist: "Shortlist",
   activity: "Activity",
   career: "Career",
+  policy: "Policy",
   templates: "Templates",
   collection: "Collection",
   settings: "Settings",
@@ -71,6 +73,9 @@ export const ALIASES: Record<string, string> = {
   today: "overview",
   jobs: "inbox",
 };
+
+/** Screens built with the design system; the others keep the older stylesheet. */
+export const REBUILT = ["career", "policy", "templates"];
 
 export const HOME = "overview";
 

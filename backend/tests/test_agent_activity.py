@@ -21,7 +21,7 @@ from openings.career import (
     TemplateCreate,
     TemplateUpdate,
 )
-from openings.db import Database
+from openings.db import SCHEMA_VERSION, Database
 from openings.discovery import CollectionWrite, DiscoveryService, SourceCreate, SourcePatch
 from openings.documents import ContextCreate, DocumentCreate, DocumentService, UploadReservation
 from openings.errors import DomainError
@@ -631,7 +631,7 @@ def test_schema_seven_upgrade_preserves_rows_and_matches_a_new_workspace(tmp_pat
     upgraded = Workspace(path)
     fresh = Database(tmp_path / "fresh.sqlite")
     with sqlite3.connect(path) as conn, sqlite3.connect(fresh.path) as reference:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert not conn.execute("PRAGMA foreign_key_check").fetchall()
         assert table_names(conn) == table_names(reference)
@@ -706,7 +706,7 @@ def test_restore_upgrades_a_schema_seven_backup_without_changing_it(tmp_path):
     assert source.read_bytes() == original
     target = app.state.workspace
     with target.db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     assert target.get_application(application["id"])["note"] == "Synthetic guidance"
     assert target.get_note(note["id"])["body"] == "Synthetic note"
     # The backup's own history is intact and unattributed; the restore itself is recorded.

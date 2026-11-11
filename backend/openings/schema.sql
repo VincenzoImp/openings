@@ -98,7 +98,12 @@ CREATE TABLE IF NOT EXISTS knowledge (
 CREATE TABLE IF NOT EXISTS claims (
  id TEXT PRIMARY KEY, knowledge_id TEXT NOT NULL REFERENCES knowledge(id) ON DELETE CASCADE,
  text TEXT NOT NULL, approved INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL DEFAULT 0 CHECK(position>=0), metadata TEXT NOT NULL DEFAULT '{}',
- version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+ version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ -- Typed selection fields (schema 10): in the CV unless the job says otherwise, how
+ -- strongly the claim is preferred, and a free short group name.
+ default_in_cv INTEGER NOT NULL DEFAULT 0 CHECK(default_in_cv IN (0,1)),
+ role TEXT NOT NULL DEFAULT 'supporting' CHECK(role IN ('core','supporting','bench')),
+ "group" TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS templates (
  id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('resume','cover_letter')),
@@ -119,7 +124,9 @@ CREATE TABLE IF NOT EXISTS contexts (
 CREATE TABLE IF NOT EXISTS context_inputs (
  context_id TEXT PRIMARY KEY REFERENCES contexts(id) ON DELETE CASCADE,
  created_at TEXT NOT NULL, profile_version INTEGER, instructions_version INTEGER,
- templates TEXT NOT NULL DEFAULT '[]', knowledge TEXT NOT NULL DEFAULT '[]', claims TEXT NOT NULL DEFAULT '[]'
+ templates TEXT NOT NULL DEFAULT '[]', knowledge TEXT NOT NULL DEFAULT '[]', claims TEXT NOT NULL DEFAULT '[]',
+ -- Policy section versions, {"decision":3,...}; NULL for a context frozen before schema 10.
+ policy TEXT
 );
 CREATE TABLE IF NOT EXISTS documents (
  id TEXT PRIMARY KEY, application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
@@ -281,4 +288,30 @@ CREATE VIEW IF NOT EXISTS context_files AS
 CREATE VIEW IF NOT EXISTS all_files AS
  SELECT id,sha256,name,media_type,size,knowledge_id,template_id,context_id,document_id,job_id,created_at FROM files
  UNION ALL SELECT id,sha256,name,media_type,size,knowledge_id,template_id,context_id,document_id,job_id,created_at FROM context_files;
-PRAGMA user_version=9;
+-- The owner's policy (policy.py): four sections with their own version, and their items.
+-- An item without confirmed_at is a proposal; origin marks a value copied from the Profile.
+CREATE TABLE IF NOT EXISTS policy_sections (
+ section TEXT PRIMARY KEY CHECK(section IN ('decision','eligibility','writing','facts')),
+ version INTEGER NOT NULL DEFAULT 0, updated_at TEXT,
+ updated_by_kind TEXT, updated_by_id TEXT, updated_by_name TEXT, updated_by_token_kind TEXT
+);
+CREATE TABLE IF NOT EXISTS policy_items (
+ id TEXT PRIMARY KEY, section TEXT NOT NULL REFERENCES policy_sections(section),
+ position INTEGER NOT NULL DEFAULT 0 CHECK(position>=0),
+ label TEXT NOT NULL, statement TEXT NOT NULL DEFAULT '',
+ value TEXT CHECK(value IS NULL OR json_valid(value)),
+ value_type TEXT CHECK(value_type IS NULL OR value_type IN ('text','number','date','boolean','list','structured')),
+ note TEXT NOT NULL DEFAULT '',
+ scope TEXT CHECK(scope IS NULL OR scope IN ('cv','letter','all')),
+ rule TEXT CHECK(rule IS NULL OR json_valid(rule)),
+ enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)),
+ origin TEXT, origin_key TEXT,
+ confirmed_at TEXT, confirmed_by_kind TEXT, confirmed_by_id TEXT, confirmed_by_name TEXT, confirmed_by_token_kind TEXT,
+ created_by_kind TEXT, created_by_id TEXT, created_by_name TEXT, created_by_token_kind TEXT,
+ updated_by_kind TEXT, updated_by_id TEXT, updated_by_name TEXT, updated_by_token_kind TEXT,
+ idempotency_key TEXT UNIQUE, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ CHECK((value IS NULL)=(value_type IS NULL))
+);
+CREATE INDEX IF NOT EXISTS policy_items_section ON policy_items(section,position);
+INSERT OR IGNORE INTO policy_sections(section) VALUES ('decision'),('eligibility'),('writing'),('facts');
+PRAGMA user_version=10;
