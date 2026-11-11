@@ -224,9 +224,12 @@ def _migrate_7_to_8(conn):
 def _migrate_8_to_9(conn):
     # Storage only: frozen payloads become shared content-addressed parts and context
     # asset files leave the files table. Every context reads back byte for byte.
+    # Re-sighting events go and observations keep only the provider values in use.
+    from .retention import trim_history
     from .snapshots import migrate_contexts
 
     migrate_contexts(conn)
+    trim_history(conn)
 
 
 # Each step upgrades from its key to the next version; steps chain inside one transaction.

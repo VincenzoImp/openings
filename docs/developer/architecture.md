@@ -24,6 +24,8 @@ flowchart LR
 | `backend/openings/career.py` | Profile, detailed evidence, claims, templates and instructions |
 | `backend/openings/documents.py` | Frozen contexts, document revisions and scoped file transfers |
 | `backend/openings/snapshots.py`, `compaction.py` | Content-addressed storage of frozen contexts; giving freed pages back to the data volume |
+| `backend/openings/retention.py` | Refresh events, what an observation stores, pruning of finished collection runs and tasks |
+| `backend/openings/operations.py` | Backup credentials, restore, the room a restore needs and storage status |
 | `backend/openings/activity.py`, `actors.py` | Actor of each change, agent runs with reports, questions for the owner, change log |
 | `backend/openings/agent_requests.py`, `subjects.py` | Requests for the agent; the subject reference shared with questions |
 | `backend/openings/discovery.py` | Typed sources, schedules and queue operations |
@@ -53,6 +55,12 @@ dashboard path, and lists every gap. Read [REST](../user/api.md) and
   in memory and recomputed only for jobs whose version changed.
 - **Corrections:** source refreshes preserve user edits, triage and application
   attempts.
+- **Refreshes:** seeing a posting again updates its observation (`last_seen_at`,
+  `content_hash`) and leaves no event. A refresh that changes the title, company,
+  location or posting text leaves one `job_refreshed` event naming those fields.
+  An observation's `payload` holds only what is read back: `source_key` (finding
+  the observation again) and `raw.job_url_direct` (the employer's apply link used
+  by duplicate scoring); add a field there only together with its reader.
 - **Lifecycle:** triage (`inbox`/`saved`/`dismissed`) stores interest independently.
   The derived `queue=inbox` and `queue=shortlist` exclude any application history;
   Shortlist requires saved interest. Starting an application retains saved interest
@@ -149,6 +157,28 @@ lists. When at least a quarter of the file (and `OPENINGS_COMPACT_MIN_MB`, defau
 32) is free afterwards, or after large deletions, `compaction.py` rewrites the file
 at start: a compact copy beside the database is copied back in one transaction, so
 an interruption leaves the previous file valid and the next start tries again.
+The same upgrade step (`retention.trim_history`) deletes `posting_updated` events
+that recorded a re-sighting, turns the others into `job_refreshed`, and reduces
+stored provider payloads to the two values above; the compaction returns the
+freed pages. A database already at the unreleased schema 9 does not get this.
+
+Retention is one environment setting, `OPENINGS_RETENTION_DAYS` (default 90, 0
+off). The scheduler thread calls `retention.prune` at start and every six hours;
+a pass is one short transaction that removes at most 500 finished collection
+runs (their tasks cascade), finished tasks without a run and the change records
+of removed runs and tasks, and repeats after a minute while more remain. A run
+with a queued or running task is never finished, the 20 most recent finished
+runs of every source stay, and events of jobs, applications and agent runs are
+never pruned.
+
+A restore of *B* bytes over a database of *D* bytes needs 3 *B* + *D* +
+max(0, *B* − *D*) + 64 MiB free on the data volume: the upload, the upgraded
+copy, the rollback copy, the write-ahead log that receives the restored pages
+and the growth of the file. `operations.restore_limit` inverts that for the
+free space; `OPENINGS_MAX_RESTORE_MB` only lowers it. The route refuses a larger
+upload before writing it and the service checks the replacement's room again
+with the real sizes. `storage_status` feeds `GET /workspace` and
+`workspace_info`.
 
 Schema 8 shipped with 0.17.0. Opening schema 7 upgrades it in the same
 transaction: events gain a subject, an actor and a run, notes gain an author,
