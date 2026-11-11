@@ -89,6 +89,7 @@ await shot("shortlist");
 await open("inbox?queue=duplicates");
 if (!(await page.getByRole("heading", { name: "Possible duplicates" }).count()))
   await page.getByRole("tab", { name: "Possible duplicates" }).click();
+await page.getByLabel("Confidence").selectOption("0.85");
 await shot("duplicates");
 
 await open("applications");

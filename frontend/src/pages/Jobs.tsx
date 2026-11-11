@@ -25,6 +25,7 @@ import {
   useWorkspace,
 } from "../state";
 import { FileManager } from "../files";
+import { ConfidenceFilter, ConfidenceTags } from "./DuplicateConfidence";
 import {
   AdvancedJson,
   Pagination,
@@ -1335,10 +1336,6 @@ function MergeJob({
   );
 }
 
-const signalLabels: Record<string, string> = {
-  company_title: "Same company and role",
-  posting_text: "Identical posting text",
-};
 function DuplicateJobLine({
   item,
   reference,
@@ -1384,10 +1381,12 @@ function DuplicateJobLine({
 function DuplicateGroups({ onOpen }: { onOpen: (id: string) => void }) {
   const [queue, setQueue] = useState(""),
     [sameLocation, setSameLocation] = useState(false),
+    [minConfidence, setMinConfidence] = useState("0.5"),
     [offset, setOffset] = useState(0);
   const params = new URLSearchParams({
     limit: "20",
     offset: String(offset),
+    min_confidence: minConfidence,
   });
   if (queue) params.set("queue", queue);
   if (sameLocation) params.set("match_location", "true");
@@ -1412,6 +1411,13 @@ function DuplicateGroups({ onOpen }: { onOpen: (id: string) => void }) {
           <option value="applications">A job with applications</option>
           <option value="dismissed">A dismissed job</option>
         </select>
+        <ConfidenceFilter
+          value={minConfidence}
+          onChange={(value) => {
+            setMinConfidence(value);
+            setOffset(0);
+          }}
+        />
         <label className="checkline">
           <input
             type="checkbox"
@@ -1433,7 +1439,8 @@ function DuplicateGroups({ onOpen }: { onOpen: (id: string) => void }) {
       ) : !resource.data.items.length ? (
         <section className="card">
           <Empty title="No possible duplicates">
-            No records share a company and role or identical posting text.
+            No records match at this confidence. Company and role alone are
+            listed under “Every candidate”.
           </Empty>
         </section>
       ) : (
@@ -1446,11 +1453,11 @@ function DuplicateGroups({ onOpen }: { onOpen: (id: string) => void }) {
             >
               <header>
                 <strong>{group.size} records</strong>
-                {group.signals.map((signal) => (
-                  <span className="tag neutral" key={signal}>
-                    {signalLabels[signal] || signal}
-                  </span>
-                ))}
+                <ConfidenceTags
+                  confidence={group.confidence}
+                  tier={group.tier}
+                  reasons={group.reasons}
+                />
                 {group.merge_blocked && (
                   <span className="tag amber">
                     {group.open_application_ids.length} open applications
@@ -1483,9 +1490,9 @@ function DuplicateGroups({ onOpen }: { onOpen: (id: string) => void }) {
         onChange={setOffset}
       />
       <p className="hint">
-        Groups are suggestions from matching company and role or identical
-        posting text. Nothing is merged automatically: compare employer,
-        requisition, location and level before merging.
+        Groups are suggestions scored from requisition IDs, apply links, posting
+        text, company, role and location. Nothing is merged automatically:
+        compare employer, requisition, location and level before merging.
       </p>
     </>
   );
@@ -1512,10 +1519,17 @@ function DuplicatePanel({
         <Loading />
       ) : !others.length ? (
         <p className="muted smalltext">
-          No other records share this company and role or posting text.
+          No other records are likely copies of this vacancy.
         </p>
       ) : (
         <>
+          <span className="duplicate-meta">
+            <ConfidenceTags
+              confidence={group.confidence}
+              tier={group.tier}
+              reasons={group.reasons}
+            />
+          </span>
           {group.merge_blocked && (
             <p className="smalltext">
               More than one record has an open application. Close one before
