@@ -14,20 +14,48 @@ merge near-duplicates. Two read-only operations find candidates without writing:
   looks up a URL or source key before ingestion. It returns every matching job
   with `matched_by`, triage and all application attempts. `identity_conflict:
   true` means several records already share that identity: merge before ingesting.
-- `jobs_duplicates({value: {queue?, job_id?, match_location?, limit, offset}})` or
-  `GET /jobs/duplicates` returns paginated candidate groups. A group joins jobs
-  with the same normalized company and title (legal suffixes and markers such as
-  `(m/f/d)` ignored; optionally the same location) or identical posting text.
-  Each group lists its `signals`, `identical_postings`, `open_application_ids`,
-  `merge_blocked` and a `reference_id` (open attempt, then any attempt, then
-  saved, then oldest). Items carry triage, attempts, `posting_hash` and advisory
-  `similarity` to the reference. `queue` keeps groups with at least one member in
-  that queue; `job_id` returns the group containing that job.
+- `jobs_duplicates({value: {queue?, job_id?, match_location?, min_confidence?,
+  limit, offset}})` or `GET /jobs/duplicates` returns paginated candidate groups,
+  most confident first. Each group has a `confidence` from 0 to 1, a `tier` and
+  `reasons: {matched, conflicts}`, with `signals` (the matched list),
+  `identical_postings`, `open_application_ids`, `merge_blocked` and a
+  `reference_id` (open attempt, then any attempt, then saved, then oldest). Items
+  carry triage, attempts, `posting_hash`, advisory text `similarity` and their own
+  `confidence` and `reasons` against the reference. `queue` keeps groups with at
+  least one member in that queue; `job_id` returns the group containing that job;
+  `match_location` drops pairs whose locations do not agree.
 
-These are review signals, not identity. The same vacancy often arrives from
-LinkedIn, Indeed, Glassdoor and the employer's ATS with the same text and
-different IDs; a shared template can also produce identical text for different
-requisitions.
+### Confidence and reasons
+
+`min_confidence` is the lowest group confidence returned; a group's confidence is
+its weakest link.
+
+| Tier | `min_confidence` | Typical evidence |
+|---|---|---|
+| `high` | `0.85` | The same apply link or ATS posting ID; a shared requisition ID with the same employer, title or text; the same company, title and location with nearly identical text. |
+| `medium` | `0.5` (default) | Nearly identical text under another company name; similar text; the same company, title and location when one record has no usable text; a record that fits two different vacancies. |
+| `low` | `0` | The same company and title only, or any match contradicted by location, requisition, level or text. |
+
+Matched signals: `apply_target` (the same ATS posting ID or URL, ignoring scheme,
+`www.` and tracking fields), `requisition_id` (an ID in the title or labelled in
+the text, such as "Req ID", "Referenznummer", "Référence" or "Rif."),
+`posting_text`, `near_identical_text`, `similar_text`, `company_title`, `company`
+(legal, corporate and country suffixes ignored: "Example", "Example AG" and
+"Example Switzerland" are one employer), `title`, `similar_title` and `location`.
+
+Conflicts: `requisition_id` and `apply_target` (both records name different IDs),
+`location` (different cities or countries; "Remote", a country alone or a missing
+location is unknown, not a conflict), `seniority`, `posting_text` (clearly
+different text), `posting_date` (published more than 60 days apart: possibly a
+re-opened vacancy, which is a new hiring round and never reaches the high tier)
+and `ambiguous` (the record matches two vacancies that differ from each other,
+for example a copy without a requisition ID next to two requisitions).
+
+These are review signals, not identity, and nothing is merged automatically. A
+high tier is a strong suggestion; an identical advertisement reused for two
+openings in different teams still looks like one vacancy. Company and title alone
+never prove a duplicate. Subsidiary or brand names ("Example" and "Example Labs")
+are joined only by an identifier or by text, usually in the medium tier.
 
 Compare employer and requisition ID first, then the actual apply destination,
 full duties, location, level and posting details. Follow a source link only when
@@ -75,6 +103,8 @@ Do not dismiss a job merely because its Draft has left actionable Shortlist.
 
 Build a stable cohort with `jobs_duplicates` (for example `queue: "shortlist"`
 before preparation, or `queue: "inbox"` before triage) and verify each group.
+Start with `min_confidence: 0.85`, continue with the default, and request `0`
+only for an exhaustive audit: the low tier is mostly different vacancies.
 Build a verified canonical-ID map before mutations. Skip a
 losing record after a confirmed merge and reuse the target's existing Draft or
 completed work. Re-read server state on rerun; notes and retained applications

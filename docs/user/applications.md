@@ -165,13 +165,22 @@ with one outcome, reopen Closed attempts to a stage, or delete them. Each attemp
 is checked separately; a failure, such as another open attempt for the same job,
 is listed without blocking the others.
 
-The **Possible duplicates** tab beside Inbox groups records that share a company
-and role or identical posting text, for example one vacancy collected from
-several job boards and the employer's site. It suggests a record to keep and
-never merges automatically. Open a job and expand **Job details, sources &
-maintenance** to see its possible duplicates and merge a verified copy.
+The **Possible duplicates** tab beside Inbox groups records that probably
+describe one vacancy, for example the same posting collected from several job
+boards and the employer's site. Each group shows a confidence and the reasons
+behind it: the same apply link or requisition ID, identical or nearly identical
+text, the same company, role and location, and anything that speaks against it,
+such as a different location, requisition, level or a posting published months
+apart. Company names are compared without legal, corporate and country suffixes.
 
-![Possible duplicates grouping one vacancy collected from three sources and another from two](../images/duplicates.png)
+Choose **High confidence** to see only strong matches, **Medium and high** (the
+default) to add probable ones, or **Every candidate** to include records that
+share only a company and role; most of those are different vacancies. The tab
+suggests a record to keep and never merges automatically. Open a job and expand
+**Job details, sources & maintenance** to see its likely duplicates and merge a
+verified copy.
+
+![Possible duplicates at high confidence: one vacancy collected from three sources and another from two, with the reasons for each group](../images/duplicates.png)
 
 Dismissing a job preserves its applications. Restore it before preparing new
 documents. If you previously dismissed an applied job just to clear Shortlist,
