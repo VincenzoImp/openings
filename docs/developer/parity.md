@@ -28,7 +28,7 @@ How to read the evidence:
 | Without REST or without MCP | 0 |
 | Without a working dashboard path | 2 |
 | Reached only through another operation | 3 |
-| With inputs the dashboard never mentions | 3 |
+| With inputs the dashboard never mentions | 4 |
 | With free-form JSON edited as raw JSON | 13 |
 | With different REST and MCP input names | 1 |
 | With a dashboard path exercised by e2e | 38 |
@@ -65,6 +65,7 @@ operation. They can be set over REST or MCP only.
 | Operation | Inputs | Remark |
 |---|---|---|
 | `jobs.create` | `raw`, `source_key` | `raw` and `source_key` are collector fields for scripted imports. |
+| `jobs.duplicates` | `min_confidence` | — |
 | `applications.create` | `deadline`, `priority`, `questions`, `requirements` | Starting an application sends the job only; plan fields and questions are edited afterwards (`applications.update`). |
 | `contexts.create` | `template_id` | The context dialog sends `template_ids`; `template_id` is the single-template form of the same input. |
 

@@ -242,6 +242,12 @@ class DuplicateQuery(Input):
     queue: Literal["inbox", "shortlist", "applications", "dismissed"] | None = None
     job_id: str | None = Field(default=None, max_length=100)
     match_location: bool = False
+    min_confidence: float = Field(
+        default=0.5,
+        ge=0,
+        le=1,
+        description="Lowest group confidence to return: 0.85 high tier only, 0.5 medium and high, 0 every candidate.",
+    )
     limit: int = Field(default=20, ge=1, le=100)
     offset: int = Field(default=0, ge=0)
 

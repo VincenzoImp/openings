@@ -209,7 +209,7 @@
         "jobs_duplicates"
       ],
       "dashboard": "Jobs: Possible duplicates tab; Job details: Possible duplicates",
-      "notes": "Read-only and paginated by group. Signals: normalized company+title (optionally location) and identical posting text; similarity is advisory. Never merges."
+      "notes": "Read-only and paginated by group, most confident first. Each group has a confidence in [0,1], a tier and the matched or conflicting signals (requisition id, apply target, posting text, company and title, location); min_confidence defaults to 0.5. Never merges."
     },
     {
       "id": "jobs.merge",

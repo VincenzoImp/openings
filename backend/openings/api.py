@@ -168,7 +168,7 @@ def register_core_mcp(mcp, workspace):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def jobs_duplicates(value: DuplicateQuery | None = None) -> dict:
-        """Read-only candidate duplicate groups (same normalized company+title, optional location, or identical posting text) with triage, attempts and text similarity. Verify before job_merge; never merges."""
+        """Read-only candidate duplicate groups, most confident first: each has a confidence in [0,1], a tier and the signals that matched or conflicted (requisition id, apply target, posting text, company and title, location), with triage and attempts. min_confidence defaults to 0.5; 0 lists every candidate. Verify before job_merge; never merges."""
         return workspace.duplicate_jobs(value or DuplicateQuery())
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
