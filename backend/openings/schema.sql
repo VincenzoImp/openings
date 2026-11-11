@@ -105,7 +105,11 @@ CREATE TABLE IF NOT EXISTS templates (
 CREATE UNIQUE INDEX IF NOT EXISTS templates_default ON templates(kind) WHERE is_default=1;
 CREATE TABLE IF NOT EXISTS contexts (
  id TEXT PRIMARY KEY, application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
- payload TEXT NOT NULL, signature TEXT NOT NULL, idempotency_key TEXT UNIQUE, created_at TEXT NOT NULL
+ signature TEXT NOT NULL, idempotency_key TEXT UNIQUE, created_at TEXT NOT NULL,
+ -- The payload is rebuilt from frame literals and context_parts (snapshots.py); the
+ -- other columns summarise it for lists.
+ frame TEXT NOT NULL DEFAULT '[]', job_title, company, note_preview, knowledge_count INTEGER,
+ claim_count INTEGER, template_name, file_count INTEGER NOT NULL DEFAULT 0
 );
 -- Derived from immutable contexts: the input versions each context froze. Rebuildable.
 CREATE TABLE IF NOT EXISTS context_inputs (
@@ -213,4 +217,36 @@ CREATE INDEX IF NOT EXISTS questions_job ON questions(job_id);
 CREATE INDEX IF NOT EXISTS questions_application ON questions(application_id);
 CREATE INDEX IF NOT EXISTS questions_knowledge ON questions(knowledge_id);
 CREATE INDEX IF NOT EXISTS questions_run ON questions(run_id);
-PRAGMA user_version=8;
+-- Content-addressed parts of frozen contexts; context files are served from them.
+CREATE TABLE IF NOT EXISTS snapshot_parts (
+ id INTEGER PRIMARY KEY, hash TEXT NOT NULL,
+ kind TEXT NOT NULL DEFAULT 'text' CHECK(kind IN ('text','list','asset')),
+ content TEXT NOT NULL, blob TEXT REFERENCES blobs(sha256),
+ UNIQUE(hash,kind), CHECK((kind='asset')=(blob IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS snapshot_parts_blob ON snapshot_parts(blob) WHERE blob IS NOT NULL;
+CREATE TABLE IF NOT EXISTS snapshot_list_items (
+ list_id INTEGER NOT NULL REFERENCES snapshot_parts(id) ON DELETE CASCADE,
+ position INTEGER NOT NULL, part_id INTEGER NOT NULL REFERENCES snapshot_parts(id),
+ PRIMARY KEY(list_id,position)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS snapshot_list_items_part ON snapshot_list_items(part_id);
+CREATE TABLE IF NOT EXISTS context_parts (
+ context_id TEXT NOT NULL REFERENCES contexts(id) ON DELETE CASCADE,
+ position INTEGER NOT NULL, part_id INTEGER NOT NULL REFERENCES snapshot_parts(id),
+ file_id TEXT, file_created_at TEXT,
+ PRIMARY KEY(context_id,position)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS context_parts_part ON context_parts(part_id);
+CREATE UNIQUE INDEX IF NOT EXISTS context_parts_file ON context_parts(file_id) WHERE file_id IS NOT NULL;
+CREATE VIEW IF NOT EXISTS context_files AS
+ SELECT cp.file_id AS id, p.blob AS sha256, json_extract(p.content,'$.path') AS name,
+  json_extract(p.content,'$.media_type') AS media_type, json_extract(p.content,'$.size') AS size,
+  NULL AS knowledge_id, NULL AS template_id, cp.context_id AS context_id,
+  NULL AS document_id, NULL AS job_id, coalesce(cp.file_created_at,c.created_at) AS created_at
+ FROM context_parts cp JOIN snapshot_parts p ON p.id=cp.part_id JOIN contexts c ON c.id=cp.context_id
+ WHERE cp.file_id IS NOT NULL;
+CREATE VIEW IF NOT EXISTS all_files AS
+ SELECT id,sha256,name,media_type,size,knowledge_id,template_id,context_id,document_id,job_id,created_at FROM files
+ UNION ALL SELECT id,sha256,name,media_type,size,knowledge_id,template_id,context_id,document_id,job_id,created_at FROM context_files;
+PRAGMA user_version=9;
