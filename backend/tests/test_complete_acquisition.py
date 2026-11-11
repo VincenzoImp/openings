@@ -1,7 +1,7 @@
 """Real gate, parser and archive behavior across incomplete collection attempts."""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 import requests
@@ -67,11 +67,9 @@ def test_complete_jobs_only_across_batch_cooldown_and_restart(tmp_path, monkeypa
     service.update_provider("linkedin", ProviderPatch(expected_version=1, min_interval_seconds=0))
     monkeypatch.setattr(module, "public_url", lambda url: url)
     monkeypatch.setattr(policy, "REQUEST_BATCH_SIZE", 2)
-    clock = [datetime.fromtimestamp(policy.time.time(), timezone.utc).timestamp()]
+    clock = [datetime.fromtimestamp(policy.time.time(), UTC).timestamp()]
     monkeypatch.setattr(policy.time, "time", lambda: clock[0])
-    monkeypatch.setattr(
-        module, "now", lambda: datetime.fromtimestamp(clock[0], timezone.utc).isoformat()
-    )
+    monkeypatch.setattr(module, "now", lambda: datetime.fromtimestamp(clock[0], UTC).isoformat())
     calls = []
 
     def send(method, url, **kwargs):

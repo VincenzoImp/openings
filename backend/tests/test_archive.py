@@ -393,22 +393,21 @@ async def test_url_extraction_rejects_challenge_or_generic_html():
 
 def test_restore_keeps_provider_requests_and_future_cooldown(workspace, tmp_path):
     import json
-    from datetime import datetime, timedelta, timezone
+    from datetime import UTC, datetime, timedelta
+
     from openings.discovery import DiscoveryService
     from openings.operations import restore_database
 
     discovery = DiscoveryService(workspace)
     provider = discovery.providers.get("linkedin")
     workspace.db.backup(tmp_path / "before-requests.sqlite")
-    deadline = (datetime.now(timezone.utc) + timedelta(minutes=20)).isoformat(
-        timespec="microseconds"
-    )
+    deadline = (datetime.now(UTC) + timedelta(minutes=20)).isoformat(timespec="microseconds")
     workspace.db.execute(
         "UPDATE providers SET runtime=? WHERE id='linkedin'",
         (
             json.dumps(
                 {
-                    "events": [datetime.now(timezone.utc).timestamp()],
+                    "events": [datetime.now(UTC).timestamp()],
                     "cooldown_until": deadline,
                     "total_requests": 1,
                 }

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Literal
-from datetime import datetime, timedelta, timezone
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -96,7 +96,7 @@ def collect(config, provider, budget, *, preview=False, source=None):
     scraper = cls(transport=budget)
     scraper.checkpoint = source.setdefault("checkpoint", {}) if not preview else {}
     scraper.on_checkpoint = source.get("on_checkpoint") if not preview else None
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    cutoff = (datetime.now(UTC) - timedelta(hours=24)).isoformat()
     scraper.known_postings = {
         key: value
         for key, value in (source.get("known_postings") or {}).items()
@@ -167,7 +167,7 @@ def collect(config, provider, budget, *, preview=False, source=None):
         )
     source.setdefault("detail_checks", {}).update(
         {
-            item["source_key"]: datetime.now(timezone.utc).isoformat(timespec="microseconds")
+            item["source_key"]: datetime.now(UTC).isoformat(timespec="microseconds")
             for item in items
             if item["posting"] and item["source_key"] not in scraper.known_postings
         }

@@ -1,6 +1,6 @@
 """Complete collection workflows across saved settings, resumable tasks."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -46,7 +46,7 @@ def run_next(service):
 
 def test_daily_slots_coalesce_and_handle_clock_changes():
     schedule = {"kind": "daily", "times": ["05:00", "13:00", "21:00"], "timezone": "Europe/Paris"}
-    now = datetime(2026, 10, 30, 20, 10, tzinfo=timezone.utc)
+    now = datetime(2026, 10, 30, 20, 10, tzinfo=UTC)
     assert (
         next_due(schedule, "2026-10-29T04:00:00+00:00", now).isoformat()
         == "2026-10-30T20:00:00+00:00"
@@ -58,7 +58,7 @@ def test_daily_slots_coalesce_and_handle_clock_changes():
     spring = {"kind": "daily", "times": ["02:30"], "timezone": "Europe/Paris"}
     assert (
         next_due(
-            spring, "2026-03-28T01:30:00+00:00", datetime(2026, 3, 29, 2, tzinfo=timezone.utc)
+            spring, "2026-03-28T01:30:00+00:00", datetime(2026, 3, 29, 2, tzinfo=UTC)
         ).isoformat()
         == "2026-03-29T01:30:00+00:00"
     )

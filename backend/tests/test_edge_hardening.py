@@ -9,8 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from openings import __main__ as entrypoint
-from openings import discovery as module
+from openings import __main__ as entrypoint, discovery as module
 from openings.app import create_app
 from openings.auth import COOKIE, LoginGuard
 from openings.errors import DomainError
