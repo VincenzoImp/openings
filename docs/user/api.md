@@ -38,6 +38,7 @@ Paste the posting when extraction cannot obtain the complete text.
 | Notes | `GET/PATCH/DELETE /notes/{id}` plus job-owned list/create routes |
 | Applications | `GET/POST /applications`, `POST /applications/bulk`, `GET/PATCH/DELETE /applications/{id}`, `GET /applications/{id}/events`, `GET /applications/{id}/staleness`, `GET /staleness` |
 | Career | `GET/PATCH /career/profile`, CRUD `/career/knowledge` and `/career/claims`, `POST /career/import/preview` then `/career/import` |
+| Policy | `GET /policy`, `GET /policy/{section}`, `POST /policy/{section}/items`, `POST /policy/{section}/reorder`, `PATCH/DELETE /policy/items/{id}`, `POST /policy/items/{id}/confirm`, `/move` |
 | Templates/guidance | CRUD `/templates`, `GET/PATCH /instructions` |
 | Collection | `GET/PATCH /collection`, `GET /providers`, `PATCH /providers/{id}`, CRUD `/sources`, `/sources/schemas`, preview/run, `/sources/bulk` and `/collection/runs` |
 | Tasks | `GET /tasks`, `GET /tasks/{id}`, `POST /tasks/{id}/cancel` or `/retry` |
@@ -151,7 +152,13 @@ attempts, independent of pagination. Overview accepts `since`/`until` for the
 submitted-attempt cohort. Career nonnullable PATCH fields reject explicit null:
 omit unchanged fields, or clear text/lists/objects with empty values. Entry dates
 are nullable; `dates: null` clears them. See [Career](career.md) for structured
-headers, partial dates, skills and ordering.
+headers, partial dates, skills, ordering and the typed selection fields of a
+claim (`default_in_cv`, `role`, `group`), and [Policy](policy.md) for the
+owner's rules and facts, their section versions and who may confirm an item.
+Profile `preferences` and `roles` are deprecated in favour of Decision items;
+they are still stored and returned. Template `rules` hold the typed limits,
+`statements` (a list of `{id, label, statement, scope, position}`; `id` and
+`position` are filled in) and any other free-form key.
 
 ## Runs, questions and the change log
 
@@ -370,8 +377,13 @@ difference, send `"allow_content_mismatch": true` with the review.
 
 ### Stale contexts
 
+A context prepared since 0.19 contains `policy`: the four sections with their
+versions and items, each item marked `confirmed` or not. Earlier contexts are
+unchanged and have no `policy`.
+
 Contexts record the Profile, instructions, template, Career entry and claim
-versions they froze. `GET /applications/{id}/staleness` compares them with the
+versions they froze, and since 0.19 the policy section versions (not compared
+by the report yet). `GET /applications/{id}/staleness` compares them with the
 current records for each current revision leaf and returns `stale`, `inputs`,
 `changes` (input, ID, label, `changed`/`deleted`/`unapproved`, frozen and current
 version) and per-document status (`current`, `stale` or `no_context`). Entries and

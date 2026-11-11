@@ -209,6 +209,36 @@ when that issue lands; the table says which parts those are.
   check of the Applications list belongs to stage 3; the browser test server
   already takes `OPENINGS_E2E_JOBS` and `OPENINGS_E2E_APPLICATIONS` for it.
 
+**Stage 5, Library.**
+
+- **Policy** (`pages/Policy.tsx`, `pages/policy/`) is new: the four sections as
+  statement lists with add, inline edit, reorder by buttons, remove after
+  asking, confirm, move to a section, the switch of a rule on a signal, the
+  version of each section and the sections panel. A version conflict reads the
+  section again and keeps the unsaved text in the open form. The banner
+  "changed since N Drafts" of the prototype waits for staleness by section
+  (#144), and a rule shows that signals arrive later (#166) instead of counts.
+- **Career** (`pages/Career.tsx`, `pages/career/`) and **Templates**
+  (`pages/Templates.tsx`, `pages/templates/`) are rebuilt and the old pages and
+  their rules in `legacy.css` are deleted. Career has the Profile with typed
+  fields, the record grouped by kind beside the entry editor, claims with their
+  typed selection fields as controls, and **All claims** for search across
+  entries. Templates has the list by kind and the tabs Source, Rules, Assets
+  and Preview; Preview shows a PDF uploaded as an asset, because the workspace
+  does not compile TeX. Free-form metadata and the free-form rest of template
+  rules are edited as rows. `#career?section=…` and
+  `#templates?template=…&section=…` open the matching part.
+- Components added to `frontend/src/design`: statement list
+  (`Statement.tsx`), key/value editor with a read-only tree for nested values
+  (`KeyValue.tsx`, logic in `kv.ts`), split view with a pane switch on narrow
+  screens (`Split.tsx`), and in `library.css` the table that stacks on narrow
+  screens, the form grid, source text and record-editor pieces.
+  `frontend/src/library` holds what the three screens share: the assets table
+  with its file dialog, the confirmation dialog, the pager and a reader that
+  always shows the latest record (`useFresh`).
+- A rebuilt screen renders in `.screen` instead of `.legacy`
+  (`shell/routes.ts`, `REBUILT`).
+
 ## Not decided here
 
 - Charts beyond simple rate bars. Insights starts with tables and bars.

@@ -7,9 +7,14 @@ and retain earlier closed attempts.
 ## Prepare the library
 
 In **Career**, store your profile, stable [career entries](career.md) and approved
-claims. In **Templates**, add one or more resume or cover-letter templates, their
-assets and optional writing guidance. Set a default for each document type.
-General instructions apply across templates; template guidance adds specific rules.
+claims. In **Policy**, state your [rules and facts](policy.md) once. In
+**Templates**, add one or more CV or letter templates with their source, assets
+and rules: typed limits (pages, bullets per entry, bullet length), a list of
+rule statements and guidance. Set a default for each kind of document.
+**General instructions** apply across templates; template guidance adds specific rules.
+
+![Templates with the list by kind and the Rules tab: guidance, limits, rule statements and other settings](../images/templates.png)
+
 The synthetic templates in `examples/` provide starting points.
 
 A template can define a one-page engineering CV, a longer research CV or another

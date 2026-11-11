@@ -130,6 +130,12 @@ await shot("collection-settings");
 await open("career?section=knowledge");
 await shot("career");
 
+await open("policy");
+await shot("policy");
+
+await open("templates?section=rules");
+await shot("templates");
+
 await open("settings?section=agents");
 await shot("agent-access");
 await page

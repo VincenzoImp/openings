@@ -108,6 +108,10 @@
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--s4);
 }
+.form-grid,
+.edit-grid {
+  align-items: start;
+}
 .form-grid .wide {
   grid-column: 1 / -1;
 }

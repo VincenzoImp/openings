@@ -14,6 +14,7 @@ and `npx playwright install chromium` in `frontend`.
 import argparse
 from datetime import date, timedelta
 import hashlib
+import json
 from pathlib import Path
 import shutil
 import signal
@@ -294,11 +295,19 @@ def seed(s: Seeder):
             },
         )
         entries.append(entry)
-        for text in claims:
+        for index, text in enumerate(claims):
             s.call(
                 "POST",
                 "/career/claims",
-                json={"knowledge_id": entry["id"], "text": text, "approved": True},
+                json={
+                    "knowledge_id": entry["id"],
+                    "text": text,
+                    "approved": True,
+                    # Typed selection: the first claim of an entry carries the account.
+                    "default_in_cv": index == 0,
+                    "role": "core" if index == 0 else "supporting",
+                    "group": "Impact" if index == 0 else "Teamwork",
+                },
             )
 
     resume = s.call(
@@ -309,6 +318,23 @@ def seed(s: Seeder):
             "kind": "resume",
             "tex": (ROOT / "examples/resume.tex").read_text(),
             "guidance": "One page. Lead with backend and data work.",
+            "rules": {
+                "max_pages": 1,
+                "max_bullets": 4,
+                "max_bullet_chars": 160,
+                "engine": "pdflatex",
+                "statements": [
+                    {
+                        "label": "Order of sections",
+                        "statement": "Experience, projects, education, skills.",
+                    },
+                    {
+                        "label": "Bullets start with a result",
+                        "statement": "Each bullet opens with what changed, then how.",
+                    },
+                    {"label": "Links", "statement": "Website in the header only."},
+                ],
+            },
             "is_default": True,
         },
     )
@@ -334,6 +360,16 @@ def seed(s: Seeder):
         },
     )
     del resume
+
+    # The synthetic policy: the owner's items through the dashboard session, the
+    # agent's proposals with its token.
+    policy = json.loads((ROOT / "examples/policy.json").read_text())
+    for section in ("decision", "eligibility", "writing", "facts"):
+        for item in policy[section]:
+            item = dict(item)
+            request = s.call if item.pop("proposed", False) else s.owner
+            current = s.call("GET", f"/policy/{section}")["version"]
+            request("POST", f"/policy/{section}/items", json={"expected_version": current, **item})
 
     sources = [
         {
