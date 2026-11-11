@@ -16,6 +16,15 @@ versions and the shared API reference. Read the current Profile/preferences,
 general guidance and the full current Career record, then its relevant evidence before decisions. Those live data
 own the selection criteria; keep no personal criteria in this skill.
 
+## Run and questions
+
+Open a run before the first write: `runs_start` with `workflow: "review-inbox"` and the scope; writes made
+with this token then attach to the run. First read the owner's answers given
+since the previous run (`questions_list` with `answered_since`) and act on them.
+Ask each new question as a record tied to its job, application or Career entry
+(`questions_ask`), not only in chat. Close the run with `runs_finish` and the
+stored [run report](../openings-workspace/references/run-report.md). A run asked only to inspect needs no run record.
+
 ## Establish and read the cohort
 
 Count the requested Inbox and snapshot all its IDs through complete pagination
@@ -35,8 +44,8 @@ Explain the fit or mismatch with specific facts, not a keyword score.
 Missing evidence does not establish that a skill or experience is absent.
 
 Shortlist or dismiss only when the evidence supports the decision. If a plausible
-role depends on a specific unresolved fact, leave it in Inbox, name the question
-and continue the other jobs. Do not manufacture certainty to empty a queue.
+role depends on a specific unresolved fact, leave it in Inbox, ask the question
+on that job (`questions_ask`) and continue the other jobs. Do not manufacture certainty to empty a queue.
 
 ## Write and resume safely
 

@@ -363,8 +363,8 @@ export default function OverviewPage({
             <h2>Recent activity</h2>
             <button
               className="iconbtn"
-              aria-label="View applications"
-              onClick={() => onNavigate("applications")}
+              aria-label="View all activity"
+              onClick={() => onNavigate("activity")}
             >
               <Icon name="arrow" />
             </button>
@@ -386,7 +386,10 @@ export default function OverviewPage({
                           "Workspace updated"
                         ).replaceAll("_", " ")}
                     </strong>
-                    <time>{date(item.created_at)}</time>
+                    <time>
+                      {date(item.created_at)}
+                      {item.actor && ` · ${item.actor.label}`}
+                    </time>
                   </div>
                 </article>
               ))

@@ -9,6 +9,7 @@ import {
   type ButtonHTMLAttributes,
 } from "react";
 import {
+  Activity as ActivityIcon,
   LayoutDashboard,
   Inbox,
   BriefcaseBusiness,
@@ -45,6 +46,7 @@ import {
 import { Notification, confirmLeave } from "./state";
 const icons = {
   overview: LayoutDashboard,
+  activity: ActivityIcon,
   inbox: Inbox,
   applications: BriefcaseBusiness,
   companies: Building2,

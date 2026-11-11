@@ -12,21 +12,19 @@ from openings.documents import DocumentCreate, ReviewUpdate, UploadReservation
 from openings.errors import DomainError
 from openings.operations import restore_database
 from openings.workspace import Workspace
+from schema_fixtures import SCHEMA_EIGHT_COLUMNS, columns, make_schema_seven
 
 SCHEMA_SEVEN_COLUMNS = ("requirements", "deadline", "priority")
 
 
 def make_schema_six(path):
     """Turn a current workspace into the released schema 6 layout, keeping its rows."""
+    make_schema_seven(path)
     with sqlite3.connect(path) as conn:
         conn.execute("DROP INDEX applications_deadline")
         for column in SCHEMA_SEVEN_COLUMNS:
             conn.execute(f"ALTER TABLE applications DROP COLUMN {column}")
         conn.execute("PRAGMA user_version=6")
-
-
-def columns(conn, table):
-    return [tuple(row)[1:] for row in conn.execute(f"PRAGMA table_info({table})")]
 
 
 def seeded(path):
@@ -72,14 +70,15 @@ def test_schema_six_upgrade_preserves_records_and_matches_a_new_workspace(tmp_pa
         sqlite3.connect(path) as conn,
         sqlite3.connect(fresh.path) as reference,
     ):
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 7
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 8
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert not conn.execute("PRAGMA foreign_key_check").fetchall()
         assert sorted(columns(conn, "applications")) == sorted(columns(reference, "applications"))
         index = "SELECT name FROM sqlite_master WHERE type='index' AND name='applications_deadline'"
         assert conn.execute(index).fetchone()
         for table, rows in before.items():
-            names = [row[0] for row in columns(conn, table) if row[0] not in SCHEMA_SEVEN_COLUMNS]
+            added = (*SCHEMA_SEVEN_COLUMNS, *SCHEMA_EIGHT_COLUMNS.get(table, ()))
+            names = [row[0] for row in columns(conn, table) if row[0] not in added]
             assert (
                 conn.execute(f"SELECT {','.join(names)} FROM {table} ORDER BY 1").fetchall() == rows
             )
@@ -116,7 +115,7 @@ def test_restore_upgrades_a_schema_six_backup_without_changing_it(tmp_path):
     restored = target.get_application(application["id"])
     assert restored["requirements"] == [] and restored["note"] == "Synthetic guidance"
     with target.db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 7
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 8
 
 
 def test_planning_fields_validate_and_clear_explicitly(tmp_path):
