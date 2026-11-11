@@ -19,6 +19,7 @@ from .career import DEFAULT_GUIDANCE, DEFAULT_PROFILE, Input, _get, _page, _sett
 from .common import decode_record, encode, new_id, now
 from .consistency import compare as compare_content, is_tex_source
 from .errors import DomainError, conflict, missing
+from .snapshots import payload_text, store_context
 from .staleness import application_staleness, store_context_inputs
 from .transfers import SnapshotResponse
 
@@ -126,10 +127,10 @@ class DocumentService:
                     "SELECT * FROM contexts WHERE idempotency_key=?", (value.idempotency_key,)
                 ).fetchone()
                 if existing:
-                    frozen = json.loads(existing["payload"])
-                    if frozen.get("request") != request:
+                    record = self.context_record(conn, existing)
+                    if record["payload"].get("request") != request:
                         conflict("This idempotency key was used for another preparation request.")
-                    return self._context_record(dict(existing))
+                    return record
             application = _get(conn, "applications", value.application_id, "Application")
             job = _get(conn, "jobs", application["job_id"], "Job")
             if job["triage"] == "dismissed":
@@ -257,30 +258,20 @@ class DocumentService:
             encoded = encode(snapshot)
             signature = hashlib.sha256(encoded.encode()).hexdigest()
             conn.execute(
-                "INSERT INTO contexts(id,application_id,payload,signature,idempotency_key,created_at) VALUES(?,?,?,?,?,?)",
+                "INSERT INTO contexts(id,application_id,signature,idempotency_key,created_at) VALUES(?,?,?,?,?)",
                 (
                     context_id,
                     value.application_id,
-                    encoded,
                     signature,
                     value.idempotency_key,
                     timestamp,
                 ),
             )
-            store_context_inputs(conn, "id=?", (context_id,))
-            for asset in assets:
-                conn.execute(
-                    "INSERT INTO files(id,sha256,name,media_type,size,context_id,created_at) VALUES(?,?,?,?,?,?,?)",
-                    (
-                        asset["id"],
-                        asset["sha256"],
-                        asset["path"],
-                        asset["media_type"],
-                        asset["size"],
-                        context_id,
-                        timestamp,
-                    ),
-                )
+            # The payload's shared values and asset files are stored once, as parts.
+            store_context(
+                conn, context_id, encoded, [{**asset, "name": asset["path"]} for asset in assets]
+            )
+            store_context_inputs(conn, context_id, timestamp, encoded)
             if job["triage"] != "saved":
                 conn.execute(
                     "UPDATE jobs SET triage='saved',version=version+1,updated_at=? WHERE id=?",
@@ -297,17 +288,25 @@ class DocumentService:
             self.workspace.clear_ready(conn, value.application_id, "context_prepared")
         return self.get_context(context_id)
 
-    def _context_record(self, row):
-        row = decode_record(row, ["payload"])
-        row["resource_uri"] = f"openings://contexts/{row['id']}"
-        return row
+    @staticmethod
+    def context_record(conn, row):
+        return {
+            "id": row["id"],
+            "application_id": row["application_id"],
+            "payload": json.loads(payload_text(conn, row["id"], row["frame"])),
+            "signature": row["signature"],
+            "idempotency_key": row["idempotency_key"],
+            "created_at": row["created_at"],
+            "resource_uri": f"openings://contexts/{row['id']}",
+        }
 
     def get_context(self, context_id: str) -> dict:
         """Read one immutable application context. File entries contain metadata/URLs rather than binary bytes."""
-        row = self.db.one("SELECT * FROM contexts WHERE id=?", (context_id,))
-        if not row:
-            missing("Application context")
-        return self._context_record(row)
+        with self.db.connect() as conn:
+            row = conn.execute("SELECT * FROM contexts WHERE id=?", (context_id,)).fetchone()
+            if not row:
+                missing("Application context")
+            return self.context_record(conn, row)
 
     def list_contexts(
         self,
@@ -332,13 +331,7 @@ class DocumentService:
         columns = "id,application_id,signature,created_at"
         if summary:
             columns += (
-                ",json_extract(payload,'$.job.title') AS job_title"
-                ",json_extract(payload,'$.job.company') AS company"
-                ",substr(json_extract(payload,'$.instructions.application_note'),1,160) AS note_preview"
-                ",json_array_length(payload,'$.knowledge') AS knowledge_count"
-                ",json_array_length(payload,'$.claims') AS claim_count"
-                ",json_extract(payload,'$.templates[0].name') AS template_name"
-                ",(SELECT COUNT(*) FROM files WHERE context_id=contexts.id) AS file_count"
+                ",job_title,company,note_preview,knowledge_count,claim_count,template_name,file_count"
                 ",(SELECT COUNT(*) FROM documents WHERE context_id=contexts.id) AS document_count"
             )
         rows = self.db.all(
@@ -471,8 +464,8 @@ class DocumentService:
             context_id = value.context_id or (previous["context_id"] if previous else None)
             context = None
             if context_id:
-                context = self._context_record(
-                    _get(conn, "contexts", context_id, "Application context")
+                context = self.context_record(
+                    conn, _get(conn, "contexts", context_id, "Application context")
                 )
                 if context["application_id"] != application["id"]:
                     raise DomainError(
@@ -794,7 +787,7 @@ class DocumentService:
 
     def get_file(self, file_id: str) -> dict:
         """Read immutable file metadata and its authenticated content URL, not binary bytes."""
-        row = self.db.one("SELECT * FROM files WHERE id=?", (file_id,))
+        row = self.db.one("SELECT * FROM all_files WHERE id=?", (file_id,))
         if not row:
             missing("File")
         return self._file_record(row)
@@ -836,12 +829,12 @@ class DocumentService:
             params.extend([application_id, application_id])
         clause = " WHERE " + " AND ".join(where) if where else ""
         rows = self.db.all(
-            f"SELECT * FROM files{clause} ORDER BY created_at,name,id LIMIT ? OFFSET ?",
+            f"SELECT * FROM all_files{clause} ORDER BY created_at,name,id LIMIT ? OFFSET ?",
             (*params, limit, offset),
         )
         return {
             "items": [self._file_record(row) for row in rows],
-            "total": self.db.one(f"SELECT COUNT(*) AS n FROM files{clause}", params)["n"],
+            "total": self.db.one(f"SELECT COUNT(*) AS n FROM all_files{clause}", params)["n"],
         }
 
     def _new_grant(self, conn, payload, method):
@@ -878,7 +871,7 @@ class DocumentService:
     def reserve_download(self, file_id: str) -> dict:
         """Obtain a short-lived GET transfer for one existing file; resolve its URL against this workspace origin."""
         with self.db.transaction() as conn:
-            row = _get(conn, "files", file_id, "File")
+            row = _get(conn, "all_files", file_id, "File")
             descriptor = self._file_record(row)
             _, job_id = self._owner(conn, descriptor["owner_type"], descriptor["owner_id"])
             return self._new_grant(
@@ -1027,7 +1020,7 @@ class DocumentService:
         )
 
     def file_response(self, file_id: str, inline: bool = True):
-        row = self.db.one("SELECT * FROM files WHERE id=?", (file_id,))
+        row = self.db.one("SELECT * FROM all_files WHERE id=?", (file_id,))
         if not row:
             missing("File")
         media_type = row["media_type"].split(";", 1)[0]
@@ -1070,7 +1063,7 @@ class DocumentService:
     def delete_file(self, file_id: str) -> dict:
         """Delete a live knowledge/template/job asset. Immutable context/document files require deleting the owning document instead."""
         with self.db.transaction() as conn:
-            row = _get(conn, "files", file_id, "File")
+            row = _get(conn, "all_files", file_id, "File")
             descriptor = self._file_record(row)
             if descriptor["owner_type"] in {"document", "context"}:
                 conflict(

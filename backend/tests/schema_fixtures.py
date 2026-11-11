@@ -3,6 +3,8 @@
 import sqlite3
 from contextlib import closing
 
+from context_fixtures import make_schema_eight
+
 SCHEMA_EIGHT_TABLES = ("questions", "requests", "runs")
 SCHEMA_EIGHT_COLUMNS = {
     "events": (
@@ -35,6 +37,7 @@ EVENTS_SEVEN = """CREATE TABLE events (
 
 def make_schema_seven(path):
     """Remove attribution, runs, questions, requests, the Ready step and token kinds (schema 8) from a current workspace file."""
+    make_schema_eight(path)  # first undo schema 9 context storage
     with closing(sqlite3.connect(path)) as conn:
         for table in SCHEMA_EIGHT_TABLES:
             conn.execute(f"DROP TABLE {table}")

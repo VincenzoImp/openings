@@ -152,7 +152,7 @@ def test_schema_five_upgrade_preserves_owned_records_and_versions(tmp_path):
     assert upgraded.get_application(application["id"]) == application
     assert upgraded.list_jobs(queue="shortlist")["total"] == 0
     with upgraded.db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 8
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
         assert not conn.execute(
             "SELECT name FROM sqlite_master WHERE name='assessments'"
         ).fetchall()
