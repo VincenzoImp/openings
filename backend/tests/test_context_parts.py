@@ -27,12 +27,12 @@ from openings.career import (
     TemplateCreate,
 )
 from openings.common import new_id, now
-from openings.db import Database
+from openings.db import MIGRATIONS, Database
 from openings.documents import ContextCreate, DocumentCreate, DocumentService
-from openings.operations import restore_database
+from openings.operations import remove_installation_credentials, restore_database
 from openings.snapshots import payload_text, store_context
 from openings.workspace import Workspace
-from schema_fixtures import make_schema_seven
+from schema_fixtures import columns, index_names, make_schema_seven, table_names
 
 # The schema 8 list summary and input summary, as released.
 OLD_SUMMARY = (
@@ -801,3 +801,97 @@ def test_five_hundred_contexts_sharing_one_career_record_shrink_by_seventy_perce
     )
     assert new <= 0.30 * old, (old, new)
     assert new_with_inputs <= 0.30 * old_with_inputs, (old_with_inputs, new_with_inputs)
+
+
+def test_the_schema_eight_fixture_is_the_schema_the_released_upgrade_produces(tmp_path):
+    """Schema 8 as 0.17.0 shipped it: the fixture equals a schema 7 file after the 7 to 8 step."""
+    fixture, upgraded = tmp_path / "fixture.sqlite", tmp_path / "upgraded.sqlite"
+    for path in (fixture, upgraded):
+        seed(path, entries=1, applications=1)
+    make_schema_eight(fixture)
+    make_schema_seven(upgraded)
+    with closing(sqlite3.connect(upgraded)) as conn:
+        MIGRATIONS[7](conn)
+        conn.execute("PRAGMA user_version=8")
+        conn.commit()
+    with closing(sqlite3.connect(fixture)) as left, closing(sqlite3.connect(upgraded)) as right:
+        assert left.execute("PRAGMA user_version").fetchone()[0] == 8
+        tables = table_names(left)
+        assert tables == table_names(right)
+        assert {"requests", "runs", "questions"} <= tables
+        assert not tables & {"snapshot_parts", "snapshot_list_items", "context_parts"}
+        assert not left.execute("SELECT name FROM sqlite_master WHERE type='view'").fetchall()
+        # Indexes the schema file adds on any start are not part of the upgrade step.
+        assert index_names(right) <= index_names(left)
+        for table in tables:
+            if not table.startswith("jobs_fts"):
+                assert sorted(columns(left, table)) == sorted(columns(right, table)), table
+        assert [row[0] for row in columns(left, "contexts")] == [
+            "id",
+            "application_id",
+            "payload",
+            "signature",
+            "idempotency_key",
+            "created_at",
+        ]
+        assert "ready_at" in {row[0] for row in columns(left, "applications")}
+        assert "kind" in {row[0] for row in columns(left, "api_tokens")}
+        assert "actor_token_kind" in {row[0] for row in columns(left, "events")}
+
+
+def test_questions_and_requests_do_not_keep_deleted_contexts_alive(tmp_path):
+    app = create_app(tmp_path / "subjects.sqlite", start_worker=False)
+    workspace, documents = app.state.workspace, app.state.documents
+    career = app.state.career
+    entry = career.create_knowledge(KnowledgeCreate(title="Backend engineer", narrative="Built."))
+    career.create_template(TemplateCreate(name="CV", kind="resume", tex="x", is_default=True))
+    add_asset(workspace, "knowledge_id", entry["id"], "proof.pdf", b"%PDF-1.4 proof")
+    applications = []
+    for index in range(2):
+        job = workspace.ingest_job({"title": f"Synthetic role {index}", "posting": "Build."})
+        application = workspace.create_application({"job_id": job["id"]})
+        context = documents.prepare_context(ContextCreate(application_id=application["id"]))
+        for subject in (("job", job["id"]), ("application", application["id"])):
+            app.state.activity.ask_question(
+                {"question": "Which team?", "subject_type": subject[0], "subject_id": subject[1]}
+            )
+            app.state.requests.create_request(
+                {"text": "Prepare this.", "subject_type": subject[0], "subject_id": subject[1]}
+            )
+        applications.append((job, application, context))
+    assert counts(workspace)["snapshot_parts"] > 0
+
+    job, application, context = applications[0]
+    workspace.delete_application(
+        application["id"], workspace.get_application(application["id"])["version"]
+    )
+    remaining = counts(workspace)
+    assert remaining["contexts"] == 1 and remaining["blobs"] == 1
+    assert documents.get_context(applications[1][2]["id"]) == applications[1][2]
+    job = applications[1][0]
+    workspace.forget_job(job["id"], workspace.get_job(job["id"])["version"])
+    final = counts(workspace)
+    assert final["contexts"] == final["context_parts"] == final["snapshot_parts"] == 0
+    assert final["snapshot_list_items"] == 0
+    # The live Career file still owns its bytes; questions and requests survive unlinked.
+    assert final["blobs"] == 1
+    assert workspace.db.one("SELECT count(*) AS n FROM questions")["n"] == 4
+    assert workspace.db.one("SELECT count(*) AS n FROM requests")["n"] == 4
+    with workspace.db.connect() as conn:
+        assert not conn.execute("PRAGMA foreign_key_check").fetchall()
+
+
+def test_a_backup_without_installation_credentials_restores_every_context(tmp_path):
+    path = tmp_path / "source.sqlite"
+    legacy_workspace(path)
+    before = recorded(path)
+    source = Workspace(path)
+    backup = tmp_path / "agent-backup.sqlite"
+    source.db.backup(backup)
+    remove_installation_credentials(backup)
+    with closing(sqlite3.connect(backup)) as conn:
+        assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        assert not conn.execute("SELECT 1 FROM api_tokens").fetchall()
+    target = Workspace(tmp_path / "target" / "live.sqlite")
+    restore_database(target, backup)
+    assert_reproduced(target, before)
