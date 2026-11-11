@@ -55,6 +55,33 @@ password and create the API token yourself.
    record and your preferences in the Profile, asks what is missing, and then
    runs the workflows above.
 
+## See what the agent did
+
+Every change in Openings records who made it: you in the dashboard, a named API
+token, or the system (collection). An agent works in **runs**. It opens a run
+with the workflow name and scope, its changes are attached to that run, and it
+closes the run with a report: summary, changes, what was not done and why,
+checks, a statement of limits and what the workflow lacked. A run that was never
+closed is shown as interrupted, with the changes it made.
+
+When the agent needs a fact or a decision, it asks a **question** tied to the
+job, application or Career entry concerned. Open **Activity** in the dashboard:
+
+- **Questions** lists the open questions with an answer form; the navigation
+  shows how many are open. The agent reads your answers at the start of its
+  next run. You can change an answer or withdraw a question.
+- **Runs** lists the runs; a run shows its report and every record it changed,
+  with links.
+- **Changes** lists every change with who made it.
+
+![Activity with two open questions from the agent, one with answer choices](../images/activity-questions.png)
+
+![A finished run with its stored report: scope, summary, changes, not done and checks](../images/activity-run.png)
+
+Give each agent, and each parallel worker that should report separately, its
+own API token: a token has one open run at a time and its name is what you see
+next to each change.
+
 ## Working with the agent
 
 Ask for anything in plain language: "what should I apply to today?", "add these

@@ -17,6 +17,15 @@ schemas, contexts, document revisions, transfers and review. Use
 [Career claims](../career-claims/SKILL.md) for writing. Personal preferences and
 all document-selection rules come from current Openings records and templates.
 
+## Run and questions
+
+Open a run before the first write: `runs_start` with `workflow: "prepare-shortlist"` and the scope; writes made
+with this token then attach to the run. First read the owner's answers given
+since the previous run (`questions_list` with `answered_since`) and act on them.
+Ask each new question as a record tied to its job, application or Career entry
+(`questions_ask`), not only in chat. Close the run with `runs_finish` and the
+stored [run report](../openings-workspace/references/run-report.md).
+
 ## Scope and checkpoint
 
 Snapshot the requested actionable Shortlist IDs before creating applications.

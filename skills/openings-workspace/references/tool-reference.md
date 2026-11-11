@@ -104,6 +104,39 @@ and preserve its documents, close it with `not_pursued`. Restore known workaroun
 dismissals explicitly to `saved`, using current versions: they remain in Applications
 when they have attempts and do not re-enter Inbox.
 
+## Runs, questions and the change log
+
+`runs_start` opens a run for the calling token (`workflow`, `scope`, optional
+`idempotency_key`); the token's later writes attach to it without any extra
+argument. A second start returns `run_open` with the open run in
+`details.run`; `supersede: true` marks that run interrupted and starts a new
+one. `runs_update` stores a progress `note`; `runs_finish` closes the run with
+`summary`, `changes`, `not_done`, `checks`, `limits` and `method`, both with the
+run's current `expected_version`. `runs_get` returns the report, the questions
+asked and a page of the changes made (`changes_limit`, `changes_offset`);
+`runs_list` filters by `status` (`open`, `finished`, `interrupted`), `workflow`,
+`token_id` and start time. An open run without a write or note for two hours is
+reported as `interrupted`; it stays open, and a later write revives it.
+
+`questions_ask` takes `question`, `why`, optional `subject_type` (`job`,
+`application`, `knowledge`) with `subject_id`, optional `choices` and an
+`idempotency_key`. `questions_list` filters by `state` (`open`, `answered`,
+`withdrawn`), subject, `run_id` and `answered_since`, which returns answers
+given at or after a time, oldest first. `questions_answer` and
+`questions_withdraw` take the question's current `expected_version`. A question
+outlives its subject: after the job, application or entry is deleted,
+`subject.id` is null, `subject.deleted` is true and `subject.label` keeps the
+name.
+
+`events_list` reads the change log, newest first, by `run_id`, `job_id`,
+`application_id`, `subject_type`/`subject_id`, `actor` (`owner`, `token`,
+`system`, `unknown`), `kind` or time. Every entry carries `actor`, `run_id` and
+`subject`; `application_history` returns the same fields. Changes recorded
+before version 0.17 have the actor `unknown (before 0.17)`. Payloads hold
+identifiers, changed field names and versions, never record content. Deleting an
+application or forgetting a job removes that record's own history and leaves one
+`application_deleted` or `job_forgotten` entry.
+
 ## Scripting and transfers
 
 Read `/api/openapi.json` for REST inputs under `/api/v1`. Some MCP tools wrap fields
