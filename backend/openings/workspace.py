@@ -2,9 +2,11 @@
 
 import hashlib
 import json
+import logging
 import math
 import re
 import threading
+import time
 from urllib.parse import urlsplit
 
 from .actors import current_actor, pop_actor
@@ -68,6 +70,9 @@ REQUIREMENT_COUNTS_SQL = (
     "(SELECT count(*) FROM json_each(app.requirements) r WHERE NOT coalesce(json_extract(r.value,'$.resolved'),0)) AS open_requirements,"
     "(SELECT count(*) FROM json_each(app.requirements) r WHERE NOT coalesce(json_extract(r.value,'$.resolved'),0) AND json_extract(r.value,'$.blocking')) AS blocking_requirements"
 )
+
+
+LOG = logging.getLogger(__name__)
 
 
 class Workspace:
@@ -728,6 +733,27 @@ class Workspace:
             index = DuplicateIndex(features[job_id] for job_id in stamps if job_id in features)
             self._duplicates = (stamps, features, index)
             return index
+
+    def warm_duplicates(self, delay=0.0):
+        """Build the duplicate features in the background, so the first request does not wait.
+
+        On a small host the first build takes many seconds for a few thousand
+        jobs. A request that arrives meanwhile waits for this build instead of
+        starting its own.
+        """
+
+        def build():
+            if delay:
+                time.sleep(delay)
+            try:
+                with self.db.connect() as connection:
+                    self._duplicate_index(connection)
+            except Exception:
+                LOG.exception("Duplicate warm-up failed")
+
+        thread = threading.Thread(target=build, name="duplicate-warmup", daemon=True)
+        thread.start()
+        return thread
 
     def likely_duplicates(self, job, min_confidence=DEFAULT_MIN_CONFIDENCE, limit=5):
         """Archived jobs most likely to be the same vacancy as one job, best first.
