@@ -318,6 +318,18 @@ class CareerService:
         merged = {**previous, **data}
         if previous != merged:
             _write_setting(conn, "profile", merged, expected + 1)
+            self._record(
+                conn,
+                "profile_updated",
+                "profile",
+                "profile",
+                fields=sorted(key for key in merged if previous.get(key) != merged[key]),
+                version=expected + 1,
+            )
+
+    def _record(self, conn, event, subject_type, subject_id, /, **payload):
+        """Leave an attributed record of a change: identifiers, field names and versions only."""
+        self.workspace.event(event, payload=payload, conn=conn, subject=(subject_type, subject_id))
 
     def update_profile(self, value: ProfileUpdate) -> dict:
         """Edit current profile with optimistic version checking."""
@@ -337,9 +349,21 @@ class CareerService:
 
     def update_instructions(self, value: InstructionsUpdate) -> dict:
         """Save editable general CV/letter guidance; existing contexts remain unchanged."""
-        self.workspace.set_settings(
-            "instructions", {"general": value.general}, value.expected_version
-        )
+        with self.db.transaction() as conn:
+            setting = _setting(conn, "instructions", {"general": DEFAULT_GUIDANCE})
+            if value.expected_version is not None and value.expected_version != setting["version"]:
+                conflict(details={"current_version": setting["version"]})
+            if setting["data"] != {"general": value.general}:
+                _write_setting(
+                    conn, "instructions", {"general": value.general}, setting["version"] + 1
+                )
+                self._record(
+                    conn,
+                    "instructions_updated",
+                    "instructions",
+                    "instructions",
+                    version=setting["version"] + 1,
+                )
         return self.get_instructions()
 
     def list_knowledge(
@@ -425,6 +449,7 @@ class CareerService:
                 timestamp,
             ),
         )
+        self._record(conn, "knowledge_created", "knowledge", record_id, kind=value.kind)
 
     def update_knowledge(self, knowledge_id: str, value: KnowledgeUpdate) -> dict:
         """Revise entry fields with version protection; dates=null clears dates, frozen contexts remain unchanged."""
@@ -461,6 +486,14 @@ class CareerService:
                         knowledge_id,
                     ),
                 )
+                self._record(
+                    conn,
+                    "knowledge_updated",
+                    "knowledge",
+                    knowledge_id,
+                    fields=[key for key in fields if previous[key] != merged[key]],
+                    version=row["version"] + 1,
+                )
         return self.get_knowledge(knowledge_id)
 
     def delete_knowledge(self, knowledge_id: str, expected_version: int) -> dict:
@@ -470,6 +503,7 @@ class CareerService:
                 _get(conn, "knowledge", knowledge_id, "Career knowledge"), expected_version
             )
             conn.execute("DELETE FROM knowledge WHERE id=?", (knowledge_id,))
+            self._record(conn, "knowledge_deleted", "knowledge", knowledge_id)
         self.db.collect_blobs()
         return {"deleted": True, "id": knowledge_id}
 
@@ -547,6 +581,14 @@ class CareerService:
                     timestamp,
                 ),
             )
+            self._record(
+                conn,
+                "claim_created",
+                "claim",
+                record_id,
+                knowledge_id=value.knowledge_id,
+                approved=value.approved,
+            )
         return self.get_claim(record_id)
 
     def update_claim(self, claim_id: str, value: ClaimUpdate) -> dict:
@@ -562,10 +604,21 @@ class CareerService:
             _get(conn, "knowledge", merged["knowledge_id"], "Career knowledge")
             if previous["knowledge_id"] != merged["knowledge_id"] and "position" not in data:
                 merged["position"] = self._next_position(conn, "claims", merged["knowledge_id"])
-            if any(
-                previous[key] != merged[key]
+            changed = [
+                key
                 for key in ["knowledge_id", "text", "approved", "position", "metadata"]
-            ):
+                if previous[key] != merged[key]
+            ]
+            if changed:
+                self._record(
+                    conn,
+                    "claim_updated",
+                    "claim",
+                    claim_id,
+                    knowledge_id=merged["knowledge_id"],
+                    fields=changed,
+                    version=row["version"] + 1,
+                )
                 conn.execute(
                     "UPDATE claims SET knowledge_id=?,text=?,approved=?,position=?,metadata=?,version=version+1,updated_at=? WHERE id=?",
                     (
@@ -583,8 +636,10 @@ class CareerService:
     def delete_claim(self, claim_id: str, expected_version: int) -> dict:
         """Permanently delete a reusable claim; existing application snapshots remain unchanged."""
         with self.db.transaction() as conn:
-            check_version(_get(conn, "claims", claim_id, "Claim"), expected_version)
+            row = _get(conn, "claims", claim_id, "Claim")
+            check_version(row, expected_version)
             conn.execute("DELETE FROM claims WHERE id=?", (claim_id,))
+            self._record(conn, "claim_deleted", "claim", claim_id, knowledge_id=row["knowledge_id"])
         return {"deleted": True, "id": claim_id}
 
     def list_templates(
@@ -663,6 +718,7 @@ class CareerService:
                     timestamp,
                 ),
             )
+            self._record(conn, "template_created", "template", record_id, kind=value.kind)
         return self.get_template(record_id)
 
     def update_template(self, template_id: str, value: TemplateUpdate) -> dict:
@@ -675,10 +731,20 @@ class CareerService:
             previous = decode_record(row, ["rules"])
             previous["is_default"] = bool(previous["is_default"])
             merged = {**previous, **data}
-            if any(
-                previous[key] != merged[key]
+            changed = [
+                key
                 for key in ["name", "kind", "tex", "guidance", "rules", "is_default"]
-            ):
+                if previous[key] != merged[key]
+            ]
+            if changed:
+                self._record(
+                    conn,
+                    "template_updated",
+                    "template",
+                    template_id,
+                    fields=changed,
+                    version=row["version"] + 1,
+                )
                 if merged["is_default"]:
                     conn.execute(
                         "UPDATE templates SET is_default=0,version=version+1,updated_at=? WHERE kind=? AND id<>? AND is_default=1",
@@ -705,6 +771,7 @@ class CareerService:
             row = _get(conn, "templates", template_id, "Template")
             check_version(row, expected_version)
             conn.execute("DELETE FROM templates WHERE id=?", (template_id,))
+            self._record(conn, "template_deleted", "template", template_id)
             if row["is_default"]:
                 other = conn.execute(
                     "SELECT id FROM templates WHERE kind=? ORDER BY created_at,id LIMIT 1",

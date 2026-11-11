@@ -149,7 +149,13 @@ filters. Rare job maintenance actions live under **Job details, sources & mainte
 | Forget job | Permanently remove the job, identities and owned application history/files. Future collection can find it again. |
 
 Closing an application keeps it in Applications, including its history and
-files. It never returns the job to Inbox or Shortlist. To cancel preparation
+files. The **History** tab lists each recorded change with who made it: you in
+the dashboard, a named API token or the system. Entries from before version
+0.17 show "unknown (before 0.17)".
+
+![Application history with a question asked by the agent and answered by the owner](../images/application-history.png)
+
+Closing never returns the job to Inbox or Shortlist. To cancel preparation
 without losing documents, close it as **Not pursued**. Deleting the final attempt
 is permanent and deliberately returns a saved job to Shortlist; the confirmation
 explains this. Other retained attempts keep it out of pending queues.

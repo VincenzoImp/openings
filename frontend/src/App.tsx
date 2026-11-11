@@ -21,6 +21,7 @@ import {
   type IconName,
 } from "./ui";
 import OverviewPage from "./pages/Overview";
+import ActivityPage from "./pages/Activity";
 import { AddJob, JobDrawer, JobsPage } from "./pages/Jobs";
 import { ApplicationDrawer, ApplicationsPage } from "./pages/Applications";
 import CompaniesPage from "./pages/Companies";
@@ -29,6 +30,7 @@ import TemplatesPage from "./pages/Templates";
 import SettingsPage from "./pages/Settings";
 const pages: { id: string; title: string; icon: IconName }[] = [
   { id: "overview", title: "Overview", icon: "overview" },
+  { id: "activity", title: "Activity", icon: "activity" },
   { id: "inbox", title: "Inbox", icon: "inbox" },
   { id: "shortlist", title: "Shortlist", icon: "bookmark" },
   { id: "applications", title: "Applications", icon: "applications" },
@@ -223,7 +225,11 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
     inbox = useResource<ListResult<never>>("/jobs?queue=inbox&limit=1", {
       items: [],
       total: 0,
-    });
+    }),
+    questions = useResource<ListResult<never>>(
+      "/questions?state=open&limit=1",
+      { items: [], total: 0 },
+    );
   useEffect(() => {
     const listener = () => {
       if (location.hash === lastRoute.current) return;
@@ -264,6 +270,12 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
   }, [theme]);
   useEffect(() => {
     document.title = `${pages.find((p) => p.id === route)?.title || "Workspace"} · Openings`;
+  }, [route]);
+  // An agent asks questions while the dashboard is open: recount on navigation.
+  const visited = useRef(route);
+  useEffect(() => {
+    if (visited.current !== route) questions.reload();
+    visited.current = route;
   }, [route]);
   useEffect(() => {
     const close = (e: KeyboardEvent) => {
@@ -398,6 +410,14 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
                 {page.id === "inbox" && (
                   <span className="navcount">{inbox.data.total}</span>
                 )}
+                {page.id === "activity" && questions.data.total > 0 && (
+                  <span
+                    className="navbadge"
+                    aria-label={`${questions.data.total} open ${questions.data.total === 1 ? "question" : "questions"}`}
+                  >
+                    {questions.data.total}
+                  </span>
+                )}
               </a>
             ))}
           </nav>
@@ -468,6 +488,12 @@ function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
               <OverviewPage
                 onAdd={() => setOverlay({ kind: "add" })}
                 onNavigate={navigate}
+              />
+            ) : route === "activity" ? (
+              <ActivityPage
+                openQuestions={questions.data.total}
+                onOpenJob={openJob}
+                onOpenApplication={openApp}
               />
             ) : route === "inbox" || route === "shortlist" ? (
               <JobsPage

@@ -12,6 +12,7 @@ from collections import deque
 
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
+from .actors import OWNER, current_actor, from_columns, token_actor
 from .common import new_id, now
 from .errors import DomainError
 
@@ -64,6 +65,7 @@ class Auth:
             self.workspace.set_settings(
                 "auth", {"password_hash": password_hash(password), "secret": secrets.token_hex(32)}
             )
+            self.workspace.event("owner_password_changed", subject=("workspace", "auth"))
         return {"updated": True, "sign_in_required": True, "api_tokens_preserved": True}
 
     def serializer(self, data=None):
@@ -111,12 +113,13 @@ class Auth:
         return {"authenticated": False, "sessions_revoked": True, "api_tokens_preserved": True}
 
     def bearer(self, request):
+        """The token actor of a valid bearer token, otherwise None."""
         header = request.headers.get("authorization", "")
         if not header.startswith("Bearer "):
-            return False
+            return None
         token_hash = hashlib.sha256(header[7:].encode()).hexdigest()
         row = self.workspace.db.one(
-            "SELECT id,last_used_at FROM api_tokens WHERE token_hash=?", (token_hash,)
+            "SELECT id,name,last_used_at FROM api_tokens WHERE token_hash=?", (token_hash,)
         )
         if row:
             stamp = now()
@@ -125,11 +128,13 @@ class Auth:
                 self.workspace.db.execute(
                     "UPDATE api_tokens SET last_used_at=? WHERE id=?", (stamp, row["id"])
                 )
-        return bool(row)
+        return token_actor(row["id"], row["name"]) if row else None
 
     def authorize(self, request, mcp=False):
-        if self.bearer(request):
-            return
+        """Authenticate the request and return who is acting: a token or the owner session."""
+        actor = self.bearer(request)
+        if actor:
+            return actor
         session = None if mcp else self.session(request)
         if not session:
             raise DomainError(401, "unauthorized", "Sign in or provide an API token.")
@@ -137,6 +142,7 @@ class Auth:
             supplied = request.headers.get("x-csrf-token", "")
             if not hmac.compare_digest(supplied, session["csrf"]):
                 raise DomainError(403, "csrf", "The session changed. Reload and try again.")
+        return OWNER
 
     def list_tokens(self):
         rows = self.workspace.db.all(
@@ -146,14 +152,27 @@ class Auth:
 
     def create_token(self, name):
         token, record_id = "op_" + secrets.token_urlsafe(32), new_id()
-        self.workspace.db.execute(
-            "INSERT INTO api_tokens(id,name,token_hash,created_at) VALUES(?,?,?,?)",
-            (record_id, name, hashlib.sha256(token.encode()).hexdigest(), now()),
-        )
+        with self.workspace.db.transaction() as conn:
+            conn.execute(
+                "INSERT INTO api_tokens(id,name,token_hash,created_at) VALUES(?,?,?,?)",
+                (record_id, name, hashlib.sha256(token.encode()).hexdigest(), now()),
+            )
+            self.workspace.event(
+                "token_created", payload={"name": name}, conn=conn, subject=("token", record_id)
+            )
         return {"id": record_id, "name": name, "token": token, "created_at": now()}
 
     def revoke_token(self, record_id):
-        self.workspace.db.execute("DELETE FROM api_tokens WHERE id=?", (record_id,))
+        with self.workspace.db.transaction() as conn:
+            row = conn.execute("SELECT name FROM api_tokens WHERE id=?", (record_id,)).fetchone()
+            conn.execute("DELETE FROM api_tokens WHERE id=?", (record_id,))
+            if row:
+                self.workspace.event(
+                    "token_revoked",
+                    payload={"name": row["name"]},
+                    conn=conn,
+                    subject=("token", record_id),
+                )
         return {"deleted": True}
 
     def operation_serializer(self):
@@ -162,8 +181,13 @@ class Auth:
         return URLSafeTimedSerializer(secret, salt="openings-operation-v1")
 
     def operation_ticket(self, operation):
+        # The raw transfer carries only this grant, so it remembers who requested it.
         return self.operation_serializer().dumps(
-            {"operation": operation, "nonce": secrets.token_urlsafe(16)}
+            {
+                "operation": operation,
+                "nonce": secrets.token_urlsafe(16),
+                "actor": list(current_actor().columns()),
+            }
         )
 
     def authorize_operation(self, token, operation):
@@ -176,6 +200,7 @@ class Auth:
         if not isinstance(value, dict) or value.get("operation") != operation:
             raise DomainError(403, "transfer_scope", "This grant does not allow that operation.")
         self.used_operations.consume(str(value.get("nonce", "")))
+        return from_columns(*(value.get("actor") or (None, None, None)))
 
 
 class UsedNonces:

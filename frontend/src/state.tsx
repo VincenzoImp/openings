@@ -415,6 +415,8 @@ function affected(read: string, changed: string) {
   const a = scope(read),
     b = scope(changed);
   if (a === b) return true;
+  // The change log and run details reflect every write.
+  if (a === "events" || a === "runs") return true;
   if (a === "overview")
     return ["jobs", "applications", "career", "sources"].includes(b);
   if (a === "jobs") return ["applications", "career", "notes"].includes(b);

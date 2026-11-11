@@ -1883,7 +1883,10 @@ export function ApplicationDrawer({
                               ? String(e.payload.status)
                               : ""}
                         </p>
-                        <time>{date(e.created_at)}</time>
+                        <time>
+                          {date(e.created_at)}
+                          {e.actor && ` · ${e.actor.label}`}
+                        </time>
                       </div>
                     </article>
                   ))}
