@@ -1,4 +1,30 @@
+import { randomUUID } from "node:crypto";
+import { createServer } from "node:net";
 import { defineConfig } from "@playwright/test";
+
+// One run, one server: OPENINGS_E2E_PORT selects the port (default: a free one
+// chosen here) and OPENINGS_E2E_TOKEN identifies the server this run starts.
+// Both are exported so the server, the global setup and the workers share them.
+function freePort() {
+  return new Promise<number>((resolve, reject) => {
+    const probe = createServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const { port } = probe.address() as { port: number };
+      probe.close(() => resolve(port));
+    });
+  });
+}
+const port = Number(
+  (process.env.OPENINGS_E2E_PORT ||= String(await freePort())),
+);
+if (!Number.isInteger(port) || port < 1 || port > 65535)
+  throw Error(
+    `OPENINGS_E2E_PORT must be a TCP port, got "${process.env.OPENINGS_E2E_PORT}".`,
+  );
+process.env.OPENINGS_E2E_TOKEN ||= randomUUID();
+const baseURL = `http://127.0.0.1:${port}`;
+
 export default defineConfig({
   testDir: "./tests",
   testMatch: "*.spec.ts",
@@ -6,10 +32,11 @@ export default defineConfig({
   workers: 1,
   timeout: 30000,
   reporter: "list",
-  use: { baseURL: "http://127.0.0.1:18084", trace: "retain-on-failure" },
+  globalSetup: "./tests/e2e-server.ts",
+  use: { baseURL, trace: "retain-on-failure" },
   webServer: {
     command: "uv run --project .. python ../backend/tests/dashboard_server.py",
-    url: "http://127.0.0.1:18084/health",
+    url: `${baseURL}/health`,
     reuseExistingServer: false,
     timeout: 30000,
   },

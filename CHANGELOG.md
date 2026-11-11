@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.16.0 — 2026-11-11
+
+Platform release for the redesign: a newer runtime, stricter outbound connections and the groundwork to change the product safely. No workflow, REST or MCP contract changes.
+
+- **Python 3.14:** the container image now runs Python 3.14 (previously 3.12); CI tests the same version, and running from source requires Python 3.14 or later.
+- **DNS rebinding:** LinkedIn, Indeed and Glassdoor searches connect only to the address that passed the public-address check, on every request and redirect hop, matching URL imports; TLS still verifies the host name.
+- **URL imports:** a job location given as plain text in a page's structured data is read correctly instead of producing a row of separators.
+- **Parity matrix:** `docs/developer/parity.md` is generated from the operation inventory, the REST/MCP contract, the dashboard source and browser tests. It shows each operation's REST route, MCP tool and real dashboard path, and lists every gap.
+- **Product proposal:** `docs/developer/proposal-redesign.md` records the accepted decisions for the redesign and their order.
+- **Development:** TypeScript 7 for the dashboard, Ruff's default lint rules, and tests for the collection worker and URL fetching (98% and 100% line coverage).
+
+Workspace schema remains **7**. Upgrading from 0.15 needs no action.
+
 ## 0.15.2 — 2026-11-10
 
 Security hardening at the edges, a release pipeline that publishes exactly what it tested, and a repository that is easier to start with and contribute to.

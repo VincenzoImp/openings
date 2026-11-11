@@ -1,5 +1,12 @@
-"""Synthetic, isolated server for browser workflows; no acquisition workers."""
+"""Synthetic, isolated server for browser workflows; no acquisition workers.
 
+Listens on 127.0.0.1:$OPENINGS_E2E_PORT (a free port when unset) and answers
+`/__e2e__/run` with $OPENINGS_E2E_TOKEN, so a Playwright run can verify that it
+reached the server it started. The route exists only in this test server.
+"""
+
+import os
+import socket
 import tempfile
 from pathlib import Path
 
@@ -10,8 +17,32 @@ from openings.app import create_app
 from openings.career import ClaimCreate, KnowledgeCreate, TemplateCreate
 from openings.documents import ContextCreate
 
+RUN_PATH = "/__e2e__/run"
+
+
+def free_port():
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
+def identified(app, token):
+    """Wrap the application so that only this process answers RUN_PATH with its run token."""
+    body = token.encode()
+
+    async def serve(scope, receive, send):
+        if scope["type"] != "http" or scope["path"] != RUN_PATH:
+            return await app(scope, receive, send)
+        headers = [(b"content-type", b"text/plain"), (b"cache-control", b"no-store")]
+        await send({"type": "http.response.start", "status": 200, "headers": headers})
+        await send({"type": "http.response.body", "body": body})
+
+    return serve
+
 
 def main():
+    port = int(os.environ.get("OPENINGS_E2E_PORT") or free_port())
+    token = os.environ.get("OPENINGS_E2E_TOKEN", "")
     with tempfile.TemporaryDirectory(prefix="openings-dashboard-") as directory:
         path = Path(directory) / "workspace.sqlite"
         app = create_app(path, start_worker=False)
@@ -80,8 +111,12 @@ def main():
                     )
             elif index < 56:
                 workspace.set_triage(job["id"], "saved", job["version"])
+        print(f"Synthetic workspace at http://127.0.0.1:{port}", flush=True)
         uvicorn.run(
-            create_app(path, start_worker=False), host="127.0.0.1", port=18084, log_level="error"
+            identified(create_app(path, start_worker=False), token),
+            host="127.0.0.1",
+            port=port,
+            log_level="error",
         )
 
 
