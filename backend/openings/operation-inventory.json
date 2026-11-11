@@ -1326,6 +1326,176 @@
       "notes": "MCP obtains a scoped raw HTTP upload grant. Validated restore preserves installation authentication; no arbitrary SQL endpoint. Recent destination provider HTTP usage and later cooldowns survive older-backup restore; saved policy settings are restored."
     },
     {
+      "id": "events.list",
+      "group": "Agent activity",
+      "operation": "List recorded changes with actor, run and subject",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/events"
+        }
+      ],
+      "mcp": [
+        "events_list"
+      ],
+      "dashboard": "Activity: Changes; run detail"
+    },
+    {
+      "id": "runs.list",
+      "group": "Agent activity",
+      "operation": "List agent runs by status, workflow, token or start time",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/runs"
+        }
+      ],
+      "mcp": [
+        "runs_list"
+      ],
+      "dashboard": "Activity: Runs",
+      "notes": "An open run without recent activity is reported as interrupted."
+    },
+    {
+      "id": "runs.read",
+      "group": "Agent activity",
+      "operation": "Read an agent run with its report, questions and changes",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/runs/{run_id}"
+        }
+      ],
+      "mcp": [
+        "runs_get"
+      ],
+      "dashboard": "Activity: run detail"
+    },
+    {
+      "id": "runs.start",
+      "group": "Agent activity",
+      "operation": "Open an agent run for the calling API token",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/runs"
+        }
+      ],
+      "mcp": [
+        "runs_start"
+      ],
+      "dashboard": "Activity: Runs (read only)",
+      "notes": "Runs belong to API tokens; a dashboard session has no runs. One open run per token."
+    },
+    {
+      "id": "runs.update",
+      "group": "Agent activity",
+      "operation": "Record a progress note on the calling token's open run",
+      "rest": [
+        {
+          "method": "PATCH",
+          "path": "/api/v1/runs/{run_id}"
+        }
+      ],
+      "mcp": [
+        "runs_update"
+      ],
+      "dashboard": "Activity: run detail (read only)",
+      "notes": "Runs belong to API tokens; a dashboard session has no runs."
+    },
+    {
+      "id": "runs.finish",
+      "group": "Agent activity",
+      "operation": "Close the calling token's run with its report",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/runs/{run_id}/finish"
+        }
+      ],
+      "mcp": [
+        "runs_finish"
+      ],
+      "dashboard": "Activity: run detail (read only)",
+      "notes": "Runs belong to API tokens; a dashboard session has no runs."
+    },
+    {
+      "id": "questions.list",
+      "group": "Agent activity",
+      "operation": "List questions for the owner by state, subject, run or answer time",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/questions"
+        }
+      ],
+      "mcp": [
+        "questions_list"
+      ],
+      "dashboard": "Activity: Questions; navigation count"
+    },
+    {
+      "id": "questions.read",
+      "group": "Agent activity",
+      "operation": "Read one question for the owner",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/questions/{question_id}"
+        }
+      ],
+      "mcp": [
+        "questions_get"
+      ],
+      "dashboard": "Activity: Questions"
+    },
+    {
+      "id": "questions.ask",
+      "group": "Agent activity",
+      "operation": "Ask the owner a question tied to a job, application, Career entry or nothing",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/questions"
+        }
+      ],
+      "mcp": [
+        "questions_ask"
+      ],
+      "dashboard": "Activity: Questions (answer only)",
+      "notes": "Agents ask; the dashboard answers and withdraws."
+    },
+    {
+      "id": "questions.answer",
+      "group": "Agent activity",
+      "operation": "Answer a question for the owner",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/questions/{question_id}/answer"
+        }
+      ],
+      "mcp": [
+        "questions_answer"
+      ],
+      "dashboard": "Activity: Questions: answer"
+    },
+    {
+      "id": "questions.withdraw",
+      "group": "Agent activity",
+      "operation": "Withdraw an open question",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/questions/{question_id}/withdraw"
+        }
+      ],
+      "mcp": [
+        "questions_withdraw"
+      ],
+      "dashboard": "Activity: Questions: withdraw"
+    },
+    {
       "id": "tokens.list",
       "group": "Workspace access and portability",
       "operation": "List owner API token metadata",

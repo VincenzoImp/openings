@@ -332,6 +332,12 @@ export interface CollectionRun {
   task_ids: string[];
   tasks?: BackgroundTask[];
 }
+export interface Actor {
+  kind: "owner" | "token" | "system" | "unknown";
+  id: string | null;
+  name: string | null;
+  label: string;
+}
 export interface Activity {
   id?: string;
   kind?: string;
@@ -340,8 +346,66 @@ export interface Activity {
   title?: string;
   created_at: string;
   payload?: Json;
-  application_id?: string;
-  job_id?: string;
+  application_id?: string | null;
+  job_id?: string | null;
+  actor?: Actor;
+  run_id?: string | null;
+  subject?: { type: string | null; id: string | null; label?: string };
+}
+export type RunStatus = "open" | "finished" | "interrupted";
+export interface RunReport {
+  summary: string;
+  changes: { text: string; counts: Record<string, number>; total: number };
+  not_done: {
+    item: string;
+    reason: string;
+    subject_type: string | null;
+    subject_id: string | null;
+    label: string;
+  }[];
+  checks: { check: string; verified: boolean }[];
+  limits: string;
+  method: string;
+}
+export interface Run extends Versioned {
+  workflow: string;
+  scope: string;
+  status: RunStatus;
+  interruption: "no_activity" | "superseded" | null;
+  superseded_by: string | null;
+  note: string;
+  actor: Actor;
+  started_at: string;
+  last_activity_at: string;
+  ended_at: string | null;
+  summary: string;
+  change_counts: Record<string, number>;
+  changes_total: number;
+  questions_count: number;
+  report?: RunReport | null;
+  changes?: ListResult<Activity>;
+  questions?: OwnerQuestion[];
+}
+export interface OwnerQuestion extends Versioned {
+  question: string;
+  why: string;
+  choices: string[];
+  state: "open" | "answered" | "withdrawn";
+  answer: string;
+  answer_choice: string | null;
+  subject: {
+    type: "job" | "application" | "knowledge";
+    id: string | null;
+    label: string;
+    deleted: boolean;
+    job_id: string | null;
+  } | null;
+  asked_by: Actor;
+  run_id: string | null;
+  answered_by: Actor | null;
+  answered_at: string | null;
+  withdrawn_by: Actor | null;
+  withdrawn_at: string | null;
 }
 export interface FunnelStep {
   stage: string;

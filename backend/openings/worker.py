@@ -3,6 +3,7 @@
 import logging
 import threading
 import time
+from contextvars import Context
 from uuid import uuid4
 
 from .common import now
@@ -32,6 +33,8 @@ class Worker:
             args=(self.stopping,),
             name="openings-scheduler",
             daemon=True,
+            # Worker threads never inherit the actor of the request that (re)starts them.
+            context=Context(),
         )
         self.threads = [self.thread] + [
             threading.Thread(
@@ -39,6 +42,7 @@ class Worker:
                 args=(self.owner, self.stopping, kind),
                 name="openings-" + kind,
                 daemon=True,
+                context=Context(),
             )
             for kind in ("collect",)
         ]
@@ -69,7 +73,9 @@ class Worker:
                         "Task heartbeat failed; the lease will expire if recovery is needed."
                     )
 
-        pulse = threading.Thread(target=heartbeat, name="openings-lease", daemon=True)
+        pulse = threading.Thread(
+            target=heartbeat, name="openings-lease", daemon=True, context=Context()
+        )
         pulse.start()
         try:
             if not stopping.is_set():

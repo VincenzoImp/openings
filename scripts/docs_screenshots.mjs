@@ -129,6 +129,19 @@ await shot("career");
 await open("settings?section=agents");
 await shot("agent-access");
 
+await open("activity");
+await page.getByRole("heading", { name: "Activity", exact: true }).waitFor();
+await shot("activity-questions");
+
+await open("activity?section=runs");
+await page.getByRole("button", { name: /review-inbox/ }).click();
+await page.getByRole("heading", { name: "Changes made" }).waitFor();
+await shot("activity-run");
+
+await open(`applications?application=${await applicationId("Lumen Health")}`);
+await dialog().getByRole("tab", { name: "History", exact: true }).click();
+await shot("application-history");
+
 await browser.close();
 if (errors.length) {
   console.error("Page errors:\n" + errors.join("\n"));

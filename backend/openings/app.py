@@ -18,6 +18,12 @@ from pydantic import Field
 from starlette.background import BackgroundTask
 
 from . import __version__
+from .activity import (
+    ActivityService,
+    register_api as register_activity_api,
+    register_mcp as register_activity_mcp,
+)
+from .actors import SYSTEM, acting_as
 from .api import register_core, register_core_mcp
 from .auth import COOKIE, MAX_AGE, Auth, LoginGuard
 from .career import (
@@ -110,6 +116,7 @@ def create_app(database=None, start_worker=True):
     career = CareerService(workspace)
     documents = DocumentService(workspace)
     discovery = DiscoveryService(workspace)
+    activity = ActivityService(workspace)
     workspace.discovery = discovery
     workspace.worker = Worker(workspace, discovery) if start_worker else None
     allowed_hosts = ["localhost:*", "127.0.0.1:*", "[::1]:*"]
@@ -125,6 +132,7 @@ def create_app(database=None, start_worker=True):
     register_career_mcp(mcp, career)
     register_document_mcp(mcp, documents)
     register_discovery_mcp(mcp, discovery)
+    register_activity_mcp(mcp, activity)
     skills = SkillLibrary()
     register_skills_mcp(mcp, skills)
 
@@ -148,6 +156,7 @@ def create_app(database=None, start_worker=True):
     )
     app.state.workspace, app.state.auth, app.state.mcp = workspace, auth, mcp
     app.state.career, app.state.documents, app.state.discovery = career, documents, discovery
+    app.state.activity = activity
     app.add_middleware(BodyLimit)
     # The client address is the real one only when uvicorn trusts the proxy
     # (OPENINGS_TRUSTED_PROXIES); otherwise every proxied client shares one bucket.
@@ -168,6 +177,7 @@ def create_app(database=None, start_worker=True):
                 "/api/v1/auth/login",
                 "/api/v1/transfers",
             }
+            actor = SYSTEM
             if path.startswith("/api/v1/") and path not in public:
                 if path in {
                     "/api/v1/backup",
@@ -183,11 +193,13 @@ def create_app(database=None, start_worker=True):
                         if path.endswith("/restore") and request.method == "POST"
                         else "invalid"
                     )
-                    auth.authorize_operation(request.headers["x-operational-token"], operation)
+                    actor = auth.authorize_operation(
+                        request.headers["x-operational-token"], operation
+                    )
                 else:
-                    auth.authorize(request)
+                    actor = auth.authorize(request)
             if path.startswith("/mcp"):
-                auth.authorize(request, mcp=True)
+                actor = auth.authorize(request, mcp=True)
             sign_in = path == "/api/v1/auth/login" and request.method == "POST"
             if path.startswith("/api/v1/auth/") and request.method == "POST" and path in public:
                 if not request.headers.get("content-type", "").startswith("application/json"):
@@ -204,8 +216,10 @@ def create_app(database=None, start_worker=True):
             if request.scope["path"] == "/mcp":
                 request.scope["path"] = "/mcp/"
                 request.scope["raw_path"] = request.scope.get("raw_path", b"/mcp") + b"/"
-            async with semaphore:
-                response = await call_next(request)
+            # Handlers, offloaded threads and MCP tools inherit the actor from this context.
+            with acting_as(actor):
+                async with semaphore:
+                    response = await call_next(request)
             if sign_in:
                 if response.status_code == 401:
                     login_guard.failed()
@@ -376,7 +390,9 @@ def create_app(database=None, start_worker=True):
                 raise DomainError(422, "backup_format", "Select a SQLite database backup.")
             workspace.maintenance = True
             try:
-                return await asyncio.to_thread(restore_database, workspace, name)
+                result = await asyncio.to_thread(restore_database, workspace, name)
+                workspace.event("workspace_restored", subject=("workspace", "backup"))
+                return result
             except sqlite3.DatabaseError:
                 raise DomainError(422, "backup_format", "This database backup could not be read.")
         finally:
@@ -421,6 +437,8 @@ def create_app(database=None, start_worker=True):
                 "postings": ["payload"],
                 "applications": ["questions", "answers", "requirements"],
                 "events": ["payload"],
+                "runs": ["report", "change_counts"],
+                "questions": ["choices"],
                 "knowledge": ["metadata", "dates", "skills"],
                 "claims": ["metadata"],
                 "templates": ["rules"],
@@ -435,6 +453,8 @@ def create_app(database=None, start_worker=True):
                 "applications",
                 "notes",
                 "events",
+                "runs",
+                "questions",
                 "knowledge",
                 "claims",
                 "templates",
@@ -512,6 +532,7 @@ def create_app(database=None, start_worker=True):
     register_career_api(router, career)
     register_document_api(router, documents)
     register_discovery_api(router, discovery)
+    register_activity_api(router, activity)
     app.include_router(router)
     # Building the transport also creates the session manager the lifespan runs.
     app.mount(

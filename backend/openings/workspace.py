@@ -7,6 +7,7 @@ import re
 import threading
 from urllib.parse import urlsplit
 
+from .actors import current_actor, describe_row
 from .common import (
     check_version,
     new_id,
@@ -90,13 +91,96 @@ class Workspace:
             )
         return {"data": data, "version": version + 1}
 
-    def event(self, kind, job_id=None, application_id=None, payload=None, conn=None):
-        args = (new_id(), job_id, application_id, kind, encode(payload or {}), now())
-        sql = "INSERT INTO events(id,job_id,application_id,kind,payload,created_at) VALUES(?,?,?,?,?,?)"
-        if conn is not None:
-            conn.execute(sql, args)
-        else:
-            self.db.execute(sql, args)
+    def event(
+        self,
+        kind,
+        job_id=None,
+        application_id=None,
+        payload=None,
+        conn=None,
+        *,
+        subject=None,
+        actor=None,
+    ):
+        """Record one change with its actor and, for a token with an open run, that run.
+
+        ``subject`` is ``(type, id)`` of the changed record; it defaults to the
+        application or job. Payloads hold identifiers, field names and versions,
+        never record content.
+        """
+        if conn is None:
+            with self.db.transaction() as connection:
+                return self.event(
+                    kind, job_id, application_id, payload, connection, subject=subject, actor=actor
+                )
+        actor = actor or current_actor()
+        stamp, run_id = now(), self.open_run_id(conn, actor)
+        if run_id:
+            conn.execute("UPDATE runs SET last_activity_at=? WHERE id=?", (stamp, run_id))
+        if subject is None:
+            subject = (
+                ("application", application_id)
+                if application_id
+                else ("job", job_id)
+                if job_id
+                else (None, None)
+            )
+        conn.execute(
+            "INSERT INTO events(id,job_id,application_id,kind,payload,created_at,subject_type,subject_id,actor_kind,actor_id,actor_name,run_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                new_id(),
+                job_id,
+                application_id,
+                kind,
+                encode(payload or {}),
+                stamp,
+                *subject,
+                *actor.columns(),
+                run_id,
+            ),
+        )
+        return None
+
+    @staticmethod
+    def open_run_id(conn, actor):
+        """The open run of a token actor; the owner session and the system have none."""
+        if actor.kind != "token":
+            return None
+        run = conn.execute(
+            "SELECT id FROM runs WHERE token_id=? AND status='open'", (actor.id,)
+        ).fetchone()
+        return run["id"] if run else None
+
+    @staticmethod
+    def event_record(row):
+        """An event as returned by history reads: decoded payload, subject and actor."""
+        item = decode_record(row, ("payload",))
+        kind = item.pop("subject_type", None)
+        identifier = item.pop("subject_id", None)
+        if kind is None:
+            # Events from before schema 8 belong to their application or job.
+            kind, identifier = (
+                ("application", item.get("application_id"))
+                if item.get("application_id")
+                else ("job", item.get("job_id"))
+                if item.get("job_id")
+                else (None, None)
+            )
+        item["subject"] = {"type": kind, "id": identifier}
+        item["actor"] = describe_row(item)
+        for key in ("actor_kind", "actor_id", "actor_name"):
+            item.pop(key, None)
+        return item
+
+    @staticmethod
+    def _note(row):
+        if row is None:
+            missing("Note")
+        row = dict(row)
+        row["author"] = describe_row(row, "author")
+        for key in ("author_kind", "author_id", "author_name"):
+            row.pop(key)
+        return row
 
     @staticmethod
     def _job_columns():
@@ -512,6 +596,8 @@ class Workspace:
             c.execute("DELETE FROM jobs WHERE id=?", (job_id,))
             if collect:
                 c.execute(COLLECT_BLOBS)
+            # The job's own history is deleted with it; this record keeps only its id.
+            self.event("job_forgotten", conn=c, subject=("job", job_id))
         return {"deleted": True, "id": job_id}
 
     def resolve_jobs(self, value):
@@ -828,7 +914,7 @@ class Workspace:
             )
             c.execute("DELETE FROM job_identities WHERE job_id=?", (source_id,))
             c.execute("UPDATE posting_details SET job_id=? WHERE job_id=?", (target_id, source_id))
-            for table in ("postings", "applications", "events", "notes", "tasks"):
+            for table in ("postings", "applications", "events", "notes", "tasks", "questions"):
                 c.execute(f"UPDATE {table} SET job_id=? WHERE job_id=?", (target_id, source_id))
             c.execute("UPDATE files SET job_id=? WHERE job_id=?", (target_id, source_id))
             c.execute("DELETE FROM jobs WHERE id=?", (source_id,))
@@ -836,13 +922,17 @@ class Workspace:
                 "UPDATE jobs SET version=version+1,content_version=?,updated_at=? WHERE id=?",
                 (next_content, now(), target_id),
             )
+            c.execute(
+                "UPDATE events SET subject_id=? WHERE subject_type='job' AND subject_id=?",
+                (target_id, source_id),
+            )
             self.event("jobs_merged", target_id, payload={"previous_id": source_id}, conn=c)
         return self.get_job(target_id)
 
     def list_notes(self, job_id):
         self.get_job(job_id)
         rows = self.db.all("SELECT * FROM notes WHERE job_id=? ORDER BY created_at DESC", (job_id,))
-        return {"items": rows, "total": len(rows)}
+        return {"items": [self._note(row) for row in rows], "total": len(rows)}
 
     def add_note(self, job_id, value):
         value = value if isinstance(value, NoteInput) else NoteInput.model_validate(value)
@@ -850,15 +940,37 @@ class Workspace:
         if value.application_id and self.get_application(value.application_id)["job_id"] != job_id:
             raise DomainError(422, "note_owner", "Application belongs to a different job.")
         note_id, stamp = new_id(), now()
-        self.db.execute(
-            "INSERT INTO notes(id,job_id,application_id,body,created_at,updated_at) VALUES(?,?,?,?,?,?)",
-            (note_id, job_id, value.application_id, value.body, stamp, stamp),
-        )
-        return self.db.one("SELECT * FROM notes WHERE id=?", (note_id,))
+        with self.db.transaction() as c:
+            c.execute(
+                "INSERT INTO notes(id,job_id,application_id,body,created_at,updated_at,author_kind,author_id,author_name) VALUES(?,?,?,?,?,?,?,?,?)",
+                (
+                    note_id,
+                    job_id,
+                    value.application_id,
+                    value.body,
+                    stamp,
+                    stamp,
+                    *current_actor().columns(),
+                ),
+            )
+            self.event(
+                "note_added", job_id, value.application_id, conn=c, subject=("note", note_id)
+            )
+        return self.get_note(note_id)
 
     def delete_note(self, note_id):
-        if not self.db.execute("DELETE FROM notes WHERE id=?", (note_id,)):
-            missing("Note")
+        with self.db.transaction() as c:
+            row = c.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
+            if row is None:
+                missing("Note")
+            c.execute("DELETE FROM notes WHERE id=?", (note_id,))
+            self.event(
+                "note_deleted",
+                row["job_id"],
+                row["application_id"],
+                conn=c,
+                subject=("note", note_id),
+            )
         return {"deleted": True}
 
     def get_application(self, application_id, compact_job=False):
@@ -1015,14 +1127,12 @@ class Workspace:
                 row["job_id"],
                 payload={"application_id": application_id},
                 conn=connection,
+                subject=("application", application_id),
             )
         return {"deleted": True, "id": application_id}
 
     def get_note(self, note_id):
-        row = self.db.one("SELECT * FROM notes WHERE id=?", (note_id,))
-        if not row:
-            missing("Note")
-        return row
+        return self._note(self.db.one("SELECT * FROM notes WHERE id=?", (note_id,)))
 
     def update_note(self, note_id, value):
         value = value if isinstance(value, NotePatch) else NotePatch.model_validate(value)
@@ -1033,6 +1143,14 @@ class Workspace:
                 connection.execute(
                     "UPDATE notes SET body=?,version=version+1,updated_at=? WHERE id=?",
                     (value.body, now(), note_id),
+                )
+                self.event(
+                    "note_edited",
+                    row["job_id"],
+                    row["application_id"],
+                    {"version": row["version"] + 1},
+                    connection,
+                    subject=("note", note_id),
                 )
         return self.get_note(note_id)
 
@@ -1303,7 +1421,7 @@ class Workspace:
     def application_events(self, application_id):
         self.get_application(application_id)
         rows = [
-            decode_record(r, ("payload",))
+            self.event_record(r)
             for r in self.db.all(
                 "SELECT * FROM events WHERE application_id=? ORDER BY created_at DESC",
                 (application_id,),
@@ -1334,13 +1452,14 @@ class Workspace:
             for s in stages
         ]
         observed_by_app = {}
+        # Only stage changes carry a target stage; other application events are skipped
+        # and the distinct stages are reduced in SQLite rather than row by row.
         for event in self.db.all(
-            "SELECT application_id,payload FROM events WHERE application_id IN (" + cohort + ")",
+            "SELECT DISTINCT application_id,json_extract(payload,'$.to') AS stage FROM events "
+            "WHERE kind='application_updated' AND application_id IN (" + cohort + ")",
             bounds,
         ):
-            observed_by_app.setdefault(event["application_id"], set()).add(
-                json.loads(event["payload"]).get("to")
-            )
+            observed_by_app.setdefault(event["application_id"], set()).add(event["stage"])
         sent = 0
         for app in apps:
             observed = set(observed_by_app.get(app["id"], ()))
@@ -1372,7 +1491,7 @@ class Workspace:
             "incomplete": counts["incomplete"],
             "funnel": funnel,
             "activity": [
-                decode_record(r, ("payload",))
+                self.event_record(r)
                 for r in self.db.all(
                     "SELECT events.*,jobs.title,jobs.company FROM events LEFT JOIN jobs ON jobs.id=events.job_id ORDER BY events.created_at DESC LIMIT 12"
                 )

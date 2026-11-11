@@ -1,0 +1,987 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Applications · Openings prototype</title>
+    <link rel="stylesheet" href="prototype.css" />
+    <style>
+      /* The form that records an employer response, opened under its row. */
+      .respond {
+        display: grid;
+        grid-template-columns: max-content 160px minmax(0, 1fr) max-content;
+        gap: var(--s3) var(--s4);
+        align-items: end;
+        padding: var(--s2) 0;
+      }
+      .respond fieldset {
+        margin: 0;
+        padding: 0;
+        border: 0;
+      }
+      .respond legend {
+        padding: 0 0 var(--s1);
+        font-size: var(--t-sm);
+        font-weight: 600;
+      }
+      tr.expansion > td {
+        border-top: 0;
+        background: var(--accent-soft);
+      }
+      /* Board: compact columns that scroll inside their own container. */
+      .board {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(200px, 1fr));
+        gap: var(--s3);
+        padding: var(--s4);
+        overflow-x: auto;
+      }
+      .board h3 {
+        display: flex;
+        justify-content: space-between;
+        padding: 0 var(--s1) var(--s2);
+      }
+      .board .tile {
+        display: block;
+        padding: var(--s2) var(--s3);
+        margin-bottom: var(--s2);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: var(--surface);
+        text-decoration: none;
+      }
+      .board .tile strong {
+        display: block;
+      }
+      .pipeline-table td.primary {
+        min-width: 230px;
+      }
+      .insight-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--s5);
+        align-items: start;
+      }
+      @media (max-width: 860px) {
+        .respond,
+        .insight-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .insight .table {
+          min-width: 520px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main
+      id="content"
+      class="page"
+      data-page="applications"
+      data-crumb="Applications"
+    >
+      <header class="page-head">
+        <h1>Applications</h1>
+        <p class="muted">
+          Every attempt, from the first Draft to the employer's answer. You send
+          each application yourself; here you record what happened.
+        </p>
+      </header>
+
+      <div class="tabs" role="tablist" aria-label="Applications views">
+        <button
+          role="tab"
+          aria-selected="true"
+          aria-controls="view-pipeline"
+          type="button"
+        >
+          Pipeline
+        </button>
+        <button role="tab" aria-controls="view-insights" type="button">
+          Insights
+        </button>
+      </div>
+
+      <div id="view-pipeline" role="tabpanel" style="margin-top: var(--s4)">
+        <div class="spread" style="flex-wrap: wrap; margin-bottom: var(--s3)">
+          <div class="chips" role="group" aria-label="Stage">
+            <button class="chip" type="button" aria-pressed="true">
+              All <span class="num">47</span>
+            </button>
+            <button class="chip" type="button" aria-pressed="false">
+              Preparing <span class="num">4</span>
+            </button>
+            <button class="chip" type="button" aria-pressed="false">
+              Ready <span class="num">6</span>
+            </button>
+            <button class="chip" type="button" aria-pressed="false">
+              Applied <span class="num">14</span>
+            </button>
+            <button class="chip" type="button" aria-pressed="false">
+              Interview <span class="num">2</span>
+            </button>
+            <button class="chip" type="button" aria-pressed="false">
+              Offer <span class="num">0</span>
+            </button>
+            <button class="chip" type="button" aria-pressed="false">
+              Closed <span class="num">21</span>
+            </button>
+          </div>
+          <div class="row">
+            <label>
+              <span class="sr">Search applications</span>
+              <input
+                class="input"
+                type="search"
+                placeholder="Search role or company"
+                style="width: 220px"
+              />
+            </label>
+            <div class="segmented" role="tablist" aria-label="Layout">
+              <button
+                role="tab"
+                aria-selected="true"
+                aria-controls="layout-list"
+                type="button"
+              >
+                List
+              </button>
+              <button role="tab" aria-controls="layout-board" type="button">
+                Board
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <section
+          id="layout-list"
+          role="tabpanel"
+          class="card"
+          aria-label="Applications as a list"
+        >
+          <div class="bulkbar">
+            <strong class="num">2 selected</strong>
+            <span class="muted grow only-desktop"
+              >Applied, waiting more than 14 days</span
+            >
+            <button class="btn sm" type="button">Close as no reply</button>
+            <button class="btn sm" type="button">Set priority</button>
+            <button class="btn quiet sm" type="button">Clear</button>
+          </div>
+          <div class="table-wrap">
+            <table class="table stack pipeline-table">
+              <thead>
+                <tr>
+                  <th><span class="sr">Select</span></th>
+                  <th>Role and company</th>
+                  <th>Stage</th>
+                  <th>Plan</th>
+                  <th>Documents</th>
+                  <th>Employer response</th>
+                  <th>Updated</th>
+                  <th><span class="sr">Action</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label="Select Python Engineer, Northstar Labs"
+                    />
+                  </td>
+                  <td class="primary">
+                    <a class="title" href="review.html">Python Engineer</a>
+                    <div class="meta">Northstar Labs · Zurich, Switzerland</div>
+                  </td>
+                  <td><span class="tag ready">Ready</span></td>
+                  <td>
+                    <span class="row" style="flex-wrap: nowrap"
+                      ><span class="tag">P1</span
+                      ><span class="tag danger">Closes tomorrow</span></span
+                    >
+                  </td>
+                  <td data-label="Documents">CV and letter approved</td>
+                  <td></td>
+                  <td class="meta" data-label="Updated">Yesterday</td>
+                  <td class="actions">
+                    <a class="btn primary sm" href="review.html">Review</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label="Select Data Platform Engineer, Fjord Analytics"
+                    />
+                  </td>
+                  <td class="primary">
+                    <a class="title" href="review.html"
+                      >Data Platform Engineer</a
+                    >
+                    <div class="meta">Fjord Analytics · Remote, Europe</div>
+                  </td>
+                  <td><span class="tag ready">Ready</span></td>
+                  <td>
+                    <span class="row" style="flex-wrap: nowrap"
+                      ><span class="tag">P1</span
+                      ><span class="tag attention">Closes 16 Nov</span></span
+                    >
+                  </td>
+                  <td data-label="Documents">CV and letter approved</td>
+                  <td></td>
+                  <td class="meta" data-label="Updated">Yesterday</td>
+                  <td class="actions">
+                    <a class="btn sm" href="review.html">Review</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label="Select Site Reliability Engineer, Cedar Systems"
+                    />
+                  </td>
+                  <td class="primary">
+                    <a class="title" href="review.html"
+                      >Site Reliability Engineer</a
+                    >
+                    <div class="meta">Cedar Systems · Zurich, Switzerland</div>
+                  </td>
+                  <td><span class="tag">Preparing</span></td>
+                  <td><span class="tag">P2</span></td>
+                  <td data-label="Documents">
+                    Written, not approved
+                    <span class="tag agent">Waits for your answer</span>
+                  </td>
+                  <td></td>
+                  <td class="meta" data-label="Updated">Yesterday</td>
+                  <td class="actions">
+                    <a class="btn sm" href="activity.html">Answer</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label="Select Platform Engineer, Harbor Bank"
+                    />
+                  </td>
+                  <td class="primary">
+                    <a class="title" href="review.html">Platform Engineer</a>
+                    <div class="meta">Harbor Bank · Zurich, Switzerland</div>
+                  </td>
+                  <td><span class="tag">Preparing</span></td>
+                  <td><span class="tag">P3</span></td>
+                  <td data-label="Documents">
+                    None
+                    <span class="tag danger">Blocked by a requirement</span>
+                  </td>
+                  <td></td>
+                  <td class="meta" data-label="Updated">Yesterday</td>
+                  <td class="actions">
+                    <a class="btn sm" href="today.html">Decide</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label="Select Analytics Engineer, Lumen Health"
+                    />
+                  </td>
+                  <td class="primary">
+                    <a class="title" href="review.html">Analytics Engineer</a>
+                    <div class="meta">Lumen Health · Basel, Switzerland</div>
+                  </td>
+                  <td><span class="tag">Preparing</span></td>
+                  <td><span class="tag">P2</span></td>
+                  <td data-label="Documents">
+                    CV approved
+                    <span class="tag attention">Writing rules changed</span>
+                  </td>
+                  <td></td>
+                  <td class="meta" data-label="Updated">Monday</td>
+                  <td class="actions">
+                    <a class="btn sm" href="review.html">Open</a>
+                  </td>
+                </tr>
+                <tr class="is-selected">
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked
+                      aria-label="Select Backend Developer, Willow Finance"
+                    />
+                  </td>
+                  <td class="primary">
+                    <a class="title" href="review.html">Backend Developer</a>
+                    <div class="meta">Willow Finance · Lugano, Switzerland</div>
+                  </td>
+                  <td><span class="tag info">Applied</span></td>
+                  <td class="meta" data-label="Sent">4 Oct</td>
+                  <td data-label="Documents">Sent: CV 2, letter 1</td>
+                  <td>
+                    <span class="tag attention">No reply for 38 days</span>
+                  </td>
+                  <td class="meta" data-label="Updated">4 Oct</td>
+                  <td class="actions">
+                    <button
+                      class="btn sm"
+                      type="button"
+                      aria-expanded="true"
+                      aria-controls="respond-willow"
+                    >
+                      Record response
+                    </button>
+                  </td>
+                </tr>
+                <tr class="expansion on-accent-soft" id="respond-willow">
+                  <td class="only-desktop"></td>
+                  <td colspan="7" class="full">
+                    <form
+                      class="respond"
+                      aria-label="Record the employer's response for Backend Developer, Willow Finance"
+                    >
+                      <fieldset>
+                        <legend>What did Willow Finance answer?</legend>
+                        <div class="segmented">
+                          <button type="button" aria-pressed="false">
+                            Interview
+                          </button>
+                          <button type="button" aria-pressed="true">
+                            Rejection
+                          </button>
+                          <button type="button" aria-pressed="false">
+                            Offer
+                          </button>
+                          <button type="button" aria-pressed="false">
+                            No reply
+                          </button>
+                        </div>
+                      </fieldset>
+                      <label class="field">
+                        <span>Date of the answer</span>
+                        <input type="date" value="2026-11-10" />
+                      </label>
+                      <label class="field">
+                        <span>Note <span class="hint">optional</span></span>
+                        <input
+                          type="text"
+                          value="Position filled internally."
+                        />
+                      </label>
+                      <div class="row">
+                        <button class="btn primary sm" type="button">
+                          Save and close as rejected
+                        </button>
+                        <button class="btn quiet sm" type="button">
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                    <p class="caption">
+                      A rejection closes the application. The date stays
+                      correctable in its timeline.
+                    </p>
+                  </td>
+                </tr>
+                <tr class="is-selected">
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked
+                      aria-label="Select Product Engineer, Harbor Studio"
+                    />
+                  </td>
+                  <td class="primary">
+                    <a class="title" href="review.html">Product Engineer</a>
+                    <div class="meta">Harbor Studio · Geneva, Switzerland</div>
+                  </td>
+                  <td><span class="tag info">Applied</span></td>
+                  <td class="meta" data-label="Sent">24 Oct</td>
+                  <td data-label="Documents">Sent: CV 1, letter 1</td>
+                  <td><span class="tag">No reply for 18 days</span></td>
+                  <td class="meta" data-label="Updated">24 Oct</td>
+                  <td class="actions">
+                    <button class="btn sm" type="button" aria-expanded="false">
+                      Record response
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label="Select Research Software Engineer, Alpine Research"
+                    />
+                  </td>
+                  <td class="primary">
+                    <a class="title" href="review.html"
+                      >Research Software Engineer</a
+                    >
+                    <div class="meta">
+                      Alpine Research · Lausanne, Switzerland
+                    </div>
+                  </td>
+                  <td><span class="tag info">Interview</span></td>
+                  <td class="meta" data-label="Sent">21 Oct</td>
+                  <td data-label="Documents">Sent: CV 3, letter 2</td>
+                  <td data-label="Response">Interview invitation · 6 Nov</td>
+                  <td class="meta" data-label="Updated">6 Nov</td>
+                  <td class="actions">
+                    <button class="btn sm" type="button" aria-expanded="false">
+                      Record response
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label="Select Data Engineer, Kestrel Robotics"
+                    />
+                  </td>
+                  <td class="primary">
+                    <a class="title" href="review.html">Data Engineer</a>
+                    <div class="meta">
+                      Kestrel Robotics · Zurich, Switzerland
+                    </div>
+                  </td>
+                  <td><span class="tag info">Interview</span></td>
+                  <td class="meta" data-label="Sent">27 Oct</td>
+                  <td data-label="Documents">Sent: CV 2, letter 1</td>
+                  <td data-label="Response">Second interview · 9 Nov</td>
+                  <td class="meta" data-label="Updated">Monday</td>
+                  <td class="actions">
+                    <button class="btn sm" type="button" aria-expanded="false">
+                      Record response
+                    </button>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label="Select Engineering Lead, Northstar Labs"
+                    />
+                  </td>
+                  <td class="primary">
+                    <a class="title" href="review.html">Engineering Lead</a>
+                    <div class="meta">Northstar Labs · Zurich, Switzerland</div>
+                  </td>
+                  <td><span class="tag">Closed</span></td>
+                  <td class="meta" data-label="Sent">21 Oct</td>
+                  <td data-label="Documents">Sent: CV 1, letter 1</td>
+                  <td data-label="Response">
+                    Rejection · 2 Nov, after 12 days
+                  </td>
+                  <td class="meta" data-label="Updated">2 Nov</td>
+                  <td class="actions">
+                    <a class="btn quiet sm" href="review.html">Open</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label="Select Backend Engineer, Cedar Systems"
+                    />
+                  </td>
+                  <td class="primary">
+                    <a class="title" href="review.html">Backend Engineer</a>
+                    <div class="meta">Cedar Systems · Remote, Europe</div>
+                  </td>
+                  <td><span class="tag">Closed</span></td>
+                  <td class="meta" data-label="Sent">17 Sep</td>
+                  <td data-label="Documents">Sent: CV 1, letter 1</td>
+                  <td data-label="Response">
+                    No reply · closed 1 Nov after 45 days
+                    <div>
+                      <span class="actor agent"
+                        >career-agent, under your rule</span
+                      >
+                    </div>
+                  </td>
+                  <td class="meta" data-label="Updated">1 Nov</td>
+                  <td class="actions">
+                    <a class="btn quiet sm" href="review.html">Open</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label="Select Data Analyst, Orbit Works"
+                    />
+                  </td>
+                  <td class="primary">
+                    <a class="title" href="review.html">Data Analyst</a>
+                    <div class="meta">Orbit Works · Remote, Europe</div>
+                  </td>
+                  <td><span class="tag">Closed</span></td>
+                  <td class="meta">Never sent</td>
+                  <td data-label="Documents">CV approved</td>
+                  <td data-label="Response" class="meta">
+                    Not pursued · not counted in Insights
+                  </td>
+                  <td class="meta" data-label="Updated">29 Oct</td>
+                  <td class="actions">
+                    <a class="btn quiet sm" href="review.html">Open</a>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <footer>
+            <span class="muted grow num">1 to 12 of 47</span>
+            <button class="btn sm" type="button" disabled>Previous</button>
+            <button class="btn sm" type="button">Next</button>
+          </footer>
+        </section>
+
+        <section
+          id="layout-board"
+          role="tabpanel"
+          class="card"
+          aria-label="Applications as a board"
+          hidden
+        >
+          <div class="board">
+            <div>
+              <h3>Preparing <span class="muted num">4</span></h3>
+              <a class="tile" href="review.html">
+                <strong>Site Reliability Engineer</strong>
+                <span class="meta muted">Cedar Systems</span><br />
+                <span class="tag agent">Waits for your answer</span>
+              </a>
+              <a class="tile" href="review.html">
+                <strong>Platform Engineer</strong>
+                <span class="meta muted">Harbor Bank</span><br />
+                <span class="tag danger">Blocked</span>
+              </a>
+              <a class="tile" href="review.html">
+                <strong>Analytics Engineer</strong>
+                <span class="meta muted">Lumen Health</span><br />
+                <span class="tag attention">Writing rules changed</span>
+              </a>
+              <a class="tile" href="review.html">
+                <strong>Cloud Engineer</strong>
+                <span class="meta muted">Kestrel Robotics</span><br />
+                <span class="tag">Being written</span>
+              </a>
+            </div>
+            <div>
+              <h3>Ready <span class="muted num">6</span></h3>
+              <a class="tile" href="review.html">
+                <strong>Python Engineer</strong>
+                <span class="meta muted">Northstar Labs</span><br />
+                <span class="tag danger">Closes tomorrow</span>
+              </a>
+              <a class="tile" href="review.html">
+                <strong>Data Platform Engineer</strong>
+                <span class="meta muted">Fjord Analytics</span><br />
+                <span class="tag attention">Closes 16 Nov</span>
+              </a>
+              <a class="tile" href="review.html">
+                <strong>Backend Engineer</strong>
+                <span class="meta muted">Lumen Health</span>
+              </a>
+              <a class="tile" href="review.html">
+                <strong>Data Engineer</strong>
+                <span class="meta muted">Orbit Works</span>
+              </a>
+              <a class="caption" href="#">2 more</a>
+            </div>
+            <div>
+              <h3>Applied <span class="muted num">14</span></h3>
+              <a class="tile" href="review.html">
+                <strong>Backend Developer</strong>
+                <span class="meta muted">Willow Finance</span><br />
+                <span class="tag attention">No reply for 38 days</span>
+              </a>
+              <a class="tile" href="review.html">
+                <strong>Product Engineer</strong>
+                <span class="meta muted">Harbor Studio</span><br />
+                <span class="tag">No reply for 18 days</span>
+              </a>
+              <a class="tile" href="review.html">
+                <strong>Data Engineer</strong>
+                <span class="meta muted">Fjord Analytics</span><br />
+                <span class="tag">Sent 5 days ago</span>
+              </a>
+              <a class="caption" href="#">11 more</a>
+            </div>
+            <div>
+              <h3>Interview <span class="muted num">2</span></h3>
+              <a class="tile" href="review.html">
+                <strong>Research Software Engineer</strong>
+                <span class="meta muted">Alpine Research</span><br />
+                <span class="tag info">Invitation · 6 Nov</span>
+              </a>
+              <a class="tile" href="review.html">
+                <strong>Data Engineer</strong>
+                <span class="meta muted">Kestrel Robotics</span><br />
+                <span class="tag info">Second interview · 9 Nov</span>
+              </a>
+            </div>
+            <div>
+              <h3>Offer <span class="muted num">0</span></h3>
+              <p class="caption" style="padding: 0 var(--s1)">
+                No offer yet. Record one from an application in Interview.
+              </p>
+            </div>
+          </div>
+          <footer>
+            <span class="muted grow"
+              >21 closed applications are not on the board.</span
+            >
+            <button class="btn quiet sm" type="button">Show closed</button>
+          </footer>
+        </section>
+      </div>
+
+      <div
+        id="view-insights"
+        role="tabpanel"
+        class="insight"
+        style="margin-top: var(--s4)"
+        hidden
+      >
+        <div class="spread" style="flex-wrap: wrap; margin-bottom: var(--s4)">
+          <p class="muted" style="max-width: 68ch">
+            Only employer answers count. Drafts you never sent and jobs the
+            agent dismissed are left out. A rate is shown from 5 sent
+            applications.
+          </p>
+          <div class="segmented" role="group" aria-label="Period">
+            <button type="button" aria-pressed="false">Last 90 days</button>
+            <button type="button" aria-pressed="true">All time</button>
+          </div>
+        </div>
+
+        <div class="stats num" style="margin-bottom: var(--s5)">
+          <div class="stat">
+            <strong>32</strong><span class="caption">Applications sent</span>
+          </div>
+          <div class="stat">
+            <strong>34%</strong
+            ><span class="caption">Got an answer · 11 of 32</span>
+          </div>
+          <div class="stat">
+            <strong>13%</strong
+            ><span class="caption">Led to an interview · 4 of 32</span>
+          </div>
+          <div class="stat">
+            <strong>0</strong><span class="caption">Offers</span>
+          </div>
+          <div class="stat">
+            <strong>9 days</strong
+            ><span class="caption">Median time to an answer</span>
+          </div>
+          <div class="stat">
+            <strong>7</strong><span class="caption">Closed as no reply</span>
+          </div>
+        </div>
+
+        <div class="insight-grid">
+          <section class="card" aria-labelledby="by-role">
+            <header><h2 id="by-role">By role family</h2></header>
+            <div class="table-wrap">
+              <table class="table num">
+                <thead>
+                  <tr>
+                    <th>Role family</th>
+                    <th class="right">Sent</th>
+                    <th>Got an answer</th>
+                    <th>Interview</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Data engineering</td>
+                    <td class="right">14</td>
+                    <td>
+                      <div class="rate">
+                        <div class="meter" style="--value: 43%">
+                          <span></span>
+                        </div>
+                        <span>43% · 6</span>
+                      </div>
+                    </td>
+                    <td>21% · 3</td>
+                  </tr>
+                  <tr>
+                    <td>Backend</td>
+                    <td class="right">11</td>
+                    <td>
+                      <div class="rate">
+                        <div class="meter" style="--value: 36%">
+                          <span></span>
+                        </div>
+                        <span>36% · 4</span>
+                      </div>
+                    </td>
+                    <td>9% · 1</td>
+                  </tr>
+                  <tr>
+                    <td>Platform and reliability</td>
+                    <td class="right">5</td>
+                    <td>
+                      <div class="rate">
+                        <div class="meter" style="--value: 20%">
+                          <span></span>
+                        </div>
+                        <span>20% · 1</span>
+                      </div>
+                    </td>
+                    <td>0% · 0</td>
+                  </tr>
+                  <tr>
+                    <td>Analytics</td>
+                    <td class="right">2</td>
+                    <td colspan="2" class="meta">
+                      Too few applications to show a rate · 0 answers
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="card" aria-labelledby="by-source">
+            <header><h2 id="by-source">By source</h2></header>
+            <div class="table-wrap">
+              <table class="table num">
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th class="right">Sent</th>
+                    <th>Got an answer</th>
+                    <th>Interview</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Company boards</td>
+                    <td class="right">9</td>
+                    <td>
+                      <div class="rate">
+                        <div class="meter" style="--value: 56%">
+                          <span></span>
+                        </div>
+                        <span>56% · 5</span>
+                      </div>
+                    </td>
+                    <td>33% · 3</td>
+                  </tr>
+                  <tr>
+                    <td>LinkedIn searches</td>
+                    <td class="right">15</td>
+                    <td>
+                      <div class="rate">
+                        <div class="meter" style="--value: 27%">
+                          <span></span>
+                        </div>
+                        <span>27% · 4</span>
+                      </div>
+                    </td>
+                    <td>7% · 1</td>
+                  </tr>
+                  <tr>
+                    <td>Indeed searches</td>
+                    <td class="right">6</td>
+                    <td>
+                      <div class="rate">
+                        <div class="meter" style="--value: 33%">
+                          <span></span>
+                        </div>
+                        <span>33% · 2</span>
+                      </div>
+                    </td>
+                    <td>0% · 0</td>
+                  </tr>
+                  <tr>
+                    <td>Added by hand</td>
+                    <td class="right">2</td>
+                    <td colspan="2" class="meta">
+                      Too few applications to show a rate · 0 answers
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <footer>
+              <span class="muted grow"
+                >Company boards answer twice as often as searches.</span
+              >
+              <a class="btn quiet sm" href="collection.html">Source yield</a>
+            </footer>
+          </section>
+
+          <section class="card" aria-labelledby="by-location">
+            <header><h2 id="by-location">By location</h2></header>
+            <div class="table-wrap">
+              <table class="table num">
+                <thead>
+                  <tr>
+                    <th>Location</th>
+                    <th class="right">Sent</th>
+                    <th>Got an answer</th>
+                    <th>Interview</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Zurich</td>
+                    <td class="right">12</td>
+                    <td>
+                      <div class="rate">
+                        <div class="meter" style="--value: 42%">
+                          <span></span>
+                        </div>
+                        <span>42% · 5</span>
+                      </div>
+                    </td>
+                    <td>17% · 2</td>
+                  </tr>
+                  <tr>
+                    <td>Remote, Europe</td>
+                    <td class="right">10</td>
+                    <td>
+                      <div class="rate">
+                        <div class="meter" style="--value: 30%">
+                          <span></span>
+                        </div>
+                        <span>30% · 3</span>
+                      </div>
+                    </td>
+                    <td>10% · 1</td>
+                  </tr>
+                  <tr>
+                    <td>Basel</td>
+                    <td class="right">6</td>
+                    <td>
+                      <div class="rate">
+                        <div class="meter" style="--value: 33%">
+                          <span></span>
+                        </div>
+                        <span>33% · 2</span>
+                      </div>
+                    </td>
+                    <td>17% · 1</td>
+                  </tr>
+                  <tr>
+                    <td>Geneva</td>
+                    <td class="right">3</td>
+                    <td colspan="2" class="meta">
+                      Too few applications to show a rate · 1 answer
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Lausanne</td>
+                    <td class="right">1</td>
+                    <td colspan="2" class="meta">
+                      Too few applications to show a rate · 0 answers
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="card" aria-labelledby="time-to">
+            <header>
+              <h2 id="time-to" class="grow">Time to an answer</h2>
+              <span class="caption">11 answers</span>
+            </header>
+            <div class="table-wrap">
+              <table class="table num">
+                <thead>
+                  <tr>
+                    <th>Answered</th>
+                    <th class="right">Applications</th>
+                    <th>Share of answers</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Within 7 days</td>
+                    <td class="right">4</td>
+                    <td>
+                      <div class="rate">
+                        <div class="meter" style="--value: 36%">
+                          <span></span>
+                        </div>
+                        <span>36%</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>8 to 14 days</td>
+                    <td class="right">4</td>
+                    <td>
+                      <div class="rate">
+                        <div class="meter" style="--value: 36%">
+                          <span></span>
+                        </div>
+                        <span>36%</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>15 to 30 days</td>
+                    <td class="right">2</td>
+                    <td>
+                      <div class="rate">
+                        <div class="meter" style="--value: 18%">
+                          <span></span>
+                        </div>
+                        <span>18%</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>After 30 days</td>
+                    <td class="right">1</td>
+                    <td>
+                      <div class="rate">
+                        <div class="meter" style="--value: 9%">
+                          <span></span>
+                        </div>
+                        <span>9%</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <footer>
+              <span class="grow">
+                14 applications still wait; 3 of them for more than 30 days,
+                when an answer is unlikely.
+              </span>
+              <button class="btn sm" type="button">Close 3 as no reply</button>
+            </footer>
+          </section>
+        </div>
+
+        <section
+          class="card"
+          style="margin-top: var(--s5)"
+          aria-labelledby="by-seniority"
+        >
+          <header><h2 id="by-seniority">By seniority</h2></header>
+          <div class="empty">
+            <p class="title">Too few applications to show a rate</p>
+            <p>
+              Only 9 of 32 sent applications have a seniority on their job. The
+              agent can add it during its next review.
+            </p>
+          </div>
+        </section>
+      </div>
+    </main>
+    <script defer src="prototype.js"></script>
+  </body>
+</html>

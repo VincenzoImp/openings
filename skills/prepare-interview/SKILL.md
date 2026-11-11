@@ -13,6 +13,15 @@ application stage unless the owner reports a new stage.
 Read [Openings workspace](../openings-workspace/SKILL.md) for transport and notes,
 and [Career claims](../career-claims/SKILL.md) for evidence-led wording.
 
+## Run and questions
+
+Open a run before the first write: `runs_start` with `workflow: "prepare-interview"` and the scope; writes made
+with this token then attach to the run. First read the owner's answers given
+since the previous run (`questions_list` with `answered_since`) and act on them.
+Ask each new question as a record tied to its job, application or Career entry
+(`questions_ask`), not only in chat. Close the run with `runs_finish` and the
+stored [run report](../openings-workspace/references/run-report.md).
+
 ## Read the application as sent
 
 Read the job posting, the application's current CV and letter leaves (the versions

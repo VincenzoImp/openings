@@ -38,6 +38,7 @@ Paste the posting when extraction cannot obtain the complete text.
 | Tasks | `GET /tasks`, `GET /tasks/{id}`, `POST /tasks/{id}/cancel` or `/retry` |
 | Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `GET /documents/{id}/consistency`, `POST /documents/{id}/review` |
 | Files | `GET /files`, `GET/DELETE /files/{id}`, `GET /files/{id}/content`, `POST /files/uploads`, `POST /files/{id}/download` |
+| Agent activity | `GET /events`; `GET/POST /runs`, `GET/PATCH /runs/{id}`, `POST /runs/{id}/finish`; `GET/POST /questions`, `GET /questions/{id}`, `POST /questions/{id}/answer`, `POST /questions/{id}/withdraw` |
 | Operations | `GET /workspace`, `/capabilities`, `/overview`, `/export`, `/backup`; `POST /backup/restore`; `/tokens`; `POST /auth/password` |
 
 List routes return `{items,total}` and accept bounded `limit`/`offset` where
@@ -133,6 +134,55 @@ submitted-attempt cohort. Career nonnullable PATCH fields reject explicit null:
 omit unchanged fields, or clear text/lists/objects with empty values. Entry dates
 are nullable; `dates: null` clears them. See [Career](career.md) for structured
 headers, partial dates, skills and ordering.
+
+## Runs, questions and the change log
+
+Each write records its actor: `owner` for the dashboard session, `token` with the
+token's id and name, or `system`. History entries (`GET /applications/{id}/events`,
+`GET /events`, the overview activity) return `actor`, `run_id` and `subject`;
+notes return `author`. Entries from before version 0.17 have
+`actor.kind = "unknown"`.
+
+Runs need an API token; a dashboard session gets `403 run_actor`.
+
+```bash
+# Open a run; later writes with this token are attached to it.
+curl -sS -X POST "$OPENINGS_URL/api/v1/runs" -H "Authorization: Bearer $OPENINGS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"workflow": "review-inbox", "scope": "Inbox: 14 jobs", "idempotency_key": "review-2026-03-02"}'
+
+# Ask the owner a question about a job.
+curl -sS -X POST "$OPENINGS_URL/api/v1/questions" -H "Authorization: Bearer $OPENINGS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Is a hybrid schedule acceptable?", "why": "Two office days are required.",
+       "subject_type": "job", "subject_id": "JOB_ID", "choices": ["Yes", "No"]}'
+
+# Close the run with its report (expected_version from the run).
+curl -sS -X POST "$OPENINGS_URL/api/v1/runs/RUN_ID/finish" -H "Authorization: Bearer $OPENINGS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"expected_version": 1, "summary": "Reviewed 14 jobs.", "changes": "Saved 3, dismissed 9.",
+       "not_done": [{"item": "Two postings", "reason": "On-call duty is not stated."}],
+       "checks": [{"check": "Final Inbox query"}, {"check": "Salary ranges", "verified": false}],
+       "limits": "Nothing was submitted.", "method": ""}'
+
+# Answers given since a time, oldest first.
+curl -sS "$OPENINGS_URL/api/v1/questions?answered_since=2026-03-01T08:00:00Z" \
+  -H "Authorization: Bearer $OPENINGS_TOKEN"
+```
+
+A second `POST /runs` for a token with an open run returns `409 run_open` with
+that run in `error.details.run`, unless `supersede` is true. `PATCH /runs/{id}`
+stores a progress `note`. `GET /runs/{id}?changes_limit=50&changes_offset=0`
+returns the report, the questions asked and the changes made; `GET /runs` filters
+by `status`, `workflow`, `token_id`, `started_since` and `started_until`.
+`GET /questions` filters by `state`, `subject_type`, `subject_id`, `run_id` and
+`answered_since`; answer and withdraw take `expected_version`. `GET /events`
+filters by `run_id`, `job_id`, `application_id`, `subject_type`, `subject_id`,
+`actor`, `token_id`, `kind`, `since` and `until`.
+
+A question keeps its text, state and a `subject.label` after its job,
+application or Career entry is deleted. Deleting an application or forgetting a
+job removes that record's own history and leaves one attributed entry.
 
 ## Identity and duplicates
 

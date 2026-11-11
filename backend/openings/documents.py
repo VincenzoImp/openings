@@ -14,6 +14,7 @@ from urllib.parse import quote
 from fastapi import Request
 from pydantic import Field, field_validator
 
+from .actors import current_actor, from_columns
 from .career import DEFAULT_GUIDANCE, DEFAULT_PROFILE, Input, _get, _page, _setting
 from .common import decode_record, encode, new_id, now
 from .consistency import compare as compare_content, is_tex_source
@@ -285,6 +286,14 @@ class DocumentService:
                     "UPDATE jobs SET triage='saved',version=version+1,updated_at=? WHERE id=?",
                     (timestamp, job["id"]),
                 )
+            self.workspace.event(
+                "context_prepared",
+                job["id"],
+                value.application_id,
+                {"context_id": context_id},
+                conn,
+                subject=("context", context_id),
+            )
         return self.get_context(context_id)
 
     def _context_record(self, row):
@@ -497,6 +506,18 @@ class DocumentService:
                         now(),
                     ),
                 )
+                self.workspace.event(
+                    "document_created",
+                    application["job_id"],
+                    value.application_id,
+                    {
+                        "document_id": document_id,
+                        "kind": value.kind,
+                        "previous_id": value.previous_id,
+                    },
+                    conn,
+                    subject=("document", document_id),
+                )
         return self.get_document(document_id)
 
     def _document_records(self, rows, *, summary=False):
@@ -645,6 +666,20 @@ class DocumentService:
                     "UPDATE documents SET review_state='approved',version=version+1 WHERE id=?",
                     (document_id,),
                 )
+                application = _get(conn, "applications", row["application_id"], "Application")
+                self.workspace.event(
+                    "document_reviewed",
+                    application["job_id"],
+                    row["application_id"],
+                    {
+                        "document_id": document_id,
+                        "kind": row["kind"],
+                        "review_state": "approved",
+                        "version": row["version"] + 1,
+                    },
+                    conn,
+                    subject=("document", document_id),
+                )
         return self.get_document(document_id)
 
     def application_staleness(self, application_id: str) -> dict:
@@ -699,7 +734,7 @@ class DocumentService:
     def delete_document(self, document_id: str) -> dict:
         """Permanently remove one document revision and its attached files; other versions remain."""
         with self.db.transaction() as conn:
-            _get(conn, "documents", document_id, "Document revision")
+            document = _get(conn, "documents", document_id, "Document revision")
             application = conn.execute(
                 "SELECT applications.job_id FROM applications JOIN documents ON documents.application_id=applications.id WHERE documents.id=?",
                 (document_id,),
@@ -715,15 +750,13 @@ class DocumentService:
                     )
             conn.execute("DELETE FROM documents WHERE id=?", (document_id,))
             if application:
-                conn.execute(
-                    "INSERT INTO events(id,job_id,kind,payload,created_at) VALUES(?,?,?,?,?)",
-                    (
-                        new_id(),
-                        application["job_id"],
-                        "document_deleted",
-                        encode({"document_id": document_id}),
-                        now(),
-                    ),
+                self.workspace.event(
+                    "document_deleted",
+                    application["job_id"],
+                    document["application_id"],
+                    {"document_id": document_id, "kind": document["kind"]},
+                    conn,
+                    subject=("document", document_id),
                 )
         self.db.collect_blobs()
         return {"deleted": True, "id": document_id}
@@ -835,6 +868,8 @@ class DocumentService:
             payload = value.model_dump()
             payload["sha256"] = value.sha256.lower() if value.sha256 else None
             payload["job_id"] = job_id
+            # The raw upload carries only the grant, so the grant remembers who reserved it.
+            payload["actor"] = list(current_actor().columns())
             return self._new_grant(conn, payload, "PUT")
 
     def reserve_download(self, file_id: str) -> dict:
@@ -941,6 +976,15 @@ class DocumentService:
                     conn.execute(
                         "UPDATE documents SET version=version+1 WHERE id=?", (current["owner_id"],)
                     )
+                self._file_event(
+                    conn,
+                    "file_uploaded",
+                    file_id,
+                    current["owner_type"],
+                    current["owner_id"],
+                    current.get("job_id"),
+                    from_columns(*(current.get("actor") or (None, None, None))),
+                )
             current["file_id"] = file_id
             conn.execute(
                 "UPDATE transfer_grants SET used=1,payload=? WHERE token_hash=?",
@@ -948,6 +992,22 @@ class DocumentService:
             )
             result = _get(conn, "files", file_id, "File")
         return self._file_record(result)
+
+    def _file_event(self, conn, kind, file_id, owner_type, owner_id, job_id, actor=None):
+        application_id = None
+        if owner_type == "document":
+            application_id = _get(conn, "documents", owner_id, "Document revision")[
+                "application_id"
+            ]
+        self.workspace.event(
+            kind,
+            job_id,
+            application_id,
+            {"file_id": file_id, "owner_type": owner_type, "owner_id": owner_id},
+            conn,
+            subject=("file", file_id),
+            actor=actor,
+        )
 
     def file_response(self, file_id: str, inline: bool = True):
         row = self.db.one("SELECT * FROM files WHERE id=?", (file_id,))
@@ -1000,6 +1060,14 @@ class DocumentService:
                     "Revision/context files are immutable. Delete the entire document or create a new revision."
                 )
             conn.execute("DELETE FROM files WHERE id=?", (file_id,))
+            self._file_event(
+                conn,
+                "file_deleted",
+                file_id,
+                descriptor["owner_type"],
+                descriptor["owner_id"],
+                row["job_id"],
+            )
             if descriptor["owner_type"] in {"knowledge", "template"}:
                 conn.execute(
                     f"UPDATE {OWNER_TABLES[descriptor['owner_type']]} SET version=version+1,updated_at=? WHERE id=?",
