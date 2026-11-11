@@ -1,0 +1,88 @@
+/* Card and list rows. Lists first; a card only groups. */
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.card > header {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--line);
+}
+.card > .body {
+  padding: var(--s4);
+}
+.card > footer {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--line);
+}
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.list > li {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  min-height: var(--row);
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--line);
+}
+.list > li:first-child {
+  border-top: 0;
+}
+.list .title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.list .meta {
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+  overflow-wrap: anywhere;
+}
+.list a.title,
+.list button.title {
+  text-decoration: none;
+}
+.list button.title {
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.list a.title:hover,
+.list button.title:hover {
+  text-decoration: underline;
+}
+.list > li.is-selected {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+/* Captions on the soft accent use the stronger secondary ink. */
+.is-selected .caption {
+  color: var(--ink-2);
+}
+@media (max-width: 860px) {
+  .card > header {
+    flex-wrap: wrap;
+  }
+  .card > header > .grow {
+    min-width: 40%;
+  }
+  .list > li {
+    flex-wrap: wrap;
+    row-gap: var(--s2);
+  }
+  /* A row keeps its text readable: tags and actions wrap below it. */
+  .list > li > .grow {
+    min-width: 60%;
+  }
+}

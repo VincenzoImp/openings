@@ -1,0 +1,75 @@
+/* Tabs and the segmented switch. */
+.tabs {
+  display: flex;
+  gap: var(--s1);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs [role="tab"] {
+  flex: none;
+  min-height: 40px;
+  padding: 0 var(--s3);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--ink-2);
+  font: 500 var(--t-md) / 1.2 var(--sans);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tabs [role="tab"]:hover {
+  color: var(--ink);
+}
+.tabs [role="tab"]:focus-visible {
+  outline-offset: -2px;
+}
+.tabs [aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+.tabs .count {
+  margin-left: 6px;
+}
+[role="tabpanel"]:focus-visible {
+  outline-offset: 4px;
+}
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+.segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 var(--s3);
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--ink-2);
+  font: 500 var(--t-md) / 1.2 var(--sans);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.segmented button:hover {
+  color: var(--ink);
+}
+.segmented [aria-pressed="true"],
+.segmented [aria-selected="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.segmented .icon {
+  width: 16px;
+  height: 16px;
+}
+@media (max-width: 860px) {
+  .tabs [role="tab"],
+  .segmented button {
+    min-height: 44px;
+  }
+}

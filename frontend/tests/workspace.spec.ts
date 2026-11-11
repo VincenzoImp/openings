@@ -412,16 +412,15 @@ test("mobile navigation contains focus and releases the background on close and 
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const button = page.getByRole("button", {
-    name: "Open navigation",
-    exact: true,
-  });
+  const button = page.getByRole("button", { name: "More", exact: true });
   await button.click();
   await expect(page.locator("main")).toHaveAttribute("inert", "");
   for (let index = 0; index < 15; index++) {
     await page.keyboard.press("Tab");
     expect(
-      await page.evaluate(() => !!document.activeElement?.closest(".sidebar")),
+      await page.evaluate(
+        () => !!document.activeElement?.closest(".more-sheet"),
+      ),
     ).toBe(true);
   }
   await page.keyboard.press("Escape");

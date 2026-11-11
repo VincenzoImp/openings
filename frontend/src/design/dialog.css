@@ -1,0 +1,115 @@
+/* Dialog (centred) and drawer (right edge), both native <dialog> elements, and
+   the action bar that stays above the bottom bar on narrow screens. */
+.dialog {
+  width: min(540px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.dialog::backdrop {
+  background: var(--backdrop);
+}
+.dialog.wide {
+  width: min(900px, calc(100vw - 32px));
+}
+.dialog.drawer {
+  width: min(600px, 100vw);
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0 0 0 auto;
+  border-width: 0 0 0 1px;
+  border-radius: 0;
+}
+.dialog-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  flex: none;
+  padding: var(--s4) var(--s4) var(--s3) var(--s5);
+}
+.drawer > .dialog-head {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: var(--s4);
+}
+.dialog-head h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 6px 0 0;
+  font: 400 var(--t-xl) / 1.25 var(--serif);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+/* The close button comes first in the document, so it takes focus first. */
+.dialog-head .icon-btn {
+  order: 1;
+  margin: -2px 0;
+}
+.dialog-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--s2) var(--s5) var(--s5);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.drawer > .dialog-body {
+  padding-top: var(--s5);
+}
+.dialog-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  flex: none;
+  flex-wrap: wrap;
+  padding: var(--s3) var(--s5);
+  border-top: 1px solid var(--line);
+  background: var(--card);
+}
+
+.actionbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+@media (max-width: 860px) {
+  .dialog-head {
+    padding-left: var(--s4);
+    padding-right: var(--s2);
+  }
+  .dialog-body {
+    padding-left: var(--s4);
+    padding-right: var(--s4);
+  }
+  .dialog-foot {
+    padding: var(--s2) var(--s4);
+  }
+  .sticky-actions {
+    position: fixed;
+    inset: auto 0 calc(var(--tabbar) + env(safe-area-inset-bottom)) 0;
+    z-index: 9;
+    flex-wrap: nowrap;
+    padding: var(--s2) var(--s4);
+    background: var(--card);
+    border-top: 1px solid var(--line);
+  }
+  .sticky-actions .btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  /* Room for the bottom bar plus the fixed action bar above it. */
+  .main:has(.sticky-actions) {
+    padding-bottom: calc(var(--tabbar) + 80px + env(safe-area-inset-bottom));
+  }
+}

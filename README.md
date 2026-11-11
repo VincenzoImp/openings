@@ -75,7 +75,7 @@ docker compose up -d --no-build
 ```
 
 Open **http://127.0.0.1:8080**, choose an owner password and add your first job in
-**Inbox**. Set up **Collection** when you want scheduled searches; new sources start
+**Jobs**. Set up **Collection** when you want scheduled searches; new sources start
 paused. Build your **Career** and **Templates** library before preparing documents.
 
 The Compose limit is **0.5 CPU / 512 MiB**; allow host resources beyond this

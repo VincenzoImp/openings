@@ -12,7 +12,7 @@ results and enable the schedule when ready. You can run a paused source manually
 |---|---|---|
 | Saved search | One query and location on selected JobSpy portals | `backend engineer`, `Berlin`, LinkedIn and Indeed |
 | Company | One supported ATS board or RSS/Atom feed | A company's Greenhouse board, filtered to engineering roles |
-| Manual job | The URL or posting you supply | Inbox → Add job |
+| Manual job | The URL or posting you supply | Jobs → Add job |
 
 Create another saved search for another query or location. Career preferences guide
 your agent’s job review; the query controls what is requested from a portal.
