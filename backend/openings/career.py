@@ -19,7 +19,6 @@ from pydantic import (
 from .common import check_version, decode_record, encode, new_id, now
 from .errors import DomainError, conflict, missing
 
-
 DEFAULT_PROFILE = {
     "name": "",
     "headline": "",

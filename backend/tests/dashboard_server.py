@@ -6,12 +6,12 @@ reached the server it started. The route exists only in this test server.
 """
 
 import os
-from pathlib import Path
 import socket
 import tempfile
+from pathlib import Path
 
-from fastapi.testclient import TestClient
 import uvicorn
+from fastapi.testclient import TestClient
 
 from openings.app import create_app
 from openings.career import ClaimCreate, KnowledgeCreate, TemplateCreate

@@ -1,7 +1,7 @@
 """Local daily slots and intervals, with one durable scheduling cursor per source."""
 
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -48,7 +48,7 @@ def next_due(schedule: dict, last_slot: str | None, moment: datetime | None = No
     clock gap resolves forward through a UTC round trip. Missed slots coalesce
     into the latest elapsed slot instead of building a catch-up queue.
     """
-    current = moment or datetime.now(timezone.utc)
+    current = moment or datetime.now(UTC)
     cfg = schedule_adapter.validate_python(schedule or {"kind": "interval"})
     previous = datetime.fromisoformat(last_slot) if last_slot else None
     if cfg.kind == "interval":
@@ -61,7 +61,7 @@ def next_due(schedule: dict, last_slot: str | None, moment: datetime | None = No
         for clock in cfg.times:
             hour, minute = map(int, clock.split(":"))
             slot = datetime(day.year, day.month, day.day, hour, minute, tzinfo=zone)
-            slots.append(slot.astimezone(timezone.utc))
+            slots.append(slot.astimezone(UTC))
     slots = sorted(set(slots))
     eligible = [slot for slot in slots if previous is None or slot > previous]
     elapsed = [slot for slot in eligible if slot <= current]

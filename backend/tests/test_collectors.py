@@ -1,9 +1,9 @@
 """Practical acquisition invariants: real transport seams, shared gates and queue fairness."""
 
-import json
 import asyncio
+import json
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
 
 import httpx
@@ -78,7 +78,7 @@ def test_every_http_attempt_obeys_persisted_cooldown(collection, monkeypatch, he
     retry = (
         "120"
         if header == "120"
-        else format_datetime(datetime.now(timezone.utc) + timedelta(seconds=120), usegmt=True)
+        else format_datetime(datetime.now(UTC) + timedelta(seconds=120), usegmt=True)
     )
 
     def send(request):
@@ -119,7 +119,7 @@ def test_jobspy_uses_explicit_instance_transport_for_all_three_providers(collect
 
     class Response:
         status_code = 429
-        headers = {"Retry-After": "90"}
+        headers = {"Retry-After": "90"}  # noqa: RUF012 - read-only test double
 
         def close(self):
             pass
