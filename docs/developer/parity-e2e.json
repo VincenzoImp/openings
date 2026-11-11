@@ -5,7 +5,11 @@
     "DELETE /api/v1/files/{}": [
       "live file and note deletion identify the item before removal"
     ],
+    "DELETE /api/v1/tokens/{}": [
+      "Settings creates an agent token that is refused token management"
+    ],
     "GET /api/v1/applications": [
+      "an application is marked ready and a new revision clears the step",
       "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
@@ -15,6 +19,7 @@
       "question edits preserve compatible work and require deliberate incompatible removal"
     ],
     "GET /api/v1/applications/{}": [
+      "an application is marked ready and a new revision clears the step",
       "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
@@ -22,6 +27,7 @@
       "question edits preserve compatible work and require deliberate incompatible removal"
     ],
     "GET /api/v1/applications/{}/events": [
+      "an application is marked ready and a new revision clears the step",
       "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
@@ -29,7 +35,9 @@
       "question edits preserve compatible work and require deliberate incompatible removal"
     ],
     "GET /api/v1/auth/session": [
+      "Settings creates an agent token that is refused token management",
       "an agent run, its report and its changes are readable",
+      "an application is marked ready and a new revision clears the step",
       "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
@@ -43,6 +51,7 @@
       "queue count, posting hierarchy and query-safe selection",
       "records export downloads valid JSON with undated career entries",
       "the owner answers an agent's question and the agent can read the answer",
+      "the owner writes a request and reads the agent's result with its run",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/career/claims": [
@@ -60,7 +69,9 @@
       "independent career, source and provider editors recover their own concurrent versions"
     ],
     "GET /api/v1/career/profile": [
+      "Settings creates an agent token that is refused token management",
       "an agent run, its report and its changes are readable",
+      "an application is marked ready and a new revision clears the step",
       "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
@@ -74,12 +85,14 @@
       "queue count, posting hierarchy and query-safe selection",
       "records export downloads valid JSON with undated career entries",
       "the owner answers an agent's question and the agent can read the answer",
+      "the owner writes a request and reads the agent's result with its run",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/collection": [
       "independent career, source and provider editors recover their own concurrent versions"
     ],
     "GET /api/v1/contexts": [
+      "an application is marked ready and a new revision clears the step",
       "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
@@ -87,6 +100,7 @@
       "question edits preserve compatible work and require deliberate incompatible removal"
     ],
     "GET /api/v1/documents": [
+      "an application is marked ready and a new revision clears the step",
       "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
@@ -94,12 +108,15 @@
       "question edits preserve compatible work and require deliberate incompatible removal"
     ],
     "GET /api/v1/documents/{}": [
+      "an application is marked ready and a new revision clears the step",
       "document upload, revision ownership and safe file preview"
     ],
     "GET /api/v1/documents/{}/consistency": [
+      "an application is marked ready and a new revision clears the step",
       "document upload, revision ownership and safe file preview"
     ],
     "GET /api/v1/events": [
+      "Settings creates an agent token that is refused token management",
       "an agent run, its report and its changes are readable"
     ],
     "GET /api/v1/export": [
@@ -109,6 +126,7 @@
       "live file and note deletion identify the item before removal"
     ],
     "GET /api/v1/files/{}/content": [
+      "an application is marked ready and a new revision clears the step",
       "document upload, revision ownership and safe file preview",
       "live file and note deletion identify the item before removal"
     ],
@@ -116,7 +134,9 @@
       "mobile applications, templates and funnel stay usable inside the viewport"
     ],
     "GET /api/v1/jobs": [
+      "Settings creates an agent token that is refused token management",
       "an agent run, its report and its changes are readable",
+      "an application is marked ready and a new revision clears the step",
       "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
@@ -130,6 +150,7 @@
       "queue count, posting hierarchy and query-safe selection",
       "records export downloads valid JSON with undated career entries",
       "the owner answers an agent's question and the agent can read the answer",
+      "the owner writes a request and reads the agent's result with its run",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/jobs/{}": [
@@ -137,6 +158,7 @@
       "live file and note deletion identify the item before removal",
       "queue count, posting hierarchy and query-safe selection",
       "the owner answers an agent's question and the agent can read the answer",
+      "the owner writes a request and reads the agent's result with its run",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/jobs/{}/notes": [
@@ -144,10 +166,13 @@
       "live file and note deletion identify the item before removal",
       "queue count, posting hierarchy and query-safe selection",
       "the owner answers an agent's question and the agent can read the answer",
+      "the owner writes a request and reads the agent's result with its run",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/overview": [
+      "Settings creates an agent token that is refused token management",
       "an agent run, its report and its changes are readable",
+      "an application is marked ready and a new revision clears the step",
       "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
@@ -161,13 +186,16 @@
       "queue count, posting hierarchy and query-safe selection",
       "records export downloads valid JSON with undated career entries",
       "the owner answers an agent's question and the agent can read the answer",
+      "the owner writes a request and reads the agent's result with its run",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/providers": [
       "independent career, source and provider editors recover their own concurrent versions"
     ],
     "GET /api/v1/questions": [
+      "Settings creates an agent token that is refused token management",
       "an agent run, its report and its changes are readable",
+      "an application is marked ready and a new revision clears the step",
       "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
@@ -181,13 +209,32 @@
       "queue count, posting hierarchy and query-safe selection",
       "records export downloads valid JSON with undated career entries",
       "the owner answers an agent's question and the agent can read the answer",
+      "the owner writes a request and reads the agent's result with its run",
+      "version conflict reviews latest values and reloads the editor with a usable version"
+    ],
+    "GET /api/v1/requests": [
+      "an agent run, its report and its changes are readable",
+      "an application is marked ready and a new revision clears the step",
+      "application history shows who made each change",
+      "application plan, blocking requirements and a stale button action recover",
+      "context selection follows evidence and supports deliberate empty selections",
+      "document upload, revision ownership and safe file preview",
+      "live file and note deletion identify the item before removal",
+      "question edits preserve compatible work and require deliberate incompatible removal",
+      "queue count, posting hierarchy and query-safe selection",
+      "the owner answers an agent's question and the agent can read the answer",
+      "the owner writes a request and reads the agent's result with its run",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/runs": [
       "an agent run, its report and its changes are readable"
     ],
     "GET /api/v1/runs/{}": [
-      "an agent run, its report and its changes are readable"
+      "an agent run, its report and its changes are readable",
+      "the owner writes a request and reads the agent's result with its run"
+    ],
+    "GET /api/v1/skills": [
+      "Settings creates an agent token that is refused token management"
     ],
     "GET /api/v1/sources": [
       "independent career, source and provider editors recover their own concurrent versions"
@@ -199,6 +246,7 @@
       "independent career, source and provider editors recover their own concurrent versions"
     ],
     "GET /api/v1/templates": [
+      "an application is marked ready and a new revision clears the step",
       "application history shows who made each change",
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
@@ -209,7 +257,11 @@
     "GET /api/v1/templates/{}": [
       "mobile applications, templates and funnel stay usable inside the viewport"
     ],
+    "GET /api/v1/tokens": [
+      "Settings creates an agent token that is refused token management"
+    ],
     "GET /api/v1/workspace": [
+      "Settings creates an agent token that is refused token management",
       "records export downloads valid JSON with undated career entries"
     ],
     "PATCH /api/v1/applications/{}": [
@@ -228,6 +280,9 @@
     "PATCH /api/v1/sources/{}": [
       "independent career, source and provider editors recover their own concurrent versions"
     ],
+    "POST /api/v1/applications/{}/ready": [
+      "an application is marked ready and a new revision clears the step"
+    ],
     "POST /api/v1/auth/login": [
       "queue count, posting hierarchy and query-safe selection"
     ],
@@ -235,12 +290,15 @@
       "context selection follows evidence and supports deliberate empty selections"
     ],
     "POST /api/v1/documents": [
+      "an application is marked ready and a new revision clears the step",
       "document upload, revision ownership and safe file preview"
     ],
     "POST /api/v1/documents/{}/review": [
+      "an application is marked ready and a new revision clears the step",
       "document upload, revision ownership and safe file preview"
     ],
     "POST /api/v1/files/uploads": [
+      "an application is marked ready and a new revision clears the step",
       "document upload, revision ownership and safe file preview",
       "live file and note deletion identify the item before removal"
     ],
@@ -250,7 +308,17 @@
     "POST /api/v1/questions/{}/answer": [
       "the owner answers an agent's question and the agent can read the answer"
     ],
+    "POST /api/v1/requests": [
+      "the owner writes a request and reads the agent's result with its run"
+    ],
+    "POST /api/v1/requests/{}/withdraw": [
+      "the owner writes a request and reads the agent's result with its run"
+    ],
+    "POST /api/v1/tokens": [
+      "Settings creates an agent token that is refused token management"
+    ],
     "PUT /api/v1/transfers": [
+      "an application is marked ready and a new revision clears the step",
       "document upload, revision ownership and safe file preview",
       "live file and note deletion identify the item before removal"
     ]

@@ -438,7 +438,7 @@ test("mobile applications, templates and funnel stay usable inside the viewport"
   await page.setViewportSize({ width: 390, height: 844 });
   await go(page, "applications");
   await expect(page.locator(".application-list")).toBeVisible();
-  await expect(page.locator(".stage-overview .btn")).toHaveCount(5);
+  await expect(page.locator(".stage-overview .btn")).toHaveCount(6);
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(390);
