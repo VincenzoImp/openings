@@ -1,14 +1,105 @@
 """Consistent portable snapshots and validated in-place restore."""
 
 import json
+import os
+import shutil
 import sqlite3
 import time
 from contextlib import closing
+from pathlib import Path
 
 from .common import encode, now
 from .compaction import compact
 from .db import MIGRATIONS, SCHEMA_VERSION, apply_schema, upgrade
 from .errors import DomainError
+from .retention import KEPT_RUNS_PER_SOURCE, retention_days
+
+# Slack for sidecar files and for an upgraded copy slightly larger than its upload.
+RESTORE_MARGIN = 64 * 1024**2
+MIB = 1024**2
+
+
+def database_bytes(db):
+    """Bytes the workspace takes on the data volume: the file and its write-ahead log."""
+    return sum(
+        path.stat().st_size for path in (db.path, Path(str(db.path) + "-wal")) if path.is_file()
+    )
+
+
+def replace_room(source, database):
+    """Free bytes that replacing the workspace with a file of ``source`` bytes needs.
+
+    The rollback copy of the current database, the write-ahead log that receives
+    every page of the restored one, and the growth of the file when it is larger.
+    """
+    return database + source + max(0, source - database) + RESTORE_MARGIN
+
+
+def restore_room(upload, database):
+    """Free bytes on the data volume that restoring an ``upload``-byte backup needs.
+
+    The upload itself and the upgraded copy of an earlier-format backup are written
+    beside the database before it is replaced (``replace_room``).
+    """
+    return 2 * upload + replace_room(upload, database)
+
+
+def restore_limit(free, database):
+    """The largest backup that fits in ``free`` bytes: the inverse of ``restore_room``."""
+    room = free - RESTORE_MARGIN
+    if room <= 4 * database:
+        return max(0, (room - database) // 3)
+    return room // 4
+
+
+def configured_restore_limit():
+    """``OPENINGS_MAX_RESTORE_MB`` as bytes: an optional upper bound, unset by default."""
+    value = (os.environ.get("OPENINGS_MAX_RESTORE_MB") or "").strip()
+    return max(0, int(value)) * MIB if value else None
+
+
+def storage_status(db):
+    """Database size, free space on its volume, the restore limit and retention."""
+    size, free = database_bytes(db), shutil.disk_usage(db.path.parent).free
+    configured = configured_restore_limit()
+    derived = restore_limit(free, size)
+    return {
+        "database_bytes": size,
+        "free_bytes": free,
+        "restore_limit_bytes": derived if configured is None else min(derived, configured),
+        "restore_limit_configured_bytes": configured,
+        "retention_days": retention_days(),
+        "kept_runs_per_source": KEPT_RUNS_PER_SOURCE,
+    }
+
+
+def backup_too_large(size, status, needed=None):
+    """The structured refusal of a backup that does not fit, with every size in its details."""
+    needed = restore_room(size, status["database_bytes"]) if needed is None else needed
+    configured = status["restore_limit_configured_bytes"]
+    if needed <= status["free_bytes"] and configured is not None:
+        message = (
+            f"This backup is {size // MIB} MiB, above this installation's "
+            f"OPENINGS_MAX_RESTORE_MB limit of {configured // MIB} MiB."
+        )
+    else:
+        message = (
+            f"This backup is {size // MIB} MiB. Restoring it needs {needed // MIB} MiB of free "
+            f"space on the data volume, and {status['free_bytes'] // MIB} MiB are free."
+        )
+    return DomainError(
+        413,
+        "backup_size",
+        message,
+        {
+            "size_bytes": size,
+            "limit_bytes": status["restore_limit_bytes"],
+            "free_bytes": status["free_bytes"],
+            "needed_bytes": needed,
+            "database_bytes": status["database_bytes"],
+            "configured_limit_bytes": configured,
+        },
+    )
 
 
 def preserve_provider_runtime(restored, current):
@@ -100,6 +191,12 @@ def _restore_current(workspace, source_path):
                     raise DomainError(
                         422, "backup_schema", "The backup does not match this workspace schema."
                     )
+        # Both copies exist now; check the room the replacement itself still needs.
+        status = storage_status(workspace.db)
+        size = Path(source_path).stat().st_size
+        needed = replace_room(size, status["database_bytes"])
+        if status["free_bytes"] < needed:
+            raise backup_too_large(size, status, needed)
         # Authentication belongs to the installation performing the restore.
         worker = getattr(workspace, "worker", None)
         if worker:

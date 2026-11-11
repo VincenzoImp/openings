@@ -25,6 +25,7 @@ from .models import (
     PeriodQuery,
     TriageInput,
 )
+from .operations import storage_status
 
 
 def register_core(router: APIRouter, workspace, requests):
@@ -39,6 +40,7 @@ def register_core(router: APIRouter, workspace, requests):
             "single_owner": True,
             "actor": current_actor().describe(),
             "open_requests": requests.count_open(),
+            "storage": storage_status(workspace.db),
         }
 
     @router.get("/overview")
@@ -146,7 +148,7 @@ def register_core(router: APIRouter, workspace, requests):
 def register_core_mcp(mcp, workspace, requests):
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def workspace_info(ctx: Context) -> dict:
-        """Read workspace capabilities, who this token is (actor, with token_kind owner or agent) and open_requests, the number of owner requests waiting for an agent (requests_list). Use REST transfer grants for file bytes."""
+        """Read workspace capabilities, who this token is (actor, with token_kind owner or agent), open_requests, the number of owner requests waiting for an agent (requests_list), and storage: database size, free space on the data volume, the largest backup a restore accepts and the days finished collection runs are kept. Use REST transfer grants for file bytes."""
         request = ctx.request_context.request
         origin = os.environ.get("OPENINGS_PUBLIC_URL") or (
             str(request.base_url).rstrip("/") if request else None
@@ -158,6 +160,7 @@ def register_core_mcp(mcp, workspace, requests):
             "api_base": "/api/v1",
             "actor": current_actor().describe(),
             "open_requests": requests.count_open(),
+            "storage": storage_status(workspace.db),
             "workflow": "Read open requests for the agent first. Read career, templates and stored instructions; prepare a frozen context; write and compile externally; submit document revisions and PDF/source files; track progress explicitly.",
         }
 

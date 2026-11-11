@@ -39,6 +39,7 @@ from .models import (
     NotePatch,
 )
 from .posting import posting_complete, posting_complete_sql
+from .retention import REFRESH_EVENT, REFRESH_FIELDS, observation_payload
 from .snapshots import collect_unused
 from .staleness import application_staleness
 
@@ -489,22 +490,26 @@ class Workspace:
                         + ",version=version+1,content_version=content_version+1,updated_at=? WHERE id=?",
                         (*updates.values(), stamp, job_id),
                     )
-                    self.event("posting_updated", job_id, payload={"fields": list(updates)}, conn=c)
+                    # A re-sighting is recorded on the observation (last_seen_at) only.
+                    visible = [key for key in updates if key in REFRESH_FIELDS]
+                    if visible:
+                        self.event(REFRESH_EVENT, job_id, payload={"fields": visible}, conn=c)
             c.executemany(
                 "INSERT OR IGNORE INTO job_identities(identity,job_id) VALUES(?,?)",
                 [(key, job_id) for key in aliases],
             )
             # Identity aliases contain no posting bodies. Update the observation
-            # already matching this exact posting rather than cloning its raw data.
+            # already matching this exact posting rather than adding another.
             observation = c.execute(
                 "SELECT id FROM postings WHERE job_id=? AND (identity=? OR (?<>'' AND url=?) OR (? IS NOT NULL AND json_extract(payload,'$.source_key')=?)) ORDER BY first_seen_at,id LIMIT 1",
                 (job_id, identity, url, url, value.source_key, value.source_key),
             ).fetchone()
             content_hash = hashlib.sha256(encode(data).encode()).hexdigest()
+            kept = encode(observation_payload(data))
             if observation:
                 c.execute(
                     "UPDATE postings SET source_id=coalesce(source_id,?),url=?,payload=?,content_hash=?,last_seen_at=? WHERE id=?",
-                    (value.source_id, url, encode(data), content_hash, stamp, observation["id"]),
+                    (value.source_id, url, kept, content_hash, stamp, observation["id"]),
                 )
             else:
                 c.execute(
@@ -515,7 +520,7 @@ class Workspace:
                         value.source_id,
                         identity,
                         url,
-                        encode(data),
+                        kept,
                         content_hash,
                         stamp,
                         stamp,

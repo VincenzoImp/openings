@@ -159,7 +159,15 @@ Each write records its actor: `owner` for the dashboard session, `token` with th
 token's id, name and `token_kind` (`owner` or `agent`), or `system`. History entries (`GET /applications/{id}/events`,
 `GET /events`, the overview activity) return `actor`, `run_id` and `subject`;
 notes return `author`. Entries from before version 0.17 have
-`actor.kind = "unknown"`.
+`actor.kind = "unknown"`. A source refresh is an entry only when it changed the
+title, company, location or posting text (`job_refreshed`, with the field names);
+the `posting_updated` kind of earlier releases no longer exists.
+
+`GET /workspace` and `workspace_info` return `storage`: `database_bytes`,
+`free_bytes` on the data volume, `restore_limit_bytes` (the largest backup a
+restore accepts now), `restore_limit_configured_bytes` (the optional
+`OPENINGS_MAX_RESTORE_MB` bound, or null), `retention_days` and
+`kept_runs_per_source` ([retention](operations.md#retention)).
 
 Runs need an API token; a dashboard session gets `403 run_actor`.
 
