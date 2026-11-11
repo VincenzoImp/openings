@@ -1096,3 +1096,85 @@ test("an application is marked ready and a new revision clears the step", async 
     outcome: "not_pursued",
   });
 });
+
+test("Settings creates an agent token that is refused token management", async ({
+  page,
+}, info) => {
+  const stamp = `${info.project.name} ${Date.now()}`;
+  const name = `Scoped agent ${stamp}`;
+  await go(page, "settings?section=agents");
+  // The form offers an agent token first; the owner chooses the kind.
+  const kind = page.getByLabel("Token kind", { exact: true });
+  await expect(kind).toHaveValue("agent");
+  await expect(page.locator(".token-kind-hint")).toContainText(
+    "Cannot change your password, manage tokens, restore a backup",
+  );
+  await page.getByLabel("Token name", { exact: true }).fill(name);
+  await page.getByLabel("Token name", { exact: true }).press("Enter");
+  const secret = await page.locator(".new-token code").innerText();
+  expect(secret).toMatch(/^op_/);
+  const row = page.locator(".token-list .settingrow", { hasText: name });
+  await expect(row.locator(".tag")).toHaveText("Agent");
+  await kind.selectOption("owner");
+  await expect(page.locator(".token-kind-hint")).toContainText("Full access");
+  await page.getByLabel("Token name", { exact: true }).fill(`Owner ${stamp}`);
+  await page.getByRole("button", { name: "Create token", exact: true }).click();
+  const ownerRow = page.locator(".token-list .settingrow", {
+    hasText: `Owner ${stamp}`,
+  });
+  await expect(ownerRow.locator(".tag")).toHaveText("Owner");
+  await fitsViewport(page);
+
+  // The agent token works for the job search and is refused owner operations.
+  const attempt = (path: string, method = "GET", body?: unknown) =>
+    page.evaluate(
+      async ({ secret, path, method, body }) => {
+        const response = await fetch("/api/v1" + path, {
+          method,
+          credentials: "omit",
+          headers: {
+            "X-Openings-E2E-Setup": "1",
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + secret,
+          },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        const value = await response.json();
+        return [response.status, value.error?.code ?? null];
+      },
+      { secret, path, method, body },
+    );
+  expect(await attempt("/jobs?limit=1")).toEqual([200, null]);
+  expect(await attempt("/tokens")).toEqual([403, "forbidden"]);
+  expect(await attempt("/tokens", "POST", { name: "Escalation" })).toEqual([
+    403,
+    "forbidden",
+  ]);
+  expect(
+    await attempt("/auth/password", "POST", { password: "changed-password" }),
+  ).toEqual([403, "forbidden"]);
+  const job = await call(page, "/jobs", "POST", {
+    title: `Scoped token job ${stamp}`,
+    company: "Example Labs",
+    posting: "Build reliable services.",
+  });
+  expect(
+    await attempt(`/jobs/${job.id}/notes`, "POST", { body: "Synthetic note." }),
+  ).toEqual([200, null]);
+
+  // Activity names the token with its kind.
+  await go(page, "activity?section=changes");
+  await expect(
+    page.locator(".change-list .activity", { hasText: "Note added" }).first(),
+  ).toContainText(`${name} (agent token)`);
+  await fitsViewport(page);
+
+  // Revoke both tokens from Settings with the keyboard.
+  await go(page, "settings?section=agents");
+  for (const item of [row, ownerRow]) {
+    await item.getByRole("button", { name: "Revoke", exact: true }).focus();
+    await page.keyboard.press("Enter");
+    await expect(item).toHaveCount(0);
+  }
+  expect(await attempt("/jobs?limit=1")).toEqual([401, "unauthorized"]);
+});

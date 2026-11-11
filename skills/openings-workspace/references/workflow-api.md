@@ -94,7 +94,8 @@ mechanics, not personal selection or writing policy.
   `questions_answer(question_id, value)` / `POST /questions/{id}/answer` and
   `questions_withdraw(question_id, value)` / `POST /questions/{id}/withdraw`.
   An answer needs text or one of the listed choices; answering again corrects
-  the answer and renews `answered_at`. Only an open question can be withdrawn.
+  the answer and renews `answered_at`. Answering needs owner authority: an agent
+  token gets `403 forbidden`. Only an open question can be withdrawn.
 - `events_list(value)` / `GET /events` reads the attributed change log.
 
 ## Recover preparation from the database

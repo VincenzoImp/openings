@@ -6,6 +6,7 @@ import os
 import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, FastAPI, Request
@@ -23,7 +24,7 @@ from .activity import (
     register_api as register_activity_api,
     register_mcp as register_activity_mcp,
 )
-from .actors import SYSTEM, acting_as
+from .actors import SYSTEM, acting_as, current_actor, require_owner
 from .api import register_core, register_core_mcp
 from .auth import COOKIE, MAX_AGE, Auth, LoginGuard
 from .career import (
@@ -45,7 +46,7 @@ from .errors import DomainError
 from .limits import REQUEST_LIMIT, BodyLimit
 from .mcp_server import OpeningsMCP
 from .models import Input
-from .operations import restore_database
+from .operations import remove_installation_credentials, restore_database
 from .skills import (
     SkillLibrary,
     register_api as register_skills_api,
@@ -62,6 +63,10 @@ class PasswordInput(Input):
 
 class TokenInput(Input):
     name: str = Field(min_length=1, max_length=100)
+    kind: Literal["owner", "agent"] = Field(
+        default="owner",
+        description="owner has full access; agent cannot change the owner password, manage tokens, restore a backup or answer questions for the owner.",
+    )
 
 
 def redact_secrets(value):
@@ -328,22 +333,22 @@ def create_app(database=None, start_worker=True):
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
     )
     def tokens_list() -> dict:
-        """List installation API/MCP token metadata; stored token secrets are never returned."""
+        """List installation API/MCP token metadata with each token's kind; stored token secrets are never returned. Owner only: an agent token is refused with forbidden."""
         return auth.list_tokens()
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     def token_create(value: TokenInput) -> dict:
-        """Create a named API/MCP token. Save its secret; it is returned only once."""
-        return auth.create_token(value.name)
+        """Create a named API/MCP token of kind owner (full access, the default) or agent (scoped). Save its secret; it is returned only once. Owner only: an agent token is refused with forbidden."""
+        return auth.create_token(value.name, value.kind)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
     def token_revoke(token_id: str) -> dict:
-        """Revoke an API/MCP token, including the current token if selected."""
+        """Revoke an API/MCP token, including the current token if selected. Owner only: an agent token is refused with forbidden."""
         return auth.revoke_token(token_id)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
     def owner_password_update(value: PasswordInput) -> dict:
-        """Change the owner password and invalidate all browser sessions; API/MCP tokens remain valid."""
+        """Change the owner password and invalidate all browser sessions; API/MCP tokens remain valid. Owner only: an agent token is refused with forbidden."""
         return auth.change_password(value.password)
 
     @router.get("/tokens")
@@ -352,7 +357,7 @@ def create_app(database=None, start_worker=True):
 
     @router.post("/tokens")
     def token(value: TokenInput):
-        return auth.create_token(value.name)
+        return auth.create_token(value.name, value.kind)
 
     @router.delete("/tokens/{token_id}")
     def revoke(token_id: str):
@@ -361,7 +366,15 @@ def create_app(database=None, start_worker=True):
     @router.get("/backup")
     def backup():
         name = workspace.db.temp_file("backup")
-        workspace.db.backup(name)
+        try:
+            workspace.db.backup(name)
+            if current_actor().is_agent:
+                # An agent may back up before broad changes, but never receives the
+                # password hash, the session secret or the tokens of the installation.
+                remove_installation_credentials(name)
+        except BaseException:
+            workspace.db.remove_temp(name)
+            raise
         return FileResponse(
             name,
             media_type="application/vnd.sqlite3",
@@ -371,6 +384,7 @@ def create_app(database=None, start_worker=True):
 
     @router.post("/backup/restore")
     async def restore(request: Request):
+        require_owner("restore a backup")
         name = workspace.db.temp_file("restore")
         count = 0
         try:
@@ -506,7 +520,7 @@ def create_app(database=None, start_worker=True):
         annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
     )
     def workspace_backup() -> dict:
-        """Reserve a scoped HTTP download of a consistent SQLite backup, including file bytes."""
+        """Reserve a scoped HTTP download of a consistent SQLite backup, including file bytes. A backup taken with an agent token omits the owner password hash, session secret and API tokens; it still restores completely."""
         return {
             "url": "/api/v1/backup",
             "method": "GET",
@@ -516,7 +530,8 @@ def create_app(database=None, start_worker=True):
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
     def workspace_restore_upload() -> dict:
-        """Reserve a scoped raw SQLite upload that replaces workspace data; installation authentication stays unchanged."""
+        """Reserve a scoped raw SQLite upload that replaces workspace data; installation authentication stays unchanged. Owner only: an agent token is refused with forbidden."""
+        require_owner("restore a backup")
         return {
             "url": "/api/v1/backup/restore",
             "method": "POST",

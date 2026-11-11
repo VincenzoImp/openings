@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 CREATE TABLE IF NOT EXISTS api_tokens (
  id TEXT PRIMARY KEY, name TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
- created_at TEXT NOT NULL, last_used_at TEXT
+ created_at TEXT NOT NULL, last_used_at TEXT,
+ kind TEXT NOT NULL DEFAULT 'owner' CHECK(kind IN ('owner','agent'))
 );
 CREATE TABLE IF NOT EXISTS jobs (
  id TEXT PRIMARY KEY, title TEXT NOT NULL, company TEXT NOT NULL, location TEXT NOT NULL DEFAULT '',
@@ -56,7 +57,7 @@ CREATE TABLE IF NOT EXISTS applications (
  priority INTEGER CHECK(priority IS NULL OR priority BETWEEN 1 AND 5),
  deadline TEXT CHECK(deadline IS NULL OR (length(deadline)=10 AND date(deadline)=deadline)),
  requirements TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(requirements) AND json_type(requirements)='array'),
- ready_at TEXT, ready_by_kind TEXT, ready_by_id TEXT, ready_by_name TEXT
+ ready_at TEXT, ready_by_kind TEXT, ready_by_id TEXT, ready_by_name TEXT, ready_by_token_kind TEXT
 );
 -- An agent run: opened by an API token, closed with a stored report.
 CREATE TABLE IF NOT EXISTS runs (
@@ -66,24 +67,26 @@ CREATE TABLE IF NOT EXISTS runs (
  note TEXT NOT NULL DEFAULT '', report TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(report)),
  change_counts TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(change_counts)),
  superseded_by TEXT, idempotency_key TEXT UNIQUE, version INTEGER NOT NULL DEFAULT 1,
- started_at TEXT NOT NULL, last_activity_at TEXT NOT NULL, ended_at TEXT, updated_at TEXT NOT NULL
+ started_at TEXT NOT NULL, last_activity_at TEXT NOT NULL, ended_at TEXT, updated_at TEXT NOT NULL,
+ token_kind TEXT
 );
 -- One record per change. job_id/application_id keep the owning timeline (and its
 -- deletion); subject_* names the changed record of any type; actor_* and run_id
--- say who changed it. Rows written before schema 8 have no actor.
+-- say who changed it (a token with its kind, owner or agent). Rows written before
+-- schema 8 have no actor.
 CREATE TABLE IF NOT EXISTS events (
  id TEXT PRIMARY KEY, job_id TEXT REFERENCES jobs(id) ON DELETE CASCADE,
  application_id TEXT REFERENCES applications(id) ON DELETE CASCADE,
  kind TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL,
  subject_type TEXT, subject_id TEXT, actor_kind TEXT, actor_id TEXT, actor_name TEXT,
- run_id TEXT REFERENCES runs(id) ON DELETE SET NULL
+ actor_token_kind TEXT, run_id TEXT REFERENCES runs(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS events_app ON events(application_id,created_at);
 CREATE TABLE IF NOT EXISTS notes (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
  application_id TEXT REFERENCES applications(id) ON DELETE CASCADE, body TEXT NOT NULL,
  version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
- author_kind TEXT, author_id TEXT, author_name TEXT
+ author_kind TEXT, author_id TEXT, author_name TEXT, author_token_kind TEXT
 );
 CREATE TABLE IF NOT EXISTS knowledge (
  id TEXT PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL, organization TEXT NOT NULL DEFAULT '',
@@ -196,9 +199,10 @@ CREATE TABLE IF NOT EXISTS questions (
  choices TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(choices) AND json_type(choices)='array'),
  state TEXT NOT NULL DEFAULT 'open' CHECK(state IN ('open','answered','withdrawn')),
  answer TEXT NOT NULL DEFAULT '', answer_choice TEXT,
- asked_by_kind TEXT NOT NULL, asked_by_id TEXT, asked_by_name TEXT,
+ asked_by_kind TEXT NOT NULL, asked_by_id TEXT, asked_by_name TEXT, asked_by_token_kind TEXT,
  run_id TEXT REFERENCES runs(id) ON DELETE SET NULL,
- resolved_by_kind TEXT, resolved_by_id TEXT, resolved_by_name TEXT, resolved_at TEXT,
+ resolved_by_kind TEXT, resolved_by_id TEXT, resolved_by_name TEXT, resolved_by_token_kind TEXT,
+ resolved_at TEXT,
  idempotency_key TEXT UNIQUE, version INTEGER NOT NULL DEFAULT 1,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
  CHECK((job_id IS NOT NULL)+(application_id IS NOT NULL)+(knowledge_id IS NOT NULL)<=1)

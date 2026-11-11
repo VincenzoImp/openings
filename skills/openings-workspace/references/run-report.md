@@ -32,8 +32,12 @@ matters, the subject (`job`, `application`, `knowledge` for a Career entry, or
 none) and, when the answer is a choice, the choices. Ask only for facts or
 decisions that block or materially improve a result. Leave the affected record
 unchanged and continue the rest of the work. Withdraw a question that no longer
-needs an answer with `questions_withdraw`. Record an answer with
-`questions_answer` only when the owner gave it to you directly.
+needs an answer with `questions_withdraw`. The answer belongs to the owner, who
+gives it in the dashboard. An agent token cannot call `questions_answer`
+(`forbidden`): when the owner answers in conversation, act on the answer, record
+a lasting fact in the Profile or the Career record, and ask the owner to confirm
+the question in **Activity** or withdraw it with a note of where the fact went.
+With an owner token, record an answer only when the owner gave it to you directly.
 
 ## Close the run
 

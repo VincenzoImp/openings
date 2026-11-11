@@ -32,9 +32,13 @@ Skip this section when the owner already has a reachable Openings URL.
 
 ## Connect
 
-The owner creates an API token in **Settings** and starts the agent client with
-`OPENINGS_URL`, `OPENINGS_TOKEN` and, for a private certificate authority,
-`OPENINGS_CA_FILE`. Never ask for the token in the conversation. Register the MCP
+The owner creates an **Agent** token in **Settings → Agent access** and starts
+the agent client with `OPENINGS_URL`, `OPENINGS_TOKEN` and, for a private
+certificate authority, `OPENINGS_CA_FILE`. Recommend an agent token, not an owner
+token: it runs every workflow and cannot change the owner password, manage
+tokens, restore a backup or answer a question for the owner. `workspace_info`
+reports the kind in `actor.token_kind`; when it is `owner`, tell the owner that
+an agent token is enough. Never ask for the token in the conversation. Register the MCP
 server at `<origin>/mcp` with the bearer header in the client's own configuration.
 Confirm with `workspace_info` and `capabilities_get`.
 

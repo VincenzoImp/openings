@@ -131,6 +131,10 @@ await shot("career");
 
 await open("settings?section=agents");
 await shot("agent-access");
+await page
+  .getByRole("heading", { name: "Access tokens." })
+  .scrollIntoViewIfNeeded();
+await shot("access-tokens");
 
 await open("activity");
 await page.getByRole("heading", { name: "Activity", exact: true }).waitFor();

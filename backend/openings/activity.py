@@ -9,7 +9,7 @@ from typing import Annotated, Literal
 from fastapi import Query
 from pydantic import Field, field_validator, model_validator
 
-from .actors import current_actor, describe, describe_row
+from .actors import current_actor, describe, pop_actor, require_owner
 from .common import check_version, encode, new_id, now
 from .errors import DomainError, conflict, missing
 from .models import Input, normalized_date
@@ -323,7 +323,9 @@ class ActivityService:
             else "superseded"
             if stored == "interrupted"
             else None,
-            "actor": describe("token", row.pop("token_id"), row.pop("token_name")),
+            "actor": describe(
+                "token", row.pop("token_id"), row.pop("token_name"), row.pop("token_kind")
+            ),
             "change_counts": counts,
             "changes_total": sum(counts.values()),
             "questions_count": conn.execute(
@@ -331,8 +333,6 @@ class ActivityService:
             ).fetchone()[0],
             "summary": report.get("summary", ""),
         }
-        for key in ("token_id", "token_name"):
-            result.pop(key, None)
         if full:
             result["report"] = report or None
         return result
@@ -379,11 +379,12 @@ class ActivityService:
                     (stamp, run_id, encode(self._counts(conn, superseded)), stamp, superseded),
                 )
             conn.execute(
-                "INSERT INTO runs(id,token_id,token_name,workflow,scope,idempotency_key,started_at,last_activity_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO runs(id,token_id,token_name,token_kind,workflow,scope,idempotency_key,started_at,last_activity_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (
                     run_id,
                     actor.id,
                     actor.name,
+                    actor.token_kind,
                     value.workflow.strip(),
                     value.scope,
                     value.idempotency_key,
@@ -581,16 +582,15 @@ class ActivityService:
             else None
         )
         row["choices"] = json.loads(row["choices"])
-        row["asked_by"] = describe_row(row, "asked_by")
-        resolved = describe_row(row, "resolved_by") if row["resolved_by_kind"] else None
+        row["asked_by"] = pop_actor(row, "asked_by")
+        resolved = pop_actor(row, "resolved_by")
+        if resolved["kind"] == "unknown":
+            resolved = None
         stamp = row.pop("resolved_at")
         for name in ("answered", "withdrawn"):
             current = row["state"] == name
             row[name + "_by"] = resolved if current else None
             row[name + "_at"] = stamp if current else None
-        for prefix in ("asked_by", "resolved_by"):
-            for suffix in ("kind", "id", "name"):
-                row.pop(f"{prefix}_{suffix}")
         row.pop("idempotency_key")
         return row
 
@@ -633,7 +633,7 @@ class ActivityService:
                 for key, column in SUBJECT_COLUMNS.items()
             }
             conn.execute(
-                "INSERT INTO questions(id,subject_type,job_id,application_id,knowledge_id,subject_label,question,why,choices,asked_by_kind,asked_by_id,asked_by_name,run_id,idempotency_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO questions(id,subject_type,job_id,application_id,knowledge_id,subject_label,question,why,choices,asked_by_kind,asked_by_id,asked_by_name,asked_by_token_kind,run_id,idempotency_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     question_id,
                     value.subject_type,
@@ -670,7 +670,7 @@ class ActivityService:
         actor = current_actor()
         stamp = now()
         conn.execute(
-            "UPDATE questions SET state=?,answer=?,answer_choice=?,resolved_by_kind=?,resolved_by_id=?,resolved_by_name=?,resolved_at=?,version=version+1,updated_at=? WHERE id=?",
+            "UPDATE questions SET state=?,answer=?,answer_choice=?,resolved_by_kind=?,resolved_by_id=?,resolved_by_name=?,resolved_by_token_kind=?,resolved_at=?,version=version+1,updated_at=? WHERE id=?",
             (state, answer, choice, *actor.columns(), stamp, stamp, row["id"]),
         )
         job_id = row["job_id"]
@@ -682,7 +682,11 @@ class ActivityService:
         return self._read_question(conn, row["id"])
 
     def answer_question(self, question_id: str, value: QuestionAnswer) -> dict:
-        """Answer an open question, or correct an earlier answer, with free text and/or one of its choices."""
+        """Answer an open question, or correct an earlier answer, with free text and/or one of its choices.
+
+        An answer is the owner's: the dashboard session or an owner token records it.
+        """
+        require_owner("answer a question for the owner")
         value = value if isinstance(value, QuestionAnswer) else QuestionAnswer.model_validate(value)
         answer = value.answer.strip()
         with self.db.transaction() as conn:
@@ -858,7 +862,7 @@ def register_mcp(mcp, activity: ActivityService):
 
     @mcp.tool(annotations=write)
     def questions_answer(question_id: str, value: QuestionAnswer) -> dict:
-        """Record the owner's answer (text and/or one of the choices) using the question's current version. Agents record an answer only when the owner gave it."""
+        """Record the owner's answer (text and/or one of the choices) using the question's current version. Owner only: an agent token is refused with forbidden; an owner token records an answer only when the owner gave it."""
         return activity.answer_question(question_id, value)
 
     @mcp.tool(annotations=write)

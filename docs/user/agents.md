@@ -5,6 +5,41 @@ client with the workspace URL and `Authorization: Bearer <token>`, using a token
 created in Settings. Store that token in the client's secret/environment facility;
 client configuration and environment-variable syntax differ.
 
+## Token kinds
+
+Every API token has a kind, chosen when it is created and shown in **Settings →
+Agent access**:
+
+| Kind | Access |
+|---|---|
+| **Agent** (recommended for an agent) | The whole job search: jobs, applications, documents, Career, collection, runs and questions. |
+| **Owner** | Everything, the same as your dashboard session. |
+
+![Access tokens in Settings: an agent token, an owner token and the form that offers an agent token first](../images/access-tokens.png)
+
+An agent token is refused, with `403 forbidden` on REST and MCP, when it tries to:
+
+- change the owner password;
+- list, create or revoke API tokens;
+- restore a backup;
+- answer a question for the owner (it can ask and withdraw questions).
+
+An agent token can still download a backup and a records export, because the
+operating mandate has the agent back up before broad changes. A backup taken
+with an agent token leaves out the owner password hash, the session secret and
+the API tokens; it restores completely, because a restore always keeps the
+installation's own access. An agent token can also delete an application or
+forget a job: those are workspace data operations with versions and a recorded
+change, governed by the operating mandate rather than by the token.
+
+Tokens created before version 0.17 are owner tokens and keep full access. To
+scope an existing agent, create an agent token, give it to the agent and revoke
+the old one. `POST /tokens` and `token_create` default to `owner` when no `kind`
+is sent, so existing scripts keep working; the dashboard form offers `agent`
+first. `workspace_info` returns `actor.token_kind`, so an agent can see which
+kind it holds. Use an owner token only when you want to run owner actions
+yourself from an external MCP session.
+
 A typical local connection uses `http://127.0.0.1:8080/mcp/`. For another machine,
 set `OPENINGS_PUBLIC_URL` to the address the agent can actually reach. The server
 returns that origin from `workspace_info`; resolve relative transfer URLs against

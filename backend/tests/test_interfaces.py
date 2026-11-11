@@ -1,5 +1,6 @@
 """Release contract: every advertised operation resolves on REST and MCP."""
 
+import json
 import re
 import subprocess
 import sys
@@ -57,3 +58,81 @@ def test_parity_matrix_is_current():
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+# One representative call per owner-only operation: REST request arguments and MCP
+# tool arguments. An operation marked access=owner without an entry fails the test.
+OWNER_ONLY_CALLS = {
+    "password.update": (
+        {"json": {"password": "another-synthetic-password"}},
+        {"value": {"password": "another-synthetic-password"}},
+    ),
+    "tokens.list": ({}, {}),
+    "tokens.create": ({"json": {"name": "Escalation"}}, {"value": {"name": "Escalation"}}),
+    "tokens.revoke": ({}, {"token_id": "missing"}),
+    "backup.restore": ({"content": b"SQLite format 3\x00"}, {}),
+    "questions.answer": (
+        {"json": {"expected_version": 1, "answer": "Synthetic"}},
+        {"question_id": "missing", "value": {"expected_version": 1, "answer": "Synthetic"}},
+    ),
+}
+
+
+def test_owner_only_operations_refuse_an_agent_token_on_rest_and_mcp(tmp_path):
+    """Every operation the inventory marks access=owner returns forbidden to an agent token."""
+    app = create_app(tmp_path / "access.sqlite", start_worker=False)
+    app.state.auth.setup("synthetic-password")
+    agent = app.state.auth.create_token("Synthetic agent", "agent")["token"]
+    owner = app.state.auth.create_token("Synthetic owner token")["token"]
+    with TestClient(app, base_url="http://localhost:8080") as client:
+        inventory = client.get(
+            "/api/v1/capabilities", headers={"Authorization": "Bearer " + agent}
+        ).json()
+        assert set(inventory["access"]) == {"owner", "default"}
+        marked = {
+            operation["id"]: operation
+            for operation in inventory["operations"]
+            if operation.get("access") == "owner"
+        }
+        assert all(
+            operation.get("access", "owner") == "owner" for operation in inventory["operations"]
+        )
+        assert set(marked) == set(OWNER_ONLY_CALLS)
+
+        def over_mcp(token, name, arguments):
+            response = client.post(
+                "/mcp",
+                headers={
+                    "Authorization": "Bearer " + token,
+                    "Accept": "application/json, text/event-stream",
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/call",
+                    "params": {"name": name, "arguments": arguments},
+                },
+            )
+            result = response.json()["result"]
+            if not result.get("isError"):
+                return None
+            return json.loads(result["content"][0]["text"])["error"]["code"]
+
+        for identifier, operation in marked.items():
+            request, arguments = OWNER_ONLY_CALLS[identifier]
+            for route in operation["rest"]:
+                path = re.sub(r"\{[^}]+\}", "missing", route["path"])
+                response = client.request(
+                    route["method"], path, headers={"Authorization": "Bearer " + agent}, **request
+                )
+                assert response.status_code == 403, (identifier, response.text)
+                assert response.json()["error"]["code"] == "forbidden", identifier
+            for name in operation["mcp"]:
+                assert over_mcp(agent, name, arguments) == "forbidden", (identifier, name)
+        # The same calls are not refused for want of authority with an owner token.
+        # The password change runs last: it is the only one that succeeds with these inputs.
+        for identifier in sorted(marked, key=lambda item: item == "password.update"):
+            if identifier == "backup.restore":
+                continue  # A real restore is covered by test_token_scopes.py.
+            for name in marked[identifier]["mcp"]:
+                assert over_mcp(owner, name, OWNER_ONLY_CALLS[identifier][1]) != "forbidden"

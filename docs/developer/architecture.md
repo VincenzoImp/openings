@@ -73,8 +73,8 @@ dashboard path, and lists every gap. Read [REST](../user/api.md) and
   tags and ordering. Descriptions are optional; claims contain free reusable text.
   Reserved structured fields are stored once, outside arbitrary metadata.
 - **Attribution:** authentication sets the actor (owner session, named API token
-  or system) in a context variable (`actors.py`) that reaches the shared services
-  through thread offloading; worker threads start with an empty context and
+  with its kind, or system) in a context variable (`actors.py`) that reaches the
+  shared services through thread offloading; worker threads start with an empty context and
   record the system. Every write leaves one event with its subject, actor and,
   for a token with an open run, that run. Payloads hold identifiers, field names
   and versions, never content. Events of a job or application are deleted with
@@ -84,6 +84,12 @@ dashboard path, and lists every gap. Read [REST](../user/api.md) and
   only an explicit supersede closes it. A finished run stores its report and
   change counts. Questions reference a job, application or Career entry with
   `ON DELETE SET NULL` and keep a label, so they outlive their subject.
+- **Token scope:** a token is `owner` or `agent`. Owner-only operations call
+  `actors.require_owner` in the shared service, so REST and MCP refuse an agent
+  token alike with `403 forbidden`; the inventory marks them `access: owner` and
+  `test_interfaces.py` calls each one. Scoped operational grants (backup, export,
+  restore) carry the requesting actor. A backup made for an agent token has the
+  installation's password hash, session secret and tokens removed from the copy.
 - **Ready:** every shared service that changes what Ready was judged on clears it
   in its own transaction through `Workspace.clear_ready`: a new revision or
   context, a deleted revision, a file added to a current revision, an unresolved
@@ -110,9 +116,10 @@ installation authentication, recent provider request history and later cooldowns
 
 Workspaces and backups use schema 8. Opening schema 7 upgrades it in one
 transaction: events gain a subject, an actor and a run, notes gain an author,
-applications gain `ready_at` with who set it, and the `runs` and `questions`
-tables are added; existing rows keep every value, read as "unknown (before 0.17)"
-and are not marked ready. Schema 6 is upgraded through schema 7 in the same
+applications gain `ready_at` with who set it, API tokens gain a kind, and the
+`runs` and `questions` tables are added; existing rows keep every value, read as
+"unknown (before 0.17)" and are not marked ready, and existing tokens become
+owner tokens with unchanged access. Schema 6 is upgraded through schema 7 in the same
 transaction (application priority, deadline and requirements), and schema 5
 through schema 6 (removing obsolete derived data and preserving owned records and
 immutable snapshots). Restore accepts schema 8 and upgrades a copy of a schema 5,

@@ -6,6 +6,7 @@ from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 
 from . import __version__
+from .actors import current_actor
 from .models import (
     ApplicationBulk,
     ApplicationInput,
@@ -36,6 +37,7 @@ def register_core(router: APIRouter, workspace):
             "api_base": "/api/v1",
             "mcp_endpoint": "/mcp",
             "single_owner": True,
+            "actor": current_actor().describe(),
         }
 
     @router.get("/overview")
@@ -143,7 +145,7 @@ def register_core(router: APIRouter, workspace):
 def register_core_mcp(mcp, workspace):
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def workspace_info(ctx: Context) -> dict:
-        """Read workspace capabilities. Use REST transfer grants for file bytes."""
+        """Read workspace capabilities and who this token is (actor, with token_kind owner or agent). Use REST transfer grants for file bytes."""
         request = ctx.request_context.request
         origin = os.environ.get("OPENINGS_PUBLIC_URL") or (
             str(request.base_url).rstrip("/") if request else None
@@ -153,6 +155,7 @@ def register_core_mcp(mcp, workspace):
             "version": __version__,
             "origin": origin,
             "api_base": "/api/v1",
+            "actor": current_actor().describe(),
             "workflow": "Read career, templates and stored instructions; prepare a frozen context; write and compile externally; submit document revisions and PDF/source files; track progress explicitly.",
         }
 

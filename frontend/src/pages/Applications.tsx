@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
+  actorLabel,
   api,
   ApiError,
   calendarDate,
@@ -1916,7 +1917,7 @@ export function ApplicationDrawer({
                         </p>
                         <time>
                           {date(e.created_at)}
-                          {e.actor && ` · ${e.actor.label}`}
+                          {e.actor && ` · ${actorLabel(e.actor)}`}
                         </time>
                       </div>
                     </article>

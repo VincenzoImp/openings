@@ -2548,6 +2548,17 @@ html[data-theme="dark"] {
 .token-form button {
   flex-shrink: 0;
 }
+.token-form select {
+  flex: 0 1 auto;
+  width: auto;
+}
+.token-kind-hint {
+  margin-top: 8px;
+}
+.token-list h3 .tag {
+  margin-left: 4px;
+  vertical-align: middle;
+}
 .new-token {
   padding: 17px;
   border: 1px solid var(--accent);
@@ -2801,6 +2812,9 @@ html[data-theme="dark"] {
   }
   .token-form input {
     flex-basis: 100%;
+  }
+  .token-form select {
+    flex: 1 1 auto;
   }
   .auth-shell {
     padding: 18px;

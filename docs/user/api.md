@@ -4,8 +4,12 @@ Base path: **`/api/v1`**. The running server exposes interactive reference at
 `/api/docs` and schemas at `/api/openapi.json`; those schemas are authoritative
 for fields. All normal data operations require an owner session or bearer token.
 
-Create a token in **Settings** and store it outside source control. Tokens grant
-owner access and can be revoked independently. Browser session writes also need
+Create a token in **Settings** and store it outside source control. A token is
+an **owner** token (full access) or an **agent** token, which is refused with
+`403 forbidden` for the owner password, token management, restore and answering
+a question (see [token kinds](agents.md#token-kinds)). `POST /tokens` takes
+`{"name": "...", "kind": "agent"}`; `kind` defaults to `owner`. Tokens can be
+revoked independently. Browser session writes also need
 the `X-CSRF-Token` returned by `/auth/session`; scripts use bearer auth instead.
 `POST /auth/logout` revokes every browser session (all signed-in browsers must
 sign in again); API/MCP tokens stay valid.
@@ -151,7 +155,7 @@ headers, partial dates, skills and ordering.
 ## Runs, questions and the change log
 
 Each write records its actor: `owner` for the dashboard session, `token` with the
-token's id and name, or `system`. History entries (`GET /applications/{id}/events`,
+token's id, name and `token_kind` (`owner` or `agent`), or `system`. History entries (`GET /applications/{id}/events`,
 `GET /events`, the overview activity) return `actor`, `run_id` and `subject`;
 notes return `author`. Entries from before version 0.17 have
 `actor.kind = "unknown"`.
@@ -189,7 +193,8 @@ stores a progress `note`. `GET /runs/{id}?changes_limit=50&changes_offset=0`
 returns the report, the questions asked and the changes made; `GET /runs` filters
 by `status`, `workflow`, `token_id`, `started_since` and `started_until`.
 `GET /questions` filters by `state`, `subject_type`, `subject_id`, `run_id` and
-`answered_since`; answer and withdraw take `expected_version`. `GET /events`
+`answered_since`; answer and withdraw take `expected_version`, and answering
+needs owner authority (an agent token gets `403 forbidden`). `GET /events`
 filters by `run_id`, `job_id`, `application_id`, `subject_type`, `subject_id`,
 `actor`, `token_id`, `kind`, `since` and `until`.
 

@@ -12,6 +12,8 @@ import {
   type Job,
   version,
   type ListResult,
+  type TokenKind,
+  tokenKinds,
 } from "../api";
 import {
   useResource,
@@ -38,9 +40,15 @@ import { RunProgress, duration } from "./CollectionForms";
 interface Token {
   id: string;
   name: string;
+  kind: TokenKind;
   created_at: string;
   last_used_at?: string;
 }
+const tokenAccess: Record<TokenKind, string> = {
+  agent:
+    "Runs the job search. Cannot change your password, manage tokens, restore a backup or answer its own questions.",
+  owner: "Full access, the same as your dashboard session.",
+};
 export default function SettingsPage({
   theme,
   onTheme,
@@ -147,7 +155,7 @@ function ClientSetup({ endpoint }: { endpoint: string }) {
       {[
         [
           "Connect your agent",
-          "Create an access token below, set OPENINGS_TOKEN (and OPENINGS_URL for file transfers), and add the configuration above to your client.",
+          "Create an agent access token below, set OPENINGS_TOKEN (and OPENINGS_URL for file transfers), and add the configuration above to your client.",
         ],
         [
           "Let it run the search",
@@ -214,12 +222,15 @@ function AgentSettings() {
   });
   const { mutate, pending, notify } = useWorkspace();
   const [token, setToken] = useState<string | null>(null);
+  // An agent needs no owner authority, so that is the kind offered first.
+  const [kind, setKind] = useState<TokenKind>("agent");
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
     await mutate(async () => {
       const result = await api<{ token: string }>("/tokens", "POST", {
         name: f.get("name"),
+        kind,
       });
       setToken(result.token);
     }, "Access token created. Save it before closing this view.");
@@ -281,6 +292,8 @@ function AgentSettings() {
             <h2>Access tokens.</h2>
             <p>
               Separate tokens can be revoked without changing your password.
+              Give an agent an <strong>Agent</strong> token; an{" "}
+              <strong>Owner</strong> token has full access.
             </p>
           </div>
         </div>
@@ -291,7 +304,15 @@ function AgentSettings() {
           {resource.data.items.map((item) => (
             <div className="settingrow" key={item.id}>
               <div>
-                <h3>{item.name}</h3>
+                <h3>
+                  {item.name}{" "}
+                  <span
+                    className={`tag ${item.kind === "agent" ? "green" : "amber"}`}
+                    title={tokenAccess[item.kind]}
+                  >
+                    {tokenKinds[item.kind]}
+                  </span>
+                </h3>
                 <p>
                   Created {date(item.created_at)} · Last used{" "}
                   {date(item.last_used_at)}
@@ -319,10 +340,19 @@ function AgentSettings() {
             placeholder="My coding assistant"
             required
           />
+          <select
+            aria-label="Token kind"
+            value={kind}
+            onChange={(event) => setKind(event.target.value as TokenKind)}
+          >
+            <option value="agent">Agent token</option>
+            <option value="owner">Owner token (full access)</option>
+          </select>
           <Button variant="primary" disabled={pending}>
             Create token
           </Button>
         </form>
+        <p className="hint token-kind-hint">{tokenAccess[kind]}</p>
         {token && (
           <div className="new-token" role="status">
             <strong>Save this token now. It will only be shown once.</strong>

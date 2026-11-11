@@ -33,7 +33,10 @@ An agent with shell access can do most of this for you with
 [setup-openings](../../skills/setup-openings/SKILL.md); you choose the owner
 password and create the API token yourself.
 
-1. [Install Openings](getting-started.md) and create an API token in Settings.
+1. [Install Openings](getting-started.md) and create an **Agent** token in
+   Settings. An agent token runs the whole search but cannot change your
+   password, manage tokens, restore a backup or answer its own questions
+   (see [token kinds](agents.md#token-kinds)).
 2. Give your agent the skills. A connected agent gets them from the server
    itself: `skills_list` and `skill_get` tools, and one MCP prompt per skill,
    always matching the running version. Clients that support
@@ -79,8 +82,8 @@ job, application or Career entry concerned. Open **Activity** in the dashboard:
 ![A finished run with its stored report: scope, summary, changes, not done and checks](../images/activity-run.png)
 
 Give each agent, and each parallel worker that should report separately, its
-own API token: a token has one open run at a time and its name is what you see
-next to each change.
+own agent token: a token has one open run at a time, and its name and kind are
+what you see next to each change.
 
 ## Working with the agent
 

@@ -138,7 +138,8 @@ def _migrate_7_to_8(conn):
  note TEXT NOT NULL DEFAULT '', report TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(report)),
  change_counts TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(change_counts)),
  superseded_by TEXT, idempotency_key TEXT UNIQUE, version INTEGER NOT NULL DEFAULT 1,
- started_at TEXT NOT NULL, last_activity_at TEXT NOT NULL, ended_at TEXT, updated_at TEXT NOT NULL
+ started_at TEXT NOT NULL, last_activity_at TEXT NOT NULL, ended_at TEXT, updated_at TEXT NOT NULL,
+ token_kind TEXT
 )"""
     )
     conn.execute(
@@ -151,9 +152,10 @@ def _migrate_7_to_8(conn):
  choices TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(choices) AND json_type(choices)='array'),
  state TEXT NOT NULL DEFAULT 'open' CHECK(state IN ('open','answered','withdrawn')),
  answer TEXT NOT NULL DEFAULT '', answer_choice TEXT,
- asked_by_kind TEXT NOT NULL, asked_by_id TEXT, asked_by_name TEXT,
+ asked_by_kind TEXT NOT NULL, asked_by_id TEXT, asked_by_name TEXT, asked_by_token_kind TEXT,
  run_id TEXT REFERENCES runs(id) ON DELETE SET NULL,
- resolved_by_kind TEXT, resolved_by_id TEXT, resolved_by_name TEXT, resolved_at TEXT,
+ resolved_by_kind TEXT, resolved_by_id TEXT, resolved_by_name TEXT, resolved_by_token_kind TEXT,
+ resolved_at TEXT,
  idempotency_key TEXT UNIQUE, version INTEGER NOT NULL DEFAULT 1,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
  CHECK((job_id IS NOT NULL)+(application_id IS NOT NULL)+(knowledge_id IS NOT NULL)<=1)
@@ -165,14 +167,30 @@ def _migrate_7_to_8(conn):
         "actor_kind TEXT",
         "actor_id TEXT",
         "actor_name TEXT",
+        "actor_token_kind TEXT",
         "run_id TEXT REFERENCES runs(id) ON DELETE SET NULL",
     ):
         conn.execute("ALTER TABLE events ADD COLUMN " + column)
-    for column in ("author_kind TEXT", "author_id TEXT", "author_name TEXT"):
+    for column in (
+        "author_kind TEXT",
+        "author_id TEXT",
+        "author_name TEXT",
+        "author_token_kind TEXT",
+    ):
         conn.execute("ALTER TABLE notes ADD COLUMN " + column)
     # Ready as a stored step: when an application was judged complete, and by whom.
-    for column in ("ready_at TEXT", "ready_by_kind TEXT", "ready_by_id TEXT", "ready_by_name TEXT"):
+    for column in (
+        "ready_at TEXT",
+        "ready_by_kind TEXT",
+        "ready_by_id TEXT",
+        "ready_by_name TEXT",
+        "ready_by_token_kind TEXT",
+    ):
         conn.execute("ALTER TABLE applications ADD COLUMN " + column)
+    # Scoped tokens: every existing token keeps full access as an owner token.
+    conn.execute(
+        "ALTER TABLE api_tokens ADD COLUMN kind TEXT NOT NULL DEFAULT 'owner' CHECK(kind IN ('owner','agent'))"
+    )
 
 
 # Each step upgrades from its key to the next version; steps chain inside one transaction.

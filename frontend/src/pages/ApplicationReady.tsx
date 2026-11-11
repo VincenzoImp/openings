@@ -1,4 +1,5 @@
 import {
+  actorLabel,
   api,
   formatTime,
   readinessLabels,
@@ -77,7 +78,7 @@ export function ReadyPanel({ application }: { application: Application }) {
         </strong>
         <p>
           {ready
-            ? `Marked by ${application.ready_by?.label || "unknown"} · ${formatTime(application.ready_at || undefined)}. A new revision, context or blocking requirement clears it.`
+            ? `Marked by ${actorLabel(application.ready_by) || "unknown"} · ${formatTime(application.ready_at || undefined)}. A new revision, context or blocking requirement clears it.`
             : nextStep[application.readiness || "none"]}
         </p>
       </div>
