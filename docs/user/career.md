@@ -24,7 +24,7 @@ text or JSON after a preview. **All claims** searches and filters the claims of
 every entry. Descriptions can stay empty; use them for context and evidence,
 and claims for reusable wording.
 
-![Career with the Profile, the record by kind and one entry open with its claims](../images/career.png)
+![Career record grouped by kind, with one entry open beside the list](../images/career.png)
 
 ## Claims and their selection
 
