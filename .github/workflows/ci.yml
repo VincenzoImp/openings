@@ -62,10 +62,7 @@ jobs:
       - run: npm --prefix frontend run budget
       - run: npm --prefix frontend run format:check
       - run: npm --prefix frontend test
-      # System packages come from the runner's package mirror, which is sometimes
-      # unreachable. The runner image already has what headless Chromium needs, so
-      # fall back to the browser alone instead of failing the job.
-      - run: npx playwright install --with-deps chromium || npx playwright install chromium
+      - run: npx playwright install --with-deps chromium
         working-directory: frontend
       - run: npm --prefix frontend run test:e2e -- --project=chromium --project=chromium-mobile
       - run: npm --prefix frontend audit --audit-level=moderate
