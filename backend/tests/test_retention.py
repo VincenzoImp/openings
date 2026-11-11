@@ -16,6 +16,7 @@ from openings.activity import ActivityService
 from openings.app import create_app
 from openings.collectors.catalog import COMPANY_KINDS
 from openings.common import encode
+from openings.db import SCHEMA_VERSION
 from openings.discovery import DiscoveryService, SourceCreate
 from openings.duplicate_signals import Features, job_features
 from openings.identities import job_identities, normalize_url
@@ -369,7 +370,7 @@ def test_the_upgrade_keeps_every_read_and_removes_only_resightings(tmp_path):
     assert before["payload_bytes"] > 40_000
     assert any(before["links"].values()) and len(before["sources"][jobs["Platform Engineer"]]) == 2
     workspace = open_workspace(current)
-    assert workspace.db.one("PRAGMA user_version")["user_version"] == 9
+    assert workspace.db.one("PRAGMA user_version")["user_version"] == SCHEMA_VERSION
     assert_same_reads(workspace, before)
     # Every source's last-run summary and the run list read as before.
     assert source_reads(workspace) == collection
@@ -458,7 +459,7 @@ def test_older_schemas_chain_through_the_same_step(tmp_path, version):
     assert rows == [{"id": "old-2", "kind": "job_refreshed", "payload": '{"fields":["company"]}'}]
     assert "posting_updated" not in kinds(workspace)
     with workspace.db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         assert conn.execute("SELECT sum(length(payload)) FROM postings").fetchone()[0] < 3000
         assert not conn.execute("PRAGMA foreign_key_check").fetchall()
 

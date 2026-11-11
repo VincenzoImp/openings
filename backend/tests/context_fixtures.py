@@ -12,6 +12,8 @@ from contextlib import closing
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from policy_fixtures import make_schema_nine
+
 # The contexts table as released with schema 5 to 8.
 CONTEXTS_EIGHT = """CREATE TABLE contexts (
  id TEXT PRIMARY KEY, application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
@@ -24,6 +26,8 @@ SCHEMA_NINE_VIEWS = ("all_files", "context_files")
 def make_schema_eight(path):
     """Put context payloads and context file rows back as schema 8 stored them."""
     from openings.snapshots import payload_text
+
+    make_schema_nine(path)  # first undo schema 10
 
     with closing(sqlite3.connect(path)) as conn:
         rows = conn.execute(

@@ -27,7 +27,7 @@ from openings.career import (
     TemplateCreate,
 )
 from openings.common import new_id, now
-from openings.db import MIGRATIONS, Database
+from openings.db import MIGRATIONS, SCHEMA_VERSION, Database
 from openings.documents import ContextCreate, DocumentCreate, DocumentService
 from openings.operations import remove_installation_credentials, restore_database
 from openings.snapshots import payload_text, store_context
@@ -186,7 +186,7 @@ def assert_reproduced(workspace, before):
     """Every recorded context reads back exactly through the current services."""
     documents = DocumentService(workspace)
     with workspace.db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert not conn.execute("PRAGMA foreign_key_check").fetchall()
         assert "payload" not in {row[1] for row in conn.execute("PRAGMA table_info(contexts)")}
@@ -705,7 +705,7 @@ def test_older_schemas_chain_through_the_context_upgrade(tmp_path, version):
     assert payloads == {key: value[0] for key, value in before["payloads"].items()}
     workspace = Workspace(path)
     with workspace.db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         for context_id, (payload, _, _) in before["payloads"].items():
             assert payload_text(conn, context_id) == payload
         assert not conn.execute("PRAGMA foreign_key_check").fetchall()

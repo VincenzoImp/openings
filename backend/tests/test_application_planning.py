@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openings.app import create_app
-from openings.db import Database
+from openings.db import SCHEMA_VERSION, Database
 from openings.documents import DocumentCreate, ReviewUpdate, UploadReservation
 from openings.errors import DomainError
 from openings.operations import restore_database
@@ -70,7 +70,7 @@ def test_schema_six_upgrade_preserves_records_and_matches_a_new_workspace(tmp_pa
         sqlite3.connect(path) as conn,
         sqlite3.connect(fresh.path) as reference,
     ):
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert not conn.execute("PRAGMA foreign_key_check").fetchall()
         assert sorted(columns(conn, "applications")) == sorted(columns(reference, "applications"))
@@ -115,7 +115,7 @@ def test_restore_upgrades_a_schema_six_backup_without_changing_it(tmp_path):
     restored = target.get_application(application["id"])
     assert restored["requirements"] == [] and restored["note"] == "Synthetic guidance"
     with target.db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
 
 
 def test_planning_fields_validate_and_clear_explicitly(tmp_path):

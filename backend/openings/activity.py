@@ -273,6 +273,7 @@ class ActivityService:
             "source": "SELECT id,name,'' FROM sources WHERE id IN ({})",
             "question": "SELECT id,substr(question,1,120),'' FROM questions WHERE id IN ({})",
             "request": "SELECT id,substr(text,1,120),'' FROM requests WHERE id IN ({})",
+            "policy_item": "SELECT id,label,'' FROM policy_items WHERE id IN ({})",
             "collection_run": "SELECT id,source_name,'' FROM collection_runs WHERE id IN ({})",
         }
         wanted = {}
