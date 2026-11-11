@@ -217,7 +217,7 @@ def record_e2e(routes):
 
 
 def trace_routes(trace, routes):
-    """Successful REST requests the dashboard itself sent in one recorded test."""
+    """REST requests the dashboard itself sent in one recorded test, unless refused."""
     found = set()
     with zipfile.ZipFile(trace) as archive:
         for name in archive.namelist():
@@ -227,7 +227,10 @@ def trace_routes(trace, routes):
                 snapshot = json.loads(line).get("snapshot", {})
                 request, response = snapshot.get("request", {}), snapshot.get("response", {})
                 headers = {header["name"].lower() for header in request.get("headers", [])}
-                if SETUP_HEADER in headers or not 200 <= response.get("status", 0) < 400:
+                # A request cut short by navigation has status -1. It still shows that
+                # the dashboard sent it, and counting it keeps recordings repeatable.
+                status = response.get("status", -1)
+                if SETUP_HEADER in headers or not (status == -1 or 200 <= status < 400):
                     continue
                 key = route_key(urlsplit(request["url"]).path)
                 # Concrete identifiers are matched against the route templates.
@@ -314,8 +317,9 @@ def build():
         "",
         "- **Dashboard code** lists the dashboard source files that name the operation's",
         "  REST route. **E2E** counts the browser tests in which the dashboard itself",
-        "  called the route successfully (Chromium desktop; setup calls made by the test",
-        "  helper are excluded). An operation with neither has no working dashboard path.",
+        "  called the route without an error response (Chromium desktop; setup calls made",
+        "  by the test helper are excluded). An operation with neither has no working",
+        "  dashboard path.",
         "- **Editor** is `raw JSON` when a free-form JSON input is edited as JSON text.",
         "- Input comparisons use names from OpenAPI and the MCP tool schemas. A name the",
         "  dashboard files never mention cannot be set there; a mentioned name may still",

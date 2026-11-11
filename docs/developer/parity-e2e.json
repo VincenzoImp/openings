@@ -129,12 +129,14 @@
       "application plan, blocking requirements and a stale button action recover",
       "context selection follows evidence and supports deliberate empty selections",
       "document upload, revision ownership and safe file preview",
+      "import protection and nested dialogs restore scroll after browser Back",
       "independent career, source and provider editors recover their own concurrent versions",
       "live file and note deletion identify the item before removal",
       "mobile applications, templates and funnel stay usable inside the viewport",
       "mobile navigation contains focus and releases the background on close and resize",
       "question edits preserve compatible work and require deliberate incompatible removal",
       "queue count, posting hierarchy and query-safe selection",
+      "records export downloads valid JSON with undated career entries",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/providers": [
