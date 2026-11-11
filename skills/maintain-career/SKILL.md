@@ -15,6 +15,15 @@ Read [Openings workspace](../openings-workspace/SKILL.md) for transport, version
 and file transfers, and [Career claims](../career-claims/SKILL.md) for wording
 and the integrated-account method.
 
+## Run and questions
+
+Open a run before the first write: `runs_start` with `workflow: "maintain-career"` and the scope; writes made
+with this token then attach to the run. First read the owner's answers given
+since the previous run (`questions_list` with `answered_since`) and act on them.
+Ask each new question as a record tied to its job, application or Career entry
+(`questions_ask`), not only in chat. Close the run with `runs_finish` and the
+stored [run report](../openings-workspace/references/run-report.md).
+
 ## Integrate new facts
 
 Ask focused questions for missing facts that matter; never invent one. Put each

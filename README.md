@@ -35,6 +35,8 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   `.tex` source.
 - **Track:** move applications through Preparing, Applied, Interview, Offer and
   Closed with recorded outcomes, history and a progress funnel.
+- **See what the agent did:** every change records who made it. An agent works in
+  runs with a stored report, and asks you questions that you answer under **Activity**.
 - **Automate:** the dashboard, REST API and MCP share one service layer and the same
   operations.
 
