@@ -14,11 +14,25 @@ Images support Linux amd64 and arm64. Docker Compose pins the release; the host
 needs no Python, Node or TeX installation. [Contributing](../../CONTRIBUTING.md)
 covers local builds.
 
+## Finding your way
+
+The navigation has three groups. **Work** holds Overview, Applications, Jobs (the
+Inbox and Shortlist queues, with Dismissed, All jobs and Possible duplicates as
+tabs) and Activity. **Library** holds Career and Templates. **System** holds
+Collection and Settings. The numbers beside Applications and Activity count the
+applications ready to apply and the agent's open questions; the line at the bottom
+names the agent while one of its runs is open.
+
+On a phone the bottom bar shows the four Work destinations and **More**, which
+opens Library and System. The top bar switches between the light and dark theme
+and between comfortable and compact rows; both choices are remembered in the
+browser, and the theme follows the system until you choose one.
+
 ## Your first job
 
 1. Open `http://127.0.0.1:8080` and choose an owner password of at least 10 characters.
    For unattended setup, set `OPENINGS_PASSWORD` in `.env` before the first start.
-2. In **Inbox**, choose **Add job**. Paste a URL or enter the title, company and full
+2. In **Jobs** (it opens on the Inbox), choose **Add job**. Paste a URL or enter the title, company and full
    posting. If URL extraction cannot obtain the text, paste it yourself.
 3. Open the job to inspect its description, add it to **Shortlist** or choose
    **Start application**. Starting creates an application in Preparing and removes it from the pending Shortlist;
