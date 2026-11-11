@@ -1,0 +1,89 @@
+/* Tag, count and actor chip. Colour never carries meaning alone: each has text. */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  min-height: 22px;
+  padding: 0 var(--s2);
+  border-radius: 999px;
+  font-size: var(--t-xs);
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  background: var(--hover);
+  color: var(--ink-2);
+}
+.tag.ready {
+  background: var(--ready-soft);
+  color: var(--ready);
+}
+.tag.attention {
+  background: var(--attention-soft);
+  color: var(--attention);
+}
+.tag.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.tag.info {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.tag.agent {
+  background: var(--agent-soft);
+  color: var(--agent);
+}
+.tag .icon {
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+.count {
+  display: inline-block;
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+}
+/* A number that informs without asking for action. */
+.count.quiet {
+  background: none;
+  color: var(--ink-2);
+}
+
+/* Who did it: owner, agent (token name), system or unknown */
+.actor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.actor::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
+.actor.agent {
+  color: var(--agent);
+}
+.actor.agent::before {
+  background: var(--agent);
+  border-radius: 2px;
+}
+.actor.owner::before {
+  background: var(--accent);
+}
+.actor.unknown::before {
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--ink-3);
+}
