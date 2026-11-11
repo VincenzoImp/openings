@@ -242,6 +242,7 @@ def test_logout_revokes_browser_sessions_but_keeps_api_tokens(tmp_path):
         client.cookies.clear()
         client.post("/api/v1/auth/login", json={"password": PASSWORD})
         other_cookie = client.cookies.get("openings_session")
+        client.cookies.clear()
         client.cookies.set("openings_session", stolen)
 
         result = client.post("/api/v1/auth/logout", headers={"X-CSRF-Token": csrf})

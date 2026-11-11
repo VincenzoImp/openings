@@ -185,7 +185,7 @@ async def test_export_preserves_nullable_career_dates_and_scoped_mcp_download(tm
         client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
         archive = client.get("/api/v1/export").json()
         grant = await app.state.mcp.call_tool("workspace_export", {})
-        ticket = app_module.json.loads(grant[0].text)
+        ticket = app_module.json.loads(grant.content[0].text)
         client.cookies.clear()
         scoped = client.get(ticket["url"], headers=ticket["headers"])
         assert scoped.status_code == 200

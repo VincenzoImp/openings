@@ -4,11 +4,6 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    ignore:
-      # Deferred to a dedicated upgrade: mcp 2 renames FastMCP and changes the
-      # server and client APIs.
-      - dependency-name: mcp
-        update-types: ["version-update:semver-major"]
     groups:
       python-minor-patch:
         update-types: [minor, patch]

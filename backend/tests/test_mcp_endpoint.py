@@ -4,6 +4,7 @@ import json
 
 from fastapi.testclient import TestClient
 
+from openings import __version__
 from openings.app import create_app
 
 
@@ -119,3 +120,103 @@ def test_both_mcp_paths_preserve_auth_origin_host_and_maintenance_checks(tmp_pat
             app.state.workspace.maintenance = True
             assert client.post(endpoint, json=message, headers=headers).status_code == 503
             app.state.workspace.maintenance = False
+
+
+CAPABILITIES = {
+    "prompts": {"listChanged": False},
+    "resources": {"subscribe": False, "listChanged": False},
+    "tools": {"listChanged": False},
+}
+
+
+def test_handshake_and_per_request_protocols_report_the_same_static_server(tmp_path):
+    app = create_app(tmp_path / "mcp-protocols.sqlite", start_worker=False)
+    app.state.auth.setup("synthetic-password")
+    token = app.state.auth.create_token("Synthetic MCP client")["token"]
+    headers = {
+        "Authorization": "Bearer " + token,
+        "Accept": "application/json, text/event-stream",
+    }
+    identity = {"name": "Openings", "version": __version__}
+    client_info = {"name": "synthetic-client", "version": "1"}
+
+    with TestClient(app, base_url="http://localhost:8080") as client:
+        for requested, negotiated in (
+            ("2024-11-05", "2024-11-05"),
+            ("2025-03-26", "2025-03-26"),
+            ("2025-06-18", "2025-06-18"),
+            ("2025-11-25", "2025-11-25"),
+            ("1999-01-01", "2025-11-25"),
+        ):
+            result = client.post(
+                "/mcp",
+                headers=headers,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": requested,
+                        "capabilities": {},
+                        "clientInfo": client_info,
+                    },
+                },
+            ).json()["result"]
+            assert result == {
+                "protocolVersion": negotiated,
+                "capabilities": CAPABILITIES,
+                "serverInfo": identity,
+            }
+
+        def per_request(method, params=None):
+            meta = {
+                "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                "io.modelcontextprotocol/clientCapabilities": {},
+                "io.modelcontextprotocol/clientInfo": client_info,
+            }
+            return client.post(
+                "/mcp",
+                headers={**headers, "MCP-Protocol-Version": "2026-07-28", "Mcp-Method": method},
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": method,
+                    "params": {**(params or {}), "_meta": meta},
+                },
+            )
+
+        discovered = per_request("server/discover").json()["result"]
+        assert discovered["capabilities"] == CAPABILITIES
+        assert discovered["_meta"]["io.modelcontextprotocol/serverInfo"] == identity
+        tools = per_request("tools/list").json()["result"]["tools"]
+        assert "workspace_info" in {tool["name"] for tool in tools}
+        # No tool, prompt or resource changes at runtime, so no stream is ever held open.
+        listen = per_request("subscriptions/listen", {"notifications": {"toolsListChanged": True}})
+        assert listen.status_code == 404
+        assert listen.headers["content-type"] == "application/json"
+        assert listen.json()["error"]["code"] == -32601
+
+
+def test_missing_context_resource_keeps_the_domain_message(tmp_path):
+    app = create_app(tmp_path / "mcp-resource.sqlite", start_worker=False)
+    app.state.auth.setup("synthetic-password")
+    token = app.state.auth.create_token("Synthetic MCP client")["token"]
+    headers = {
+        "Authorization": "Bearer " + token,
+        "Accept": "application/json, text/event-stream",
+    }
+    with TestClient(app, base_url="http://localhost:8080") as client:
+        response = client.post(
+            "/mcp",
+            headers=headers,
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "resources/read",
+                "params": {"uri": "openings://contexts/unknown"},
+            },
+        )
+    assert response.status_code == 200
+    error = response.json()["error"]
+    assert error["code"] == -32602
+    assert error["message"] == "Application context was not found."

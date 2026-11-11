@@ -118,15 +118,9 @@ def create_app(database=None, start_worker=True):
     if public_url:
         allowed_hosts.append(urlsplit(public_url).netloc)
         origins.append(public_url)
-    mcp = OpeningsMCP(
-        "Openings",
-        stateless_http=True,
-        json_response=True,
-        streamable_http_path="/",
-        transport_security=TransportSecuritySettings(
-            allowed_hosts=allowed_hosts, allowed_origins=origins
-        ),
-    )
+    # Tools, prompts and resources never change at runtime, so no notification
+    # stream is offered: every exchange stays one request and one JSON response.
+    mcp = OpeningsMCP("Openings", version=__version__, subscriptions=False)
     register_core_mcp(mcp, workspace)
     register_career_mcp(mcp, career)
     register_document_mcp(mcp, documents)
@@ -519,7 +513,18 @@ def create_app(database=None, start_worker=True):
     register_document_api(router, documents)
     register_discovery_api(router, discovery)
     app.include_router(router)
-    app.mount("/mcp", mcp.streamable_http_app())
+    # Building the transport also creates the session manager the lifespan runs.
+    app.mount(
+        "/mcp",
+        mcp.streamable_http_app(
+            streamable_http_path="/",
+            json_response=True,
+            stateless_http=True,
+            transport_security=TransportSecuritySettings(
+                allowed_hosts=allowed_hosts, allowed_origins=origins
+            ),
+        ),
+    )
 
     static = Path(
         os.environ.get(
