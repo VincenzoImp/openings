@@ -153,6 +153,8 @@ def create_app(database=None, start_worker=True):
         async with mcp.session_manager.run():
             if workspace.worker:
                 workspace.worker.start()
+                # After the health check has had time to pass.
+                workspace.warm_duplicates(delay=5)
             try:
                 yield
             finally:
