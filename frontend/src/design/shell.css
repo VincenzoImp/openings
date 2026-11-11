@@ -73,9 +73,13 @@
 .nav .count {
   margin-left: auto;
 }
+/* On the shell background, small text uses the secondary ink: the caption
+   ink is for surface and card only. */
 .sidebar-foot {
   margin-top: auto;
   padding: 0 var(--s3);
+  color: var(--ink-2);
+  font-size: var(--t-xs);
   overflow-wrap: anywhere;
 }
 .sidebar-foot .actor {

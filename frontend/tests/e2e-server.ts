@@ -16,4 +16,15 @@ export default async function checkServerIdentity() {
         `(${url} answered "${answer.slice(0, 80)}"). ` +
         "Stop the other process or choose another OPENINGS_E2E_PORT.",
     );
+  // One owner session for the specs that do not test signing in: the server
+  // limits sign-in attempts per minute, and every spec file would spend one.
+  const login = await fetch(`http://127.0.0.1:${port}/api/v1/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password: "synthetic-browser-password" }),
+  });
+  const cookie = login.headers.getSetCookie()[0]?.split(";")[0];
+  if (!login.ok || !cookie)
+    throw Error(`The synthetic owner could not sign in (${login.status}).`);
+  process.env.OPENINGS_E2E_SESSION = cookie;
 }

@@ -3,10 +3,7 @@ import { go, isNarrow, ownerSession, type Cookies } from "./session";
 
 // The shell: navigation groups, route aliases, theme and density, screens
 // loaded on demand, and everything of it operated from the keyboard alone.
-let cookies: Cookies = [];
-test.beforeAll(async ({ browser }, info) => {
-  cookies = await ownerSession(browser, info);
-});
+const cookies: Cookies = ownerSession();
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {
   errors.set(page, []);
@@ -32,12 +29,17 @@ const focused = (page: Page) =>
       : "";
   });
 const main = (page: Page) => page.locator("main#content");
+// Safari moves through links with Option+Tab; the other browsers with Tab.
+const tabKey = (page: Page) =>
+  page.context().browser()?.browserType().name() === "webkit"
+    ? "Alt+Tab"
+    : "Tab";
 
 test("keyboard only: skip link, navigation, theme and density", async ({
   page,
 }) => {
   // The first Tab reaches the skip link; Enter moves focus to the content.
-  await page.keyboard.press("Tab");
+  await page.keyboard.press(tabKey(page));
   await expect(
     page.getByRole("link", { name: "Skip to content" }),
   ).toBeFocused();
@@ -115,7 +117,7 @@ test("keyboard only: the sidebar reaches every destination in its group", async 
   await page.getByRole("link", { name: "Openings", exact: true }).focus();
   const order: string[] = [];
   for (let index = 0; index < 8; index++) {
-    await page.keyboard.press("Tab");
+    await page.keyboard.press(tabKey(page));
     order.push((await focused(page)).split(":")[1]);
   }
   expect(order.map((label) => label.replace(/\d.*$/, ""))).toEqual([
@@ -149,7 +151,8 @@ test("keyboard only: More opens, keeps focus, closes with Escape and navigates",
   await page.keyboard.press("Enter");
   await expect(more).toHaveAttribute("aria-expanded", "true");
   const sheet = page.getByRole("dialog", { name: "More destinations" });
-  await expect(sheet.getByRole("link")).toHaveText([
+  const links = sheet.getByRole("navigation", { name: "More" });
+  await expect(links.getByRole("link")).toHaveText([
     "Career",
     "Templates",
     "Collection",
@@ -157,9 +160,10 @@ test("keyboard only: More opens, keeps focus, closes with Escape and navigates",
   ]);
   await expect(sheet.getByRole("link", { name: "Career" })).toBeFocused();
   await expect(main(page)).toHaveAttribute("inert", "");
-  // Focus stays in the sheet in both directions.
+  // Focus stays in the sheet in both directions: back from the first link to
+  // the last one (the agent's status line while a run is open), then forward.
   await page.keyboard.press("Shift+Tab");
-  await expect(sheet.getByRole("link", { name: "Settings" })).toBeFocused();
+  await expect(sheet.getByRole("link").last()).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(sheet.getByRole("link", { name: "Career" })).toBeFocused();
   // Escape closes it and focus returns to More.
