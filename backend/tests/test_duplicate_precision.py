@@ -481,3 +481,25 @@ def test_confidence_is_the_same_over_service_rest_and_mcp(tmp_path):
     tools = asyncio.run(app.state.mcp.list_tools())
     tool = next(tool for tool in tools if tool.name == "jobs_duplicates")
     assert "min_confidence" in json.dumps(tool.input_schema)
+
+
+def test_a_background_warm_up_spares_the_first_request(tmp_path, monkeypatch):
+    workspace = Workspace(tmp_path / "workspace.sqlite")
+    for source in ("one", "two"):
+        workspace.ingest_job(
+            {
+                "url": f"https://example.test/{source}",
+                "title": "Fleet Analyst",
+                "company": "Fjordlane Shipping",
+                "location": "Copenhagen",
+                "posting": TEXT,
+            }
+        )
+    workspace.warm_duplicates().join(timeout=10)
+    computed = []
+    original = workspace_module.job_features
+    monkeypatch.setattr(
+        workspace_module, "job_features", lambda job: computed.append(job["id"]) or original(job)
+    )
+    assert workspace.duplicate_jobs({})["items"][0]["size"] == 2
+    assert computed == []
