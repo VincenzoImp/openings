@@ -395,11 +395,16 @@ test("import protection and nested dialogs restore scroll after browser Back", a
   await top(page)
     .getByRole("button", { name: "Close dialog", exact: true })
     .click();
-  await page.locator(".career-entry-card .career-entry-title").first().click();
-  await top(page)
-    .getByRole("button", { name: "Edit details", exact: true })
+  // A claim of the selected entry opens in a dialog.
+  const detail = page
+    .getByRole("group", { name: "Shown pane" })
+    .getByRole("button", { name: "Selected entry", exact: true });
+  if (await detail.isVisible()) await detail.click();
+  await page
+    .getByRole("button", { name: /^Edit claim: /, exact: false })
+    .first()
     .click();
-  await expect(page.locator("dialog[open]")).toHaveCount(2);
+  await expect(page.locator("dialog[open]")).toHaveCount(1);
   await page.goBack();
   await expect(page.locator(".main h1")).toHaveText("Inbox");
   await expect(page.locator("dialog[open]")).toHaveCount(0);
@@ -442,18 +447,25 @@ test("mobile applications, templates and funnel stay usable inside the viewport"
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(390);
   await go(page, "templates");
-  await expect(page.locator(".mobile-template-picker select")).toBeVisible();
-  const chooser = page.locator(".mobile-template-picker select");
-  await expect(chooser.locator("option")).toHaveCount(30);
-  await chooser.selectOption({ index: 1 });
+  // One pane at a time: the list first, the chosen template after a tap.
+  const list = page.getByRole("region", { name: "Templates by kind" });
+  await expect(list).toBeVisible();
+  await expect(page.locator("#template-title")).toBeHidden();
+  await list
+    .getByRole("button", { name: "Synthetic CV 01", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Synthetic CV 01", exact: true }),
   ).toBeVisible();
+  await expect(list).toBeHidden();
   expect(
     await page
-      .locator(".templates-layout > section")
+      .locator("#template-title")
       .evaluate((element) => element.getBoundingClientRect().top),
   ).toBeLessThan(844);
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(390);
   await go(page, "overview");
   await page.getByText("View counts as a table", { exact: true }).click();
   await expect
@@ -486,44 +498,54 @@ test("records export downloads valid JSON with undated career entries", async ({
 test("independent career, source and provider editors recover their own concurrent versions", async ({
   page,
 }) => {
-  const recover = async (field: string, value: string) => {
-    await top(page)
+  const recover = async (field: string, value: string, scope = top(page)) => {
+    await scope
       .getByRole("button", { name: "Review latest values", exact: true })
       .click();
-    await expect(top(page).locator(".conflict-recovery")).toContainText(value);
-    await top(page)
+    await expect(scope.locator(".conflict-recovery")).toContainText(value);
+    await scope
       .getByRole("button", {
         name: "Reload editor and discard draft",
         exact: true,
       })
       .click();
-    await expect(top(page).locator(`[name=${field}]`)).toHaveValue(value);
+    await expect(scope.locator(`[name=${field}]`)).toHaveValue(value);
   };
   const entry = await call(page, "/career/knowledge", "POST", {
     kind: "project",
     title: "Concurrent career entry",
   });
   await go(page, "career?section=knowledge&q=Concurrent");
-  await page.locator(".career-entry-title").first().click();
-  await top(page)
-    .getByRole("button", { name: "Edit details", exact: true })
-    .click();
-  await top(page).locator("[name=title]").fill("My entry draft");
+  // The entry is edited in the panel beside the record, not in a dialog.
+  const shown = page
+    .getByRole("group", { name: "Shown pane" })
+    .getByRole("button", { name: "Selected entry", exact: true });
+  if (await shown.isVisible()) await shown.click();
+  const editor = page.locator("section.detail");
+  await expect(editor.locator("[name=title]")).toHaveValue(
+    "Concurrent career entry",
+  );
+  await editor.locator("[name=title]").fill("My entry draft");
   await call(page, `/career/knowledge/${entry.id}`, "PATCH", {
     expected_version: entry.version,
-    title: "Newer career title",
+    title: "Concurrent newer title",
   });
-  await top(page)
-    .getByRole("button", { name: "Save entry", exact: true })
-    .click();
-  await recover("title", "Newer career title");
-  await top(page)
-    .getByRole("button", { name: "Save entry", exact: true })
-    .click();
-  await expect(page.locator("dialog[open]")).toHaveCount(1);
-  await top(page)
-    .getByRole("button", { name: "Close dialog", exact: true })
-    .click();
+  await editor.getByRole("button", { name: "Save entry", exact: true }).click();
+  await recover("title", "Concurrent newer title", editor);
+  await editor
+    .locator("[name=title]")
+    .fill("Concurrent, saved after the conflict");
+  await editor.getByRole("button", { name: "Save entry", exact: true }).click();
+  await expect
+    .poll(async () => (await call(page, `/career/knowledge/${entry.id}`)).title)
+    .toBe("Concurrent, saved after the conflict");
+  // The four projects share one workspace: leave no entry that matches the search.
+  const left = await call(page, `/career/knowledge/${entry.id}`);
+  await call(
+    page,
+    `/career/knowledge/${entry.id}?expected_version=${left.version}`,
+    "DELETE",
+  );
   const source = await call(page, "/sources", "POST", {
     name: "Concurrent search",
     kind: "jobspy",

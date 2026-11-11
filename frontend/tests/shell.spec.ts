@@ -109,6 +109,7 @@ test("keyboard only: the sidebar reaches every destination in its group", async 
     /^Jobs/,
     /^Activity/,
     /^Career/,
+    /^Policy/,
     /^Templates/,
     /^Collection/,
     /^Settings/,
@@ -116,7 +117,7 @@ test("keyboard only: the sidebar reaches every destination in its group", async 
   // Tab walks the links in order, starting after the brand.
   await page.getByRole("link", { name: "Openings", exact: true }).focus();
   const order: string[] = [];
-  for (let index = 0; index < 8; index++) {
+  for (let index = 0; index < 9; index++) {
     await page.keyboard.press(tabKey(page));
     order.push((await focused(page)).split(":")[1]);
   }
@@ -126,6 +127,7 @@ test("keyboard only: the sidebar reaches every destination in its group", async 
     "Jobs",
     "Activity",
     "Career",
+    "Policy",
     "Templates",
     "Collection",
     "Settings",
@@ -154,6 +156,7 @@ test("keyboard only: More opens, keeps focus, closes with Escape and navigates",
   const links = sheet.getByRole("navigation", { name: "More" });
   await expect(links.getByRole("link")).toHaveText([
     "Career",
+    "Policy",
     "Templates",
     "Collection",
     "Settings",
@@ -175,6 +178,7 @@ test("keyboard only: More opens, keeps focus, closes with Escape and navigates",
   // Open again and go to Templates: the sheet closes, the screen takes focus
   // and More is the current tab.
   await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
   await expect(sheet.getByRole("link", { name: "Templates" })).toBeFocused();
   await page.keyboard.press("Enter");
@@ -250,7 +254,9 @@ test("a screen that fails to load offers a reload", async ({ page }) => {
     .getByRole("button", { name: "Reload the dashboard", exact: true })
     .click();
   await expect(page.locator(".main h1")).toHaveText("Templates");
-  await expect(page.locator(".template-option").first()).toBeAttached();
+  await expect(
+    page.getByRole("region", { name: "Templates by kind" }),
+  ).toBeVisible();
 });
 
 test("no horizontal page scroll from 360 to 1600 px on every screen", async ({
@@ -270,7 +276,10 @@ test("no horizontal page scroll from 360 to 1600 px on every screen", async ({
       ["inbox", "Inbox"],
       ["activity", "Activity"],
       ["career?section=knowledge", "Career"],
+      ["career?section=claims", "Career"],
+      ["policy", "Policy"],
       ["templates", "Templates"],
+      ["templates?section=rules", "Templates"],
       ["collection", "Collection"],
       ["settings", "Settings"],
     ]) {

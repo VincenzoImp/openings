@@ -77,6 +77,7 @@ test("every shipped hash route still opens its screen, and design names are alia
     "applications",
     "collection",
     "career",
+    "policy",
     "templates",
     "settings",
   ])
@@ -99,7 +100,7 @@ test("navigation has three groups, and both job queues belong to Jobs", () => {
     ]),
     [
       ["Work", ["Overview", "Applications", "Jobs", "Activity"]],
-      ["Library", ["Career", "Templates"]],
+      ["Library", ["Career", "Policy", "Templates"]],
       ["System", ["Collection", "Settings"]],
     ],
   );
@@ -152,4 +153,92 @@ test("the stored theme and density win; otherwise the system theme and comfortab
   };
   assert.equal(preferences.initialTheme(broken, true), "dark");
   assert.equal(preferences.initialDensity(null), "comfortable");
+});
+
+test("free-form values become typed rows and come back unchanged", async () => {
+  const kv = await import("../src/design/kv.ts");
+  const value = {
+    name: "Alex",
+    team_size: 6,
+    remote: false,
+    customers: ["Operator A", "Operator B"],
+    references: { manager: { name: "Sam" }, years: [2022, 2023] },
+    nothing: null,
+    mixed: ["a", 1],
+    comma: ["a, b"],
+    empty: [],
+  };
+  const rows = kv.toRows(value);
+  assert.deepEqual(
+    rows.map((row) => row.type),
+    [
+      "text",
+      "number",
+      "boolean",
+      "list",
+      "structured",
+      "structured",
+      "structured",
+      "structured",
+      "structured",
+    ],
+  );
+  // Untouched rows give back exactly what they were given.
+  assert.deepEqual(kv.fromRows(rows), value);
+  assert.equal(kv.problem(rows), null);
+  assert.equal(kv.describe(value.references), "2 fields");
+  assert.equal(kv.describe(value.mixed), "2 items");
+  assert.equal(kv.describe(null), "Empty");
+
+  // A type change carries the value over where it has a meaning.
+  assert.equal(kv.valueOf(kv.retype(rows[1], "text")), "6");
+  assert.equal(kv.valueOf(kv.retype(rows[0], "number")), 0);
+  assert.equal(
+    kv.problem([kv.retype(rows[0], "number")]),
+    '"name" needs a number.',
+  );
+  assert.deepEqual(kv.valueOf(kv.retype(rows[0], "list")), ["Alex"]);
+  assert.equal(
+    kv.valueOf(kv.retype(rows[3], "text")),
+    "Operator A, Operator B",
+  );
+  assert.equal(kv.valueOf(kv.retype(rows[2], "text")), "");
+  assert.equal(kv.valueOf(kv.retype(rows[4], "boolean")), false);
+
+  // An object is edited one level down; deeper values stay as they are.
+  assert.equal(kv.editableAsFields(rows[4]), true);
+  assert.equal(kv.editableAsFields(rows[6]), false);
+  const opened = kv.asFields(rows[4]);
+  assert.deepEqual(
+    opened.fields.map((row) => [row.key, row.type]),
+    [
+      ["manager", "structured"],
+      ["years", "structured"],
+    ],
+  );
+  opened.fields.push({ ...kv.newRow(), key: "checked", value: "yes" });
+  assert.deepEqual(kv.valueOf(opened), {
+    ...value.references,
+    checked: "yes",
+  });
+  assert.equal(kv.asFields(rows[6]), rows[6]);
+
+  // What stops a save is said in words.
+  assert.equal(kv.problem([kv.newRow()]), "Give every row a key.");
+  assert.equal(
+    kv.problem([rows[0], { ...rows[1], key: " name " }]),
+    'The key "name" is used twice.',
+  );
+  assert.equal(
+    kv.problem([{ ...rows[0], key: "dates" }], ["dates"]),
+    '"dates" has its own field above.',
+  );
+  assert.equal(
+    kv.problem([{ ...rows[3], value: " , " }]),
+    '"customers" needs at least one list item.',
+  );
+  assert.equal(
+    kv.problem([{ ...opened, fields: [kv.newRow()] }]),
+    'In "references": Give every row a key.',
+  );
 });

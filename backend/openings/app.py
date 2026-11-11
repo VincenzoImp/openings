@@ -439,7 +439,7 @@ def create_app(database=None, start_worker=True):
 
     @router.get("/examples")
     def examples():
-        names = ["career.json", "resume.tex", "cover-letter.tex"]
+        names = ["career.json", "policy.json", "resume.tex", "cover-letter.tex"]
         directory = Path(
             os.environ.get("OPENINGS_EXAMPLES", Path(__file__).resolve().parents[2] / "examples")
         )
@@ -453,7 +453,7 @@ def create_app(database=None, start_worker=True):
 
     @router.get("/examples/{name}")
     def example_file(name: str):
-        if name not in {"career.json", "resume.tex", "cover-letter.tex"}:
+        if name not in {"career.json", "policy.json", "resume.tex", "cover-letter.tex"}:
             raise DomainError(404, "not_found", "Example not found.")
         path = (
             Path(
