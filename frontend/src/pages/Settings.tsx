@@ -806,6 +806,7 @@ function WorkspaceSettings({
   const { mutate, pending, notify } = useWorkspace();
   const [restore, setRestore] = useState(false);
   const workspace = useResource<Json>("/workspace", {});
+  const storage = workspace.data.storage as Storage | undefined;
   async function backup() {
     await mutate(async () => {
       const response = await binary("/backup", "GET");
@@ -850,6 +851,26 @@ function WorkspaceSettings({
             {theme === "light" ? "Dark mode" : "Light mode"}
           </Button>
         </div>
+        {storage && (
+          <div className="settingrow">
+            <div>
+              <h3>Storage</h3>
+              <p>
+                Database {megabytes(storage.database_bytes)},{" "}
+                {megabytes(storage.free_bytes)} free on the data volume. A
+                backup of up to {megabytes(storage.restore_limit_bytes)} can be
+                restored
+                {storage.restore_limit_configured_bytes === null
+                  ? ""
+                  : " (OPENINGS_MAX_RESTORE_MB applies)"}
+                .{" "}
+                {storage.retention_days
+                  ? `Finished collection runs and tasks are removed after ${storage.retention_days} days, except the latest ${storage.kept_runs_per_source} of each source.`
+                  : "Finished collection runs and tasks are kept."}
+              </p>
+            </div>
+          </div>
+        )}
         <div className="settingrow">
           <div>
             <h3>Portable backup</h3>
@@ -902,14 +923,40 @@ function WorkspaceSettings({
         </div>
       </section>
       <PasswordSettings />
-      {restore && <RestoreDialog onClose={() => setRestore(false)} />}
+      {restore && (
+        <RestoreDialog
+          limit={storage?.restore_limit_bytes}
+          onClose={() => setRestore(false)}
+        />
+      )}
     </div>
   );
 }
-function RestoreDialog({ onClose }: { onClose: () => void }) {
+interface Storage {
+  database_bytes: number;
+  free_bytes: number;
+  restore_limit_bytes: number;
+  restore_limit_configured_bytes: number | null;
+  retention_days: number;
+  kept_runs_per_source: number;
+}
+function megabytes(bytes: number) {
+  const value = bytes / 1024 ** 2;
+  return value >= 1024
+    ? `${(value / 1024).toFixed(1)} GiB`
+    : `${value.toFixed(value < 10 ? 1 : 0)} MiB`;
+}
+function RestoreDialog({
+  limit,
+  onClose,
+}: {
+  limit?: number;
+  onClose: () => void;
+}) {
   const { mutate, pending } = useWorkspace();
   const [file, setFile] = useState<File | null>(null),
     [confirmation, setConfirmation] = useState("");
+  const tooLarge = !!file && limit !== undefined && file.size > limit;
   return (
     <Dialog title="Restore this workspace?" onClose={onClose}>
       <p className="modal-intro">
@@ -917,7 +964,16 @@ function RestoreDialog({ onClose }: { onClose: () => void }) {
         backup first if you want to keep the current state. This installation's
         owner password and access tokens are preserved.
       </p>
-      <Field label="SQLite backup">
+      <Field
+        label="SQLite backup"
+        hint={
+          limit === undefined
+            ? undefined
+            : tooLarge
+              ? `This file is ${megabytes(file.size)}. With the free space on the data volume, up to ${megabytes(limit)} can be restored.`
+              : `Up to ${megabytes(limit)} with the free space on the data volume.`
+        }
+      >
         <input
           type="file"
           accept=".sqlite,.sqlite3,.db"
@@ -935,7 +991,7 @@ function RestoreDialog({ onClose }: { onClose: () => void }) {
         <Button onClick={onClose}>Cancel</Button>
         <Button
           variant="danger-fill"
-          disabled={pending || !file || confirmation !== "RESTORE"}
+          disabled={pending || !file || tooLarge || confirmation !== "RESTORE"}
           onClick={async () => {
             if (!file) return;
             const ok = await mutate(async () => {
