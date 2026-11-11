@@ -11,8 +11,10 @@ Server records stay authoritative; the report explains what this run did.
 1. Read the answers given since the previous run:
    `questions_list({"value": {"answered_since": "<start of the previous run>"}})`.
    `runs_list` gives that start time. Act on the answers first. Record an answer
-   that is a lasting fact in the Profile or the Career record, so the same
-   question is never asked twice.
+   that is a lasting fact as a policy item (`policy_add` in `decision`,
+   `eligibility`, `writing` or `facts`, with the question in the note) or in the
+   Career record, so the same question is never asked twice. The item is a
+   proposal until the owner confirms it under **Policy**; name it in the report.
 2. Call `runs_start` with the workflow name and the scope: the owner's request,
    the cohort snapshot (count and how it was selected) and anything deliberately
    left out. Use an idempotency key for retries.
@@ -44,8 +46,9 @@ optional subject (`job`, `application`, `knowledge`) and a state.
   mandate, impossible, already done, superseded). The owner reads it next to
   the request, with a link to the run. Repeat the same lines in the run report.
 - A request that states a lasting preference ("no consultancies") is completed
-  by recording it where preferences live, in the Profile policy, so later runs
-  follow it without the request.
+  by recording it where preferences live, as a `decision` item of the policy
+  (`policy_add`), so later runs follow it without the request once the owner
+  has confirmed the item.
 - A withdrawn request needs no work. An agent token cannot write or withdraw
   requests (`forbidden`); ask a question instead when you need a decision.
 - When a request is unclear, ask a question tied to the same subject, keep the
@@ -67,7 +70,7 @@ unchanged and continue the rest of the work. Withdraw a question that no longer
 needs an answer with `questions_withdraw`. The answer belongs to the owner, who
 gives it in the dashboard. An agent token cannot call `questions_answer`
 (`forbidden`): when the owner answers in conversation, act on the answer, record
-a lasting fact in the Profile or the Career record, and ask the owner to confirm
+a lasting fact as a policy item or in the Career record, and ask the owner to confirm
 the question in **Activity** or withdraw it with a note of where the fact went.
 With an owner token, record an answer only when the owner gave it to you directly.
 

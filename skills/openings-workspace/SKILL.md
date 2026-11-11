@@ -58,8 +58,9 @@ field names and supported operations.
 
 ## Professional information and scope
 
-Read the current Profile, preferences, general guidance, relevant Career entries,
-claims and template rules. Personal policy stays in Openings. Use
+Read the current Profile, the owner's policy (`policy_get`), general guidance,
+relevant Career entries, claims and template rules. Personal policy stays in
+Openings: an agent proposes policy items and the owner confirms them. Use
 [Career claims](../career-claims/SKILL.md) for evidence-led writing.
 
 Act under the [operating mandate](references/operating-mandate.md). Use current expected versions;

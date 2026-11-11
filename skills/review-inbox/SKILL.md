@@ -12,9 +12,12 @@ read-only. Triage does not prepare applications, change application stages or
 change collection.
 
 Read [Openings workspace](../openings-workspace/SKILL.md) for connection, schemas,
-versions and the shared API reference. Read the current Profile/preferences,
-general guidance and the full current Career record, then its relevant evidence before decisions. Those live data
-own the selection criteria; keep no personal criteria in this skill.
+versions and the shared API reference. Read the owner's policy (`policy_get`):
+its `decision` items are the rules for shortlisting and dismissing and its
+`eligibility` items the facts employers ask about. Read the Profile, general
+guidance and the full current Career record, then its relevant evidence before
+decisions. Those live data own the selection criteria; keep no personal criteria
+in this skill.
 
 ## Run and questions
 
@@ -43,8 +46,14 @@ Read Career descriptions when a title, duty or requirement is ambiguous.
 ## Decide from the current policy
 
 Assess actual responsibilities, essential requirements, preferred tools and
-supported transfer. Use the Profile preferences and any structured decision
-policy recorded in Profile metadata; they own the criteria and flexibility.
+supported transfer. Use the policy's `decision` items and `eligibility` facts;
+they own the criteria and flexibility. Rely on confirmed items (`confirmed:
+true`). An unconfirmed item is your own proposal or a value copied from the old
+Profile (`origin`): treat it as a hint, and ask the owner to confirm it when a
+decision depends on it. A decision item may carry a `rule` on a collection
+signal; the server does not apply rules yet, so follow its statement like any
+other item. Profile `preferences` and `roles` stay readable until the policy
+holds their content; record no new criteria there.
 Explain the fit or mismatch with specific facts, not a keyword score.
 Missing evidence does not establish that a skill or experience is absent.
 

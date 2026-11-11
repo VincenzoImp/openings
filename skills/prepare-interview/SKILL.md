@@ -44,8 +44,9 @@ format, interviewers and stage when they are unknown and matter.
    short answer outlines that point to the stories.
 4. **Gaps**: requirements without supporting evidence, with an honest bridge from
    transferable work. Do not present a gap as experience.
-5. **Logistics**: availability, work authorization and other dated Profile facts
-   the owner may be asked about, as recorded, without inferring rights.
+5. **Logistics**: availability, work authorization and other confirmed
+   `eligibility` and `facts` items of the policy the owner may be asked about,
+   as recorded, without inferring rights.
 6. **Questions to ask**: specific to the team, product and role.
 
 Use public company information only from sources the owner can verify; cite them.
