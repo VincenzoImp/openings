@@ -12,6 +12,7 @@ const loaders = {
   applications: () => import("../pages/Applications"),
   collection: () => import("../pages/Companies"),
   career: () => import("../pages/Career"),
+  policy: () => import("../pages/Policy"),
   templates: () => import("../pages/Templates"),
   settings: () => import("../pages/Settings"),
 };
@@ -33,6 +34,7 @@ export const OverviewPage = lazy(loaders.overview);
 export const ActivityPage = lazy(loaders.activity);
 export const CollectionPage = lazy(loaders.collection);
 export const CareerPage = lazy(loaders.career);
+export const PolicyPage = lazy(loaders.policy);
 export const TemplatesPage = lazy(loaders.templates);
 export const SettingsPage = lazy(loaders.settings);
 export const JobsPage = lazy(() =>
