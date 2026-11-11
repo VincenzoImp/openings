@@ -45,10 +45,7 @@ const SCREENS = [
   "settings?section=workspace",
 ];
 
-let cookies: Cookies = [];
-test.beforeAll(async ({ browser }, info) => {
-  cookies = await ownerSession(browser, info);
-});
+const cookies: Cookies = ownerSession();
 
 async function findings(page: Page, key: string) {
   const { violations } = await new AxeBuilder({ page })
@@ -90,6 +87,43 @@ async function settled(page: Page) {
   await page.waitForLoadState("networkidle");
   await expect(page.locator(".loading")).toHaveCount(0);
 }
+
+// An agent run stays open for the rest of the suite, so every screen below is
+// checked with the agent's status line in the navigation.
+test("an agent opens a run and the navigation shows its status line", async ({
+  page,
+}, info) => {
+  await page.context().addCookies(cookies);
+  await go(page, "overview");
+  const workflow = `accessibility ${info.project.name} ${Date.now()}`;
+  await page.evaluate(async (workflow) => {
+    const setup = { "X-Openings-E2E-Setup": "1" };
+    const json = { ...setup, "Content-Type": "application/json" };
+    const session = await fetch("/api/v1/auth/session", {
+      headers: setup,
+    }).then((response) => response.json());
+    const agent = await fetch("/api/v1/tokens", {
+      method: "POST",
+      headers: { ...json, "X-CSRF-Token": session.csrf_token },
+      body: JSON.stringify({ name: `Agent ${workflow}`, kind: "agent" }),
+    }).then((response) => response.json());
+    const run = await fetch("/api/v1/runs", {
+      method: "POST",
+      credentials: "omit",
+      headers: { ...json, Authorization: "Bearer " + agent.token },
+      body: JSON.stringify({ workflow, scope: "Synthetic open run." }),
+    });
+    if (!run.ok) throw Error(await run.text());
+  }, workflow);
+  await page.reload();
+  if (isNarrow(page))
+    await page.getByRole("button", { name: "More", exact: true }).click();
+  const status = page.locator(".sidebar-foot");
+  await expect(status).toContainText("Run in progress:");
+  await expect(status.locator(".actor")).toHaveClass(/agent/);
+  await expect(status.locator(".actor")).toContainText("Agent accessibility");
+  expect(await findings(page, "status")).toEqual([]);
+});
 
 for (const theme of ["light", "dark"]) {
   test.describe(`${theme} theme`, () => {

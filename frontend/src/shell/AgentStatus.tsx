@@ -16,7 +16,7 @@ export function AgentStatus({
   if (!run) return null;
   const others = runs.total - 1;
   return (
-    <div className="sidebar-foot caption" role="status">
+    <div className="sidebar-foot" role="status">
       <ActorChip actor={run.actor} />
       <a
         href="#activity?section=runs"

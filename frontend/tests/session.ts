@@ -1,29 +1,21 @@
-import {
-  expect,
-  type Browser,
-  type BrowserContext,
-  type Page,
-  type TestInfo,
-} from "@playwright/test";
+import { expect, type BrowserContext, type Page } from "@playwright/test";
 
 export type Cookies = Parameters<BrowserContext["addCookies"]>[0];
 
-/** Sign in once as the owner of the synthetic workspace; reuse the cookies. */
-export async function ownerSession(
-  browser: Browser,
-  info: TestInfo,
-): Promise<Cookies> {
-  const context = await browser.newContext({
-    baseURL: info.project.use.baseURL,
-  });
-  const page = await context.newPage();
-  await page.goto("/");
-  await page.locator("input[name=password]").fill("synthetic-browser-password");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.locator(".main h1")).toBeVisible();
-  const cookies = await context.cookies();
-  await context.close();
-  return cookies;
+/** The owner session the global setup opened, as cookies for a context. */
+export function ownerSession(): Cookies {
+  const [name, ...value] = (process.env.OPENINGS_E2E_SESSION || "").split("=");
+  if (!name || !value.length) throw Error("The global setup did not sign in.");
+  return [
+    {
+      name,
+      value: value.join("="),
+      domain: "127.0.0.1",
+      path: "/",
+      httpOnly: true,
+      sameSite: "Strict",
+    },
+  ];
 }
 
 /** Open a hash route and wait for its screen. */
