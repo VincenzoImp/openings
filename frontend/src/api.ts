@@ -51,10 +51,20 @@ export interface DuplicateJob extends Versioned {
   applications: ApplicationSummary[];
   posting_hash: string | null;
   similarity: number | null;
+  /** Against the group's reference record; null on the reference itself. */
+  confidence: number | null;
+  reasons: DuplicateReasons | null;
+}
+export interface DuplicateReasons {
+  matched: string[];
+  conflicts: string[];
 }
 export interface DuplicateGroup {
   job_ids: string[];
-  signals: ("company_title" | "posting_text")[];
+  signals: string[];
+  confidence: number;
+  tier: "high" | "medium" | "low";
+  reasons: DuplicateReasons;
   size: number;
   identical_postings: boolean;
   reference_id: string;
