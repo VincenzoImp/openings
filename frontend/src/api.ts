@@ -241,15 +241,98 @@ export interface Claim extends Versioned {
   knowledge_organization?: string;
   position: number;
   approved: boolean;
+  /** In the CV unless the job gives a reason to leave it out. */
+  default_in_cv: boolean;
+  role: ClaimRole;
+  group: string;
   metadata: Json;
+}
+export const claimRoles = {
+  core: "Core",
+  supporting: "Supporting",
+  bench: "Bench",
+} as const;
+export type ClaimRole = keyof typeof claimRoles;
+export interface RuleStatement {
+  id: string;
+  label: string;
+  statement: string;
+  scope: string | null;
+  position: number;
+}
+/** Typed limits, rule statements and any other free-form key. */
+export interface TemplateRules extends Json {
+  max_pages?: number;
+  max_bullets?: number;
+  max_bullet_chars?: number;
+  statements?: RuleStatement[];
 }
 export interface Template extends Versioned {
   name: string;
   kind: "resume" | "cover_letter";
   tex: string;
   guidance: string;
-  rules: Record<string, number>;
+  rules: TemplateRules;
   is_default: boolean;
+  file_count?: number;
+  updated_at?: string;
+}
+export const policySections = {
+  decision: "Decision",
+  eligibility: "Eligibility",
+  writing: "Writing",
+  facts: "Facts",
+} as const;
+export type PolicySectionName = keyof typeof policySections;
+export type PolicyValueType =
+  "text" | "number" | "date" | "boolean" | "list" | "structured";
+export interface PolicyRule {
+  signal: string;
+  condition: { operator: string; value: unknown };
+  action: string;
+}
+export interface PolicyItem {
+  id: string;
+  section: PolicySectionName;
+  position: number;
+  label: string;
+  statement: string;
+  value: unknown;
+  value_type: PolicyValueType | null;
+  note: string;
+  scope: "cv" | "letter" | "all" | null;
+  rule: PolicyRule | null;
+  enabled: boolean;
+  confirmed: boolean;
+  confirmed_at: string | null;
+  confirmed_by: Actor | null;
+  created_by: Actor | null;
+  updated_by: Actor | null;
+  origin: { source: string; key: string; note: string } | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface PolicySection {
+  section: PolicySectionName;
+  description: string;
+  version: number;
+  updated_at: string | null;
+  updated_by: Actor | null;
+  items: PolicyItem[];
+  total: number;
+  unconfirmed: number;
+}
+export interface PolicySignal {
+  signal: string;
+  label: string;
+  description: string;
+  operators: { operator: string; value_type: PolicyValueType }[];
+}
+export interface Policy {
+  sections: PolicySection[];
+  signals: PolicySignal[];
+  rule_actions: string[];
+  signals_applied: boolean;
 }
 export interface Instructions {
   general: string;
@@ -470,16 +553,20 @@ export class ApiError extends Error {
   status: number;
   code: string;
   path: string;
+  /** Structured details of the error, such as the current version. */
+  details: Json;
   constructor(
     message: string,
     status: number,
     code = "request_failed",
     path = "",
+    details: Json = {},
   ) {
     super(message);
     this.status = status;
     this.code = code;
     this.path = path;
+    this.details = details;
   }
 }
 export async function api<T>(
@@ -545,6 +632,7 @@ export async function api<T>(
       response.status,
       error?.code,
       path,
+      error?.details && !Array.isArray(error.details) ? error.details : {},
     );
   }
   if (
