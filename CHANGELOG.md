@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.17.0 — 2026-11-11
+
+The owner and the agent can now hand work to each other inside the product: every change says who made it, an agent's runs and reports are stored, and questions and requests travel in both directions.
+
+- **Who made each change:** every change records the dashboard session, a named API token (kept after the token is revoked, with its kind) or the system. Application history, the overview activity and notes show it; `GET /events` / `events_list` list all changes by run, record, actor or time. Changes that left no trace before (Profile, instructions, Career entries, claims, templates, notes, contexts, documents, files, sources, collection settings, tokens, restore) now leave an entry with identifiers, changed field names and versions only.
+- **Agent runs:** an agent opens a run (`runs_start`, `POST /runs`) with a workflow and scope; its writes are attached automatically, and it closes the run with a stored report (summary, changes with server-derived counts, not done, checks, limits, method). One open run per token; a run never closed is shown as interrupted with the changes it made.
+- **Questions for the owner:** records tied to a job, an application, a Career entry or nothing, with optional choices. Answer them under Activity; an agent reads answers given since a time (`questions_list` with `answered_since`).
+- **Requests for the agent:** write an instruction under Activity → Requests, or with Ask your agent on a job or an application. The agent reads open requests at the start of its next run, takes them and reports a result or a reason; you can withdraw a request until it is finished. REST `/requests`, MCP `requests_*`. A request never authorises submitting an application, contacting an employer or recording Applied.
+- **Ready is a stored step:** mark a Preparing application ready once every current revision has an approved PDF and no blocking requirement is open; otherwise the mark is refused and names the failed check. It is cleared, with a recorded reason, when a revision, context or blocking requirement changes or the application leaves Preparing. Applications has a Ready to apply queue, a badge, sorting by ready time and bulk Mark ready (`POST /applications/{id}/ready`, `application_ready`).
+- **Scoped API tokens:** a token is `owner` or `agent`. An agent token runs the job search but is refused (403, REST and MCP) for the owner password, token management, restoring a backup, answering a question for the owner, and writing or withdrawing a request. Existing tokens are owner tokens and keep full access. A backup downloaded with an agent token omits the owner password hash, the session secret and the API tokens; it still restores completely.
+- **Duplicate candidates:** `jobs_duplicates` scores each group from apply links and ATS posting ids, requisition ids, location, nearly identical posting text and company names without legal and country suffixes. Groups carry `confidence`, `tier` and `reasons` and are listed most confident first; nothing is merged automatically.
+- **Dashboard:** new Activity page (Questions, Requests, Runs, Changes) with an open-question count in the navigation; Possible duplicates shows confidence and reasons.
+- **Skills:** every workflow opens a run, reads the owner's answers and open requests, asks questions as records, marks finished Drafts ready and closes the run with the stored report.
+- **MCP:** upgraded to the MCP Python SDK 2.3. The server also answers protocol revision 2026-07-28, reports the Openings version as its server version, and no longer includes internal exception text in unexpected tool errors.
+
+**Changed behaviour**
+
+- `readiness=ready` now means the stored Ready step. An application whose checks pass without the mark reports the new value `reviewed`. After upgrading, mark existing finished Drafts ready (bulk Mark ready in Applications, or let the agent do it).
+- `jobs_duplicates` hides low-confidence groups by default; pass `min_confidence=0` for every candidate, including records that share only a company and title.
+
+**Database schema 8.** A schema 5, 6 or 7 workspace is upgraded automatically at start in one transaction; existing records are kept, and earlier changes show the actor "unknown (before 0.17)". Restore accepts a schema 8 backup and upgrades a copy of an older one. A schema 8 workspace or backup cannot be opened by 0.16 or earlier: back up before upgrading.
+
 ## 0.16.0 — 2026-11-11
 
 Platform release for the redesign: a newer runtime, stricter outbound connections and the groundwork to change the product safely. No workflow, REST or MCP contract changes.
