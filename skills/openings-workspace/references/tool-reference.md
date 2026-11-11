@@ -6,7 +6,8 @@ Step-by-step MCP/REST sequences behind the workflow skills: [Prepare Shortlist](
 
 1. Find and read the job with `jobs_search` and `job_get`. Before ingesting a
    URL, `jobs_resolve` reports any existing record and its attempts without
-   writing; `jobs_duplicates` lists candidate copies of the same vacancy. Its `application`
+   writing; `jobs_duplicates` lists candidate copies of the same vacancy with a
+   `confidence`, `tier` and `reasons` (`min_confidence` defaults to 0.5). A job's `application`
    summary identifies an open attempt or the latest closed one. Use
    `applications_list` with `value.job_id` for the full history. Continue an open
    attempt, or create Draft with `application_create` and an idempotency key.
