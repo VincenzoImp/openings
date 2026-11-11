@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Career · Openings prototype</title>
+    <link rel="stylesheet" href="prototype.css" />
+    <style>
+      .kind {
+        padding: var(--s2) var(--s4);
+        background: var(--surface);
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+      .entries > li {
+        align-items: flex-start;
+      }
+      .claim {
+        padding: var(--s3) var(--s4);
+        border-top: 1px solid var(--line);
+      }
+      .claim-controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--s2) var(--s4);
+        margin-top: var(--s2);
+      }
+      .claim-controls label {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--s2);
+        font-size: var(--t-sm);
+        color: var(--ink-2);
+      }
+      .claim-controls select {
+        min-height: 30px;
+        padding: 0 var(--s2);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-sm);
+        background: var(--card);
+        color: var(--ink);
+      }
+      .editor-section {
+        border-top: 1px solid var(--line);
+      }
+      .editor-section > .spread {
+        padding: var(--s3) var(--s4);
+      }
+      .skill-edit {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--s2);
+        padding: var(--s2);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-sm);
+        background: var(--card);
+      }
+      .skill-edit button {
+        border: 0;
+        background: none;
+        padding: 0 0 0 2px;
+        color: inherit;
+        cursor: pointer;
+      }
+      .skill-edit input {
+        flex: 1;
+        min-width: 90px;
+        min-height: 22px;
+        padding: 0;
+        border: 0;
+        background: none;
+      }
+      @media (max-width: 860px) {
+        .claim-controls label {
+          min-height: 44px;
+        }
+        .claim-controls select {
+          min-height: 44px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main id="content" class="page" data-page="career" data-crumb="Career">
+      <header class="page-head">
+        <h1>Career</h1>
+        <p class="muted">
+          Who you are and what you have done. Documents may only state what is
+          recorded and approved here.
+        </p>
+      </header>
+
+      <section
+        class="card"
+        aria-labelledby="profile-title"
+        style="margin-bottom: var(--s5)"
+      >
+        <header>
+          <h2 id="profile-title" class="grow">Profile</h2>
+          <span class="caption only-desktop"
+            >Changed 3 Nov by <span class="actor owner">Alex Morgan</span></span
+          >
+          <button class="btn primary sm" type="button">Save profile</button>
+        </header>
+        <div class="body form-grid">
+          <label class="field"
+            ><span>Name</span
+            ><input type="text" value="Alex Morgan" autocomplete="off"
+          /></label>
+          <label class="field"
+            ><span>Headline</span
+            ><input type="text" value="Senior Data Engineer"
+          /></label>
+          <label class="field"
+            ><span>Location</span
+            ><input type="text" value="Zurich, Switzerland"
+          /></label>
+          <label class="field"
+            ><span>Email</span
+            ><input type="email" value="alex@example.test" autocomplete="off"
+          /></label>
+          <label class="field"
+            ><span>Phone</span
+            ><input type="tel" value="+41 00 000 00 00" autocomplete="off"
+          /></label>
+          <label class="field"
+            ><span>Website</span
+            ><input type="url" value="https://example.test/alex"
+          /></label>
+          <label class="field wide">
+            <span
+              >Summary
+              <span class="hint"
+                >used at the top of a CV when the template has a summary</span
+              ></span
+            >
+            <textarea>
+Data engineer with seven years of Python in production. Builds pipelines and APIs for energy data.</textarea>
+          </label>
+          <p class="caption wide">
+            Preferences, eligibility and writing rules are not here any more:
+            they are items in your <a href="policy.html">Policy</a>.
+          </p>
+        </div>
+      </section>
+
+      <div class="spread" style="flex-wrap: wrap; margin-bottom: var(--s3)">
+        <h2>Career record</h2>
+        <div class="row">
+          <span class="muted num">9 entries · 31 claims · 27 approved</span>
+          <button class="btn sm" type="button">Add an entry</button>
+        </div>
+      </div>
+
+      <div
+        class="segmented only-mobile"
+        data-switch="entry"
+        style="margin-bottom: var(--s3)"
+      >
+        <button type="button" data-show="entry-list">Record</button>
+        <button type="button" data-show="entry-editor">Selected entry</button>
+      </div>
+
+      <div class="split" style="--split: minmax(0, 1fr) minmax(0, 1.25fr)">
+        <section class="card" id="entry-list" aria-label="Entries by kind">
+          <h3
+            class="kind eyebrow"
+            style="
+              border-top: 0;
+              border-radius: var(--radius) var(--radius) 0 0;
+            "
+          >
+            Experience
+          </h3>
+          <ul class="list entries">
+            <li class="is-selected" aria-current="true">
+              <div class="grow">
+                <a class="title" href="#entry-editor">Senior Data Engineer</a>
+                <div class="meta">Example Labs · Feb 2022 to present</div>
+                <div class="row" style="margin-top: var(--s1)">
+                  <span class="tag">Python</span
+                  ><span class="tag">PostgreSQL</span
+                  ><span class="tag">Kafka</span>
+                  <span class="caption">+3</span>
+                </div>
+              </div>
+              <span class="caption num" style="white-space: nowrap"
+                >8 claims</span
+              >
+            </li>
+            <li>
+              <div class="grow">
+                <a class="title" href="#entry-editor">Software Engineer</a>
+                <div class="meta">Sample Grid · Sep 2019 to Jan 2022</div>
+                <div class="row" style="margin-top: var(--s1)">
+                  <span class="tag">Python</span
+                  ><span class="tag">REST APIs</span
+                  ><span class="tag">Docker</span>
+                </div>
+              </div>
+              <span class="caption num" style="white-space: nowrap"
+                >7 claims</span
+              >
+            </li>
+            <li>
+              <div class="grow">
+                <a class="title" href="#entry-editor"
+                  >Working Student, Data Team</a
+                >
+                <div class="meta">Demo Energy · 2017 to 2019</div>
+                <div class="row" style="margin-top: var(--s1)">
+                  <span class="tag">SQL</span>
+                </div>
+              </div>
+              <span class="tag attention">No claims yet</span>
+            </li>
+          </ul>
+          <h3 class="kind eyebrow">Projects</h3>
+          <ul class="list entries">
+            <li>
+              <div class="grow">
+                <a class="title" href="#entry-editor">Open meter data format</a>
+                <div class="meta">Open source · 2023 to present</div>
+                <div class="row" style="margin-top: var(--s1)">
+                  <span class="tag">Python</span
+                  ><span class="tag">Parquet</span>
+                </div>
+              </div>
+              <span class="caption num" style="white-space: nowrap"
+                >4 claims</span
+              >
+            </li>
+            <li>
+              <div class="grow">
+                <a class="title" href="#entry-editor">Forecast benchmark</a>
+                <div class="meta">Example Labs · 2024</div>
+                <div class="row" style="margin-top: var(--s1)">
+                  <span class="tag agent">1 question for you</span>
+                </div>
+              </div>
+              <span class="caption num" style="white-space: nowrap"
+                >3 claims</span
+              >
+            </li>
+          </ul>
+          <h3 class="kind eyebrow">Education</h3>
+          <ul class="list entries">
+            <li>
+              <div class="grow">
+                <a class="title" href="#entry-editor">MSc Computer Science</a>
+                <div class="meta">Example University · 2017 to 2019</div>
+              </div>
+              <span class="caption num" style="white-space: nowrap"
+                >3 claims</span
+              >
+            </li>
+            <li>
+              <div class="grow">
+                <a class="title" href="#entry-editor">BSc Computer Science</a>
+                <div class="meta">Example University · 2014 to 2017</div>
+              </div>
+              <span class="caption num" style="white-space: nowrap"
+                >2 claims</span
+              >
+            </li>
+          </ul>
+          <h3 class="kind eyebrow">Languages and certificates</h3>
+          <ul class="list entries">
+            <li>
+              <div class="grow">
+                <a class="title" href="#entry-editor">Languages</a>
+                <div class="meta">English, Italian, German (basic)</div>
+              </div>
+              <span class="caption num" style="white-space: nowrap"
+                >3 claims</span
+              >
+            </li>
+            <li>
+              <div class="grow">
+                <a class="title" href="#entry-editor"
+                  >Cloud practitioner certificate</a
+                >
+                <div class="meta">Sample Institute · 2021</div>
+              </div>
+              <span class="caption num" style="white-space: nowrap"
+                >1 claim</span
+              >
+            </li>
+          </ul>
+        </section>
+
+        <section
+          class="card detail"
+          id="entry-editor"
+          aria-labelledby="entry-title"
+        >
+          <header>
+            <h3 id="entry-title" class="grow">
+              Edit entry: Senior Data Engineer
+            </h3>
+            <button class="btn quiet danger sm" type="button">Delete</button>
+            <button class="btn primary sm" type="button">Save entry</button>
+          </header>
+          <div class="banner attention" style="margin: var(--s4) var(--s4) 0">
+            <div class="grow">
+              <strong>career-agent changed this entry yesterday</strong> in a
+              run that stopped without a report: 1 claim edited, 1 claim added.
+              Both are marked below.
+            </div>
+            <a class="btn sm" href="activity.html">See the run</a>
+          </div>
+          <div class="body form-grid">
+            <label class="field">
+              <span>Kind</span>
+              <select>
+                <option>Experience</option>
+                <option>Project</option>
+                <option>Education</option>
+                <option>Language</option>
+                <option>Certificate</option>
+              </select>
+            </label>
+            <label class="field"
+              ><span>Title</span
+              ><input type="text" value="Senior Data Engineer"
+            /></label>
+            <label class="field"
+              ><span>Organisation</span><input type="text" value="Example Labs"
+            /></label>
+            <label class="field"
+              ><span>Location</span
+              ><input type="text" value="Zurich, Switzerland"
+            /></label>
+            <label class="field"
+              ><span>From</span><input type="month" value="2022-02"
+            /></label>
+            <label class="field">
+              <span>To <span class="hint">empty means present</span></span>
+              <input type="month" />
+            </label>
+            <div class="field wide">
+              <span id="skills-label">Skills</span>
+              <div
+                class="skill-edit"
+                role="group"
+                aria-labelledby="skills-label"
+              >
+                <span class="tag"
+                  >Python
+                  <button type="button" aria-label="Remove Python">
+                    ×
+                  </button></span
+                >
+                <span class="tag"
+                  >PostgreSQL
+                  <button type="button" aria-label="Remove PostgreSQL">
+                    ×
+                  </button></span
+                >
+                <span class="tag"
+                  >Kafka
+                  <button type="button" aria-label="Remove Kafka">
+                    ×
+                  </button></span
+                >
+                <span class="tag"
+                  >Airflow
+                  <button type="button" aria-label="Remove Airflow">
+                    ×
+                  </button></span
+                >
+                <span class="tag"
+                  >Terraform
+                  <button type="button" aria-label="Remove Terraform">
+                    ×
+                  </button></span
+                >
+                <span class="tag"
+                  >Docker
+                  <button type="button" aria-label="Remove Docker">
+                    ×
+                  </button></span
+                >
+                <input
+                  type="text"
+                  aria-label="Add a skill"
+                  placeholder="Add a skill"
+                />
+              </div>
+            </div>
+            <label class="field wide">
+              <span>Description</span>
+              <textarea>
+Platform team for grid measurement data of three network operators. Six engineers.</textarea>
+            </label>
+          </div>
+
+          <div class="editor-section">
+            <div class="spread">
+              <h4 style="margin: 0; font-size: var(--t-md)">
+                Claims <span class="muted num">8</span>
+              </h4>
+              <button class="btn sm" type="button">Add a claim</button>
+            </div>
+            <div class="claim">
+              <div class="spread" style="align-items: flex-start">
+                <p>
+                  Built Python pipelines that process 40 million measurements a
+                  day.
+                </p>
+                <span class="tag ready">Approved</span>
+              </div>
+              <div class="claim-controls">
+                <label
+                  ><input
+                    type="checkbox"
+                    role="switch"
+                    class="switch"
+                    checked
+                  />
+                  Default in CV</label
+                >
+                <label>
+                  Role
+                  <select>
+                    <option>Data engineering</option>
+                    <option>Backend</option>
+                    <option>Platform</option>
+                    <option>Any role</option>
+                  </select>
+                </label>
+                <label>
+                  Group
+                  <select>
+                    <option>Scale</option>
+                    <option>Impact</option>
+                    <option>Leadership</option>
+                    <option>No group</option>
+                  </select>
+                </label>
+                <span class="caption">
+                  Edited yesterday by
+                  <span class="actor agent">career-agent</span>: was "30
+                  million"
+                </span>
+              </div>
+            </div>
+            <div class="claim">
+              <div class="spread" style="align-items: flex-start">
+                <p>
+                  Moved reporting queries to PostgreSQL and cut their time by
+                  70%.
+                </p>
+                <span class="tag ready">Approved</span>
+              </div>
+              <div class="claim-controls">
+                <label
+                  ><input
+                    type="checkbox"
+                    role="switch"
+                    class="switch"
+                    checked
+                  />
+                  Default in CV</label
+                >
+                <label>
+                  Role
+                  <select>
+                    <option>Any role</option>
+                    <option>Data engineering</option>
+                    <option>Backend</option>
+                  </select>
+                </label>
+                <label>
+                  Group
+                  <select>
+                    <option>Impact</option>
+                    <option>Scale</option>
+                    <option>Leadership</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="claim">
+              <div class="spread" style="align-items: flex-start">
+                <p>
+                  Introduced on-call handbooks used by all three platform teams.
+                </p>
+                <span class="tag ready">Approved</span>
+              </div>
+              <div class="claim-controls">
+                <label
+                  ><input type="checkbox" role="switch" class="switch" />
+                  Default in CV</label
+                >
+                <label>
+                  Role
+                  <select>
+                    <option>Platform</option>
+                    <option>Any role</option>
+                  </select>
+                </label>
+                <label>
+                  Group
+                  <select>
+                    <option>Leadership</option>
+                    <option>Impact</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="claim">
+              <div class="spread" style="align-items: flex-start">
+                <p>
+                  Led the migration of 14 pipelines to a new scheduler without
+                  downtime.
+                </p>
+                <span class="tag attention">Not confirmed by you</span>
+              </div>
+              <div class="claim-controls">
+                <label
+                  ><input
+                    type="checkbox"
+                    role="switch"
+                    class="switch"
+                    disabled
+                  />
+                  Default in CV</label
+                >
+                <span class="caption">
+                  Added yesterday by
+                  <span class="actor agent">career-agent</span> from your old
+                  CV. Documents cannot use it until you approve it.
+                </span>
+              </div>
+              <div class="row" style="margin-top: var(--s2)">
+                <button class="btn sm" type="button">Approve</button>
+                <button class="btn sm" type="button">Edit</button>
+                <button class="btn quiet danger sm" type="button">
+                  Remove
+                </button>
+              </div>
+            </div>
+            <div class="claim">
+              <a class="btn quiet sm" href="#">4 more claims</a>
+            </div>
+          </div>
+
+          <div class="editor-section">
+            <div class="spread">
+              <h4 style="margin: 0; font-size: var(--t-md)">Other details</h4>
+              <span class="caption"
+                >Free-form values the product does not act on</span
+              >
+            </div>
+            <div style="padding: 0 var(--s4) var(--s4)">
+              <div
+                class="kv"
+                role="group"
+                aria-label="Other details as keys and values"
+              >
+                <div class="kv-row kv-head" aria-hidden="true">
+                  <span>Key</span><span>Type</span><span>Value</span
+                  ><span style="width: 36px"></span>
+                </div>
+                <div class="kv-row">
+                  <input
+                    class="input"
+                    type="text"
+                    aria-label="Key"
+                    value="team_size"
+                  />
+                  <select class="input" aria-label="Type">
+                    <option>Number</option>
+                    <option>Text</option>
+                    <option>Yes or no</option>
+                    <option>List</option>
+                  </select>
+                  <input
+                    class="input"
+                    type="number"
+                    aria-label="Value"
+                    value="6"
+                  />
+                  <button
+                    class="btn quiet sm"
+                    type="button"
+                    aria-label="Remove team_size"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div class="kv-row">
+                  <input
+                    class="input"
+                    type="text"
+                    aria-label="Key"
+                    value="employment"
+                  />
+                  <select class="input" aria-label="Type">
+                    <option>Text</option>
+                    <option>Number</option>
+                    <option>Yes or no</option>
+                    <option>List</option>
+                  </select>
+                  <input
+                    class="input"
+                    type="text"
+                    aria-label="Value"
+                    value="Permanent, full time"
+                  />
+                  <button
+                    class="btn quiet sm"
+                    type="button"
+                    aria-label="Remove employment"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div class="kv-row">
+                  <input
+                    class="input"
+                    type="text"
+                    aria-label="Key"
+                    value="may_name_customers"
+                  />
+                  <select class="input" aria-label="Type">
+                    <option>Yes or no</option>
+                    <option>Text</option>
+                    <option>Number</option>
+                    <option>List</option>
+                  </select>
+                  <label class="toggle"
+                    ><input
+                      type="checkbox"
+                      role="switch"
+                      class="switch"
+                      aria-label="Value"
+                    />
+                    No</label
+                  >
+                  <button
+                    class="btn quiet sm"
+                    type="button"
+                    aria-label="Remove may_name_customers"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div class="kv-row">
+                  <input
+                    class="input"
+                    type="text"
+                    aria-label="Key"
+                    value="customers"
+                  />
+                  <select class="input" aria-label="Type">
+                    <option>List</option>
+                    <option>Text</option>
+                    <option>Number</option>
+                    <option>Yes or no</option>
+                  </select>
+                  <input
+                    class="input"
+                    type="text"
+                    aria-label="Value, separated by commas"
+                    value="Operator A, Operator B, Operator C"
+                  />
+                  <button
+                    class="btn quiet sm"
+                    type="button"
+                    aria-label="Remove customers"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+              <button
+                class="btn sm"
+                type="button"
+                style="margin-top: var(--s3)"
+              >
+                Add a detail
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+    <script defer src="prototype.js"></script>
+  </body>
+</html>
