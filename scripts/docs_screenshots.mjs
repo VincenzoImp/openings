@@ -116,6 +116,10 @@ await open(
 await dialog().waitFor();
 await shot("requirements");
 
+await open(`applications?application=${await applicationId("Orbit Works")}`);
+await dialog().getByRole("region", { name: "Ready to apply" }).waitFor();
+await shot("application-ready");
+
 await open("collection");
 await shot("collection");
 await page.getByRole("button", { name: "Edit settings" }).first().click();

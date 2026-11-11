@@ -187,6 +187,13 @@ class ApplicationPatch(Versioned):
         return self
 
 
+class ApplicationReady(Versioned):
+    ready: bool = Field(
+        default=True,
+        description="True marks the application ready to apply; false clears the mark.",
+    )
+
+
 class NotePatch(Versioned):
     body: str = Field(min_length=1, max_length=30_000)
 
@@ -207,7 +214,7 @@ def unique_items(items, label):
 
 
 class ApplicationBulk(Input):
-    action: Literal["close", "reopen", "delete"]
+    action: Literal["close", "reopen", "delete", "mark_ready", "unmark_ready"]
     items: list[BulkItem] = Field(min_length=1, max_length=200)
     outcome: Literal["accepted", "rejected", "not_pursued"] | None = None
     status: Literal["draft", "applied", "interview", "offer"] | None = None
@@ -299,15 +306,36 @@ class ApplicationQuery(Input):
     status: Literal["draft", "applied", "interview", "offer", "closed"] | None = None
     outcome: Literal["accepted", "rejected", "not_pursued"] | None = None
     company: str | None = Field(default=None, max_length=300)
-    readiness: Literal["blocked", "none", "missing_pdf", "unreviewed", "ready"] | None = Field(
+    readiness: (
+        Literal["blocked", "none", "missing_pdf", "unreviewed", "reviewed", "ready"] | None
+    ) = Field(
         default=None,
-        description="Derived from current revision leaves and unresolved blocking requirements.",
+        description="ready is the stored step (marked ready and still passing every check); reviewed passes every check but is not marked; the other values are derived from current revision leaves and unresolved blocking requirements.",
+    )
+    ready_since: str | None = Field(
+        default=None, description="Only applications marked ready at or after this time."
+    )
+    ready_until: str | None = Field(
+        default=None, description="Only applications marked ready at or before this time."
     )
     sort: Literal[
-        "updated", "newest", "oldest", "company", "stage", "applied", "deadline", "priority"
+        "updated",
+        "newest",
+        "oldest",
+        "company",
+        "stage",
+        "applied",
+        "deadline",
+        "priority",
+        "ready",
     ] = "updated"
     limit: int = Field(default=100, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
+
+    @field_validator("ready_since", "ready_until")
+    @classmethod
+    def valid_date(cls, value, info):
+        return normalized_date(value, end=info.field_name == "ready_until")
 
 
 class PeriodQuery(Input):

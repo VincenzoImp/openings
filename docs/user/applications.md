@@ -87,8 +87,27 @@ or limit makes an answer invalid, the editor shows the saved answer and requires
 an explicit choice before clearing it. Frozen contexts and document revisions stay
 unchanged.
 
-Submit through the employer's portal, then record **Applied**. Preparing documents
-or uploading a PDF leaves the application in its current stage.
+## Mark ready and submit
+
+**Ready** is a stored step inside Preparing: someone, you or your agent, judged
+the application complete. In the application, **Mark ready** is available once
+every current revision has its PDF and is approved and no blocking requirement is
+unresolved; otherwise the panel names what is missing. The application shows who
+marked it and when, and **Not ready** removes the mark.
+
+![Application marked ready by the agent, with who marked it and when](../images/application-ready.png)
+
+The mark describes exactly what was judged, so Openings clears it when that
+changes: a new document revision or context, a deleted revision, a file added to
+a current revision, a blocking requirement added or reopened, or the application
+leaving Preparing. The History tab records each clearing with its reason and who
+caused it. Mark the application ready again after reviewing the change.
+
+**Ready to apply** above the list is your queue: it shows how many Preparing
+applications are marked ready and lists them longest-waiting first. Submit
+through the employer's portal, then record **Applied**. Marking ready, preparing
+documents or uploading a PDF never submits anything and leaves the application
+in its current stage.
 
 ## Follow progress
 
@@ -107,18 +126,21 @@ board columns show when only part of a stage is loaded and link to the full stag
 Each application can have a **priority** (P1 highest to P5 lowest) and the
 employer's **deadline**, set under **Details**. Cards and list rows show them;
 a past deadline on an application still in Preparing is marked overdue. Sort
-Applications by **Deadline** or **Priority**, and filter by **readiness**:
+Applications by **Deadline**, **Priority** or **Ready**, and filter by **readiness**:
 
-| Readiness | Meaning |
-|---|---|
-| No documents | No document revision yet. |
-| Missing PDF | A current CV or cover letter revision has no PDF. |
-| Needs review | Every current revision has its files but one is not approved. |
-| Blocked by a requirement | An employer requirement is blocking and unresolved. |
-| Ready | Current revisions have their PDFs and are approved. |
+| Readiness | REST/MCP value | Meaning |
+|---|---|---|
+| No documents | `none` | No document revision yet. |
+| Missing PDF | `missing_pdf` | A current CV or cover letter revision has no PDF. |
+| Needs review | `unreviewed` | Every current revision has its files but one is not approved. |
+| Blocked by a requirement | `blocked` | An employer requirement is blocking and unresolved. |
+| Reviewed, not marked ready | `reviewed` | Every check passes, but nobody marked the application ready. |
+| Ready to apply | `ready` | Marked ready, and every check still passes. |
 
 Readiness uses only the current revision of each document; an approved earlier
 revision does not count. It does not check the content or submit anything.
+Before version 0.17 `ready` meant that the checks passed; that state is now
+`reviewed`, and `ready` is the stored step.
 
 ![Applications list sorted by deadline, with priority and deadline tags, readiness, a blocking requirement and the bulk action bar](../images/applications-planning.png)
 
@@ -161,9 +183,9 @@ is permanent and deliberately returns a saved job to Shortlist; the confirmation
 explains this. Other retained attempts keep it out of pending queues.
 
 In the Applications **List** view, select attempts across pages to close them
-with one outcome, reopen Closed attempts to a stage, or delete them. Each attempt
-is checked separately; a failure, such as another open attempt for the same job,
-is listed without blocking the others.
+with one outcome, reopen Closed attempts to a stage, mark them ready, or delete
+them. Each attempt is checked separately; a failure, such as another open attempt
+for the same job or a missing PDF, is listed without blocking the others.
 
 The **Possible duplicates** tab beside Inbox groups records that share a company
 and role or identical posting text, for example one vacancy collected from

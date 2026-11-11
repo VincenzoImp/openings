@@ -28,8 +28,11 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   cover letter and form answers were written from, with PDF/source revisions and review.
 - **Plan:** give applications a priority, a deadline and the employer's requirements
   (authorship rules, attachments, references, language, eligibility). Filter by
-  readiness (blocked, no documents, missing PDF, needs review, ready) and sort by
-  deadline or priority. Close, reopen or delete applications in bulk.
+  readiness (blocked, no documents, missing PDF, needs review, reviewed, ready) and
+  sort by deadline or priority. Close, reopen or delete applications in bulk.
+- **Hand over:** an application is marked **Ready** once its documents are approved
+  and nothing blocks it. Ready to apply is your queue, and a later change to the
+  documents clears the mark.
 - **Stay consistent:** applications built on older inputs are flagged after Profile,
   template or Career changes, and review checks a document's content against its
   `.tex` source.

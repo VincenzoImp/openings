@@ -97,10 +97,23 @@ non-Closed attempt. A conflicting creation or reopening returns 409
 `application_in_progress` with the active `application_id`; use that attempt or
 close it before starting another. Use `idempotency_key` for retries of one creation.
 `GET /applications?job_id=JOB_ID` lists the exact job's attempts with pagination.
-`readiness=none|missing_pdf|unreviewed|blocked|ready` filters by the derived
+`readiness=none|missing_pdf|unreviewed|blocked|reviewed|ready` filters by the
 preparation state, and `sort=deadline` or `sort=priority` lists planned attempts
-first. Rows include `priority`, `deadline`, `readiness`, `open_requirements` and
-`blocking_requirements`; the full `requirements` list is on the single read.
+first. Rows include `priority`, `deadline`, `readiness`, `ready_at`, `ready_by`,
+`open_requirements` and `blocking_requirements`; the full `requirements` list is
+on the single read.
+
+`ready` is a stored step: `POST /applications/{id}/ready` with
+`{"expected_version":4}` marks a Preparing application ready and
+`{"expected_version":5,"ready":false}` clears the mark. Marking is refused with
+409 `application_not_ready` while a check fails; `details.check` names it
+(`stage`, `blocked`, `none`, `missing_pdf` or `unreviewed`). `reviewed` means
+that every check passes and nobody marked the application. The mark is cleared
+automatically, with an `application_ready_cleared` event and its `reason`, by a
+new revision or context, a deleted revision, a file added to a current revision,
+an unresolved blocking requirement or leaving Preparing. `readiness=ready`,
+`sort=ready` (longest waiting first), `ready_since` and `ready_until` read the
+queue; the list also returns `ready_count`, and the overview `ready`.
 Create and `PATCH` accept `priority` (1 highest to 5), `deadline` (`YYYY-MM-DD`)
 and `requirements`, a list of `{id, kind, text, blocking, resolved, note}`.
 A requirements patch replaces the whole list; keep existing `id` values. `null`

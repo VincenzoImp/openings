@@ -170,6 +170,9 @@ def _migrate_7_to_8(conn):
         conn.execute("ALTER TABLE events ADD COLUMN " + column)
     for column in ("author_kind TEXT", "author_id TEXT", "author_name TEXT"):
         conn.execute("ALTER TABLE notes ADD COLUMN " + column)
+    # Ready as a stored step: when an application was judged complete, and by whom.
+    for column in ("ready_at TEXT", "ready_by_kind TEXT", "ready_by_id TEXT", "ready_by_name TEXT"):
+        conn.execute("ALTER TABLE applications ADD COLUMN " + column)
 
 
 # Each step upgrades from its key to the next version; steps chain inside one transaction.

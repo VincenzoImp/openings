@@ -3,6 +3,7 @@ export interface ListResult<T> {
   items: T[];
   total: number;
   stage_counts?: Record<string, number>;
+  ready_count?: number;
   facets?: Record<string, string[]>;
 }
 export interface Versioned {
@@ -107,13 +108,14 @@ export interface Requirement {
   note: string;
 }
 export type Readiness =
-  "blocked" | "none" | "missing_pdf" | "unreviewed" | "ready";
+  "blocked" | "none" | "missing_pdf" | "unreviewed" | "reviewed" | "ready";
 export const readinessLabels: Record<Readiness, string> = {
   blocked: "Blocked by a requirement",
   none: "No documents",
   missing_pdf: "Missing PDF",
   unreviewed: "Needs review",
-  ready: "Ready",
+  reviewed: "Reviewed, not marked ready",
+  ready: "Ready to apply",
 };
 export interface Application extends Versioned {
   job_id: string;
@@ -128,6 +130,8 @@ export interface Application extends Versioned {
   deadline?: string | null;
   requirements?: Requirement[];
   readiness?: Readiness;
+  ready_at?: string | null;
+  ready_by?: Actor | null;
   open_requirements?: number;
   blocking_requirements?: number;
   documents_count?: number;
@@ -408,6 +412,7 @@ export interface Overview {
   offers: number;
   active: number;
   drafts: number;
+  ready?: number;
   inbox: number;
   incomplete: number;
   funnel: FunnelStep[];

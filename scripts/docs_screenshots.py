@@ -534,10 +534,10 @@ def seed(s: Seeder):
         outcome="not_pursued",
     )
 
-    activity(s, lumen, cedar)
+    activity(s, lumen, cedar, orbit)
 
 
-def activity(s: Seeder, lumen, cedar):
+def activity(s: Seeder, lumen, cedar, orbit):
     """Two agent runs with their changes, a stored report and questions for the owner."""
     review = s.call(
         "POST",
@@ -641,6 +641,13 @@ def activity(s: Seeder, lumen, cedar):
             "question": "Which notice period should applications state?",
             "why": "Two application forms ask for the earliest start date.",
         },
+    )
+    # The agent hands a complete Draft to the owner: both documents approved, no blocker.
+    current = s.call("GET", f"/applications/{orbit['id']}")
+    s.call(
+        "POST",
+        f"/applications/{orbit['id']}/ready",
+        json={"expected_version": current["version"]},
     )
     s.call(
         "PATCH",

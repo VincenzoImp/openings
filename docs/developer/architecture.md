@@ -84,6 +84,12 @@ dashboard path, and lists every gap. Read [REST](../user/api.md) and
   only an explicit supersede closes it. A finished run stores its report and
   change counts. Questions reference a job, application or Career entry with
   `ON DELETE SET NULL` and keep a label, so they outlive their subject.
+- **Ready:** every shared service that changes what Ready was judged on clears it
+  in its own transaction through `Workspace.clear_ready`: a new revision or
+  context, a deleted revision, a file added to a current revision, an unresolved
+  blocking requirement, leaving Preparing. Each clearing bumps the application
+  version and leaves an attributed `application_ready_cleared` event with its
+  reason. A new operation that changes current revisions must call it too.
 - **Concurrency:** typed inputs, optimistic versions, idempotency keys, foreign
   keys and short transactions protect shared state. Run one application process
   per workspace; database connections do not cross threads. Mutable job and
@@ -93,16 +99,20 @@ SQLite uses WAL and stores SHA-256-deduplicated BLOBs for attachments. Lists ret
 compact paginated summaries; full postings, narratives, contexts and file bytes
 are separate reads. Application preparation summaries count current revision leaves
 and their exact PDF/review state; derived readiness combines them with unresolved
-blocking employer requirements stored on the application. Byte downloads and record exports prepare a
+blocking employer requirements stored on the application. Ready is a stored step
+on top of that derivation (`ready_at` and who set it): marking is refused while a
+check fails, `readiness` reports `ready` only while the mark and every check hold,
+and `reviewed` when the checks pass without the mark. Byte downloads and record exports prepare a
 temporary snapshot on the database thread before streaming, preserving bounded
 memory and releasing SQLite readers before cancellation or thread changes.
 Backups use SQLite's online backup API. A restore preserves
 installation authentication, recent provider request history and later cooldowns.
 
 Workspaces and backups use schema 8. Opening schema 7 upgrades it in one
-transaction: events gain a subject, an actor and a run, notes gain an author, and
-the `runs` and `questions` tables are added; existing rows keep every value and
-read as "unknown (before 0.17)". Schema 6 is upgraded through schema 7 in the same
+transaction: events gain a subject, an actor and a run, notes gain an author,
+applications gain `ready_at` with who set it, and the `runs` and `questions`
+tables are added; existing rows keep every value, read as "unknown (before 0.17)"
+and are not marked ready. Schema 6 is upgraded through schema 7 in the same
 transaction (application priority, deadline and requirements), and schema 5
 through schema 6 (removing obsolete derived data and preserving owned records and
 immutable snapshots). Restore accepts schema 8 and upgrades a copy of a schema 5,

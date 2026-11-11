@@ -9,6 +9,7 @@ import {
   type RunStatus,
 } from "../api";
 import { useResource, useUrlState, useWorkspace } from "../state";
+import { readyReason } from "./ApplicationReady";
 import {
   Button,
   Empty,
@@ -82,6 +83,7 @@ function changeDetail(event: Activity) {
     return `${payload.from ? stage(payload.from) + " → " : ""}${stage(payload.to)}`;
   if (Array.isArray(payload.fields) && payload.fields.length)
     return "Fields: " + payload.fields.join(", ").replaceAll("_", " ");
+  if (event.kind === "application_ready_cleared") return readyReason(payload);
   return "";
 }
 function RecordLink({

@@ -81,7 +81,7 @@
         "overview_get"
       ],
       "dashboard": "Overview: period selector and funnel",
-      "notes": "since/until select the submitted-attempt cohort; counts are independent of loaded pages."
+      "notes": "since/until select the submitted-attempt cohort; counts are independent of loaded pages. ready counts Preparing attempts marked ready."
     },
     {
       "id": "jobs.list",
@@ -914,7 +914,7 @@
         "applications_list"
       ],
       "dashboard": "Applications: list/Kanban filters",
-      "notes": "q, job_id, status, outcome, company, readiness (blocked/none/missing_pdf/unreviewed/ready), sort (updated/newest/oldest/company/stage/applied/deadline/priority), limit, offset; job_id is exact and stage_counts span all matching records. Rows include priority, deadline, readiness and unresolved/blocking requirement counts; full requirements are on the attempt read."
+      "notes": "q, job_id, status, outcome, company, readiness (blocked/none/missing_pdf/unreviewed/reviewed/ready), ready_since, ready_until, sort (updated/newest/oldest/company/stage/applied/deadline/priority/ready), limit, offset; job_id is exact; stage_counts and ready_count span all matching records. readiness=ready is the stored Ready step; reviewed passes every check but is not marked ready. Rows include priority, deadline, readiness, ready_at, ready_by and unresolved/blocking requirement counts; full requirements are on the attempt read."
     },
     {
       "id": "applications.read",
@@ -930,7 +930,7 @@
         "application_get"
       ],
       "dashboard": "Applications: attempt detail",
-      "notes": "readiness is derived from current revision leaves and unresolved blocking requirements."
+      "notes": "readiness is derived from current revision leaves and unresolved blocking requirements; ready is reported only for an application marked ready (ready_at, ready_by) whose checks still pass."
     },
     {
       "id": "applications.create",
@@ -962,7 +962,23 @@
         "application_update"
       ],
       "dashboard": "Applications: progress, planning, requirements and questions/answers",
-      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history. Entering Closed requires an explicit outcome. Reopening enforces one open attempt per job. applied_at, priority or deadline null clears the value. requirements replaces the whole list; keep existing ids. The returned job is the compact job summary."
+      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history. Entering Closed requires an explicit outcome. Reopening enforces one open attempt per job. applied_at, priority or deadline null clears the value. requirements replaces the whole list; keep existing ids. The returned job is the compact job summary. Leaving Preparing or adding/unresolving a blocking requirement clears the stored Ready step."
+    },
+    {
+      "id": "applications.ready",
+      "group": "Applications and documents",
+      "operation": "Mark a Preparing application ready to apply, or clear the mark",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/applications/{application_id}/ready"
+        }
+      ],
+      "mcp": [
+        "application_ready"
+      ],
+      "dashboard": "Applications: Mark ready / Not ready in the attempt; Ready badge, filter and queue",
+      "notes": "expected_version; ready (default true). Refused with 409 application_not_ready and details.check (stage, blocked, none, missing_pdf, unreviewed) while a check fails. Cleared automatically, with an attributed application_ready_cleared event and its reason, by a new revision or context, a deleted revision, a file added to a current revision, a blocking requirement, or leaving Preparing. Never submits anything."
     },
     {
       "id": "applications.delete",
@@ -983,7 +999,7 @@
     {
       "id": "applications.bulk",
       "group": "Applications and documents",
-      "operation": "Close, reopen or delete selected application attempts",
+      "operation": "Close, reopen, mark ready, unmark ready or delete selected application attempts",
       "rest": [
         {
           "method": "POST",
@@ -994,7 +1010,7 @@
         "applications_bulk"
       ],
       "dashboard": "Applications: list selection toolbar",
-      "notes": "At most 200 versioned items, with per-item results/errors. Close requires an outcome; reopen requires a non-Closed stage and respects one open attempt per job."
+      "notes": "At most 200 versioned items, with per-item results/errors. Close requires an outcome; reopen requires a non-Closed stage and respects one open attempt per job. mark_ready is refused per item with application_not_ready while a readiness check fails."
     },
     {
       "id": "applications.history",

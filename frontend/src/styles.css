@@ -4256,6 +4256,59 @@ html[data-theme="dark"] .tag.amber {
 .application-card .plan-tags {
   margin-top: 0;
 }
+
+/* Ready as a stored step of a Preparing application. */
+.ready-tag {
+  align-self: flex-start;
+  font-size: 10px;
+}
+.ready-tag .icon {
+  width: 11px;
+  height: 11px;
+}
+td .ready-tag {
+  margin-bottom: 5px;
+}
+.ready-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+.ready-panel.is-ready {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--card));
+}
+.ready-panel strong {
+  font-size: 13px;
+}
+.ready-panel p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.ready-panel .btn {
+  flex: none;
+}
+.stage-overview .ready-queue {
+  margin-left: auto;
+}
+@media (max-width: 600px) {
+  .ready-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .stage-overview .ready-queue {
+    margin-left: 0;
+    flex: 1 0 100%;
+  }
+}
 .drawer-meta + .plan-tags {
   margin: 0 0 12px;
 }

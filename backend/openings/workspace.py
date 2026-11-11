@@ -20,6 +20,7 @@ from .models import (
     ApplicationBulk,
     ApplicationInput,
     ApplicationPatch,
+    ApplicationReady,
     DuplicateQuery,
     JobBulk,
     JobInput,
@@ -43,8 +44,18 @@ READINESS_SQL = (
     "WHEN EXISTS("
     + _LEAVES
     + " AND d.kind IN ('resume','cover_letter') AND NOT EXISTS(SELECT 1 FROM files f WHERE f.document_id=d.id AND f.media_type='application/pdf')) THEN 'missing_pdf' "
-    "WHEN EXISTS(" + _LEAVES + " AND d.review_state<>'approved') THEN 'unreviewed' ELSE 'ready' END"
+    "WHEN EXISTS(" + _LEAVES + " AND d.review_state<>'approved') THEN 'unreviewed' "
+    # Every check passes: "reviewed" until someone marks the application ready.
+    "WHEN app.ready_at IS NULL THEN 'reviewed' ELSE 'ready' END"
 )
+READINESS = ("blocked", "none", "missing_pdf", "unreviewed", "reviewed", "ready")
+# Why an application whose checks fail cannot be marked ready, by derived readiness.
+NOT_READY = {
+    "blocked": "Resolve every blocking requirement before marking this application ready.",
+    "none": "Save the application documents before marking this application ready.",
+    "missing_pdf": "Attach a PDF to every current CV and cover letter revision before marking this application ready.",
+    "unreviewed": "Approve every current document revision before marking this application ready.",
+}
 REQUIREMENT_COUNTS_SQL = (
     "(SELECT count(*) FROM json_each(app.requirements) r WHERE NOT coalesce(json_extract(r.value,'$.resolved'),0)) AS open_requirements,"
     "(SELECT count(*) FROM json_each(app.requirements) r WHERE NOT coalesce(json_extract(r.value,'$.resolved'),0) AND json_extract(r.value,'$.blocking')) AS blocking_requirements"
@@ -874,7 +885,7 @@ class Workspace:
         )
         if not row:
             missing("Application")
-        row = decode_record(row, ("questions", "answers", "requirements"))
+        row = self._ready_by(decode_record(row, ("questions", "answers", "requirements")))
         row["job"] = (self.job_summary if compact_job else self.get_job)(row["job_id"])
         row["documents_count"] = self.db.one(
             "SELECT count(*) n FROM documents WHERE application_id=?", (application_id,)
@@ -886,6 +897,14 @@ class Workspace:
             row["stale_inputs"] = application_staleness(connection, [application_id])[
                 application_id
             ]["inputs"]
+        return row
+
+    @staticmethod
+    def _ready_by(row):
+        """Replace the stored actor columns with who marked the application ready."""
+        row["ready_by"] = describe_row(row, "ready_by") if row["ready_at"] else None
+        for key in ("ready_by_kind", "ready_by_id", "ready_by_name"):
+            row.pop(key)
         return row
 
     @staticmethod
@@ -920,17 +939,26 @@ class Workspace:
         sort="updated",
         job_id=None,
         readiness=None,
+        ready_since=None,
+        ready_until=None,
     ):
         conditions, args = [], []
         if readiness:
-            if readiness not in ("blocked", "none", "missing_pdf", "unreviewed", "ready"):
+            if readiness not in READINESS:
                 raise DomainError(
                     422,
                     "application_readiness",
-                    "Choose blocked, none, missing_pdf, unreviewed or ready.",
+                    "Choose blocked, none, missing_pdf, unreviewed, reviewed or ready.",
                 )
+            if readiness == "ready":
+                # The stored step first, so the partial index narrows the candidates.
+                conditions.append("app.ready_at IS NOT NULL")
             conditions.append(f"({READINESS_SQL})=?")
             args.append(readiness)
+        for value, operator in ((ready_since, ">="), (ready_until, "<=")):
+            if value:
+                conditions.append("app.ready_at" + operator + "?")
+                args.append(value)
         if job_id is not None:
             conditions.append("app.job_id=?")
             args.append(job_id)
@@ -961,10 +989,13 @@ class Workspace:
             # Undated or unprioritized attempts follow the planned ones.
             "deadline": "app.deadline IS NULL,app.deadline,app.priority IS NULL,app.priority,app.updated_at DESC",
             "priority": "app.priority IS NULL,app.priority,app.deadline IS NULL,app.deadline,app.updated_at DESC",
+            # The ready queue: longest waiting first, then everything not marked ready.
+            "ready": "app.ready_at IS NULL,app.ready_at,app.updated_at DESC",
         }.get(sort, "app.updated_at DESC")
         with self.db.connect() as connection:
             projection = "app.id,app.job_id,app.status,app.outcome,app.version,app.applied_at,app.created_at,app.updated_at,"
             projection += "app.priority,app.deadline,"
+            projection += "app.ready_at,app.ready_by_kind,app.ready_by_id,app.ready_by_name,"
             projection += f"{READINESS_SQL} AS readiness,{REQUIREMENT_COUNTS_SQL},"
             projection += (
                 "(SELECT count(*) FROM documents WHERE application_id=app.id) AS documents_count,"
@@ -982,20 +1013,33 @@ class Workspace:
             ).fetchall()
             total = connection.execute("SELECT count(*)" + base + where, args).fetchone()[0]
             counts = {stage: 0 for stage in ("draft", "applied", "interview", "offer", "closed")}
+            ready_count = 0
             for row in connection.execute(
-                "SELECT app.status,count(*) n" + base + where + " GROUP BY app.status", args
+                "SELECT app.status,count(*) n,count(app.ready_at) ready"
+                + base
+                + where
+                + " GROUP BY app.status",
+                args,
             ):
                 counts[row["status"]] = row["n"]
+                ready_count += row["ready"]
             preparation = self._application_preparation(connection, [row["id"] for row in rows])
             staleness = application_staleness(connection, [row["id"] for row in rows])
         items = []
         for raw in rows:
-            item = {key: value for key, value in dict(raw).items() if not key.startswith("j_")}
+            item = self._ready_by(
+                {key: value for key, value in dict(raw).items() if not key.startswith("j_")}
+            )
             item["job"] = self._compact_job(raw)
             item["preparation"] = preparation[item["id"]]
             item["stale_inputs"] = staleness[item["id"]]["inputs"]
             items.append(item)
-        return {"items": items, "total": total, "stage_counts": counts}
+        return {
+            "items": items,
+            "total": total,
+            "stage_counts": counts,
+            "ready_count": ready_count,
+        }
 
     def delete_application(self, application_id, expected_version, collect=True):
         with self.db.transaction() as connection:
@@ -1096,7 +1140,7 @@ class Workspace:
         return self._bulk(value.items, apply, value.action == "forget")
 
     def bulk_applications(self, value):
-        """Close with an outcome, reopen to a stage, or delete versioned attempts."""
+        """Close with an outcome, reopen to a stage, mark or unmark ready, or delete versioned attempts."""
         value = (
             value if isinstance(value, ApplicationBulk) else ApplicationBulk.model_validate(value)
         )
@@ -1109,6 +1153,19 @@ class Workspace:
             if value.action == "delete":
                 self.delete_application(item.id, item.expected_version, collect=False)
                 return {"deleted": True}
+            if value.action in {"mark_ready", "unmark_ready"}:
+                updated = self.set_ready(
+                    item.id,
+                    ApplicationReady(
+                        expected_version=item.expected_version, ready=value.action == "mark_ready"
+                    ),
+                )
+                return {
+                    "job_id": updated["job_id"],
+                    "readiness": updated["readiness"],
+                    "ready_at": updated["ready_at"],
+                    "version": updated["version"],
+                }
             if value.action == "reopen" and row["status"] != "closed":
                 raise DomainError(
                     409,
@@ -1264,7 +1321,85 @@ class Workspace:
                     {"from": row["status"], "to": status, "fields": list(actual)},
                     c,
                 )
+                # Ready is a judgement on a Preparing attempt without blocking requirements.
+                if status != "draft":
+                    self.clear_ready(c, application_id, "left_preparing")
+                elif "requirements" in actual and any(
+                    item["blocking"] and not item["resolved"] for item in changes["requirements"]
+                ):
+                    self.clear_ready(c, application_id, "blocking_requirement")
         return self.get_application(application_id, compact_job=True)
+
+    def set_ready(self, application_id, value):
+        """Mark a Preparing application ready to apply, or clear the mark.
+
+        Marking is refused while a derived readiness check fails; the error names it.
+        """
+        value = (
+            value if isinstance(value, ApplicationReady) else ApplicationReady.model_validate(value)
+        )
+        with self.db.transaction() as c:
+            row = c.execute(
+                f"SELECT app.*,{READINESS_SQL} AS readiness,{REQUIREMENT_COUNTS_SQL} FROM applications app WHERE app.id=?",
+                (application_id,),
+            ).fetchone()
+            if row is None:
+                missing("Application")
+            check_version(row, value.expected_version)
+            if not value.ready:
+                self.clear_ready(c, application_id, "unmarked")
+            elif row["ready_at"] is None:
+                details = {
+                    "readiness": row["readiness"],
+                    "status": row["status"],
+                    "blocking_requirements": row["blocking_requirements"],
+                    "current_version": row["version"],
+                }
+                if row["status"] != "draft":
+                    raise DomainError(
+                        409,
+                        "application_not_ready",
+                        "Only a Preparing application can be marked ready.",
+                        {"check": "stage", **details},
+                    )
+                if row["readiness"] in NOT_READY:
+                    raise DomainError(
+                        409,
+                        "application_not_ready",
+                        NOT_READY[row["readiness"]],
+                        {"check": row["readiness"], **details},
+                    )
+                stamp = now()
+                c.execute(
+                    "UPDATE applications SET ready_at=?,ready_by_kind=?,ready_by_id=?,ready_by_name=?,version=version+1,updated_at=? WHERE id=?",
+                    (stamp, *current_actor().columns(), stamp, application_id),
+                )
+                self.event("application_marked_ready", row["job_id"], application_id, conn=c)
+        return self.get_application(application_id, compact_job=True)
+
+    def clear_ready(self, conn, application_id, reason):
+        """Clear the stored Ready step once its judgement no longer holds, recording why.
+
+        Every shared service that changes what Ready was judged on calls this in its
+        own transaction. Returns whether the application was ready.
+        """
+        row = conn.execute(
+            "SELECT job_id FROM applications WHERE id=? AND ready_at IS NOT NULL", (application_id,)
+        ).fetchone()
+        if row is None:
+            return False
+        conn.execute(
+            "UPDATE applications SET ready_at=NULL,ready_by_kind=NULL,ready_by_id=NULL,ready_by_name=NULL,version=version+1,updated_at=? WHERE id=?",
+            (now(), application_id),
+        )
+        self.event(
+            "application_ready_cleared",
+            row["job_id"],
+            application_id,
+            {"reason": reason, "automatic": reason != "unmarked"},
+            conn,
+        )
+        return True
 
     @staticmethod
     def normalize_requirements(requirements):
@@ -1333,7 +1468,9 @@ class Workspace:
             " WHERE " + " AND ".join(conditions) if conditions else ""
         )
         apps = self.db.all(
-            "SELECT id,status,outcome,applied_at FROM applications WHERE id IN (" + cohort + ")",
+            "SELECT id,status,outcome,applied_at,ready_at FROM applications WHERE id IN ("
+            + cohort
+            + ")",
             bounds,
         )
         stages = ["applied", "interview", "offer"]
@@ -1381,6 +1518,7 @@ class Workspace:
             "offers": funnel[2]["count"],
             "active": sum(a["status"] not in {"draft", "closed"} for a in apps),
             "drafts": sum(a["status"] == "draft" for a in apps),
+            "ready": sum(a["status"] == "draft" and a["ready_at"] is not None for a in apps),
             "inbox": counts["inbox"],
             "incomplete": counts["incomplete"],
             "funnel": funnel,

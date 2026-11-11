@@ -37,6 +37,9 @@
     "applications.update": {
       "note": "Answers have one control per question; raw JSON is the advanced fallback."
     },
+    "applications.list": {
+      "note": "The Ready to apply queue filters by `readiness=ready` with `sort=ready`; the time range serves agents and scripts."
+    },
     "runs.start": {
       "note": "Runs belong to API tokens: a dashboard session has no runs. Activity shows runs, their reports and their changes read-only."
     },
