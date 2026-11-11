@@ -68,6 +68,12 @@ npm run test:e2e
 The four projects cover Chromium and WebKit at desktop/mobile widths. CI runs
 Chromium at both widths. Browser binaries are development tools, outside the core.
 
+Each run starts its own server on a free local port, so runs in several checkouts
+or worktrees can overlap. Set `OPENINGS_E2E_PORT` to choose the port, for example
+`OPENINGS_E2E_PORT=18084 npm run test:e2e`. The run gives its server a one-time
+token and stops before the first test if the port is already in use or the server
+that answers there is not the one it started.
+
 ### Parity matrix
 
 [docs/developer/parity.md](docs/developer/parity.md) is generated from the operation
