@@ -8,15 +8,22 @@
       "note": "No lookup of a job by URL, external key or title and company. Job details open Possible duplicates (`jobs.duplicates`) instead."
     },
     "sources.run": {
-      "via": ["sources.bulk"],
+      "via": [
+        "sources.bulk"
+      ],
       "note": "Run once, also for one source, sends a bulk action."
     },
     "sources.delete": {
-      "via": ["sources.bulk"],
+      "via": [
+        "sources.bulk"
+      ],
       "note": "Remove, also for one source, sends a bulk action."
     },
     "applications.staleness_list": {
-      "via": ["applications.list", "applications.staleness"],
+      "via": [
+        "applications.list",
+        "applications.staleness"
+      ],
       "note": "Badges use `stale_inputs` in the application list; details use the per-application report. There is no workspace-wide staleness view."
     },
     "jobs.create": {
@@ -29,10 +36,10 @@
       "note": "The context dialog sends `template_ids`; `template_id` is the single-template form of the same input."
     },
     "profile.update": {
-      "note": "`metadata` holds the owner's decision policy and eligibility facts on real workspaces."
+      "note": "`metadata` is edited as rows under Other details; the owner's rules and facts are items of the Policy. The deprecated `preferences` and `roles` stay editable under a collapsed heading."
     },
     "templates.update": {
-      "note": "`rules` is free-form apart from three typed limits (pages, bullets, bullet length)."
+      "note": "The Rules tab edits the typed limits, the rule statements and the free-form rest of `rules` as rows."
     },
     "applications.update": {
       "note": "Answers have one control per question; raw JSON is the advanced fallback."
@@ -74,12 +81,22 @@
       "note": "Activity filters requests by state and the Ask your agent dialog by subject; `run_id` and `updated_since` serve agents."
     },
     "requests.read": {
-      "via": ["requests.list"],
+      "via": [
+        "requests.list"
+      ],
       "note": "Activity renders requests from the list, which returns complete records."
     },
     "questions.read": {
-      "via": ["questions.list"],
+      "via": [
+        "questions.list"
+      ],
       "note": "Activity renders questions from the list, which returns complete records."
+    },
+    "policy.add": {
+      "note": "The form sends the fields it shows; `position` and `idempotency_key` serve agents and scripts (a new item goes to the end, then the arrows move it)."
+    },
+    "policy.read": {
+      "note": "The screen reads the whole policy; `GET /policy/{section}` serves agents that need one section."
     }
   }
 }

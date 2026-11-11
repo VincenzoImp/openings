@@ -1,7 +1,9 @@
 # Career entries and claims
 
 Career stores your profile, reusable entries and claims. A template and its writing
-instructions determine how those records appear in an application document.
+instructions determine how those records appear in an application document. Your
+rules and preferences are not part of Career: they are items of the
+[Policy](policy.md).
 
 An **entry** holds stable facts: type, title, optional organization, dates, skill
 tags and an optional detailed description. A **claim** belongs to one entry and
@@ -14,13 +16,39 @@ holds reusable wording. An entry can have no claims, one claim or several.
 | Publication | Measuring Public Data Pipelines | Example Conference | Evaluated 40 public datasets. |
 | Skill | Languages | — | Python, Go, SQL |
 
-Use **Career → Career entries** to add or edit an entry and manage its claims.
-The global **Reusable claims** view supports searching and filtering across entries.
-Cards show titles, organizations, career dates and a two-line description or claim
-preview. Titles and organizations identify entries in selectors. Descriptions can
-stay empty; use them for context and evidence, and claims for reusable wording.
+**Library → Career** shows the **Profile** first: name, headline, location,
+contact, summary and links. Below it, **Career record** lists your entries by
+kind. Choose an entry to edit it beside the list: its fields, its claims and
+its files. **Add an entry** starts a new one and **Import** adds entries from
+text or JSON after a preview. **All claims** searches and filters the claims of
+every entry. Descriptions can stay empty; use them for context and evidence,
+and claims for reusable wording.
 
-![Career entries showing titles, organizations, dates and reusable claim previews](../images/career.png)
+![Career with the Profile, the record by kind and one entry open with its claims](../images/career.png)
+
+## Claims and their selection
+
+A claim is a draft until you approve it; only approved claims reach an
+application. Each claim has three selection fields, set with the controls on
+its row:
+
+| Field | Meaning |
+|---|---|
+| **Default in CV** | The claim is in the CV unless the job gives a reason to leave it out. |
+| **Role** | **Core** carries your account, **Supporting** is used when the job calls for it, **Bench** is kept in reserve. |
+| **Group** | A free short name for claims that belong together, for example "Scale" or "Leadership". |
+
+They are the API fields `default_in_cv`, `role` (`core`, `supporting`, `bench`)
+and `group`. New claims are supporting, not in the default CV and without a
+group.
+
+## Other details
+
+The Profile, entries and claims can hold free-form values the product does not
+act on. **Other details** shows them as rows with a key, a type (text, number,
+yes or no, list) and a value. A nested value, such as an object written by an
+agent, is shown collapsed and read-only; **Edit as fields** opens its keys as
+rows, one level down. Nothing is edited as JSON text.
 
 ## Dates and ordering
 
@@ -46,7 +74,8 @@ sentence. Choose the convention that suits your templates and instructions.
 
 REST and MCP expose the same fields and validation. Entry fields `organization`,
 `dates`, `skills` and `position` are structured fields, separate from free-form
-`metadata`. Do not repeat them inside metadata.
+`metadata`. Do not repeat them inside metadata. A claim's selection fields are
+typed in the same way; skills read them instead of metadata.
 
 ```json
 {
@@ -66,6 +95,11 @@ to clear dates in a versioned update. Omit unchanged fields. Claims also expose
 Prepared application contexts freeze the selected entries, claims, dates and
 ordering. Later edits affect future contexts. Review generated wording and files
 before recording a submission.
+
+The Profile fields `preferences` and `roles` are deprecated: record them as
+Decision items of the [Policy](policy.md). They stay readable and writable, and
+the Profile shows them under **Target roles and preferences, kept from earlier
+versions**.
 
 Import previews keep the pasted text while you review it. Leaving an unfinished
 import asks before discarding it. If a versioned editor reports a conflict, review

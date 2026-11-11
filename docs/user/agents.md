@@ -24,7 +24,10 @@ An agent token is refused, with `403 forbidden` on REST and MCP, when it tries t
 - restore a backup;
 - answer a question for the owner (it can ask and withdraw questions);
 - write or withdraw a request for the agent (it takes, completes and declines
-  the requests you write).
+  the requests you write);
+- confirm a [policy](policy.md) item or switch on a rule (it adds, edits, moves
+  and removes items, and what it adds or changes is a proposal until you
+  confirm it).
 
 An agent token can still download a backup and a records export, because the
 operating mandate has the agent back up before broad changes. A backup taken
