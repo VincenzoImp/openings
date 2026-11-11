@@ -9,33 +9,43 @@ from __future__ import annotations
 
 import json
 
+from .snapshots import payload_text
+
 INPUT_KINDS = ("profile", "instructions", "template", "knowledge", "claim")
 
 _CONTEXT_INPUTS = (
-    "SELECT id AS context_id,created_at,"
-    "json_extract(payload,'$.profile.version') AS profile_version,"
-    "json_extract(payload,'$.instructions.version') AS instructions_version,"
+    "SELECT ?1,?2,"
+    "json_extract(?3,'$.profile.version'),"
+    "json_extract(?3,'$.instructions.version'),"
     "(SELECT json_group_array(json_array(json_extract(value,'$.id'),json_extract(value,'$.version'),json_extract(value,'$.name')))"
-    " FROM json_each(contexts.payload,'$.templates')) AS templates,"
+    " FROM json_each(?3,'$.templates')),"
     "(SELECT json_group_array(json_array(json_extract(value,'$.id'),json_extract(value,'$.version'),json_extract(value,'$.title')))"
-    " FROM json_each(contexts.payload,'$.knowledge')) AS knowledge,"
+    " FROM json_each(?3,'$.knowledge')),"
     "(SELECT json_group_array(json_array(json_extract(value,'$.id'),json_extract(value,'$.version'),substr(json_extract(value,'$.text'),1,120)))"
-    " FROM json_each(contexts.payload,'$.claims')) AS claims "
-    "FROM contexts WHERE {}"
+    " FROM json_each(?3,'$.claims'))"
 )
 _COLUMNS = "context_id,created_at,profile_version,instructions_version,templates,knowledge,claims"
 
 
-def store_context_inputs(connection, where="id=?", params=()):
-    """Record the input versions of contexts; parsing payloads once keeps reads cheap."""
+def store_context_inputs(connection, context_id, created_at, payload):
+    """Record the input versions one context froze; parsing its payload once keeps reads cheap."""
     connection.execute(
-        f"INSERT OR IGNORE INTO context_inputs({_COLUMNS}) " + _CONTEXT_INPUTS.format(where),
-        params,
+        f"INSERT OR IGNORE INTO context_inputs({_COLUMNS}) " + _CONTEXT_INPUTS,
+        (context_id, created_at, payload),
     )
 
 
-def backfill_context_inputs(connection):
-    store_context_inputs(connection, "id NOT IN (SELECT context_id FROM context_inputs)")
+def backfill_context_inputs(connection, where="", params=()):
+    """Derive the summaries missing for contexts, rebuilding each payload from its parts."""
+    missing = connection.execute(
+        "SELECT id,created_at FROM contexts WHERE id NOT IN (SELECT context_id FROM context_inputs)"
+        + where,
+        params,
+    ).fetchall()
+    for context_id, created_at in missing:
+        store_context_inputs(
+            connection, context_id, created_at, payload_text(connection, context_id)
+        )
 
 
 def _placeholders(values):
@@ -78,7 +88,9 @@ def context_changes(connection, context_ids) -> dict[str, dict]:
     frozen = read()
     if len(frozen) < len(context_ids):
         # Contexts restored or created without a summary: derive them once.
-        store_context_inputs(connection, f"id IN ({_placeholders(context_ids)})", context_ids)
+        backfill_context_inputs(
+            connection, f" AND id IN ({_placeholders(context_ids)})", context_ids
+        )
         connection.commit()
         frozen = read()
     for row in frozen:
