@@ -57,9 +57,9 @@ async function go(page: Page, hash: string) {
 const top = (page: Page) => page.locator("dialog[open]").last();
 const errors = new WeakMap<Page, string[]>();
 let ownerCookies: Parameters<BrowserContext["addCookies"]>[0] = [];
-test.beforeAll(async ({ browser }) => {
+test.beforeAll(async ({ browser }, info) => {
   const context = await browser.newContext({
-    baseURL: "http://127.0.0.1:18084",
+    baseURL: info.project.use.baseURL,
   });
   const page = await context.newPage();
   await page.goto("/");
