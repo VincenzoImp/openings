@@ -145,3 +145,6 @@ and canonical filter metadata, and test failed/empty/malformed responses. The
 its pinned upstream source and local transport changes.
 
 Use the focused checks and manual workflow guidance in [Contributing](../../CONTRIBUTING.md).
+
+The accepted product direction is in the [redesign proposal](proposal-redesign.md);
+the dashboard design and its static prototypes are in [dashboard design](dashboard-design.md).
