@@ -15,6 +15,15 @@ Read [Openings workspace](../openings-workspace/SKILL.md) for transport, schemas
 application history and versions. Keep application progress separate from job
 interest.
 
+## Run and questions
+
+Open a run before the first write: `runs_start` with `workflow: "track-applications"` and the scope; writes made
+with this token then attach to the run. First read the owner's answers given
+since the previous run (`questions_list` with `answered_since`) and act on them.
+Ask each new question as a record tied to its job, application or Career entry
+(`questions_ask`), not only in chat. Close the run with `runs_finish` and the
+stored [run report](../openings-workspace/references/run-report.md). A run asked only to inspect needs no run record.
+
 ## Read the pipeline
 
 List applications by stage with complete pagination. Each row has a derived

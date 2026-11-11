@@ -22,6 +22,7 @@ flowchart LR
 | `backend/openings/workspace.py` | Job identities, triage, notes, application attempts and reporting |
 | `backend/openings/career.py` | Profile, detailed evidence, claims, templates and instructions |
 | `backend/openings/documents.py` | Frozen contexts, document revisions and scoped file transfers |
+| `backend/openings/activity.py`, `actors.py` | Actor of each change, agent runs with reports, questions for the owner, change log |
 | `backend/openings/discovery.py` | Typed sources, schedules and queue operations |
 | `backend/openings/collectors` | Adapter capability catalog, typed options and shared HTTP policy/runtime |
 | `backend/openings/worker.py` | Independent scheduling and acquisition lanes |
@@ -71,6 +72,18 @@ dashboard path, and lists every gap. Read [REST](../user/api.md) and
 - **Career:** entries have structured organizations, nullable partial dates, skill
   tags and ordering. Descriptions are optional; claims contain free reusable text.
   Reserved structured fields are stored once, outside arbitrary metadata.
+- **Attribution:** authentication sets the actor (owner session, named API token
+  or system) in a context variable (`actors.py`) that reaches the shared services
+  through thread offloading; worker threads start with an empty context and
+  record the system. Every write leaves one event with its subject, actor and,
+  for a token with an open run, that run. Payloads hold identifiers, field names
+  and versions, never content. Events of a job or application are deleted with
+  it; the deletion itself stays recorded.
+- **Runs and questions:** a token has one open run (a partial unique index); its
+  writes attach to it. A run without activity is reported as interrupted but
+  only an explicit supersede closes it. A finished run stores its report and
+  change counts. Questions reference a job, application or Career entry with
+  `ON DELETE SET NULL` and keep a label, so they outlive their subject.
 - **Concurrency:** typed inputs, optimistic versions, idempotency keys, foreign
   keys and short transactions protect shared state. Run one application process
   per workspace; database connections do not cross threads. Mutable job and
@@ -86,12 +99,14 @@ memory and releasing SQLite readers before cancellation or thread changes.
 Backups use SQLite's online backup API. A restore preserves
 installation authentication, recent provider request history and later cooldowns.
 
-Workspaces and backups use schema 7. Opening schema 6 upgrades it in one
-transaction, adding application priority, deadline and requirements while keeping
-records and versions. Schema 5 is upgraded through schema 6 in the same
-transaction, removing obsolete derived data and preserving owned records and
-immutable snapshots. Restore accepts schema 7 and upgrades a copy of a schema 5 or
-6 backup. Other historical formats require the matching release.
+Workspaces and backups use schema 8. Opening schema 7 upgrades it in one
+transaction: events gain a subject, an actor and a run, notes gain an author, and
+the `runs` and `questions` tables are added; existing rows keep every value and
+read as "unknown (before 0.17)". Schema 6 is upgraded through schema 7 in the same
+transaction (application priority, deadline and requirements), and schema 5
+through schema 6 (removing obsolete derived data and preserving owned records and
+immutable snapshots). Restore accepts schema 8 and upgrades a copy of a schema 5,
+6 or 7 backup. Other historical formats require the matching release.
 
 ## Acquisition
 

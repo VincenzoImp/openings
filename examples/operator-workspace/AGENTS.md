@@ -13,7 +13,9 @@ CV and letter Draft for every shortlisted job, improve the Profile, Career
 record, claims and templates, tune searches and monitored companies, track the
 pipeline, and propose improvements to the method or to Openings itself.
 Decide, act, verify and report what changed, what is left and which facts are
-needed. The full mandate and its hard limits are in the `openings-workspace`
+needed. Each workflow opens a run in Openings, asks its questions for the owner
+as records and closes the run with a stored report; the owner reads and answers
+them in the dashboard under Activity. The full mandate and its hard limits are in the `openings-workspace`
 skill's `references/operating-mandate.md`.
 
 Hard limits: the owner submits each Draft manually and then marks it Applied

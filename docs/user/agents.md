@@ -86,6 +86,33 @@ Mutating service tools also commonly wrap fields in `value`. For example:
 }
 ```
 
+## Runs, questions and attribution
+
+Every change records its actor: the dashboard session, the API token (its id and
+its name at the time) or the system. Use one token per agent.
+
+1. At the start, read the answers given since the previous run with
+   `questions_list({"value": {"answered_since": "2026-03-01T08:00:00Z"}})`, then
+   call `runs_start({"value": {"workflow": "review-inbox", "scope": "Inbox: 14 jobs"}})`.
+   Writes made with the same token are attached to the open run automatically.
+   A token has one open run: a second start returns `run_open` with the open run
+   in `details.run`; pass `supersede: true` to mark it interrupted and start anew.
+2. Ask the owner with `questions_ask`: `question`, `why`, optional
+   `subject_type` (`job`, `application`, `knowledge`) with `subject_id`, and
+   optional `choices`. The owner answers in the dashboard under **Activity**.
+3. Close with `runs_finish(run_id, value)`: `expected_version`, `summary`,
+   `changes`, `not_done`, `checks`, `limits` and `method`. Openings adds the
+   change counts by kind. `runs_update` stores a progress note meanwhile.
+
+`runs_get` returns a run with its report, questions and a page of its changes;
+`runs_list` filters by status, workflow, token and start time; `events_list`
+reads the change log by run, record, actor or time. `application_history` and
+notes carry the same `actor`. An open run without a write for two hours is
+reported as `interrupted` but stays open; a later write with the same token
+attaches to it again. Changes made before version 0.17 show the actor
+`unknown (before 0.17)`. The skills' [run report reference](../../skills/openings-workspace/references/run-report.md)
+describes the full procedure.
+
 ## Collection through an agent
 
 Use `sources_schemas` to discover valid provider settings, then read the saved

@@ -43,7 +43,7 @@ Use [Review Inbox](../review-inbox/SKILL.md) for job review and
 The shared [workflow API reference](references/workflow-api.md) records the
 queue, application, context, document and file semantics used by both. Shared
 references also define the [employer requirements preflight](references/employer-requirements.md)
-and the [run report](references/run-report.md) used by every workflow. The
+and the [run, report and questions](references/run-report.md) record used by every workflow. The
 [tool reference](references/tool-reference.md) lists step-by-step MCP/REST
 sequences for documents, collection and transfers.
 Read current schemas before constructing requests; the connected service owns

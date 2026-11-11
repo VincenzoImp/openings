@@ -101,9 +101,13 @@ For development commands and release gates, see [Contributing](../../CONTRIBUTIN
 
 ## Upgrade the workspace format
 
-Back up before upgrading. On start, a schema 6 workspace is upgraded to schema 7
-in one transaction: applications gain empty priority, deadline and requirements,
-and jobs, application progress, versions, files and frozen contexts are kept.
-Schema 5 (0.10) is upgraded through schema 6 in the same step. Restore accepts a
-schema 7 backup and upgrades a copy of a schema 5 or 6 backup; the uploaded file
-is not changed. Older formats require their matching release.
+Back up before upgrading. On start, a schema 7 workspace is upgraded to schema 8
+in one transaction: changes gain their actor and run, notes gain an author, and
+the tables for agent runs and questions for the owner are added. Every existing
+record, version, file and frozen context is kept. Changes recorded before the
+upgrade keep their content and show the actor "unknown (before 0.17)". Schema 6
+(applications gain empty priority, deadline and requirements) and schema 5 (0.10)
+are upgraded through the same chain in the same step. Restore accepts a schema 8
+backup and upgrades a copy of a schema 5, 6 or 7 backup; the uploaded file is
+not changed. A schema 8 workspace cannot be opened by an earlier release. Older
+formats require their matching release.

@@ -68,6 +68,27 @@ mechanics, not personal selection or writing policy.
   Missing output or a failed check remains incomplete; do not delete the attempt
   or dismiss the job to conceal a preparation failure.
 
+## Runs and questions
+
+- `runs_start(value)` / `POST /runs` takes `workflow`, `scope`, optional
+  `supersede` and `idempotency_key`, and needs an API token: a dashboard session
+  has no runs (`403 run_actor`). One open run per token: `409 run_open` carries
+  the open run in `details.run`.
+- `runs_update(run_id, value)` / `PATCH /runs/{id}` and
+  `runs_finish(run_id, value)` / `POST /runs/{id}/finish` take the run's
+  `expected_version` and work only for the token that opened the run
+  (`403 run_owner`) while it is open (`409 run_closed`).
+- `runs_get` / `GET /runs/{id}` and `runs_list` / `GET /runs` are open to every
+  caller. `change_counts` is derived from the recorded changes; a finished or
+  superseded run keeps the counts it had when it ended.
+- `questions_ask(value)` / `POST /questions`, `questions_list(value)` /
+  `GET /questions`, `questions_get` / `GET /questions/{id}`,
+  `questions_answer(question_id, value)` / `POST /questions/{id}/answer` and
+  `questions_withdraw(question_id, value)` / `POST /questions/{id}/withdraw`.
+  An answer needs text or one of the listed choices; answering again corrects
+  the answer and renews `answered_at`. Only an open question can be withdrawn.
+- `events_list(value)` / `GET /events` reads the attributed change log.
+
 ## Recover preparation from the database
 
 Use `applications_list(value: {status: "draft", limit: 200, offset: 0})` or

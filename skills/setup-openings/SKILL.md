@@ -48,6 +48,15 @@ checks). Openings does not compile documents. If they are missing, propose a
 user-level TeX distribution such as TinyTeX, install it with the owner's
 agreement, and report PDF preparation as blocked until a compiler works.
 
+## Run and questions
+
+Once the connection works, open a run: `runs_start` with `workflow: "setup-openings"` and the scope; writes made
+with this token then attach to the run. First read the owner's answers given
+since the previous run (`questions_list` with `answered_since`) and act on them.
+Ask each new question as a record tied to its job, application or Career entry
+(`questions_ask`), not only in chat. Close the run with `runs_finish` and the
+stored [run report](../openings-workspace/references/run-report.md).
+
 ## Onboard the owner
 
 To try the workflow before sharing personal data, import the repository's
