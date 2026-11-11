@@ -182,11 +182,10 @@ export function InstructionsDialog({ onClose }: { onClose: () => void }) {
     if (
       await mutate(
         () =>
-          api(
-            "/instructions",
-            "PATCH",
-            version(data, { general: form.get("general") }),
-          ),
+          api("/instructions", "PATCH", {
+            expected_version: data.version,
+            general: form.get("general"),
+          }),
         "General instructions saved.",
       )
     )
