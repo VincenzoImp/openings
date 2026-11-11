@@ -1,136 +1,25 @@
-import {
-  cloneElement,
-  isValidElement,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type ReactNode,
-  type ButtonHTMLAttributes,
-} from "react";
-import {
-  Activity as ActivityIcon,
-  LayoutDashboard,
-  Inbox,
-  BriefcaseBusiness,
-  Building2,
-  UserRound,
-  Files,
-  SlidersHorizontal,
-  Plus,
-  Search,
-  X,
-  Bookmark,
-  Check,
-  ArrowRight,
-  Download,
-  RefreshCw,
-  Clock,
-  FileText,
-  Menu,
-  Moon,
-  Sun,
-  Pencil,
-  Columns3,
-  List,
-  Info,
-  Copy,
-  Trash2,
-  Play,
-  LogOut,
-  Upload,
-  ExternalLink,
-  AlertCircle,
-  Ellipsis,
-} from "lucide-react";
-import { Notification, confirmLeave } from "./state";
-const icons = {
-  overview: LayoutDashboard,
-  activity: ActivityIcon,
-  inbox: Inbox,
-  applications: BriefcaseBusiness,
-  companies: Building2,
-  career: UserRound,
-  templates: Files,
-  settings: SlidersHorizontal,
-  plus: Plus,
-  search: Search,
-  close: X,
-  bookmark: Bookmark,
-  check: Check,
-  arrow: ArrowRight,
-  download: Download,
-  refresh: RefreshCw,
-  clock: Clock,
-  file: FileText,
-  menu: Menu,
-  moon: Moon,
-  sun: Sun,
-  edit: Pencil,
-  board: Columns3,
-  list: List,
-  info: Info,
-  copy: Copy,
-  trash: Trash2,
-  play: Play,
-  logout: LogOut,
-  upload: Upload,
-  external: ExternalLink,
-  error: AlertCircle,
-  more: Ellipsis,
-};
-export type IconName = keyof typeof icons;
-export function Icon({ name }: { name: IconName }) {
-  const I = icons[name];
-  return <I className="icon" size={18} strokeWidth={1.5} aria-hidden="true" />;
-}
-export function Button({
-  children,
-  variant = "",
-  icon,
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: string;
-  icon?: IconName;
-}) {
-  return (
-    <button {...props} className={`btn ${variant} ${props.className || ""}`}>
-      {icon && <Icon name={icon} />} {children}
-    </button>
-  );
-}
-export function Field({
-  label,
-  hint,
-  children,
-  className = "",
-}: {
-  label: string;
-  hint?: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  const id = useId();
-  const control =
-    isValidElement(children) &&
-    typeof children.type === "string" &&
-    ["input", "textarea", "select"].includes(children.type);
-  const child = control
-    ? cloneElement(children as React.ReactElement<Record<string, unknown>>, {
-        id,
-        "aria-describedby": hint ? id + "-hint" : undefined,
-      })
-    : children;
-  return (
-    <div className={`field ${className}`}>
-      <label className="fieldlabel" htmlFor={control ? id : undefined}>
-        {label}
-      </label>
-      {child}
-      {hint && <small id={id + "-hint"}>{hint}</small>}
-    </div>
-  );
-}
+// Components for the pages written before the design system. Buttons, tabs,
+// fields, dialogs and feedback come from ./design; this module keeps the older
+// names and loads the stylesheet those pages still need. A rebuilt page imports
+// from ./design instead.
+import { useState, type ReactNode } from "react";
+import { Button, EmptyState, ErrorBanner, Field } from "./design";
+import "./legacy.css";
+
+export {
+  Button,
+  Dialog,
+  Field,
+  Icon,
+  Loading,
+  Switch,
+  Tabs,
+  lockPageScroll,
+  type IconName,
+} from "./design";
+export const Empty = EmptyState;
+export const ErrorBox = ErrorBanner;
+
 export function Heading({
   title,
   description,
@@ -141,138 +30,13 @@ export function Heading({
   children?: ReactNode;
 }) {
   return (
-    <header className="pagehead">
-      <div>
-        <div className="eyebrow">Your workspace</div>
+    <header className="page-head spread">
+      <div className="grow">
         <h1>{title}</h1>
         <p>{description}</p>
       </div>
-      <div className="actions">{children}</div>
+      {children && <div className="row">{children}</div>}
     </header>
-  );
-}
-export function Tabs({
-  items,
-  value,
-  onChange,
-  label,
-}: {
-  items: { id: string; label: string; count?: number }[];
-  value: string;
-  onChange: (id: string) => void;
-  label: string;
-}) {
-  const tabs = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const revealSelected = () => {
-      const container = tabs.current;
-      const selected = container?.querySelector<HTMLElement>(
-        "[aria-selected=true]",
-      );
-      if (!container || !selected) return;
-      const frame = container.getBoundingClientRect();
-      const target = selected.getBoundingClientRect();
-      if (target.left < frame.left)
-        container.scrollLeft -= frame.left - target.left;
-      else if (target.right > frame.right)
-        container.scrollLeft += target.right - frame.right;
-    };
-    revealSelected();
-    window.addEventListener("resize", revealSelected);
-    return () => window.removeEventListener("resize", revealSelected);
-  }, [value]);
-  return (
-    <div
-      ref={tabs}
-      className="tabs"
-      role="tablist"
-      aria-label={label}
-      onKeyDown={(event) => {
-        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key))
-          return;
-        event.preventDefault();
-        const current = items.findIndex((item) => item.id === value);
-        const next =
-          event.key === "Home"
-            ? 0
-            : event.key === "End"
-              ? items.length - 1
-              : (current +
-                  (event.key === "ArrowRight" ? 1 : -1) +
-                  items.length) %
-                items.length;
-        if (!confirmLeave()) return;
-        onChange(items[next].id);
-        event.currentTarget
-          .querySelectorAll<HTMLButtonElement>("[role=tab]")
-          [next]?.focus();
-      }}
-    >
-      {items.map((item) => (
-        <button
-          type="button"
-          role="tab"
-          aria-selected={item.id === value}
-          tabIndex={item.id === value ? 0 : -1}
-          className={`tab ${item.id === value ? "active" : ""}`}
-          key={item.id}
-          onClick={() => {
-            if (item.id === value || confirmLeave()) onChange(item.id);
-          }}
-        >
-          {item.label}
-          {item.count !== undefined && (
-            <span className="tabcount">{item.count}</span>
-          )}
-        </button>
-      ))}
-    </div>
-  );
-}
-export function Empty({
-  title,
-  children,
-  action,
-}: {
-  title: string;
-  children: ReactNode;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="empty">
-      <h2>{title}</h2>
-      <p>{children}</p>
-      {action && <div className="actions centered">{action}</div>}
-    </div>
-  );
-}
-export function ErrorBox({
-  message,
-  retry,
-}: {
-  message: string;
-  retry?: () => void;
-}) {
-  return (
-    <div className="note error-note" role="alert">
-      <Icon name="error" />
-      <div>
-        {message}
-        {retry && (
-          <button type="button" className="textbutton" onClick={retry}>
-            Try again
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-export function Loading() {
-  return (
-    <div className="loading" role="status">
-      <span className="spinner" />
-      Loading workspace…
-    </div>
   );
 }
 export function LazyDetails({
@@ -295,44 +59,6 @@ export function LazyDetails({
     </details>
   );
 }
-export function Switch({
-  label,
-  checked,
-  onChange,
-  disabled = false,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (value: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      data-dirty-control="true"
-      role="switch"
-      className="switch"
-      aria-label={label}
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-    />
-  );
-}
-let scrollLocks = 0;
-let originalOverflow = "";
-export function lockPageScroll() {
-  if (scrollLocks++ === 0) {
-    originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-  }
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    if (--scrollLocks === 0) document.body.style.overflow = originalOverflow;
-  };
-}
 export function PendingResults({ pending }: { pending: boolean }) {
   return pending ? (
     <p className="loading inline-loading" role="status">
@@ -340,76 +66,6 @@ export function PendingResults({ pending }: { pending: boolean }) {
       Updating results…
     </p>
   ) : null;
-}
-export function Dialog({
-  title,
-  children,
-  onClose,
-  drawer = false,
-  footer,
-  className = "",
-}: {
-  title: string;
-  children: ReactNode;
-  onClose: () => void;
-  drawer?: boolean;
-  footer?: ReactNode;
-  className?: string;
-}) {
-  const close = () => {
-    if (!ref.current || confirmLeave(ref.current)) onClose();
-  };
-  const ref = useRef<HTMLDialogElement>(null),
-    id = useId();
-  useEffect(() => {
-    const last = document.activeElement as HTMLElement | null;
-    ref.current?.showModal();
-    const unlock = lockPageScroll();
-    return () => {
-      unlock();
-      if (last?.isConnected) last.focus({ preventScroll: true });
-    };
-  }, []);
-  return (
-    <dialog
-      ref={ref}
-      className={`${drawer ? "drawer native-dialog" : "modal native-dialog"} ${className}`}
-      aria-labelledby={id}
-      onCancel={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        close();
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          const r = e.currentTarget.getBoundingClientRect();
-          if (
-            e.clientX < r.left ||
-            e.clientX > r.right ||
-            e.clientY < r.top ||
-            e.clientY > r.bottom
-          )
-            close();
-        }
-      }}
-    >
-      <div className={drawer ? "drawerhead" : "modalhead"}>
-        <button
-          className="iconbtn close"
-          aria-label="Close dialog"
-          onClick={close}
-        >
-          <Icon name="close" />
-        </button>
-        <h2 id={id}>{title}</h2>
-      </div>
-      <div className={drawer ? "drawercontent" : "modalcontent"}>
-        {children}
-      </div>
-      {footer && <div className="drawerfoot">{footer}</div>}
-      <Notification inDialog />
-    </dialog>
-  );
 }
 export const stageLabels = {
   draft: "Preparing",
