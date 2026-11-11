@@ -229,7 +229,7 @@ def test_explicit_retry_preserves_progress_and_renews_error_allowance(collection
 
 
 @pytest.mark.parametrize("preview", ["", "Python and SQL preview"])
-def test_partial_refresh_keeps_complete_body_and_records_raw_observation(collection, preview):
+def test_partial_refresh_keeps_complete_body_and_records_the_observation(collection, preview):
     workspace, _ = collection
     source = {"url": "https://example.org/job", "title": "Engineer", "company": "Example"}
     original = workspace.ingest_job(
@@ -239,6 +239,7 @@ def test_partial_refresh_keeps_complete_body_and_records_raw_observation(collect
             "metadata": {"description_complete": True, "description_status": "complete"},
         }
     )
+    first = workspace.db.one("SELECT * FROM postings WHERE job_id=?", (original["id"],))
     refreshed = workspace.ingest_job(
         {
             **source,
@@ -248,8 +249,13 @@ def test_partial_refresh_keeps_complete_body_and_records_raw_observation(collect
     )
     assert refreshed["complete"] and refreshed["posting"] == original["posting"]
     assert refreshed["content_version"] == original["content_version"]
-    observation = workspace.db.one("SELECT payload FROM postings WHERE job_id=?", (original["id"],))
-    assert '"description_complete":false' in observation["payload"]
+    # The same observation records the sighting and that its content differed; the
+    # provider's response itself is not stored.
+    observation = workspace.db.one("SELECT * FROM postings WHERE job_id=?", (original["id"],))
+    assert observation["id"] == first["id"] and observation["payload"] == "{}"
+    assert observation["content_hash"] != first["content_hash"]
+    assert observation["last_seen_at"] > first["last_seen_at"]
+    assert workspace.db.one("SELECT count(*) n FROM events WHERE kind='job_refreshed'")["n"] == 0
 
 
 def test_partial_filter_patch_preserves_other_terms_and_explicit_empty_clears(collection):

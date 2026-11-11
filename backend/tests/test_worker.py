@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from openings import discovery as module
+from openings import discovery as module, retention
 from openings.collectors import policy
 from openings.collectors.policy import ProviderDeferred, ProviderPatch
 from openings.discovery import CollectionWrite, DiscoveryService, SourceCreate, SourcePatch
@@ -64,6 +64,7 @@ def clock(monkeypatch):
     monkeypatch.setattr(module, "datetime", Frozen)
     monkeypatch.setattr(module, "now", clock.stamp)
     monkeypatch.setattr(policy, "now", clock.stamp)
+    monkeypatch.setattr(retention, "now", clock.stamp)
     monkeypatch.setattr(policy.time, "time", lambda: clock.moment.timestamp())
     monkeypatch.setattr(
         policy.time, "sleep", lambda seconds: pytest.fail("The collection lane slept.")
