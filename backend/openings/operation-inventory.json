@@ -2,6 +2,10 @@
   "format": "openings-operation-inventory-v1",
   "status": "verified-logical-operation-map",
   "api_prefix": "/api/v1",
+  "access": {
+    "owner": "Owner authority: the dashboard session or an API token of kind owner. An API token of kind agent is refused with 403 forbidden on REST and MCP.",
+    "default": "Operations without an access field accept the dashboard session and API tokens of either kind."
+  },
   "operations": [
     {
       "id": "workspace.info",
@@ -16,7 +20,8 @@
       "mcp": [
         "workspace_info"
       ],
-      "dashboard": "Settings: workspace information"
+      "dashboard": "Settings: workspace information",
+      "notes": "actor describes the caller; for an API token, token_kind is owner or agent."
     },
     {
       "id": "workspace.capabilities",
@@ -1323,7 +1328,7 @@
         "workspace_backup"
       ],
       "dashboard": "Settings: download backup",
-      "notes": "MCP obtains a short-lived scoped HTTP grant; bytes stay outside the tool response."
+      "notes": "MCP obtains a short-lived scoped HTTP grant; bytes stay outside the tool response. A backup taken with an agent token omits the owner password hash, the session secret and API tokens; it restores completely because restore keeps the destination's authentication."
     },
     {
       "id": "backup.restore",
@@ -1339,7 +1344,8 @@
         "workspace_restore_upload"
       ],
       "dashboard": "Settings: restore backup",
-      "notes": "MCP obtains a scoped raw HTTP upload grant. Validated restore preserves installation authentication; no arbitrary SQL endpoint. Recent destination provider HTTP usage and later cooldowns survive older-backup restore; saved policy settings are restored."
+      "notes": "MCP obtains a scoped raw HTTP upload grant. Validated restore preserves installation authentication; no arbitrary SQL endpoint. Recent destination provider HTTP usage and later cooldowns survive older-backup restore; saved policy settings are restored.",
+      "access": "owner"
     },
     {
       "id": "events.list",
@@ -1479,7 +1485,7 @@
         "questions_ask"
       ],
       "dashboard": "Activity: Questions (answer only)",
-      "notes": "Agents ask; the dashboard answers and withdraws."
+      "notes": "Agents ask; the dashboard answers and withdraws. An agent token may withdraw a question but not answer one."
     },
     {
       "id": "questions.answer",
@@ -1494,7 +1500,9 @@
       "mcp": [
         "questions_answer"
       ],
-      "dashboard": "Activity: Questions: answer"
+      "dashboard": "Activity: Questions: answer",
+      "notes": "An answer is the owner's. An owner token records it only when the owner gave it.",
+      "access": "owner"
     },
     {
       "id": "questions.withdraw",
@@ -1514,7 +1522,7 @@
     {
       "id": "tokens.list",
       "group": "Workspace access and portability",
-      "operation": "List owner API token metadata",
+      "operation": "List API token metadata and kinds",
       "rest": [
         {
           "method": "GET",
@@ -1524,13 +1532,14 @@
       "mcp": [
         "tokens_list"
       ],
-      "dashboard": "Settings: agent tokens",
-      "notes": "Token secrets are not returned after creation."
+      "dashboard": "Settings: access tokens with their kind",
+      "notes": "Token secrets are not returned after creation. Each token has a kind: owner (full access) or agent.",
+      "access": "owner"
     },
     {
       "id": "tokens.create",
       "group": "Workspace access and portability",
-      "operation": "Create a named owner API token",
+      "operation": "Create a named owner or agent API token",
       "rest": [
         {
           "method": "POST",
@@ -1540,13 +1549,14 @@
       "mcp": [
         "token_create"
       ],
-      "dashboard": "Settings: create agent token",
-      "notes": "Secret is returned once and has owner-level authority."
+      "dashboard": "Settings: create access token (owner or agent)",
+      "notes": "kind is owner (default, full access) or agent (scoped). The secret is returned once. The dashboard form defaults to agent.",
+      "access": "owner"
     },
     {
       "id": "tokens.revoke",
       "group": "Workspace access and portability",
-      "operation": "Revoke an owner API token",
+      "operation": "Revoke an API token",
       "rest": [
         {
           "method": "DELETE",
@@ -1556,8 +1566,9 @@
       "mcp": [
         "token_revoke"
       ],
-      "dashboard": "Settings: revoke agent token",
-      "notes": "May revoke the caller token; subsequent requests require another valid credential."
+      "dashboard": "Settings: revoke access token",
+      "notes": "May revoke the caller token; subsequent requests require another valid credential.",
+      "access": "owner"
     },
     {
       "id": "password.update",
@@ -1573,7 +1584,8 @@
         "owner_password_update"
       ],
       "dashboard": "Settings: change password",
-      "notes": "Retains API tokens; cookie caller must log in again."
+      "notes": "Retains API tokens; cookie caller must log in again.",
+      "access": "owner"
     },
     {
       "id": "sources.schemas",

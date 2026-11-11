@@ -326,11 +326,24 @@ export interface CollectionRun {
   task_ids: string[];
   tasks?: BackgroundTask[];
 }
+export type TokenKind = "owner" | "agent";
+export const tokenKinds: Record<TokenKind, string> = {
+  agent: "Agent",
+  owner: "Owner",
+};
 export interface Actor {
   kind: "owner" | "token" | "system" | "unknown";
   id: string | null;
   name: string | null;
+  token_kind?: TokenKind | null;
   label: string;
+}
+/** Who made a change; an API token is shown with its kind. */
+export function actorLabel(actor?: Actor | null) {
+  if (!actor) return "";
+  return actor.kind === "token" && actor.token_kind
+    ? `${actor.label} (${actor.token_kind} token)`
+    : actor.label;
 }
 export interface Activity {
   id?: string;

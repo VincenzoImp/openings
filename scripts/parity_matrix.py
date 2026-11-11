@@ -262,6 +262,13 @@ def build():
     unknown_notes = set(notes["operations"]) - {entry["id"] for entry in inventory["operations"]}
     if unknown_notes:
         raise SystemExit(f"parity-notes.json names unknown operations: {sorted(unknown_notes)}")
+    unknown_access = {
+        entry["id"]
+        for entry in inventory["operations"]
+        if entry.get("access", "owner") not in inventory["access"]
+    }
+    if unknown_access:
+        raise SystemExit(f"The inventory has unknown access levels: {sorted(unknown_access)}")
 
     rows = []
     for entry in inventory["operations"]:
@@ -324,6 +331,9 @@ def build():
         "- Input comparisons use names from OpenAPI and the MCP tool schemas. A name the",
         "  dashboard files never mention cannot be set there; a mentioned name may still",
         "  lack a control, so those lists are lower bounds.",
+        "- **Access** is `owner` for an operation that needs owner authority (the",
+        "  dashboard session or an API token of kind `owner`) and refuses an API token",
+        "  of kind `agent` with `403 forbidden`; `any` accepts both kinds.",
         "",
         "## Summary",
         "",
@@ -336,11 +346,13 @@ def build():
     unmentioned = [row for row in rows if row["unmentioned"]]
     different = [row for row in rows if row["rest_only"] or row["mcp_only"]]
     one_sided = [row for row in rows if not row["entry"]["rest"] or not row["entry"]["mcp"]]
+    owner_only = [row for row in rows if row["entry"].get("access") == "owner"]
     out += [
         "| Measure | Operations |",
         "|---|---|",
         f"| Logical operations in the inventory | {total} |",
         f"| Without REST or without MCP | {len(one_sided)} |",
+        f"| Owner only (refused for an agent token) | {len(owner_only)} |",
         f"| Without a working dashboard path | {len(unreachable)} |",
         f"| Reached only through another operation | {len(indirect)} |",
         f"| With inputs the dashboard never mentions | {len(unmentioned)} |",
@@ -436,6 +448,21 @@ def build():
         )
     out += [
         "",
+        "### Owner-only operations",
+        "",
+        "Operations that need owner authority. An API token of kind `agent` is refused",
+        "with `403 forbidden` on REST and MCP; `test_interfaces.py` checks each one.",
+        "",
+        "| Operation | REST | MCP | Remark |",
+        "|---|---|---|---|",
+    ]
+    for row in owner_only:
+        entry = row["entry"]
+        out.append(
+            f"| `{entry['id']}` | {rest_cell(entry)} | {mcp_cell(entry)} | {entry.get('notes') or '—'} |"
+        )
+    out += [
+        "",
         "### Dashboard actions outside the logical operations",
         "",
         "REST routes the dashboard calls that the inventory records as transport",
@@ -469,8 +496,8 @@ def build():
             "",
             f"### {group}",
             "",
-            "| Operation | REST | MCP | Dashboard location | Dashboard code | Editor | E2E |",
-            "|---|---|---|---|---|---|---|",
+            "| Operation | REST | MCP | Access | Dashboard location | Dashboard code | Editor | E2E |",
+            "|---|---|---|---|---|---|---|---|",
         ]
         for row in members:
             entry = row["entry"]
@@ -481,11 +508,12 @@ def build():
             if row["via"]:
                 code = "via " + ", ".join(f"`{name}`" for name in row["via"])
             out.append(
-                "| `{}`<br>{} | {} | {} | {} | {} | {} | {} |".format(
+                "| `{}`<br>{} | {} | {} | {} | {} | {} | {} | {} |".format(
                     entry["id"],
                     entry["operation"],
                     rest_cell(entry),
                     mcp_cell(entry),
+                    entry.get("access", "any"),
                     entry["dashboard"],
                     code,
                     editor,

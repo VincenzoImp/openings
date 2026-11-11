@@ -979,7 +979,7 @@ class DocumentService:
                     conn.execute(
                         "UPDATE documents SET version=version+1 WHERE id=?", (current["owner_id"],)
                     )
-                uploader = from_columns(*(current.get("actor") or (None, None, None)))
+                uploader = from_columns(*(current.get("actor") or ()))
                 self._file_event(
                     conn,
                     "file_uploaded",

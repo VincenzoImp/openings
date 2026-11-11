@@ -1,5 +1,6 @@
 import { type FormEvent, type ReactNode } from "react";
 import {
+  actorLabel,
   api,
   formatTime,
   type Activity,
@@ -166,7 +167,7 @@ function Changes({
               )}
             </p>
             <time>
-              {formatTime(event.created_at)} · {event.actor?.label}
+              {formatTime(event.created_at)} · {actorLabel(event.actor)}
               {event.run_id && onRun && (
                 <>
                   {" · "}
@@ -189,7 +190,8 @@ function Changes({
 function Asked({ question, onRun }: { question: OwnerQuestion; onRun: Open }) {
   return (
     <p className="muted smalltext">
-      Asked by {question.asked_by.label} · {formatTime(question.created_at)}
+      Asked by {actorLabel(question.asked_by)} ·{" "}
+      {formatTime(question.created_at)}
       {question.run_id && (
         <>
           {" · "}
@@ -321,7 +323,7 @@ function QuestionCard({
                   .join(" · ")}
               </strong>
               <br />
-              Answered by {question.answered_by?.label} ·{" "}
+              Answered by {actorLabel(question.answered_by)} ·{" "}
               {formatTime(question.answered_at || undefined)}
             </div>
           </div>
@@ -333,7 +335,7 @@ function QuestionCard({
       )}
       {question.state === "withdrawn" && (
         <p className="muted">
-          Withdrawn by {question.withdrawn_by?.label} ·{" "}
+          Withdrawn by {actorLabel(question.withdrawn_by)} ·{" "}
           {formatTime(question.withdrawn_at || undefined)}
         </p>
       )}
@@ -462,7 +464,7 @@ function Runs({ onRun }: { onRun: Open }) {
               <span className="run-row-meta">
                 <RunStatusTag run={run} />
                 <span className="muted smalltext">
-                  {run.actor.label} · {formatTime(run.started_at)} ·{" "}
+                  {actorLabel(run.actor)} · {formatTime(run.started_at)} ·{" "}
                   {run.changes_total}{" "}
                   {run.changes_total === 1 ? "change" : "changes"}
                   {run.questions_count
@@ -541,7 +543,8 @@ function RunDetail({
                 <div>
                   <h2>{run.workflow}</h2>
                   <p className="muted">
-                    {run.actor.label} · started {formatTime(run.started_at)}
+                    {actorLabel(run.actor)} · started{" "}
+                    {formatTime(run.started_at)}
                     {run.ended_at
                       ? ` · ended ${formatTime(run.ended_at)}`
                       : ` · last activity ${formatTime(run.last_activity_at)}`}

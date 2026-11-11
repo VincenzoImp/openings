@@ -6,7 +6,7 @@ import math
 import re
 from urllib.parse import urlsplit
 
-from .actors import current_actor, describe_row
+from .actors import current_actor, pop_actor
 from .common import (
     check_version,
     new_id,
@@ -127,7 +127,7 @@ class Workspace:
                 else (None, None)
             )
         conn.execute(
-            "INSERT INTO events(id,job_id,application_id,kind,payload,created_at,subject_type,subject_id,actor_kind,actor_id,actor_name,run_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO events(id,job_id,application_id,kind,payload,created_at,subject_type,subject_id,actor_kind,actor_id,actor_name,actor_token_kind,run_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 new_id(),
                 job_id,
@@ -168,9 +168,7 @@ class Workspace:
                 else (None, None)
             )
         item["subject"] = {"type": kind, "id": identifier}
-        item["actor"] = describe_row(item)
-        for key in ("actor_kind", "actor_id", "actor_name"):
-            item.pop(key, None)
+        item["actor"] = pop_actor(item)
         return item
 
     @staticmethod
@@ -178,9 +176,7 @@ class Workspace:
         if row is None:
             missing("Note")
         row = dict(row)
-        row["author"] = describe_row(row, "author")
-        for key in ("author_kind", "author_id", "author_name"):
-            row.pop(key)
+        row["author"] = pop_actor(row, "author")
         return row
 
     @staticmethod
@@ -847,7 +843,7 @@ class Workspace:
         note_id, stamp = new_id(), now()
         with self.db.transaction() as c:
             c.execute(
-                "INSERT INTO notes(id,job_id,application_id,body,created_at,updated_at,author_kind,author_id,author_name) VALUES(?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO notes(id,job_id,application_id,body,created_at,updated_at,author_kind,author_id,author_name,author_token_kind) VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (
                     note_id,
                     job_id,
@@ -902,9 +898,8 @@ class Workspace:
     @staticmethod
     def _ready_by(row):
         """Replace the stored actor columns with who marked the application ready."""
-        row["ready_by"] = describe_row(row, "ready_by") if row["ready_at"] else None
-        for key in ("ready_by_kind", "ready_by_id", "ready_by_name"):
-            row.pop(key)
+        marked_by = pop_actor(row, "ready_by")
+        row["ready_by"] = marked_by if row["ready_at"] else None
         return row
 
     @staticmethod
@@ -996,6 +991,7 @@ class Workspace:
             projection = "app.id,app.job_id,app.status,app.outcome,app.version,app.applied_at,app.created_at,app.updated_at,"
             projection += "app.priority,app.deadline,"
             projection += "app.ready_at,app.ready_by_kind,app.ready_by_id,app.ready_by_name,"
+            projection += "app.ready_by_token_kind,"
             projection += f"{READINESS_SQL} AS readiness,{REQUIREMENT_COUNTS_SQL},"
             projection += (
                 "(SELECT count(*) FROM documents WHERE application_id=app.id) AS documents_count,"
@@ -1371,7 +1367,7 @@ class Workspace:
                     )
                 stamp = now()
                 c.execute(
-                    "UPDATE applications SET ready_at=?,ready_by_kind=?,ready_by_id=?,ready_by_name=?,version=version+1,updated_at=? WHERE id=?",
+                    "UPDATE applications SET ready_at=?,ready_by_kind=?,ready_by_id=?,ready_by_name=?,ready_by_token_kind=?,version=version+1,updated_at=? WHERE id=?",
                     (stamp, *current_actor().columns(), stamp, application_id),
                 )
                 self.event("application_marked_ready", row["job_id"], application_id, conn=c)
@@ -1389,7 +1385,7 @@ class Workspace:
         if row is None:
             return False
         conn.execute(
-            "UPDATE applications SET ready_at=NULL,ready_by_kind=NULL,ready_by_id=NULL,ready_by_name=NULL,version=version+1,updated_at=? WHERE id=?",
+            "UPDATE applications SET ready_at=NULL,ready_by_kind=NULL,ready_by_id=NULL,ready_by_name=NULL,ready_by_token_kind=NULL,version=version+1,updated_at=? WHERE id=?",
             (now(), application_id),
         )
         self.event(

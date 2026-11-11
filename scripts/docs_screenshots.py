@@ -680,7 +680,8 @@ def main():
     try:
         app = create_app(directory / "workspace.sqlite", start_worker=False)
         app.state.auth.setup(PASSWORD)
-        token = app.state.auth.create_token("Agent on laptop")["token"]
+        app.state.auth.create_token("Backup script")  # an owner token, for the token list
+        token = app.state.auth.create_token("Agent on laptop", "agent")["token"]
         port = free_port(args.port)
         base = f"http://127.0.0.1:{port}"
         server = uvicorn.Server(

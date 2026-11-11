@@ -56,7 +56,8 @@ dismissed are not preference signals.
 
 Keep personal evidence, documents and secrets out of Git; Openings is
 authoritative. Use the ignored `.local/` directory for temporary files and an
-optional resume note. `OPENINGS_TOKEN` lives only in the client's environment.
+optional resume note. `OPENINGS_TOKEN` lives only in the client's environment;
+use an agent token, which has no owner authority (password, tokens, restore).
 
 - `.agents/mcp.json`: the canonical MCP server definition.
 - `.agents/scripts/sync.py`: sets the server URL and generates client adapters

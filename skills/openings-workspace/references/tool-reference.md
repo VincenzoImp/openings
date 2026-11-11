@@ -138,15 +138,17 @@ reported as `interrupted`; it stays open, and a later write revives it.
 `idempotency_key`. `questions_list` filters by `state` (`open`, `answered`,
 `withdrawn`), subject, `run_id` and `answered_since`, which returns answers
 given at or after a time, oldest first. `questions_answer` and
-`questions_withdraw` take the question's current `expected_version`. A question
+`questions_withdraw` take the question's current `expected_version`;
+`questions_answer` needs owner authority and returns `403 forbidden` to an agent
+token. A question
 outlives its subject: after the job, application or entry is deleted,
 `subject.id` is null, `subject.deleted` is true and `subject.label` keeps the
 name.
 
 `events_list` reads the change log, newest first, by `run_id`, `job_id`,
 `application_id`, `subject_type`/`subject_id`, `actor` (`owner`, `token`,
-`system`, `unknown`), `kind` or time. Every entry carries `actor`, `run_id` and
-`subject`; `application_history` returns the same fields. Changes recorded
+`system`, `unknown`), `kind` or time. Every entry carries `actor` (for a token,
+with `token_kind` `owner` or `agent`), `run_id` and `subject`; `application_history` returns the same fields. Changes recorded
 before version 0.17 have the actor `unknown (before 0.17)`. Payloads hold
 identifiers, changed field names and versions, never record content. Deleting an
 application or forgetting a job removes that record's own history and leaves one
@@ -162,5 +164,10 @@ values. Career dates also accept null to clear them.
 `workspace_export` returns readable JSON without file bytes. Scoped
 `workspace_backup` and `workspace_restore_upload` move a portable SQLite snapshot
 when requested. Restore replaces workspace data while retaining destination
-authentication, recent provider request history and later cooldowns. Keep transfer
+authentication, recent provider request history and later cooldowns.
+`workspace_restore_upload`, `tokens_list`, `token_create`, `token_revoke` and
+`owner_password_update` need owner authority: an agent token gets
+`403 forbidden`. A backup downloaded with an agent token omits the owner
+password hash, the session secret and the API tokens, and still restores
+completely. Keep transfer
 headers, credentials and personal data out of logs and repository examples.
