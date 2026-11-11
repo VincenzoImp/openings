@@ -20,6 +20,7 @@ import {
   JobsPage,
   Overlay as OverlayFrame,
   OverviewPage,
+  PolicyPage,
   Screen,
   SettingsPage,
   TemplatesPage,
@@ -34,7 +35,14 @@ import {
   type Density,
   type Theme,
 } from "./preferences";
-import { HOME, SCREENS, canonicalHash, overlayOf, routeOf } from "./routes";
+import {
+  HOME,
+  REBUILT,
+  SCREENS,
+  canonicalHash,
+  overlayOf,
+  routeOf,
+} from "./routes";
 
 type Overlay =
   { kind: "add" } | { kind: "job" | "application"; id: string } | null;
@@ -283,7 +291,7 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
             inert={more}
           >
             {/* The old pages bring their own stylesheet, scoped to .legacy. */}
-            <div className="legacy">
+            <div className={REBUILT.includes(route) ? "screen" : "legacy"}>
               <Screen route={route}>
                 {route === "overview" ? (
                   <OverviewPage
@@ -309,6 +317,8 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
                   <CollectionPage />
                 ) : route === "career" ? (
                   <CareerPage />
+                ) : route === "policy" ? (
+                  <PolicyPage />
                 ) : route === "templates" ? (
                   <TemplatesPage />
                 ) : (
