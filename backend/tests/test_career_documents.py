@@ -5,10 +5,10 @@ import json
 import sqlite3
 from unittest.mock import patch
 
+import pytest
 from fastapi import APIRouter, FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
-import pytest
 from pydantic import ValidationError
 
 from openings.career import (
@@ -113,7 +113,7 @@ def upload(
 
 
 def test_relevant_profile_edits_are_distinct_from_contacts_and_templates(workspace):
-    ws, career, _, _, evidence, _, template, _ = workspace
+    _, career, _, _, evidence, _, template, _ = workspace
     profile = career.get_profile()
     changed = career.update_profile(
         ProfileUpdate(expected_version=profile["version"], email="alex@example.test")

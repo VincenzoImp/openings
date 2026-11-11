@@ -9,20 +9,20 @@ import argparse
 import asyncio
 import hashlib
 import json
-from pathlib import Path
 import socket
 import sqlite3
 import subprocess
 import tempfile
 import threading
 import time
+from pathlib import Path
 from urllib.parse import urljoin
 
-from fastapi import APIRouter
 import httpx
+import uvicorn
+from fastapi import APIRouter
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
-import uvicorn
 
 from openings.app import create_app
 
@@ -43,7 +43,8 @@ async def exercise(base, token, folder, tectonic):
             checks["rest_requires_owner"] = (
                 await anonymous.get(base + "/api/v1/career/profile")
             ).status_code == 401
-        async with streamablehttp_client(base + "/mcp/", headers=headers) as (read, write, _):
+        # Kept nested: merging the two contexts would re-indent the whole driver body.
+        async with streamablehttp_client(base + "/mcp/", headers=headers) as (read, write, _):  # noqa: SIM117
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 tools = await session.list_tools()
@@ -176,7 +177,7 @@ async def exercise(base, token, folder, tectonic):
                 )
                 source = folder / "application.tex"
                 source.write_text(context["payload"]["templates"][0]["tex"])
-                subprocess.run(
+                subprocess.run(  # noqa: ASYNC221 - sequential manual driver
                     [tectonic, "--untrusted", "--outdir", str(folder), str(source)],
                     check=True,
                     stdout=subprocess.PIPE,

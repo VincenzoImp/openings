@@ -30,12 +30,11 @@ def test_only_one_open_attempt_survives_concurrent_creation_and_reopening(tmp_pa
     assert conflict.code == "application_in_progress"
     assert conflict.details == {"application_id": first["id"], "status": "draft"}
     assert workspace.get_job(job["id"])["triage"] == "saved"
-    with pytest.raises(sqlite3.IntegrityError):
-        with workspace.db.transaction() as connection:
-            connection.execute(
-                "INSERT INTO applications(id,job_id,created_at,updated_at) VALUES('bypass',?,?,?)",
-                (job["id"], first["created_at"], first["created_at"]),
-            )
+    with pytest.raises(sqlite3.IntegrityError), workspace.db.transaction() as connection:
+        connection.execute(
+            "INSERT INTO applications(id,job_id,created_at,updated_at) VALUES('bypass',?,?,?)",
+            (job["id"], first["created_at"], first["created_at"]),
+        )
 
     first = workspace.update_application(
         first["id"],

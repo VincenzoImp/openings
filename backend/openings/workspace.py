@@ -1,8 +1,8 @@
 """Core archive operations, shared by the dashboard, REST and MCP."""
 
 import hashlib
-import math
 import json
+import math
 import re
 from urllib.parse import urlsplit
 
@@ -12,22 +12,22 @@ from .common import (
     now,
 )
 from .db import Database, decode_record, encode
+from .duplicates import candidate_groups, posting_fingerprint, posting_similarity
 from .errors import DomainError, conflict, missing
+from .identities import job_identities, normalize_url
 from .models import (
     ApplicationBulk,
     ApplicationInput,
     ApplicationPatch,
+    DuplicateQuery,
+    JobBulk,
     JobInput,
     JobPatch,
+    JobResolve,
     NoteInput,
     NotePatch,
-    JobBulk,
-    JobResolve,
-    DuplicateQuery,
 )
-from .duplicates import candidate_groups, posting_fingerprint, posting_similarity
 from .posting import posting_complete, posting_complete_sql
-from .identities import job_identities, normalize_url
 from .staleness import application_staleness
 
 # Current revision leaves only; a parent's PDF or approval never counts for its child.

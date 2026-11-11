@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 
 from openings.app import create_app
 from openings.db import encode
-
 from test_mcp_contract import call, error_body
 
 PASSWORD = "synthetic-password"
@@ -83,7 +82,7 @@ def populated(tmp_path):
 
 
 def test_lists_default_to_compact_records_with_full_opt_in(tmp_path):
-    app, headers, jobs, application = populated(tmp_path)
+    app, headers, _jobs, _application = populated(tmp_path)
     with TestClient(app, base_url="http://localhost:8080") as client:
         rest = client.get("/api/v1/jobs", headers=headers).json()
         mcp = structured(call(client, headers, "jobs_search", {}))
@@ -191,7 +190,7 @@ def test_job_and_application_mutations_return_compact_jobs(tmp_path):
 
 
 def test_settings_conflicts_report_current_version(tmp_path):
-    app, headers, jobs, application = populated(tmp_path)
+    app, headers, jobs, _application = populated(tmp_path)
     with TestClient(app, base_url="http://localhost:8080") as client:
         profile = client.get("/api/v1/career/profile", headers=headers).json()
         instructions = client.get("/api/v1/instructions", headers=headers).json()
@@ -231,7 +230,7 @@ def test_settings_conflicts_report_current_version(tmp_path):
 
 
 def test_logout_revokes_browser_sessions_but_keeps_api_tokens(tmp_path):
-    app, headers, jobs, application = populated(tmp_path)
+    app, headers, _jobs, _application = populated(tmp_path)
     with TestClient(app, base_url="http://localhost:8080") as client:
         login = client.post("/api/v1/auth/login", json={"password": PASSWORD})
         assert login.status_code == 200

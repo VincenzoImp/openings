@@ -1,26 +1,27 @@
-from fastapi import APIRouter, Query, Request
+import os
 from typing import Annotated
-from . import __version__
+
+from fastapi import APIRouter, Query, Request
 from mcp.server.fastmcp import Context
 from mcp.types import ToolAnnotations
-import os
 
+from . import __version__
 from .models import (
+    ApplicationBulk,
     ApplicationInput,
     ApplicationPatch,
+    ApplicationQuery,
+    DuplicateQuery,
+    JobBulk,
     JobInput,
     JobPatch,
+    JobQuery,
+    JobResolve,
     MergeInput,
     NoteInput,
-    TriageInput,
-    JobQuery,
-    ApplicationQuery,
-    PeriodQuery,
-    JobBulk,
     NotePatch,
-    ApplicationBulk,
-    JobResolve,
-    DuplicateQuery,
+    PeriodQuery,
+    TriageInput,
 )
 
 
