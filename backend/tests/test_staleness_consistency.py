@@ -105,7 +105,7 @@ async def test_review_refuses_source_mismatch_unless_explicitly_allowed(tmp_path
         mcp = await app.state.mcp.call_tool(
             "documents_consistency", {"document_id": stale_text["id"]}
         )
-        assert json.loads(mcp[0].text) == report
+        assert json.loads(mcp.content[0].text) == report
 
         refused = client.post(
             f"/api/v1/documents/{stale_text['id']}/review",
@@ -267,12 +267,12 @@ async def test_staleness_reports_changed_inputs_without_rewriting_contexts(tmp_p
     )
     assert documents.application_staleness(applications[0]["id"])["stale"] is False
     result = await app.state.mcp.call_tool("applications_staleness", {})
-    listed = json.loads(result[0].text)
+    listed = json.loads(result.content[0].text)
     assert [item["application_id"] for item in listed["items"]] == [applications[1]["id"]]
     single = await app.state.mcp.call_tool(
         "application_staleness", {"application_id": applications[1]["id"]}
     )
-    assert json.loads(single[0].text)["inputs"] == report["inputs"]
+    assert json.loads(single.content[0].text)["inputs"] == report["inputs"]
 
     entry = career.get_knowledge(entry["id"])
     career.delete_knowledge(entry["id"], entry["version"])

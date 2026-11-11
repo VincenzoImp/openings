@@ -98,7 +98,7 @@ async def test_rest_mcp_queues_filter_before_totals_facets_and_pagination(tmp_pa
                 }
             },
         )
-        structured = mcp[1] if isinstance(mcp, tuple) else json.loads(mcp[0].text)
+        structured = json.loads(mcp.content[0].text)
         assert structured == result
         job = result["items"][0]
         stale = client.post(

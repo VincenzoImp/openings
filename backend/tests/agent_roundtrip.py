@@ -19,19 +19,20 @@ from pathlib import Path
 from urllib.parse import urljoin
 
 import httpx
+import httpx2
 import uvicorn
 from fastapi import APIRouter
-from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+from mcp import Client
+from mcp.client.streamable_http import streamable_http_client
 
 from openings.app import create_app
 
 
 def unpack(result):
-    if result.isError:
+    if result.is_error:
         raise RuntimeError(result.content[0].text)
-    if result.structuredContent is not None:
-        return result.structuredContent
+    if result.structured_content is not None:
+        return result.structured_content
     return json.loads(next(item.text for item in result.content if item.type == "text"))
 
 
@@ -44,9 +45,11 @@ async def exercise(base, token, folder, tectonic):
                 await anonymous.get(base + "/api/v1/career/profile")
             ).status_code == 401
         # Kept nested: merging the two contexts would re-indent the whole driver body.
-        async with streamablehttp_client(base + "/mcp/", headers=headers) as (read, write, _):  # noqa: SIM117
-            async with ClientSession(read, write) as session:
-                await session.initialize()
+        # The SDK client speaks httpx2; it takes its headers from the client it is given.
+        async with httpx2.AsyncClient(headers=headers, timeout=30) as agent_http:  # noqa: SIM117
+            async with Client(
+                streamable_http_client(base + "/mcp/", http_client=agent_http)
+            ) as session:
                 tools = await session.list_tools()
                 names = {tool.name for tool in tools.tools}
                 by_name = {tool.name: tool for tool in tools.tools}
@@ -57,11 +60,11 @@ async def exercise(base, token, folder, tectonic):
                     "files_reserve_upload",
                 } <= names
                 checks["career_file_tool_annotations"] = (
-                    by_name["knowledge_list"].annotations.readOnlyHint
-                    and by_name["documents_get"].annotations.readOnlyHint
-                    and by_name["documents_delete"].annotations.destructiveHint
-                    and not by_name["files_reserve_upload"].annotations.readOnlyHint
-                    and not by_name["files_reserve_upload"].annotations.openWorldHint
+                    by_name["knowledge_list"].annotations.read_only_hint
+                    and by_name["documents_get"].annotations.read_only_hint
+                    and by_name["documents_delete"].annotations.destructive_hint
+                    and not by_name["files_reserve_upload"].annotations.read_only_hint
+                    and not by_name["files_reserve_upload"].annotations.open_world_hint
                 )
                 profile = unpack(await session.call_tool("career_get_profile", {}))
                 unpack(

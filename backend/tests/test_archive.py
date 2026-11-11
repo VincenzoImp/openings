@@ -103,7 +103,7 @@ async def test_completeness_filter_matches_overview_and_page_totals_on_rest_and_
             )
         assert client.get("/api/v1/jobs?complete=invalid").status_code == 422
     result = await app.state.mcp.call_tool("jobs_search", {"value": {"complete": False}})
-    structured = json.loads(result[0].text)
+    structured = json.loads(result.content[0].text)
     assert structured["total"] == 3
     assert {row["id"] for row in structured["items"]} == missing_ids
 
@@ -125,7 +125,7 @@ async def test_active_job_filter_matches_attention_counts_without_dismissed_jobs
     result = await app.state.mcp.call_tool(
         "jobs_search", {"value": {"triage": "active", "complete": False}}
     )
-    assert json.loads(result[0].text)["total"] == 2
+    assert json.loads(result.content[0].text)["total"] == 2
 
 
 def test_attempts_and_recorded_funnel_are_separate_from_job_triage(workspace):

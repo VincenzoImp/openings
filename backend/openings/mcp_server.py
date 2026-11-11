@@ -1,12 +1,15 @@
-"""FastMCP server that matches REST threading and error contracts."""
+"""MCP server that matches REST threading and error contracts."""
 
-import functools
 import json
 import sqlite3
 
-import anyio.to_thread
-from mcp.server.fastmcp import FastMCP
-from mcp.server.fastmcp.exceptions import ToolError
+from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import (
+    ResourceError,
+    ResourceNotFoundError,
+    ToolError,
+    UnexpectedResourceError,
+)
 from pydantic import ValidationError
 
 from .errors import DomainError
@@ -31,24 +34,12 @@ def structured_error(error: BaseException) -> DomainError | None:
     return None
 
 
-class OpeningsMCP(FastMCP):
-    """Run sync tools off the event loop and return REST-shaped error bodies."""
+class OpeningsMCP(MCPServer):
+    """Return REST-shaped error bodies; the SDK runs sync tools in worker threads."""
 
-    def add_tool(self, fn, *args, **kwargs):
-        super().add_tool(fn, *args, **kwargs)
-        tool = self._tool_manager.get_tool(kwargs.get("name") or fn.__name__)
-        if tool is not None and not tool.is_async:
-            sync = tool.fn
-
-            @functools.wraps(sync)
-            async def threaded(**arguments):
-                return await anyio.to_thread.run_sync(functools.partial(sync, **arguments))
-
-            tool.fn, tool.is_async = threaded, True
-
-    async def call_tool(self, name, arguments):
+    async def call_tool(self, name, arguments, context=None):
         try:
-            return await super().call_tool(name, arguments)
+            return await super().call_tool(name, arguments, context)
         except ToolError as error:
             domain = structured_error(error.__cause__)
             if domain is None:
@@ -60,3 +51,13 @@ class OpeningsMCP(FastMCP):
                 "details": domain.details,
             }
             raise ToolError(json.dumps({"error": body}, default=str)) from error.__cause__
+
+    async def read_resource(self, uri, context=None):
+        try:
+            return await super().read_resource(uri, context)
+        except UnexpectedResourceError as error:
+            domain = structured_error(error.__cause__)
+            if domain is None:
+                raise
+            kind = ResourceNotFoundError if domain.status == 404 else ResourceError
+            raise kind(domain.message) from error.__cause__
