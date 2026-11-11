@@ -442,7 +442,6 @@ def create_app(database=None, start_worker=True):
                 "knowledge": ["metadata", "dates", "skills"],
                 "claims": ["metadata"],
                 "templates": ["rules"],
-                "contexts": ["payload"],
                 "documents": ["content"],
                 "sources": ["config", "schedule"],
                 "providers": ["policy", "runtime"],
@@ -470,8 +469,13 @@ def create_app(database=None, start_worker=True):
                 for table in tables:
                     yield ',"' + table + '":['
                     first = True
-                    for row in conn.execute("SELECT * FROM " + table):
+                    # Context files are served from snapshot parts; payloads are rebuilt.
+                    source = "all_files" if table == "files" else table
+                    for row in conn.execute("SELECT * FROM " + source):
                         item = dict(row)
+                        if table == "contexts":
+                            item = DocumentService.context_record(conn, row)
+                            del item["resource_uri"]
                         for key in json_fields.get(table, []):
                             if item[key] is not None:
                                 item[key] = json.loads(item[key])
