@@ -20,6 +20,7 @@ flowchart LR
 | Location | Responsibility |
 |---|---|
 | `backend/openings/workspace.py` | Job identities, triage, notes, application attempts and reporting |
+| `backend/openings/duplicates.py`, `duplicate_signals.py` | Read-only duplicate candidates: per-job signals, pair confidence and groups |
 | `backend/openings/career.py` | Profile, detailed evidence, claims, templates and instructions |
 | `backend/openings/documents.py` | Frozen contexts, document revisions and scoped file transfers |
 | `backend/openings/activity.py`, `actors.py` | Actor of each change, agent runs with reports, questions for the owner, change log |
@@ -44,7 +45,11 @@ dashboard path, and lists every gap. Read [REST](../user/api.md) and
 
 - **Identity:** normalized URLs and stable external keys resolve through retained
   aliases. Conflicting identities require explicit Merge; title/company similarity
-  alone never merges jobs. Dismissal survives URL changes.
+  alone never merges jobs. Dismissal survives URL changes. Duplicate candidates
+  are a separate, read-only suggestion: deterministic signals (requisition IDs,
+  apply targets, location, posting text, company and title) give each pair a
+  confidence in [0, 1], and nothing is merged or stored. Per-job signals are kept
+  in memory and recomputed only for jobs whose version changed.
 - **Corrections:** source refreshes preserve user edits, triage and application
   attempts.
 - **Lifecycle:** triage (`inbox`/`saved`/`dismissed`) stores interest independently.
