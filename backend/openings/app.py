@@ -51,7 +51,12 @@ from .errors import DomainError
 from .limits import REQUEST_LIMIT, BodyLimit
 from .mcp_server import OpeningsMCP
 from .models import Input
-from .operations import remove_installation_credentials, restore_database
+from .operations import (
+    backup_too_large,
+    remove_installation_credentials,
+    restore_database,
+    storage_status,
+)
 from .skills import (
     SkillLibrary,
     register_api as register_skills_api,
@@ -394,18 +399,20 @@ def create_app(database=None, start_worker=True):
     @router.post("/backup/restore")
     async def restore(request: Request):
         require_owner("restore a backup")
+        # Refuse before writing anything when the declared size cannot fit.
+        status = storage_status(workspace.db)
+        limit = status["restore_limit_bytes"]
+        declared = request.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > limit:
+            raise backup_too_large(int(declared), status)
         name = workspace.db.temp_file("restore")
         count = 0
         try:
             with open(name, "wb") as upload:  # noqa: ASYNC230 - local temp file, bounded chunks
                 async for chunk in request.stream():
                     count += len(chunk)
-                    if count > int(os.environ.get("OPENINGS_MAX_RESTORE_MB", "2048")) * 1024**2:
-                        raise DomainError(
-                            413,
-                            "backup_size",
-                            "The backup exceeds this installation's restore limit.",
-                        )
+                    if count > limit:
+                        raise backup_too_large(count, status)
                     upload.write(chunk)
             with open(name, "rb") as check_file:  # noqa: ASYNC230 - 16-byte local read
                 header = check_file.read(16)

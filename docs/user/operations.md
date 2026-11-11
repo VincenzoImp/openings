@@ -40,10 +40,19 @@ curl --fail "$OPENINGS_URL/api/v1/backup/restore" \
   --data-binary @openings-backup.sqlite
 ```
 
-The default restore limit is 2048 MiB; configure `OPENINGS_MAX_RESTORE_MB` before
-uploading a larger backup. Backup, restore upload and rollback copies are written
-beside the database on the data volume, so allow free space there of about three
-times the database size; copies left by a crash are removed at the next start.
+The restore limit follows the free space on the data volume, because the upload,
+the upgraded copy of an earlier-format backup and the rollback copy of the current
+database are written beside the database, and the restored pages pass through its
+write-ahead log. Restoring a backup of *B* bytes over a database of *D* bytes
+needs 3 × *B* + *D* + 64 MiB free, plus *B* − *D* when the backup is the larger
+one: about four times the size when you restore a workspace over itself. A larger
+upload is refused before it is written, with `413 backup_size` and the backup
+size, the free space and the space needed in the error details; the room is
+checked again before the database is replaced. **Settings → Workspace** and
+`GET /api/v1/workspace` (`workspace_info`) show the database size, the free space
+and the largest backup that fits now (`storage`). `OPENINGS_MAX_RESTORE_MB` is an
+optional upper bound, unset by default; it can only lower the limit. Copies left
+by a crash are removed at the next start.
 Enabled sources come from the restored workspace; inspect them when moving hosts. `.env` remains host-local.
 
 ## Service lifecycle
@@ -64,6 +73,25 @@ Tasks show collection failures, cancellation and explicit retry. Source failures
 do not discard acquired jobs. The global scheduled collection
 switch preserves source settings and prevents new scheduled runs. Queued/current
 runs continue until stopped; manual runs share provider spacing and cooldowns.
+
+## Retention
+
+Finished collection runs and their tasks are removed 90 days after they were
+created; set `OPENINGS_RETENTION_DAYS` to another number of days, or to `0` to
+keep everything. The 20 most recent finished runs of every source stay whatever
+their age, so each source keeps its last run and its run history. Queued and
+running work, including the progress stored with it, is never removed. The
+change-log entries of a removed run or task (queued, cancelled, retried) go with
+it unless an agent run recorded them. Job and application history is never
+pruned. The worker does this at start and every six hours, in small batches;
+Settings → Workspace shows the period in use.
+
+A source refresh that only sees a posting again is recorded on the posting
+(`last_seen_at` in the job's sources), not as an event. When a refresh changes
+the title, company, location or posting text, the job gets one `job_refreshed`
+event that names the changed fields. A posting keeps its source key and the
+employer's apply link a job board reported; the provider's full response is not
+stored.
 
 ## Access controls
 
@@ -114,6 +142,20 @@ held a full copy of your Career record, now share one stored copy of every entry
 claim and template, and their asset files no longer add file rows. Every context
 still reads back byte for byte with the same signature, and file ids and links
 stay valid; the upgrade checks each context and changes nothing if one differs.
+
+The same step removes what earlier releases stored without using it. Every
+`posting_updated` event that recorded a refresh without a change to the title,
+company, location or posting text is deleted; the others become `job_refreshed`
+events with those field names, and `posting_updated` no longer appears in the
+change log, the overview activity or run change counts. Stored provider responses
+are reduced to the source key and the employer's apply link, so the `payload` of
+`postings` in a JSON export holds only those two values. Identity lookups,
+duplicate candidates, the sources of a job and collection run summaries read the
+same as before. Finished collection runs older than the retention period are
+removed by the worker after the start, not by the upgrade
+([Retention](#retention)). A development database that already has the
+unreleased schema 9 is not changed by this step: its old events and payloads
+stay until the jobs are refreshed or forgotten.
 
 Right after that upgrade the start takes longer once: the database file is
 rewritten without the freed space (seconds on an SSD, longer on slow storage). This needs free

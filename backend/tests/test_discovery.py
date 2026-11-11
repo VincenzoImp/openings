@@ -58,8 +58,9 @@ def test_user_completed_posting_survives_source_preview_refresh(case):
     assert refreshed["metadata"]["description_complete"] is False
     assert workspace.list_jobs(complete=True)["total"] == 1
     assert workspace.overview()["incomplete"] == 0
-    raw = workspace.db.one("SELECT payload FROM postings WHERE job_id=?", (preview["id"],))
-    assert '"posting":"New source preview"' in raw["payload"]
+    # The observation is refreshed in place and stores no provider response.
+    seen = workspace.db.all("SELECT payload FROM postings WHERE job_id=?", (preview["id"],))
+    assert [row["payload"] for row in seen] == ["{}"]
 
 
 def test_source_failure_is_isolated(case, monkeypatch):

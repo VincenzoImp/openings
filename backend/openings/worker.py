@@ -7,12 +7,15 @@ from contextvars import Context
 from uuid import uuid4
 
 from .common import now
+from .retention import prune
 
 LOG = logging.getLogger(__name__)
 
 
 class Worker:
     heartbeat_seconds = 15  # lease renewals; a lease lasts 90 seconds
+    prune_seconds = 6 * 3600  # old finished runs and tasks: once at start, then at this pace
+    prune_backlog_seconds = 60  # while a bounded pass still left old records behind
 
     def __init__(self, workspace, discovery=None):
         self.workspace = workspace
@@ -85,11 +88,24 @@ class Worker:
             pulse.join(timeout=1)
 
     def _schedule_loop(self, stopping):
+        next_prune = time.monotonic()
         while not stopping.is_set():
             try:
                 self.discovery.schedule_due(stopping)
             except Exception:
                 LOG.exception("The scheduler could not complete this cycle.")
+            if (
+                self.workspace is not None
+                and time.monotonic() >= next_prune
+                and not stopping.is_set()
+            ):
+                wait = self.prune_seconds
+                try:
+                    if prune(self.workspace.db)["more"]:
+                        wait = self.prune_backlog_seconds
+                except Exception:
+                    LOG.exception("Old collection runs and tasks could not be pruned.")
+                next_prune = time.monotonic() + wait
             stopping.wait(15)
 
     def _loop(self, owner, stopping, kind):
