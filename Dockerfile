@@ -6,7 +6,7 @@ RUN --mount=type=cache,target=/root/.npm npm ci
 COPY frontend/ ./
 RUN npm run build
 
-FROM ghcr.io/astral-sh/uv:0.13.7 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.8 AS uv
 FROM python:3.14-slim-bookworm AS dependencies
 COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /app
