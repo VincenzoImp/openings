@@ -200,14 +200,63 @@ when that issue lands; the table says which parts those are.
   `frontend/src/legacy.css`. Its rules apply only inside `.legacy` and its
   colours come from the tokens. A rebuilt page leaves that wrapper; stage 7
   deletes the file.
-- Until their stage, Today is still Overview, and Jobs opens the existing Inbox
-  and Shortlist pages. `#today` and `#jobs` are aliases; every earlier route
-  works.
+- Until its stage, Jobs opens the existing Inbox and Shortlist pages; `#jobs`
+  is an alias. Every earlier route works.
 - Checks: `npm run budget` (first screen, each later screen, stylesheet),
   axe on every screen in both themes at both widths, the contrast of every pair
   of the colour table, and a keyboard-only test of the shell. The performance
   check of the Applications list belongs to stage 3; the browser test server
   already takes `OPENINGS_E2E_JOBS` and `OPENINGS_E2E_APPLICATIONS` for it.
+
+**Stage 2, Today and Activity.**
+
+- **Today** (`pages/Today.tsx`, `pages/today/`) is the first screen; `#overview`
+  is its alias and keeps its period (`#overview?since=…` opens
+  `#today?since=…`). The summary sentence counts the stored Ready queue, the
+  open questions, the Preparing applications blocked by a requirement and the
+  applications in Applied longer than the no-reply period. That period is the
+  number in the Policy decision item labelled "No reply" (the example policy
+  says 45 days), and 30 days without one. Ready to apply lists the queue by
+  deadline, then priority; Needs your decision answers questions in place;
+  the pipeline strip counts Preparing (without the Ready ones), Ready, Applied,
+  Interview and Offer, each a link to Applications. The prototype's "Close 3 as
+  no reply" waits for the `no_response` outcome (#151); Record replies opens
+  Applied filtered by `applied_until`. A blocked application links to its
+  requirements; the prototype's "I will write it myself" and "Do not pursue"
+  belong to the review page of stage 3, as does the Review link (it opens the
+  application until then).
+- **Since your last visit.** A visit lasts while Today keeps being opened and
+  ends after 30 minutes without it (`pages/today/visit.ts`, unit-tested). The
+  list counts from the end of the previous visit, so a reload or a look at a run
+  changes nothing and it moves on only after a real absence. The browser keeps
+  it in `localStorage` (`openings-today-visit`); without storage, or on the first
+  visit, Today shows the last 7 days and says so. Runs count when their last
+  activity is in the window (`runs?active_since=`); the collection line is
+  derived from the newest 100 collection runs.
+- **Progress**, the old Overview's numbers and stage table for a period, stays
+  on Today as its last card until stage 3 moves it to Applications, Insights.
+  The old SVG funnel, the "In progress" total and the "Add job" button of
+  Overview are gone: Add job stays in Jobs and the pipeline strip counts the
+  stages.
+- **Activity** (`pages/Activity.tsx`, `pages/activity/`) has the tabs
+  Questions (open, answered and withdrawn side by side), Requests (the form
+  beside the list, filtered by state), Runs (the list beside the report,
+  filtered by status; one pane at a time on a phone) and Timeline (by day, with
+  filters by who, kind of record, period and run, 30 per page). Every earlier
+  link works: `section=changes` opens the timeline, `state=answered` scrolls to
+  the answered questions, `run=` opens a report.
+- Backend reads added for these screens: `applied_since`/`applied_until` on
+  the application list, `active_since` on the run list, `subject_types` on the
+  change list, and `run_workflow` on changes, questions and requests.
+- Components added to `frontend/src/design`: question with its answer controls
+  (`Question.tsx`), pipeline strip and stats (`Pipeline.tsx`), filter chips and
+  filter bar (`Chips.tsx`), report section, count list, day heading and
+  timeline entry (`Report.tsx`), with their styles in `activity.css`. The
+  Overview and Activity rules of `legacy.css` are deleted.
+- The browser-test workspace (`backend/tests/today_fixtures.py`) adds ready
+  applications with deadlines, a blocked one, sent applications of several
+  ages, finished, interrupted and open runs with reports, questions with and
+  without choices, requests in every state and collection runs.
 
 **Stage 5, Library.**
 

@@ -45,7 +45,7 @@
       "note": "Answers have one control per question; raw JSON is the advanced fallback."
     },
     "applications.list": {
-      "note": "The Ready to apply queue filters by `readiness=ready` with `sort=ready`; the time range serves agents and scripts."
+      "note": "The Ready to apply queue filters by `readiness=ready` with `sort=ready`; Today's Waiting for a reply and Record replies filter Applied by `applied_until`. The other time ranges serve agents and scripts."
     },
     "runs.start": {
       "note": "Runs belong to API tokens: a dashboard session has no runs. Activity shows runs, their reports and their changes read-only."
@@ -57,13 +57,13 @@
       "note": "Runs belong to API tokens: a dashboard session has no runs."
     },
     "events.list": {
-      "note": "Activity filters changes by who made them and by run; the other filters serve agents and scripts."
+      "note": "The Activity timeline filters changes by who made them (owner, API tokens or one token, system, not recorded), by kind of record (`subject_types`), by period and by run; the job, application and subject filters serve the record histories, agents and scripts."
     },
     "runs.list": {
-      "note": "Activity filters runs by status only."
+      "note": "Activity filters runs by status; Today lists the runs active since the last visit (`active_since`). The workflow, token and start-time filters serve agents and scripts."
     },
     "questions.list": {
-      "note": "Activity filters questions by state; `answered_since` and the subject filters serve the agent's next run."
+      "note": "Today and Activity filter questions by state; `answered_since` and the subject filters serve the agent's next run."
     },
     "questions.ask": {
       "note": "Agents ask questions for the owner; the dashboard answers and withdraws them."

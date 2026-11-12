@@ -71,19 +71,32 @@ checks, a statement of limits and what the workflow lacked. A run that was never
 closed is shown as interrupted, with the changes it made.
 
 When the agent needs a fact or a decision, it asks a **question** tied to the
-job, application or Career entry concerned. Open **Activity** in the dashboard:
+job, application or Career entry concerned. **Today** shows the newest open
+questions under **Needs your decision**, where you answer them in place. Open
+**Activity** in the dashboard for everything:
 
-- **Questions** lists the open questions with an answer form; the navigation
-  shows how many are open. The agent reads your answers at the start of its
-  next run. You can change an answer or withdraw a question.
+- **Questions** lists the open questions, each with who asked it in which run,
+  what it is about and its answer controls: a choice answers at once, **Write
+  an answer** opens a text box (a comment and a choice are sent together), and
+  **Not now** only folds the box away. The navigation shows how many are open.
+  Beside them, **Answered** keeps each answer with who gave it and when, and you
+  can change it; **Withdrawn** keeps the questions nobody needs answered any
+  more. The agent reads your answers at the start of its next run.
 - **Requests** is where you tell the agent what to do next (see below).
-- **Runs** lists the runs; a run shows its report, the requests it handled and
-  every record it changed, with links.
-- **Changes** lists every change with who made it.
+- **Runs** lists the runs with their workflow, agent, start, duration, status
+  and what they changed; filter by status. A run opens its report: summary, the
+  changes counted by kind with links to the records, what was not done and why,
+  checks, limits, method, the questions it asked and the requests it handled.
+  An interrupted run says why it has no report and keeps its changes.
+- **Timeline** lists every change, newest first and by day, with who made it.
+  Filter by who (you, API tokens or one token, the system), by kind of record,
+  by period and by run; a run's report links to its changes here.
 
 ![Activity with two open questions from the agent, one with answer choices](../images/activity-questions.png)
 
-![A finished run with its stored report: scope, summary, changes, not done and checks](../images/activity-run.png)
+![A finished run beside the list of runs, with its report: scope, summary, changes by kind, not done and checks](../images/activity-run.png)
+
+![The timeline of every change by day, with who made it and the filters by who, kind and period](../images/activity-timeline.png)
 
 ## Ask your agent
 
