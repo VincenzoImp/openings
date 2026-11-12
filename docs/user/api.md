@@ -120,6 +120,9 @@ new revision or context, a deleted revision, a file added to a current revision,
 an unresolved blocking requirement or leaving Preparing. `readiness=ready`,
 `sort=ready` (longest waiting first), `ready_since` and `ready_until` read the
 queue; the list also returns `ready_count`, and the overview `ready`.
+`applied_since` and `applied_until` filter by the time an application was
+recorded as applied: `status=applied&applied_until=2026-10-12` lists the ones
+still waiting for a reply since that day.
 Create and `PATCH` accept `priority` (1 highest to 5), `deadline` (`YYYY-MM-DD`)
 and `requirements`, a list of `{id, kind, text, blocking, resolved, note}`.
 A requirements patch replaces the whole list; keep existing `id` values. `null`
@@ -207,12 +210,15 @@ A second `POST /runs` for a token with an open run returns `409 run_open` with
 that run in `error.details.run`, unless `supersede` is true. `PATCH /runs/{id}`
 stores a progress `note`. `GET /runs/{id}?changes_limit=50&changes_offset=0`
 returns the report, the questions asked and the changes made; `GET /runs` filters
-by `status`, `workflow`, `token_id`, `started_since` and `started_until`.
+by `status`, `workflow`, `token_id`, `started_since`, `started_until` and
+`active_since` (last activity at or after a time: a start, a change or the end).
 `GET /questions` filters by `state`, `subject_type`, `subject_id`, `run_id` and
 `answered_since`; answer and withdraw take `expected_version`, and answering
 needs owner authority (an agent token gets `403 forbidden`). `GET /events`
 filters by `run_id`, `job_id`, `application_id`, `subject_type`, `subject_id`,
-`actor`, `token_id`, `kind`, `since` and `until`.
+`actor`, `token_id`, `kind`, `since` and `until`; `subject_types` (repeat the
+parameter) takes several kinds of record at once. A change, a question and a
+request carry `run_workflow`, the workflow of their run, beside `run_id`.
 
 A question keeps its text, state and a `subject.label` after its job,
 application or Career entry is deleted. Deleting an application or forgetting a

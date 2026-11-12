@@ -324,6 +324,13 @@ class ApplicationQuery(Input):
     ready_until: str | None = Field(
         default=None, description="Only applications marked ready at or before this time."
     )
+    applied_since: str | None = Field(
+        default=None, description="Only applications recorded as applied at or after this time."
+    )
+    applied_until: str | None = Field(
+        default=None,
+        description="Only applications recorded as applied at or before this time; with status=applied, the ones still waiting for a reply.",
+    )
     sort: Literal[
         "updated",
         "newest",
@@ -338,10 +345,10 @@ class ApplicationQuery(Input):
     limit: int = Field(default=100, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
 
-    @field_validator("ready_since", "ready_until")
+    @field_validator("ready_since", "ready_until", "applied_since", "applied_until")
     @classmethod
     def valid_date(cls, value, info):
-        return normalized_date(value, end=info.field_name == "ready_until")
+        return normalized_date(value, end=info.field_name.endswith("_until"))
 
 
 class PeriodQuery(Input):

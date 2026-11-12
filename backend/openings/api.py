@@ -236,7 +236,7 @@ def register_core_mcp(mcp, workspace, requests):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def applications_list(value: ApplicationQuery | None = None) -> dict:
-        """Read paginated application summaries, stage totals and the ready count. Filter by exact job_id, query, stage, outcome, company or readiness (readiness=ready is the stored Ready step; reviewed passes every check but is not marked); sort by deadline, priority or ready time."""
+        """Read paginated application summaries, stage totals and the ready count. Filter by exact job_id, query, stage, outcome, company or readiness (readiness=ready is the stored Ready step; reviewed passes every check but is not marked); applied_since and applied_until filter by the time recorded as applied; sort by deadline, priority or ready time."""
         return workspace.list_applications(**(value or ApplicationQuery()).model_dump())
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
