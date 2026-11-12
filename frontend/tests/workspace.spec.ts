@@ -436,7 +436,7 @@ test("mobile navigation contains focus and releases the background on close and 
   await expect(page.locator("main")).not.toHaveAttribute("inert", "");
 });
 
-test("mobile applications, templates and funnel stay usable inside the viewport", async ({
+test("mobile applications, templates and progress stay usable inside the viewport", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -466,14 +466,16 @@ test("mobile applications, templates and funnel stay usable inside the viewport"
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(390);
-  await go(page, "overview");
-  await page.getByText("View counts as a table", { exact: true }).click();
+  // The progress of sent applications stacks its table on Today.
+  await go(page, "today");
+  await expect(
+    page.getByRole("table", {
+      name: "Sent applications by the furthest stage they reached",
+    }),
+  ).toBeVisible();
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(390);
-  await expect(
-    page.getByRole("region", { name: "Application journey chart" }),
-  ).toHaveAttribute("tabindex", "0");
 });
 
 test("records export downloads valid JSON with undated career entries", async ({
@@ -808,176 +810,6 @@ async function fitsViewport(page: Page) {
     .toBeLessThanOrEqual(width);
 }
 
-test("the owner answers an agent's question and the agent can read the answer", async ({
-  page,
-}, info) => {
-  const stamp = `${info.project.name} ${Date.now()}`;
-  const agent = await call(page, "/tokens", "POST", {
-    name: `Synthetic agent ${stamp}`,
-  });
-  const job = await call(page, "/jobs", "POST", {
-    title: `Hybrid role ${stamp}`,
-    company: "Example Labs",
-    posting: "Build reliable services.",
-  });
-  const text = `Is a hybrid schedule acceptable? ${stamp}`;
-  const asked = await agentCall(page, agent.token, "/questions", "POST", {
-    question: text,
-    why: "The posting requires two office days each week.",
-    subject_type: "job",
-    subject_id: job.id,
-    choices: ["Yes", "No"],
-  });
-  const open = (await call(page, "/questions?state=open&limit=1")).total;
-
-  await go(page, "activity");
-  await expect(page.locator(".navbadge")).toHaveText(String(open));
-  const card = page.getByRole("article", { name: text, exact: true });
-  await expect(card).toContainText("two office days");
-  await expect(card).toContainText(`Asked by Synthetic agent ${stamp}`);
-  await fitsViewport(page);
-  // The subject opens the job it is about.
-  await card.getByRole("button", { name: /^Job: Hybrid role/ }).click();
-  await expect(top(page)).toContainText("Hybrid role");
-  await top(page)
-    .getByRole("button", { name: "Close dialog", exact: true })
-    .click();
-
-  // Answer with the keyboard: choose, comment, submit.
-  await card.getByRole("radio", { name: "Yes", exact: true }).focus();
-  await page.keyboard.press("Space");
-  await card.getByRole("textbox").fill("Two days are fine.");
-  await card.getByRole("button", { name: "Answer", exact: true }).focus();
-  await page.keyboard.press("Enter");
-  await expect(page.locator(".app-toast")).toContainText("Answer saved.");
-  await expect(card).toHaveCount(0);
-  if (open > 1)
-    await expect(page.locator(".navbadge")).toHaveText(String(open - 1));
-  else await expect(page.locator(".navbadge")).toHaveCount(0);
-
-  await page.getByLabel("State", { exact: true }).selectOption("answered");
-  await expect(card).toContainText("Yes · Two days are fine.");
-  await expect(card).toContainText("Answered by Owner (dashboard)");
-  await fitsViewport(page);
-
-  const answers = await agentCall(
-    page,
-    agent.token,
-    "/questions?answered_since=" + encodeURIComponent(asked.created_at),
-  );
-  expect(answers.items).toContainEqual(
-    expect.objectContaining({
-      id: asked.id,
-      state: "answered",
-      answer_choice: "Yes",
-      answer: "Two days are fine.",
-    }),
-  );
-  await call(page, "/tokens/" + agent.id, "DELETE");
-});
-
-test("an agent run, its report and its changes are readable", async ({
-  page,
-}, info) => {
-  const stamp = `${info.project.name} ${Date.now()}`;
-  const workflow = `review-inbox ${stamp}`;
-  const agent = await call(page, "/tokens", "POST", {
-    name: `Synthetic agent ${stamp}`,
-  });
-  const job = await call(page, "/jobs", "POST", {
-    title: `Run subject ${stamp}`,
-    company: "Example Labs",
-    posting: "Build reliable services.",
-  });
-  const run = await agentCall(page, agent.token, "/runs", "POST", {
-    workflow,
-    scope: "One synthetic Inbox job.",
-  });
-  await agentCall(page, agent.token, `/jobs/${job.id}/notes`, "POST", {
-    body: "Synthetic agent note.",
-  });
-  await agentCall(page, agent.token, "/questions", "POST", {
-    question: `Which notice period applies? ${stamp}`,
-    subject_type: "job",
-    subject_id: job.id,
-  });
-  await agentCall(page, agent.token, `/runs/${run.id}/finish`, "POST", {
-    expected_version: run.version,
-    summary: "Reviewed one synthetic job.",
-    changes: "Added one note and asked one question.",
-    not_done: [
-      {
-        item: "Shortlist decision",
-        reason: "Waiting for the notice period.",
-        subject_type: "job",
-        subject_id: job.id,
-      },
-    ],
-    checks: [
-      { check: "Inbox query re-read" },
-      { check: "PDF render", verified: false },
-    ],
-    limits: "No application was submitted.",
-    method: "A salary filter is missing.",
-  });
-
-  await go(page, "activity?section=runs");
-  const row = page.getByRole("button", { name: new RegExp(workflow) });
-  await expect(row).toContainText("Finished");
-  await expect(row).toContainText("2 changes · 1 question");
-  await fitsViewport(page);
-  await row.focus();
-  await page.keyboard.press("Enter");
-
-  const report = page.locator(".run-detail");
-  await expect(
-    report.getByRole("heading", { name: workflow, exact: true }),
-  ).toBeVisible();
-  await expect(report).toContainText(`Synthetic agent ${stamp}`);
-  for (const [heading, content] of [
-    ["Scope", "One synthetic Inbox job."],
-    ["Summary", "Reviewed one synthetic job."],
-    ["Changes", "Added one note and asked one question."],
-    ["Not done", "Waiting for the notice period."],
-    ["Checks", "Not verified"],
-    ["Statement of limits", "No application was submitted."],
-    ["Method", "A salary filter is missing."],
-    ["Questions for you", "Which notice period applies?"],
-  ]) {
-    const section = report.locator(".report-section", {
-      has: page.getByRole("heading", { name: heading, exact: true }),
-    });
-    await expect(section).toContainText(content);
-  }
-  await expect(report).toContainText("Note added · 1");
-  await expect(report).toContainText("Question asked · 1");
-  const changes = page.locator(".change-list .activity");
-  await expect(changes).toHaveCount(2);
-  await expect(changes.first()).toContainText("Question asked");
-  await expect(changes.last()).toContainText("Note added");
-  await expect(changes.last()).toContainText(`Synthetic agent ${stamp}`);
-  await fitsViewport(page);
-  // A change links to the record it touched.
-  await changes
-    .last()
-    .getByRole("button", { name: /Run subject/ })
-    .click();
-  await expect(top(page)).toContainText("Run subject");
-  await top(page)
-    .getByRole("button", { name: "Close dialog", exact: true })
-    .click();
-
-  await page.getByRole("button", { name: "Back to runs", exact: true }).click();
-  await expect(row).toBeVisible();
-  await page.getByRole("tab", { name: "Changes", exact: true }).click();
-  await expect(
-    page.locator(".change-list .activity", {
-      hasText: `Synthetic agent ${stamp}`,
-    }),
-  ).toHaveCount(2);
-  await call(page, "/tokens/" + agent.id, "DELETE");
-});
-
 test("application history shows who made each change", async ({
   page,
 }, info) => {
@@ -1183,11 +1015,14 @@ test("Settings creates an agent token that is refused token management", async (
     await attempt(`/jobs/${job.id}/notes`, "POST", { body: "Synthetic note." }),
   ).toEqual([200, null]);
 
-  // Activity names the token with its kind.
-  await go(page, "activity?section=changes");
+  // Activity names the agent by its token.
+  await go(page, "activity?section=timeline");
   await expect(
-    page.locator(".change-list .activity", { hasText: "Note added" }).first(),
-  ).toContainText(`${name} (agent token)`);
+    page
+      .locator("main li", { hasText: "Note added" })
+      .first()
+      .locator(".actor"),
+  ).toHaveText(name);
   await fitsViewport(page);
 
   // Revoke both tokens from Settings with the keyboard.
@@ -1198,111 +1033,4 @@ test("Settings creates an agent token that is refused token management", async (
     await expect(item).toHaveCount(0);
   }
   expect(await attempt("/jobs?limit=1")).toEqual([401, "unauthorized"]);
-});
-
-test("the owner writes a request and reads the agent's result with its run", async ({
-  page,
-}, info) => {
-  const stamp = `${info.project.name} ${Date.now()}`;
-  const agent = await call(page, "/tokens", "POST", {
-    name: `Synthetic agent ${stamp}`,
-    kind: "agent",
-  });
-  const job = await call(page, "/jobs", "POST", {
-    title: `Requested role ${stamp}`,
-    company: "Example Labs",
-    posting: "Build reliable services.",
-  });
-
-  // Write a general request in Activity with the keyboard.
-  const general = `Stop preparing consultancy roles ${stamp}`;
-  await go(page, "activity?section=requests");
-  await page.getByLabel("Ask your agent", { exact: true }).fill(general);
-  await page.getByRole("button", { name: "Send request", exact: true }).focus();
-  await page.keyboard.press("Enter");
-  await expect(page.locator(".app-toast")).toContainText("Request saved.");
-  const card = page.getByRole("article", { name: general, exact: true });
-  await expect(card).toContainText("Waiting for the agent");
-  await expect(card).toContainText("Written by Owner (dashboard)");
-  await fitsViewport(page);
-
-  // Ask about one job from the job itself.
-  const about = `Prepare this one too ${stamp}`;
-  await go(page, `inbox?job=${job.id}`);
-  await top(page)
-    .getByRole("button", { name: "Ask your agent", exact: true })
-    .click();
-  await expect(top(page)).toContainText(`About Requested role ${stamp}`);
-  await top(page)
-    .getByLabel("Request for your agent", { exact: true })
-    .fill(about);
-  await top(page)
-    .getByRole("button", { name: "Send request", exact: true })
-    .click();
-  await expect(
-    top(page).getByRole("article", { name: about, exact: true }),
-  ).toContainText("Waiting for the agent");
-  await fitsViewport(page);
-  await top(page)
-    .getByRole("button", { name: "Close dialog", exact: true })
-    .click();
-  await expect(top(page).locator(".ask-agent")).toContainText(
-    "1 request waiting",
-  );
-
-  // The agent reads the open requests, takes one in a run and reports the result.
-  const info_ = await agentCall(page, agent.token, "/workspace");
-  expect(info_.open_requests).toBeGreaterThanOrEqual(2);
-  const waiting = await agentCall(
-    page,
-    agent.token,
-    `/requests?state=open&subject_type=job&subject_id=${job.id}`,
-  );
-  expect(waiting.items.map((item: { text: string }) => item.text)).toEqual([
-    about,
-  ]);
-  const run = await agentCall(page, agent.token, "/runs", "POST", {
-    workflow: `prepare-shortlist ${stamp}`,
-  });
-  const taken = await agentCall(
-    page,
-    agent.token,
-    `/requests/${waiting.items[0].id}/take`,
-    "POST",
-    { expected_version: waiting.items[0].version },
-  );
-  await agentCall(page, agent.token, `/requests/${taken.id}/complete`, "POST", {
-    expected_version: taken.version,
-    result: `Draft prepared and marked ready ${stamp}`,
-  });
-
-  await go(page, "activity?section=requests");
-  await page.getByLabel("State", { exact: true }).selectOption("done");
-  const done = page.getByRole("article", { name: about, exact: true });
-  await expect(done).toContainText(`Draft prepared and marked ready ${stamp}`);
-  await expect(done).toContainText(
-    `Completed by Synthetic agent ${stamp} (agent token)`,
-  );
-  await expect(
-    done.getByRole("button", { name: /^Job: Requested role/ }),
-  ).toBeVisible();
-  await fitsViewport(page);
-  // The result links to the run that handled the request.
-  await done.getByRole("button", { name: "View run", exact: true }).click();
-  const report = page.locator(".run-detail");
-  await expect(
-    report.locator(".report-section", {
-      has: page.getByRole("heading", { name: "Requests handled", exact: true }),
-    }),
-  ).toContainText(about);
-  await fitsViewport(page);
-
-  // The owner withdraws the request nobody took.
-  await page.getByRole("tab", { name: "Requests", exact: true }).click();
-  await page.getByLabel("State", { exact: true }).selectOption("open");
-  await card.getByRole("button", { name: "Withdraw", exact: true }).click();
-  await expect(card).toHaveCount(0);
-  await page.getByLabel("State", { exact: true }).selectOption("withdrawn");
-  await expect(card).toContainText("Withdrawn by Owner (dashboard)");
-  await call(page, "/tokens/" + agent.id, "DELETE");
 });
