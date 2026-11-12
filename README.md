@@ -12,7 +12,7 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
 **[Start with Docker](#start-with-docker)** · [Connect an agent](#connect-an-agent) ·
 [Documentation](docs/README.md) · [Changelog](CHANGELOG.md)
 
-![Workspace overview with application totals and the progress funnel](docs/images/overview.png)
+![Today: applications ready to apply, the agent's questions, the pipeline, what happened since the last visit and replies to record](docs/images/today.png)
 
 ## Features
 
