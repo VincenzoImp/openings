@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from "react";
+import { useId, type ReactNode, type Ref } from "react";
 import { cx } from "./classes";
 import { Count } from "./Tag";
 
@@ -9,9 +9,11 @@ export function Card({
   actions,
   footer,
   className,
+  ref,
   children,
 }: {
   title?: string;
+  ref?: Ref<HTMLElement>;
   count?: number;
   /** Controls at the end of the header. */
   actions?: ReactNode;
@@ -22,6 +24,7 @@ export function Card({
   const id = useId();
   return (
     <section
+      ref={ref}
       className={cx("card", className)}
       aria-labelledby={title ? id : undefined}
     >
@@ -65,10 +68,13 @@ export function ListRow({
   href,
   onOpen,
   selected = false,
+  foot,
   children,
 }: {
   title: ReactNode;
   meta?: ReactNode;
+  /** A last line under the detail, such as who did it. */
+  foot?: ReactNode;
   href?: string;
   onOpen?: () => void;
   selected?: boolean;
@@ -76,7 +82,10 @@ export function ListRow({
   children?: ReactNode;
 }) {
   return (
-    <li className={selected ? "is-selected" : undefined}>
+    <li
+      className={selected ? "is-selected" : undefined}
+      aria-current={selected || undefined}
+    >
       <div className="grow">
         {href ? (
           <a className="title" href={href}>
@@ -90,6 +99,7 @@ export function ListRow({
           <span className="title">{title}</span>
         )}
         {meta && <div className="meta">{meta}</div>}
+        {foot}
       </div>
       {children}
     </li>

@@ -450,6 +450,8 @@ export interface Activity {
   job_id?: string | null;
   actor?: Actor;
   run_id?: string | null;
+  /** The workflow of the run the change belongs to. */
+  run_workflow?: string | null;
   subject?: { type: string | null; id: string | null; label?: string };
 }
 export type RunStatus = "open" | "finished" | "interrupted";
@@ -496,6 +498,7 @@ export interface AgentRequest extends Versioned {
   subject: OwnerQuestion["subject"];
   created_by: Actor;
   run_id: string | null;
+  run_workflow?: string | null;
   taken_by: Actor | null;
   taken_at: string | null;
   resolved_by: Actor | null;
@@ -517,6 +520,7 @@ export interface OwnerQuestion extends Versioned {
   } | null;
   asked_by: Actor;
   run_id: string | null;
+  run_workflow?: string | null;
   answered_by: Actor | null;
   answered_at: string | null;
   withdrawn_by: Actor | null;
