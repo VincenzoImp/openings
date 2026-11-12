@@ -107,10 +107,14 @@ class RunQuery(Input):
     token_id: str | None = Field(default=None, max_length=100)
     started_since: str | None = None
     started_until: str | None = None
+    active_since: str | None = Field(
+        default=None,
+        description="Only runs whose last activity (start, a change or the end) is at or after this time.",
+    )
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
 
-    @field_validator("started_since", "started_until")
+    @field_validator("started_since", "started_until", "active_since")
     @classmethod
     def valid_date(cls, value, info):
         return normalized_date(value, end=info.field_name == "started_until")
@@ -185,6 +189,11 @@ class EventQuery(Input):
     run_id: str | None = Field(default=None, max_length=100)
     subject_type: str | None = Field(default=None, max_length=50)
     subject_id: str | None = Field(default=None, max_length=100)
+    subject_types: list[Annotated[str, Field(min_length=1, max_length=50)]] | None = Field(
+        default=None,
+        max_length=20,
+        description="Changes to any of these kinds of record, for example document, context and file.",
+    )
     job_id: str | None = Field(default=None, max_length=100)
     application_id: str | None = Field(default=None, max_length=100)
     actor: Literal["owner", "token", "system", "unknown"] | None = None
@@ -234,6 +243,18 @@ class ActivityService:
             if value.subject_id is not None:
                 where.append("e.subject_id=?")
                 params.append(value.subject_id)
+        if value.subject_types:
+            kinds = sorted(set(value.subject_types))
+            options = ["e.subject_type IN (" + ",".join("?" for _ in kinds) + ")"]
+            params.extend(kinds)
+            # Events from before schema 8 belong to their application or job.
+            if "application" in kinds:
+                options.append("(e.subject_type IS NULL AND e.application_id IS NOT NULL)")
+            if "job" in kinds:
+                options.append(
+                    "(e.subject_type IS NULL AND e.application_id IS NULL AND e.job_id IS NOT NULL)"
+                )
+            where.append("(" + " OR ".join(options) + ")")
         if value.actor == "unknown":
             where.append("e.actor_kind IS NULL")
         elif value.actor:
@@ -249,8 +270,10 @@ class ActivityService:
     def _events(self, conn, where, params, limit, offset):
         clause = " WHERE " + " AND ".join(where) if where else ""
         rows = conn.execute(
-            "SELECT e.*,j.title AS job_title,j.company AS job_company FROM events e "
-            "LEFT JOIN jobs j ON j.id=e.job_id" + clause + " ORDER BY e.created_at DESC "
+            "SELECT e.*,j.title AS job_title,j.company AS job_company,r.workflow AS run_workflow "
+            "FROM events e LEFT JOIN jobs j ON j.id=e.job_id LEFT JOIN runs r ON r.id=e.run_id"
+            + clause
+            + " ORDER BY e.created_at DESC "
             "LIMIT ? OFFSET ?",
             (*params, limit, offset),
         ).fetchall()
@@ -518,9 +541,13 @@ class ActivityService:
             if item is not None:
                 where.append(column + "=?")
                 params.append(item)
-        for item, operator in ((value.started_since, ">="), (value.started_until, "<=")):
+        for column, item, operator in (
+            ("started_at", value.started_since, ">="),
+            ("started_at", value.started_until, "<="),
+            ("last_activity_at", value.active_since, ">="),
+        ):
             if item:
-                where.append("started_at" + operator + "?")
+                where.append(column + operator + "?")
                 params.append(item)
         clause = " WHERE " + " AND ".join(where) if where else ""
         with self.db.connect() as conn:
@@ -765,7 +792,7 @@ def register_mcp(mcp, activity: ActivityService):
 
     @mcp.tool(annotations=read)
     def events_list(value: EventQuery | None = None) -> dict:
-        """List recorded changes, newest first, with actor, run and subject. Filter by run_id, job_id, application_id, subject, actor, kind or time."""
+        """List recorded changes, newest first, with actor, run (run_id, run_workflow) and subject. Filter by run_id, job_id, application_id, subject, subject_types (several kinds of record), actor, kind or time."""
         return activity.list_events(value)
 
     @mcp.tool(annotations=write)
@@ -790,7 +817,7 @@ def register_mcp(mcp, activity: ActivityService):
 
     @mcp.tool(annotations=read)
     def runs_list(value: RunQuery | None = None) -> dict:
-        """List agent runs, newest first, by status (open, finished, interrupted), workflow, token or start time. An open run without recent activity is reported as interrupted."""
+        """List agent runs, newest first, by status (open, finished, interrupted), workflow, token, start time or active_since (last activity). An open run without recent activity is reported as interrupted."""
         return activity.list_runs(value)
 
     @mcp.tool(annotations=write)

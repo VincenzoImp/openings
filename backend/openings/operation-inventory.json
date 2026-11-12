@@ -1036,7 +1036,7 @@
         "applications_list"
       ],
       "dashboard": "Applications: list/Kanban filters",
-      "notes": "q, job_id, status, outcome, company, readiness (blocked/none/missing_pdf/unreviewed/reviewed/ready), ready_since, ready_until, sort (updated/newest/oldest/company/stage/applied/deadline/priority/ready), limit, offset; job_id is exact; stage_counts and ready_count span all matching records. readiness=ready is the stored Ready step; reviewed passes every check but is not marked ready. Rows include priority, deadline, readiness, ready_at, ready_by and unresolved/blocking requirement counts; full requirements are on the attempt read."
+      "notes": "q, job_id, status, outcome, company, readiness (blocked/none/missing_pdf/unreviewed/reviewed/ready), ready_since, ready_until, applied_since, applied_until, sort (updated/newest/oldest/company/stage/applied/deadline/priority/ready), limit, offset; job_id is exact; stage_counts and ready_count span all matching records. readiness=ready is the stored Ready step; reviewed passes every check but is not marked ready. Rows include priority, deadline, readiness, ready_at, ready_by and unresolved/blocking requirement counts; full requirements are on the attempt read."
     },
     {
       "id": "applications.read",
@@ -1493,7 +1493,7 @@
         "runs_list"
       ],
       "dashboard": "Activity: Runs",
-      "notes": "An open run without recent activity is reported as interrupted."
+      "notes": "status, workflow, token_id, started_since, started_until, active_since (last activity at or after a time). An open run without recent activity is reported as interrupted."
     },
     {
       "id": "runs.read",

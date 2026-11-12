@@ -1079,6 +1079,8 @@ class Workspace:
         readiness=None,
         ready_since=None,
         ready_until=None,
+        applied_since=None,
+        applied_until=None,
     ):
         conditions, args = [], []
         if readiness:
@@ -1093,9 +1095,14 @@ class Workspace:
                 conditions.append("app.ready_at IS NOT NULL")
             conditions.append(f"({READINESS_SQL})=?")
             args.append(readiness)
-        for value, operator in ((ready_since, ">="), (ready_until, "<=")):
+        for column, value, operator in (
+            ("ready_at", ready_since, ">="),
+            ("ready_at", ready_until, "<="),
+            ("applied_at", applied_since, ">="),
+            ("applied_at", applied_until, "<="),
+        ):
             if value:
-                conditions.append("app.ready_at" + operator + "?")
+                conditions.append("app." + column + operator + "?")
                 args.append(value)
         if job_id is not None:
             conditions.append("app.job_id=?")
