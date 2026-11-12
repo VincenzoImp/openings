@@ -21,7 +21,7 @@ interface Exclusion {
 const EXCLUSIONS: Record<string, Exclusion[]> = {};
 
 const SCREENS = [
-  "overview",
+  "today",
   "applications",
   "applications?view=list",
   "inbox",
@@ -32,7 +32,7 @@ const SCREENS = [
   "activity",
   "activity?section=requests",
   "activity?section=runs",
-  "activity?section=changes",
+  "activity?section=timeline",
   "career",
   "career?section=knowledge",
   "career?section=claims",
@@ -98,7 +98,7 @@ test("an agent opens a run and the navigation shows its status line", async ({
   page,
 }, info) => {
   await page.context().addCookies(cookies);
-  await go(page, "overview");
+  await go(page, "today");
   const workflow = `accessibility ${info.project.name} ${Date.now()}`;
   await page.evaluate(async (workflow) => {
     const setup = { "X-Openings-E2E-Setup": "1" };
