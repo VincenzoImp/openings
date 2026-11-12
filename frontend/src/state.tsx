@@ -539,7 +539,7 @@ export function useUrlState(key: string, initial: string) {
     history.replaceState(
       null,
       "",
-      `${page || "#overview"}${params.size ? "?" + params : ""}`,
+      `${page || "#today"}${params.size ? "?" + params : ""}`,
     );
     window.dispatchEvent(new Event("openings:url"));
     setValue(next);
@@ -585,7 +585,7 @@ export function useUrlFilters(defaults: Record<string, string>) {
     history.replaceState(
       null,
       "",
-      `${page || "#overview"}${params.size ? "?" + params : ""}`,
+      `${page || "#today"}${params.size ? "?" + params : ""}`,
     );
     window.dispatchEvent(new Event("openings:url"));
     setValues(next);

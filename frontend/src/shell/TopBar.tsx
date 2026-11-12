@@ -1,6 +1,6 @@
 import { Button, IconButton } from "../design";
 import type { Density, Theme } from "./preferences";
-import { SCREENS, destinationOf } from "./routes";
+import { HOME, SCREENS, destinationOf } from "./routes";
 
 /** Where you are, what the workspace is doing, and the two display choices. */
 export function TopBar({
@@ -23,7 +23,15 @@ export function TopBar({
   inert?: boolean;
 }) {
   const destination = destinationOf(route);
-  const group = destination?.group;
+  // The home screen says which day it is; the others say where they are.
+  const today =
+    route === HOME &&
+    new Date().toLocaleDateString("en-GB", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+  const group = today ? "" : destination?.group;
   const otherTheme = theme === "light" ? "dark" : "light";
   const otherDensity = density === "compact" ? "comfortable" : "compact";
   return (
@@ -38,7 +46,7 @@ export function TopBar({
           </>
         )}
         <span aria-current="page">
-          {destination?.item.label ?? SCREENS[route]}
+          {today || (destination?.item.label ?? SCREENS[route])}
         </span>
       </p>
       {saving && (

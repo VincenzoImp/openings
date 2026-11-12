@@ -20,8 +20,7 @@ export const NAV: NavGroup[] = [
   {
     group: "Work",
     items: [
-      // Becomes "Today" when the home screen is rebuilt (stage 2).
-      { id: "overview", label: "Overview" },
+      { id: "today", label: "Today" },
       { id: "applications", label: "Applications", count: "ready" },
       // Inbox and Shortlist are the two queues of one Jobs destination; the
       // page keeps both routes until it is rebuilt (stage 4).
@@ -52,11 +51,11 @@ export const NAV: NavGroup[] = [
 ];
 
 /** The destinations of the bottom bar on narrow screens; the rest is under More. */
-export const TAB_BAR = ["overview", "applications", "inbox", "activity"];
+export const TAB_BAR = ["today", "applications", "inbox", "activity"];
 
 /** Titles of the screens, by route. */
 export const SCREENS: Record<string, string> = {
-  overview: "Overview",
+  today: "Today",
   applications: "Applications",
   inbox: "Inbox",
   shortlist: "Shortlist",
@@ -68,16 +67,19 @@ export const SCREENS: Record<string, string> = {
   settings: "Settings",
 };
 
-/** Names from the approved design that do not have their own screen yet. */
+/**
+ * Other names of a screen: the one it had in an earlier version (Overview is
+ * now Today) and names from the approved design without their own screen yet.
+ */
 export const ALIASES: Record<string, string> = {
-  today: "overview",
+  overview: "today",
   jobs: "inbox",
 };
 
 /** Screens built with the design system; the others keep the older stylesheet. */
-export const REBUILT = ["career", "policy", "templates"];
+export const REBUILT = ["today", "activity", "career", "policy", "templates"];
 
-export const HOME = "overview";
+export const HOME = "today";
 
 /** The screen a location hash shows; an unknown route shows the home screen. */
 export function routeOf(hash: string) {
