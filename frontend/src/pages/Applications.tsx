@@ -35,7 +35,7 @@ import {
 } from "../api";
 import { FileManager } from "../files";
 import { ReadyPanel, ReadyTag, readyReason } from "./ApplicationReady";
-import { AskAgent } from "./Requests";
+import { AskAgent } from "./AskAgent";
 import {
   useEditorRecord,
   confirmLeave,
@@ -241,6 +241,8 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
     status: "",
     outcome: "",
     readiness: "",
+    // Set by Today's "Record replies": applications sent on or before a day.
+    applied_until: "",
     sort: "updated",
     offset: "0",
     view: (() => {
@@ -275,7 +277,8 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
     filters.q ||
     filters.status ||
     filters.outcome ||
-    filters.readiness
+    filters.readiness ||
+    filters.applied_until
   );
   const { pending, mutate, notify } = useWorkspace();
   const progress = useApplicationProgress();
@@ -295,6 +298,7 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
     filters.status,
     filters.outcome,
     filters.readiness,
+    filters.applied_until,
     filters.view,
   ]);
   useEffect(() => {
@@ -524,6 +528,16 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
         >
           Ready to apply <span>{resource.data.ready_count ?? 0}</span>
         </Button>
+        {filters.applied_until && (
+          <Button
+            variant="selected"
+            icon="close"
+            aria-label={`Sent on or before ${calendarDate(filters.applied_until)}: remove this filter`}
+            onClick={() => setFilters({ applied_until: "", offset: "0" })}
+          >
+            Sent on or before {calendarDate(filters.applied_until)}
+          </Button>
+        )}
       </div>
       <div className="boardcaption">
         <span>{resource.data.total} application attempts</span>
@@ -552,6 +566,7 @@ export function ApplicationsPage({ onOpen }: { onOpen: (id: string) => void }) {
                       status: "",
                       outcome: "",
                       readiness: "",
+                      applied_until: "",
                       offset: "0",
                     })
                   }

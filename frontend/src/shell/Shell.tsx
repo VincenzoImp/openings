@@ -19,11 +19,11 @@ import {
   JobDrawer,
   JobsPage,
   Overlay as OverlayFrame,
-  OverviewPage,
   PolicyPage,
   Screen,
   SettingsPage,
   TemplatesPage,
+  TodayPage,
 } from "./Screens";
 import { TopBar } from "./TopBar";
 import {
@@ -121,7 +121,7 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
     runs = useResource<ListResult<Run>>("/runs?status=open&limit=1", emptyList);
 
   useEffect(() => {
-    // A design name such as #today or #jobs is rewritten to the route that
+    // Another name of a screen (#overview, #jobs) is rewritten to the route that
     // shows it, so links and the Back button see one address per screen.
     const canonicalise = () => {
       const canonical = canonicalHash(location.hash);
@@ -293,11 +293,8 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
             {/* The old pages bring their own stylesheet, scoped to .legacy. */}
             <div className={REBUILT.includes(route) ? "screen" : "legacy"}>
               <Screen route={route}>
-                {route === "overview" ? (
-                  <OverviewPage
-                    onAdd={() => setOverlay({ kind: "add" })}
-                    onNavigate={navigate}
-                  />
+                {route === "today" ? (
+                  <TodayPage onOpenJob={openJob} onOpenApplication={openApp} />
                 ) : route === "activity" ? (
                   <ActivityPage
                     openQuestions={questions.data.total}
