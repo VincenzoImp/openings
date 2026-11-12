@@ -4,27 +4,10 @@ import {
   formatTime,
   readinessLabels,
   type Application,
-  type Json,
 } from "../api";
+import { readyReason } from "../library/ready";
 import { useWorkspace } from "../state";
 import { Button, Icon } from "../ui";
-
-/** Why the stored Ready step was cleared, from an application_ready_cleared event. */
-const clearedReasons: Record<string, string> = {
-  unmarked: "The mark was removed",
-  document_created: "A new document revision was saved",
-  document_deleted: "A document revision was deleted",
-  context_prepared: "A new context was prepared",
-  file_uploaded: "A file was added to a current revision",
-  blocking_requirement: "A blocking requirement is unresolved",
-  left_preparing: "The application left Preparing",
-};
-export function readyReason(payload?: Json) {
-  const reason = payload?.reason;
-  return typeof reason === "string"
-    ? clearedReasons[reason] || reason.replaceAll("_", " ")
-    : "";
-}
 
 /** What still has to happen before an application can be marked ready. */
 const nextStep: Record<string, string> = {
@@ -100,3 +83,4 @@ export function ReadyPanel({ application }: { application: Application }) {
     </section>
   );
 }
+export { readyReason };

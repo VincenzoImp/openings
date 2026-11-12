@@ -1,6 +1,5 @@
 import {
   Activity as ActivityIcon,
-  LayoutDashboard,
   Inbox,
   BriefcaseBusiness,
   Building2,
@@ -40,7 +39,6 @@ import {
 } from "lucide-react";
 
 const icons = {
-  overview: LayoutDashboard,
   activity: ActivityIcon,
   inbox: Inbox,
   applications: BriefcaseBusiness,

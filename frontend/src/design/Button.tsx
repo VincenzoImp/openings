@@ -1,8 +1,9 @@
-import type { ButtonHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, Ref } from "react";
 import { Icon, type IconName } from "./Icon";
 import { buttonClass } from "./classes";
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  ref?: Ref<HTMLButtonElement>;
   /** "primary", "quiet" or "danger"; empty for the default button. */
   variant?: string;
   size?: "sm" | "md";

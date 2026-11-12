@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { api } from "../api";
 import { useWorkspace } from "../state";
 
@@ -56,4 +63,13 @@ export function useFresh<T>(path: string | null, initial: T, scopes: string[]) {
   }, [path, revision, tick]);
   const reload = useCallback(() => setTick((n) => n + 1), []);
   return { data, setData, loading, error, reload };
+}
+
+/** What `useFresh` returns for a record of type T. */
+export interface Fresh<T> {
+  data: T;
+  setData: Dispatch<SetStateAction<T>>;
+  loading: boolean;
+  error: string | null;
+  reload: () => void;
 }
