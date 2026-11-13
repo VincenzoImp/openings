@@ -1,8 +1,8 @@
 """Content-addressed storage of frozen application contexts.
 
 A context payload is one canonical JSON text. Its large shared values (each Career
-entry, claim and template, the Profile, the job, the general instructions, each
-policy section) are cut out as parts, stored once and keyed by the SHA-256 of their text. A context keeps
+entry, claim and template, the Profile, the job, the template guidance, each
+Preferences section) are cut out as parts, stored once and keyed by the SHA-256 of their text. A context keeps
 the remaining text as a frame of literals with one part between each pair, so the
 payload is rebuilt by concatenation alone and is byte-identical by construction.
 
@@ -148,7 +148,7 @@ def _split(text, files):
             literal(encode(value))
 
     def section(_, value):
-        # One policy section with its version: shared until that section changes.
+        # One Preferences section with its version: shared until that section changes.
         if isinstance(value, dict):
             shared(value)
         else:
@@ -164,7 +164,7 @@ def _split(text, files):
             shared(value)
         elif key == "instructions" and isinstance(value, dict):
             members(value, instruction)
-        elif key == "policy" and isinstance(value, dict):
+        elif key == "preferences" and isinstance(value, dict):
             members(value, section)
         elif (
             key == "files"

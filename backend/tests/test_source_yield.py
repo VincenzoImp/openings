@@ -24,14 +24,14 @@ FIXTURE = [
     ("search", "linkedin", ENGLISH, "interview"),
     ("search", "indeed", ENGLISH, "rejected"),
     ("search", "indeed", ENGLISH, "dismissed_agent"),
-    ("search", "indeed", GERMAN, "rule"),
-    ("search", "indeed", GERMAN, "rule"),
+    ("search", "indeed", GERMAN, "dismissed_system"),
+    ("search", "indeed", GERMAN, "dismissed_system"),
     ("search", "linkedin", ENGLISH, "dismissed_owner"),
     ("search", "linkedin", ENGLISH, "draft"),
     ("search", "linkedin", ENGLISH, "not_pursued"),
     ("board", "greenhouse", ENGLISH, "offer"),
     ("board", "greenhouse", ENGLISH, "inbox"),
-    ("board", "greenhouse", GERMAN, "rule"),
+    ("board", "greenhouse", GERMAN, "dismissed_system"),
     ("board", "greenhouse", ENGLISH, "dismissed_agent"),
     (None, "manual", ENGLISH, "saved"),
     (None, "manual", ENGLISH, "inbox"),
@@ -45,9 +45,9 @@ def expected(rows):
     """The counts computed straight from the fixture, without the service."""
     fates = [fate for *_, fate in rows]
     dismissed = Counter(
-        {"rule": "rule", "dismissed_agent": "agent", "dismissed_owner": "owner"}[fate]
+        {"dismissed_system": "other", "dismissed_agent": "agent", "dismissed_owner": "owner"}[fate]
         for fate in fates
-        if fate in {"rule", "dismissed_agent", "dismissed_owner"}
+        if fate in {"dismissed_system", "dismissed_agent", "dismissed_owner"}
     )
     return {
         "collected": len(fates),
@@ -58,12 +58,12 @@ def expected(rows):
         "interviews": sum(fate in {"interview", "offer"} for fate in fates),
         "offers": fates.count("offer"),
         "dismissed": sum(dismissed.values()),
-        "dismissed_by": {key: dismissed.get(key, 0) for key in ("rule", "agent", "owner", "other")},
+        "dismissed_by": {key: dismissed.get(key, 0) for key in ("agent", "owner", "other")},
     }
 
 
 def seed(app):
-    workspace, policy, responses = app.state.workspace, app.state.policy, app.state.responses
+    workspace, responses = app.state.workspace, app.state.responses
     sources = {"search": new_id(), "board": new_id()}
     with workspace.db.transaction() as conn:
         for key, name, kind, config in (
@@ -74,20 +74,6 @@ def seed(app):
                 "INSERT INTO sources(id,name,kind,config,created_at,updated_at) VALUES(?,?,?,?,?,?)",
                 (sources[key], name, kind, json.dumps(config), now(), now()),
             )
-    with acting_as(OWNER):
-        rule = policy.add_item(
-            "decision",
-            {
-                "expected_version": 0,
-                "label": "Languages outside my list",
-                "rule": {
-                    "signal": "language_required",
-                    "condition": {"operator": "not_in", "value": ["English"]},
-                    "action": "dismiss",
-                },
-                "enabled": True,
-            },
-        )["item"]
     for number, (source, board, posting, fate) in enumerate(FIXTURE):
         job = workspace.ingest_job(
             {
@@ -99,8 +85,11 @@ def seed(app):
                 "source_id": sources.get(source),
             }
         )
-        assert (job["triage"] == "dismissed") == (fate == "rule"), (number, fate)
-        if fate in {"saved", "dismissed_owner"}:
+        # Nothing is dismissed automatically.
+        assert job["triage"] == "inbox", (number, fate)
+        if fate == "dismissed_system":
+            workspace.set_triage(job["id"], "dismissed", job["version"])
+        elif fate in {"saved", "dismissed_owner"}:
             with acting_as(OWNER):
                 workspace.set_triage(job["id"], fate.split("_")[0], job["version"])
         elif fate == "dismissed_agent":
@@ -126,12 +115,12 @@ def seed(app):
                 responses.add_response(
                     application["id"], {"kind": ANSWERED[fate], "date": now()[:10]}
                 )
-    return sources, rule
+    return sources
 
 
 def test_yield_equals_the_counts_of_the_fixture(tmp_path):
     app = create_app(tmp_path / "yield.sqlite", start_worker=False)
-    sources, rule = seed(app)
+    sources = seed(app)
     result = app.state.source_yield.source_yield({"min_sample": 5})
     rows = {item["source_id"]: item for item in result["items"]}
     assert set(rows) == {sources["search"], sources["board"], None}
@@ -155,14 +144,9 @@ def test_yield_equals_the_counts_of_the_fixture(tmp_path):
         assert {name: boards[board][name] for name in want if name != "dismissed_by"} == {
             name: value for name, value in want.items() if name != "dismissed_by"
         }
-    assert search["dismissed_by_rule"] == [
-        {"item_id": rule["id"], "label": rule["label"], "dismissed": 2}
-    ]
     total = result["total"]
     assert {name: total[name] for name in expected(FIXTURE)} == expected(FIXTURE)
-    assert total["dismissed_by_rule"] == [
-        {"item_id": rule["id"], "label": rule["label"], "dismissed": 3}
-    ]
+    assert "dismissed_by_rule" not in total and "rule" not in total["dismissed_by"]
     assert total["sources"] == 2
     # A period that ends before anything was collected counts nothing.
     empty = app.state.source_yield.source_yield({"until": "2000-01-01"})

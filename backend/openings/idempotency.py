@@ -26,7 +26,6 @@ TABLES = frozenset(
         "jobs",
         "knowledge",
         "notes",
-        "policy_items",
         "questions",
         "requests",
         "responses",

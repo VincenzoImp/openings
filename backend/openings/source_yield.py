@@ -14,8 +14,8 @@ For the jobs a source collected in the period (by the time the job was added):
   date, a sent stage or an employer response);
 - ``responded``, ``interviews``, ``offers``: with an employer response, an
   interview or offer response, an offer response (0.20 ``responses``);
-- ``dismissed``: dismissed now, split by who dismissed them (a policy rule, an
-  agent token, the owner, other) and by rule;
+- ``dismissed``: dismissed now, split by who dismissed them (an agent token, the
+  owner, other);
 - ``likely_duplicates`` and ``no_longer_listed``: jobs with those ingest signals.
 
 ``kept_rate`` is shortlisted over collected; it is withheld (``null``) for a source
@@ -109,23 +109,12 @@ LEFT JOIN answers r ON r.job_id = j.id
 {where}
 GROUP BY f.source_id, provider
 """
-_RULES = """
-WITH first AS (
- SELECT job_id, source_id FROM (
-  SELECT job_id, source_id, row_number() OVER (PARTITION BY job_id ORDER BY first_seen_at, id) AS n
-  FROM postings WHERE source_id IS NOT NULL) WHERE n = 1)
-SELECT f.source_id, j.dismissed_rule_id, max(j.dismissed_rule_label), count(*)
-FROM jobs j LEFT JOIN first f ON f.job_id = j.id
-{where} {conjunction} j.triage = 'dismissed' AND j.dismissed_rule_id IS NOT NULL
-GROUP BY f.source_id, j.dismissed_rule_id
-"""
 
 
 def _empty():
     return {
         **dict.fromkeys(COUNTS, 0),
         "dismissed_by": dict.fromkeys(DISMISSED_BY, 0),
-        "dismissed_by_rule": [],
     }
 
 
@@ -171,9 +160,6 @@ class YieldService:
             }
             groups = conn.execute(
                 _JOBS.format(dismissed_by=dismissed_by, where=where), args
-            ).fetchall()
-            rules = conn.execute(
-                _RULES.format(where=where, conjunction="AND" if where else "WHERE"), args
             ).fetchall()
         rows = {}
 
@@ -236,36 +222,19 @@ class YieldService:
                 else:
                     for key in COUNTS:
                         known[key] += provider[key]
-        for source_id, rule_id, label, count in rules:
-            item = row_of(source_id if source_id in sources else None)
-            known = next((r for r in item["dismissed_by_rule"] if r["item_id"] == rule_id), None)
-            if known is None:
-                item["dismissed_by_rule"].append(
-                    {"item_id": rule_id, "label": label or "", "dismissed": count}
-                )
-            else:
-                known["dismissed"] += count
         items = list(rows.values())
         total = {
             **_empty(),
             "name": "All sources",
             "sources": sum(item["source_id"] is not None for item in items),
         }
-        by_rule = {}
         for item in items:
             for key in COUNTS:
                 total[key] += item[key]
             for key in DISMISSED_BY:
                 total["dismissed_by"][key] += item["dismissed_by"][key]
-            for rule in item["dismissed_by_rule"]:
-                entry = by_rule.setdefault(rule["item_id"], {**rule, "dismissed": 0})
-                entry["dismissed"] += rule["dismissed"]
             item["providers"].sort(key=lambda p: (-p["collected"], p["label"]))
-            item["dismissed_by_rule"].sort(key=lambda r: (-r["dismissed"], r["label"]))
             _rate(item, value.min_sample)
-        total["dismissed_by_rule"] = sorted(
-            by_rule.values(), key=lambda r: (-r["dismissed"], r["label"])
-        )
         _rate(total, value.min_sample)
         # Busiest sources first; the row without a source last.
         items.sort(key=lambda item: (item["source_id"] is None, -item["collected"], item["name"]))

@@ -25,9 +25,7 @@ from openings import backups
 from openings.actors import OWNER, acting_as
 from openings.app import create_app
 from openings.career import ClaimCreate, KnowledgeCreate, ProfileUpdate, TemplateCreate
-from openings.common import new_id, now
 from openings.documents import ContextCreate
-from openings.policy import SECTIONS
 from today_fixtures import seed_today
 
 RUN_PATH = "/__e2e__/run"
@@ -57,8 +55,8 @@ def identified(app, token):
 
 
 def seed_library(app, agent):
-    """A Profile, typed claims, template rules and the example policy, with one copied value."""
-    career, policy = app.state.career, app.state.policy
+    """A Profile, typed claims, template limits and the example Preferences."""
+    career, preferences = app.state.career, app.state.preferences
     career.update_profile(
         ProfileUpdate(
             expected_version=career.get_profile()["version"],
@@ -148,37 +146,27 @@ def seed_library(app, agent):
                 "max_pages": 1,
                 "engine": "lualatex",
                 "date_format": "MMM YYYY",
-                "statements": [
-                    {"label": "Opening", "statement": "Name the role and one result that fits it."},
-                    {"label": "Links", "statement": "No links in the body.", "scope": "body"},
-                ],
             },
         )
     )
-    example = json.loads((ROOT / "examples/policy.json").read_text())
-    for section in SECTIONS:
-        for item in example[section]:
-            item = dict(item)
-            with acting_as(agent if item.pop("proposed", False) else OWNER):
-                current = policy.get_policy(section)["version"]
-                policy.add_item(section, {"expected_version": current, **item})
-    # One value as the 0.19 upgrade copies it from Profile metadata: unconfirmed, structured.
-    with app.state.workspace.db.transaction() as conn:
-        stamp = now()
-        conn.execute(
-            "INSERT INTO policy_items(id,section,position,label,value,value_type,origin,origin_key,"
-            "created_by_kind,updated_by_kind,created_at,updated_at) "
-            "SELECT ?, 'facts', count(*), 'Interview availability', ?, 'structured', "
-            "'profile_metadata', 'interview_availability', 'system', 'system', ?, ? "
-            "FROM policy_items WHERE section='facts'",
-            (
-                new_id(),
-                json.dumps({"days": ["Tue", "Thu"], "from": "16:00", "timezone": "Europe/Zurich"}),
-                stamp,
-                stamp,
-            ),
+    example = json.loads((ROOT / "examples/preferences.json").read_text())
+    with acting_as(OWNER):
+        for section, items in example["sections"].items():
+            preferences.update_preferences(section, {"expected_version": 0, "items": items})
+        preferences.update_settings({"expected_version": 0, **example["settings"]})
+    # One statement an agent added.
+    with acting_as(agent):
+        current = preferences.get_preferences()["sections"][2]
+        preferences.update_preferences(
+            "facts",
+            {
+                "expected_version": current["version"],
+                "items": [
+                    *current["items"],
+                    {"text": "Interviews on Tuesday or Thursday after 16:00."},
+                ],
+            },
         )
-        conn.execute("UPDATE policy_sections SET version=version+1 WHERE section='facts'")
 
 
 def main():

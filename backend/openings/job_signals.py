@@ -1,4 +1,4 @@
-"""Ingest signals of a job and the policy rules that act on them.
+"""Ingest signals of a job: labels and filters, never an automatic dismissal.
 
 Four signals, all deterministic and without a model:
 
@@ -16,16 +16,7 @@ The text signals are stored in ``job_signals`` (derived, rebuildable: a row of
 another ``language_signals.FORMAT`` is computed again) when a job is collected or
 its title or posting changes. The duplicate is computed once, when the job is
 collected (or by the backfill for jobs collected before schema 12), against the
-jobs collected earlier.
-
-**Rules.** A ``decision`` policy item with a rule acts only while it is enabled
-and confirmed by the owner. Rules act once, when their signal arrives for a job
-nobody has triaged: at ingest for the text and duplicate signals, and when a
-collection run finds a posting no longer listed. They never act on jobs already
-reviewed, so restoring a job keeps it restored. A ``dismiss`` rule dismisses the
-job as the system, with the rule's item id and label on the job's dismissal and
-the item id in the ``triage_changed`` event; a ``flag`` rule only records that it
-matched. The first matching dismiss rule in policy order wins.
+jobs collected earlier. Signals label jobs and filter lists; they never dismiss a job.
 """
 
 from __future__ import annotations
@@ -48,7 +39,7 @@ SIGNALS_SQL = (
     "(SELECT json_object('format',s.format,'language',s.language,'language_confidence',"
     "s.language_confidence,'required',json(s.required),'welcome',json(s.welcome),"
     "'duplicate_checked',s.duplicate_checked,'duplicate_of',s.duplicate_of,"
-    "'duplicate_confidence',s.duplicate_confidence,'rules',json(s.rules)) "
+    "'duplicate_confidence',s.duplicate_confidence) "
     "FROM job_signals s WHERE s.job_id={alias}.id)"
 )
 UNLISTED_SQL = (
@@ -61,16 +52,12 @@ DISMISSAL_COLUMNS = (
     "dismissed_by_id",
     "dismissed_by_name",
     "dismissed_by_token_kind",
-    "dismissed_rule_id",
-    "dismissed_rule_label",
     "dismissed_reason",
 )
 # Who dismissed a job, as the Dismissed tab groups it.
 DISMISSED_BY = {
-    "rule": "j.dismissed_rule_id IS NOT NULL",
-    "agent": "j.dismissed_rule_id IS NULL AND j.dismissed_by_kind='token' "
-    "AND j.dismissed_by_token_kind='agent'",
-    "owner": "j.dismissed_rule_id IS NULL AND (j.dismissed_by_kind='owner' OR "
+    "agent": "j.dismissed_by_kind='token' AND j.dismissed_by_token_kind='agent'",
+    "owner": "(j.dismissed_by_kind='owner' OR "
     "(j.dismissed_by_kind='token' AND coalesce(j.dismissed_by_token_kind,'owner')='owner'))",
 }
 # Without a record (dismissed before 0.21 without an event) the conditions above
@@ -85,15 +72,8 @@ SIGNAL_FILTERS = {
     "AND p.unlisted_at IS NOT NULL)",
     "language_required": "EXISTS(SELECT 1 FROM job_signals s WHERE s.job_id=j.id "
     "AND s.required<>'[]')",
-    "flagged": "EXISTS(SELECT 1 FROM job_signals s, json_each(s.rules) r WHERE s.job_id=j.id "
-    "AND json_extract(r.value,'$.action')='flag')",
     "pending": "NOT EXISTS(SELECT 1 FROM job_signals s WHERE s.job_id=j.id)",
 }
-# A job nobody has reviewed: in the Inbox, without an application or a triage change.
-UNTOUCHED_SQL = (
-    "j.triage='inbox' AND NOT EXISTS(SELECT 1 FROM applications a WHERE a.job_id=j.id) "
-    "AND NOT EXISTS(SELECT 1 FROM events e WHERE e.job_id=j.id AND e.kind='triage_changed')"
-)
 _BATCH = 200
 
 
@@ -111,7 +91,6 @@ def signal_record(raw, unlisted_at=None):
             "duplicate": None,
             "no_longer_listed": unlisted_at is not None,
             "unlisted_at": unlisted_at,
-            "rules": [],
         }
     duplicate = None
     if data.get("duplicate_of"):
@@ -131,12 +110,11 @@ def signal_record(raw, unlisted_at=None):
         "duplicate": duplicate,
         "no_longer_listed": unlisted_at is not None,
         "unlisted_at": unlisted_at,
-        "rules": data["rules"],
     }
 
 
 def dismissal_record(row):
-    """Who dismissed a job, when, why and through which rule; None unless dismissed."""
+    """Who dismissed a job, when and why; None unless dismissed."""
     values = {name: row.pop(name, None) for name in DISMISSAL_COLUMNS}
     if row.get("triage") != "dismissed":
         return None
@@ -147,15 +125,8 @@ def dismissal_record(row):
         },
         "dismissed_by",
     )
-    rule = (
-        {"item_id": values["dismissed_rule_id"], "label": values["dismissed_rule_label"] or ""}
-        if values["dismissed_rule_id"]
-        else None
-    )
     category = (
-        "rule"
-        if rule
-        else "agent"
+        "agent"
         if by["kind"] == "token" and by["token_kind"] == "agent"
         else "owner"
         if by["kind"] == "owner" or (by["kind"] == "token")
@@ -165,13 +136,12 @@ def dismissal_record(row):
         "at": values["dismissed_at"],
         "by": by,
         "category": category,
-        "rule": rule,
         "reason": values["dismissed_reason"] or "",
     }
 
 
 def store_text_signals(conn, job_id, title, posting, content_version, stamp=None):
-    """Compute and store the text signals of one job, keeping its duplicate and rules."""
+    """Compute and store the text signals of one job, keeping its duplicate."""
     found = text_signals(title, posting)
     conn.execute(
         "INSERT INTO job_signals(job_id,format,content_version,language,language_confidence,"
@@ -193,59 +163,8 @@ def store_text_signals(conn, job_id, title, posting, content_version, stamp=None
     return found
 
 
-# Rules -----------------------------------------------------------------------
-
-
-def active_rules(conn):
-    """Enabled, owner-confirmed decision rules, in policy order."""
-    return [
-        {"item_id": row[0], "label": row[1], **json.loads(row[2])}
-        for row in conn.execute(
-            "SELECT id,label,rule FROM policy_items WHERE section='decision' AND rule IS NOT NULL "
-            "AND enabled=1 AND confirmed_at IS NOT NULL ORDER BY position,created_at,id"
-        )
-    ]
-
-
-def rule_matches(rule, signals):
-    """True when a rule's condition holds for a job's signals (``signal_record`` shape)."""
-    condition = rule["condition"]
-    operator, value = condition["operator"], condition["value"]
-    signal = rule["signal"]
-    if signal == "posting_language":
-        language = signals["language"]
-        if language is None:
-            return False
-        return (language in normalize_languages(value)) == (operator == "in")
-    if signal == "language_required":
-        wanted = set(normalize_languages(value))
-        groups = [set(group) for group in signals["required"]]
-        if operator == "in":
-            # The posting needs one of these languages and accepts no other in its place.
-            return any(group <= wanted for group in groups)
-        # The posting needs a language outside the list.
-        return any(not group & wanted for group in groups)
-    if signal == "likely_duplicate":
-        duplicate = signals["duplicate"]
-        return duplicate is not None and duplicate["confidence"] >= value
-    if signal == "no_longer_listed":
-        return signals["no_longer_listed"] == value
-    return False
-
-
-def matched_rules(rules, signals, signal_names):
-    """The rules of ``signal_names`` that match, and the first matching dismiss rule."""
-    matched = [
-        {"item_id": rule["item_id"], "label": rule["label"], "action": rule["action"]}
-        for rule in rules
-        if rule["signal"] in signal_names and rule_matches(rule, signals)
-    ]
-    dismiss = next((rule for rule in matched if rule["action"] == "dismiss"), None)
-    return matched, dismiss
-
-
 def normalize_languages(values):
-    """Language codes of a rule's values: "English" and "en" are both en."""
+    """Language codes: "English" and "en" are both en."""
     result = []
     for value in values:
         key = fold(value).strip()
@@ -294,7 +213,7 @@ def unlist_missing(conn, source, started_at, stamp):
 
 
 class SignalService:
-    """Computes signals at ingest, applies rules and fills signals of older jobs."""
+    """Computes signals at ingest and fills signals of older jobs."""
 
     def __init__(self, workspace):
         self.workspace = workspace
@@ -303,34 +222,17 @@ class SignalService:
 
     # Ingest -------------------------------------------------------------------
 
-    def after_ingest(self, job_id, apply_rules=True):
-        """Second step of ingesting a new job: its duplicate, then the rules.
+    def after_ingest(self, job_id):
+        """Second step of ingesting a new job: its duplicate.
 
         Runs outside the collector's database lock: building the duplicate index
-        the first time after a start reads every job. ``apply_rules`` is false for
-        a job the owner added in the dashboard: a rule never dismisses that.
+        the first time after a start reads every job.
         """
         duplicate = self.workspace.earlier_duplicate(job_id)
         with self.db.transaction() as conn:
             if not conn.execute("SELECT 1 FROM job_signals WHERE job_id=?", (job_id,)).fetchone():
                 return  # deleted or merged meanwhile
             self._store_duplicate(conn, job_id, duplicate)
-            row = conn.execute(
-                "SELECT "
-                + SIGNALS_SQL.format(alias="j")
-                + ","
-                + UNLISTED_SQL.format(alias="j")
-                + " FROM jobs j WHERE j.id=?",
-                (job_id,),
-            ).fetchone()
-            signals = signal_record(row[0], row[1])
-            rules = active_rules(conn) if apply_rules else []
-            if not rules:
-                return
-            matched, dismiss = matched_rules(
-                rules, signals, {"posting_language", "language_required", "likely_duplicate"}
-            )
-            self._act(conn, job_id, matched, dismiss)
 
     @staticmethod
     def _store_duplicate(conn, job_id, duplicate):
@@ -346,41 +248,10 @@ class SignalService:
             (other, confidence, job_id),
         )
 
-    def _act(self, conn, job_id, matched, dismiss):
-        """Record matched rules on an untouched job and dismiss it for a dismiss rule."""
-        if not matched:
-            return
-        untouched = conn.execute(
-            "SELECT 1 FROM jobs j WHERE j.id=? AND " + UNTOUCHED_SQL, (job_id,)
-        ).fetchone()
-        if not untouched:
-            return
-        current = conn.execute("SELECT rules FROM job_signals WHERE job_id=?", (job_id,)).fetchone()
-        known = json.loads(current[0]) if current else []
-        merged = known + [rule for rule in matched if rule not in known]
-        if current:
-            conn.execute("UPDATE job_signals SET rules=? WHERE job_id=?", (encode(merged), job_id))
-        if dismiss:
-            self.workspace.dismiss_by_rule(conn, job_id, dismiss)
-
-    def after_unlisted(self, job_ids):
-        """Apply no_longer_listed rules to the untouched jobs a run found delisted."""
-        if not job_ids:
-            return
-        with self.db.transaction() as conn:
-            rules = [rule for rule in active_rules(conn) if rule["signal"] == "no_longer_listed"]
-            if not rules:
-                return
-            for job_id in job_ids:
-                matched, dismiss = matched_rules(
-                    rules, {"no_longer_listed": True}, {"no_longer_listed"}
-                )
-                self._act(conn, job_id, matched, dismiss)
-
     # Backfill -----------------------------------------------------------------
 
     def backfill(self, stopping=None, duplicates=True):
-        """Compute the signals jobs do not have yet, in short batches. Never applies rules.
+        """Compute the signals jobs do not have yet, in short batches.
 
         First the text signals of jobs without a row (or with a row of another
         format), then the duplicate of every job not
@@ -425,43 +296,3 @@ class SignalService:
                         self._store_duplicate(conn, job_id, found.get(job_id))
                 counts["duplicates"] += len(ids)
         return counts
-
-    # Preview ------------------------------------------------------------------
-
-    def preview(self, rule, sample=5):
-        """How many Inbox jobs a rule matches now, without acting on any of them."""
-        with self.db.connect() as conn:
-            rows = conn.execute(
-                "SELECT j.id,"
-                + SIGNALS_SQL.format(alias="j")
-                + ","
-                + UNLISTED_SQL.format(alias="j")
-                + " FROM jobs j WHERE j.triage='inbox' AND NOT EXISTS("
-                "SELECT 1 FROM applications a WHERE a.job_id=j.id) ORDER BY j.created_at DESC,j.id"
-            ).fetchall()
-            matched, pending = [], 0
-            for job_id, raw, unlisted_at in rows:
-                signals = signal_record(raw, unlisted_at)
-                if not signals["computed"] and rule["signal"] != "no_longer_listed":
-                    pending += 1
-                    continue
-                if (
-                    rule["signal"] == "likely_duplicate"
-                    and signals["computed"]
-                    and not signals["duplicate_checked"]
-                ):
-                    pending += 1
-                    continue
-                if rule_matches(rule, signals):
-                    matched.append(job_id)
-            examples = self.workspace._job_summaries(conn, matched[:sample]) if matched else []
-        return {
-            "rule": rule,
-            "matches": len(matched),
-            "inbox": len(rows),
-            "pending": pending,
-            "examples": [
-                {key: item[key] for key in ("id", "title", "company", "location", "created_at")}
-                for item in examples
-            ],
-        }
