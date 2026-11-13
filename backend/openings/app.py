@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from mcp.server.transport_security import TransportSecuritySettings
 
-from . import __version__
+from . import __version__, backups
 from .activity import ActivityService
 from .actors import SYSTEM, acting_as
 from .agent_requests import RequestService
@@ -251,7 +251,21 @@ def create_app(database=None, start_worker=True):
     @app.get("/health")
     def health():
         workspace.db.one("SELECT 1")
-        return {"status": "ok", "version": __version__}
+        backup = backups.status(workspace.db)
+        worker = workspace.worker
+        age = worker.heartbeat_age() if worker else None
+        body = {
+            "status": "ok",
+            "version": __version__,
+            "backup": {key: backup[key] for key in ("last_at", "age_hours", "ok")},
+            "worker": {
+                "heartbeat_age_seconds": None if age is None else round(age, 1),
+            },
+        }
+        # A stalled scheduler fails the container healthcheck; a restore restarts it.
+        if worker and not workspace.maintenance and worker.stalled():
+            return JSONResponse({**body, "status": "worker_stalled"}, status_code=503)
+        return body
 
     router = APIRouter(prefix="/api/v1")
 

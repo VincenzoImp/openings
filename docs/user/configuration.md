@@ -19,6 +19,8 @@ tokens and the owner password.
 | `OPENINGS_TRUSTED_PROXIES` | empty: trust no proxy | Comma-separated IP addresses or CIDR ranges of reverse proxies whose `X-Forwarded-For` and `X-Forwarded-Proto` are trusted. Each client behind a trusted proxy gets its own sign-in limit. An invalid entry stops the start with an error. Option `--trusted-proxies`. | `__main__.py` |
 | `OPENINGS_RETENTION_DAYS` | `90` | Days finished collection runs and tasks are kept; `0` keeps everything. The 20 most recent finished runs of every source always stay. A value that is not a number falls back to 90 with a warning. | `retention.py` |
 | `OPENINGS_MAX_RESTORE_MB` | unset | An upper bound, in MiB, on the backup a restore accepts. The limit otherwise follows the free space on the data volume (see [Operations](operations.md)); this setting can only lower it. | `operations.py` |
+| `OPENINGS_BACKUP_DIR` | `<data dir>/backups` (the folder of the workspace file; `/data/backups` in the image) | Where the daily backups are written. Created with mode 0700 when missing; keep it on a volume the container can write. | `backups.py` |
+| `OPENINGS_BACKUP_KEEP` | `3` | How many daily backups are kept; older ones are deleted after a new one is verified. `0` turns daily backups off. A value that is not a number falls back to 3 with a warning. See [Backups](operations.md#backups). | `backups.py` |
 | `OPENINGS_COMPACT_MIN_MB` | `32` | At start, the database file is rewritten without its free pages when at least a quarter of the file and this many MiB are free. A very large value disables it. | `compaction.py` |
 
 ## Process and paths
