@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from openings import discovery as module
+from discovery_fixtures import patch_discovery
 from openings.app import create_app
 from openings.discovery import DiscoveryService, SourceCreate, SourcePreview
 from openings.errors import DomainError
@@ -19,14 +19,14 @@ def service(tmp_path, monkeypatch):
     workspace = Workspace(tmp_path / "adapters.sqlite")
     discovery = DiscoveryService(workspace)
     workspace.discovery = discovery
-    monkeypatch.setattr(module, "public_url", lambda url: url)
+    patch_discovery(monkeypatch, "public_url", lambda url: url)
     return discovery
 
 
 def transport(monkeypatch, send):
     original = httpx.Client
     monkeypatch.setattr(
-        module.httpx,
+        httpx,
         "Client",
         lambda **kwargs: original(**{**kwargs, "transport": httpx.MockTransport(send)}),
     )

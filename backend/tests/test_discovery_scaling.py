@@ -2,10 +2,11 @@
 
 import pytest
 
-from openings import discovery as module
+from discovery_fixtures import patch_discovery
 from openings.db import encode
 from openings.discovery import CollectionWrite, DiscoveryService
 from openings.errors import DomainError
+from openings.scheduling import next_due
 from openings.workspace import Workspace
 
 
@@ -111,7 +112,7 @@ def test_source_page_batches_reads_and_preserves_provider_summaries(populated, m
 def test_scheduler_does_not_rebuild_collection_or_source_summaries(populated, monkeypatch):
     workspace, service, _ = populated
     calls = []
-    original = module.next_due
+    original = next_due
 
     def due(*args, **kwargs):
         calls.append(args)
@@ -120,7 +121,7 @@ def test_scheduler_does_not_rebuild_collection_or_source_summaries(populated, mo
     def summary(*args, **kwargs):
         pytest.fail("Scheduling must not build display summaries for each source")
 
-    monkeypatch.setattr(module, "next_due", due)
+    patch_discovery(monkeypatch, "next_due", due)
     monkeypatch.setattr(service, "get_collection", summary)
     monkeypatch.setattr(service, "_source", summary)
     service.schedule_due()

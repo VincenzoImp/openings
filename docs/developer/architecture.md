@@ -19,23 +19,24 @@ flowchart LR
 
 | Location | Responsibility |
 |---|---|
-| `backend/openings/workspace.py` | Job identities, triage, notes, application attempts and reporting |
+| `backend/openings/workspace/` | Job identities, triage, notes, application attempts and reporting |
 | `backend/openings/duplicates.py`, `duplicate_signals.py` | Read-only duplicate candidates: per-job signals, pair confidence and groups |
 | `backend/openings/language_signals.py` | Deterministic text signals: the posting's language and the languages it requires or welcomes |
 | `backend/openings/job_signals.py` | Ingest signals of each job (stored, backfilled), listing observations, the dismissal record and policy rules applied to new jobs |
 | `backend/openings/source_yield.py` | Yield of each collection source and search, from collected jobs to employer answers |
-| `backend/openings/career.py` | Profile, detailed evidence, claims, templates and instructions |
-| `backend/openings/policy.py` | The owner's policy: four sections of items, section versions, owner confirmation, signal rules |
-| `backend/openings/documents.py` | Frozen contexts, document revisions and scoped file transfers |
+| `backend/openings/career/` | Profile, detailed evidence, claims, templates and instructions |
+| `backend/openings/policy/` | The owner's policy: four sections of items, section versions, owner confirmation, signal rules |
+| `backend/openings/documents/` | Frozen contexts, document revisions and scoped file transfers |
 | `backend/openings/snapshots.py`, `compaction.py` | Content-addressed storage of frozen contexts; giving freed pages back to the data volume |
 | `backend/openings/retention.py` | Refresh events, what an observation stores, pruning of finished collection runs and tasks |
 | `backend/openings/operations.py` | Backup credentials, restore, the room a restore needs and storage status |
 | `backend/openings/activity.py`, `actors.py` | Actor of each change, agent runs with reports, questions for the owner, change log |
 | `backend/openings/agent_requests.py`, `subjects.py` | Requests for the agent; the subject reference shared with questions |
-| `backend/openings/discovery.py` | Typed sources, schedules and queue operations |
+| `backend/openings/discovery/` | Typed sources, schedules and queue operations |
 | `backend/openings/collectors` | Adapter capability catalog, typed options and shared HTTP policy/runtime |
 | `backend/openings/worker.py` | Independent scheduling and acquisition lanes |
-| `backend/openings/app.py`, `api.py` | Authentication, REST/MCP registration and dashboard hosting |
+| `backend/openings/interfaces/` | REST routes and MCP tools of each area, bound to the shared services |
+| `backend/openings/app.py`, `auth.py` | HTTP host: authentication, middleware, error bodies, the MCP mount and dashboard hosting |
 | `backend/openings/schema.sql` | Relational ownership, SQLite indexes and JSON payloads |
 | `frontend/src` | Dashboard using REST; no duplicated domain decisions |
 | `backend/openings/skills.py`, `skill_notes.py` | Shipped skills served read-only; per-workspace local notes appended when a skill is served |
@@ -48,6 +49,32 @@ authoritative for individual input fields. The generated
 [parity matrix](parity.md) shows each operation's REST route, MCP tool and real
 dashboard path, and lists every gap. Read [REST](../user/api.md) and
 [agent](../user/agents.md) guides for usable examples.
+
+## Module map
+
+No backend module exceeds about 800 lines. A large service is a package whose
+`service.py` defines the class other code uses; that class is composed of one
+class per concern, each in its own module, and the package's `__init__.py`
+re-exports the service and its inputs, so `from openings.workspace import
+Workspace` keeps working. The composed classes share the service's state
+(`self.db`, `self.workspace`) and call each other through `self`; a method
+belongs to the module of its concern.
+
+| Package | Modules |
+|---|---|
+| `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage, rule dismissals and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py`; `applications.py` derived readiness, preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, responses, Ready and deletion; `bulk.py` per-item bulk results; `overview.py` the funnel |
+| `discovery/` | `service.py` the provider gate (`http_budget`, `fetch_bytes`); `models.py` typed inputs; `network.py` the public-address policy and the bounded fetch; `resolution.py` board detection and source configuration; `feeds.py` posting readers (Lever, Ashby, RSS) and adapter dispatch; `sources.py` source schemas, preview and writes; `runs.py` the global switch, provider policies, queueing, scheduling and run records; `tasks.py` leases, retry and running one collection |
+| `documents/` | `contexts.py` frozen contexts and their staleness reports; `revisions.py` content validation, review, consistency and deletion; `files.py` owned files and scoped transfer grants; `models.py` inputs |
+| `career/` | `profile.py` Profile and instructions; `entries.py` Career entries; `claims.py`; `templates.py`; `imports.py`; `models.py` inputs and defaults; `records.py` row helpers shared with documents |
+| `policy/` | `service.py` item writes, confirmation and rule preview; `models.py` sections, the signal registry `SIGNALS` and inputs; `records.py` records as read and the frozen policy; `upgrade.py` the schema 9 to 10 step |
+| `interfaces/` | One module per area binding its service, with `register_api` for REST routes and `register_mcp` for MCP tools: `career.py`, `documents.py`, `discovery.py`, `activity.py`, `agent_requests.py`, `policy.py`, `outcomes.py`, `insights.py`, `source_yield.py`, `skills.py`; `core.py` (`register_core`, `register_core_mcp`: workspace, jobs, notes, applications, overview) and `system.py` (`register_system`, both transports: sign-in, tokens, inventory, backup, restore, examples, export) |
+
+Services never import FastAPI routing or MCP registration; `interfaces/` binds
+them, and `app.py` calls each area in a fixed order, which is the order of the
+OpenAPI paths and the MCP tool list. Smaller concerns stay single modules
+(`activity.py`, `outcomes.py`, `insights.py`, `staleness.py`, `job_signals.py`
+and the others in the code map). When a module approaches the limit, split it the
+same way rather than growing it.
 
 ## Data and workflow rules
 
@@ -337,7 +364,9 @@ cannot overwrite a current result. See [source configuration](../user/sources.md
 ## Extending the app
 
 Add behavior in the shared service before exposing it through REST, MCP and the
-dashboard. Update the operation inventory when adding an operation. Keep
+dashboard: the method goes in the module of its concern (see the module map),
+its route and tool in the area's `interfaces/` module. Update the operation
+inventory when adding an operation. Keep
 operator/bootstrap and raw-byte transport differences explicit.
 
 Provider adapters emit bounded structured postings and use the shared HTTP gate.

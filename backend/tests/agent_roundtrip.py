@@ -398,14 +398,18 @@ def main():
         app = create_app(folder / "workspace.sqlite", start_worker=False)
         if args.standalone_registration:
             from openings import career, documents
+            from openings.interfaces import (
+                career as career_interface,
+                documents as documents_interface,
+            )
 
             service = career.CareerService(app.state.workspace)
             files = documents.DocumentService(app.state.workspace)
             router = APIRouter(prefix="/api/v1")
-            career.register_api(router, service)
-            documents.register_api(router, files)
-            career.register_mcp(app.state.mcp, service)
-            documents.register_mcp(app.state.mcp, files)
+            career_interface.register_api(router, service)
+            documents_interface.register_api(router, files)
+            career_interface.register_mcp(app.state.mcp, service)
+            documents_interface.register_mcp(app.state.mcp, files)
             catchalls = [
                 route for route in app.router.routes if getattr(route, "path", "") == "/{path:path}"
             ]

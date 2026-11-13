@@ -1,6 +1,7 @@
 """Consistent JSON exports survive streaming thread changes and failed downloads."""
 
 import asyncio
+import json
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
@@ -8,8 +9,8 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.requests import ClientDisconnect
 
-import openings.app as app_module
-from openings.app import RecordsResponse, create_app
+from openings.app import create_app
+from openings.interfaces.system import RecordsResponse
 from openings.models import JobInput
 
 
@@ -87,7 +88,7 @@ def test_export_keeps_one_snapshot_during_concurrent_writes(tmp_path, monkeypatc
         JobInput(title="First role", company="Example", posting="Build reliable services.")
     )
     workspace.set_settings("instructions", {"general": "Before export"})
-    dumps = app_module.json.dumps
+    dumps = json.dumps
     changed = False
 
     def write_during_export(value, *args, **kwargs):
@@ -102,7 +103,7 @@ def test_export_keeps_one_snapshot_during_concurrent_writes(tmp_path, monkeypatc
 
     with TestClient(app) as client:
         client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
-        monkeypatch.setattr(app_module.json, "dumps", write_during_export)
+        monkeypatch.setattr(json, "dumps", write_during_export)
         response = client.get("/api/v1/export")
     archive = response.json()
     assert changed
@@ -185,7 +186,7 @@ async def test_export_preserves_nullable_career_dates_and_scoped_mcp_download(tm
         client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
         archive = client.get("/api/v1/export").json()
         grant = await app.state.mcp.call_tool("workspace_export", {})
-        ticket = app_module.json.loads(grant.content[0].text)
+        ticket = json.loads(grant.content[0].text)
         client.cookies.clear()
         scoped = client.get(ticket["url"], headers=ticket["headers"])
         assert scoped.status_code == 200

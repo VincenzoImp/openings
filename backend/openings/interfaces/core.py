@@ -1,3 +1,5 @@
+"""REST routes and MCP tools of the workspace: jobs, notes, applications and the overview."""
+
 import os
 from typing import Annotated
 
@@ -5,10 +7,10 @@ from fastapi import APIRouter, Query, Request
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 
-from . import __version__
-from .actors import current_actor
-from .db import SCHEMA_VERSION
-from .models import (
+from .. import __version__
+from ..actors import current_actor
+from ..db import SCHEMA_VERSION
+from ..models import (
     ApplicationBulk,
     ApplicationInput,
     ApplicationPatch,
@@ -27,7 +29,7 @@ from .models import (
     PeriodQuery,
     TriageInput,
 )
-from .operations import storage_status
+from ..operations import storage_status
 
 
 def register_core(router: APIRouter, workspace, requests):
@@ -68,7 +70,7 @@ def register_core(router: APIRouter, workspace, requests):
 
     @router.post("/jobs")
     async def ingest(value: JobInput):
-        from .fetching import complete_input
+        from ..fetching import complete_input
 
         value = await complete_input(value, workspace.discovery)
         return workspace.ingest_job(value)
@@ -200,7 +202,7 @@ def register_core_mcp(mcp, workspace, requests):
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=True))
     async def job_ingest(value: JobInput) -> dict:
         """Add a URL, pasted text or structured job. Duplicate identities preserve history. A new job gets its ingest signals, and an enabled rule the owner confirmed may dismiss it at once (dismissal.rule names the rule; restore it with job_triage)."""
-        from .fetching import complete_input
+        from ..fetching import complete_input
 
         value = await complete_input(value, workspace.discovery)
         return workspace.ingest_job(value)
