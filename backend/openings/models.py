@@ -131,6 +131,27 @@ def valid_deadline(value):
     return value
 
 
+def latest_day():
+    """The latest calendar day anywhere on Earth now (UTC+14): later days are in the future."""
+    return (datetime.now(UTC) + timedelta(hours=14)).date().isoformat()
+
+
+def past_day(value):
+    """An ISO date that is not in the future, as an employer response or a closing has."""
+    value = valid_deadline(value)
+    if value is not None and value > latest_day():
+        raise ValueError("Use a day that is not in the future.")
+    if value is not None and value < "2000-01-01":
+        raise ValueError("Use a day from 2000 on.")
+    return value
+
+
+# How an application ended: hired (accepted), turned down by the employer (rejected),
+# stopped by the owner (not_pursued) or no answer within the no-reply period (no_response).
+Outcome = Literal["accepted", "rejected", "not_pursued", "no_response"]
+OUTCOMES = ("accepted", "rejected", "not_pursued", "no_response")
+
+
 class ApplicationInput(Input):
     job_id: str
     note: str = Field(default="", max_length=30_000)
@@ -148,7 +169,10 @@ class ApplicationInput(Input):
 
 class ApplicationPatch(Versioned):
     status: Literal["draft", "applied", "interview", "offer", "closed"] | None = None
-    outcome: Literal["accepted", "rejected", "not_pursued"] | None = None
+    outcome: Outcome | None = Field(
+        default=None,
+        description="Required to close: accepted, rejected (by the employer), not_pursued (stopped by the owner) or no_response (no answer within the no-reply period; only for a sent application).",
+    )
     note: str | None = Field(default=None, max_length=30_000)
     questions: list[Question] | None = Field(default=None, max_length=100)
     answers: dict[str, Any] | None = None
@@ -162,11 +186,29 @@ class ApplicationPatch(Versioned):
         max_length=100,
         description="Replaces the whole requirement list; include existing ids to keep them.",
     )
+    concluded_on: str | None = Field(
+        default=None,
+        description="With outcome no_response: the day it was concluded that no reply will come (YYYY-MM-DD, not in the future); today (UTC) when omitted.",
+    )
+    response_date: str | None = Field(
+        default=None,
+        description="The day the employer responded (YYYY-MM-DD, not in the future), for a change that records an employer response: moving to Interview or Offer, or closing as rejected or accepted. Today (UTC) when omitted.",
+    )
+    response_note: str | None = Field(
+        default=None,
+        max_length=2000,
+        description="A note on the employer response this change records.",
+    )
 
     @field_validator("applied_at")
     @classmethod
     def valid_applied_date(cls, value):
         return normalized_date(value)
+
+    @field_validator("concluded_on", "response_date")
+    @classmethod
+    def valid_past_day(cls, value):
+        return past_day(value)
 
     @field_validator("deadline")
     @classmethod
@@ -216,7 +258,7 @@ def unique_items(items, label):
 class ApplicationBulk(Input):
     action: Literal["close", "reopen", "delete", "mark_ready", "unmark_ready"]
     items: list[BulkItem] = Field(min_length=1, max_length=200)
-    outcome: Literal["accepted", "rejected", "not_pursued"] | None = None
+    outcome: Outcome | None = None
     status: Literal["draft", "applied", "interview", "offer"] | None = None
 
     @model_validator(mode="after")
@@ -310,8 +352,16 @@ class ApplicationQuery(Input):
     q: str = Field(default="", max_length=1000)
     job_id: str | None = None
     status: Literal["draft", "applied", "interview", "offer", "closed"] | None = None
-    outcome: Literal["accepted", "rejected", "not_pursued"] | None = None
+    outcome: Outcome | None = None
     company: str | None = Field(default=None, max_length=300)
+    ready: bool | None = Field(
+        default=None,
+        description="true: only applications marked ready (the stored step); false: only those not marked.",
+    )
+    no_reply_due: bool | None = Field(
+        default=None,
+        description="true: only Applied applications sent longer ago than the no-reply period (the policy's No reply decision, else 30 days), the ones to close as no_response; false: every other application.",
+    )
     readiness: (
         Literal["blocked", "none", "missing_pdf", "unreviewed", "reviewed", "ready"] | None
     ) = Field(

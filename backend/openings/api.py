@@ -236,12 +236,12 @@ def register_core_mcp(mcp, workspace, requests):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def applications_list(value: ApplicationQuery | None = None) -> dict:
-        """Read paginated application summaries, stage totals and the ready count. Filter by exact job_id, query, stage, outcome, company or readiness (readiness=ready is the stored Ready step; reviewed passes every check but is not marked); applied_since and applied_until filter by the time recorded as applied; sort by deadline, priority or ready time."""
+        """Read paginated application summaries, stage totals and the ready count. Filter by exact job_id, query, stage, outcome, company or readiness (readiness=ready is the stored Ready step; reviewed passes every check but is not marked; ready=false lists the Preparing ones not marked); applied_since and applied_until filter by the time recorded as applied; no_reply_due=true lists the Applied applications past the no-reply period, to propose closing them as no_response. Each row has its last_response; no_reply gives the period, its source (the policy's No reply decision item and whether the owner confirmed it, or the 30-day default) and the number due. Sort by deadline, priority or ready time."""
         return workspace.list_applications(**(value or ApplicationQuery()).model_dump())
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
     def applications_bulk(value: ApplicationBulk) -> dict:
-        """Close (with outcome), reopen (to a non-Closed stage), mark_ready, unmark_ready or delete at most 200 explicit application IDs/versions, with per-item results. Delete is permanent."""
+        """Close (with outcome: accepted, rejected, not_pursued or no_response), reopen (to a non-Closed stage), mark_ready, unmark_ready or delete at most 200 explicit application IDs/versions, with per-item results. Closing as rejected records a rejection response dated today; no_response needs a sent application and is concluded today. Delete is permanent."""
         return workspace.bulk_applications(value)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
@@ -261,7 +261,7 @@ def register_core_mcp(mcp, workspace, requests):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def application_get(application_id: str) -> dict:
-        """Read a single application, its job, employer requirements, derived readiness and the stored Ready step (ready_at, ready_by)."""
+        """Read a single application, its job, employer requirements, derived readiness, the stored Ready step (ready_at, ready_by) and its employer responses."""
         return workspace.get_application(application_id)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
@@ -271,7 +271,7 @@ def register_core_mcp(mcp, workspace, requests):
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     def application_update(application_id: str, value: ApplicationPatch) -> dict:
-        """Record progress, priority, deadline, employer requirements and questions/answers explicitly; editing documents never marks sent. The returned job is the compact summary."""
+        """Record progress, priority, deadline, employer requirements and questions/answers explicitly; editing documents never marks sent. Moving to Interview or Offer, or closing as rejected (or accepted without an offer on record), records the matching employer response dated response_date (today by default) with response_note. Close as no_response (with concluded_on, today by default) only a sent application whose employer did not answer within the no-reply period. Record only what the owner reported. The returned job is the compact summary."""
         return workspace.update_application(application_id, value)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))

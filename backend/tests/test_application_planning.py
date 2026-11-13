@@ -12,6 +12,7 @@ from openings.documents import DocumentCreate, ReviewUpdate, UploadReservation
 from openings.errors import DomainError
 from openings.operations import restore_database
 from openings.workspace import Workspace
+from outcome_fixtures import SCHEMA_ELEVEN_COLUMNS
 from schema_fixtures import SCHEMA_EIGHT_COLUMNS, columns, make_schema_seven
 
 SCHEMA_SEVEN_COLUMNS = ("requirements", "deadline", "priority")
@@ -77,7 +78,11 @@ def test_schema_six_upgrade_preserves_records_and_matches_a_new_workspace(tmp_pa
         index = "SELECT name FROM sqlite_master WHERE type='index' AND name='applications_deadline'"
         assert conn.execute(index).fetchone()
         for table, rows in before.items():
-            added = (*SCHEMA_SEVEN_COLUMNS, *SCHEMA_EIGHT_COLUMNS.get(table, ()))
+            added = (
+                *SCHEMA_SEVEN_COLUMNS,
+                *SCHEMA_EIGHT_COLUMNS.get(table, ()),
+                *SCHEMA_ELEVEN_COLUMNS.get(table, ()),
+            )
             names = [row[0] for row in columns(conn, table) if row[0] not in added]
             assert (
                 conn.execute(f"SELECT {','.join(names)} FROM {table} ORDER BY 1").fetchall() == rows

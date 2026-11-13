@@ -1036,7 +1036,7 @@
         "applications_list"
       ],
       "dashboard": "Applications: list/Kanban filters",
-      "notes": "q, job_id, status, outcome, company, readiness (blocked/none/missing_pdf/unreviewed/reviewed/ready), ready_since, ready_until, applied_since, applied_until, sort (updated/newest/oldest/company/stage/applied/deadline/priority/ready), limit, offset; job_id is exact; stage_counts and ready_count span all matching records. readiness=ready is the stored Ready step; reviewed passes every check but is not marked ready. Rows include priority, deadline, readiness, ready_at, ready_by and unresolved/blocking requirement counts; full requirements are on the attempt read."
+      "notes": "q, job_id, status, outcome (accepted/rejected/not_pursued/no_response), company, readiness (blocked/none/missing_pdf/unreviewed/reviewed/ready), ready (marked ready or not), no_reply_due (Applied longer than the no-reply period), ready_since, ready_until, applied_since, applied_until, sort (updated/newest/oldest/company/stage/applied/deadline/priority/ready), limit, offset; job_id is exact; stage_counts and ready_count span all matching records. readiness=ready is the stored Ready step; reviewed passes every check but is not marked ready. Rows include priority, deadline, readiness, ready_at, ready_by, concluded_on, last_response and unresolved/blocking requirement counts; full requirements are on the attempt read. no_reply gives the period in days, its source (the policy's No reply decision item, confirmed or not, or the 30-day default) and the number of Applied applications past it (due)."
     },
     {
       "id": "applications.read",
@@ -1084,7 +1084,7 @@
         "application_update"
       ],
       "dashboard": "Applications: progress, planning, requirements and questions/answers",
-      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history. Entering Closed requires an explicit outcome. Reopening enforces one open attempt per job. applied_at, priority or deadline null clears the value. requirements replaces the whole list; keep existing ids. The returned job is the compact job summary. Leaving Preparing or adding/unresolving a blocking requirement clears the stored Ready step."
+      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history. Entering Closed requires an explicit outcome: accepted, rejected, not_pursued or no_response (no answer within the no-reply period; only for a sent application, with concluded_on, today by default). Moving to Interview or Offer, or closing as rejected (or accepted without an offer on record) records the matching employer response, dated response_date (today by default) with response_note; a response of that kind on that day is never repeated, and its date stays correctable with responses.update. Reopening enforces one open attempt per job. applied_at, priority or deadline null clears the value. requirements replaces the whole list; keep existing ids. The returned job is the compact job summary. Leaving Preparing or adding/unresolving a blocking requirement clears the stored Ready step."
     },
     {
       "id": "applications.ready",
@@ -1132,7 +1132,7 @@
         "applications_bulk"
       ],
       "dashboard": "Applications: list selection toolbar",
-      "notes": "At most 200 versioned items, with per-item results/errors. Close requires an outcome; reopen requires a non-Closed stage and respects one open attempt per job. mark_ready is refused per item with application_not_ready while a readiness check fails."
+      "notes": "At most 200 versioned items, with per-item results/errors. Close requires an outcome (no_response only for sent applications, concluded today; rejected records a rejection response dated today); reopen requires a non-Closed stage and respects one open attempt per job. mark_ready is refused per item with application_not_ready while a readiness check fails."
     },
     {
       "id": "applications.history",
@@ -1148,6 +1148,70 @@
         "application_history"
       ],
       "dashboard": "Applications: history"
+    },
+    {
+      "id": "responses.list",
+      "group": "Applications and documents",
+      "operation": "List the employer responses of an application",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/applications/{application_id}/responses"
+        }
+      ],
+      "mcp": [
+        "responses_list"
+      ],
+      "dashboard": "Application review: Timeline, employer responses; Applications: Employer response column",
+      "notes": "Newest day first. Each response has kind (rejection, interview, offer, other), date, note, estimated (a day the 0.20 upgrade took from updated_at), origin (manual, stage or upgrade), version and created_by/updated_by. The application read also carries responses, and every list row its last_response."
+    },
+    {
+      "id": "responses.add",
+      "group": "Applications and documents",
+      "operation": "Record an employer response to a sent application",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/applications/{application_id}/responses"
+        }
+      ],
+      "mcp": [
+        "responses_add"
+      ],
+      "dashboard": "Applications: Record response on an Applied, Interview or Offer row; Application review: Timeline, Record a response",
+      "notes": "kind, date (YYYY-MM-DD, not in the future), note and an optional idempotency_key. Only a sent application (applied_at, or Applied/Interview/Offer) accepts one: 409 application_not_sent otherwise. One response of a kind per day (409 response_exists with details.response_id); other may repeat. Never moves the stage: applications.update with response_date records the response together with the stage. An agent records only a response the owner reported."
+    },
+    {
+      "id": "responses.update",
+      "group": "Applications and documents",
+      "operation": "Correct an employer response's kind, day or note",
+      "rest": [
+        {
+          "method": "PATCH",
+          "path": "/api/v1/responses/{response_id}"
+        }
+      ],
+      "mcp": [
+        "responses_update"
+      ],
+      "dashboard": "Application review: Timeline, Edit on a response",
+      "notes": "expected_version; a stale one returns 409 with details.current_version. A corrected date clears estimated."
+    },
+    {
+      "id": "responses.remove",
+      "group": "Applications and documents",
+      "operation": "Delete an employer response recorded by mistake",
+      "rest": [
+        {
+          "method": "DELETE",
+          "path": "/api/v1/responses/{response_id}"
+        }
+      ],
+      "mcp": [
+        "responses_remove"
+      ],
+      "dashboard": "Application review: Timeline, Remove on a response",
+      "notes": "expected_version is required. The application's stage and outcome do not change."
     },
     {
       "id": "contexts.list",
