@@ -77,6 +77,11 @@ from .skills import (
     register_api as register_skills_api,
     register_mcp as register_skills_mcp,
 )
+from .source_yield import (
+    YieldService,
+    register_api as register_yield_api,
+    register_mcp as register_yield_mcp,
+)
 from .transfers import SnapshotResponse
 from .worker import Worker
 from .workspace import Workspace
@@ -151,6 +156,7 @@ def create_app(database=None, start_worker=True):
     policy = PolicyService(workspace)
     responses = ResponseService(workspace)
     insights = InsightsService(workspace)
+    source_yield = YieldService(workspace)
     workspace.discovery = discovery
     workspace.worker = Worker(workspace, discovery) if start_worker else None
     allowed_hosts = ["localhost:*", "127.0.0.1:*", "[::1]:*"]
@@ -171,6 +177,7 @@ def create_app(database=None, start_worker=True):
     register_policy_mcp(mcp, policy)
     register_response_mcp(mcp, responses)
     register_insights_mcp(mcp, insights)
+    register_yield_mcp(mcp, source_yield)
     skills = SkillLibrary()
     register_skills_mcp(mcp, skills)
 
@@ -199,6 +206,7 @@ def create_app(database=None, start_worker=True):
     app.state.activity, app.state.requests = activity, requests
     app.state.policy = policy
     app.state.responses, app.state.insights = responses, insights
+    app.state.source_yield = source_yield
     app.add_middleware(BodyLimit)
     # The client address is the real one only when uvicorn trusts the proxy
     # (OPENINGS_TRUSTED_PROXIES); otherwise every proxied client shares one bucket.
@@ -445,6 +453,9 @@ def create_app(database=None, start_worker=True):
             try:
                 result = await asyncio.to_thread(restore_database, workspace, name)
                 workspace.event("workspace_restored", subject=("workspace", "backup"))
+                # Other jobs now: build the duplicate index and missing signals again.
+                workspace.reset_duplicates()
+                workspace.warm_duplicates()
                 return result
             except sqlite3.DatabaseError:
                 raise DomainError(422, "backup_format", "This database backup could not be read.")
@@ -487,6 +498,7 @@ def create_app(database=None, start_worker=True):
         def records():
             json_fields = {
                 "jobs": ["metadata", "overrides"],
+                "job_signals": ["required", "welcome", "distinct_from", "rules"],
                 "postings": ["payload"],
                 "applications": ["questions", "answers", "requirements"],
                 "events": ["payload"],
@@ -502,6 +514,7 @@ def create_app(database=None, start_worker=True):
             }
             tables = [
                 "jobs",
+                "job_signals",
                 "postings",
                 "applications",
                 "responses",
@@ -600,6 +613,7 @@ def create_app(database=None, start_worker=True):
     register_policy_api(router, policy)
     register_response_api(router, responses)
     register_insights_api(router, insights)
+    register_yield_api(router, source_yield)
     app.include_router(router)
     # Building the transport also creates the session manager the lifespan runs.
     app.mount(

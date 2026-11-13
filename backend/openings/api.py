@@ -13,6 +13,7 @@ from .models import (
     ApplicationPatch,
     ApplicationQuery,
     ApplicationReady,
+    DistinctInput,
     DuplicateQuery,
     JobBulk,
     JobInput,
@@ -80,7 +81,11 @@ def register_core(router: APIRouter, workspace, requests):
 
     @router.post("/jobs/{job_id}/triage")
     def triage(job_id: str, value: TriageInput):
-        return workspace.set_triage(job_id, value.triage, value.expected_version)
+        return workspace.set_triage(job_id, value.triage, value.expected_version, value.reason)
+
+    @router.post("/jobs/{job_id}/distinct")
+    def distinct(job_id: str, value: DistinctInput):
+        return workspace.mark_distinct(job_id, value.other_id)
 
     @router.post("/jobs/{job_id}/merge")
     def merge(job_id: str, value: MergeInput):
@@ -166,12 +171,12 @@ def register_core_mcp(mcp, workspace, requests):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def jobs_search(value: JobQuery | None = None) -> dict:
-        """Search compact paginated job summaries with location/source/remote/date/queue filters; include_facets=true adds filter value lists. Read job_get for full content."""
+        """Search compact paginated job summaries with location/source/remote/date/queue filters; include_facets=true adds filter value lists and include_counts=true the size of each queue. Each job has its ingest signals (posting language, languages the posting requires or welcomes, the earlier job it likely duplicates with a confidence, whether the source no longer lists it, policy rules that matched) and, when dismissed, its dismissal (who, why, which rule). Filter by signal, posting_language, posting_language_not, requires, dismissed_by or rule_id. Read job_get for full content."""
         return workspace.list_jobs(**(value or JobQuery()).model_dump())
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
     def jobs_bulk(value: JobBulk) -> dict:
-        """Apply saved/dismissed/inbox/forget to at most 200 explicit job IDs/versions, with per-item results. Forget is permanent."""
+        """Apply saved/dismissed/inbox/forget to at most 200 explicit job IDs/versions, with per-item results; reason (dismissed only) is stored on each dismissal. Forget is permanent."""
         return workspace.bulk_jobs(value)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
@@ -186,12 +191,12 @@ def register_core_mcp(mcp, workspace, requests):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def job_get(job_id: str) -> dict:
-        """Read full job text, metadata, versions."""
+        """Read full job text, metadata, versions, observations (with unlisted_at when a board stopped listing one), signals and dismissal."""
         return workspace.get_job(job_id)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=True))
     async def job_ingest(value: JobInput) -> dict:
-        """Add a URL, pasted text or structured job. Duplicate identities preserve history."""
+        """Add a URL, pasted text or structured job. Duplicate identities preserve history. A new job gets its ingest signals, and an enabled rule the owner confirmed may dismiss it at once (dismissal.rule names the rule; restore it with job_triage)."""
         from .fetching import complete_input
 
         value = await complete_input(value, workspace.discovery)
@@ -204,8 +209,13 @@ def register_core_mcp(mcp, workspace, requests):
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
     def job_triage(job_id: str, value: TriageInput) -> dict:
-        """Set inbox/saved/dismissed and return the compact job summary. Use queue=inbox/shortlist/applications for actionable queues; saved is retained interest."""
-        return workspace.set_triage(job_id, value.triage, value.expected_version)
+        """Set inbox/saved/dismissed and return the compact job summary. Use queue=inbox/shortlist/applications for actionable queues; saved is retained interest. When dismissing, give a short reason (shown to the owner beside the dismissal); the dismissal records who made it and can be restored."""
+        return workspace.set_triage(job_id, value.triage, value.expected_version, value.reason)
+
+    @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
+    def job_distinct(job_id: str, value: DistinctInput) -> dict:
+        """Record that a job flagged as a likely duplicate (signals.duplicate) is a different vacancy from other_id: the flag is cleared and does not return. Merge verified duplicates with job_merge instead."""
+        return workspace.mark_distinct(job_id, value.other_id)
 
     @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
     def job_forget(job_id: str, expected_version: int) -> dict:

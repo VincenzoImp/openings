@@ -74,7 +74,7 @@ def test_sections_have_their_own_version_and_items_keep_a_dense_order(services):
     empty = policy.get_policy()
     assert [section["section"] for section in empty["sections"]] == list(SECTIONS)
     assert all(section["version"] == 0 and not section["items"] for section in empty["sections"])
-    assert empty["signals_applied"] is False
+    assert empty["signals_applied"] is True
     assert {signal["signal"] for signal in empty["signals"]} == {
         "language_required",
         "posting_language",
@@ -321,8 +321,8 @@ def test_a_rule_is_validated_stays_off_and_only_the_owner_enables_it(services):
     with acting_as(OWNER):
         cleared = policy.update_item(item["id"], {"expected_version": 4, "rule": None})
         assert cleared["item"]["rule"] is None and cleared["item"]["enabled"] is False
-    # Nothing applies a rule yet: the registry says so.
-    assert policy.get_policy()["signals_applied"] is False
+    # Rules are applied now; the registry says so.
+    assert policy.get_policy()["signals_applied"] is True
 
 
 def test_values_are_small_and_typed(services):

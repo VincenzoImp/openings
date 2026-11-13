@@ -36,6 +36,8 @@ from schema_fixtures import make_schema_seven
 MIB = 1024**2
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 # The statement that finds the observation a refresh updates, unchanged since 0.17.
+# The observation fields of a job read that schema 11 had.
+OBSERVATION_FIELDS = ("id", "source_id", "identity", "url", "first_seen_at", "last_seen_at")
 OBSERVATION = (
     "SELECT id FROM postings WHERE job_id=? AND (identity=? OR (?<>'' AND url=?) OR "
     "(? IS NOT NULL AND json_extract(payload,'$.source_key')=?)) ORDER BY first_seen_at,id LIMIT 1"
@@ -351,7 +353,10 @@ def assert_same_reads(workspace, before):
     assert set(index.jobs) == set(before["features"])
     for job_id, expected in before["features"].items():
         assert feature_values(index.jobs[job_id]) == expected, job_id
-        assert workspace.get_job(job_id)["postings"] == before["sources"][job_id]
+        assert [
+            {key: posting[key] for key in OBSERVATION_FIELDS}
+            for posting in workspace.get_job(job_id)["postings"]
+        ] == before["sources"][job_id]
 
 
 def source_reads(workspace):

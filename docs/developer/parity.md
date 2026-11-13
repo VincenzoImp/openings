@@ -27,12 +27,12 @@ How to read the evidence:
 
 | Measure | Operations |
 |---|---|
-| Logical operations in the inventory | 122 |
+| Logical operations in the inventory | 125 |
 | Without REST or without MCP | 0 |
 | Owner only (refused for an agent token) | 9 |
-| Without a working dashboard path | 9 |
+| Without a working dashboard path | 12 |
 | Reached only through another operation | 5 |
-| With inputs the dashboard never mentions | 16 |
+| With inputs the dashboard never mentions | 19 |
 | With free-form JSON edited as raw JSON | 5 |
 | With different REST and MCP input names | 1 |
 | With a dashboard path exercised by e2e | 86 |
@@ -49,6 +49,8 @@ code calls the route and no browser test reached it.
 |---|---|---|---|---|
 | `skills.read` | `GET /skills/{name}`<br>`GET /skills/{name}/files/{path}` | `skill_get` | Settings: Connect an agent | Settings lists the served skills by name and description; their text and reference files cannot be opened. |
 | `jobs.resolve` | `GET /jobs/resolve` | `jobs_resolve` | Job details: Possible duplicates (identity matches are merged on ingestion) | No lookup of a job by URL, external key or title and company. Job details open Possible duplicates (`jobs.duplicates`) instead. |
+| `jobs.distinct` | `POST /jobs/{job_id}/distinct` | `job_distinct` | Jobs: job detail, Is this the same vacancy? Different | — |
+| `policy.rule_preview` | `POST /policy/rules/preview` | `policy_rule_preview` | Policy: a rule's matches in the Inbox | — |
 | `runs.start` | `POST /runs` | `runs_start` | Activity: Runs (read only) | Runs belong to API tokens: a dashboard session has no runs. Activity shows runs, their reports and their changes read-only. |
 | `runs.update` | `PATCH /runs/{run_id}` | `runs_update` | Activity: run report (read only) | Runs belong to API tokens: a dashboard session has no runs. |
 | `runs.finish` | `POST /runs/{run_id}/finish` | `runs_finish` | Activity: run report (read only) | Runs belong to API tokens: a dashboard session has no runs. |
@@ -56,6 +58,7 @@ code calls the route and no browser test reached it.
 | `requests.take` | `POST /requests/{request_id}/take` | `requests_take` | Activity: Requests (read only) | Agents take, complete and decline requests with an API token; the dashboard writes and withdraws them. |
 | `requests.complete` | `POST /requests/{request_id}/complete` | `requests_complete` | Activity: Requests (read only) | Agents take, complete and decline requests with an API token; the dashboard writes and withdraws them. |
 | `requests.decline` | `POST /requests/{request_id}/decline` | `requests_decline` | Activity: Requests (read only) | Agents take, complete and decline requests with an API token; the dashboard writes and withdraws them. |
+| `collection.yield` | `GET /collection/yield` | `collection_yield` | Collection: Yield | — |
 
 ### Operations reached only through another operation
 
@@ -77,7 +80,10 @@ operation. They can be set over REST or MCP only.
 
 | Operation | Inputs | Remark |
 |---|---|---|
+| `jobs.list` | `dismissed_by`, `include_counts`, `posting_language`, `posting_language_not`, `requires`, `rule_id`, `signal` | — |
 | `jobs.create` | `raw`, `source_key` | `raw` and `source_key` are collector fields for scripted imports. |
+| `jobs.triage` | `reason` | — |
+| `jobs.bulk` | `reason` | — |
 | `templates.list` | `offset` | Templates and the frozen-copy dialog read the templates as one page of summaries; `offset` serves agents and scripts. |
 | `policy.add` | `idempotency_key`, `position` | The form sends the fields it shows; `position` and `idempotency_key` serve agents and scripts (a new item goes to the end, then the arrows move it). |
 | `applications.list` | `ready_since`, `ready_until` | The Preparing and Ready chips filter Draft by `ready=false` and `ready=true`; the Ready to apply queue filters by `readiness=ready` with `sort=ready`; Waiting for a reply and Close as no reply use `no_reply_due`. The other time ranges serve agents and scripts. |
@@ -168,6 +174,7 @@ missing from the inventory.
 | `jobs.resolve`<br>Look up archived jobs by URL or source identity without ingesting | `GET /jobs/resolve` | `jobs_resolve` | any | Job details: Possible duplicates (identity matches are merged on ingestion) | **none** | — | — |
 | `jobs.duplicates`<br>List candidate duplicate job groups for review | `GET /jobs/duplicates` | `jobs_duplicates` | any | Jobs: Possible duplicates tab; Job details: Possible duplicates | pages/Jobs.tsx | structured | 1 |
 | `jobs.merge`<br>Merge verified duplicate jobs and retain history | `POST /jobs/{job_id}/merge` | `job_merge` | any | Inbox: merge duplicate | pages/Jobs.tsx | structured | **0** |
+| `jobs.distinct`<br>Mark a job flagged as a likely duplicate as a different vacancy | `POST /jobs/{job_id}/distinct` | `job_distinct` | any | Jobs: job detail, Is this the same vacancy? Different | **none** | — | — |
 | `jobs.delete`<br>Permanently forget job-owned data and identities | `DELETE /jobs/{job_id}` | `job_forget` | any | Inbox: Forget | pages/Jobs.tsx | structured | **0** |
 | `notes.list`<br>List job notes | `GET /jobs/{job_id}/notes` | `notes_list` | any | Inbox: notes | pages/Jobs.tsx<br>pages/review/Timeline.tsx | structured | 11 |
 | `notes.read`<br>Read one note and its version | `GET /notes/{note_id}` | `note_get` | any | Inbox: note editor | pages/Jobs.tsx | structured | **0** |
@@ -199,6 +206,7 @@ missing from the inventory.
 | `collection.runs.list`<br>List logical collection invocations | `GET /collection/runs` | `collection_runs_list` | any | Collection: run history | pages/Settings.tsx<br>pages/Today.tsx | structured | 44 |
 | `collection.runs.read`<br>Read frozen collection settings, progress and results | `GET /collection/runs/{run_id}` | `collection_runs_get` | any | Collection: source run details | pages/Settings.tsx | structured | **0** |
 | `collection.runs.cancel`<br>Stop current collection work | `POST /collection/runs/{run_id}/cancel` | `collection_runs_cancel` | any | Collection: Stop current run | pages/Companies.tsx<br>pages/Settings.tsx | structured | **0** |
+| `collection.yield`<br>Read what each source and search yielded: collected, shortlisted, applied, responses, dismissed | `GET /collection/yield` | `collection_yield` | any | Collection: Yield | **none** | — | — |
 
 ### Career and templates
 
@@ -232,6 +240,7 @@ missing from the inventory.
 | `policy.reorder`<br>Reorder a section's policy items | `POST /policy/{section}/reorder` | `policy_reorder` | any | Policy: Move up / Move down | — | structured | 2 |
 | `policy.confirm`<br>Confirm a proposed policy item | `POST /policy/items/{item_id}/confirm` | `policy_confirm` | owner | Policy: Confirm | — | structured | 1 |
 | `policy.remove`<br>Remove a policy item | `DELETE /policy/items/{item_id}` | `policy_remove` | any | Policy: Remove | pages/policy/Section.tsx | structured | 3 |
+| `policy.rule_preview`<br>Count the jobs to review a decision rule matches now, without acting | `POST /policy/rules/preview` | `policy_rule_preview` | any | Policy: a rule's matches in the Inbox | **none** | — | — |
 
 ### Applications and documents
 

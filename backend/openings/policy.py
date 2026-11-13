@@ -10,8 +10,8 @@ rule) by the dashboard session or an owner token confirms the item; the same wri
 by an agent token leaves it a proposal and switches its rule off. Only owner
 authority confirms a proposal or enables a rule.
 
-A decision item may carry a rule on a collection signal. This release stores and
-validates the rule; nothing applies it yet (signals arrive with ingest signals).
+A decision item may carry a rule on a collection signal. An enabled rule the owner
+confirmed acts on new jobs as their signals arrive (job_signals.py).
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ ValueType = Literal["text", "number", "date", "boolean", "list"]
 STRUCTURED = "structured"
 
 # Collection signals a decision rule may name, with the comparisons each allows
-# and the type of the compared value. Ingest does not compute them yet.
+# and the type of the compared value. job_signals.py computes them and applies rules.
 SIGNALS = {
     "language_required": {
         "label": "Required language",
@@ -67,7 +67,7 @@ SIGNALS = {
     },
 }
 RULE_ACTIONS = ("dismiss", "flag")
-SIGNALS_APPLIED = False
+SIGNALS_APPLIED = True
 
 ORIGIN_NOTES = {
     "profile_metadata": "Copied from Profile metadata in 0.19",
@@ -157,7 +157,7 @@ class RuleCondition(Input):
 
 
 class PolicyRule(Input):
-    """A machine-readable rule on a collection signal. Stored and validated only."""
+    """A machine-readable rule on a collection signal, applied to new jobs while enabled and confirmed."""
 
     signal: Literal["language_required", "posting_language", "likely_duplicate", "no_longer_listed"]
     condition: RuleCondition
@@ -220,7 +220,7 @@ class PolicyItemCreate(ItemFields):
     )
     rule: PolicyRule | None = Field(
         default=None,
-        description="Decision items only: {signal, condition: {operator, value}, action}. Stored and validated; not applied at ingest yet.",
+        description="Decision items only: {signal, condition: {operator, value}, action}. While enabled and confirmed by the owner, it acts on each new job as its signals arrive: dismiss (attributed to the rule, restorable) or flag.",
     )
     enabled: bool = Field(
         default=False,
@@ -262,6 +262,12 @@ class PolicyMove(Input):
     section: Section = Field(description="The section the item moves to.")
     target_version: int = Field(
         ge=0, strict=True, description="Current version of the section it moves to."
+    )
+
+
+class RulePreview(Input):
+    rule: PolicyRule = Field(
+        description="The rule to try: {signal, condition: {operator, value}, action}; it need not be saved."
     )
 
 
@@ -473,6 +479,15 @@ class PolicyService:
                 "rule_actions": list(RULE_ACTIONS),
                 "signals_applied": SIGNALS_APPLIED,
             }
+
+    def preview_rule(self, value: RulePreview) -> dict:
+        """How many jobs to review a rule matches now, with a few examples. Nothing changes.
+
+        Rules act only on new jobs; this shows what the rule would have done to the
+        jobs waiting in the Inbox, so the owner can judge it before enabling it.
+        """
+        value = value if isinstance(value, RulePreview) else RulePreview.model_validate(value)
+        return self.workspace.signals.preview(value.rule.model_dump())
 
     def add_item(self, section: str, value: PolicyItemCreate) -> dict:
         """Add an item to a section. An agent token's item is a proposal until the owner confirms it."""
@@ -829,6 +844,10 @@ def register_api(router, policy: PolicyService):
     def policy_get_section(section: Section):
         return policy.get_policy(section)
 
+    @router.post("/policy/rules/preview")
+    def policy_rule_preview(value: RulePreview):
+        return policy.preview_rule(value)
+
     @router.post("/policy/{section}/items", status_code=201)
     def policy_add(section: Section, value: PolicyItemCreate):
         return policy.add_item(section, value)
@@ -865,6 +884,11 @@ def register_mcp(mcp, policy: PolicyService):
     def policy_get(section: Section | None = None) -> dict:
         """Read the owner's policy: the sections decision (rules for shortlisting and dismissing), eligibility (facts employers ask about), writing (document rules with scope cv, letter or all) and facts, each with its own version and items. Omit section for all four plus the signal registry. An item with confirmed=false is a proposal or a value copied from the old Profile: do not rely on it; ask the owner to confirm it."""
         return policy.get_policy(section)
+
+    @mcp.tool(annotations=read)
+    def policy_rule_preview(value: RulePreview) -> dict:
+        """Dry run of a decision rule: how many jobs waiting in the Inbox it matches now (matches), how many have no signals yet (pending), out of inbox, with up to five examples. Nothing is dismissed: an enabled rule the owner confirmed acts only on new jobs. Use it before proposing a rule."""
+        return policy.preview_rule(value)
 
     @mcp.tool(annotations=write)
     def policy_add(section: Section, value: PolicyItemCreate) -> dict:

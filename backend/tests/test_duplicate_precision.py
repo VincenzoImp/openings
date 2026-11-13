@@ -396,6 +396,12 @@ def test_one_job_is_scored_against_its_blocks_only(benchmark, monkeypatch):
 
 def test_features_are_read_again_only_for_changed_jobs(tmp_path, monkeypatch):
     workspace = Workspace(tmp_path / "workspace.sqlite")
+    computed = []
+    original = workspace_module.job_features
+    monkeypatch.setattr(
+        workspace_module, "job_features", lambda job: computed.append(job["id"]) or original(job)
+    )
+    # Each new job is read once, for its likely-duplicate signal at ingest.
     jobs = [
         workspace.ingest_job(
             {
@@ -408,14 +414,13 @@ def test_features_are_read_again_only_for_changed_jobs(tmp_path, monkeypatch):
         )
         for source in ("one", "two", "three")
     ]
-    computed = []
-    original = workspace_module.job_features
-    monkeypatch.setattr(
-        workspace_module, "job_features", lambda job: computed.append(job["id"]) or original(job)
-    )
-    assert workspace.duplicate_jobs({})["items"][0]["size"] == 3
     assert sorted(computed) == sorted(job["id"] for job in jobs)
+    assert jobs[0]["signals"]["duplicate"] is None
+    assert jobs[2]["signals"]["duplicate"]["job_id"] in {jobs[0]["id"], jobs[1]["id"]}
     computed.clear()
+    assert workspace.duplicate_jobs({})["items"][0]["size"] == 3
+    assert computed == []
+    jobs = [workspace.get_job(job["id"]) for job in jobs]
     assert workspace.duplicate_jobs({"min_confidence": 0})["total"] == 1
     assert computed == []
 

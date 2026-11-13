@@ -155,7 +155,7 @@ def test_upgrade_keeps_every_row_and_backfills_exactly(tmp_path):
     workspace = Workspace(path)
     fresh = Database(tmp_path / "fresh.sqlite")
     with closing(sqlite3.connect(path)) as conn, closing(sqlite3.connect(fresh.path)) as reference:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 11
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 12
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert not conn.execute("PRAGMA foreign_key_check").fetchall()
         assert table_names(conn) == table_names(reference)
