@@ -161,12 +161,14 @@ breaks it:
   recorded evidence (`docs/developer/parity-e2e.json`), when a REST input has no
   dashboard control or a name differs between REST and MCP, or when the
   dashboard source names an `/api/v1` route outside the inventory.
-- The browser tests in CI run with `OPENINGS_PARITY_EVIDENCE` set: the fixture
-  in `frontend/tests/fixtures.ts` writes, per test, the REST requests the
-  dashboard itself sent (Chromium desktop; the helpers' setup requests are left
-  out). The next step, `scripts/parity_matrix.py --gate <directory>`, fails when
-  an operation has no dashboard path in that run, or when the dashboard called a
-  route outside the inventory. Every spec imports `test` from `./fixtures`.
+- With `OPENINGS_PARITY_EVIDENCE` set, the fixture in `frontend/tests/fixtures.ts`
+  writes, per test, the REST requests the dashboard itself sent (Chromium
+  desktop; the helpers' setup requests are left out), and
+  `scripts/parity_matrix.py --gate <directory>` fails when an operation has no
+  dashboard path in that run, or when the dashboard called a route outside the
+  inventory. CI no longer runs this gate while browser specs are quarantined
+  (#220); #206 replaces the parity tooling. Every spec imports `test` from
+  `./fixtures`.
 
 A difference can be documented instead of closed only with a reason, in
 `docs/developer/parity-notes.json`: `exempt` for an operation only an API token
