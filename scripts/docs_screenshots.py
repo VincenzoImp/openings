@@ -12,10 +12,8 @@ and `npx playwright install chromium` in `frontend`.
 """
 
 import argparse
-from datetime import date, timedelta
 import hashlib
 import json
-from pathlib import Path
 import shutil
 import signal
 import socket
@@ -24,6 +22,8 @@ import sys
 import tempfile
 import threading
 import time
+from datetime import date, timedelta
+from pathlib import Path
 
 import httpx
 import uvicorn
@@ -42,17 +42,15 @@ def day(offset):
 def synthetic_pdf(title, lines=()):
     """A one-page PDF with a title and a few lines of text, built without dependencies."""
     escape = lambda text: text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
-    body = "".join(
-        f" 0 -22 Td ({escape(line)}) Tj" for line in lines if line.isascii()
-    )
-    stream = (
-        f"BT /F1 16 Tf 40 450 Td ({escape(title)}) Tj /F1 9 Tf 0 -12 Td{body} ET"
-    )
+    body = "".join(f" 0 -22 Td ({escape(line)}) Tj" for line in lines if line.isascii())
+    stream = f"BT /F1 16 Tf 40 450 Td ({escape(title)}) Tj /F1 9 Tf 0 -12 Td{body} ET"
     objects = [
         "<< /Type /Catalog /Pages 2 0 R >>",
         "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 500] "
-        "/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+        (
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 500] "
+            "/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"
+        ),
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
         f"<< /Length {len(stream)} >>\nstream\n{stream}\nendstream",
     ]
@@ -703,15 +701,55 @@ def answers(s: Seeder):
     """Applications sent weeks ago with the employers' answers, for Insights."""
     history = [
         # title, company, location, source, days ago sent, answer, days to answer
-        ("Data Engineer", "Basalt Analytics", "Zurich, Switzerland", "greenhouse", 70, "interview", 6),
-        ("Senior Data Engineer", "Fjordline Data", "Zurich, Switzerland", "lever", 64, "rejection", 12),
+        (
+            "Data Engineer",
+            "Basalt Analytics",
+            "Zurich, Switzerland",
+            "greenhouse",
+            70,
+            "interview",
+            6,
+        ),
+        (
+            "Senior Data Engineer",
+            "Fjordline Data",
+            "Zurich, Switzerland",
+            "lever",
+            64,
+            "rejection",
+            12,
+        ),
         ("Data Engineer", "Granite Metrics", "Remote, Europe", "linkedin", 58, None, None),
-        ("Data Platform Engineer", "Larch Systems", "Basel, Switzerland", "greenhouse", 55, "interview", 9),
-        ("Analytics Engineer", "Meadow Health", "Zurich, Switzerland", "linkedin", 52, "rejection", 21),
+        (
+            "Data Platform Engineer",
+            "Larch Systems",
+            "Basel, Switzerland",
+            "greenhouse",
+            55,
+            "interview",
+            9,
+        ),
+        (
+            "Analytics Engineer",
+            "Meadow Health",
+            "Zurich, Switzerland",
+            "linkedin",
+            52,
+            "rejection",
+            21,
+        ),
         ("Data Engineer", "Pine Logistics", "Remote, Europe", "indeed", 49, None, None),
         ("Backend Engineer", "Quarry Bank", "Zurich, Switzerland", "linkedin", 46, "rejection", 4),
         ("Backend Developer", "Rowan Retail", "Geneva, Switzerland", "indeed", 44, None, None),
-        ("Senior Backend Engineer", "Sable Insurance", "Zurich, Switzerland", "greenhouse", 41, "interview", 7),
+        (
+            "Senior Backend Engineer",
+            "Sable Insurance",
+            "Zurich, Switzerland",
+            "greenhouse",
+            41,
+            "interview",
+            7,
+        ),
         ("Backend Engineer", "Thistle Payments", "Remote, Europe", "linkedin", 38, None, None),
         ("Python Developer", "Umber Labs", "Basel, Switzerland", "lever", 35, "rejection", 10),
         ("Platform Engineer", "Vale Energy", "Zurich, Switzerland", "greenhouse", 33, "offer", 25),

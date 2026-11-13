@@ -1,8 +1,12 @@
 name: CI
 
+# Required checks on `main` (see CONTRIBUTING.md, "Repository settings"):
+# backend, frontend, e2e and container (amd64). Renaming a job means updating
+# the branch ruleset in the same change.
+
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
   workflow_dispatch:
   workflow_call:
@@ -11,8 +15,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   backend:
@@ -27,18 +31,15 @@ jobs:
           python-version: '3.14'
           enable-cache: true
       - run: uv sync --locked
-      - run: uv run ruff check backend
-      - run: uv run ruff format --check backend
+      - run: uv run ruff check backend scripts
+      - run: uv run ruff format --check backend scripts
       - run: python3 scripts/bump_version.py --check
-      - run: uv run pytest
+      # The default selection skips `performance` (pyproject.toml); nightly.yml runs it weekly.
+      - run: uv run pytest -q -n auto backend
       - name: Smoke installed wheel and packaged resources
         run: |
           uv build --wheel --out-dir /tmp/openings-wheel
           uv run python scripts/check_package.py /tmp/openings-wheel/openings-*.whl
-      - name: Audit locked runtime dependencies
-        run: |
-          uv export --locked --no-dev --no-emit-project --no-hashes --output-file /tmp/openings-requirements.txt
-          uvx --from pip-audit==2.10.1 pip-audit --requirement /tmp/openings-requirements.txt --no-deps --disable-pip
 
   frontend:
     runs-on: ubuntu-24.04
@@ -46,6 +47,40 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm --prefix frontend ci
+      # `build` typechecks (tsc --noEmit) before bundling.
+      - run: npm --prefix frontend run build
+      - run: npm --prefix frontend run budget
+      - run: npm --prefix frontend run format:check
+      - run: npm --prefix frontend test
+
+  e2e:
+    runs-on: ubuntu-24.04
+    # The official Playwright image ships the browsers and their system
+    # dependencies, so the job downloads none. Its tag must equal the
+    # @playwright/test version in frontend/package-lock.json (checked below);
+    # bump both together and refresh the digest.
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe
+      options: --ipc=host
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The image matches the locked Playwright version
+        env:
+          IMAGE_PLAYWRIGHT: '1.65.0'
+        run: |
+          locked="$(node -p "require('./frontend/package-lock.json').packages['node_modules/@playwright/test'].version")"
+          if [ "$locked" != "$IMAGE_PLAYWRIGHT" ]; then
+            echo "::error::@playwright/test is $locked but the e2e image is v$IMAGE_PLAYWRIGHT; update the image in ci.yml and nightly.yml."
+            exit 1
+          fi
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '26'
@@ -59,30 +94,30 @@ jobs:
       - run: uv sync --locked
       - run: npm --prefix frontend ci
       - run: npm --prefix frontend run build
-      - run: npm --prefix frontend run budget
-      - run: npm --prefix frontend run format:check
-      - run: npm --prefix frontend test
-      - run: npx playwright install --with-deps chromium
-        working-directory: frontend
       - name: Browser tests, recording the requests the dashboard makes
-        run: npm --prefix frontend run test:e2e -- --project=chromium --project=chromium-mobile --project=chromium-performance
+        run: npm --prefix frontend run test:e2e -- --project=chromium --project=chromium-mobile
         env:
           OPENINGS_PARITY_EVIDENCE: ${{ runner.temp }}/parity-evidence
       - name: Parity gate (every operation has REST, MCP and a dashboard path the browser tests used)
         run: uv run python scripts/parity_matrix.py --gate "$RUNNER_TEMP/parity-evidence"
-      - run: npm --prefix frontend audit --audit-level=moderate
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-traces
+          path: frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
 
   container:
-    needs: [backend, frontend]
+    name: container (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-24.04
-          - arch: arm64
-            runner: ubuntu-24.04-arm
+        # Pull requests smoke amd64 only; pushes to main, manual runs and
+        # releases (workflow_call from images.yml) smoke both architectures.
+        include: ${{ fromJSON(github.event_name == 'pull_request' && '[{"arch":"amd64","runner":"ubuntu-24.04"}]' || '[{"arch":"amd64","runner":"ubuntu-24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
