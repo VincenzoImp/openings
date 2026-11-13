@@ -1,12 +1,13 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
+  attachSource,
   call,
   fitsViewport,
   go,
   isNarrow,
   ownerSession,
   syntheticPdf,
-  upload,
+  syntheticTex,
   type Cookies,
 } from "./session";
 
@@ -75,15 +76,8 @@ async function make(page: Page, title: string, options: Options = {}) {
         application_id: application.id,
         kind,
         title: kind === "resume" ? "CV" : "Letter",
-        content: { text: "Synthetic text." },
       });
-      await upload(
-        page,
-        "document",
-        document.id,
-        `${kind}.pdf`,
-        syntheticPdf(),
-      );
+      await attachSource(page, document.id, "Synthetic text.", kind);
       const current = await call(page, `/documents/${document.id}`);
       await call(page, `/documents/${document.id}/review`, "POST", {
         review_state: "approved",
@@ -206,7 +200,6 @@ test("marking applied is refused cleanly once the application is no longer ready
     application_id: application.id,
     kind: "resume",
     title: "Changed CV",
-    content: { text: "Changed." },
   });
   await page.getByRole("button", { name: "Mark applied" }).first().click();
   await expect(toast(page)).toContainText("no longer ready");
@@ -701,21 +694,34 @@ test("documents, revisions, frozen copies and their files are managed in the rev
     .click();
   await again;
 
-  // A document from that copy, with its PDF, approved, revised and deleted.
+  // A CV from that copy: its source and the PDF built from it, approved,
+  // revised, compared with the first revision and deleted.
   await page.getByRole("tab", { name: "Documents" }).click();
   await page.getByRole("button", { name: "Add a document" }).click();
   await dialog(page).getByLabel("Title").fill("Workflow CV");
   await dialog(page).getByLabel("Written from").selectOption({ index: 1 });
-  await dialog(page).getByLabel("Text").fill("Synthetic document text.");
-  await dialog(page).getByLabel("PDF or source file").setInputFiles({
+  await dialog(page)
+    .getByLabel("Source (.tex)")
+    .setInputFiles({
+      name: "workflow.tex",
+      mimeType: "application/x-tex",
+      buffer: syntheticTex("Synthetic document text."),
+    });
+  await dialog(page).getByLabel("PDF", { exact: true }).setInputFiles({
     name: "workflow.pdf",
     mimeType: "application/pdf",
     buffer: syntheticPdf(),
   });
+  await dialog(page).getByLabel("Note").fill("Leads with the data work.");
   await dialog(page).getByRole("button", { name: "Save the revision" }).click();
   await expect(dialog(page)).toHaveCount(0);
   const revisions = page.getByRole("list", { name: "Document revisions" });
   await revisions.getByRole("button", { name: /^Open Workflow CV/ }).click();
+  await expect(
+    revisions.getByRole("document", { name: "Text of revision 1" }),
+  ).toHaveText("Synthetic document text.");
+  await expect(revisions).toContainText("PDF, built from workflow.tex");
+  await expect(revisions).toContainText("Leads with the data work.");
   await page.getByRole("button", { name: "Approve this revision" }).click();
   await expect(
     revisions.getByText("Approved", { exact: true }).first(),
@@ -723,6 +729,14 @@ test("documents, revisions, frozen copies and their files are managed in the rev
   await expect(
     page.locator('iframe[title^="Preview of the CV"]'),
   ).toBeVisible();
+  // The CV pane shows the text read from the source beside the PDF.
+  await page
+    .getByRole("group", { name: "Show the CV as" })
+    .getByRole("button", { name: "Text" })
+    .click();
+  await expect(
+    page.getByRole("document", { name: "Text of the CV" }),
+  ).toHaveText("Synthetic document text.");
   await page.getByRole("button", { name: "workflow.pdf" }).click();
   await expect(
     dialog(page).getByTitle("Preview of workflow.pdf"),
@@ -731,11 +745,34 @@ test("documents, revisions, frozen copies and their files are managed in the rev
     .getByRole("button", { name: "Close", exact: true })
     .click();
   await page.getByRole("button", { name: "New revision" }).click();
-  await dialog(page).getByLabel("Text").fill("Changed synthetic document.");
+  await dialog(page)
+    .getByLabel("Source (.tex)")
+    .setInputFiles({
+      name: "workflow.tex",
+      mimeType: "application/x-tex",
+      buffer: syntheticTex("Changed synthetic document."),
+    });
   await dialog(page).getByRole("button", { name: "Save the revision" }).click();
   await expect(dialog(page)).toHaveCount(0);
   await expect(revisions.locator(":scope > li")).toHaveCount(2);
   await revisions.getByRole("button", { name: /^Open/ }).first().click();
+  await expect(
+    page.getByText("Add the PDF built from the source before approving."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Approve this revision" }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Compare with revision 1" }).click();
+  const changes = page.getByRole("list", {
+    name: "Changes since revision 1",
+  });
+  await expect(changes.getByRole("listitem")).toHaveText([
+    "−Removed: Synthetic document text.",
+    "+Added: Changed synthetic document.",
+  ]);
+  await expect(
+    page.getByText("Since revision 1: 1 line added, 1 removed."),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Delete revision" }).click();
   await dialog(page)
     .getByRole("button", { name: "Delete the revision" })
@@ -793,7 +830,6 @@ test("the Inputs tab and the list name the parts that changed since the document
       context_id: context.id,
       kind,
       title: kind === "resume" ? "CV" : "Letter",
-      content: { text: "Synthetic text." },
     });
   const profile = async (fields: Record<string, unknown>) =>
     call(page, "/career/profile", "PATCH", {

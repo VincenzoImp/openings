@@ -10,14 +10,14 @@ import {
 import { Button, Dialog, Field, KeyValueEditor } from "../../design";
 import { dayTime } from "../../library/time";
 import { useResource, useWorkspace } from "../../state";
-import { kindLabels } from "./model";
+import { isSourceKind, kindLabels } from "./model";
 
 const NONE = { items: [], total: 0 };
 
 /**
- * Save a document as a new revision: its text (or, for a revision with
- * structured content, its fields as rows), an optional frozen copy it was
- * written from, and a PDF or source file. Earlier revisions never change.
+ * Save a document as a new revision. A CV or letter is its .tex source and
+ * the PDF built from it, with an optional note; form answers and other kinds
+ * keep their text or fields. Earlier revisions never change.
  */
 export function RevisionDialog({
   application,
@@ -30,7 +30,10 @@ export function RevisionDialog({
   onClose: () => void;
 }) {
   const { mutate, pending } = useWorkspace();
-  const structured = !!previous && typeof previous.content?.text !== "string";
+  const [kind, setKind] = useState(previous?.kind || "resume");
+  const sourceKind = isSourceKind(kind);
+  const structured =
+    !sourceKind && !!previous && typeof previous.content?.text !== "string";
   const [content, setContent] = useState<{
     value: Json;
     problem: string | null;
@@ -38,8 +41,11 @@ export function RevisionDialog({
     value: (previous?.content as Json) || {},
     problem: null,
   });
+  const [source, setSource] = useState<File | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  // What a failed save already stored, so saving again only retries the rest.
   const [created, setCreated] = useState<string | null>(null);
+  const [sourceSha, setSourceSha] = useState<string | null>(null);
   const contexts = useResource<ListResult<Json>>(
     previous
       ? null
@@ -57,19 +63,30 @@ export function RevisionDialog({
           application_id: application.id,
           context_id: previous?.context_id || form.get("context_id") || null,
           previous_id: previous?.id || null,
-          kind: previous?.kind || form.get("kind"),
+          kind,
           title: String(form.get("title") || ""),
-          content: structured
-            ? content.value
-            : { text: String(form.get("text") || "") },
+          note: String(form.get("note") || ""),
+          ...(sourceKind
+            ? {}
+            : {
+                content: structured
+                  ? content.value
+                  : { text: String(form.get("text") || "") },
+              }),
         });
         id = document.id;
         setCreated(id);
       }
-      if (file) await uploadFile(file, "document", id);
+      let built = sourceSha;
+      if (sourceKind && source && !built) {
+        built = (await uploadFile(source, "document", id)).sha256 || null;
+        setSourceSha(built);
+      }
+      if (file) await uploadFile(file, "document", id, built);
     }, "Revision saved.");
     if (ok) onClose();
   }
+  const locked = !!created;
   return (
     <Dialog
       title={previous ? "Save a new revision" : "Add a document"}
@@ -86,8 +103,9 @@ export function RevisionDialog({
           <Field label="Kind">
             <select
               name="kind"
-              defaultValue={previous?.kind || "resume"}
-              disabled={!!previous || !!created}
+              value={kind}
+              onChange={(event) => setKind(event.target.value)}
+              disabled={!!previous || locked}
             >
               {Object.entries(kindLabels).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -102,12 +120,12 @@ export function RevisionDialog({
               required
               maxLength={300}
               defaultValue={previous?.title}
-              disabled={!!created}
+              disabled={locked}
             />
           </Field>
           {!previous && (
             <Field label="Written from" className="wide">
-              <select name="context_id" defaultValue="" disabled={!!created}>
+              <select name="context_id" defaultValue="" disabled={locked}>
                 <option value="">No frozen copy</option>
                 {contexts.data.items.map((context) => (
                   <option key={String(context.id)} value={String(context.id)}>
@@ -119,7 +137,32 @@ export function RevisionDialog({
             </Field>
           )}
         </div>
-        {structured ? (
+        {sourceKind ? (
+          <>
+            <Field
+              label="Source (.tex)"
+              hint="The revision's text is read from it."
+            >
+              <input
+                type="file"
+                accept=".tex,.ltx"
+                required={!sourceSha}
+                disabled={!!sourceSha}
+                onChange={(event) => setSource(event.target.files?.[0] || null)}
+              />
+            </Field>
+            <Field
+              label="PDF"
+              hint="Optional now, needed to approve. It must be built from this source."
+            >
+              <input
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={(event) => setFile(event.target.files?.[0] || null)}
+              />
+            </Field>
+          </>
+        ) : structured ? (
           <fieldset className="field">
             <legend>Content</legend>
             <KeyValueEditor
@@ -139,17 +182,25 @@ export function RevisionDialog({
                   ? previous.content.text
                   : ""
               }
-              disabled={!!created}
+              disabled={locked}
             />
           </Field>
         )}
-        <Field
-          label="PDF or source file"
-          hint="Optional. A PDF is shown on the review page."
-        >
-          <input
-            type="file"
-            onChange={(event) => setFile(event.target.files?.[0] || null)}
+        {!sourceKind && (
+          <Field label="File" hint="Optional.">
+            <input
+              type="file"
+              onChange={(event) => setFile(event.target.files?.[0] || null)}
+            />
+          </Field>
+        )}
+        <Field label="Note" hint="Optional: what changed and why.">
+          <textarea
+            name="note"
+            rows={2}
+            maxLength={5000}
+            defaultValue=""
+            disabled={locked}
           />
         </Field>
         {created && (

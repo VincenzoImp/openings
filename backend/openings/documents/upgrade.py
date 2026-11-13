@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 
+from ..common import encode
 from .models import SOURCE_KINDS
 from .sources import refresh_text
 
@@ -84,7 +85,7 @@ def migrate_to_13(conn):
         if claims or entries:
             conn.execute(
                 "UPDATE documents SET claim_ids=?,knowledge_ids=? WHERE id=?",
-                (json.dumps(claims), json.dumps(entries), document_id),
+                (encode(claims), encode(entries), document_id),
             )
     # Content that was not empty is kept as it was stored, byte for byte. Content
     # that is not JSON (never written by Openings) is left where it is.

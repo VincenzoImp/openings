@@ -171,9 +171,10 @@ await shot("review");
 await review(await applicationId("Northstar Labs", "Python Engineer"), "documents");
 await page
   .getByRole("list", { name: "Document revisions" })
-  .getByRole("button", { name: /^Open/ })
-  .first()
+  .getByRole("button", { name: /^Open Engineering CV — updated/ })
   .click();
+await settle();
+await page.getByRole("button", { name: "Compare with revision 1" }).click();
 await settle();
 await page.locator("#more").evaluate((tabs) => tabs.scrollIntoView());
 await shot("documents");
