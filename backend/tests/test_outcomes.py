@@ -9,7 +9,6 @@ from pydantic import ValidationError
 from openings.actors import acting_as, token_actor
 from openings.errors import DomainError
 from openings.outcomes import ResponseService, today
-from openings.workspace import Workspace
 
 
 def days_ago(days):
@@ -18,11 +17,6 @@ def days_ago(days):
 
 def stamp_ago(days):
     return (datetime.now(UTC) - timedelta(days=days)).isoformat(timespec="microseconds")
-
-
-@pytest.fixture
-def workspace(tmp_path):
-    return Workspace(tmp_path / "outcomes.sqlite")
 
 
 def attempt(workspace, title="Synthetic data engineer", status=None, **fields):

@@ -4,24 +4,20 @@ import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from openings.actors import OWNER, acting_as, token_actor
-from openings.app import create_app
 from openings.career import CareerService, TemplateCreate
 from openings.errors import DomainError
 from openings.outcomes import no_reply_period
 from openings.preferences import SECTIONS, PreferencesService
-from openings.workspace import Workspace
 
 AGENT = token_actor("token-agent", "Synthetic agent", "agent")
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 
 
 @pytest.fixture
-def services(tmp_path):
-    workspace = Workspace(tmp_path / "preferences.sqlite")
+def services(workspace):
     return workspace, PreferencesService(workspace)
 
 
@@ -258,75 +254,50 @@ def test_the_languages_filter_hides_jobs_and_never_dismisses_them(services):
     assert {job["triage"] for job in workspace.list_jobs()["items"]} == {"inbox"}
 
 
-def test_rest_and_mcp_read_and_write_preferences_alike(tmp_path):
-    app = create_app(tmp_path / "interfaces.sqlite", start_worker=False)
-    app.state.auth.setup("synthetic-password")
-    token = app.state.auth.create_token("Synthetic agent", "agent")["token"]
-    headers = {"Authorization": "Bearer " + token}
-
-    def tool(client, name, arguments):
-        response = client.post(
-            "/mcp",
-            headers={**MCP_HEADERS, **headers},
-            json={
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "tools/call",
-                "params": {"name": name, "arguments": arguments},
+def test_rest_and_mcp_read_and_write_preferences_alike(app, agent_token, mcp):
+    headers = agent_token["headers"]
+    client = mcp.client
+    written = client.put(
+        "/api/v1/preferences/ruled_out",
+        json={"expected_version": 0, "items": [{"text": "No agencies."}]},
+        headers=headers,
+    )
+    assert written.status_code == 200, written.text
+    assert written.json()["updated_by"] == "agent:Synthetic agent"
+    over_mcp, error = mcp.call(
+        "preferences_update",
+        {
+            "section": "ruled_out",
+            "value": {
+                "expected_version": 1,
+                "items": [{"text": "No agencies."}, {"text": "No night shifts."}],
             },
-        )
-        return response.json()["result"]
-
-    def content(result):
-        assert not result.get("isError"), result
-        return result.get("structuredContent") or json.loads(result["content"][0]["text"])
-
-    with TestClient(app, base_url="http://localhost:8080") as client:
-        written = client.put(
-            "/api/v1/preferences/ruled_out",
-            json={"expected_version": 0, "items": [{"text": "No agencies."}]},
-            headers=headers,
-        )
-        assert written.status_code == 200, written.text
-        assert written.json()["updated_by"] == "agent:Synthetic agent"
-        over_mcp = content(
-            tool(
-                client,
-                "preferences_update",
-                {
-                    "section": "ruled_out",
-                    "value": {
-                        "expected_version": 1,
-                        "items": [{"text": "No agencies."}, {"text": "No night shifts."}],
-                    },
-                },
-            )
-        )
-        assert over_mcp["version"] == 2
-        assert client.get("/api/v1/preferences", headers=headers).json() == content(
-            tool(client, "preferences_get", {})
-        )
-        settings = client.patch(
-            "/api/v1/settings", json={"expected_version": 0, "no_reply_days": 21}, headers=headers
-        ).json()
-        assert settings["no_reply_days"] == 21
-        stale = client.put(
-            "/api/v1/preferences/ruled_out",
-            json={"expected_version": 1, "items": []},
-            headers=headers,
-        )
-        assert stale.status_code == 409
-        assert stale.json()["error"]["details"]["current_version"] == 2
-        # The policy and the general instructions are gone, with a hint over MCP.
-        assert client.get("/api/v1/policy", headers=headers).status_code == 404
-        assert client.get("/api/v1/instructions", headers=headers).status_code == 404
-        removed = tool(client, "policy_get", {})
-        assert removed["isError"] and "preferences_get" in removed["content"][0]["text"]
-        assert "tool_removed" in removed["content"][0]["text"]
+        },
+    )
+    assert error is None and over_mcp["version"] == 2
+    assert (
+        client.get("/api/v1/preferences", headers=headers).json()
+        == (mcp.call("preferences_get")[0])
+    )
+    settings = client.patch(
+        "/api/v1/settings", json={"expected_version": 0, "no_reply_days": 21}, headers=headers
+    ).json()
+    assert settings["no_reply_days"] == 21
+    stale = client.put(
+        "/api/v1/preferences/ruled_out",
+        json={"expected_version": 1, "items": []},
+        headers=headers,
+    )
+    assert stale.status_code == 409
+    assert stale.json()["error"]["details"]["current_version"] == 2
+    # The policy and the general instructions are gone, with a hint over MCP.
+    assert client.get("/api/v1/policy", headers=headers).status_code == 404
+    assert client.get("/api/v1/instructions", headers=headers).status_code == 404
+    _, removed = mcp.call("policy_get")
+    assert removed["code"] == "tool_removed" and "preferences_get" in removed["message"]
 
 
-def test_templates_hold_no_rule_statements(tmp_path):
-    workspace = Workspace(tmp_path / "templates.sqlite")
+def test_templates_hold_no_rule_statements(workspace):
     career = CareerService(workspace)
     with pytest.raises(ValidationError, match="Writing rules"):
         TemplateCreate(
