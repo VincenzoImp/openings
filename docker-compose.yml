@@ -18,8 +18,19 @@ services:
       OPENINGS_RETENTION_DAYS: ${OPENINGS_RETENTION_DAYS:-90}
       OPENINGS_COMPACT_MIN_MB: ${OPENINGS_COMPACT_MIN_MB:-32}
       OPENINGS_TRUSTED_PROXIES: ${OPENINGS_TRUSTED_PROXIES:-}
+      OPENINGS_BACKUP_KEEP: ${OPENINGS_BACKUP_KEEP:-3}
+      OPENINGS_BACKUP_DIR: ${OPENINGS_BACKUP_DIR:-}
     volumes:
       - workspace:/data
+    # Every write goes to /data; temporary files of the libraries go to /tmp.
+    read_only: true
+    tmpfs:
+      - /tmp
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
     cpus: 0.5
     mem_limit: 512m
     pids_limit: 128

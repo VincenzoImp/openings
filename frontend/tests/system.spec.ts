@@ -528,6 +528,45 @@ test("backup, records export and a guarded restore", async ({ page }) => {
   expect((await call(page, "/jobs?limit=1")).total).toBe(jobs);
 });
 
+test("automatic backups: download a daily one, delete a pre-upgrade copy", async ({
+  page,
+}) => {
+  await go(page, "settings?section=backup");
+  const automatic = card(page, "Automatic backups");
+  await expect(automatic).toContainText("Owner only");
+  await expect(automatic).toContainText("Last backup: Today");
+  const daily = automatic.getByRole("table", { name: "Daily backups" });
+  const first = daily.getByRole("row").nth(1);
+  const name = (await first.locator(".title").textContent())!;
+  expect(name).toMatch(/^openings-\d{8}T\d{6}Z\.sqlite$/);
+  const download = page.waitForEvent("download");
+  await first.getByRole("link", { name: `Download ${name}` }).click();
+  expect((await download).suggestedFilename()).toBe(name);
+  // Daily backups rotate by themselves: there is nothing to delete.
+  await expect(daily.getByRole("button")).toHaveCount(0);
+
+  const copies = automatic.getByRole("table", {
+    name: "Copies before an upgrade",
+  });
+  const rows = copies.locator("tbody tr");
+  const count = await rows.count();
+  expect(count).toBeGreaterThan(0);
+  const copy = (await rows.first().locator(".title").textContent())!;
+  expect(copy).toMatch(/\.pre-schema13-\d{8}T\d{6}Z\.sqlite$/);
+  await rows
+    .first()
+    .getByRole("button", { name: `Delete ${copy}` })
+    .click();
+  const confirm = dialog(page);
+  await expect(confirm).toContainText(`Delete ${copy}?`);
+  await expect(confirm).toContainText(/\d+(\.\d)? MiB/);
+  await fitsViewport(page);
+  await confirm.getByRole("button", { name: "Delete copy" }).click();
+  await toast(page, `${copy} was deleted.`);
+  await expect(rows).toHaveCount(count - 1);
+  await expect(copies.getByText(copy, { exact: true })).toHaveCount(0);
+});
+
 test("the password form and the list of operations", async ({ page }) => {
   // A real change signs out every browser session, the shared one of these
   // tests too: the test answers the request as the server does.
