@@ -351,4 +351,3 @@ class ResponseService:
                 subject=("response", response_id),
             )
         return {"deleted": True, "id": response_id}
-
