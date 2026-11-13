@@ -122,8 +122,7 @@ async function settled(page: Page) {
   await expect(page.locator(".loading")).toHaveCount(0);
 }
 
-// An agent run stays open for the rest of the suite, so every screen below is
-// checked with the agent's status line in the navigation.
+// The navigation with an open agent run shows a status line; check it too.
 test("an agent opens a run and the navigation shows its status line", async ({
   page,
 }, info) => {

@@ -49,6 +49,6 @@ building your own image.
 
 The server does not read these. The guides use `OPENINGS_URL` and
 `OPENINGS_TOKEN` in REST examples and agent environments, and `OPENINGS_CA_FILE`
-for a private certificate authority. The browser tests read `OPENINGS_E2E_PORT`,
-`OPENINGS_E2E_TOKEN`, `OPENINGS_E2E_JOBS` and `OPENINGS_E2E_APPLICATIONS` (see
+for a private certificate authority. The browser tests' synthetic server reads
+`OPENINGS_E2E_PORT`, `OPENINGS_E2E_JOBS` and `OPENINGS_E2E_APPLICATIONS` (see
 [Contributing](../../CONTRIBUTING.md)).
