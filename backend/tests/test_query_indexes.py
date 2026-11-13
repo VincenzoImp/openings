@@ -23,6 +23,8 @@ QUERIES = [
     ("SELECT id FROM tasks WHERE job_id=?", "tasks"),
     ("SELECT id FROM tasks WHERE source_id=?", "tasks"),
     ("SELECT id FROM postings WHERE source_id=?", "postings"),
+    # The default order of the jobs list (jobs_list sort=newest).
+    ("SELECT j.id FROM jobs j ORDER BY j.created_at DESC,j.id LIMIT 50 OFFSET 0", "j"),
     # Attribution, runs and questions (schema 8).
     ("SELECT id FROM runs WHERE token_id=? AND status='open'", "runs"),
     ("SELECT * FROM runs WHERE token_id=? ORDER BY started_at DESC LIMIT 50", "runs"),

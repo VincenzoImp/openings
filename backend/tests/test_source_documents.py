@@ -2,23 +2,15 @@
 
 import hashlib
 import json
-import sqlite3
-from contextlib import closing
 
 import pytest
 from fastapi.testclient import TestClient
 
-from document_fixtures import PDF, source_revision, tex, upload
+from document_fixtures import PDF, tex, upload
 from openings.app import create_app
-from openings.db import SCHEMA_VERSION, Database
 from openings.documents import DocumentCreate, ReviewUpdate
 from openings.documents.text import derive_text, revision_text, tokens
-from openings.documents.upgrade import cited_ids
 from openings.errors import DomainError
-from openings.operations import restore_database
-from openings.workspace import Workspace
-from schema_fixtures import columns
-from timeline_fixtures import make_schema_twelve
 
 SOURCE = r"""\documentclass{article}
 \usepackage{hyperref}
@@ -205,18 +197,6 @@ def test_text_is_the_body_without_markup_with_the_breaks_tex_makes():
     assert revision_text([]) is None
     assert revision_text([("b.tex", "Second."), ("a.tex", "First.")]) == "First.\n\nSecond."
     assert tokens(r"Stra\ss e \v{S}koda na\"{\i}ve") == ["strasse", "skoda", "naive"]
-
-
-def test_cited_ids_are_read_from_legacy_content_in_first_seen_order():
-    content = {
-        "header": {"claim_ids": ["c2"]},
-        "bullets": [
-            {"text": "x", "evidence_ids": ["k1"], "claim_ids": ["c1", "c2"]},
-            {"knowledge_ids": ["k2", "k1", 3]},
-        ],
-    }
-    assert cited_ids(content) == (["c2", "c1"], ["k1", "k2"])
-    assert cited_ids("text") == ([], [])
 
 
 @pytest.fixture
@@ -432,156 +412,3 @@ def test_a_retry_returns_only_an_empty_draft(tmp_path):
     with TestClient(app) as client:
         upload(documents, client.put, first["id"], "cv.tex", tex(), "application/x-tex")
     assert documents.create_document(value)["id"] != first["id"]
-
-
-def schema_twelve_workspace(path):
-    """A schema 12 file: CV and letter revisions with content, sources and PDFs, approved or not."""
-    app = create_app(path, start_worker=False)
-    workspace, documents = app.state.workspace, app.state.documents
-    job = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build services."})
-    application = workspace.create_application({"job_id": job["id"]})
-    ids, content = {}, {}
-    with TestClient(app) as client:
-        put = client.put
-        approved = source_revision(
-            documents, put, application["id"], text="Approved CV text.", approve=True
-        )
-        ids["approved"] = approved["id"]
-        content[approved["id"]] = json.dumps(
-            {
-                "bullets": [
-                    {"text": "Approved CV text.", "claim_ids": ["c1"], "evidence_ids": ["k1"]}
-                ]
-            }
-        )
-        draft = source_revision(
-            documents, put, application["id"], "cover_letter", "Letter that differs."
-        )
-        ids["draft"] = draft["id"]
-        content[draft["id"]] = json.dumps({"body": "Letter as it was saved."})
-        bare = documents.create_document(
-            DocumentCreate(application_id=application["id"], kind="resume", title="No source")
-        )
-        ids["bare"] = bare["id"]
-        content[bare["id"]] = json.dumps({"text": "Only structured content."})
-        empty = documents.create_document(
-            DocumentCreate(application_id=application["id"], kind="resume", title="Empty")
-        )
-        ids["empty"] = empty["id"]
-        answers = documents.create_document(
-            DocumentCreate(
-                application_id=application["id"],
-                kind="answers",
-                content={"answers": {"why": "Because."}, "claim_ids": []},
-            )
-        )
-        ids["answers"] = answers["id"]
-        # Two sources, as an older client could attach.
-        twice = documents.create_document(
-            DocumentCreate(application_id=application["id"], kind="other", title="Two sources")
-        )
-        ids["twice"] = twice["id"]
-        upload(documents, put, twice["id"], "b.tex", tex("Second part."), "application/x-tex")
-        upload(documents, put, twice["id"], "a.tex", tex("First part."), "application/x-tex")
-        legacy_pdf = source_revision(documents, put, application["id"], text="Legacy PDF.")
-        ids["legacy_pdf"] = legacy_pdf["id"]
-    with closing(sqlite3.connect(path)) as conn:
-        # A PDF uploaded before 0.22 named no source.
-        conn.execute("UPDATE files SET source_sha256=NULL")
-        conn.commit()
-    make_schema_twelve(path, content)
-    return ids, content
-
-
-def document_rows(conn):
-    return {
-        row[0]: row
-        for row in conn.execute(
-            "SELECT id,application_id,context_id,kind,title,previous_id,review_state,version,created_at,content "
-            "FROM documents"
-        )
-    }
-
-
-def file_rows(conn):
-    return sorted(
-        conn.execute(
-            "SELECT id,sha256,name,media_type,size,document_id,created_at FROM files ORDER BY id"
-        ).fetchall()
-    )
-
-
-def test_upgrade_moves_cv_content_to_legacy_and_derives_text(tmp_path):
-    path = tmp_path / "schema12.sqlite"
-    ids, content = schema_twelve_workspace(path)
-    with closing(sqlite3.connect(path)) as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 12
-        before, files = document_rows(conn), file_rows(conn)
-    workspace = Workspace(path)
-    fresh = Database(tmp_path / "fresh.sqlite")
-    with closing(sqlite3.connect(path)) as conn, closing(sqlite3.connect(fresh.path)) as reference:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 14
-        assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
-        assert not conn.execute("PRAGMA foreign_key_check").fetchall()
-        for table in ("documents", "files"):
-            assert columns(conn, table) == columns(reference, table), table
-        for view in ("all_files", "context_files"):
-            sql = "SELECT sql FROM sqlite_master WHERE name=?"
-            assert (
-                conn.execute(sql, (view,)).fetchone() == reference.execute(sql, (view,)).fetchone()
-            )
-        after = document_rows(conn)
-        # Approved revisions keep their files, hashes, review state and version.
-        assert file_rows(conn) == files
-        assert not conn.execute("SELECT 1 FROM files WHERE source_sha256 IS NOT NULL").fetchall()
-        legacy = dict(conn.execute("SELECT id,legacy_content FROM documents"))
-    for document_id, row in before.items():
-        assert after[document_id][:9] == row[:9]
-    from openings.documents import DocumentService
-
-    documents = DocumentService(workspace)
-    approved = documents.get_document(ids["approved"])
-    assert approved["review_state"] == "approved" and "content" not in approved
-    assert approved["text"] == "Approved CV text."
-    assert legacy[ids["approved"]] == content[ids["approved"]]
-    assert approved["legacy_content"] == json.loads(content[ids["approved"]])
-    assert (approved["claim_ids"], approved["knowledge_ids"]) == (["c1"], ["k1"])
-    draft = documents.get_document(ids["draft"])
-    assert (draft["text"], draft["legacy_content"]) == (
-        "Letter that differs.",
-        {"body": "Letter as it was saved."},
-    )
-    bare = documents.get_document(ids["bare"])
-    assert (bare["text"], bare["legacy_content"]) == (None, {"text": "Only structured content."})
-    assert documents.get_document(ids["empty"])["legacy_content"] is None
-    answers = documents.get_document(ids["answers"])
-    assert answers["content"] == {"answers": {"why": "Because."}, "claim_ids": []}
-    assert answers["legacy_content"] is None and answers["text"] is None
-    assert documents.get_document(ids["twice"])["text"] == "First part.\n\nSecond part."
-    # A legacy draft without a source cannot be approved; one with a source and an
-    # unpaired PDF still can, and approving it changes nothing else.
-    with pytest.raises(DomainError) as error:
-        documents.review_document(ids["bare"], ReviewUpdate(expected_version=bare["version"]))
-    assert error.value.code == "source_required"
-    legacy_pdf = documents.get_document(ids["legacy_pdf"])
-    assert (
-        documents.review_document(
-            ids["legacy_pdf"], ReviewUpdate(expected_version=legacy_pdf["version"])
-        )["text"]
-        == "Legacy PDF."
-    )
-
-
-def test_a_schema_twelve_backup_is_restored_upgraded(tmp_path):
-    source = tmp_path / "backup12.sqlite"
-    ids, content = schema_twelve_workspace(source)
-    original = source.read_bytes()
-    target = Workspace(tmp_path / "live.sqlite")
-    restore_database(target, source)
-    assert source.read_bytes() == original
-    with target.db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
-        row = conn.execute(
-            "SELECT legacy_content,text,content FROM documents WHERE id=?", (ids["draft"],)
-        ).fetchone()
-    assert tuple(row) == (content[ids["draft"]], "Letter that differs.", "{}")

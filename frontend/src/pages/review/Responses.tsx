@@ -15,7 +15,6 @@ import {
   Loading,
   Statement,
   StatementList,
-  Tag,
 } from "../../design";
 import { ConfirmDialog } from "../../library/common";
 import { shortDate } from "../../library/time";
@@ -23,11 +22,6 @@ import { useResource, useWorkspace } from "../../state";
 import { responseLabels } from "../applications/model";
 import { Respond } from "../applications/Respond";
 
-const ORIGINS: Record<EmployerResponse["origin"], string> = {
-  manual: "recorded by hand",
-  stage: "recorded with the stage change",
-  upgrade: "taken from the stage when Openings was upgraded",
-};
 /** "10 Oct" for a calendar day (YYYY-MM-DD), read in local time. */
 export const day = (value: string) => {
   const [year, month, date] = value.split("-").map(Number);
@@ -148,17 +142,7 @@ export function Responses({
               movable={false}
               editing={editing === response.id}
               label={`${responseLabels[response.kind as ResponseKind]} · ${day(response.date)}`}
-              tags={
-                response.estimated ? (
-                  <Tag tone="attention">Estimated date</Tag>
-                ) : undefined
-              }
-              caption={
-                <>
-                  <ActorChip actor={response.created_by} /> ·{" "}
-                  {ORIGINS[response.origin]}
-                </>
-              }
+              caption={<ActorChip actor={response.created_by} />}
               actions={
                 <>
                   <Button

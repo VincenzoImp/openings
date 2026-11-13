@@ -3,7 +3,6 @@
 import hashlib
 import json
 import sqlite3
-from contextlib import closing
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,7 +10,6 @@ from fastapi.testclient import TestClient
 from openings.actors import OWNER, acting_as, current_actor, token_actor
 from openings.app import create_app
 from openings.errors import DomainError
-from schema_fixtures import columns, make_schema_seven
 
 PASSWORD = "synthetic-password"
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
@@ -312,50 +310,3 @@ def test_the_owner_session_and_the_system_are_never_refused(app):
     with pytest.raises(DomainError) as invalid:
         auth.create_token("Invalid", "admin")
     assert invalid.value.code == "token_kind"
-
-
-def test_tokens_from_schema_seven_keep_full_access(tmp_path):
-    path = tmp_path / "schema7.sqlite"
-    app = create_app(path, start_worker=False)
-    app.state.auth.setup(PASSWORD)
-    token = app.state.auth.create_token("Token from 0.16")
-    with closing(sqlite3.connect(path)) as conn:
-        before = conn.execute(
-            "SELECT id,name,token_hash,created_at,last_used_at FROM api_tokens"
-        ).fetchall()
-    make_schema_seven(path)
-    with closing(sqlite3.connect(path)) as conn:
-        assert "kind" not in {row[0] for row in columns(conn, "api_tokens")}
-
-    upgraded = create_app(path, start_worker=False)
-    with closing(sqlite3.connect(path)) as conn:
-        assert (
-            conn.execute(
-                "SELECT id,name,token_hash,created_at,last_used_at FROM api_tokens"
-            ).fetchall()
-            == before
-        )
-        assert conn.execute("SELECT kind FROM api_tokens").fetchall() == [("owner",)]
-    headers = bearer(token)
-    with TestClient(upgraded, base_url="http://localhost:8080") as client:
-        listed = client.get("/api/v1/tokens", headers=headers)
-        assert listed.status_code == 200
-        assert [(item["name"], item["kind"]) for item in listed.json()["items"]] == [
-            ("Token from 0.16", "owner")
-        ]
-        created, error = tool(client, token, "tokens_create", {"value": {"name": "New agent"}})
-        assert error is None and created["kind"] == "owner"
-        assert client.delete(f"/api/v1/tokens/{created['id']}", headers=headers).status_code == 200
-        backup = client.get("/api/v1/backup", headers=headers)
-        restored = client.post(
-            "/api/v1/backup/restore",
-            content=backup.content,
-            headers={**headers, "Content-Type": "application/vnd.sqlite3"},
-        )
-        assert restored.status_code == 200, restored.text
-        changed = client.post(
-            "/api/v1/auth/password", json={"password": "changed-password"}, headers=headers
-        )
-        assert changed.status_code == 200
-        info = client.get("/api/v1/workspace", headers=headers).json()
-        assert info["actor"]["token_kind"] == "owner"

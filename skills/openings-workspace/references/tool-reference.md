@@ -183,9 +183,8 @@ ready.
 `responses_update(response_id, value)` and `responses_delete(response_id,
 expected_version)` manage an application's employer answers. A response has
 `kind` (`rejection`, `interview`, `offer`, `other`), `date` (not in the future;
-today when omitted), `note`, `estimated`, `origin` (`manual`, `stage`,
-`upgrade`), who created and updated it, and `version`. Adding takes an
-`idempotency_key`; one per kind and day (except `other`) returns
+today when omitted), `note`, who created and updated it, and `version`. Adding
+takes an `idempotency_key`; one per kind and day (except `other`) returns
 `409 response_exists` with `details.response_id`, and a Draft never sent returns
 `409 application_not_sent`. Adding never moves the stage; removing never moves
 it back. `applications_get` returns `responses` and `last_response`; list rows
@@ -294,7 +293,7 @@ with all of its applications, or `application_id` for one application with its
 job's entries. Each entry has `type` (`note` or `event`), `kind` (`note`,
 `event`, or `response` for an employer response recorded, corrected or
 removed), `scope` (`job` or `application`), `actor`, `run` and either `note`
-(`body`, `version`, `pinned`, `origin`) or `event` (`kind`, a text-free
+(`body`, `version`, `pinned`) or `event` (`kind`, a text-free
 `payload`, `subject`). Pinned notes come first, then newest first. Filter with
 `kinds`, `who` (`owner`, `agent`, `system`, `unknown`), `scope`, `since` and
 `until`; `counts` gives the entries of each kind for the other filters; page

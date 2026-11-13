@@ -27,6 +27,7 @@ from pydantic import Field, field_validator, model_validator
 from .actors import current_actor, pop_actor
 from .common import new_id, now
 from .errors import DomainError, conflict, missing
+from .idempotency import fingerprint, remember, replay
 from .models import Input, Versioned, past_day
 
 ResponseKind = Literal["rejection", "interview", "offer", "other"]
@@ -60,7 +61,7 @@ class ResponsePatch(Versioned):
     kind: ResponseKind | None = None
     date: str | None = Field(
         default=None,
-        description="The corrected day (YYYY-MM-DD, not in the future); clears estimated.",
+        description="The corrected day (YYYY-MM-DD, not in the future).",
     )
     note: str | None = Field(default=None, max_length=2000)
 
@@ -80,10 +81,8 @@ class ResponsePatch(Versioned):
 def response_record(row):
     """A response as returned by reads."""
     row = dict(row)
-    row["estimated"] = bool(row["estimated"])
     row["created_by"] = pop_actor(row, "created_by")
     row["updated_by"] = pop_actor(row, "updated_by")
-    row.pop("idempotency_key", None)
     return row
 
 
@@ -103,14 +102,14 @@ def responses_of(conn, application_ids):
 
 
 def last_responses(conn, application_ids):
-    """The newest response of each application: kind, date, estimated; None without one."""
+    """The newest response of each application: kind, date and count; None without one."""
     result = dict.fromkeys(application_ids)
     if not application_ids:
         return result
     marks = ",".join("?" for _ in application_ids)
     for row in conn.execute(
-        "SELECT application_id,id,kind,date,estimated,count FROM (SELECT r.application_id,r.id,"
-        "r.kind,r.date,r.estimated,count(*) OVER (PARTITION BY r.application_id) AS count,"
+        "SELECT application_id,id,kind,date,count FROM (SELECT r.application_id,r.id,"
+        "r.kind,r.date,count(*) OVER (PARTITION BY r.application_id) AS count,"
         "row_number() OVER (PARTITION BY r.application_id ORDER BY r.date DESC,r.created_at DESC,"
         f"r.id) AS position FROM responses r WHERE r.application_id IN ({marks})) WHERE position=1",
         list(application_ids),
@@ -119,8 +118,7 @@ def last_responses(conn, application_ids):
             "id": row[1],
             "kind": row[2],
             "date": row[3],
-            "estimated": bool(row[4]),
-            "count": row[5],
+            "count": row[4],
         }
     return result
 
@@ -175,9 +173,7 @@ def not_sent():
     )
 
 
-def record_response(
-    workspace, conn, application, kind, day, note="", origin="manual", idempotency_key=None
-):
+def record_response(workspace, conn, application, kind, day, note=""):
     """Insert one response in the caller's transaction, with its event.
 
     Returns the new id, or None when a response of this kind already exists for
@@ -193,20 +189,18 @@ def record_response(
         return None
     response_id, stamp, actor = new_id(), now(), current_actor()
     conn.execute(
-        "INSERT INTO responses(id,application_id,kind,date,note,origin,"
+        "INSERT INTO responses(id,application_id,kind,date,note,"
         "created_by_kind,created_by_id,created_by_name,created_by_token_kind,"
         "updated_by_kind,updated_by_id,updated_by_name,updated_by_token_kind,"
-        "idempotency_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             response_id,
             application["id"],
             kind,
             day,
             note,
-            origin,
             *actor.columns(),
             *actor.columns(),
-            idempotency_key,
             stamp,
             stamp,
         ),
@@ -215,7 +209,7 @@ def record_response(
         "response_added",
         application["job_id"],
         application["id"],
-        {"kind": kind, "date": day, "origin": origin},
+        {"kind": kind, "date": day},
         conn,
         subject=("response", response_id),
     )
@@ -275,16 +269,11 @@ class ResponseService:
     def add_response(self, application_id, value):
         """Record an employer response to a sent application. It never moves the stage."""
         value = value if isinstance(value, ResponseInput) else ResponseInput.model_validate(value)
+        digest = fingerprint({"application_id": application_id, **value.model_dump(mode="json")})
         with self.db.transaction() as conn:
-            if value.idempotency_key:
-                old = conn.execute(
-                    "SELECT id,application_id,kind,date FROM responses WHERE idempotency_key=?",
-                    (value.idempotency_key,),
-                ).fetchone()
-                if old:
-                    if tuple(old)[1:] != (application_id, value.kind, value.date):
-                        conflict("This idempotency key was used for another response.")
-                    return self._read(conn, old["id"])
+            replayed = replay(conn, "responses", value.idempotency_key, digest)
+            if replayed:
+                return self._read(conn, replayed)
             application = self._application(conn, application_id)
             if not application["sent"]:
                 raise not_sent()
@@ -296,12 +285,12 @@ class ResponseService:
                 value.kind,
                 value.date,
                 value.note,
-                idempotency_key=value.idempotency_key,
             )
+            remember(conn, "responses", value.idempotency_key, digest, response_id)
             return self._read(conn, response_id)
 
     def update_response(self, response_id, value):
-        """Correct a response's kind, day or note with its version; a corrected day is no longer estimated."""
+        """Correct a response's kind, day or note with its version."""
         value = value if isinstance(value, ResponsePatch) else ResponsePatch.model_validate(value)
         changes = value.model_dump(exclude_unset=True, exclude={"expected_version"})
         with self.db.transaction() as conn:
@@ -316,8 +305,6 @@ class ResponseService:
             if "kind" in actual or "date" in actual:
                 self._duplicate(conn, current["application_id"], kind, day, excluding=response_id)
             fields = sorted(actual)
-            if "date" in actual:
-                actual["estimated"] = 0
             conn.execute(
                 "UPDATE responses SET "
                 + ",".join(key + "=?" for key in actual)
