@@ -42,6 +42,7 @@ flowchart LR
 | `backend/openings/schema.sql` | The whole schema of a new workspace: relational ownership, SQLite indexes and JSON payloads |
 | `backend/openings/migrations/` | The one supported upgrade, from the previous schema (`m15.py`: a new file with the data copied in, the archive and the pre-upgrade copy) |
 | `frontend/src` | Dashboard using REST; no duplicated domain decisions |
+| `frontend/src/ui/` | Design system of the new dashboard: tokens, Inter, Lucide icons and the primitives, in cascade layers; `ui.html` is its gallery |
 | `backend/openings/skills.py`, `skill_notes.py` | Shipped skills served read-only; per-workspace local notes appended when a skill is served |
 | `skills/` | Agent workflow skills (Agent Skills format) and their shared references |
 
