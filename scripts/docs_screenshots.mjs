@@ -89,6 +89,24 @@ async function applicationId(company, title) {
     [company, title],
   );
 }
+/** The id of a job by company and title; `duplicate` picks a flagged copy. */
+async function jobId(company, title, duplicate = false) {
+  return page.evaluate(
+    async ([company, title, duplicate]) => {
+      const response = await fetch(
+        "/api/v1/jobs?limit=200&q=" + encodeURIComponent(company),
+      );
+      const { items } = await response.json();
+      return items.find(
+        (item) =>
+          item.company === company &&
+          item.title === title &&
+          (!duplicate || item.signals?.duplicate),
+      ).id;
+    },
+    [company, title, duplicate],
+  );
+}
 /** The review page has read its record and its documents. */
 async function review(id, tab = "") {
   await page.goto(`/#review?application=${id}${tab ? "&tab=" + tab : ""}`);
@@ -103,16 +121,22 @@ await open("today");
 await page.getByRole("heading", { name: "Ready to apply" }).waitFor();
 await shot("today");
 
-await open("inbox");
-await shot("inbox");
+await open(`jobs?job=${await jobId("Alpenlicht Software", "Backend-Entwickler")}`);
+await page.locator("#job-title").waitFor();
+await shot("jobs");
 
-await open("shortlist");
+await open("jobs?section=shortlist");
 await shot("shortlist");
 
-await open("inbox?queue=duplicates");
-if (!(await page.getByRole("heading", { name: "Possible duplicates" }).count()))
-  await page.getByRole("tab", { name: "Possible duplicates" }).click();
-await page.getByLabel("Confidence").selectOption("0.85");
+await open(
+  `jobs?job=${await jobId("Brightline AI", "Machine Learning Engineer", true)}`,
+);
+await page.locator("#duplicate-title").waitFor();
+await page
+  .locator("#duplicate-title")
+  .evaluate((heading) =>
+    window.scrollTo(0, heading.getBoundingClientRect().top + window.scrollY - 160),
+  );
 await shot("duplicates");
 
 await open("applications?sort=deadline");
@@ -178,6 +202,10 @@ await page
     window.scrollTo(0, heading.getBoundingClientRect().top + window.scrollY - 88),
   );
 await shot("collection-settings");
+
+await open("collection?section=yield");
+await page.getByRole("table", { name: /Yield by source/ }).waitFor();
+await shot("yield");
 
 await open("career?section=knowledge");
 // Show the record with one entry open; the Profile is above it.
