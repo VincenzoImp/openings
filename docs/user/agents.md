@@ -98,9 +98,12 @@ skills: discover the tools/resources and their typed input schemas.
    from the attached `.tex` source; `documents_consistency` runs the same
    read-only check. Fix the content or source, or pass
    `value.allow_content_mismatch=true` only for an intentional difference.
-8. After a Profile, guidance, template or Career change, `applications_staleness`
-   lists Draft applications whose current revisions were built on older inputs and
-   `application_staleness` explains one. Contexts stay frozen: refresh by
+8. After a Profile, policy, guidance, template or Career change,
+   `applications_staleness` lists Draft applications whose current revisions were
+   built on older inputs and `application_staleness` explains one, naming each
+   changed part (for example the Profile `summary` or the policy item "Work
+   authorization"). Profile metadata, preferences, roles, decision items and
+   unconfirmed proposals never make a Draft stale. Contexts stay frozen: refresh by
    preparing a new context and new revisions. The owner submits
    applications and records Applied. Portals and sending are outside Openings.
 

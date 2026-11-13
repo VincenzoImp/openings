@@ -66,7 +66,7 @@ The route itself is never called from the dashboard.
 |---|---|---|
 | `sources.delete` | `sources.bulk` | Remove, also for one source, sends a bulk action. |
 | `sources.run` | `sources.bulk` | Run once, also for one source, sends a bulk action. |
-| `applications.staleness_list` | `applications.list`, `applications.staleness` | Badges use `stale_inputs` in the application list; details use the per-application report. There is no workspace-wide staleness view. |
+| `applications.staleness_list` | `applications.list`, `applications.staleness` | Rows use `stale_inputs`, `stale_changes` and `stale_changes_total` in the application list; details use the per-application report. There is no workspace-wide staleness view. |
 | `questions.read` | `questions.list` | Activity renders questions from the list, which returns complete records. |
 | `requests.read` | `requests.list` | Activity renders requests from the list, which returns complete records. |
 
@@ -253,8 +253,8 @@ missing from the inventory.
 | `contexts.list`<br>List/filter compact frozen-context metadata | `GET /contexts` | `contexts_list` | any | Applications: prepared contexts | pages/review/Inputs.tsx<br>pages/review/RevisionDialog.tsx | structured | 2 |
 | `contexts.read`<br>Read full frozen context and signature | `GET /contexts/{context_id}` | `contexts_get` | any | Applications: context detail | pages/review/Inputs.tsx | structured | 1 |
 | `contexts.create`<br>Prepare an immutable context for external generation | `POST /contexts` | `application_prepare_context` | any | Applications: prepare context | pages/review/ContextDialog.tsx | structured | 1 |
-| `applications.staleness`<br>Report whether an attempt's current revisions use outdated inputs | `GET /applications/{application_id}/staleness` | `application_staleness` | any | Applications: Built on older inputs indicator and detail | pages/review/Inputs.tsx | structured | 1 |
-| `applications.staleness_list`<br>List attempts whose current revisions use outdated inputs | `GET /staleness` | `applications_staleness` | any | Applications: Built on older inputs badges on cards and rows | via `applications.list`, `applications.staleness` | — | — |
+| `applications.staleness`<br>Report whether an attempt's current revisions use outdated inputs | `GET /applications/{application_id}/staleness` | `application_staleness` | any | Applications: Inputs changed indicator and the review page Inputs tab | pages/review/Inputs.tsx | structured | 1 |
+| `applications.staleness_list`<br>List attempts whose current revisions use outdated inputs | `GET /staleness` | `applications_staleness` | any | Applications: Inputs changed tag and first change on rows | via `applications.list`, `applications.staleness` | — | — |
 | `documents.list`<br>List/filter paginated revision summaries | `GET /documents` | `documents_list` | any | Applications: documents/history | pages/review/DocumentPanes.tsx<br>pages/review/Revisions.tsx | structured | 11 |
 | `documents.read`<br>Read exact revision content, chain number and files | `GET /documents/{document_id}` | `documents_get` | any | Applications: revision detail and preview | pages/review/DocumentPanes.tsx<br>pages/review/Revisions.tsx | structured | 6 |
 | `documents.create`<br>Save content as a new immutable revision | `POST /documents` | `documents_create` | any | Applications: add/edit content as a new revision | pages/review/RevisionDialog.tsx | structured | 1 |

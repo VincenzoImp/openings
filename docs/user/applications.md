@@ -137,11 +137,26 @@ file name to preview a supported PDF, image or text file with its size and hash.
 
 The list shows the state of the CV and letter from the current revisions:
 **None**, **Written, without PDF**, **Written, not approved**, **CV approved,
-letter not yet** or **CV and letter approved**. **Inputs changed since
-written** marks an application whose current revisions use a frozen copy made
-before a later change to the Profile, general guidance, a selected template, a
-Career entry or a claim; **Inputs** lists what changed. Frozen copies never
-change; to refresh, prepare a new one and save new revisions.
+letter not yet** or **CV and letter approved**. **Inputs changed** marks an
+application whose current revisions use a frozen copy made before a later change
+to something the documents use, and the line below names the first change, for
+example "Profile summary and 2 more". The tab **Inputs** lists every change with
+what happened to it: "Profile summary — changed", "Policy “Work authorization” —
+changed · Facts employers ask about". A writing rule for the CV only marks the CV
+("CV only").
+
+Only what documents use counts: the Profile's name, headline, contact details,
+links and summary; the confirmed items of the policy sections for eligibility,
+writing and other facts; the text of general guidance; the source, guidance and
+rules of the selected templates; the text, dates and skills of the selected
+Career entries and the wording of their claims. Editing Profile metadata,
+preferences or target roles, a rule for shortlisting jobs, an agent's
+unconfirmed proposal, a template's name, the order of entries or claims, a
+claim's selection fields or any free-form metadata leaves every Draft current,
+and so does changing spacing or changing a part back. A frozen copy made before the policy
+existed (0.19) holds none of it; **Inputs** says that policy changes are not
+compared for it. Frozen copies never change; to refresh, prepare a new one and
+save new revisions.
 
 Editing a form question keeps compatible live answers. If a changed type, option
 or limit makes an answer invalid, the editor shows why and requires an explicit

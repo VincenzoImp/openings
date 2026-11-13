@@ -182,6 +182,9 @@ export interface Application extends Versioned {
     approved: number;
   }[];
   stale_inputs?: StaleInput[];
+  /** The first changes since the current revisions were written. */
+  stale_changes?: StaleChange[];
+  stale_changes_total?: number;
   /** The day an application closed as no_response was concluded. */
   concluded_on?: string | null;
   responses?: EmployerResponse[];
@@ -194,14 +197,24 @@ export interface Application extends Versioned {
   } | null;
 }
 export type StaleInput =
-  "profile" | "instructions" | "template" | "knowledge" | "claim";
+  "profile" | "policy" | "instructions" | "template" | "knowledge" | "claim";
 export interface StaleChange {
   input: StaleInput;
+  /** A Profile part (null: the whole Profile), a policy item or a record. */
   id: string | null;
   label: string;
-  state: "changed" | "deleted" | "unapproved";
+  state:
+    | "changed"
+    | "deleted"
+    | "unapproved"
+    | "added"
+    | "removed"
+    | "unconfirmed"
+    | "confirmed";
   frozen_version: number | null;
   current_version: number | null;
+  /** A policy item's section. */
+  section?: PolicySectionName;
 }
 export interface Staleness {
   application_id: string;
@@ -215,6 +228,11 @@ export interface Staleness {
     context_id: string | null;
     context_created_at: string | null;
     status: "current" | "stale" | "no_context";
+    /** How the frozen copy was compared; null without one. */
+    comparison: {
+      profile: "parts" | "whole";
+      policy: "items" | "not_frozen";
+    } | null;
     changes: StaleChange[];
   }[];
 }

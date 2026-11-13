@@ -37,8 +37,9 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   and nothing blocks it. Its review page shows the posting, CV and letter side by
   side with the open requirements; download both PDFs, apply on the employer's
   site and **Mark applied**. A later change to the documents clears the mark.
-- **Stay consistent:** applications built on older inputs are flagged after Profile,
-  template or Career changes, and review checks a document's content against its
+- **Stay consistent:** applications built on older inputs are flagged after a
+  change to a part their documents use (Profile header and summary, confirmed
+  policy items, templates, Career), naming the part, and review checks a document's content against its
   `.tex` source.
 - **Track:** follow applications through Preparing, Ready, Applied, Interview,
   Offer and Closed as a list or a board. Record the employer's rejection,
