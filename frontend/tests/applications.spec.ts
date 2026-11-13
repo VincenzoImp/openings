@@ -438,8 +438,9 @@ test("keyboard only: an employer response is recorded from an Applied row", asyn
   });
   await go(page, `applications?stage=applied&q=${encodeURIComponent(prefix)}`);
   await settled(page);
+  // 50 days in UTC; the local day can be one off near midnight.
   await expect(row(page, `${prefix} silent`)).toContainText(
-    "No reply for 50 days",
+    /No reply for (49|50|51) days/,
   );
 
   // Rejection, with the keyboard: the form takes focus on its first choice.
