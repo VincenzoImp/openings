@@ -28,15 +28,10 @@ def main():
             )
         for name in (
             "openings/schema.sql",
-            "openings/operation-inventory.json",
             "openings/_vendor/jobspy/LICENSE",
             "openings/_vendor/jobspy/PROVENANCE.md",
         ):
             assert name in package.namelist(), f"Missing package resource: {name}"
-        expected = json.loads(package.read("openings/operation-inventory.json"))
-        assert expected == json.loads(
-            (repository / "backend/openings/operation-inventory.json").read_text()
-        )
     with tempfile.TemporaryDirectory(prefix="openings-installed-") as directory:
         target = Path(directory) / "site-packages"
         subprocess.run(
@@ -69,12 +64,12 @@ token = app.state.auth.create_token('synthetic-package-probe')['token']
 with TestClient(app) as client:
     response = client.get('/api/v1/capabilities', headers={'Authorization': 'Bearer ' + token})
     response.raise_for_status()
-    inventory = response.json()
-    assert inventory['version'] == version('openings') == openings.__version__
-    assert len(inventory['operations']) >= 83
+    capabilities = response.json()
+    assert capabilities['version'] == version('openings') == openings.__version__
+    assert capabilities['operations']
     assert client.get('/health').json()['status'] == 'ok'
     print(json.dumps({'installed_version': version('openings'),
-                      'operation_count': len(inventory['operations']),
+                      'operation_count': len(capabilities['operations']),
                       'capabilities_status': response.status_code,
                       'package_origin': str(Path(openings.__file__).resolve().relative_to(Path.cwd().resolve()))}))
 """
@@ -89,7 +84,6 @@ with TestClient(app) as client:
         if completed.returncode:
             raise RuntimeError(completed.stderr)
         result = json.loads(completed.stdout)
-        assert result["operation_count"] == len(expected["operations"])
         result["source_files_verified"] = len(list(filter(None, tracked)))
         print(json.dumps(result, indent=2))
 

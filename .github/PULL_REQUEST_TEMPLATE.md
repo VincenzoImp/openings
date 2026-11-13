@@ -18,8 +18,8 @@
 
 ## Contract
 
-- [ ] Business logic lives in shared services; new operations are declared in `interfaces/` with `operation-inventory.json` regenerated
-- [ ] Parity: every operation has REST, MCP and a dashboard path a browser test uses; `docs/developer/parity.md` and `parity-e2e.json` are regenerated (`scripts/parity_matrix.py --e2e`), and any exemption in `parity-notes.json` states its reason (CONTRIBUTING → Parity)
+- [ ] Business logic lives in shared services; new operations are declared in `interfaces/`
+- [ ] Parity: every dashboard action is a REST operation, and every operation that is not owner-only is also an MCP tool (`backend/tests/test_parity.py`)
 - [ ] Versioned updates, immutable contexts/revisions, exact file ownership and deletion rules still hold
 - [ ] Database changes include a migration, backup/restore handling and a CHANGELOG note on the schema
 - [ ] Dashboard changes checked with populated data at desktop and mobile widths, keyboard access and loading/error states

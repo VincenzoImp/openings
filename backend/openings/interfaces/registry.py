@@ -1,15 +1,19 @@
-"""One declaration per operation: its REST routes, its MCP tool and its inventory entry.
+"""One declaration per operation: its REST routes and its MCP tool.
 
 An area module lists its ``Operation`` declarations. ``bind_rest`` and
 ``bind_mcp`` turn each declaration into a FastAPI route and an MCP tool that
-call the same service code, and ``inventory`` writes the operation inventory
-from them (``scripts/inventory.py``). Adding an operation means one declaration
-plus its service method.
+call the same service code, and ``capability_entries`` lists them for
+``GET /api/v1/capabilities``. Adding an operation means one declaration plus its
+service method.
+
+Parity runs one way: every dashboard action is a REST operation, and every
+operation that is not owner-only is also an MCP tool. An owner-only operation
+may be REST-only (``tool=None``). ``backend/tests/test_parity.py`` checks this.
 
 A declaration names its parameters once (``Param``); a parameter that REST
 reads differently, such as a query model, says so with ``rest``. A route or
 tool marked ``custom`` is registered by hand next to the declarations (raw
-bytes, streaming, browser sessions) and is still listed in the inventory.
+bytes, streaming, browser sessions) and is still declared here.
 
 The MCP tool is named ``<resource>_<verb>`` (``canonical_name``). Its arguments
 are the identifiers a REST path names, ``expected_version`` of a delete, and one
@@ -84,7 +88,10 @@ class Tool:
 
 @dataclass(frozen=True)
 class Operation:
-    """A logical operation: inventory identity, inputs, service call and interfaces."""
+    """A logical operation: identity, inputs, service call and interfaces.
+
+    ``access`` is ``"owner"`` for an operation an agent token may not perform.
+    """
 
     id: str
     resource: str
@@ -105,12 +112,11 @@ class Operation:
 
 @dataclass(frozen=True)
 class Exemption:
-    """A documented transport difference: routes or tools without a logical twin."""
+    """A documented transport difference: routes without an operation, with a one-line reason."""
 
     id: str
     reason: str
     rest: tuple[Route, ...] = ()
-    tools: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -200,54 +206,23 @@ def bind_mcp(mcp, operations, service):
         mcp.add_tool(function, name=name, annotations=tool.annotations)
 
 
-def _routes(routes):
-    return [
-        {
-            "method": route.method,
-            "path": ("" if route.absolute else API_PREFIX) + route.path.replace(":path", ""),
-        }
-        for route in routes
-    ]
+def capability_entries(operations):
+    """One ``{name, method, path}`` entry per operation, plus ``access: owner`` when owner-only.
 
-
-def inventory(operations, exemptions, notes):
-    """The operation inventory: declarations in the notes' order, with their remarks."""
-    declared = {operation.id: operation for operation in operations}
-    exempted = {exemption.id: exemption for exemption in exemptions}
-    listed = [item["id"] for item in notes["operations"]]
-    if sorted(listed) != sorted(declared):
-        raise ValueError(
-            f"Inventory notes and declarations differ: {sorted(set(listed) ^ set(declared))}"
-        )
-    if sorted(item["id"] for item in notes["exceptions"]) != sorted(exempted):
-        raise ValueError("Inventory notes and exemptions differ.")
-    document = {
-        key: value for key, value in notes.items() if key not in ("operations", "exceptions")
-    }
-    document["operations"] = []
-    for item in notes["operations"]:
-        operation = declared[item["id"]]
+    ``name`` is the operation's MCP name; ``method`` and ``path`` are its main REST
+    route, relative to ``/api/v1``. An entry without ``access`` is open to any token.
+    """
+    entries = []
+    for operation in operations:
+        if not operation.rest:
+            continue
+        route = operation.rest[0]
         entry = {
-            "id": operation.id,
-            "group": operation.group,
-            "operation": operation.label,
-            "rest": _routes(operation.rest),
-            "mcp": [operation.canonical_name] if operation.tool else [],
-            "dashboard": item["dashboard"],
+            "name": operation.canonical_name,
+            "method": route.method,
+            "path": route.path.replace(":path", ""),
         }
-        if "notes" in item:
-            entry["notes"] = item["notes"]
         if operation.access:
             entry["access"] = operation.access
-        document["operations"].append(entry)
-    document["exceptions"] = [
-        {
-            "id": item["id"],
-            "rest": _routes(exempted[item["id"]].rest),
-            "mcp": list(exempted[item["id"]].tools),
-            "dashboard": item["dashboard"],
-            "reason": exempted[item["id"]].reason,
-        }
-        for item in notes["exceptions"]
-    ]
-    return document
+        entries.append(entry)
+    return entries

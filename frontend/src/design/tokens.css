@@ -1,6 +1,6 @@
 /* Openings design tokens: the single source for colour, type, space and density.
-   Values are the approved ones from docs/developer/dashboard-design.md; the
-   contrast of every pair in that table is asserted by tests/contrast.test.mjs. */
+   The contrast of every colour on its backgrounds is asserted by
+   tests/contrast.test.mjs. */
 :root {
   /* Surfaces, from the page shell up to raised paper */
   --bg: #ebe8e0;
