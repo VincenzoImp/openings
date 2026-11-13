@@ -199,7 +199,7 @@ Preparing ones not marked ready. Every list returns `no_reply`: the period in
 `days`, its `source` (`policy`, the number in the Decision item labelled "No
 reply", with `item_id` and whether it is `confirmed`; otherwise `default`, 30
 days) and how many applications are `due`. Each row has its `last_response`
-(`kind`, `date`, `estimated`, `count`) and `concluded_on`.
+(`kind`, `date`, `count`) and `concluded_on`.
 Create and `PATCH` accept `priority` (1 highest to 5), `deadline` (`YYYY-MM-DD`)
 and `requirements`, a list of `{id, kind, text, blocking, resolved, note}`.
 A requirements patch replaces the whole list; keep existing `id` values. `null`
@@ -232,11 +232,8 @@ response without moving the stage; it is refused with 409
 `application_not_sent` for an application never sent, and with 409
 `response_exists` (`details.response_id`) for a second one of a kind on a day.
 `PATCH /responses/{id}` corrects `kind`, `date` or `note` with
-`expected_version` (a corrected date is no longer `estimated`), and `DELETE
-/responses/{id}?expected_version=1` removes one. The application read lists its
-`responses`. Responses that the 0.20 upgrade derived from an application's stage
-have `origin: "upgrade"`; their day comes from the stage change that moved the
-application there, or is `estimated` from its last change.
+`expected_version`, and `DELETE /responses/{id}?expected_version=1` removes one.
+The application read lists its `responses`.
 
 `GET /insights` reports how employers answered the sent applications: `sent`,
 `responded`, `interviews` (an interview or offer response), `offers`,
@@ -309,7 +306,7 @@ come first, then everything newest first. Each entry has `type` (`note` or
 `event`), `kind` (`note`, `event`, or `response` for an employer response
 recorded, corrected or removed), `scope` (`{"type": "job" | "application",
 "id"}`), `actor`, `run` and either `note` (`body`, `version`, `updated_at`,
-`pinned`, `pinned_at`, `origin`) or `event` (`kind`, `payload`, `subject`).
+`pinned`, `pinned_at`) or `event` (`kind`, `payload`, `subject`).
 Event payloads hold identifiers, field names and versions, never text; adding
 or editing a note is shown by the note itself. Filters: `kinds`, `who` (`owner`
 for the dashboard or an owner token, `agent`, `system`, `unknown`), `scope`

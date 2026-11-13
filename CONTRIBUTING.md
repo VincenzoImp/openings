@@ -170,13 +170,59 @@ uv run python backend/tests/agent_roundtrip.py --tectonic /path/to/tectonic
 | `frontend` | React dashboard calling REST |
 | `examples` | Synthetic career data and LaTeX templates |
 | `skills/` | Agent workflow skills (Agent Skills format) and their shared references |
-| `scripts/` | Release version tool and package smoke check |
+| `scripts/` | Release version tool, package smoke check, release fixture and upgrade rehearsal |
 | `docs/user` | Setup, workflow and operator guides |
 | `docs/developer` | Architecture and extension boundaries |
 
 `uv.lock` and `frontend/package-lock.json` are authoritative. Keep personal data,
 model caches, deployment files, one-off importers and development work notes out of
 the public tree. Preserve upstream notices for vendored code.
+
+## Changing the schema
+
+`backend/openings/schema.sql` is the whole layout of a new workspace and runs only
+on a new file. A workspace of the previous schema is upgraded by the one migration
+in `backend/openings/migrations/` (`MIGRATIONS` has exactly one key,
+`SCHEMA_VERSION - 1`); any older workspace is refused with the release to open it
+with first. A migration is frozen with its release: it imports only the standard
+library and holds every statement it needs (`test_migration_policy.py`).
+
+The 0.24 migration, `m15.py`, builds a new file from `schema.sql` and copies the
+data in, so an upgraded workspace equals a new one (`test_upgrade.py` compares
+them). **While its release is unreleased, change it instead of adding a version**
+("edit the unreleased migration"), in the same pull request as the schema change:
+
+- `schema.sql`: the new layout.
+- `m15.TABLES`: a `Table` entry per changed table, with `columns` (an SQL
+  expression over the schema-14 row `o` for each new or transformed column),
+  `source` for a renamed table, `where` for rows that are not copied, or
+  `fresh=True` for a new table.
+- `m15.SECTIONS`: the archive section of every removed table or value that is not
+  already archived automatically (a dropped column's non-default values go to
+  `dropped_columns` by themselves; list a column in `NOT_ARCHIVED` only with a
+  reason).
+- `m15.FOLDS`: functions that create rows from removed data (notes, items), each
+  returning the rows it created per table; `m15.INVARIANTS` for values the upgrade
+  must keep.
+- A block of data mapping assertions in `backend/tests/test_upgrade.py`, and the
+  aggregates of the dropped or folded columns in `scripts/verify_m15.py`.
+
+Before the release, run `scripts/verify_m15.py` on a private copy of a real
+workspace (aggregates only; add `--upgrade` to time an upgrade of a copy).
+
+**Fixtures.** `backend/tests/fixtures/workspace-<schema>.sql.gz` is a real
+workspace written by the last release at the previous schema, from that release's
+own synthetic seed (the browser-test workspace and the agent round trip, which
+needs `tectonic`). Regenerate it at release time when the seed changed, and at the
+next schema change for the new previous schema; then delete the older fixture:
+
+```bash
+uv run python scripts/release_fixture.py --tag v0.23.0 --schema 14
+```
+
+At the next schema change, delete `m15.py`, write the next migration (a new file
+from `schema.sql` with the data copied in is the default), point `MIGRATIONS` at
+it, and rename the user-visible files in it (`openings.pre-<release>.sqlite`).
 
 ## Changelog
 

@@ -114,17 +114,20 @@ def test_export_keeps_one_snapshot_during_concurrent_writes(tmp_path, monkeypatc
 
 def test_export_preparation_failure_closes_snapshot_before_response(tmp_path, snapshots):
     app = create_app(tmp_path / "invalid-record.sqlite", start_worker=False)
-    app.state.workspace.db.execute(
-        "INSERT INTO sources(id,name,kind,config,created_at,updated_at) VALUES(?,?,?,?,?,?)",
-        (
-            "invalid",
-            "Synthetic invalid source",
-            "rss",
-            "invalid JSON",
-            "2026-01-01T00:00:00Z",
-            "2026-01-01T00:00:00Z",
-        ),
-    )
+    # The schema refuses text that is not JSON; a damaged file can still hold it.
+    with app.state.workspace.db.transaction() as conn:
+        conn.execute("PRAGMA ignore_check_constraints=ON")
+        conn.execute(
+            "INSERT INTO sources(id,name,kind,config,created_at,updated_at) VALUES(?,?,?,?,?,?)",
+            (
+                "invalid",
+                "Synthetic invalid source",
+                "rss",
+                "invalid JSON",
+                "2026-01-01T00:00:00Z",
+                "2026-01-01T00:00:00Z",
+            ),
+        )
     with TestClient(app, raise_server_exceptions=False) as client:
         client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
         response = client.get("/api/v1/export")

@@ -45,7 +45,7 @@ def move(workspace, application, **fields):
 
 
 def kinds(application):
-    return [(item["kind"], item["date"], item["origin"]) for item in application["responses"]]
+    return [(item["kind"], item["date"]) for item in application["responses"]]
 
 
 def test_responses_are_recorded_corrected_and_removed_for_a_sent_application(workspace):
@@ -67,12 +67,18 @@ def test_responses_are_recorded_corrected_and_removed_for_a_sent_application(wor
                 "idempotency_key": "k1",
             },
         )
-    assert first["created_by"]["token_kind"] == "agent" and first["origin"] == "manual"
-    assert first["estimated"] is False and first["version"] == 1
-    # A retry with the same key returns the same response; another use of the key is refused.
+    assert first["created_by"]["token_kind"] == "agent" and first["version"] == 1
+    # A retry of the same request with the same key returns the same response; another
+    # use of the key is refused.
     assert (
         responses.add_response(
-            sent["id"], {"kind": "other", "date": days_ago(3), "idempotency_key": "k1"}
+            sent["id"],
+            {
+                "kind": "other",
+                "date": days_ago(3),
+                "note": "Asked for references.",
+                "idempotency_key": "k1",
+            },
         )["id"]
         == first["id"]
     )
@@ -135,30 +141,30 @@ def test_stage_moves_record_the_matching_response_once(workspace):
     interview = move(
         workspace, sent, status="interview", response_date=days_ago(5), response_note="Call."
     )
-    assert kinds(interview) == [("interview", days_ago(5), "stage")]
+    assert kinds(interview) == [("interview", days_ago(5))]
     assert interview["responses"][0]["note"] == "Call."
     # Back and forth on the same day records nothing twice.
     move(workspace, sent, status="applied")
     again = move(workspace, sent, status="interview", response_date=days_ago(5))
-    assert kinds(again) == [("interview", days_ago(5), "stage")]
+    assert kinds(again) == [("interview", days_ago(5))]
     offer = move(workspace, sent, status="offer")
-    assert kinds(offer)[0] == ("offer", today(), "stage")
+    assert kinds(offer)[0] == ("offer", today())
     accepted = move(workspace, sent, status="closed", outcome="accepted")
     # An offer is on record: accepting adds none.
-    assert [kind for kind, _, _ in kinds(accepted)] == ["offer", "interview"]
+    assert [kind for kind, _ in kinds(accepted)] == ["offer", "interview"]
 
     rejected = attempt(workspace, "Synthetic platform engineer", status="applied")
     closed = move(
         workspace, rejected, status="closed", outcome="rejected", response_date=days_ago(1)
     )
-    assert kinds(closed) == [("rejection", days_ago(1), "stage")]
+    assert kinds(closed) == [("rejection", days_ago(1))]
     # Correcting the outcome of a closed application to rejected again records nothing new.
     assert kinds(move(workspace, rejected, priority=2)) == kinds(closed)
 
     accepted_directly = attempt(workspace, "Synthetic analyst", status="interview")
-    assert kinds(accepted_directly) == [("interview", today(), "stage")]
+    assert kinds(accepted_directly) == [("interview", today())]
     done = move(workspace, accepted_directly, status="closed", outcome="accepted")
-    assert [kind for kind, _, _ in kinds(done)] == ["offer", "interview"]
+    assert [kind for kind, _ in kinds(done)] == ["offer", "interview"]
 
     # A Draft closed as rejected was never sent: no employer answered it.
     draft = attempt(workspace, "Synthetic tester")
@@ -186,7 +192,7 @@ def test_stage_moves_record_the_matching_response_once(workspace):
         }
     )
     assert result["succeeded"] == 1
-    assert kinds(workspace.get_application(bulk["id"])) == [("rejection", today(), "stage")]
+    assert kinds(workspace.get_application(bulk["id"])) == [("rejection", today())]
 
 
 def test_no_reply_closes_only_sent_applications_with_the_day_it_was_concluded(workspace):

@@ -1,12 +1,11 @@
-"""Idempotency keys of the creates whose records have no key column of their own.
+"""Idempotency keys of creates.
 
-Applications, contexts, responses, policy items, runs, questions and requests keep
-their key on the record. Jobs, notes, Career entries, claims, templates, document
-revisions, sources and API tokens record it in ``idempotency_keys``: the table of
-the record, the key, the SHA-256 of the request without the key and the id of the
-record the first request created or found. A retry with the same key and request
-returns that record; the same key with another request is refused. A key whose
-record no longer exists is free again, as a key column would be.
+A create that takes an ``idempotency_key`` records it in ``idempotency_keys``: the
+table of the record, the key, the SHA-256 of the request without the key and the
+id of the record the first request created or found. A retry with the same key and
+request returns that record; the same key with another request is refused (409).
+A key whose record no longer exists is free again. (Before schema 15 some tables
+kept the key on the record; the 0.24 upgrade archives those values.)
 """
 
 import hashlib
@@ -18,7 +17,23 @@ from .errors import conflict
 
 # The tables whose creates take a key here; their records have an ``id``.
 TABLES = frozenset(
-    {"jobs", "notes", "knowledge", "claims", "templates", "documents", "sources", "api_tokens"}
+    {
+        "api_tokens",
+        "applications",
+        "claims",
+        "contexts",
+        "documents",
+        "jobs",
+        "knowledge",
+        "notes",
+        "policy_items",
+        "questions",
+        "requests",
+        "responses",
+        "runs",
+        "sources",
+        "templates",
+    }
 )
 
 
