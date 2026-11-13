@@ -92,12 +92,19 @@ dashboard path, and lists every gap. Read [REST](../user/api.md) and
   view serves them beside the rows of `files`. Deleting an application or job
   removes the parts and bytes nothing references any more, in the same transaction
   or once per bulk run. Foreign keys make a dangling reference impossible.
-- **Staleness:** contexts are never rewritten. `staleness.py` compares the Profile,
-  instructions, template, entry and claim versions recorded in each current
-  leaf's context with the live records on read; refreshing means a new context
-  and new revisions. `context_inputs.policy` records the policy section
-  versions a context froze (NULL before schema 10); the report does not compare
-  them yet.
+- **Staleness:** contexts are never rewritten. `context_inputs` is derived from
+  each payload: the versions it froze, the policy section versions (NULL before
+  schema 10) and `parts`, a 16-hex-digit SHA-256 prefix of each Profile part,
+  each policy item (with its label, scope and confirmation) and each template's
+  content. `staleness.py` compares them with the live records on read, only for
+  what documents use (`DOCUMENT_PROFILE_PARTS`, the confirmed items of
+  `DOCUMENT_POLICY_SECTIONS`, and templates, entries and claims by version, a
+  template's content hash settling a moved version), and filters a scoped writing
+  item per document kind. Rows without part hashes, or of another
+  `PARTS_FORMAT`, are derived again from the frozen payload when the workspace
+  opens or a report reads them; a payload that cannot be read stores no part
+  and is compared by whole Profile version. Refreshing means a new context and
+  new revisions.
 - **Policy:** `policy_sections` holds one version per section (`decision`,
   `eligibility`, `writing`, `facts`) and `policy_items` their items in a dense
   order. An item write names its section's version and bumps it by one; a move

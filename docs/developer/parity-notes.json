@@ -24,7 +24,7 @@
         "applications.list",
         "applications.staleness"
       ],
-      "note": "Badges use `stale_inputs` in the application list; details use the per-application report. There is no workspace-wide staleness view."
+      "note": "Rows use `stale_inputs`, `stale_changes` and `stale_changes_total` in the application list; details use the per-application report. There is no workspace-wide staleness view."
     },
     "jobs.create": {
       "note": "`raw` and `source_key` are collector fields for scripted imports."
