@@ -12,6 +12,7 @@ from openings.db import SCHEMA_VERSION, Database
 from openings.job_signals import signal_record
 from openings.language_signals import text_signals
 from openings.operations import restore_database
+from openings.source_yield import YieldService
 from openings.workspace import Workspace
 from schema_fixtures import columns, index_names, table_names
 from signal_fixtures import SCHEMA_TWELVE_COLUMNS, make_schema_eleven
@@ -64,6 +65,7 @@ def schema_eleven_workspace(path):
         ("agent", None),
         ("restored", None),
         ("inbox", None),
+        ("silent", None),
     ):
         url = (
             f"https://boards.greenhouse.io/{board}/jobs/{name}"
@@ -86,6 +88,9 @@ def schema_eleven_workspace(path):
         workspace.set_triage(ids["agent"], "dismissed", 1)
         workspace.set_triage(ids["restored"], "dismissed", 1)
     workspace.set_triage(ids["restored"], "inbox", 2)
+    with workspace.db.transaction() as conn:
+        # Dismissed without a change record, as before 0.17.
+        conn.execute("UPDATE jobs SET triage='dismissed' WHERE id=?", (ids["silent"],))
     with workspace.db.transaction() as conn:
         for key, board, filters in (
             ("board", "example", {"titles": ["Engineer"]}),
@@ -166,6 +171,7 @@ def test_upgrade_keeps_every_row_and_fills_only_the_new_columns(tmp_path):
     assert dismissals[ids["agent"]] == ("token", "agent", "Synthetic agent", 1, None, "")
     assert dismissals[ids["restored"]] == (None, None, None, 0, None, "")
     assert dismissals[ids["inbox"]] == (None, None, None, 0, None, "")
+    assert dismissals[ids["silent"]] == (None, None, None, 0, None, "")
     # Only the board posting the last complete run missed is no longer listed: not the
     # one it saw, not one its filters exclude, not one of a capped run, not a URL job.
     assert {job_id for job_id, stamp in unlisted.items() if stamp} == {ids["missed"]}
@@ -173,16 +179,17 @@ def test_upgrade_keeps_every_row_and_fills_only_the_new_columns(tmp_path):
     listed = workspace.get_job(ids["missed"])
     assert listed["signals"]["no_longer_listed"] and not listed["signals"]["computed"]
     assert workspace.get_job(ids["owner"])["dismissal"]["category"] == "owner"
-    assert workspace.list_jobs(queue="dismissed", include_counts=True)["counts"][
-        "dismissed_by"
-    ] == {
-        "rule": 0,
-        "agent": 1,
-        "owner": 1,
-        "other": 0,
-    }
+    assert workspace.get_job(ids["silent"])["dismissal"]["category"] == "other"
+    by = {"rule": 0, "agent": 1, "owner": 1, "other": 1}
+    assert (
+        workspace.list_jobs(queue="dismissed", include_counts=True)["counts"]["dismissed_by"] == by
+    )
+    assert [item["id"] for item in workspace.list_jobs(dismissed_by="other")["items"]] == [
+        ids["silent"]
+    ]
+    assert YieldService(workspace).source_yield()["total"]["dismissed_by"] == by
     # The backfill computes every job's signals and applies no rule.
-    assert workspace.signals.backfill() == {"text": 8, "duplicates": 8}
+    assert workspace.signals.backfill() == {"text": 9, "duplicates": 9}
     assert workspace.signals.backfill() == {"text": 0, "duplicates": 0}
     signals = workspace.get_job(ids["inbox"])["signals"]
     expected = text_signals("Platform Engineer", POSTING)
@@ -193,7 +200,7 @@ def test_upgrade_keeps_every_row_and_fills_only_the_new_columns(tmp_path):
     assert all(item["duplicate_checked"] and item["duplicate"] is None for item in read)
     assert [item["triage"] for item in workspace.list_jobs(sort="oldest")["items"]].count(
         "dismissed"
-    ) == 2
+    ) == 3
 
 
 def test_a_failed_upgrade_leaves_the_schema_eleven_file_unchanged(tmp_path, monkeypatch):
@@ -211,7 +218,7 @@ def test_a_failed_upgrade_leaves_the_schema_eleven_file_unchanged(tmp_path, monk
         assert conn.execute("PRAGMA user_version").fetchone()[0] == 11
         assert "job_signals" not in table_names(conn)
         assert "dismissed_at" not in {row[0] for row in columns(conn, "jobs")}
-    assert Workspace(path).list_jobs()["total"] == 8
+    assert Workspace(path).list_jobs()["total"] == 9
 
 
 def test_restore_upgrades_a_schema_eleven_backup(tmp_path):

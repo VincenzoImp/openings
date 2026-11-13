@@ -104,7 +104,11 @@ DISMISSED_BY = {
     "owner": "j.dismissed_rule_id IS NULL AND (j.dismissed_by_kind='owner' OR "
     "(j.dismissed_by_kind='token' AND coalesce(j.dismissed_by_token_kind,'owner')='owner'))",
 }
-DISMISSED_BY["other"] = "NOT (" + ") AND NOT (".join(DISMISSED_BY.values()) + ")"
+# Without a record (dismissed before 0.21 without an event) the conditions above
+# are NULL, not false: coalesce so that those jobs count as other.
+DISMISSED_BY["other"] = (
+    "NOT (" + " OR ".join(f"coalesce(({sql}),0)" for sql in DISMISSED_BY.values()) + ")"
+)
 SIGNAL_FILTERS = {
     "likely_duplicate": "EXISTS(SELECT 1 FROM job_signals s WHERE s.job_id=j.id "
     "AND s.duplicate_of IS NOT NULL)",
