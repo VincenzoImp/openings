@@ -100,7 +100,7 @@ or delete an application to remove a duplicate.
 
 If identity is uncertain, report both IDs and the reason; do not merge or dismiss
 on similarity alone. A supported job note (`note_add`, body plus optional
-application_id) can record the candidate canonical ID without inventing a metadata
+`application_id`) can record the candidate canonical ID without inventing a metadata
 field. If an explicitly authorized cleanup uses dismissal instead of merge for a
 confirmed duplicate, note the canonical ID and reason first; preserve all history.
 Do not dismiss a job merely because its Draft has left actionable Shortlist.

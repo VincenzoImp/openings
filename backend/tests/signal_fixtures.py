@@ -3,7 +3,7 @@
 import sqlite3
 from contextlib import closing
 
-from document_fixtures import make_schema_twelve
+from timeline_fixtures import make_schema_twelve
 
 # What schema 12 (0.21) added to a schema 11 file.
 # skill_notes is the local notes of skills (#168), job_signals the ingest signals (#166).

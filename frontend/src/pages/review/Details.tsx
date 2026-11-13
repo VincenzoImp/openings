@@ -92,8 +92,83 @@ function Ready({ application }: { application: Application }) {
 }
 
 /**
- * The application's stage and plan, the Ready step, requests for the agent,
- * the job it belongs to, and its permanent deletion.
+ * The application's pinned note: its standing guidance, which the agent reads
+ * first and new frozen copies of the record include. Saving edits the pinned
+ * note or pins a new one; unpinning keeps the note in the timeline.
+ */
+function PinnedNote({ application }: { application: Application }) {
+  const { mutate, pending } = useWorkspace();
+  const pinned = application.pinned_note;
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const body = String(new FormData(event.currentTarget).get("body") || "");
+    if (!body.trim() || body === pinned?.body) return;
+    await mutate(
+      () =>
+        pinned
+          ? api(`/notes/${pinned.id}`, "PATCH", {
+              body,
+              expected_version: pinned.version,
+            })
+          : api(`/jobs/${application.job_id}/notes`, "POST", {
+              body,
+              application_id: application.id,
+              pinned: true,
+            }),
+      "Pinned note saved.",
+    );
+  }
+  return (
+    <form className="stack" onSubmit={save} aria-label="Pinned note">
+      <Field
+        label="Pinned note"
+        hint="Standing guidance for this application: your agent reads it first, and new frozen copies of your record include it. Other notes are in the Timeline."
+      >
+        <textarea
+          name="body"
+          rows={5}
+          maxLength={30000}
+          required
+          defaultValue={pinned?.body || ""}
+        />
+      </Field>
+      <div className="row">
+        <Button size="sm" disabled={pending}>
+          {pinned ? "Save the pinned note" : "Pin this note"}
+        </Button>
+        {pinned && (
+          <Button
+            size="sm"
+            variant="quiet"
+            disabled={pending}
+            onClick={() =>
+              void mutate(
+                () =>
+                  api(`/notes/${pinned.id}/pin`, "POST", {
+                    expected_version: pinned.version,
+                    pinned: false,
+                  }),
+                "Note unpinned. It stays in the Timeline.",
+              )
+            }
+          >
+            Unpin
+          </Button>
+        )}
+        {pinned && (
+          <span className="caption">
+            {actorLabel(pinned.author) || "Unknown"},{" "}
+            {dayTime(pinned.updated_at || pinned.created_at)}
+          </span>
+        )}
+      </div>
+    </form>
+  );
+}
+
+/**
+ * The application's stage and plan, the Ready step, its pinned note, requests
+ * for the agent, the job it belongs to, and its permanent deletion.
  */
 export function Details({
   application,
@@ -120,7 +195,6 @@ export function Details({
             ? { concluded_on: text("concluded_on") || null }
             : {}),
           ...(answers ? { response_date: text("response_date") || null } : {}),
-          note: text("note"),
           priority: Number(text("priority")) || null,
           deadline: text("deadline") || null,
           // The field shows minutes; an unchanged one keeps the stored time.
@@ -219,13 +293,6 @@ export function Details({
               defaultValue={application.applied_at?.slice(0, 16) || ""}
             />
           </Field>
-          <Field
-            label="Application note and writing guidance"
-            hint="Your agent's frozen copy of the record includes it."
-            className="wide"
-          >
-            <textarea name="note" rows={5} defaultValue={application.note} />
-          </Field>
         </div>
         <div className="row">
           <Button variant="primary" size="sm" disabled={pending}>
@@ -233,6 +300,10 @@ export function Details({
           </Button>
         </div>
       </form>
+      <PinnedNote
+        key={`${application.pinned_note?.id}-${application.pinned_note?.version}`}
+        application={application}
+      />
       <AskAgent
         subjectType="application"
         subjectId={application.id}

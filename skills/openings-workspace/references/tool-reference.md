@@ -273,7 +273,38 @@ record at once. Every entry carries `actor` (for a token, with `token_kind`
 before version 0.17 have the actor `unknown (before 0.17)`. Payloads hold
 identifiers, changed field names and versions, never record content. Deleting an
 application or forgetting a job removes that record's own history and leaves one
-`application_deleted` or `job_forgotten` entry.
+`application_deleted` or `job_forgotten` entry. For one job or application,
+`timeline_get` (below) lists the same changes with its notes.
+
+## Notes and the timeline
+
+A note belongs to a job, or to one application of that job when written with
+`application_id`: `note_add(job_id, {"body": "...", "application_id": ...})`.
+It records its author and the open run. `pinned: true` pins it; a job and an
+application each have one pinned note, listed first, and pinning another unpins
+it (`note_pin(note_id, {"expected_version": N, "pinned": true|false})`). The
+application's pinned note is the owner's standing guidance for that application:
+read it first, leave it to the owner, and write your own findings as ordinary
+notes. `note_update` edits a body with its version; `note_delete` removes a note
+for good and leaves a `note_deleted` event.
+
+`timeline_get` reads one list of notes and recorded changes: `job_id` for a job
+with all of its applications, or `application_id` for one application with its
+job's entries. Each entry has `type` (`note` or `event`), `kind` (`note`,
+`event`, or `response` for an employer response recorded, corrected or
+removed), `scope` (`job` or `application`), `actor`, `run` and either `note`
+(`body`, `version`, `pinned`, `origin`) or `event` (`kind`, a text-free
+`payload`, `subject`). Pinned notes come first, then newest first. Filter with
+`kinds`, `who` (`owner`, `agent`, `system`, `unknown`), `scope`, `since` and
+`until`; `counts` gives the entries of each kind for the other filters; page
+with `limit` and `offset`. REST serves the same entries at
+`GET /jobs/{id}/timeline` and `GET /applications/{id}/timeline`.
+
+`application.note` is deprecated since 0.22 and removed in 0.23: it reads the
+pinned note's text (`pinned_note` holds the note itself), and writing it edits
+the pinned note, adds one when there is none, or unpins it when empty. A frozen
+context still carries the pinned note as `application.note` and
+`instructions.application_note`.
 
 ## Scripting and transfers
 

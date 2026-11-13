@@ -94,7 +94,29 @@ class MergeInput(Versioned):
 
 class NoteInput(Input):
     body: str = Field(min_length=1, max_length=30_000)
-    application_id: str | None = None
+    application_id: str | None = Field(
+        default=None,
+        description="Write the note on this application of the job; omit for a note on the job itself.",
+    )
+    pinned: bool = Field(
+        default=False,
+        description="Pin the note: it is listed first in its timeline. A job and an application each have at most one pinned note; pinning another unpins it.",
+    )
+
+
+class NotePin(Versioned):
+    pinned: bool = Field(
+        default=True,
+        description="True pins the note (unpinning the note pinned in the same scope); false unpins it.",
+    )
+
+
+# Deprecated application note: the text of the application's pinned note.
+DEPRECATED_NOTE = (
+    "Deprecated since 0.22, removed in 0.23: the application's pinned note "
+    "(pinned_note). Writing it edits that note, creates it pinned when there is none, "
+    "or unpins it when empty. Use note_add with pinned=true, note_update and note_pin."
+)
 
 
 class Question(Input):
@@ -175,7 +197,7 @@ OUTCOMES = ("accepted", "rejected", "not_pursued", "no_response")
 
 class ApplicationInput(Input):
     job_id: str
-    note: str = Field(default="", max_length=30_000)
+    note: str = Field(default="", max_length=30_000, description=DEPRECATED_NOTE, deprecated=True)
     questions: list[Question] = Field(default_factory=list, max_length=100)
     priority: Priority | None = None
     deadline: str | None = Field(default=None, description="Closing date as YYYY-MM-DD.")
@@ -194,7 +216,9 @@ class ApplicationPatch(Versioned):
         default=None,
         description="Required to close: accepted, rejected (by the employer), not_pursued (stopped by the owner) or no_response (no answer within the no-reply period; only for a sent application).",
     )
-    note: str | None = Field(default=None, max_length=30_000)
+    note: str | None = Field(
+        default=None, max_length=30_000, description=DEPRECATED_NOTE, deprecated=True
+    )
     questions: list[Question] | None = Field(default=None, max_length=100)
     answers: dict[str, Any] | None = None
     applied_at: str | None = None
@@ -245,7 +269,8 @@ class ApplicationPatch(Versioned):
             "answers",
             "requirements",
         }:
-            if getattr(self, key) is None:
+            # __dict__, not getattr: reading the deprecated note warns.
+            if self.__dict__[key] is None:
                 raise ValueError(f"{key} cannot be null; omit it to keep the existing value.")
         return self
 
@@ -259,6 +284,38 @@ class ApplicationReady(Versioned):
 
 class NotePatch(Versioned):
     body: str = Field(min_length=1, max_length=30_000)
+
+
+TimelineKind = Literal["note", "event", "response"]
+TimelineWho = Literal["owner", "agent", "system", "unknown"]
+
+
+class TimelineQuery(Input):
+    kinds: list[TimelineKind] | None = Field(
+        default=None,
+        max_length=3,
+        description="Only these kinds of entry: note, event (a recorded change) and response (an employer response recorded, corrected or removed). Every kind when omitted.",
+    )
+    who: list[TimelineWho] | None = Field(
+        default=None,
+        max_length=4,
+        description="Only entries by: owner (the dashboard or an owner token), agent (an agent token), system, unknown (recorded before 0.17, including application notes last written then).",
+    )
+    scope: Literal["job", "application"] | None = Field(
+        default=None,
+        description="Only the entries of the job itself (job) or of its applications (application). An application's timeline includes its job's entries unless scope=application.",
+    )
+    since: str | None = Field(default=None, description="Only entries at or after this time.")
+    until: str | None = Field(
+        default=None, description="Only entries at or before this time (a date includes its day)."
+    )
+    limit: int = Field(default=50, ge=1, le=200)
+    offset: int = Field(default=0, ge=0)
+
+    @field_validator("since", "until")
+    @classmethod
+    def valid_date(cls, value, info):
+        return normalized_date(value, end=info.field_name == "until")
 
 
 class BulkItem(Versioned):

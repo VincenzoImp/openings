@@ -36,6 +36,12 @@ class ContextOperations:
             if job["triage"] == "dismissed":
                 conflict("Restore this dismissed job before preparing an application.")
             application = decode_record(application, ["questions", "answers", "requirements"])
+            # The application note frozen since 0.5 is its pinned note since 0.22.
+            pinned = conn.execute(
+                "SELECT body FROM notes WHERE application_id=? AND pinned_at IS NOT NULL",
+                (application["id"],),
+            ).fetchone()
+            application["note"] = pinned["body"] if pinned else ""
             job = decode_record(job, ["metadata", "overrides"])
             profile = _setting(conn, "profile", DEFAULT_PROFILE)
             instructions = _setting(conn, "instructions", {"general": DEFAULT_GUIDANCE})

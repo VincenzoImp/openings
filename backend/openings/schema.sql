@@ -56,13 +56,14 @@ CREATE TABLE IF NOT EXISTS posting_details (
  checked_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS posting_details_job ON posting_details(job_id);
--- applications: kept identical to db.APPLICATIONS. concluded_on is the day an
--- application closed as no_response was concluded (schema 11).
+-- applications: db.APPLICATIONS without note, which schema 13 moved to a pinned
+-- note. concluded_on is the day an application closed as no_response was
+-- concluded (schema 11).
 CREATE TABLE IF NOT EXISTS applications (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
  status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','applied','interview','offer','closed')),
  outcome TEXT CHECK(outcome IS NULL OR outcome IN ('accepted','rejected','not_pursued','no_response')),
- note TEXT NOT NULL DEFAULT '', questions TEXT NOT NULL DEFAULT '[]', answers TEXT NOT NULL DEFAULT '{}',
+ questions TEXT NOT NULL DEFAULT '[]', answers TEXT NOT NULL DEFAULT '{}',
  version INTEGER NOT NULL DEFAULT 1, idempotency_key TEXT UNIQUE, applied_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
  priority INTEGER CHECK(priority IS NULL OR priority BETWEEN 1 AND 5),
  deadline TEXT CHECK(deadline IS NULL OR (length(deadline)=10 AND date(deadline)=deadline)),
@@ -93,11 +94,17 @@ CREATE TABLE IF NOT EXISTS events (
  actor_token_kind TEXT, run_id TEXT REFERENCES runs(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS events_app ON events(application_id,created_at);
+-- A note on a job, or on one application when application_id is set (its scope).
+-- author_* and run_id say who wrote it; pinned_at marks the one pinned note of
+-- its scope; origin 'upgrade' is an application note the 0.22 upgrade copied
+-- (schema 13).
 CREATE TABLE IF NOT EXISTS notes (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
  application_id TEXT REFERENCES applications(id) ON DELETE CASCADE, body TEXT NOT NULL,
  version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
- author_kind TEXT, author_id TEXT, author_name TEXT, author_token_kind TEXT
+ author_kind TEXT, author_id TEXT, author_name TEXT, author_token_kind TEXT,
+ run_id TEXT REFERENCES runs(id) ON DELETE SET NULL, pinned_at TEXT,
+ origin TEXT NOT NULL DEFAULT 'manual' CHECK(origin IN ('manual','upgrade'))
 );
 CREATE TABLE IF NOT EXISTS knowledge (
  id TEXT PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL, organization TEXT NOT NULL DEFAULT '',
@@ -386,4 +393,8 @@ CREATE INDEX IF NOT EXISTS job_signals_duplicate ON job_signals(duplicate_of);
 CREATE INDEX IF NOT EXISTS job_signals_language ON job_signals(language);
 CREATE INDEX IF NOT EXISTS postings_unlisted ON postings(job_id) WHERE unlisted_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS jobs_dismissed_rule ON jobs(dismissed_rule_id) WHERE dismissed_rule_id IS NOT NULL;
+-- One pinned note per job and per application (schema 13; workspace/timeline_upgrade.py).
+CREATE UNIQUE INDEX IF NOT EXISTS notes_pinned_application ON notes(application_id) WHERE pinned_at IS NOT NULL AND application_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS notes_pinned_job ON notes(job_id) WHERE pinned_at IS NOT NULL AND application_id IS NULL;
+CREATE INDEX IF NOT EXISTS notes_run ON notes(run_id);
 PRAGMA user_version=13;

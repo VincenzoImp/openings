@@ -1,8 +1,6 @@
-"""CV and letter revisions as their source and PDF; schema 12, when they stored content."""
+"""CV and letter revisions as their source and PDF, and undoing their part of schema 13."""
 
 import hashlib
-import sqlite3
-from contextlib import closing
 
 from openings.documents import DocumentCreate, ReviewUpdate, UploadReservation
 
@@ -93,26 +91,19 @@ FILE_VIEWS_TWELVE = (
 )
 
 
-def make_schema_twelve(path, content=None):
-    """Remove what schema 13 added from a current workspace file, keeping every other value.
+def undo_documents(conn, content=None):
+    """Remove the documents part of schema 13 from an open workspace file.
 
     A CV or letter revision gets back its legacy content, else ``content[id]`` when
     given, else ``{}``: the structured content it stored before 0.22.
     """
-    content = content or {}
-    with closing(sqlite3.connect(path)) as conn:
-        conn.execute("UPDATE documents SET content=legacy_content WHERE legacy_content IS NOT NULL")
-        for document_id, value in content.items():
-            conn.execute("UPDATE documents SET content=? WHERE id=?", (value, document_id))
-        conn.execute("DROP VIEW all_files")
-        conn.execute("DROP VIEW context_files")
-        for table, names in SCHEMA_THIRTEEN_COLUMNS.items():
-            for name in names:
-                conn.execute(f"ALTER TABLE {table} DROP COLUMN {name}")
-        for view in FILE_VIEWS_TWELVE:
-            conn.execute(view)
-        conn.execute("PRAGMA user_version=12")
-        conn.commit()
-        assert not conn.execute("PRAGMA foreign_key_check").fetchall()
-        # Keep the whole database in the one file, as a downloaded backup is.
-        conn.execute("PRAGMA journal_mode=DELETE")
+    conn.execute("UPDATE documents SET content=legacy_content WHERE legacy_content IS NOT NULL")
+    for document_id, value in (content or {}).items():
+        conn.execute("UPDATE documents SET content=? WHERE id=?", (value, document_id))
+    conn.execute("DROP VIEW all_files")
+    conn.execute("DROP VIEW context_files")
+    for table, names in SCHEMA_THIRTEEN_COLUMNS.items():
+        for name in names:
+            conn.execute(f"ALTER TABLE {table} DROP COLUMN {name}")
+    for view in FILE_VIEWS_TWELVE:
+        conn.execute(view)

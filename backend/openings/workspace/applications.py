@@ -71,6 +71,10 @@ class ApplicationReads:
             )
             row["responses"] = responses_of(connection, [application_id])[application_id]
             row["last_response"] = last_responses(connection, [application_id])[application_id]
+            pinned = self.pinned_application_notes(connection, [application_id])[application_id]
+        row["pinned_note"] = pinned
+        # Deprecated since 0.22, removed in 0.23: the pinned note's text.
+        row["note"] = pinned["body"] if pinned else ""
         return row
 
     @staticmethod
@@ -167,7 +171,10 @@ class ApplicationReads:
             conditions.append("j.company=?")
             args.append(company)
         if q.strip():
-            conditions.append("(j.title LIKE ? OR j.company LIKE ? OR app.note LIKE ?)")
+            conditions.append(
+                "(j.title LIKE ? OR j.company LIKE ? OR EXISTS(SELECT 1 FROM notes n "
+                "WHERE n.application_id=app.id AND n.pinned_at IS NOT NULL AND n.body LIKE ?))"
+            )
             args.extend(["%" + q.strip() + "%"] * 3)
         where = " WHERE " + " AND ".join(conditions) if conditions else ""
         base = " FROM applications app JOIN jobs j ON j.id=app.job_id"

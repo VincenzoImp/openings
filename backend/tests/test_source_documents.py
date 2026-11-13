@@ -8,7 +8,7 @@ from contextlib import closing
 import pytest
 from fastapi.testclient import TestClient
 
-from document_fixtures import PDF, make_schema_twelve, source_revision, tex, upload
+from document_fixtures import PDF, source_revision, tex, upload
 from openings.app import create_app
 from openings.db import SCHEMA_VERSION, Database
 from openings.documents import DocumentCreate, ReviewUpdate
@@ -18,6 +18,7 @@ from openings.errors import DomainError
 from openings.operations import restore_database
 from openings.workspace import Workspace
 from schema_fixtures import columns
+from timeline_fixtures import make_schema_twelve
 
 SOURCE = r"""\documentclass{article}
 \usepackage{hyperref}
