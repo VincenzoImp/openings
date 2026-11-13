@@ -29,11 +29,13 @@ cache-keys = [
 ]
 
 [dependency-groups]
-dev = ["pytest==9.2.0", "pytest-asyncio==1.4.1.post1", "ruff==0.17.4"]
+dev = ["pytest==9.2.0", "pytest-asyncio==1.4.1.post1", "pytest-xdist==3.8.0", "ruff==0.17.4"]
 
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]
 asyncio_mode = "auto"
+# Performance budgets and benchmarks run weekly (nightly.yml) or with `-m performance`.
+addopts = "-m 'not performance'"
 markers = [
   "performance: time budgets of hot reads on a large synthetic workspace (select with -m performance)",
 ]
