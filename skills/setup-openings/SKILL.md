@@ -41,7 +41,7 @@ tokens, restore a backup or answer a question for the owner. `workspace_info`
 reports the kind in `actor.token_kind`; when it is `owner`, tell the owner that
 an agent token is enough. Never ask for the token in the conversation. Register the MCP
 server at `<origin>/mcp` with the bearer header in the client's own configuration.
-Confirm with `workspace_info` and `capabilities_get`.
+Confirm with `workspace_info`.
 
 Suggest an operator workspace: copy the repository's
 `examples/operator-workspace/`, run its `sync.py --url <origin>`, and start the

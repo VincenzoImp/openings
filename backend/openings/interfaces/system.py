@@ -1,4 +1,4 @@
-"""Installation routes and tools: sign-in, tokens, inventory, backup, restore and export."""
+"""Installation routes and tools: sign-in, tokens, capabilities, backup, restore and export."""
 
 import asyncio
 import json
@@ -16,6 +16,7 @@ from starlette.background import BackgroundTask
 from .. import __version__, backups
 from ..actors import current_actor, require_owner
 from ..auth import COOKIE, MAX_AGE
+from ..db import SCHEMA_VERSION
 from ..documents import DocumentService
 from ..errors import DomainError
 from ..models import Input
@@ -26,7 +27,16 @@ from ..operations import (
     storage_status,
 )
 from ..transfers import SnapshotResponse
-from .registry import Exemption, Operation, Param, Route, Tool, bind_mcp, bind_rest
+from .registry import (
+    Exemption,
+    Operation,
+    Param,
+    Route,
+    Tool,
+    bind_mcp,
+    bind_rest,
+    capability_entries,
+)
 
 
 class PasswordInput(Input):
@@ -120,7 +130,7 @@ REMOVE = ToolAnnotations(destructiveHint=True, openWorldHint=False)
 GROUP = "Workspace access and portability"
 
 # Hand-written routes and tools (custom) are registered in register_system: browser
-# sessions and cookies, the inventory itself, and streamed backup, restore and export.
+# sessions and cookies, the capabilities list, and streamed backup, restore and export.
 OPERATIONS = (
     Operation(
         "password.update",
@@ -142,7 +152,7 @@ OPERATIONS = (
         "capabilities",
         "get",
         "Archive",
-        "Read supported logical operations and transport exceptions",
+        "Read the version, schema and each operation's route, MCP name and access",
         rest=(Route("GET", "/capabilities", "capabilities", custom=True),),
         tool=Tool(READ, custom=True),
     ),
@@ -217,6 +227,35 @@ OPERATIONS = (
             "Reserve a scoped raw SQLite upload that replaces workspace data; installation authentication stays unchanged. Owner only: an agent token is refused with forbidden.",
         ),
     ),
+    # Kept copies hold the whole workspace, including the password hash, the session
+    # secret and token hashes: owner-only REST, never an MCP tool.
+    Operation(
+        "backups.list",
+        "backups",
+        "list",
+        GROUP,
+        "List scheduled backups and pre-upgrade copies",
+        access="owner",
+        rest=(Route("GET", "/backups", "backups", custom=True),),
+    ),
+    Operation(
+        "backups.download",
+        "backups",
+        "download",
+        GROUP,
+        "Download a scheduled backup or a pre-upgrade copy",
+        access="owner",
+        rest=(Route("GET", "/backups/{name}", "backup_file", custom=True),),
+    ),
+    Operation(
+        "backups.delete",
+        "backups",
+        "delete",
+        GROUP,
+        "Delete a pre-upgrade copy",
+        access="owner",
+        rest=(Route("DELETE", "/backups/{name}", "delete_backup_file", custom=True),),
+    ),
     Operation(
         "export.records",
         "workspace",
@@ -255,15 +294,6 @@ EXEMPTIONS = (
             Route("POST", "/mcp/", "mcp", custom=True, absolute=True),
             Route("GET", "/mcp/", "mcp", custom=True, absolute=True),
             Route("DELETE", "/mcp/", "mcp", custom=True, absolute=True),
-        ),
-    ),
-    Exemption(
-        "backups.owner_files",
-        "Scheduled backups and pre-upgrade copies hold the whole workspace, including the password hash, session secret and token hashes: listing, downloading and deleting them is owner-only REST and never an MCP tool.",
-        rest=(
-            Route("GET", "/backups", "backups", custom=True),
-            Route("GET", "/backups/{name}", "backup_file", custom=True),
-            Route("DELETE", "/backups/{name}", "delete_backup_file", custom=True),
         ),
     ),
     Exemption(
@@ -329,14 +359,22 @@ def register_system(router, mcp, workspace, auth, public_url):
         return response
 
     def capabilities() -> dict:
-        path = Path(__file__).parent.with_name("operation-inventory.json")
-        return {**json.loads(path.read_text()), "version": __version__}
+        from . import catalog  # The areas import this module.
+
+        actor = current_actor()
+        return {
+            "version": __version__,
+            "schema": SCHEMA_VERSION,
+            "token_kind": actor.token_kind or ("session" if actor.kind == "owner" else None),
+            "api_base": "/api/v1",
+            "operations": capability_entries(catalog()[0]),
+        }
 
     router.add_api_route("/capabilities", capabilities, methods=["GET"])
 
     mcp.tool(
         name="capabilities_get",
-        description="Read the logical operation matrix, REST routes, MCP tools and dashboard locations.",
+        description="Read the version, the schema, this token's kind and each operation's MCP name and main REST route; access is owner on owner-only operations. Use tools/list for tool schemas.",
         annotations=READ,
     )(capabilities)
 
