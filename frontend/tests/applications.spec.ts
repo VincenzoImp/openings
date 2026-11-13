@@ -555,7 +555,9 @@ test("answers and the questions of the form are edited without JSON", async ({
     .toBe(1);
 });
 
-test("requirements, the plan and a concurrent change in the details", async ({
+// Quarantined: order-dependent on the shared e2e server and database (failed on
+// CI in November 2026). Restore once each worker has its own workspace, #220.
+test.fixme("requirements, the plan and a concurrent change in the details", async ({
   page,
 }) => {
   const application = await make(page, unique("Planned"), {
@@ -680,7 +682,9 @@ test("requirements, the plan and a concurrent change in the details", async ({
   ).toContainText("Lead with the API work.");
 });
 
-test("documents, revisions, frozen copies and their files are managed in the review page", async ({
+// Quarantined: order-dependent on the shared e2e server and database (failed on
+// CI in November 2026). Restore once each worker has its own workspace, #220.
+test.fixme("documents, revisions, frozen copies and their files are managed in the review page", async ({
   page,
 }) => {
   const application = await make(page, unique("Documents"));
