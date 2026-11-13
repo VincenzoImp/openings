@@ -11,7 +11,7 @@ from pathlib import Path
 from .errors import DomainError
 from .posting import posting_complete
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 SCHEMA_SQL = Path(__file__).with_name("schema.sql")
 TEMP_PREFIX = ".openings-temp-"
 
@@ -263,6 +263,56 @@ def _migrate_9_to_10(conn):
     migrate_profile(conn)
 
 
+# The applications table of schema 11; schema.sql holds the same text. Changing a
+# CHECK constraint in SQLite means building the table again (_migrate_10_to_11).
+APPLICATIONS = """CREATE TABLE {name} (
+ id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+ status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','applied','interview','offer','closed')),
+ outcome TEXT CHECK(outcome IS NULL OR outcome IN ('accepted','rejected','not_pursued','no_response')),
+ note TEXT NOT NULL DEFAULT '', questions TEXT NOT NULL DEFAULT '[]', answers TEXT NOT NULL DEFAULT '{{}}',
+ version INTEGER NOT NULL DEFAULT 1, idempotency_key TEXT UNIQUE, applied_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ priority INTEGER CHECK(priority IS NULL OR priority BETWEEN 1 AND 5),
+ deadline TEXT CHECK(deadline IS NULL OR (length(deadline)=10 AND date(deadline)=deadline)),
+ requirements TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(requirements) AND json_type(requirements)='array'),
+ ready_at TEXT, ready_by_kind TEXT, ready_by_id TEXT, ready_by_name TEXT, ready_by_token_kind TEXT,
+ concluded_on TEXT CHECK(concluded_on IS NULL OR (length(concluded_on)=10 AND date(concluded_on)=concluded_on))
+)"""
+
+
+def _migrate_10_to_11(conn):
+    # Additive: employer responses, the no_response outcome with the day it was
+    # concluded, and one response for each application whose stage already says the
+    # employer answered (outcomes.backfill_responses). The outcome CHECK constraint
+    # changes, so the applications table is built again: every row keeps its rowid
+    # and values, its indexes and triggers are recreated, and the tables that
+    # reference it keep their rows (upgrade() runs with foreign keys off and checks
+    # them before committing).
+    from .outcomes import SCHEMA, backfill_responses
+
+    columns = [row[1] for row in conn.execute("PRAGMA table_info(applications)")]
+    kept = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE tbl_name='applications' "
+        "AND type IN ('index','trigger') AND sql IS NOT NULL ORDER BY rowid"
+    ).fetchall()
+    count = conn.execute("SELECT count(*) FROM applications").fetchone()[0]
+    conn.execute(APPLICATIONS.format(name="applications_rebuilt"))
+    names = ",".join(f'"{column}"' for column in columns)
+    conn.execute(
+        f"INSERT INTO applications_rebuilt(rowid,{names}) SELECT rowid,{names} FROM applications"
+    )
+    if conn.execute("SELECT count(*) FROM applications_rebuilt").fetchone()[0] != count:
+        raise sqlite3.IntegrityError("The applications table was not copied completely.")
+    conn.execute("DROP TABLE applications")
+    conn.execute("ALTER TABLE applications_rebuilt RENAME TO applications")
+    for (sql,) in kept:
+        conn.execute(sql)
+    # executescript would commit the surrounding upgrade, so run each statement.
+    for statement in SCHEMA.split(";\n"):
+        if statement.strip():
+            conn.execute(statement)
+    backfill_responses(conn)
+
+
 # Each step upgrades from its key to the next version; steps chain inside one transaction.
 MIGRATIONS = {
     5: _migrate_5_to_6,
@@ -270,18 +320,33 @@ MIGRATIONS = {
     7: _migrate_7_to_8,
     8: _migrate_8_to_9,
     9: _migrate_9_to_10,
+    10: _migrate_10_to_11,
 }
 
 
 def upgrade(conn):
-    """Upgrade an older supported workspace to the current schema, all or nothing."""
-    with conn:
-        conn.execute("BEGIN IMMEDIATE")
-        version = conn.execute("PRAGMA user_version").fetchone()[0]
-        while version in MIGRATIONS:
-            MIGRATIONS[version](conn)
-            version += 1
-        conn.execute(f"PRAGMA user_version={version}")
+    """Upgrade an older supported workspace to the current schema, all or nothing.
+
+    Foreign keys are off while the steps run, because building a table again (to
+    change a constraint) drops the old one, which would otherwise delete the rows
+    that reference it. SQLite ignores the setting inside a transaction, so it is
+    changed around it; before committing, no reference may be broken that was not
+    broken before.
+    """
+    conn.execute("PRAGMA foreign_keys=OFF")
+    try:
+        with conn:
+            conn.execute("BEGIN IMMEDIATE")
+            broken = {tuple(row) for row in conn.execute("PRAGMA foreign_key_check")}
+            version = conn.execute("PRAGMA user_version").fetchone()[0]
+            while version in MIGRATIONS:
+                MIGRATIONS[version](conn)
+                version += 1
+            if {tuple(row) for row in conn.execute("PRAGMA foreign_key_check")} - broken:
+                raise sqlite3.IntegrityError("The upgrade would break references between records.")
+            conn.execute(f"PRAGMA user_version={version}")
+    finally:
+        conn.execute("PRAGMA foreign_keys=ON")
 
 
 def apply_schema(conn):

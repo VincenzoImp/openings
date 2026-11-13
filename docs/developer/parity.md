@@ -27,12 +27,12 @@ How to read the evidence:
 
 | Measure | Operations |
 |---|---|
-| Logical operations in the inventory | 117 |
+| Logical operations in the inventory | 121 |
 | Without REST or without MCP | 0 |
 | Owner only (refused for an agent token) | 9 |
-| Without a working dashboard path | 9 |
+| Without a working dashboard path | 13 |
 | Reached only through another operation | 5 |
-| With inputs the dashboard never mentions | 11 |
+| With inputs the dashboard never mentions | 12 |
 | With free-form JSON edited as raw JSON | 6 |
 | With different REST and MCP input names | 1 |
 | With a dashboard path exercised by e2e | 75 |
@@ -49,6 +49,10 @@ code calls the route and no browser test reached it.
 |---|---|---|---|---|
 | `skills.read` | `GET /skills/{name}`<br>`GET /skills/{name}/files/{path}` | `skill_get` | Settings: Connect an agent | Settings lists the served skills by name and description; their text and reference files cannot be opened. |
 | `jobs.resolve` | `GET /jobs/resolve` | `jobs_resolve` | Job details: Possible duplicates (identity matches are merged on ingestion) | No lookup of a job by URL, external key or title and company. Job details open Possible duplicates (`jobs.duplicates`) instead. |
+| `responses.list` | `GET /applications/{application_id}/responses` | `responses_list` | Application review: Timeline, employer responses; Applications: Employer response column | — |
+| `responses.add` | `POST /applications/{application_id}/responses` | `responses_add` | Applications: Record response on an Applied, Interview or Offer row; Application review: Timeline, Record a response | — |
+| `responses.update` | `PATCH /responses/{response_id}` | `responses_update` | Application review: Timeline, Edit on a response | — |
+| `responses.remove` | `DELETE /responses/{response_id}` | `responses_remove` | Application review: Timeline, Remove on a response | — |
 | `runs.start` | `POST /runs` | `runs_start` | Activity: Runs (read only) | Runs belong to API tokens: a dashboard session has no runs. Activity shows runs, their reports and their changes read-only. |
 | `runs.update` | `PATCH /runs/{run_id}` | `runs_update` | Activity: run report (read only) | Runs belong to API tokens: a dashboard session has no runs. |
 | `runs.finish` | `POST /runs/{run_id}/finish` | `runs_finish` | Activity: run report (read only) | Runs belong to API tokens: a dashboard session has no runs. |
@@ -79,8 +83,9 @@ operation. They can be set over REST or MCP only.
 |---|---|---|
 | `jobs.create` | `raw`, `source_key` | `raw` and `source_key` are collector fields for scripted imports. |
 | `policy.add` | `idempotency_key`, `position` | The form sends the fields it shows; `position` and `idempotency_key` serve agents and scripts (a new item goes to the end, then the arrows move it). |
-| `applications.list` | `applied_since`, `ready_since`, `ready_until` | The Ready to apply queue filters by `readiness=ready` with `sort=ready`; Today's Waiting for a reply and Record replies filter Applied by `applied_until`. The other time ranges serve agents and scripts. |
+| `applications.list` | `applied_since`, `no_reply_due`, `ready_since`, `ready_until` | The Ready to apply queue filters by `readiness=ready` with `sort=ready`; Today's Waiting for a reply and Record replies filter Applied by `applied_until`. The other time ranges serve agents and scripts. |
 | `applications.create` | `deadline`, `priority`, `questions`, `requirements` | Starting an application sends the job only; plan fields and questions are edited afterwards (`applications.update`). |
+| `applications.update` | `concluded_on`, `response_date`, `response_note` | Answers have one control per question; raw JSON is the advanced fallback. |
 | `contexts.create` | `template_id` | The context dialog sends `template_ids`; `template_id` is the single-template form of the same input. |
 | `events.list` | `application_id`, `job_id`, `subject_id`, `subject_type` | The Activity timeline filters changes by who made them (owner, API tokens or one token, system, not recorded), by kind of record (`subject_types`), by period and by run; the job, application and subject filters serve the record histories, agents and scripts. |
 | `runs.list` | `started_since`, `started_until`, `token_id` | Activity filters runs by status; Today lists the runs active since the last visit (`active_since`). The workflow, token and start-time filters serve agents and scripts. |
@@ -241,6 +246,10 @@ missing from the inventory.
 | `applications.delete`<br>Delete one attempt and its owned history/files | `DELETE /applications/{application_id}` | `application_delete` | any | Applications: delete attempt | pages/Applications.tsx | structured | **0** |
 | `applications.bulk`<br>Close, reopen, mark ready, unmark ready or delete selected application attempts | `POST /applications/bulk` | `applications_bulk` | any | Applications: list selection toolbar | pages/Applications.tsx | structured | **0** |
 | `applications.history`<br>Read immutable lifecycle history | `GET /applications/{application_id}/events` | `application_history` | any | Applications: history | pages/Applications.tsx | structured | 7 |
+| `responses.list`<br>List the employer responses of an application | `GET /applications/{application_id}/responses` | `responses_list` | any | Application review: Timeline, employer responses; Applications: Employer response column | **none** | — | — |
+| `responses.add`<br>Record an employer response to a sent application | `POST /applications/{application_id}/responses` | `responses_add` | any | Applications: Record response on an Applied, Interview or Offer row; Application review: Timeline, Record a response | **none** | — | — |
+| `responses.update`<br>Correct an employer response's kind, day or note | `PATCH /responses/{response_id}` | `responses_update` | any | Application review: Timeline, Edit on a response | **none** | — | — |
+| `responses.remove`<br>Delete an employer response recorded by mistake | `DELETE /responses/{response_id}` | `responses_remove` | any | Application review: Timeline, Remove on a response | **none** | — | — |
 | `contexts.list`<br>List/filter compact frozen-context metadata | `GET /contexts` | `contexts_list` | any | Applications: prepared contexts | pages/Applications.tsx | structured | 7 |
 | `contexts.read`<br>Read full frozen context and signature | `GET /contexts/{context_id}` | `contexts_get` | any | Applications: context detail | pages/Applications.tsx | structured | **0** |
 | `contexts.create`<br>Prepare an immutable context for external generation | `POST /contexts` | `application_prepare_context` | any | Applications: prepare context | pages/Applications.tsx | structured | 1 |
