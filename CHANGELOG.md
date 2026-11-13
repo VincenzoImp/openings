@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.23.1 — 2026-11-13
+
+Your data protected before the big changes, and the most annoying problems of the current dashboard fixed.
+
+- **Automatic backups:** a verified copy of the database every day, the newest 3 kept in `<data dir>/backups` (`OPENINGS_BACKUP_DIR`, `OPENINGS_BACKUP_KEEP`; `0` turns them off). Settings › Backup and restore lists them with Download.
+- **Copy before every upgrade:** when a release finds an older schema it first writes a verified copy beside the database (`<name>.pre-schema<N>-<time>.sqlite`, the 2 newest kept). If there is not enough free space, the start is refused and the database is left untouched.
+- `/health` reports the last backup and the worker's heartbeat, and answers 503 when the worker has stalled.
+- **Review loop:** after Mark applied the review page opens the next ready application, with Undo; "All sent." when the queue is empty.
+- **Jobs:** after a decision the next job is selected; on phones the job's actions stay in a bar above the navigation.
+- Fixed: the Record response dialog layout, toasts that never went away, the inline response form staying open after a filter change, empty rows under the Applications list, bulk actions that did not apply to the whole selection, `""` in search summaries, the `usa` default country (Indeed and Glassdoor now ask for one), the cut-off agent connection snippet (now with Copy), and tab strips cut off on phones.
+- For scripts and agents: a reply's `date` defaults to today; a new token's kind defaults to `agent`; skill prompts no longer show a stray `name` argument; idempotency keys allow 200 characters and are pruned after 30 days; a fetch without a provider budget is refused instead of passing.
+- `capabilities` is smaller and built from the operation declarations; the operation inventory file, the parity matrix and the 0.22/0.23 upgrade guides are removed from the repository.
+
+No schema change: the workspace stays at schema 14.
+
 ## 0.23.0 — 2026-11-13
 
 The end of the redesign: a setup guide for new workspaces, parity enforced in CI, and the deprecated names and fields removed. **Read [Upgrading to 0.23](docs/user/upgrading-0.23.md) before upgrading scripts or agents.**
