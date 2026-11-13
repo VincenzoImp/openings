@@ -281,6 +281,12 @@ test("keyboard only: move through the Collection tabs and pause collection", asy
   const before = await call(page, "/collection");
   await page.getByRole("tab", { name: "Sources" }).focus();
   await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "Yield" })).toBeFocused();
+  await expect(page).toHaveURL(/#collection\?section=yield$/);
+  await expect(
+    page.getByRole("table", { name: "Yield by source" }),
+  ).toBeVisible();
+  await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("tab", { name: "Runs and tasks" })).toBeFocused();
   await expect(page).toHaveURL(/#collection\?section=runs$/);
   await page.keyboard.press("ArrowRight");

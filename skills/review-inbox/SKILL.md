@@ -43,6 +43,32 @@ Read each full job with its current version. A list preview is not a complete
 posting. Check existing application state and the actual scope of the request.
 Read Career descriptions when a title, duty or requirement is ambiguous.
 
+## Use the ingest signals
+
+Every job carries `signals`, computed when it was collected and without a model:
+the posting's `language`, the languages it states as `required` (groups: one
+language of a group is enough) or `welcome`, a likely `duplicate` of an earlier
+job with its confidence, and `no_longer_listed` when a company board stopped
+listing it. `computed: false` means a job from before 0.21 whose signals are
+still being computed; read the posting instead. Use them to order and to find
+evidence quickly, not as verdicts:
+
+- A required language outside the policy's languages is strong evidence of a
+  mismatch; confirm it in the posting text before dismissing, because the
+  detector reads phrases such as "fluent German" and may miss or misread an
+  unusual wording. A posting written in another language without a stated
+  requirement is not a requirement.
+- A likely duplicate is a candidate, never a fact: compare with the earlier job
+  (`job_get` on `signals.duplicate.job_id`) as the
+  [vacancy identity check](../openings-workspace/references/job-deduplication.md)
+  says. Merge only a verified duplicate (`job_merge`); mark a different vacancy
+  with `job_distinct` so the flag does not return.
+- A posting no longer listed by its board has probably closed: dismiss it with
+  that reason unless the owner is already pursuing it.
+
+Filter the cohort with `jobs_search` (`signal`, `requires`, `posting_language`,
+`posting_language_not`) to handle a whole kind of mismatch together.
+
 ## Decide from the current policy
 
 Assess actual responsibilities, essential requirements, preferred tools and
@@ -51,8 +77,13 @@ they own the criteria and flexibility. Rely on confirmed items (`confirmed:
 true`). An unconfirmed item is your own proposal or a value copied from the old
 Profile (`origin`): treat it as a hint, and ask the owner to confirm it when a
 decision depends on it. A decision item may carry a `rule` on a collection
-signal; the server does not apply rules yet, so follow its statement like any
-other item. Profile `preferences` and `roles` stay readable until the policy
+signal. While the owner keeps it enabled and confirmed, the server applies it
+to new jobs as they are collected: those jobs arrive dismissed with
+`dismissal.rule` naming it, or with the rule in `signals.rules` for a flag
+rule. Rules never act on jobs already in the Inbox, so apply the statement of
+every decision item yourself, enabled or not. To suggest a rule, measure it
+first with `policy_rule_preview` and propose it with `policy_add`; only the
+owner enables it. Profile `preferences` and `roles` stay readable until the policy
 holds their content; record no new criteria there.
 Explain the fit or mismatch with specific facts, not a keyword score.
 Missing evidence does not establish that a skill or experience is absent.
@@ -63,7 +94,10 @@ on that job (`questions_ask`) and continue the other jobs. Do not manufacture ce
 
 ## Write and resume safely
 
-Use the current triage operation and expected version. Inspect each bulk item;
+Use the current triage operation and expected version. Give every dismissal a
+short `reason` (`job_triage` or `jobs_bulk`) in the owner's terms, such as
+"Requires German (C1); your policy lists English and Italian": the owner reads
+it beside the dismissal and can restore the job. Inspect each bulk item;
 partial success is not a completed batch. On conflict, read the job again and
 preserve a concurrent decision. On an uncertain response, read server state
 before retrying. Record successful IDs so reruns do not repeat completed work.

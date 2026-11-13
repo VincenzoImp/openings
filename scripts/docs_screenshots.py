@@ -80,6 +80,29 @@ Requirements
 - Clear written English.
 
 This is a fictional posting created for the Openings documentation."""
+GERMAN_ENGLISH = (
+    "Alpenlicht Software entwickelt Planungswerkzeuge für Bahnen. Wir suchen eine Person, "
+    "die unsere Dienste in Python und Go weiterentwickelt und mit dem Betrieb zusammenarbeitet. "
+    "Dein Profil: mehrjährige Erfahrung mit verteilten Systemen und fließend Englisch. "
+    "Deutschkenntnisse sind von Vorteil. Dies ist ein fiktives Inserat für die Dokumentation."
+)
+FRENCH_OR_ENGLISH = (
+    "Rhône Analytique aide les régions à suivre leur consommation d'énergie. Vous construisez "
+    "nos flux de données et vous travaillez avec nos analystes. Votre profil : trois ans "
+    "d'expérience avec Python et SQL, français ou anglais courant. Ceci est une annonce fictive "
+    "créée pour la documentation."
+)
+GERMAN_REQUIRED = (
+    "Kantonsnetz betreibt die Netzwerke mehrerer Gemeinden. Du automatisierst Deployments, "
+    "verbesserst das Monitoring und unterstützt unsere Teams. Voraussetzungen: Erfahrung mit "
+    "Linux und Ansible, fließend Deutsch (C1) und gute Englischkenntnisse. Dies ist ein "
+    "fiktives Inserat für die Dokumentation."
+)
+GERMAN_ONLY = (
+    "Seetal Systeme baut die Plattform für unsere Logistikkunden. Du betreust Kubernetes, "
+    "schreibst Terraform und hilfst den Teams beim Ausliefern. Sehr gute Deutschkenntnisse "
+    "in Wort und Schrift sind erforderlich. Dies ist ein fiktives Inserat für die Dokumentation."
+)
 
 
 class Seeder:
@@ -107,7 +130,17 @@ class Seeder:
             raise RuntimeError(f"{method} {path}: {response.status_code} {response.text}")
         return response.json() if response.content else None
 
-    def job(self, title, company, location, source="manual", key=None, posting=None, url=None):
+    def job(
+        self,
+        title,
+        company,
+        location,
+        source="manual",
+        key=None,
+        posting=None,
+        url=None,
+        source_id=None,
+    ):
         slug = f"{company}-{title}".lower().replace(" ", "-").replace("&", "and")
         return self.call(
             "POST",
@@ -120,6 +153,7 @@ class Seeder:
                 "posting": posting or POSTING.format(company=company, title=title),
                 "source_key": key,
                 "metadata": {"source": source},
+                **({"source_id": source_id} if source_id else {}),
             },
         )
 
@@ -378,6 +412,15 @@ def seed(s: Seeder):
             request = s.call if item.pop("proposed", False) else s.owner
             current = s.call("GET", f"/policy/{section}")["version"]
             request("POST", f"/policy/{section}/items", json={"expected_version": current, **item})
+    # The owner switches the language rule on: new jobs that require another
+    # language arrive dismissed by it.
+    decision = s.call("GET", "/policy/decision")
+    rule = next(item for item in decision["items"] if item["label"] == "Languages outside my list")
+    s.owner(
+        "PATCH",
+        f"/policy/items/{rule['id']}",
+        json={"expected_version": decision["version"], "enabled": True},
+    )
 
     sources = [
         {
@@ -408,17 +451,20 @@ def seed(s: Seeder):
             "filters": {"exclude_titles": ["principal", "manager"]},
         },
     ]
+    source_ids = {}
     for source in sources:
-        s.call("POST", "/sources", json=source)
+        source_ids[source["name"]] = s.call("POST", "/sources", json=source)["id"]
     for name, board in [
         ("Northstar Labs", "northstar-labs-example"),
         ("Brightline AI", "brightline-example"),
     ]:
-        s.call(
+        source_ids[name] = s.call(
             "POST",
             "/sources",
             json={"name": name, "kind": "greenhouse", "config": {"board": board}},
-        )
+        )["id"]
+    zurich = source_ids["Engineering roles in Zurich"]
+    remote = source_ids["Remote data engineering"]
 
     # Inbox: unreviewed jobs.
     for title, company, location, source in [
@@ -428,7 +474,22 @@ def seed(s: Seeder):
         ("Platform Engineer", "Larch Mobility", "Bern, Switzerland", "greenhouse"),
         ("Analytics Engineer", "Helio Retail", "Remote, Europe", "linkedin"),
     ]:
-        s.job(title, company, location, source, key=f"{source}:{company}:{title}".lower())
+        s.job(
+            title,
+            company,
+            location,
+            source,
+            key=f"{source}:{company}:{title}".lower(),
+            source_id=remote if "Remote" in location else zurich,
+        )
+    # Postings in other languages: the signals name the language and what it requires.
+    for title, company, location, posting in [
+        ("Backend-Entwickler", "Alpenlicht Software", "Bern, Switzerland", GERMAN_ENGLISH),
+        ("Ingénieur données", "Rhône Analytique", "Geneva, Switzerland", FRENCH_OR_ENGLISH),
+        ("DevOps Engineer", "Kantonsnetz", "Zurich, Switzerland", GERMAN_REQUIRED),
+        ("Platform-Ingenieur", "Seetal Systeme", "Lucerne, Switzerland", GERMAN_ONLY),
+    ]:
+        s.job(title, company, location, "linkedin", posting=posting, source_id=zurich)
 
     # Possible duplicates: one vacancy from three places, one from two.
     ml_posting = POSTING.format(company="Brightline AI", title="Machine Learning Engineer")
@@ -445,6 +506,7 @@ def seed(s: Seeder):
             key=f"{source}:brightline-ml",
             posting=ml_posting,
             url=url,
+            source_id=source_ids["Brightline AI"] if source == "greenhouse" else zurich,
         )
     for source in ["linkedin", "greenhouse"]:
         job = s.job(
@@ -454,6 +516,7 @@ def seed(s: Seeder):
             source,
             key=f"{source}:pine-frontend",
             url=f"https://{source}.example.test/pine-and-co/frontend-engineer",
+            source_id=zurich,
         )
         s.triage(job, "saved")
 
@@ -462,9 +525,9 @@ def seed(s: Seeder):
         ("Backend Engineer, Payments", "Saffron Pay", "Zurich, Switzerland"),
         ("Research Engineer", "Glacier Climate Lab", "Geneva, Switzerland"),
     ]:
-        s.triage(s.job(title, company, location, "linkedin"), "saved")
+        s.triage(s.job(title, company, location, "linkedin", source_id=zurich), "saved")
     for title, company in [("Sales Engineer", "Quartz CRM"), ("Junior QA Intern", "Bolt Games")]:
-        s.triage(s.job(title, company, "Remote", "indeed"), "dismissed")
+        s.triage(s.job(title, company, "Remote", "indeed", source_id=remote), "dismissed")
 
     # Applications across stages, with planning fields.
     cv_lines = [

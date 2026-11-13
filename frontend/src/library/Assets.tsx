@@ -33,7 +33,7 @@ const kindOf = (file: WorkspaceFile) =>
             ? "Text"
             : "File";
 
-/** The files of a Career entry or a template, with the path to the list. */
+/** The files of a Career entry, a template or a job, with the path to the list. */
 export function useAssets(ownerType: string, ownerId: string) {
   return useFresh<ListResult<WorkspaceFile>>(
     `/files?owner_type=${ownerType}&owner_id=${ownerId}&limit=200`,
@@ -53,7 +53,7 @@ export function Assets({
   empty,
   note,
 }: {
-  ownerType: "knowledge" | "template";
+  ownerType: "knowledge" | "template" | "job";
   ownerId: string;
   /** What to say when there is no file yet. */
   empty: string;

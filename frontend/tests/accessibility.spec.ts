@@ -26,11 +26,11 @@ const SCREENS = [
   "applications?view=board",
   "applications?stage=applied",
   "applications?section=insights",
-  "inbox",
-  "shortlist",
-  "inbox?queue=dismissed",
-  "inbox?queue=all",
-  "inbox?queue=duplicates",
+  "jobs",
+  "jobs?section=shortlist",
+  "jobs?section=dismissed",
+  "jobs?section=all",
+  "jobs?signal=likely_duplicate",
   "activity",
   "activity?section=requests",
   "activity?section=runs",
@@ -44,6 +44,7 @@ const SCREENS = [
   "templates?section=assets",
   "templates?section=preview",
   "collection",
+  "collection?section=yield",
   "collection?section=runs",
   "collection?section=runs&view=tasks",
   "collection?section=providers",
@@ -192,19 +193,66 @@ for (const theme of ["light", "dark"]) {
         expect(await findings(page, screen)).toEqual([]);
       });
 
-    test("an open job and the add-job dialog have no serious accessibility finding", async ({
+    test("a job with its details, the dismissed job, the dialogs and the selection have no serious accessibility finding", async ({
       page,
     }) => {
+      test.setTimeout(90000);
       await page.context().addCookies(cookies);
-      await go(page, "inbox");
+      await go(page, "today");
+      const api = (path: string) =>
+        page.evaluate(
+          (path) =>
+            fetch("/api/v1" + path, {
+              headers: { "X-Openings-E2E-Setup": "1" },
+            }).then((response) => response.json()),
+          path,
+        );
+      const flagged = (await api("/jobs?signal=likely_duplicate&limit=1"))
+        .items[0];
+      const ruled = (
+        await api("/jobs?queue=dismissed&dismissed_by=rule&limit=1")
+      ).items[0];
+      // A likely duplicate with every detail section open.
+      await go(page, `jobs?job=${flagged.id}`);
       await settled(page);
-      await page.locator(".jobmain").first().click();
-      await expect(page.locator("dialog[open] .posting")).toBeVisible();
+      await expect(page.locator(".job-detail .duplicate")).toBeVisible();
+      for (const summary of await page
+        .locator(".job-detail details > summary")
+        .all())
+        await summary.click();
+      await settled(page);
       expect(await findings(page, "job")).toEqual([]);
+      await go(page, `jobs?section=dismissed&job=${ruled.id}`);
+      await settled(page);
+      expect(await findings(page, "dismissed-job")).toEqual([]);
+      // Dismiss with a reason, merge, add a job.
+      await go(page, `jobs?job=${flagged.id}`);
+      await settled(page);
+      await page
+        .getByRole("group", { name: "Actions on this job" })
+        .getByRole("button", { name: "Dismiss…" })
+        .click();
+      await expect(page.locator("dialog[open]")).toBeVisible();
+      expect(await findings(page, "dismiss")).toEqual([]);
       await page.keyboard.press("Escape");
-      await page.getByRole("button", { name: "Add job" }).click();
+      await page
+        .getByRole("button", { name: "Same vacancy: merge", exact: true })
+        .click();
+      await expect(page.locator("dialog[open]")).toBeVisible();
+      expect(await findings(page, "merge")).toEqual([]);
+      await page.keyboard.press("Escape");
+      await page.getByRole("button", { name: "Add a job" }).click();
       await expect(page.locator("dialog[open] input[name=url]")).toBeVisible();
       expect(await findings(page, "add-job")).toEqual([]);
+      await page.keyboard.press("Escape");
+      // Selected rows with the bulk actions.
+      await go(page, "jobs");
+      await settled(page);
+      await page.locator(".job-list input[type=checkbox]").first().check();
+      await expect(
+        page.getByRole("group", { name: "Selected jobs" }),
+      ).toBeVisible();
+      expect(await findings(page, "jobs-bulk")).toEqual([]);
     });
 
     test("the review page, each of its tabs and the response form have no serious accessibility finding", async ({

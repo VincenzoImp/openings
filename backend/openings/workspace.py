@@ -9,7 +9,7 @@ import threading
 import time
 from urllib.parse import urlsplit
 
-from .actors import current_actor, pop_actor
+from .actors import SYSTEM, current_actor, pop_actor
 from .common import (
     check_version,
     new_id,
@@ -25,6 +25,18 @@ from .duplicates import (
 )
 from .errors import DomainError, conflict, missing
 from .identities import job_identities, normalize_url
+from .job_signals import (
+    DISMISSAL_COLUMNS,
+    DISMISSED_BY,
+    SIGNAL_FILTERS,
+    SIGNALS_SQL,
+    UNLISTED_SQL,
+    SignalService,
+    dismissal_record,
+    normalize_languages,
+    signal_record,
+    store_text_signals,
+)
 from .models import (
     OUTCOMES,
     ApplicationBulk,
@@ -93,6 +105,7 @@ class Workspace:
         # Duplicate features per job, reused until that job changes.
         self._duplicates = ({}, {}, None)
         self._duplicates_lock = threading.Lock()
+        self.signals = SignalService(self)
 
     def get_settings(self, key, default=None):
         row = self.db.one("SELECT * FROM settings WHERE key=?", (key,))
@@ -222,11 +235,14 @@ class Workspace:
                 "updated_at",
             )
         ]
+        columns += [f"j.{name} AS j_{name}" for name in DISMISSAL_COLUMNS]
         columns += [
             "substr(j.posting,1,240) AS j_posting_preview",
             posting_complete_sql() + " AS j_complete",
             "(SELECT json_object('id',id,'status',status,'outcome',outcome,'version',version) FROM applications WHERE job_id=j.id ORDER BY (status='closed'),created_at DESC,id DESC LIMIT 1) AS j_application",
             "(SELECT count(*) FROM applications WHERE job_id=j.id) AS j_application_count",
+            SIGNALS_SQL.format(alias="j") + " AS j_signals",
+            UNLISTED_SQL.format(alias="j") + " AS j_unlisted_at",
         ]
         return ",".join(columns)
 
@@ -242,6 +258,8 @@ class Workspace:
         for field in ("is_remote", "job_type", "salary", "date_posted", "workplace_type"):
             if field in result["metadata"]:
                 result[field] = result["metadata"][field]
+        result["signals"] = signal_record(result["signals"], result.pop("unlisted_at"))
+        result["dismissal"] = dismissal_record(result)
         return result
 
     def _job(self, row):
@@ -249,13 +267,14 @@ class Workspace:
             missing("Job")
         row = decode_record(row, ("metadata", "overrides"))
         with self.db.connect() as connection:
-            row["postings"] = [
-                dict(posting)
-                for posting in connection.execute(
-                    "SELECT id,source_id,identity,url,first_seen_at,last_seen_at FROM postings WHERE job_id=? ORDER BY first_seen_at",
-                    (row["id"],),
-                )
-            ]
+            row["postings"] = []
+            for posting in connection.execute(
+                "SELECT p.id,p.source_id,s.name AS source_name,s.kind AS source_kind,p.identity,"
+                "p.url,p.first_seen_at,p.last_seen_at,p.unlisted_at FROM postings p "
+                "LEFT JOIN sources s ON s.id=p.source_id WHERE p.job_id=? ORDER BY p.first_seen_at",
+                (row["id"],),
+            ):
+                row["postings"].append(dict(posting))
             application = connection.execute(
                 "SELECT id,status,outcome,version,(SELECT count(*) FROM applications WHERE job_id=?) AS application_count FROM applications WHERE job_id=? ORDER BY (status='closed'),created_at DESC,id DESC LIMIT 1",
                 (row["id"], row["id"]),
@@ -264,7 +283,17 @@ class Workspace:
             row["application_count"] = (
                 row["application"].pop("application_count") if application else 0
             )
+            signals = connection.execute(
+                "SELECT "
+                + SIGNALS_SQL.format(alias="j")
+                + ","
+                + UNLISTED_SQL.format(alias="j")
+                + " FROM jobs j WHERE j.id=?",
+                (row["id"],),
+            ).fetchone()
         row["complete"] = posting_complete(row["posting"], row["metadata"], row["overrides"])
+        row["signals"] = signal_record(signals[0], signals[1])
+        row["dismissal"] = dismissal_record(row)
         return row
 
     def get_job(self, job_id):
@@ -290,8 +319,40 @@ class Workspace:
         created_until=None,
         complete=None,
         queue=None,
+        signal=None,
+        posting_language=None,
+        posting_language_not=None,
+        requires=None,
+        dismissed_by=None,
+        rule_id=None,
     ):
         conditions, args = [], []
+        if signal:
+            if signal not in SIGNAL_FILTERS:
+                raise DomainError(
+                    422, "signal", "Choose " + ", ".join(sorted(SIGNAL_FILTERS)) + "."
+                )
+            conditions.append(SIGNAL_FILTERS[signal])
+        for value, operator in ((posting_language, "="), (posting_language_not, "<>")):
+            if value:
+                conditions.append(
+                    "EXISTS(SELECT 1 FROM job_signals s WHERE s.job_id=j.id "
+                    f"AND s.language IS NOT NULL AND s.language{operator}?)"
+                )
+                args.append(normalize_languages([value])[0])
+        if requires:
+            conditions.append(
+                "EXISTS(SELECT 1 FROM job_signals s, json_each(s.required) g, json_each(g.value) c "
+                "WHERE s.job_id=j.id AND c.value=?)"
+            )
+            args.append(normalize_languages([requires])[0])
+        if dismissed_by:
+            if dismissed_by not in DISMISSED_BY:
+                raise DomainError(422, "dismissed_by", "Choose rule, agent, owner or other.")
+            conditions.append("j.triage='dismissed' AND " + DISMISSED_BY[dismissed_by])
+        if rule_id:
+            conditions.append("j.dismissed_rule_id=?")
+            args.append(rule_id)
         if triage == "active":
             conditions.append("j.triage!='dismissed'")
         elif triage:
@@ -359,8 +420,21 @@ class Workspace:
         complete=None,
         queue=None,
         include_facets=False,
+        signal=None,
+        posting_language=None,
+        posting_language_not=None,
+        requires=None,
+        dismissed_by=None,
+        rule_id=None,
+        include_counts=False,
     ):
         limit, offset = min(max(int(limit), 1), 200), max(int(offset), 0)
+        signal_filters = {
+            "signal": signal,
+            "posting_language": posting_language,
+            "posting_language_not": posting_language_not,
+            "requires": requires,
+        }
         with self.db.connect() as connection:
             where, args = self._job_filters(
                 q,
@@ -374,12 +448,16 @@ class Workspace:
                 created_until,
                 complete,
                 queue,
+                dismissed_by=dismissed_by,
+                rule_id=rule_id,
+                **signal_filters,
             )
             base = " FROM jobs j"
             order = {
                 "oldest": "j.created_at ASC",
                 "company": "j.company,j.title",
                 "title": "j.title",
+                "dismissed": "j.dismissed_at IS NULL,j.dismissed_at DESC,j.created_at DESC",
             }.get(sort, "j.created_at DESC")
             rows = connection.execute(
                 "SELECT "
@@ -393,6 +471,20 @@ class Workspace:
             ).fetchall()
             total = connection.execute("SELECT count(*)" + base + where, args).fetchone()[0]
             result = {"items": [self._compact_job(row) for row in rows], "total": total}
+            if include_counts:
+                result["counts"] = self._job_counts(
+                    connection,
+                    q,
+                    company=company,
+                    location=location,
+                    source=source,
+                    remote=remote,
+                    job_type=job_type,
+                    created_since=created_since,
+                    created_until=created_until,
+                    complete=complete,
+                    **signal_filters,
+                )
             if not include_facets:
                 return result
             facets = {}
@@ -417,7 +509,39 @@ class Workspace:
                 facets[name] = [r[0] for r in facet_rows if r[0] not in (None, "")]
         return {**result, "facets": facets}
 
-    def ingest_job(self, value):
+    def _job_counts(self, connection, q="", **filters):
+        """Jobs of each queue and dismissed jobs by who dismissed them, for the same filters."""
+        where, args = self._job_filters(q, **filters)
+        attempt = "EXISTS(SELECT 1 FROM applications a WHERE a.job_id=j.id)"
+        row = connection.execute(
+            "SELECT count(*),"
+            f"coalesce(sum(j.triage='inbox' AND NOT {attempt}),0),"
+            f"coalesce(sum(j.triage='saved' AND NOT {attempt}),0),"
+            f"coalesce(sum({attempt}),0),"
+            "coalesce(sum(j.triage='dismissed'),0),"
+            + ",".join(
+                f"coalesce(sum(j.triage='dismissed' AND {sql}),0)" for sql in DISMISSED_BY.values()
+            )
+            + " FROM jobs j"
+            + where,
+            args,
+        ).fetchone()
+        return {
+            "all": row[0],
+            "inbox": row[1],
+            "shortlist": row[2],
+            "applications": row[3],
+            "dismissed": row[4],
+            "dismissed_by": dict(zip(DISMISSED_BY, row[5:], strict=True)),
+        }
+
+    def ingest_job(self, value, defer_signals=False):
+        """Store a posting as a new job or as a refresh of the job it identifies.
+
+        A new job gets its text signals in the same transaction, then its duplicate
+        and the policy rules (``SignalService.after_ingest``). A caller holding the
+        database lock passes ``defer_signals`` and runs that step after releasing it.
+        """
         value = value if isinstance(value, JobInput) else JobInput.model_validate(value)
         data = value.model_dump()
         if not value.url and not value.posting.strip():
@@ -462,6 +586,7 @@ class Workspace:
                 self.event(
                     "job_added", job_id, payload={"title": title, "company": company}, conn=c
                 )
+                store_text_signals(c, job_id, title, value.posting, 1, stamp)
             else:
                 overrides = json.loads(prior["overrides"])
                 updates = {}
@@ -504,6 +629,8 @@ class Workspace:
                     visible = [key for key in updates if key in REFRESH_FIELDS]
                     if visible:
                         self.event(REFRESH_EVENT, job_id, payload={"fields": visible}, conn=c)
+                    if "title" in updates or "posting" in updates:
+                        self._refresh_text_signals(c, job_id)
             c.executemany(
                 "INSERT OR IGNORE INTO job_identities(identity,job_id) VALUES(?,?)",
                 [(key, job_id) for key in aliases],
@@ -517,8 +644,9 @@ class Workspace:
             content_hash = hashlib.sha256(encode(data).encode()).hexdigest()
             kept = encode(observation_payload(data))
             if observation:
+                # Seen again: a posting the source had stopped listing is listed again.
                 c.execute(
-                    "UPDATE postings SET source_id=coalesce(source_id,?),url=?,payload=?,content_hash=?,last_seen_at=? WHERE id=?",
+                    "UPDATE postings SET source_id=coalesce(source_id,?),url=?,payload=?,content_hash=?,last_seen_at=?,unlisted_at=NULL WHERE id=?",
                     (value.source_id, url, kept, content_hash, stamp, observation["id"]),
                 )
             else:
@@ -536,9 +664,20 @@ class Workspace:
                         stamp,
                     ),
                 )
+        if prior is None and not defer_signals:
+            # A job the owner adds in the dashboard is never dismissed by a rule.
+            self.signals.after_ingest(job_id, apply_rules=current_actor().kind != "owner")
         result = self.get_job(job_id)
         result["created"] = prior is None
         return result
+
+    @staticmethod
+    def _refresh_text_signals(conn, job_id):
+        """Text signals follow the title and posting; the duplicate and rules stay."""
+        row = conn.execute(
+            "SELECT title,posting,content_version FROM jobs WHERE id=?", (job_id,)
+        ).fetchone()
+        store_text_signals(conn, job_id, row[0], row[1], row[2])
 
     def update_job(self, job_id, value):
         value = value if isinstance(value, JobPatch) else JobPatch.model_validate(value)
@@ -586,28 +725,104 @@ class Workspace:
                         "INSERT OR IGNORE INTO job_identities(identity,job_id) VALUES(?,?)",
                         [(key, job_id) for key in job_identities(actual["url"])],
                     )
+                if "title" in actual or "posting" in actual:
+                    self._refresh_text_signals(c, job_id)
                 self.event("job_edited", job_id, payload={"fields": list(actual)}, conn=c)
         return self.job_summary(job_id)
 
-    def set_triage(self, job_id, triage, expected_version):
+    def set_triage(self, job_id, triage, expected_version, reason=None):
+        """Set inbox/saved/dismissed. A dismissal records who made it and, optionally, why."""
         if triage not in {"inbox", "saved", "dismissed"}:
             raise DomainError(422, "triage", "Unknown job disposition.")
+        if reason and triage != "dismissed":
+            raise DomainError(422, "triage_reason", "A reason goes with a dismissal only.")
         with self.db.transaction() as c:
             row = c.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
             check_version(row, expected_version)
             if row["triage"] != triage:
+                self._triage(c, row, triage, current_actor(), reason=reason or "")
+            elif triage == "dismissed" and reason is not None and reason != row["dismissed_reason"]:
                 c.execute(
-                    "UPDATE jobs SET triage=?,version=version+1,updated_at=? WHERE id=?",
-                    (triage, now(), job_id),
+                    "UPDATE jobs SET dismissed_reason=?,version=version+1,updated_at=? WHERE id=?",
+                    (reason, now(), job_id),
                 )
-                self.event(
-                    "triage_changed", job_id, payload={"from": row["triage"], "to": triage}, conn=c
-                )
-            if triage == "dismissed":
+                self.event("job_edited", job_id, payload={"fields": ["dismissed_reason"]}, conn=c)
+        return self.job_summary(job_id)
+
+    def _triage(self, conn, row, triage, actor, rule=None, reason=""):
+        """Move a job to another triage state, keeping the record of a dismissal."""
+        stamp = now()
+        if triage == "dismissed":
+            conn.execute(
+                "UPDATE jobs SET triage=?,dismissed_at=?,dismissed_by_kind=?,dismissed_by_id=?,"
+                "dismissed_by_name=?,dismissed_by_token_kind=?,dismissed_rule_id=?,"
+                "dismissed_rule_label=?,dismissed_reason=?,version=version+1,updated_at=? WHERE id=?",
+                (
+                    triage,
+                    stamp,
+                    *actor.columns(),
+                    rule["item_id"] if rule else None,
+                    rule["label"] if rule else None,
+                    reason,
+                    stamp,
+                    row["id"],
+                ),
+            )
+            conn.execute(
+                "UPDATE tasks SET state='cancelled',updated_at=? WHERE job_id=? AND state IN ('queued','running')",
+                (stamp, row["id"]),
+            )
+        else:
+            conn.execute(
+                "UPDATE jobs SET triage=?,dismissed_at=NULL,dismissed_by_kind=NULL,"
+                "dismissed_by_id=NULL,dismissed_by_name=NULL,dismissed_by_token_kind=NULL,"
+                "dismissed_rule_id=NULL,dismissed_rule_label=NULL,dismissed_reason='',"
+                "version=version+1,updated_at=? WHERE id=?",
+                (triage, stamp, row["id"]),
+            )
+        payload = {"from": row["triage"], "to": triage}
+        if rule:
+            payload["rule"] = {"item_id": rule["item_id"]}
+        self.event("triage_changed", row["id"], payload=payload, conn=conn, actor=actor)
+
+    def dismiss_by_rule(self, conn, job_id, rule):
+        """Dismiss a job for a policy rule, as the system, naming the rule."""
+        row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+        if row is not None and row["triage"] != "dismissed":
+            self._triage(conn, row, "dismissed", SYSTEM, rule=rule)
+
+    def mark_distinct(self, job_id, other_id):
+        """Record that a job flagged as a likely duplicate is a different vacancy.
+
+        Clears the flag and remembers the pair, so the flag does not return when
+        signals are computed again. Nothing else changes; merging is ``merge_jobs``.
+        """
+        if job_id == other_id:
+            raise DomainError(422, "distinct", "Choose a different job.")
+        with self.db.transaction() as c:
+            for record in (job_id, other_id):
+                if not c.execute("SELECT 1 FROM jobs WHERE id=?", (record,)).fetchone():
+                    missing("Job")
+            changed = False
+            # Either job may carry the flag against the other.
+            for first, second in ((job_id, other_id), (other_id, job_id)):
+                row = c.execute(
+                    "SELECT duplicate_of,distinct_from FROM job_signals WHERE job_id=?", (first,)
+                ).fetchone()
+                if row is None:
+                    continue
+                known = json.loads(row["distinct_from"])
+                if second in known and row["duplicate_of"] != second:
+                    continue
                 c.execute(
-                    "UPDATE tasks SET state='cancelled',updated_at=? WHERE job_id=? AND state IN ('queued','running')",
-                    (now(), job_id),
+                    "UPDATE job_signals SET distinct_from=?,duplicate_of=CASE WHEN duplicate_of=? "
+                    "THEN NULL ELSE duplicate_of END,duplicate_confidence=CASE WHEN duplicate_of=? "
+                    "THEN NULL ELSE duplicate_confidence END WHERE job_id=?",
+                    (encode(sorted({*known, second})), second, second, first),
                 )
+                changed = True
+            if changed:
+                self.event("duplicate_cleared", job_id, payload={"other_id": other_id}, conn=c)
         return self.job_summary(job_id)
 
     def forget_job(self, job_id, expected_version, collect=True):
@@ -694,6 +909,8 @@ class Workspace:
                     "created_at",
                     "application",
                     "application_count",
+                    "signals",
+                    "dismissal",
                 )
             }
             item["applications"] = attempts.get(job["id"], [])
@@ -705,7 +922,7 @@ class Workspace:
         stamps = {
             row[0]: tuple(row)[1:]
             for row in connection.execute(
-                "SELECT j.id,j.version,j.updated_at,"
+                "SELECT j.id,j.version,j.updated_at,j.created_at,"
                 "(SELECT count(*) FROM job_identities i WHERE i.job_id=j.id) "
                 "FROM jobs j ORDER BY j.rowid"
             )
@@ -718,36 +935,114 @@ class Workspace:
             features = {
                 job_id: features[job_id] for job_id in stamps if known.get(job_id) == stamps[job_id]
             }
-            for start in range(0, len(stale), 400):
-                chunk = stale[start : start + 400]
-                placeholders = ",".join("?" for _ in chunk)
-                identities, urls = {}, {}
-                for job_id, identity in connection.execute(
-                    f"SELECT job_id,identity FROM job_identities WHERE job_id IN ({placeholders})",
-                    chunk,
-                ):
-                    identities.setdefault(job_id, []).append(identity)
-                # The employer's own apply link, when a job board reported one.
-                for job_id, url in connection.execute(
-                    "SELECT job_id,json_extract(payload,'$.raw.job_url_direct') FROM postings "
-                    f"WHERE job_id IN ({placeholders}) AND instr(payload,'job_url_direct')",
-                    chunk,
-                ):
-                    if isinstance(url, str):
-                        urls.setdefault(job_id, []).append(url)
-                for row in connection.execute(
-                    "SELECT id,title,company,location,url,substr(posting,1,50000) AS posting,"
-                    f"metadata,created_at FROM jobs WHERE id IN ({placeholders})",
-                    chunk,
-                ):
-                    job = dict(row)
-                    job["metadata"] = json.loads(job["metadata"])
-                    job["identities"] = identities.get(job["id"], ())
-                    job["urls"] = urls.get(job["id"], ())
-                    features[job["id"]] = job_features(job)
+            features.update(self._read_features(connection, stale))
             index = DuplicateIndex(features[job_id] for job_id in stamps if job_id in features)
             self._duplicates = (stamps, features, index)
             return index
+
+    @staticmethod
+    def _read_features(connection, job_ids):
+        """Duplicate features of these jobs, read from the database."""
+        features = {}
+        for start in range(0, len(job_ids), 400):
+            chunk = job_ids[start : start + 400]
+            placeholders = ",".join("?" for _ in chunk)
+            identities, urls = {}, {}
+            for job_id, identity in connection.execute(
+                f"SELECT job_id,identity FROM job_identities WHERE job_id IN ({placeholders})",
+                chunk,
+            ):
+                identities.setdefault(job_id, []).append(identity)
+            # The employer's own apply link, when a job board reported one.
+            for job_id, url in connection.execute(
+                "SELECT job_id,json_extract(payload,'$.raw.job_url_direct') FROM postings "
+                f"WHERE job_id IN ({placeholders}) AND instr(payload,'job_url_direct')",
+                chunk,
+            ):
+                if isinstance(url, str):
+                    urls.setdefault(job_id, []).append(url)
+            for row in connection.execute(
+                "SELECT id,title,company,location,url,substr(posting,1,50000) AS posting,"
+                f"metadata,created_at FROM jobs WHERE id IN ({placeholders})",
+                chunk,
+            ):
+                job = dict(row)
+                job["metadata"] = json.loads(job["metadata"])
+                job["identities"] = identities.get(job["id"], ())
+                job["urls"] = urls.get(job["id"], ())
+                features[job["id"]] = job_features(job)
+        return features
+
+    def earlier_duplicate(self, job_id):
+        """The job collected earlier that this one most likely repeats: (id, confidence)."""
+        return self.earlier_duplicates([job_id]).get(job_id)
+
+    def earlier_duplicates(self, job_ids):
+        """For each job, its most likely earlier copy at DEFAULT_MIN_CONFIDENCE or more.
+
+        Uses the cached duplicate index (built once after a start) and adds the jobs
+        it does not hold yet, so jobs collected in one run are compared with each
+        other. Pairs the owner marked as different vacancies are skipped. Read-only.
+        """
+        with self._duplicates_lock:
+            index = self._duplicates[2]
+        if index is None:
+            with self.db.connect() as connection:
+                index = self._duplicate_index(connection)
+        with self.db.connect() as connection:
+            unknown = [job_id for job_id in job_ids if job_id not in index.jobs]
+            fresh = self._read_features(connection, unknown)
+            stamps = {}
+            if unknown:
+                placeholders = ",".join("?" for _ in unknown)
+                stamps = {
+                    row[0]: tuple(row)[1:]
+                    for row in connection.execute(
+                        "SELECT j.id,j.version,j.updated_at,j.created_at,"
+                        "(SELECT count(*) FROM job_identities i WHERE i.job_id=j.id) "
+                        f"FROM jobs j WHERE j.id IN ({placeholders})",
+                        unknown,
+                    )
+                }
+            placeholders = ",".join("?" for _ in job_ids)
+            distinct = {
+                row[0]: set(json.loads(row[1]))
+                for row in connection.execute(
+                    f"SELECT job_id,distinct_from FROM job_signals WHERE job_id IN ({placeholders})",
+                    job_ids,
+                )
+            }
+        found = {}
+        for job_id in job_ids:
+            features = fresh.get(job_id) or index.jobs.get(job_id)
+            if features is None:
+                continue
+            order = (features.created_at, job_id)
+            for other, evidence in index.matches(features, DEFAULT_MIN_CONFIDENCE, limit=25):
+                candidate = index.jobs.get(other)
+                if (
+                    candidate is None
+                    or other in distinct.get(job_id, ())
+                    or (candidate.created_at, other) >= order
+                ):
+                    continue
+                found[job_id] = (other, evidence.score)
+                break
+        if fresh:
+            with self._duplicates_lock:
+                known, cached, current = self._duplicates
+                if current is index:
+                    for job_id, features in fresh.items():
+                        if job_id in stamps and job_id not in index.jobs:
+                            index.add(features)
+                            cached[job_id] = features
+                            known[job_id] = stamps[job_id]
+        return found
+
+    def reset_duplicates(self):
+        """Forget the cached duplicate index, after the jobs were replaced (a restore)."""
+        with self._duplicates_lock:
+            self._duplicates = ({}, {}, None)
 
     def warm_duplicates(self, delay=0.0):
         """Build the duplicate features in the background, so the first request does not wait.
@@ -761,10 +1056,14 @@ class Workspace:
             if delay:
                 time.sleep(delay)
             try:
+                # Text signals of jobs collected before schema 12 first: they are cheap
+                # and lists show them. Then the index, then the duplicate signals.
+                self.signals.backfill(duplicates=False)
                 with self.db.connect() as connection:
                     self._duplicate_index(connection)
+                self.signals.backfill()
             except Exception:
-                LOG.exception("Duplicate warm-up failed")
+                LOG.exception("Duplicate and signal warm-up failed")
 
         thread = threading.Thread(target=build, name="duplicate-warmup", daemon=True)
         thread.start()
@@ -971,10 +1270,22 @@ class Workspace:
             ):
                 c.execute(f"UPDATE {table} SET job_id=? WHERE job_id=?", (target_id, source_id))
             c.execute("UPDATE files SET job_id=? WHERE job_id=?", (target_id, source_id))
+            # A job flagged as a copy of the merged record is now a copy of the one kept.
+            c.execute(
+                "UPDATE job_signals SET duplicate_of=CASE WHEN job_id=? THEN NULL ELSE ? END,"
+                "duplicate_confidence=CASE WHEN job_id=? THEN NULL ELSE duplicate_confidence END "
+                "WHERE duplicate_of=?",
+                (target_id, target_id, target_id, source_id),
+            )
             c.execute("DELETE FROM jobs WHERE id=?", (source_id,))
             c.execute(
                 "UPDATE jobs SET version=version+1,content_version=?,updated_at=? WHERE id=?",
                 (next_content, now(), target_id),
+            )
+            c.execute(
+                "UPDATE job_signals SET content_version=?,duplicate_of=CASE WHEN duplicate_of=? "
+                "THEN NULL ELSE duplicate_of END WHERE job_id=?",
+                (next_content, source_id, target_id),
             )
             c.execute(
                 "UPDATE events SET subject_id=? WHERE subject_type='job' AND subject_id=?",
@@ -1310,7 +1621,12 @@ class Workspace:
             if value.action == "forget":
                 self.forget_job(item.id, item.expected_version, collect=False)
                 return {"deleted": True}
-            updated = self.set_triage(item.id, value.action, item.expected_version)
+            updated = self.set_triage(
+                item.id,
+                value.action,
+                item.expected_version,
+                reason=value.reason if value.action == "dismissed" else None,
+            )
             return {"triage": updated["triage"], "version": updated["version"]}
 
         return self._bulk(value.items, apply, value.action == "forget")

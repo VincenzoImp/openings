@@ -94,45 +94,40 @@ test("queue count, posting hierarchy and query-safe selection", async ({
     triage: "inbox",
     expected_version: job.version,
   });
-  await go(page, "inbox");
+  await go(page, "jobs");
   const queue = await call(page, "/jobs?queue=inbox");
-  await expect(page.locator(".navcount")).toHaveText(String(queue.total));
-  await page.locator(".jobmain").first().click();
-  await expect(top(page).locator(".posting")).toBeVisible();
+  await expect(page.locator(".navcount").first()).toHaveText(
+    String(queue.total),
+  );
+  const rows = page.locator(".job-list > li");
+  await rows.first().locator("a.title").click();
+  await expect(page.locator(".job-detail .posting")).toBeVisible();
   await expect(
-    top(page).getByRole("button", { name: "Shortlist", exact: true }),
+    page
+      .getByRole("group", { name: "Actions on this job" })
+      .getByRole("button", { name: "Shortlist", exact: true }),
   ).toHaveClass(/primary/);
+  // On a phone the job replaces the list until the switch shows it again.
+  if (page.viewportSize()!.width <= 860)
+    await page.getByRole("button", { name: "List", exact: true }).click();
+  await rows.first().locator("input[type=checkbox]").check();
   await expect(
-    top(page).getByRole("button", { name: "Merge duplicate", exact: true }),
-  ).not.toBeVisible();
-  await top(page)
-    .getByRole("button", { name: "Close dialog", exact: true })
-    .click();
-  await page.locator(".row-select").first().check();
-  await expect(page.getByLabel("Selected opportunities")).toBeVisible();
-  await page.route("**/api/v1/jobs?*", async (route) => {
-    if (new URL(route.request().url()).searchParams.get("q")) {
-      const response = await route.fetch();
-      await new Promise((r) => setTimeout(r, 700));
-      await route.fulfill({ response });
-    } else await route.continue();
-  });
+    page.getByRole("group", { name: "Selected jobs" }),
+  ).toBeVisible();
   await page
-    .getByRole("textbox", { name: "Search jobs", exact: true })
+    .getByRole("searchbox", { name: "Search jobs", exact: true })
     .fill("no-such-synthetic-role");
+  // A new search empties the selection: an action never reaches unseen jobs.
+  await expect(page.getByRole("group", { name: "Selected jobs" })).toHaveCount(
+    0,
+  );
   await expect(
-    page.getByRole("status").filter({ hasText: "Updating results" }),
-  ).toBeVisible();
-  await expect(page.locator(".jobrow")).toHaveCount(0);
-  await expect(page.getByLabel("Selected opportunities")).toHaveCount(0);
-  await expect(
-    page.getByRole("heading", { name: "No jobs match your filters" }),
+    page.getByRole("heading", { name: "No job matches" }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Clear filters", exact: true })
-    .last()
+    .getByRole("button", { name: "Clear the filters", exact: true })
     .click();
-  await expect(page.locator(".jobrow").first()).toBeVisible();
+  await expect(rows.first()).toBeVisible();
 });
 
 test("version conflict reviews latest values and reloads the editor with a usable version", async ({
@@ -143,39 +138,38 @@ test("version conflict reviews latest values and reloads the editor with a usabl
     company: "Original",
     posting: "Build services.",
   });
+  // The old drawer's address opens the job in Jobs.
   await go(page, `inbox?job=${job.id}`);
-  await top(page)
-    .getByRole("tab", { name: "Edit details", exact: true })
-    .click();
-  await top(page).locator("input[name=company]").fill("My draft");
+  await expect(page).toHaveURL(new RegExp(`#jobs\\?job=${job.id}$`));
+  const editor = page.getByRole("form", { name: "Correct this job" });
+  await page.getByText("Correct the job", { exact: true }).click();
+  await editor.locator("input[name=company]").fill("My draft");
   await call(page, `/jobs/${job.id}`, "PATCH", {
     expected_version: job.version,
     company: "Newer value",
   });
-  await top(page)
-    .getByRole("button", { name: "Save details", exact: true })
+  await editor
+    .getByRole("button", { name: "Save the details", exact: true })
     .click();
-  await expect(top(page).locator("input[name=company]")).toHaveValue(
-    "My draft",
-  );
-  await top(page)
+  await expect(editor.locator("input[name=company]")).toHaveValue("My draft");
+  await editor
     .getByRole("button", { name: "Review latest values", exact: true })
     .click();
-  await expect(top(page).locator(".conflict-recovery")).toContainText(
+  await expect(editor.locator(".conflict-recovery")).toContainText(
     "Newer value",
   );
-  await top(page)
+  await editor
     .getByRole("button", {
       name: "Reload editor and discard draft",
       exact: true,
     })
     .click();
-  await expect(top(page).locator("input[name=company]")).toHaveValue(
+  await expect(editor.locator("input[name=company]")).toHaveValue(
     "Newer value",
   );
-  await top(page).locator("input[name=company]").fill("Reapplied deliberately");
-  await top(page)
-    .getByRole("button", { name: "Save details", exact: true })
+  await editor.locator("input[name=company]").fill("Reapplied deliberately");
+  await editor
+    .getByRole("button", { name: "Save the details", exact: true })
     .click();
   await expect
     .poll(async () => (await call(page, `/jobs/${job.id}`)).company)
@@ -185,7 +179,7 @@ test("version conflict reviews latest values and reloads the editor with a usabl
 test("import protection and nested dialogs restore scroll after browser Back", async ({
   page,
 }) => {
-  await go(page, "inbox");
+  await go(page, "jobs");
   await go(page, "career?section=knowledge");
   await page.getByRole("button", { name: "Import", exact: true }).click();
   await top(page)
@@ -213,7 +207,7 @@ test("import protection and nested dialogs restore scroll after browser Back", a
     .click();
   await expect(page.locator("dialog[open]")).toHaveCount(1);
   await page.goBack();
-  await expect(page.locator(".main h1")).toHaveText("Inbox");
+  await expect(page.locator(".main h1")).toHaveText("Jobs");
   await expect(page.locator("dialog[open]")).toHaveCount(0);
   await expect
     .poll(() => page.evaluate(() => document.body.style.overflow))
@@ -347,59 +341,58 @@ test("live file and note deletion identify the item before removal", async ({
     title: "Owned notes and files",
     posting: "Build services.",
   });
-  await go(page, `inbox?job=${job.id}`);
-  await top(page).getByRole("tab", { name: /Notes/ }).click();
-  await top(page)
-    .locator("[name=body]")
+  await go(page, `jobs?section=all&job=${job.id}`);
+  const detail = page.locator(".job-detail");
+  await detail
+    .getByLabel("A note on this job")
     .fill("Synthetic note to review before deletion.");
-  await top(page)
-    .getByRole("button", { name: "Add note", exact: true })
+  await detail
+    .getByRole("button", { name: "Add the note", exact: true })
     .click();
-  await top(page)
-    .getByRole("button", { name: "Delete note", exact: true })
+  const timeline = detail.getByRole("list", { name: "Timeline of this job" });
+  await timeline
+    .getByRole("button", { name: "Delete this note", exact: true })
     .click();
   await expect(top(page)).toContainText(
     "Synthetic note to review before deletion.",
   );
   await top(page)
-    .getByRole("button", { name: "Keep note", exact: true })
+    .getByRole("button", { name: "Keep the note", exact: true })
     .click();
-  await expect(page.locator(".note-entry")).toHaveCount(1);
-  await top(page).getByRole("tab", { name: "Files", exact: true }).click();
-  await top(page)
-    .locator("input[type=file]")
-    .setInputFiles({
-      name: "safe-text.txt",
-      mimeType: "text/plain",
-      buffer: Buffer.from(
-        "<script>window.__unsafe=true</script>\nSynthetic source",
-      ),
-    });
-  await top(page)
+  await expect(timeline).toContainText(
+    "Synthetic note to review before deletion.",
+  );
+  await detail.getByText("Files", { exact: true }).click();
+  await detail.locator("input[type=file]").setInputFiles({
+    name: "safe-text.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from(
+      "<script>window.__unsafe=true</script>\nSynthetic source",
+    ),
+  });
+  await detail
     .getByRole("button", { name: "safe-text.txt", exact: true })
     .click();
-  await expect(top(page).locator(".file-text")).toContainText("<script>");
+  await expect(top(page).locator("pre")).toContainText("<script>");
   expect(await page.evaluate(() => (window as any).__unsafe)).toBeUndefined();
-  await top(page)
-    .getByRole("button", { name: "Close preview", exact: true })
-    .click();
-  await top(page)
-    .getByRole("button", { name: "Delete safe-text.txt", exact: true })
+  await top(page).getByRole("button", { name: "Close", exact: true }).click();
+  await detail
+    .getByRole("button", { name: "Remove safe-text.txt", exact: true })
     .click();
   await expect(top(page)).toContainText("safe-text.txt");
   await top(page)
     .getByRole("button", { name: "Keep file", exact: true })
     .click();
   await expect(
-    top(page).getByRole("button", { name: "safe-text.txt", exact: true }),
+    detail.getByRole("button", { name: "safe-text.txt", exact: true }),
   ).toBeVisible();
-  await top(page)
-    .getByRole("button", { name: "Delete safe-text.txt", exact: true })
+  await detail
+    .getByRole("button", { name: "Remove safe-text.txt", exact: true })
     .click();
   await top(page)
-    .getByRole("button", { name: "Delete file", exact: true })
+    .getByRole("button", { name: "Remove file", exact: true })
     .click();
   await expect(
-    top(page).getByRole("button", { name: "safe-text.txt", exact: true }),
+    detail.getByRole("button", { name: "safe-text.txt", exact: true }),
   ).toHaveCount(0);
 });

@@ -149,6 +149,8 @@ def test_schema_five_upgrade_preserves_owned_records_and_versions(tmp_path):
         )
         conn.execute("PRAGMA user_version=5")
     upgraded = Workspace(path)
+    # Signals of jobs collected before schema 12 are computed after the upgrade.
+    assert upgraded.signals.backfill() == {"text": 1, "duplicates": 1}
     assert upgraded.get_job(job["id"])["version"] == ws.get_job(job["id"])["version"]
     assert upgraded.get_application(application["id"]) == application
     assert upgraded.list_jobs(queue="shortlist")["total"] == 0

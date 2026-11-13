@@ -1,14 +1,16 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 // The performance budget of docs/developer/dashboard-design.md: on a synthetic
-// workspace of 5,000 jobs and 500 applications, the Applications list of 200
-// rows is interactive in under 300 ms after navigation. This project starts
-// its own large workspace (backend/tests/large_fixtures.py), so the other
-// projects keep their small, fast one.
+// workspace of 25,000 jobs (with their ingest signals) and 500 applications,
+// the Applications list and the jobs to review, 200 rows each, are interactive
+// in under 300 ms after navigation. This project starts its own large
+// workspace (backend/tests/large_fixtures.py), so the other projects keep
+// their small, fast one.
 const BUDGET_MS = 300;
 const RUNS = 7;
+const JOBS = 25000;
 let server: ChildProcess | undefined;
 let base = "";
 
@@ -24,7 +26,7 @@ function freePort() {
 }
 
 test.beforeAll(async () => {
-  test.setTimeout(240_000);
+  test.setTimeout(300_000);
   const port = await freePort();
   base = `http://127.0.0.1:${port}`;
   server = spawn(
@@ -41,14 +43,14 @@ test.beforeAll(async () => {
         ...process.env,
         OPENINGS_E2E_PORT: String(port),
         OPENINGS_E2E_TOKEN: "performance",
-        OPENINGS_E2E_JOBS: "5000",
+        OPENINGS_E2E_JOBS: String(JOBS),
         OPENINGS_E2E_APPLICATIONS: "500",
       },
       stdio: "ignore",
     },
   );
   const started = Date.now();
-  while (Date.now() - started < 220_000) {
+  while (Date.now() - started < 280_000) {
     try {
       if ((await fetch(base + "/health")).ok) return;
     } catch {}
@@ -61,47 +63,35 @@ test.afterAll(() => {
   server?.kill();
 });
 
-test("the Applications list of 200 rows is interactive in under 300 ms", async ({
-  page,
-}) => {
+async function signIn(page: Page) {
   await page.goto(base + "/");
   await page.locator("input[name=password]").fill("synthetic-browser-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.locator(".main h1")).toHaveText("Today");
-  const counts = await page.evaluate(() =>
-    fetch("/api/v1/applications?limit=1").then((response) => response.json()),
-  );
-  expect(counts.total).toBeGreaterThanOrEqual(500);
-  expect(
-    (
-      await page.evaluate(() =>
-        fetch("/api/v1/jobs?limit=1").then((response) => response.json()),
-      )
-    ).total,
-  ).toBeGreaterThanOrEqual(5000);
+}
 
+/**
+ * The median time from a click on a navigation link to `rows` rows of the
+ * list on screen, with the main thread free again to take the next click.
+ */
+async function median(page: Page, href: string, rows: string, label: string) {
   const timings: number[] = [];
   for (let run = 0; run < RUNS; run++) {
     await page.goto(base + "/#today");
     await expect(page.locator(".main h1")).toHaveText("Today");
     await page.waitForLoadState("networkidle");
-    // From the click on Applications in the navigation to 200 rows on screen,
-    // with the main thread free again to take the next click.
     const elapsed = await page.evaluate(
-      () =>
+      ({ href, rows }) =>
         new Promise<number>((resolve, reject) => {
           const link = [
             ...document.querySelectorAll<HTMLAnchorElement>(
-              "a[href='#applications']",
+              `a[href='${href}']`,
             ),
           ].find((item) => item.offsetParent !== null);
-          if (!link) return reject(Error("No Applications link."));
+          if (!link) return reject(Error(`No link to ${href}.`));
           const start = performance.now();
           const done = () => {
-            const rows = document.querySelectorAll(
-              "[role=table][aria-label=Applications] [role=rowgroup]:last-child > [role=row]",
-            );
-            if (rows.length < 200) return false;
+            if (document.querySelectorAll(rows).length < 200) return false;
             // Wait for the browser to paint, then for a free task.
             requestAnimationFrame(() =>
               setTimeout(() => resolve(performance.now() - start), 0),
@@ -115,22 +105,58 @@ test("the Applications list of 200 rows is interactive in under 300 ms", async (
           setTimeout(() => reject(Error("The list did not appear.")), 10_000);
           link.click();
         }),
+      { href, rows },
     );
-    // The rows are real and usable: the last one can be selected.
-    const boxes = page.locator(
-      "[role=table][aria-label=Applications] input[type=checkbox]",
-    );
-    await expect(boxes).toHaveCount(201);
     timings.push(Math.round(elapsed));
   }
   const sorted = [...timings].sort((a, b) => a - b);
-  const median = sorted[Math.floor(sorted.length / 2)];
-  test.info().annotations.push({
-    type: "timings",
-    description: `Applications list, 200 rows: ${timings.join(", ")} ms; median ${median} ms (budget ${BUDGET_MS} ms)`,
-  });
-  console.log(
-    `Applications list, 200 rows: ${timings.join(", ")} ms; median ${median} ms`,
+  const middle = sorted[Math.floor(sorted.length / 2)];
+  const line = `${label}, 200 rows: ${timings.join(", ")} ms; median ${middle} ms (budget ${BUDGET_MS} ms)`;
+  test.info().annotations.push({ type: "timings", description: line });
+  console.log(line);
+  return middle;
+}
+
+test("the Applications list of 200 rows is interactive in under 300 ms", async ({
+  page,
+}) => {
+  await signIn(page);
+  const counts = await page.evaluate(() =>
+    fetch("/api/v1/applications?limit=1").then((response) => response.json()),
   );
-  expect(median).toBeLessThan(BUDGET_MS);
+  expect(counts.total).toBeGreaterThanOrEqual(500);
+  expect(
+    (
+      await page.evaluate(() =>
+        fetch("/api/v1/jobs?limit=1").then((response) => response.json()),
+      )
+    ).total,
+  ).toBeGreaterThanOrEqual(JOBS);
+  const time = await median(
+    page,
+    "#applications",
+    "[role=table][aria-label=Applications] [role=rowgroup]:last-child > [role=row]",
+    "Applications list",
+  );
+  // The rows are real and usable: the last one can be selected.
+  await expect(
+    page.locator("[role=table][aria-label=Applications] input[type=checkbox]"),
+  ).toHaveCount(201);
+  expect(time).toBeLessThan(BUDGET_MS);
+});
+
+test("the jobs to review, 200 rows with their signals, are interactive in under 300 ms", async ({
+  page,
+}) => {
+  await signIn(page);
+  const inbox = await page.evaluate(() =>
+    fetch("/api/v1/jobs?queue=inbox&limit=1").then((response) =>
+      response.json(),
+    ),
+  );
+  expect(inbox.total).toBeGreaterThanOrEqual(200);
+  expect(inbox.items[0].signals.computed).toBe(true);
+  const time = await median(page, "#jobs", ".job-list > li", "Jobs to review");
+  await expect(page.locator(".job-list input[type=checkbox]")).toHaveCount(200);
+  expect(time).toBeLessThan(BUDGET_MS);
 });
