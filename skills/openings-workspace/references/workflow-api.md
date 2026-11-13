@@ -10,7 +10,10 @@ mechanics, not personal selection or writing policy.
   compact preview. `job_get` / `GET /jobs/{id}` supplies the full posting.
   Filter value lists (`facets`) appear only with `include_facets: true`.
 - `job_triage(job_id, value)` / `POST /jobs/{id}/triage` takes `triage` and
-  `expected_version`. Values are `inbox`, `saved` and `dismissed`, not `draft`.
+  `expected_version`, and with `dismissed` an optional `reason` (at most 500
+  characters) the owner reads beside the dismissal; `jobs_bulk` takes the same
+  `reason` for its `dismissed` action. Values are `inbox`, `saved` and
+  `dismissed`, not `draft`. Restoring a dismissed job clears its dismissal.
   It returns the compact job summary with the new `version`, not the posting.
   `job_update` and `application_update` also return compact jobs.
 - A 409 version conflict carries `details.current_version`; read the record

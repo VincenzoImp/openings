@@ -33,12 +33,23 @@ stored [run report](../openings-workspace/references/run-report.md).
 ## Measure before changing
 
 For each source, read its configuration, schedule, last runs and errors. Measure
-yield from server data over a stated period: jobs collected, saved, dismissed,
-still in Inbox, and jobs that reached an application. Separate history from the
-current filters: jobs collected before a filter change do not describe it.
+yield with `collection_yield` (REST `GET /collection/yield`) over a stated
+period (`since`, `until`): per source and per search, the jobs it collected
+first, still to review, shortlisted, applied to, answered by an employer
+(responses, interviews, offers), dismissed by a policy rule, an agent or the
+owner, likely duplicates and postings no longer listed; searches are also
+split by job board (`providers`). Each job counts once, for the source that
+found it first, so a search whose jobs are mostly `likely_duplicates` of other
+sources adds little. `kept_rate` is withheld below `min_sample` collected jobs:
+do not judge a small source on it. Separate history from the current filters:
+jobs collected before a filter change do not describe it, so set `since` to the
+change when you re-measure.
 
 Dismissals were made by agents applying the policy, so a high dismissal
-rate measures collected text outside that policy, not the owner's taste. Drafts
+rate measures collected text outside that policy, not the owner's taste.
+Dismissals by a rule (`dismissed_by.rule`, `dismissed_by_rule`) already cost
+the agent nothing; a source whose jobs a language rule dismisses in bulk is
+better narrowed by place or language, so that collection stops paying for them. Drafts
 the owner closed without applying are not preference evidence either: postings
 close or become unfeasible. Derive every filter from the policy and Career
 records, and use dismissed titles only to find recurring clear mismatches
@@ -65,7 +76,7 @@ terms with no ambiguous technical use and leave borderline titles to triage.
 
 ## Report
 
-List each changed source with before/after configuration and the measurement that
-justified it. Use the shared
+List each changed source with before/after configuration and the yield that
+justified it (period, collected, shortlisted, applied, responses). Use the shared
 [run report](../openings-workspace/references/run-report.md). Re-measure after
 the next collection cycles before tuning the same source again.
