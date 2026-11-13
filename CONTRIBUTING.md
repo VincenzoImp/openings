@@ -94,8 +94,11 @@ checks:
   sheet, the theme and the density from the keyboard alone;
   `frontend/tests/today.spec.ts` answers a question on Today,
   `frontend/tests/activity.spec.ts` moves through the Activity tabs and opens a
-  run's report, and `frontend/tests/applications.spec.ts` goes from Today's
-  Review to Mark applied and records an employer response the same way.
+  run's report, `frontend/tests/applications.spec.ts` goes from Today's
+  Review to Mark applied and records an employer response the same way,
+  `frontend/tests/system.spec.ts` moves through the Collection tabs and switches
+  scheduled collection, revokes tokens, and `frontend/tests/skills.spec.ts`
+  opens a skill and saves its local notes.
 
 The browser tests run on the synthetic workspace of
 `backend/tests/dashboard_server.py` and `backend/tests/today_fixtures.py`. The

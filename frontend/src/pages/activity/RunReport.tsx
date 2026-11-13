@@ -235,9 +235,20 @@ export function RunReport({
           </ReportSection>
           <ReportSection title="Method">
             <p className="muted">
-              What the workflow lacked, for the maintainer of the skills.
+              What the workflow lacked. What applies to this workspace can
+              become a local note of the skill; the rest is for the maintainer
+              of the skills.
             </p>
             <p className="prose">{report.method || "Nothing reported."}</p>
+            {report.method.trim() && (
+              <p>
+                <a
+                  href={`#settings?section=skills&skill=${encodeURIComponent(run.workflow)}&from_run=${run.id}`}
+                >
+                  Add to the local notes of {run.workflow}
+                </a>
+              </p>
+            )}
           </ReportSection>
         </>
       )}

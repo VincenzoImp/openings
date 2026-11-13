@@ -93,7 +93,13 @@ Call `runs_finish` with the run's current `expected_version` and the report:
    and with `verified: false` what could not be verified.
 5. **limits**: no application submitted, no employer contacted, no Applied
    recorded, unless the owner explicitly did or reported that.
-6. **method**: what the workflow or the product lacked during this run.
+6. **method**: what the workflow or the product lacked during this run. The
+   owner reads it with the run and may turn it into the skill's local notes.
+   When the gap is lasting and specific to this workspace (a step this
+   workflow always needs here), you may also record it yourself with
+   `skill_notes_update` and say so in the report. Personal criteria belong to
+   the policy, never to skill notes; gaps in the shipped skill itself stay in
+   the method section for the maintainer.
 
 Use server reads at the end of the run, not the plan. Read the stored run back
 with `runs_get` and give the owner its summary and the open questions in chat as

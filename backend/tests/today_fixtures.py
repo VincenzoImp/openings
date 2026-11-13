@@ -346,6 +346,24 @@ def seed_today(app, client, before_open_run):
             },
         )
         later = requests.create_request({"text": "Check the Lumen Health posting again."})
+        # Local notes of a skill: the owner's first version, then the agent's addition.
+        notes = app.state.skill_notes
+        first = notes.update(
+            "prepare-shortlist",
+            {
+                "expected_version": 0,
+                "text": "Write the letter in English, even when the posting is in German.",
+            },
+        )
+    with acting_as(agent):
+        notes.update(
+            "prepare-shortlist",
+            {
+                "expected_version": first["version"],
+                "text": first["text"] + "\n\nWhen a posting forbids AI-written applications, "
+                "record a blocking requirement and stop.",
+            },
+        )
 
     before_open_run(agent)
     with acting_as(agent):
