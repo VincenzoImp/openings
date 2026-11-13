@@ -81,6 +81,20 @@ export async function startServer({
     /Synthetic workspace at (http:\/\/127\.0\.0\.1:\d+)/,
     timeout,
   );
+  // Ready once the application answers, not only once the port is open.
+  const ready = Date.now() + timeout;
+  while (
+    !(await fetch(url + "/health").then(
+      (r) => r.ok,
+      () => false,
+    ))
+  ) {
+    if (Date.now() > ready) {
+      stop(child);
+      throw Error(`The synthetic server at ${url} never answered /health.`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
   return {
     url,
     stop: () =>

@@ -330,6 +330,9 @@ def serve(snapshot, directory, port=0):
     app = create_app(live, start_worker=False)
     listener = socket.socket()
     listener.bind(("127.0.0.1", port))
+    # Listening before the line below: a connection made right after it waits
+    # in the backlog until uvicorn has started, instead of being refused.
+    listener.listen(128)
     # The worker that started this process reads the address from this line.
     print(f"Synthetic workspace at http://127.0.0.1:{listener.getsockname()[1]}", flush=True)
     server = uvicorn.Server(uvicorn.Config(resettable(app, snapshot), log_level="error"))
