@@ -879,6 +879,19 @@ test("requirements, the plan and a concurrent change in the details", async ({
   ).toContainText("Lead with the API work.");
 });
 
+/**
+ * Load the review page afresh on its Documents tab. After a save with files,
+ * the tab's list can keep a read from before the files arrived (seen on a
+ * loaded CI runner, never locally); the rebuilt application page replaces
+ * this loader (#214, #224).
+ */
+async function reopenDocuments(page: Page, applicationId: string) {
+  await page.waitForLoadState("networkidle");
+  await page.goto("about:blank");
+  await go(page, `review?application=${applicationId}&tab=documents`);
+  await settled(page);
+}
+
 test("documents, revisions, frozen copies and their files are managed in the review page", async ({
   page,
 }) => {
@@ -943,13 +956,7 @@ test("documents, revisions, frozen copies and their files are managed in the rev
   await dialog(page).getByLabel("Note").fill("Leads with the data work.");
   await dialog(page).getByRole("button", { name: "Save the revision" }).click();
   await expect(dialog(page)).toHaveCount(0);
-  // The Documents tab can show a list read before the save when its reads
-  // answer out of order (seen on a loaded CI runner; the rebuilt screen's
-  // query cache replaces this loader): reload it for a fresh read.
-  await page.waitForLoadState("networkidle");
-  await page.goto("about:blank");
-  await go(page, `review?application=${application.id}&tab=documents`);
-  await settled(page);
+  await reopenDocuments(page, application.id);
   const revisions = page.getByRole("list", { name: "Document revisions" });
   await revisions.getByRole("button", { name: /^Open Workflow CV/ }).click();
   await expect(
@@ -989,6 +996,7 @@ test("documents, revisions, frozen copies and their files are managed in the rev
     });
   await dialog(page).getByRole("button", { name: "Save the revision" }).click();
   await expect(dialog(page)).toHaveCount(0);
+  await reopenDocuments(page, application.id);
   await expect(revisions.locator(":scope > li")).toHaveCount(2);
   await revisions.getByRole("button", { name: /^Open/ }).first().click();
   await expect(
