@@ -19,9 +19,8 @@ def case(tmp_path, monkeypatch):
     workspace.set_settings(
         "profile",
         {
+            "headline": "Backend engineer",
             "summary": "Python backend engineer, five years building APIs.",
-            "roles": "Backend engineer",
-            "preferences": "Remote roles",
         },
     )
     return workspace, service

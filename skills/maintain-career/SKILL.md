@@ -51,13 +51,16 @@ version; every write sends the current version of the section it changes.
   dashboard under **Policy**; an agent token cannot call `policy_confirm`. Say
   in the report which items wait, and ask with `questions_ask` when a decision
   depends on one.
-- After the upgrade to 0.19 the `facts` section holds the old Profile metadata,
-  one unconfirmed item per key (`origin.source: "profile_metadata"`), and
-  `decision` holds the old `preferences` and `roles` text. Sort them with the
-  owner: split a block into single statements (`policy_add`), move an item to
-  its section (`policy_move`), give it a label and a typed value
-  (`policy_update`), and remove what is obsolete (`policy_remove`). The Profile
-  keeps its copy until the owner removes it; do not delete it for them.
+- After the upgrades to 0.19 and 0.23 the `facts` section holds the old
+  Profile metadata, one unconfirmed item per key (`origin.source:
+  "profile_metadata"`), and `decision` holds the old Profile preferences and
+  target roles text (`origin.source` `profile_preferences` or `profile_roles`,
+  or `profile_preferences_removed` or `profile_roles_removed` for a text 0.23
+  copied when it removed the fields). Sort them with the owner: split a block
+  into single statements (`policy_add`), move an item to its section
+  (`policy_move`), give it a label and a typed value (`policy_update`), and
+  remove what is obsolete (`policy_remove`). The Profile metadata keeps its
+  copy until the owner removes it; do not delete it for them.
 - Changing the content of a confirmed item makes it a proposal again. Change
   wording only when the owner asked for it or the fact changed.
 - A decision item may carry a `rule` on a collection signal. Propose it with
@@ -92,7 +95,7 @@ Existing Drafts keep their frozen contexts. After the change, list stale Drafts
 with `staleness_list` (REST `GET /staleness`); each report names the
 changed Profile part, policy item, guidance, template, entry or claim and the
 affected revisions. Only what documents use counts: Profile metadata,
-preferences and roles, decision items, unconfirmed proposals, template names,
+decision items, unconfirmed proposals, template names,
 entry and claim order, claim selection fields, free-form metadata and spacing
 never make a Draft stale, and a writing item scoped to the CV or the letter concerns that
 document only. Contexts prepared before 0.19 froze no policy, so policy changes

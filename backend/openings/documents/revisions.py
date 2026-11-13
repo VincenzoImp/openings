@@ -477,8 +477,8 @@ class RevisionOperations:
                 )
         return self.get_document(document_id)
 
-    def delete_document(self, document_id: str, expected_version: int | None = None) -> dict:
-        """Permanently remove one document revision and its attached files, with its current expected_version (required from 0.23); other revisions remain."""
+    def delete_document(self, document_id: str, expected_version: int) -> dict:
+        """Permanently remove one document revision and its attached files, with its current expected_version; other revisions remain."""
         with self.db.transaction() as conn:
             document = _get(conn, "documents", document_id, "Document revision")
             check_version(document, expected_version)

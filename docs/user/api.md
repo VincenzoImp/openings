@@ -77,9 +77,8 @@ include frozen job/template labels, evidence/claim counts, a bounded
 application, signature and time. Files contain metadata only.
 Versioned changes include the last read `expected_version`, and every delete
 names it as a query parameter, for example
-`DELETE /notes/{id}?expected_version=3`. A delete of a note, document revision or
-file without it is still accepted in 0.22 (deprecated) and refused from 0.23. A
-file never changes: its `version` is always 1. Every create accepts an
+`DELETE /notes/{id}?expected_version=3`; a delete without it is refused with
+`422 validation`. A file never changes: its `version` is always 1. Every create accepts an
 `idempotency_key`: a retry with the same key and request returns the record the
 first request created; the same key with another request returns
 `409 conflict`.
@@ -148,9 +147,9 @@ such as `German`), `dismissed_by=rule|agent|owner|other`, `rule_id=ITEM_ID` and
 `counts`: jobs in each queue (`inbox`, `shortlist`, `applications`,
 `dismissed`, `all`) and `dismissed_by`, for the same filters.
 
-The job field `availability` (`open`, `closed` or `unknown`, set by hand) is
-deprecated: it stays readable and writable through `PATCH /jobs/{id}`, nothing
-reads it and the dashboard no longer shows it. Use `signals.no_longer_listed` instead.
+Whether a company board still lists a posting is `signals.no_longer_listed`.
+(The manual `availability` field was removed in 0.23; a value set by hand is
+kept as a note on its job.)
 
 A Policy rule acts on these signals: see [Policy](policy.md#rules-on-a-signal).
 `POST /policy/rules/preview` with `{"rule": {"signal": "language_required",
@@ -281,8 +280,8 @@ are nullable; `dates: null` clears them. See [Career](career.md) for structured
 headers, partial dates, skills, ordering and the typed selection fields of a
 claim (`default_in_cv`, `role`, `group`), and [Policy](policy.md) for the
 owner's rules and facts, their section versions and who may confirm an item.
-Profile `preferences` and `roles` are deprecated in favour of Decision items;
-they are still stored and returned. Template `rules` hold the typed limits,
+Target roles and preferences are Decision items of the policy; the Profile has
+no `preferences` or `roles` since 0.23. Template `rules` hold the typed limits,
 `statements` (a list of `{id, label, statement, scope, position}`; `id` and
 `position` are filled in) and any other free-form key.
 
@@ -320,13 +319,12 @@ for the dashboard or an owner token, `agent`, `system`, `unknown`), `scope`
 each kind for the other filters; `limit` (at most 200) and `offset` page.
 `timeline_get` returns the same entries over MCP.
 
-The application `note` field is deprecated since 0.22 and is removed in 0.23.
-`GET /applications/{id}` returns `pinned_note` (the note record, or null) and
-`note`, its text. On create and `PATCH`, `note` still works: it edits the pinned
-note, adds one pinned when there is none, or unpins it when empty, without
-changing the application's version. `q` on the application list searches the
-pinned notes. A frozen context carries the pinned note as `application.note`
-and `instructions.application_note`, as before.
+An application's standing guidance is its pinned note. `GET
+/applications/{id}` returns `pinned_note` (the note record, or null); write it
+with the notes routes above. `q` on the application list searches the pinned
+notes. A frozen context carries the pinned note as `application.note` and
+`instructions.application_note`. An application has no `note` field since 0.23:
+sending one is refused with `422 validation`.
 
 ## Runs, questions and the change log
 
@@ -339,7 +337,7 @@ title, company, location or posting text (`job_refreshed`, with the field names)
 the `posting_updated` kind of earlier releases no longer exists.
 
 `GET /workspace` and `workspace_info` return `schema_version` (the database
-schema of this release, 13 in 0.22) and `storage`: `database_bytes`,
+schema of this release, 14 in 0.23) and `storage`: `database_bytes`,
 `free_bytes` on the data volume, `restore_limit_bytes` (the largest backup a
 restore accepts now), `restore_limit_configured_bytes` (the optional
 `OPENINGS_MAX_RESTORE_MB` bound, or null), `retention_days` and
@@ -636,8 +634,9 @@ per-document status (`current`, `stale` or `no_context`) with that document's
 Only what documents use is compared:
 
 - **Profile:** the parts `name`, `headline`, `contact` (email, phone, location),
-  `links` and `summary`. `metadata`, `preferences` and `roles` are frozen too but
-  never make a document stale: rules and facts belong in the policy.
+  `links` and `summary`. `metadata` is frozen too but never makes a document
+  stale: rules and facts belong in the policy. (Contexts frozen before 0.23 also
+  hold the Profile's `preferences` and `roles`; they are not compared.)
 - **Policy:** the confirmed items of `eligibility`, `writing` and `facts`, by
   content (label, statement, value, scope, rule). Decision items, unconfirmed
   proposals and the order of items are not compared. A writing item scoped to

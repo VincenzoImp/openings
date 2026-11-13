@@ -258,8 +258,6 @@ def seed(s: Seeder):
             "headline": "Backend and data engineer",
             "location": "Zurich, Switzerland",
             "email": "alex.morgan@example.test",
-            "roles": "Backend engineer, data platform engineer, research software engineer",
-            "preferences": "Zurich, Basel or remote within Europe. Product teams; no on-call-only roles.",
             "summary": "Backend engineer who builds reliable Python services and data pipelines.",
         },
     )

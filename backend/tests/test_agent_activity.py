@@ -239,8 +239,8 @@ def test_every_kind_of_write_leaves_an_attributed_record_without_content(tmp_pat
         discovery.update_collection(
             CollectionWrite(expected_version=discovery.get_collection()["version"], enabled=False)
         )
-        workspace.delete_note(note["id"])
-        documents.delete_document(document["id"])
+        workspace.delete_note(note["id"], note["version"])
+        documents.delete_document(document["id"], document["version"])
         career.delete_claim(claim["id"], claim["version"])
         career.delete_template(template["id"], template["version"])
         discovery.delete_source(source["id"], source["version"])
@@ -662,7 +662,11 @@ def test_questions_outlive_their_subject_with_a_label(tmp_path):
 def schema_seven_workspace(path):
     workspace = Workspace(path)
     job = add_job(workspace)
-    application = workspace.create_application({"job_id": job["id"], "note": "Synthetic guidance"})
+    application = workspace.create_application({"job_id": job["id"]})
+    workspace.add_note(
+        job["id"],
+        {"body": "Synthetic guidance", "application_id": application["id"], "pinned": True},
+    )
     workspace.update_application(
         application["id"], {"expected_version": application["version"], "status": "applied"}
     )
@@ -766,7 +770,9 @@ def test_restore_upgrades_a_schema_seven_backup_without_changing_it(tmp_path):
     target = app.state.workspace
     with target.db.connect() as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
-    assert target.get_application(application["id"])["note"] == "Synthetic guidance"
+    assert target.get_application(application["id"])["pinned_note"]["body"] == (
+        "Synthetic guidance"
+    )
     assert target.get_note(note["id"])["body"] == "Synthetic note"
     # The backup's own history is intact and unattributed; the restore itself is recorded.
     assert history["total"] == count + 1

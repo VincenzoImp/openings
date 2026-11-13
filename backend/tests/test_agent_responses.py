@@ -180,9 +180,9 @@ def test_job_and_application_mutations_return_compact_jobs(tmp_path):
         changed = client.patch(
             f"/api/v1/applications/{application['id']}",
             headers=headers,
-            json={"note": "Follow up", "expected_version": application["version"]},
+            json={"priority": 3, "expected_version": application["version"]},
         ).json()
-        assert changed["note"] == "Follow up" and changed["job"]["id"] == jobs[0]["id"]
+        assert changed["priority"] == 3 and changed["job"]["id"] == jobs[0]["id"]
         assert "posting" not in changed["job"] and changed["job"]["posting_preview"]
         assert changed["preparation"] is not None
         read = client.get(f"/api/v1/applications/{application['id']}", headers=headers).json()

@@ -54,9 +54,13 @@ changes nothing in the Profile:
 The copied items are not confirmed. Sort them with **Confirm as a fact**,
 **Move to…** and **Edit**: give each a label, write the statement, and choose a
 kind of value to replace a copied structure. Your agent can do the sorting and
-ask you to confirm (the `maintain-career` skill describes it). The Profile keeps
-its copy; both fields stay readable and writable until a later release removes
-them.
+ask you to confirm (the `maintain-career` skill describes it).
+
+0.23 removed the Profile's **Target roles** and **Preferences** fields. Before
+removing them, the upgrade checks that an item of the policy holds each text
+(in any section, ignoring differences of spacing); a text that none holds, for
+example one edited after 0.19, becomes one more unconfirmed **Decision** item,
+marked as copied when 0.23 removed the field.
 
 ## Rules on a signal
 

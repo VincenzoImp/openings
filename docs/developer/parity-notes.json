@@ -36,7 +36,7 @@
       "note": "Add a document and New revision send the title, frozen copy, note, the CV or letter's source and PDF, or form content; the agent cites `claim_ids` and `knowledge_ids`, which an open revision shows as counts."
     },
     "profile.update": {
-      "note": "`metadata` is edited as rows under Other details; the owner's rules and facts are items of the Policy. The deprecated `preferences` and `roles` stay editable under a collapsed heading."
+      "note": "`metadata` is edited as rows under Other details; the owner's rules and facts are items of the Policy. Target roles and preferences are decision items of the Policy."
     },
     "templates.update": {
       "note": "The Rules tab edits the typed limits, the rule statements and the free-form rest of `rules` as rows."
@@ -132,7 +132,7 @@
       "note": "Jobs filters by tab (queue), search, signal, text completeness, who dismissed and rule, and the All tab by company, place, source, work style and added from; `posting_language`, `posting_language_not`, `requires`, `job_type`, `remote` and `created_until` also serve agents and scripts."
     },
     "jobs.update": {
-      "note": "Correct the job edits role, company, place, address, text and the other details as keys and values. `availability` is deprecated since 0.21: whether the source still lists the posting is the no_longer_listed signal."
+      "note": "Correct the job edits role, company, place, address, text and the other details as keys and values. Whether the source still lists the posting is the no_longer_listed signal."
     },
     "jobs.duplicates": {
       "note": "A job's Possible copies lists its group at the default confidence; `queue`, `match_location` and `offset` page the workspace-wide list for agents and scripts."
