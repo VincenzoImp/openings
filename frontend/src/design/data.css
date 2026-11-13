@@ -11,6 +11,7 @@
 }
 .review-more {
   margin-top: var(--s5);
+  scroll-margin-top: calc(var(--topbar) + var(--s4));
 }
 .pane footer {
   min-height: 49px;
@@ -58,6 +59,11 @@
 .grid-row > [role="cell"] {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+/* A tag in a narrow cell wraps instead of running into the next column. */
+.grid-row .tag {
+  max-width: 100%;
+  white-space: normal;
 }
 .grid-row .full {
   grid-column: 1 / -1;
