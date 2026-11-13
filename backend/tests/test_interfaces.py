@@ -84,7 +84,12 @@ async def test_every_declared_route_tool_and_surface_is_registered(tmp_path):
             if not route.absolute:
                 assert route.method.lower() in paths["/api/v1" + route.path], exemption.id
     tools = {tool.name for tool in await app.state.mcp.list_tools()}
-    declared = {operation.tool.name for operation in operations if operation.tool}
+    declared = {
+        name
+        for operation in operations
+        if operation.tool
+        for name in (operation.canonical_name, *(alias.name for alias in operation.alias_entries))
+    }
     assert tools == declared
     templates = {item.uri_template for item in await app.state.mcp.list_resource_templates()}
     prompts = await app.state.mcp.list_prompts()
@@ -215,7 +220,7 @@ async def test_one_declaration_gives_a_route_a_tool_its_aliases_and_an_inventory
         params=(Param("name", str), Param("loud", bool, False)),
         call=lambda s, name, loud: s.greet(name, loud),
         rest=(Route("GET", "/greetings/{name}", "greeting_get"),),
-        tool=Tool("greetings_get", ToolAnnotations(readOnlyHint=True), "Greet someone."),
+        tool=Tool(ToolAnnotations(readOnlyHint=True), "Greet someone."),
         aliases=("greeting_get",),
     )
     assert operation.canonical_name == "greetings_get"
@@ -230,7 +235,7 @@ async def test_one_declaration_gives_a_route_a_tool_its_aliases_and_an_inventory
     tools = {tool.name: tool for tool in await mcp.list_tools()}
     assert set(tools) == {"greetings_get", "greeting_get"}
     alias, tool = tools["greeting_get"], tools["greetings_get"]
-    assert alias.description == "Deprecated alias of greetings_get. Greet someone."
+    assert alias.description == "Deprecated alias of greetings_get; removed in 0.23. Greet someone."
     assert alias.input_schema["properties"] == tool.input_schema["properties"]
     result = await mcp.call_tool("greeting_get", {"name": "Ada"})
     assert "Hello Ada" in result.content[0].text

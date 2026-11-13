@@ -397,4 +397,12 @@ CREATE INDEX IF NOT EXISTS jobs_dismissed_rule ON jobs(dismissed_rule_id) WHERE 
 CREATE UNIQUE INDEX IF NOT EXISTS notes_pinned_application ON notes(application_id) WHERE pinned_at IS NOT NULL AND application_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS notes_pinned_job ON notes(job_id) WHERE pinned_at IS NOT NULL AND application_id IS NULL;
 CREATE INDEX IF NOT EXISTS notes_run ON notes(run_id);
+-- Idempotency keys of creates whose records have no key column (idempotency.py, 0.22):
+-- the record's table, the key, the SHA-256 of the request and the record it gave.
+-- Created whenever a workspace opens, so no upgrade step is needed.
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+ scope TEXT NOT NULL, key TEXT NOT NULL, fingerprint TEXT NOT NULL,
+ record_id TEXT NOT NULL, created_at TEXT NOT NULL,
+ PRIMARY KEY(scope,key)
+);
 PRAGMA user_version=13;

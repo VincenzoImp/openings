@@ -445,7 +445,7 @@ def test_rest_and_mcp_expose_signals_rules_and_the_preview_alike(tmp_path):
         ).json()
         assert listed == tool(
             client,
-            "jobs_search",
+            "jobs_list",
             {"value": {"signal": "likely_duplicate", "include_counts": True}},
         )
         assert [item["id"] for item in listed["items"]] == [copy["id"]]
@@ -459,7 +459,7 @@ def test_rest_and_mcp_expose_signals_rules_and_the_preview_alike(tmp_path):
             and dismissed["dismissal"]["category"] == "agent"
         )
         distinct = tool(
-            client, "job_distinct", {"job_id": copy["id"], "value": {"other_id": first["id"]}}
+            client, "jobs_distinct", {"job_id": copy["id"], "value": {"other_id": first["id"]}}
         )
         assert distinct["signals"]["duplicate"] is None
         over_rest = client.post(

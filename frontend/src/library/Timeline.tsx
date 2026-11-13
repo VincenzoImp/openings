@@ -390,7 +390,11 @@ export function RecordTimeline({
           onConfirm={async () => {
             if (
               await mutate(
-                () => api(`/notes/${removing.id}`, "DELETE"),
+                () =>
+                  api(
+                    `/notes/${removing.id}?expected_version=${removing.note?.version}`,
+                    "DELETE",
+                  ),
                 "Note deleted.",
               )
             )

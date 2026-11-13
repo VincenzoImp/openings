@@ -26,7 +26,6 @@ OPERATIONS = (
         call=lambda s, value: s.list_requests(value),
         rest=(Route("GET", "/requests", "requests_list"),),
         tool=Tool(
-            "requests_list",
             READ,
             "List the owner's requests for the agent by state (open, taken, done, declined, withdrawn), subject or run. Read state=open at the start of every run. updated_since returns the requests written or changed at or after a time, oldest first.",
         ),
@@ -42,7 +41,6 @@ OPERATIONS = (
         call=lambda s, value: s.create_request(value),
         rest=(Route("POST", "/requests", "requests_create", status_code=201),),
         tool=Tool(
-            "requests_create",
             WRITE,
             "Write a request for the agent, tied to a job, an application, a Career entry (knowledge) or nothing. Owner only: an agent token is refused with forbidden and never writes requests for itself. Use an idempotency key for retries.",
         ),
@@ -57,7 +55,6 @@ OPERATIONS = (
         call=lambda s, request_id: s.get_request(request_id),
         rest=(Route("GET", "/requests/{request_id}", "requests_get"),),
         tool=Tool(
-            "requests_get",
             READ,
             "Read one request for the agent with its state, who wrote it, the run that handled it and the result or reason.",
         ),
@@ -72,7 +69,6 @@ OPERATIONS = (
         call=lambda s, request_id, value: s.take_request(request_id, value),
         rest=(Route("POST", "/requests/{request_id}/take", "requests_take"),),
         tool=Tool(
-            "requests_take",
             WRITE,
             "Take an open request in this workflow's scope, using its current version; this token's open run is recorded as the run that handles it. A request never authorises submitting an application, contacting an employer or recording Applied.",
         ),
@@ -87,7 +83,6 @@ OPERATIONS = (
         call=lambda s, request_id, value: s.complete_request(request_id, value),
         rest=(Route("POST", "/requests/{request_id}/complete", "requests_complete"),),
         tool=Tool(
-            "requests_complete",
             WRITE,
             "Complete an open or taken request with a short result the owner will read, using its current version.",
         ),
@@ -102,7 +97,6 @@ OPERATIONS = (
         call=lambda s, request_id, value: s.decline_request(request_id, value),
         rest=(Route("POST", "/requests/{request_id}/decline", "requests_decline"),),
         tool=Tool(
-            "requests_decline",
             WRITE,
             "Decline an open or taken request with the reason, for example that it asks for something the operating mandate forbids, using its current version.",
         ),
@@ -118,7 +112,6 @@ OPERATIONS = (
         call=lambda s, request_id, value: s.withdraw_request(request_id, value),
         rest=(Route("POST", "/requests/{request_id}/withdraw", "requests_withdraw"),),
         tool=Tool(
-            "requests_withdraw",
             WRITE,
             "Withdraw an open or taken request, using its current version. Owner only: an agent token is refused with forbidden. The record stays readable.",
         ),

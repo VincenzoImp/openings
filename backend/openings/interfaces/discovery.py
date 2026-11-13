@@ -13,7 +13,8 @@ from ..discovery import (
     SourcePreview,
     SourceRun,
 )
-from .registry import Operation, Param, Route, Tool, bind_mcp, bind_rest
+from ..discovery.models import CollectionRunQuery, SourceQuery, TaskQuery
+from .registry import Operation, Param, Route, Tool, bind_mcp, bind_rest, query_model
 
 READ = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
 CHANGE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)
@@ -29,7 +30,6 @@ OPERATIONS = (
         call=lambda s: s.get_collection(),
         rest=(Route("GET", "/collection", "collection_get"),),
         tool=Tool(
-            "collection_get",
             READ,
             "Read the global automatic collection switch, counts and next queued run.",
         ),
@@ -44,7 +44,6 @@ OPERATIONS = (
         call=lambda s, value: s.update_collection(value),
         rest=(Route("PATCH", "/collection", "collection_update"),),
         tool=Tool(
-            "collection_update",
             CHANGE,
             "Pause/resume automatic collection with version protection; manual run remains available.",
         ),
@@ -59,7 +58,6 @@ OPERATIONS = (
         call=lambda s: s.list_providers(),
         rest=(Route("GET", "/providers", "providers_list"),),
         tool=Tool(
-            "providers_list",
             READ,
             "Read supported providers, editable HTTP safeguards and persisted window/cooldown diagnostics.",
         ),
@@ -74,7 +72,6 @@ OPERATIONS = (
         call=lambda s, provider_id, value: s.update_provider(provider_id, value),
         rest=(Route("PATCH", "/providers/{provider_id}", "providers_update"),),
         tool=Tool(
-            "providers_update",
             CHANGE,
             "Edit a provider policy using its version. Runtime/cooldown are read-only and shared by all runs.",
         ),
@@ -85,21 +82,13 @@ OPERATIONS = (
         "list",
         "Collection",
         "List logical collection invocations",
-        params=(
-            Param("limit", int, 50),
-            Param("offset", int, 0),
-            Param("source_id", str | None, None),
-            Param("state", str | None, None),
-            Param("summary", bool, True),
-        ),
-        call=lambda s, limit, offset, source_id, state, summary: s.list_runs(
-            limit, offset, source_id, state, summary
-        ),
+        params=(query_model(CollectionRunQuery),),
+        call=lambda s, value: s.list_runs(**(value or CollectionRunQuery()).model_dump()),
         rest=(Route("GET", "/collection/runs", "collection_runs_list"),),
         tool=Tool(
-            "collection_runs_list",
             READ,
-            "List logical collections with cumulative provider counts, waiting and processing time. summary=false adds frozen source snapshots and full task payloads/results.",
+            "List logical collections with cumulative provider counts, waiting and processing time, by source_id or state. summary=false adds frozen source snapshots and full task payloads/results.",
+            legacy=tuple(CollectionRunQuery.model_fields),
         ),
     ),
     Operation(
@@ -112,7 +101,6 @@ OPERATIONS = (
         call=lambda s, run_id: s.get_run(run_id),
         rest=(Route("GET", "/collection/runs/{run_id}", "collection_runs_get"),),
         tool=Tool(
-            "collection_runs_get",
             READ,
             "Read frozen acquisition settings and provider tasks for one collection invocation.",
         ),
@@ -127,7 +115,6 @@ OPERATIONS = (
         call=lambda s, run_id: s.cancel_run(run_id),
         rest=(Route("POST", "/collection/runs/{run_id}/cancel", "collection_runs_cancel"),),
         tool=Tool(
-            "collection_runs_cancel",
             CHANGE,
             "Stop current collection work while retaining jobs already archived.",
         ),
@@ -142,7 +129,6 @@ OPERATIONS = (
         call=lambda s: s.source_schemas(),
         rest=(Route("GET", "/sources/schemas", "sources_schemas"),),
         tool=Tool(
-            "sources_schemas",
             READ,
             "Discover supported source fields/defaults, schedule variants and temporary run options.",
         ),
@@ -153,13 +139,13 @@ OPERATIONS = (
         "list",
         "Collection",
         "List saved searches/company feeds and health",
-        params=(Param("limit", int, 100), Param("offset", int, 0), Param("summary", bool, True)),
-        call=lambda s, limit, offset, summary: s.list_sources(limit, offset, summary),
+        params=(query_model(SourceQuery),),
+        call=lambda s, value: s.list_sources(**(value or SourceQuery()).model_dump()),
         rest=(Route("GET", "/sources", "sources_list"),),
         tool=Tool(
-            "sources_list",
             READ,
             "List saved portal searches and selected company/feed sources, schedules and outcomes. summary=false adds last-run diagnostics and full task records.",
+            legacy=tuple(SourceQuery.model_fields),
         ),
     ),
     Operation(
@@ -172,7 +158,6 @@ OPERATIONS = (
         call=lambda s, value: s.preview_source(value),
         rest=(Route("POST", "/sources/preview", "sources_preview"),),
         tool=Tool(
-            "sources_preview",
             ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=True),
             "Preview a saved-search/company/feed configuration without saving jobs; shared request spacing and cooldowns apply.",
             offload=True,
@@ -188,7 +173,6 @@ OPERATIONS = (
         call=lambda s, value: s.create_source(value),
         rest=(Route("POST", "/sources", "sources_create", status_code=201),),
         tool=Tool(
-            "sources_create",
             ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True),
             "Create one explicit saved query/location or company/feed source; individually paused by default.",
             offload=True,
@@ -204,7 +188,6 @@ OPERATIONS = (
         call=lambda s, value: s.bulk_sources(value),
         rest=(Route("POST", "/sources/bulk", "sources_bulk"),),
         tool=Tool(
-            "sources_bulk",
             ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=True),
             "Enable, pause, run, configure or delete selected versioned sources; inspect each result/error.",
         ),
@@ -218,9 +201,7 @@ OPERATIONS = (
         params=(Param("source_id", str),),
         call=lambda s, source_id: s.get_source(source_id),
         rest=(Route("GET", "/sources/{source_id}", "sources_get"),),
-        tool=Tool(
-            "sources_get", READ, "Read a source's complete editable configuration and version."
-        ),
+        tool=Tool(READ, "Read a source's complete editable configuration and version."),
     ),
     Operation(
         "sources.update",
@@ -232,7 +213,6 @@ OPERATIONS = (
         call=lambda s, source_id, value: s.update_source(source_id, value),
         rest=(Route("PATCH", "/sources/{source_id}", "sources_update"),),
         tool=Tool(
-            "sources_update",
             ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True),
             "Update or pause a source with optimistic version protection.",
             offload=True,
@@ -248,7 +228,6 @@ OPERATIONS = (
         call=lambda s, source_id, expected_version: s.delete_source(source_id, expected_version),
         rest=(Route("DELETE", "/sources/{source_id}", "sources_delete"),),
         tool=Tool(
-            "sources_delete",
             ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=False),
             "Remove a versioned source while retaining archived jobs and collection history.",
         ),
@@ -265,7 +244,6 @@ OPERATIONS = (
         ),
         rest=(Route("POST", "/sources/{source_id}/run", "sources_run"),),
         tool=Tool(
-            "sources_run",
             ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True),
             "Run a versioned source with frozen optional overrides; shared request spacing and cooldowns apply.",
         ),
@@ -276,22 +254,13 @@ OPERATIONS = (
         "list",
         "Collection",
         "List/filter paginated collection tasks",
-        params=(
-            Param("limit", int, 50),
-            Param("offset", int, 0),
-            Param("state", str | None, None),
-            Param("kind", str | None, None),
-            Param("source_id", str | None, None),
-            Param("job_id", str | None, None),
-        ),
-        call=lambda s, limit, offset, state, kind, source_id, job_id: s.list_tasks(
-            limit, offset, state, kind, source_id, job_id
-        ),
+        params=(query_model(TaskQuery),),
+        call=lambda s, value: s.list_tasks(**(value or TaskQuery()).model_dump()),
         rest=(Route("GET", "/tasks", "tasks_list"),),
         tool=Tool(
-            "tasks_list",
             READ,
             "Filter collection work by state/kind/source/job, with readable labels and diagnostics.",
+            legacy=tuple(TaskQuery.model_fields),
         ),
     ),
     Operation(
@@ -304,7 +273,6 @@ OPERATIONS = (
         call=lambda s, task_id: s.get_task(task_id),
         rest=(Route("GET", "/tasks/{task_id}", "tasks_get"),),
         tool=Tool(
-            "tasks_get",
             READ,
             "Read one task's inputs, result, HTTP diagnostics, lease and next run time.",
         ),
@@ -319,7 +287,6 @@ OPERATIONS = (
         call=lambda s, task_id: s.cancel_task(task_id),
         rest=(Route("POST", "/tasks/{task_id}/cancel", "tasks_cancel"),),
         tool=Tool(
-            "tasks_cancel",
             CHANGE,
             "Cancel queued/running work; already stored jobs and documents are kept.",
         ),
@@ -334,7 +301,6 @@ OPERATIONS = (
         call=lambda s, task_id: s.retry_task(task_id),
         rest=(Route("POST", "/tasks/{task_id}/retry", "tasks_retry"),),
         tool=Tool(
-            "tasks_retry",
             ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True),
             "Retry failed/cancelled work; collection keeps its frozen inputs and saved progress.",
         ),

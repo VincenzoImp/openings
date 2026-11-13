@@ -428,7 +428,10 @@ test("a career entry with claims, typed selection, files and import is managed e
   await expect(item).toContainText("No claims yet");
   await show(page, "Selected entry");
   const entry = (
-    await call(page, `/career/knowledge?q=${encodeURIComponent(title)}`)
+    await call(
+      page,
+      `/career/knowledge?summary=false&q=${encodeURIComponent(title)}`,
+    )
   ).items[0];
   expect([entry.skills, entry.metadata, entry.dates.start]).toEqual([
     ["Rust", "Go", "SQL"],
@@ -454,7 +457,8 @@ test("a career entry with claims, typed selection, files and import is managed e
   await page.keyboard.press("Enter");
   await saved(page, "Group saved.");
   const read = async () =>
-    (await call(page, `/career/claims?knowledge_id=${entry.id}`)).items[0];
+    (await call(page, `/career/claims?summary=false&knowledge_id=${entry.id}`))
+      .items[0];
   let stored = await read();
   expect([
     stored.approved,
@@ -581,7 +585,8 @@ test("a template's source, typed rules, assets and sample are managed end to end
     detail.getByRole("heading", { name, exact: true }),
   ).toBeVisible();
   const read = async () =>
-    (await call(page, `/templates?q=${encodeURIComponent(name)}`)).items[0];
+    (await call(page, `/templates?summary=false&q=${encodeURIComponent(name)}`))
+      .items[0];
 
   // Source: the text is edited in place and saved with the version.
   await detail.getByLabel("LaTeX source").fill("\\documentclass{letter}\n% v2");

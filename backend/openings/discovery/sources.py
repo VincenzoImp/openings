@@ -7,6 +7,7 @@ from ..collectors.catalog import COMPANY_ADAPTERS
 from ..collectors.policy import ProviderDeferred
 from ..common import check_version, decode_record, encode, missing, new_id, now
 from ..errors import DomainError
+from ..idempotency import fingerprint, remember, replay
 from ..scheduling import next_due, schedule_adapter
 from .feeds import fetch_postings
 from .models import (
@@ -217,13 +218,15 @@ class SourceOperations:
 
     def list_sources(self, limit=100, offset=0, summary=True):
         """List sources; summary=true returns a compact last run and a diagnostic count instead of diagnostics."""
+        limit, offset = min(max(limit, 1), 500), max(offset, 0)
         rows = self.db.all(
-            "SELECT * FROM sources ORDER BY name,id LIMIT ? OFFSET ?",
-            (min(max(limit, 1), 500), max(offset, 0)),
+            "SELECT * FROM sources ORDER BY name,id LIMIT ? OFFSET ?", (limit, offset)
         )
         return {
             "items": self._source_records(rows, summary=summary),
             "total": self.db.one("SELECT COUNT(*) AS n FROM sources")["n"],
+            "limit": limit,
+            "offset": offset,
         }
 
     def get_source(self, source_id):
@@ -285,26 +288,39 @@ class SourceOperations:
     def create_source(self, value: SourceCreate):
         if not value.name.strip():
             raise DomainError(422, "source_name", "Give the company or feed a name.")
-        resolved = self._resolve_source(value.model_dump())
+        # A retry with the key returns the source before resolving its board again.
+        digest = fingerprint(value)
+        if value.idempotency_key:
+            with self.db.transaction() as connection:
+                replayed = replay(connection, "sources", value.idempotency_key, digest)
+            if replayed:
+                return self._source(replayed)
+        resolved = self._resolve_source(value.model_dump(exclude={"idempotency_key"}))
         require_automatic_collection(resolved["kind"])
         record_id, stamp = new_id(), now()
         with self.db.transaction() as connection:
-            connection.execute(
-                "INSERT INTO sources(id,name,kind,config,enabled,schedule,last_scheduled_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
-                (
-                    record_id,
-                    value.name.strip(),
-                    resolved["kind"],
-                    encode(resolved["config"]),
-                    int(value.enabled),
-                    encode(value.schedule.model_dump()),
-                    stamp,
-                    stamp,
-                    stamp,
-                ),
-            )
-            self._record(connection, "source_created", "source", record_id, kind=resolved["kind"])
-        return self._source(record_id)
+            # Another request with the key may have created it in the meantime.
+            replayed = replay(connection, "sources", value.idempotency_key, digest)
+            if replayed is None:
+                connection.execute(
+                    "INSERT INTO sources(id,name,kind,config,enabled,schedule,last_scheduled_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (
+                        record_id,
+                        value.name.strip(),
+                        resolved["kind"],
+                        encode(resolved["config"]),
+                        int(value.enabled),
+                        encode(value.schedule.model_dump()),
+                        stamp,
+                        stamp,
+                        stamp,
+                    ),
+                )
+                self._record(
+                    connection, "source_created", "source", record_id, kind=resolved["kind"]
+                )
+                remember(connection, "sources", value.idempotency_key, digest, record_id)
+        return self._source(replayed or record_id)
 
     def update_source(self, source_id, value: SourcePatch):
         old = self._source(source_id)

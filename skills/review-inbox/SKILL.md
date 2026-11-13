@@ -59,14 +59,14 @@ evidence quickly, not as verdicts:
   unusual wording. A posting written in another language without a stated
   requirement is not a requirement.
 - A likely duplicate is a candidate, never a fact: compare with the earlier job
-  (`job_get` on `signals.duplicate.job_id`) as the
+  (`jobs_get` on `signals.duplicate.job_id`) as the
   [vacancy identity check](../openings-workspace/references/job-deduplication.md)
-  says. Merge only a verified duplicate (`job_merge`); mark a different vacancy
-  with `job_distinct` so the flag does not return.
+  says. Merge only a verified duplicate (`jobs_merge`); mark a different vacancy
+  with `jobs_distinct` so the flag does not return.
 - A posting no longer listed by its board has probably closed: dismiss it with
   that reason unless the owner is already pursuing it.
 
-Filter the cohort with `jobs_search` (`signal`, `requires`, `posting_language`,
+Filter the cohort with `jobs_list` (`signal`, `requires`, `posting_language`,
 `posting_language_not`) to handle a whole kind of mismatch together.
 
 ## Decide from the current policy
@@ -95,7 +95,7 @@ on that job (`questions_ask`) and continue the other jobs. Do not manufacture ce
 ## Write and resume safely
 
 Use the current triage operation and expected version. Give every dismissal a
-short `reason` (`job_triage` or `jobs_bulk`) in the owner's terms, such as
+short `reason` (`jobs_triage` or `jobs_bulk`) in the owner's terms, such as
 "Requires German (C1); your policy lists English and Italian": the owner reads
 it beside the dismissal and can restore the job. Inspect each bulk item;
 partial success is not a completed batch. On conflict, read the job again and

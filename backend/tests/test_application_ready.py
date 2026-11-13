@@ -378,7 +378,7 @@ def test_rest_and_mcp_mark_ready_with_the_same_inputs_and_errors(app):
         _, error = tool(
             client,
             headers,
-            "application_ready",
+            "applications_ready",
             {"application_id": application["id"], "value": body},
         )
         assert refused.status_code == 409
@@ -390,7 +390,7 @@ def test_rest_and_mcp_mark_ready_with_the_same_inputs_and_errors(app):
         marked, error = tool(
             client,
             headers,
-            "application_ready",
+            "applications_ready",
             {
                 "application_id": application["id"],
                 "value": {"expected_version": current["version"]},

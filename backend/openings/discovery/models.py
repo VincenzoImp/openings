@@ -38,6 +38,12 @@ class SourcePreview(Input):
 class SourceCreate(SourcePreview):
     enabled: bool = False
     schedule: Schedule = Field(default_factory=IntervalSchedule)
+    idempotency_key: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description="Retrying with the same key and request returns the record the first request created.",
+    )
 
 
 class RSSConfig(Input):
@@ -101,6 +107,35 @@ class SourceConfigure(Input):
         ):
             raise ValueError("Provide at least one non-null configuration field.")
         return self
+
+
+class Query(BaseModel):
+    """The filters and page of a list: MCP's value, REST's query string (not strict)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CollectionRunQuery(Query):
+    limit: int = 50
+    offset: int = 0
+    source_id: str | None = None
+    state: str | None = None
+    summary: bool = True
+
+
+class SourceQuery(Query):
+    limit: int = 100
+    offset: int = 0
+    summary: bool = True
+
+
+class TaskQuery(Query):
+    limit: int = 50
+    offset: int = 0
+    state: str | None = None
+    kind: str | None = None
+    source_id: str | None = None
+    job_id: str | None = None
 
 
 class SourceBulk(Input):

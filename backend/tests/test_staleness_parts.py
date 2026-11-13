@@ -256,9 +256,7 @@ async def test_rest_mcp_and_application_summaries_report_the_same_parts(tmp_path
         assert [row[key] for key in ("stale_inputs", "stale_changes", "stale_changes_total")] == [
             summary[key] for key in ("stale_inputs", "stale_changes", "stale_changes_total")
         ]
-    result = await app.state.mcp.call_tool(
-        "application_staleness", {"application_id": application_id}
-    )
+    result = await app.state.mcp.call_tool("staleness_get", {"application_id": application_id})
     assert json.loads(result.content[0].text) == report
 
 

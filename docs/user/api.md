@@ -49,27 +49,40 @@ Paste the posting when extraction cannot obtain the complete text.
 | Skills | `GET /skills`, `GET /skills/{name}`, `GET /skills/{name}/files/{path}`, `GET/PUT /skills/{name}/notes` |
 | Operations | `GET /workspace`, `/capabilities`, `/overview`, `/export`, `/backup`; `POST /backup/restore`; `/tokens`; `POST /auth/password` |
 
-List routes return `{items,total}` and accept bounded `limit`/`offset` where
-applicable. Job rows include `application_count` and a compact `application`
+Paged list routes take bounded `limit` and `offset` and return `items`, `total`,
+`limit` and `offset`. `GET /jobs/{id}/notes`, `/applications/{id}/responses`,
+`/providers`, `/skills` and `/tokens` are bounded by one job, one application or
+the installation and return every item with `total`. Job rows include `application_count` and a compact `application`
 summary with `id`, `status`, `outcome` and `version`: the open attempt, otherwise
 the latest closed attempt, or null. Read detail records for full postings,
 questions or answers. `GET /jobs` returns filter value lists in `facets` only
 with `include_facets=true` (up to 200 matching companies, locations, sources and
-job types each). Career/claims/templates offer `summary=true` for bounded
-previews/counts without narratives, metadata or TeX.
+job types each).
 
-Lists that agents read often are compact by default and take `summary=false`
-for full records:
+Lists return summaries by default and take `summary=false` for full records:
 
 | List | Default `summary=true` | Added by `summary=false` |
 |---|---|---|
+| `GET /career/knowledge` | Entry fields, bounded `narrative_preview` and `claim_preview`, claim and file counts | `narrative` and `metadata` |
+| `GET /career/claims` | Claim fields, the typed selection fields, a bounded `text_preview` and the entry's title and organization | Full `text` and `metadata` |
+| `GET /templates` | Name, kind, default flag, version and `file_count` | `tex`, `guidance` and `rules` |
 | `GET /documents` | Revision metadata, `revision_number`, `file_count` | Derived `text`, form `content`, evidence ids and `files` |
 | `GET /sources` | Source settings, outcome/counts, `last_diagnostic_count`, compact `last_run` | `last_diagnostics`, full `last_run` with `source_snapshot` and task payloads/results |
 | `GET /collection/runs` | Run state, counts, timing, compact `tasks` (`id`, `kind`, `provider`, `state`, `attempts`, `error`, `next_run_at`, `updated_at`) | `source_snapshot` and full task payloads/results |
 
 `GET /sources/{id}` and `GET /collection/runs/{id}` always return the full record.
-Context lists never return payloads; files contain metadata only.
-Versioned changes include the last read `expected_version`.
+Context lists never return payloads: with `summary=true` (the default) they
+include frozen job/template labels, evidence/claim counts, a bounded
+`note_preview` and file/document counts, and with `summary=false` only the id,
+application, signature and time. Files contain metadata only.
+Versioned changes include the last read `expected_version`, and every delete
+names it as a query parameter, for example
+`DELETE /notes/{id}?expected_version=3`. A delete of a note, document revision or
+file without it is still accepted in 0.22 (deprecated) and refused from 0.23. A
+file never changes: its `version` is always 1. Every create accepts an
+`idempotency_key`: a retry with the same key and request returns the record the
+first request created; the same key with another request returns
+`409 conflict`.
 
 Job mutations return the compact job summary used by list rows (with
 `posting_preview`, without `posting`, `postings` or `overrides`):
@@ -84,8 +97,7 @@ submission. `stale_inputs` lists the input kinds (`profile`, `policy`,
 `instructions`, `template`, `knowledge`, `claim`) that changed after the contexts
 of the current leaves were frozen; it is empty when they are current.
 `stale_changes` holds the first three changes of the staleness report and
-`stale_changes_total` their number. Context lists with `summary=true` include frozen job/template labels,
-evidence/claim counts and a bounded `note_preview`, alongside file/document counts.
+`stale_changes_total` their number.
 A version conflict returns HTTP 409 with the stored version, for example
 `{"error":{"code":"conflict","message":"…","details":{"current_version":4}}}`;
 reload before editing again. This includes settings records (profile,
@@ -422,7 +434,7 @@ and `local_notes` (`version`, `updated_at`, `updated_by`, `length`, or null).
 reference file. Skills ship with the server and are never edited by a workspace.
 
 A workspace adds **local notes** to a skill instead: at most 2,000 characters,
-appended to the served `SKILL.md` (over REST, `skill_get` and the MCP prompt
+appended to the served `SKILL.md` (over REST, `skills_get` and the MCP prompt
 alike) after a rule, under `## Local notes for this workspace`, with the
 version, the day and who wrote them. `?local_notes=false` returns the shipped
 text alone; reference files are served as shipped. The response's

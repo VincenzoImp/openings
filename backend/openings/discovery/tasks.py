@@ -25,6 +25,7 @@ class TaskOperations:
     """Persisted provider tasks of DiscoveryService and the collection they run."""
 
     def list_tasks(self, limit=50, offset=0, state=None, kind=None, source_id=None, job_id=None):
+        limit, offset = min(max(limit, 1), 200), max(offset, 0)
         clauses, params = [], []
         for key, value in (
             ("state", state),
@@ -50,11 +51,13 @@ class TaskOperations:
             "SELECT t.*,s.name AS source_name,j.title AS job_title FROM tasks t LEFT JOIN sources s ON s.id=t.source_id LEFT JOIN jobs j ON j.id=t.job_id"
             + where
             + " ORDER BY t.created_at DESC,t.id DESC LIMIT ? OFFSET ?",
-            (*params, min(max(limit, 1), 200), max(offset, 0)),
+            (*params, limit, offset),
         )
         return {
             "items": [self._task_record(row) for row in rows],
             "total": self.db.one("SELECT COUNT(*) AS n FROM tasks t" + where, params)["n"],
+            "limit": limit,
+            "offset": offset,
         }
 
     @staticmethod

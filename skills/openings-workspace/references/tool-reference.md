@@ -4,20 +4,20 @@ Step-by-step MCP/REST sequences behind the workflow skills: [Prepare Shortlist](
 
 ## Documents
 
-1. Find and read the job with `jobs_search` and `job_get`. Before ingesting a
+1. Find and read the job with `jobs_list` and `jobs_get`. Before ingesting a
    URL, `jobs_resolve` reports any existing record and its attempts without
    writing; `jobs_duplicates` lists candidate copies of the same vacancy with a
    `confidence`, `tier` and `reasons` (`min_confidence` defaults to 0.5). A job's `application`
    summary identifies an open attempt or the latest closed one. Use
    `applications_list` with `value.job_id` for the full history. Continue an open
-   attempt, or create Draft with `application_create` and an idempotency key.
+   attempt, or create Draft with `applications_create` and an idempotency key.
    Starting retains saved interest and removes the job from the pending Shortlist queue. A separate later attempt requires the
    previous one to be closed. Retain the attempt ID for subsequent writes.
 2. Read profile, the policy (`policy_get`), detailed career entries, approved
    claims with their typed selection fields, selected templates and writing
    instructions. Summary lists help discovery; fetch the full records
    before writing. Ask for missing facts and keep qualifications accurate.
-3. Call `application_prepare_context` with the application, selected templates
+3. Call `contexts_create` with the application, selected templates
    and relevant evidence/claims. Omitted selections use available defaults. Use
    an idempotency key for retries. Retain the context ID/signature and read its
    frozen payload or returned `openings://contexts/...` resource.
@@ -37,7 +37,7 @@ Step-by-step MCP/REST sequences behind the workflow skills: [Prepare Shortlist](
    read the revision's derived `text`. Binary bodies do not belong in MCP
    arguments.
 7. An answers document archives a revision. Update the application's live
-   `answers` separately with `application_update`, current `expected_version`
+   `answers` separately with `applications_update`, current `expected_version`
    and question IDs. Leave progress and review state unchanged unless requested.
 
 A PDF does not record submission. A changed source needs a new revision using
@@ -101,7 +101,7 @@ Runs freeze source settings at enqueue time. Use `collection_runs_list` and
 `sources_list` and `collection_runs_list` return compact rows by default: a
 `last_diagnostic_count` instead of diagnostics, and task stubs (state, provider,
 attempts, error, next run) without payloads/results or the frozen source
-snapshot. Pass `summary: false`, or read `sources_get` / `collection_runs_get`,
+snapshot. Pass `value.summary: false`, or read `sources_get` / `collection_runs_get`,
 for diagnostics and full task records.
 `collection_runs_cancel` stops one run. Automatic collection pause preserves
 source settings and stops future enqueueing; queued/current runs need explicit
@@ -113,7 +113,7 @@ Description retrieval is automatic. Candidates awaiting text stay in the run
 checkpoint; only usable automatic postings enter the archive. Inspect pending,
 unavailable and failed results before calling a collection complete.
 
-`collection_yield({since?, until?, min_sample?})` reports, per source and per
+`sources_yield({since?, until?, min_sample?})` reports, per source and per
 search, what the jobs it first collected became: collected, to review,
 shortlisted, applied, employer responses, dismissed (by rule, agent, owner or
 other, and by rule), likely duplicates and postings no longer listed, with
@@ -123,16 +123,16 @@ Every job has `signals` computed at collection without a model: `language`,
 the languages it states as `required` (groups, one of a group suffices) or
 `welcome`, a likely `duplicate` of an earlier job with its confidence, and
 `no_longer_listed` (a company board stopped listing it; `unlisted_at` on the
-observation). `jobs_search` filters by `signal`, `posting_language`,
+observation). `jobs_list` filters by `signal`, `posting_language`,
 `posting_language_not`, `requires`, `dismissed_by` and `rule_id`, and
 `include_counts` returns the size of each queue. A dismissed job has
 `dismissal`: who, when, why (`reason`) and the rule, if one dismissed it.
-`job_distinct(job_id, {other_id})` records that a flagged likely duplicate is a
+`jobs_distinct(job_id, {other_id})` records that a flagged likely duplicate is a
 different vacancy. The manual `availability` field is deprecated and read by
 nothing.
 
-Use `jobs_search` with `value.queue="inbox"` to review new jobs and
-`job_triage` / `jobs_bulk` to save or dismiss selected versioned jobs. Read full
+Use `jobs_list` with `value.queue="inbox"` to review new jobs and
+`jobs_triage` / `jobs_bulk` to save or dismiss selected versioned jobs. Read full
 postings and the user's career/preferences to make a qualitative selection.
 `value.queue="shortlist"` returns saved jobs with no application attempts, with
 server-side totals and pagination. Draft (`draft`, shown as Preparing) removes a
@@ -140,12 +140,12 @@ job from that queue. Applied, Interview, Offer and Closed history never returns
 it to Inbox or Shortlist. `triage` remains the independent interest flag;
 `queue="applications"` finds jobs with any attempt, including dismissed ones. Dismiss remembers the job during future collection. Forget deletes
 job-owned history, documents, files and identities when permanent removal is
-intended. `job_forget` requires `job_id` and the current `expected_version`.
+intended. `jobs_delete` requires `job_id` and the current `expected_version`.
 
 Applications progress through Preparing (`draft`) / Applied / Interview / Offer / Closed.
 Closing requires an explicit outcome. Creation or reopening cannot introduce a
 second open attempt; use the application identified by a conflict. Deleting an
-attempt preserves its job and other attempts; `application_delete` requires
+attempt preserves its job and other attempts; `applications_delete` requires
 `application_id` and the current `expected_version`. Deleting the final attempt
 returns a saved job to Shortlist; only use this deliberately.
 `applications_bulk` applies one action to at most 200 explicit
@@ -160,7 +160,7 @@ when they have attempts and do not re-enter Inbox.
 
 ## Ready
 
-`application_ready(application_id, value)` takes the application's current
+`applications_ready(application_id, value)` takes the application's current
 `expected_version` and `ready` (default true). Marking needs a Preparing
 application whose derived checks pass; otherwise it returns
 `409 application_not_ready` with `details.check`: `stage` (not Preparing),
@@ -179,8 +179,8 @@ ready.
 
 ## Employer responses, no reply and insights
 
-`responses_list(application_id)`, `responses_add(application_id, value)`,
-`responses_update(response_id, value)` and `responses_remove(response_id,
+`responses_list(application_id)`, `responses_create(application_id, value)`,
+`responses_update(response_id, value)` and `responses_delete(response_id,
 expected_version)` manage an application's employer answers. A response has
 `kind` (`rejection`, `interview`, `offer`, `other`), `date` (not in the future;
 today when omitted), `note`, `estimated`, `origin` (`manual`, `stage`,
@@ -188,10 +188,10 @@ today when omitted), `note`, `estimated`, `origin` (`manual`, `stage`,
 `idempotency_key`; one per kind and day (except `other`) returns
 `409 response_exists` with `details.response_id`, and a Draft never sent returns
 `409 application_not_sent`. Adding never moves the stage; removing never moves
-it back. `application_get` returns `responses` and `last_response`; list rows
+it back. `applications_get` returns `responses` and `last_response`; list rows
 carry `last_response`.
 
-`application_update` records the matching response when it moves a sent
+`applications_update` records the matching response when it moves a sent
 application: to `interview` from Preparing or Applied, to `offer` from an
 earlier stage, or to `closed` with `outcome: "rejected"` (accepting without an
 offer on record also records one). Closing a Draft never sent as rejected
@@ -238,14 +238,15 @@ argument. A second start returns `run_open` with the open run in
 one. `runs_update` stores a progress `note`; `runs_finish` closes the run with
 `summary`, `changes`, `not_done`, `checks`, `limits` and `method`, both with the
 run's current `expected_version`. `runs_get` returns the report, the questions
-asked and a page of the changes made (`changes_limit`, `changes_offset`);
+asked and a page of the changes made (`value.changes_limit`,
+`value.changes_offset`);
 `runs_list` filters by `status` (`open`, `finished`, `interrupted`), `workflow`,
 `token_id`, start time and `active_since` (last activity at or after a time). An open run without a write or note for two hours is
 reported as `interrupted`; it stays open, and a later write revives it.
 Each listed run carries its report's `summary` and `method`.
 
-`skill_get(name)` returns `SKILL.md` with this workspace's local notes appended
-under `## Local notes for this workspace` (`local_notes: false` for the shipped
+`skills_get(name)` returns `SKILL.md` with this workspace's local notes appended
+under `## Local notes for this workspace` (`value.local_notes: false` for the shipped
 text alone); reference files are served as shipped. `skill_notes_get(name)`
 returns `text`, `version` (0 when none), the author and up to 50 earlier
 versions. `skill_notes_update(name, {"expected_version": N, "text": "..."})`
@@ -269,7 +270,7 @@ name.
 `application_id`, `subject_type`/`subject_id`, `actor` (`owner`, `token`,
 `system`, `unknown`), `kind` or time; `subject_types` takes several kinds of
 record at once. Every entry carries `actor` (for a token, with `token_kind`
-`owner` or `agent`), `run_id` with `run_workflow`, and `subject`; `application_history` returns the same fields. Changes recorded
+`owner` or `agent`), `run_id` with `run_workflow`, and `subject`; `applications_history` returns the same fields. Changes recorded
 before version 0.17 have the actor `unknown (before 0.17)`. Payloads hold
 identifiers, changed field names and versions, never record content. Deleting an
 application or forgetting a job removes that record's own history and leaves one
@@ -279,14 +280,14 @@ application or forgetting a job removes that record's own history and leaves one
 ## Notes and the timeline
 
 A note belongs to a job, or to one application of that job when written with
-`application_id`: `note_add(job_id, {"body": "...", "application_id": ...})`.
+`application_id`: `notes_create(job_id, {"body": "...", "application_id": ...})`.
 It records its author and the open run. `pinned: true` pins it; a job and an
 application each have one pinned note, listed first, and pinning another unpins
-it (`note_pin(note_id, {"expected_version": N, "pinned": true|false})`). The
+it (`notes_pin(note_id, {"expected_version": N, "pinned": true|false})`). The
 application's pinned note is the owner's standing guidance for that application:
 read it first, leave it to the owner, and write your own findings as ordinary
-notes. `note_update` edits a body with its version; `note_delete` removes a note
-for good and leaves a `note_deleted` event.
+notes. `notes_update` edits a body with its version; `notes_delete(note_id,
+expected_version)` removes a note for good and leaves a `note_deleted` event.
 
 `timeline_get` reads one list of notes and recorded changes: `job_id` for a job
 with all of its applications, or `application_id` for one application with its
@@ -308,16 +309,18 @@ context still carries the pinned note as `application.note` and
 
 ## Scripting and transfers
 
-Read `/api/openapi.json` for REST inputs under `/api/v1`. Some MCP tools wrap fields
-in a `value` DTO; discover their exact schemas. Use optimistic versions and
-idempotency keys. Omit unchanged PATCH fields; clear text/lists/objects with empty
+Read `/api/openapi.json` for REST inputs under `/api/v1`. An MCP tool takes the
+record ids of its REST path and the `expected_version` of a delete as flat
+arguments and everything else in one `value` (the REST body or query string);
+discover the exact schemas. Use optimistic versions on every write and delete,
+and an idempotency key on every create you may retry. Omit unchanged PATCH fields; clear text/lists/objects with empty
 values. Career dates also accept null to clear them.
 
 `workspace_export` returns readable JSON without file bytes. Scoped
-`workspace_backup` and `workspace_restore_upload` move a portable SQLite snapshot
+`workspace_backup` and `workspace_restore` move a portable SQLite snapshot
 when requested. Restore replaces workspace data while retaining destination
 authentication, recent provider request history and later cooldowns.
-`workspace_restore_upload`, `tokens_list`, `token_create`, `token_revoke`,
+`workspace_restore`, `tokens_list`, `tokens_create`, `tokens_revoke`,
 `owner_password_update`, `requests_create` and `requests_withdraw` need owner authority: an agent token gets
 `403 forbidden`. A backup downloaded with an agent token omits the owner
 password hash, the session secret and the API tokens, and still restores
