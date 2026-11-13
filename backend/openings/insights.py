@@ -414,12 +414,36 @@ def source_kind(kind, metadata):
         return "feed"
     if kind in COMPANY_KINDS or kind == "auto":
         return "company"
-    # The source was removed: the job's metadata still says how it arrived.
-    if metadata.get("ats"):
+    # No collection source (added by URL, or the source was removed): the job's
+    # metadata still says where it was found.
+    provider = str(metadata.get("source") or "").lower()
+    if metadata.get("ats") or provider in COMPANY_KINDS:
         return "company"
-    if metadata.get("source") and metadata.get("source") != "manual":
+    if provider == "rss":
+        return "feed"
+    if provider and provider != "manual":
         return "search"
     return "manual"
+
+
+PROVIDER_NAMES = {
+    "linkedin": "LinkedIn",
+    "indeed": "Indeed",
+    "glassdoor": "Glassdoor",
+    "zip_recruiter": "ZipRecruiter",
+    "google": "Google Jobs",
+    "rss": "RSS",
+}
+
+
+def source_name(name, kind, metadata):
+    """The collection source's name, else the board the job came from, else the kind."""
+    if name:
+        return name
+    provider = str(metadata.get("ats") or metadata.get("source") or "").lower()
+    if provider and provider != "manual":
+        return PROVIDER_NAMES.get(provider, provider.replace("_", " ").title())
+    return SOURCE_KINDS[kind]
 
 
 class InsightsQuery(Input):
@@ -543,20 +567,21 @@ class InsightsService:
                 first = min(day for _, day in responses)
                 days = max(0, (date.fromisoformat(first) - date.fromisoformat(applied[:10])).days)
             metadata = json.loads(row["metadata"] or "{}")
+            metadata = metadata if isinstance(metadata, dict) else {}
             place = location_group(row["location"])
-            kind = source_kind(row["source_kind"], metadata if isinstance(metadata, dict) else {})
+            kind = source_kind(row["source_kind"], metadata)
             sample.append(
                 {
                     "status": row["status"],
                     "outcome": row["outcome"],
-                    "kinds": {kind for kind, _ in responses},
+                    "kinds": {answer for answer, _ in responses},
                     "days": days,
                     "role_family": role_family(row["title"]),
                     "seniority": seniority(row["title"]),
                     "location": place.casefold() or "unknown",
                     "location_label": place or "Not stated",
                     "source_kind": kind,
-                    "source": row["source_name"] or SOURCE_KINDS[kind],
+                    "source": source_name(row["source_name"], kind, metadata),
                     "month": applied[:7] if applied else "unknown",
                 }
             )

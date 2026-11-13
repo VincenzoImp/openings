@@ -18,13 +18,13 @@ from pathlib import Path
 import uvicorn
 from fastapi.testclient import TestClient
 
+from large_fixtures import seed_large
 from openings.actors import OWNER, acting_as
 from openings.app import create_app
 from openings.career import ClaimCreate, KnowledgeCreate, ProfileUpdate, TemplateCreate
 from openings.common import new_id, now
 from openings.documents import ContextCreate
 from openings.policy import SECTIONS
-from large_fixtures import seed_large
 from today_fixtures import seed_today
 
 RUN_PATH = "/__e2e__/run"

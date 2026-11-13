@@ -15,6 +15,8 @@ from openings.insights import (
     location_group,
     role_family,
     seniority,
+    source_kind,
+    source_name,
 )
 from openings.outcomes import ResponseService
 
@@ -64,6 +66,20 @@ def test_role_family_and_seniority_come_from_the_title(title, family, level):
     assert role_family(title) == family
     assert seniority(title) == level
     assert family in FAMILY_LABELS and level in SENIORITY_LABELS
+
+
+def test_source_kind_and_name_come_from_the_source_or_the_job():
+    assert source_kind("jobspy", {}) == "search"
+    assert source_name("Data roles", "search", {}) == "Data roles"
+    assert source_kind("greenhouse", {}) == "company"
+    assert source_kind("rss", {}) == "feed"
+    # Without a collection source, the job's metadata says where it was found.
+    assert source_kind(None, {"source": "linkedin"}) == "search"
+    assert source_name(None, "search", {"source": "linkedin"}) == "LinkedIn"
+    assert source_kind(None, {"source": "greenhouse"}) == "company"
+    assert source_name(None, "company", {"source": "greenhouse"}) == "Greenhouse"
+    assert source_kind(None, {"ats": "lever"}) == "company"
+    assert (source_kind(None, {}), source_name(None, "manual", {})) == ("manual", "Added by hand")
 
 
 def test_location_groups_use_the_first_part():
