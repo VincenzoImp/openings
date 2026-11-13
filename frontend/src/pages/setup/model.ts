@@ -1,11 +1,11 @@
 // What the setup guide shows, derived from the workspace alone: which steps
 // are done, what each part of the record holds and where to start. No React:
 // tested directly.
-import type { NoReply, PolicySection } from "../../api.ts";
+import type { NoReply, PreferenceSection } from "../../api.ts";
 
 export type StepId = "agent" | "record" | "next";
 export type ItemId =
-  "profile" | "policy" | "searches" | "entries" | "claims" | "templates";
+  "profile" | "preferences" | "searches" | "entries" | "claims" | "templates";
 export type ItemState = "done" | "progress" | "todo";
 
 export interface SetupToken {
@@ -17,7 +17,7 @@ export interface SetupToken {
 /** Everything the guide reads; counts are totals. */
 export interface SetupFacts {
   profile: { name: string; headline: string; location: string; email: string };
-  sections: PolicySection[];
+  sections: Pick<PreferenceSection, "section" | "items">[];
   noReply: NoReply | null;
   sources: number;
   tokens: SetupToken[];
@@ -30,7 +30,7 @@ export interface SetupFacts {
 const plural = (count: number, one: string, many = `${one}s`) =>
   `${count} ${count === 1 ? one : many}`;
 const sectionTotal = (facts: SetupFacts, name: string) =>
-  facts.sections.find((section) => section.section === name)?.total ?? 0;
+  facts.sections.find((section) => section.section === name)?.items.length ?? 0;
 
 /**
  * The agent is connected once one of its tokens made a call: the newest
@@ -60,9 +60,13 @@ export interface RecordItem {
 export function recordItems(facts: SetupFacts): RecordItem[] {
   const { profile } = facts;
   const named = profile.name.trim();
-  const eligibility = sectionTotal(facts, "eligibility");
-  const items = facts.sections.reduce((sum, section) => sum + section.total, 0);
-  const reply = facts.noReply?.source === "policy";
+  const lookingFor = sectionTotal(facts, "looking_for");
+  const ruledOut = sectionTotal(facts, "ruled_out");
+  const items = facts.sections.reduce(
+    (sum, section) => sum + section.items.length,
+    0,
+  );
+  const reply = facts.noReply?.source === "settings";
   const count = (
     id: ItemId,
     title: string,
@@ -89,18 +93,20 @@ export function recordItems(facts: SetupFacts): RecordItem[] {
           : "todo",
     },
     {
-      id: "policy",
-      title: "Policy",
+      id: "preferences",
+      title: "Preferences",
       meta:
-        eligibility || reply
+        items || reply
           ? [
-              plural(eligibility, "fact") + " employers ask about",
+              plural(lookingFor, "statement") + " on what you look for",
+              `${ruledOut} you rule out`,
               reply
                 ? `no reply after ${plural(facts.noReply!.days, "day")}`
                 : "no reply period not set",
             ].join(" · ")
-          : "What employers ask about, such as your work authorization, and when an application counts as unanswered.",
-      state: eligibility && reply ? "done" : items ? "progress" : "todo",
+          : "What you are looking for, what you rule out, and when an application counts as unanswered.",
+      state:
+        lookingFor && reply ? "done" : items || reply ? "progress" : "todo",
     },
     count(
       "searches",
@@ -184,10 +190,4 @@ export function firstStep(facts: SetupFacts): StepId {
 export function setupComplete(facts: SetupFacts) {
   const state = steps(facts);
   return state.agent.done && state.record.done;
-}
-
-/** The days of a no-reply period typed by the owner, or null. */
-export function replyDays(text: string) {
-  const value = Number(text.trim());
-  return Number.isInteger(value) && value >= 1 && value <= 3650 ? value : null;
 }

@@ -169,7 +169,7 @@ function NotesForm({ notes }: { notes: Notes }) {
         <span className="caption" id="notes-hint">
           Added after the skill's text each time your agent reads it, here and
           in no other workspace. Lasting preferences belong in your{" "}
-          <a href="#policy">Policy</a>.
+          <a href="#preferences">Preferences</a>.
         </span>
       </div>
       {history && (

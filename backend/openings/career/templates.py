@@ -53,7 +53,7 @@ class TemplateOperations:
         }
 
     def get_template(self, template_id: str) -> dict:
-        """Read raw template source, guidance and rules (typed limits, rule statements, free-form rest); fetch attached assets separately."""
+        """Read raw template source, guidance and rules (typed limits and free-form settings); fetch attached assets separately."""
         row = self.db.one("SELECT * FROM templates WHERE id=?", (template_id,))
         if not row:
             missing("Template")

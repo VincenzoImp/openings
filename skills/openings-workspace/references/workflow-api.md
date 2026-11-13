@@ -2,7 +2,7 @@
 
 Use the current MCP schemas or REST OpenAPI for exact inputs. REST paths below
 are relative to the configured `/api/v1` origin. This reference contains shared
-mechanics, not personal selection or writing policy.
+mechanics, not personal selection or writing rules.
 
 ## Names and arguments
 
@@ -46,8 +46,8 @@ mechanics, not personal selection or writing policy.
 
 - `contexts_create` / `POST /contexts` takes `application_id`,
   explicit `template_ids`, optional `knowledge_ids`, `claim_ids`, `note` and
-  `idempotency_key`. It freezes job, Profile, the policy sections with their
-  versions, guidance, evidence, claims, templates and selected source-file bytes,
+  `idempotency_key`. It freezes job, Profile, the Preferences sections with
+  their versions (`preferences`), template guidance, evidence, claims, templates and selected source-file bytes,
   and the application's pinned note as `instructions.application_note`, followed
   by this request's `note`. Same key/request reuses the context; changed
   input with the same key conflicts. Omitted selections use current defaults.

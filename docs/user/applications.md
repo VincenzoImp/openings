@@ -7,18 +7,18 @@ application at a time and retain earlier closed attempts.
 ## Prepare the library
 
 In **Career**, store your profile, stable [career entries](career.md) and approved
-claims. In **Policy**, state your [rules and facts](policy.md) once. In
-**Templates**, add one or more CV or letter templates with their source, assets
-and rules: typed limits (pages, bullets per entry, bullet length), a list of
-rule statements and guidance. Set a default for each kind of document.
-**General instructions** apply across templates; template guidance adds specific rules.
+claims. In **Preferences**, state [what you want and your writing rules](preferences.md)
+once. In **Templates**, add one or more CV or letter templates with their
+source, assets, guidance and typed limits (pages, bullets per entry, bullet
+length). Set a default for each kind of document. Writing rules live in
+Preferences, for all documents, the CV or the letter.
 
-![Templates with the list by kind and the Rules tab: guidance, limits, rule statements and other settings](../images/templates.png)
+![Templates with the list by kind and the Rules tab](../images/templates.png)
 
 The synthetic templates in `examples/` provide starting points.
 
 A template can define a one-page engineering CV, a longer research CV or another
-layout. Your external agent fills it using the selected facts and instructions.
+layout. Your external agent fills it using the selected facts and your writing rules.
 
 ## Start an application
 
@@ -111,8 +111,8 @@ page on the matching tab.
 
 ## Write, compile and upload
 
-Under **Inputs**, **Prepare a frozen copy** freezes the posting, profile, policy,
-approved claims, instructions, questions, templates and exact asset bytes for
+Under **Inputs**, **Prepare a frozen copy** freezes the posting, profile, Preferences,
+approved claims, questions, templates with their guidance and exact asset bytes for
 your agent, and downloads it. The chooser supports search and selecting or
 clearing matching entries, claims and templates. Claims follow their owning
 entries: excluding an entry also excludes its claims. Omitted entry/claim
@@ -155,21 +155,21 @@ letter not yet** or **CV and letter approved**. **Inputs changed** marks an
 application whose current revisions use a frozen copy made before a later change
 to something the documents use, and the line below names the first change, for
 example "Profile summary and 2 more". The tab **Inputs** lists every change with
-what happened to it: "Profile summary — changed", "Policy “Work authorization” —
-changed · Facts employers ask about". A writing rule for the CV only marks the CV
+what happened to it: "Profile summary — changed", "“Available from February
+2027.” — added · Facts about me". A writing rule for the CV only marks the CV
 ("CV only").
 
 Only what documents use counts: the Profile's name, headline, contact details,
-links and summary; the confirmed items of the policy sections for eligibility,
-writing and other facts; the text of general guidance; the source, guidance and
-rules of the selected templates; the text, dates and skills of the selected
-Career entries and the wording of their claims. Editing Profile metadata,
-a Decision item (target roles, preferences, a rule for shortlisting jobs), an agent's
-unconfirmed proposal, a template's name, the order of entries or claims, a
-claim's selection fields or any free-form metadata leaves every Draft current,
-and so does changing spacing or changing a part back. A frozen copy made before the policy
-existed (0.19) holds none of it; **Inputs** says that policy changes are not
-compared for it. Frozen copies never change; to refresh, prepare a new one and
+links and summary; the statements of Facts about me and Writing rules in
+Preferences; the source, guidance and rules of the selected templates; the
+text, dates and skills of the selected Career entries and the wording of their
+claims. Editing Profile metadata, the other Preferences sections (what you are
+looking for or rule out, working with me), the order of statements, a
+template's name, the order of entries or claims, a claim's selection fields or
+any free-form metadata leaves every Draft current, and so does changing spacing
+or changing a part back. A frozen copy made before Preferences existed (0.24)
+holds none of them; **Inputs** says that Preferences changes are not compared
+for it. Frozen copies never change; to refresh, prepare a new one and
 save new revisions.
 
 Editing a form question keeps compatible live answers. If a changed type, option
@@ -221,12 +221,12 @@ it there; a response marked **Estimated date** took the day of the
 application's last change instead, so correct it if you know better.
 
 **No reply** is a fourth way to close, with Accepted, Rejected and Not pursued.
-The no-reply period is the number of days in your Policy's Decision item
-labelled "No reply" (for example "45 days"), or 30 days without one. Today's
+The no-reply period is **Count an application as no reply after [30] days**
+in [Preferences](preferences.md#settings), 30 days unless you change it. Today's
 **Waiting for a reply** counts the Applied applications sent longer ago,
 **Record replies** lists them and **Close N as no reply** closes them after
 listing them; Insights offers the same. Your agent may close them too, but only
-under a "No reply" rule you confirmed in the Policy; otherwise it asks you.
+when you ask or say so under Working with me; otherwise it asks you.
 
 ## Insights
 

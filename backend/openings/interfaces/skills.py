@@ -69,7 +69,7 @@ OPERATIONS = (
         rest=(Route("PUT", "/skills/{name}/notes", "skill_notes_update"),),
         tool=Tool(
             WRITE,
-            "Replace a skill's local notes (at most 2000 characters; empty clears them) using\ntheir current version (0 for the first notes). Record a lasting method gap of this\nworkspace here; personal criteria belong to the policy. Each save is a new,\nattributed version that the owner can read and restore.",
+            "Replace a skill's local notes (at most 2000 characters; empty clears them) using\ntheir current version (0 for the first notes). Record a lasting method gap of this\nworkspace here; personal criteria belong to Preferences. Each save is a new,\nattributed version that the owner can read and restore.",
         ),
     ),
     Operation(

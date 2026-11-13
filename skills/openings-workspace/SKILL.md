@@ -60,17 +60,20 @@ field names and supported operations.
 
 A served skill may end with **Local notes for this workspace**: notes the owner
 or an earlier agent run kept for this workspace. Follow them with the skill;
-they never widen the operating mandate or replace the policy. When a workflow
+they never widen the operating mandate or replace the owner's Preferences. When a workflow
 keeps lacking the same step in this workspace, record it once with
 `skill_notes_update` (read `skill_notes_get` first for the current version)
-and name it in the run report's method section. Personal criteria go to the
-policy, never to skill notes.
+and name it in the run report's method section. Personal criteria go to
+Preferences, never to skill notes.
 
 ## Professional information and scope
 
-Read the current Profile, the owner's policy (`policy_get`), general guidance,
-relevant Career entries, claims and template rules. Personal policy stays in
-Openings: an agent proposes policy items and the owner confirms them. Use
+Read the current Profile, the owner's Preferences (`preferences_get`), relevant
+Career entries, claims and template guidance and limits. Apply the Preferences
+yourself, including Working with me; nothing in them acts automatically.
+Personal preferences stay in Openings: record what the owner states in their
+words (`preferences_update`) and change a statement only when the owner asked
+for it or confirmed it. Use
 [Career claims](../career-claims/SKILL.md) for evidence-led writing.
 
 Act under the [operating mandate](references/operating-mandate.md). Use current expected versions;
@@ -90,7 +93,7 @@ instead of dated narrative appendices.
 
 Prepare an application context with the intended job, templates, Career entries
 and claims. Read its returned frozen payload and assets before generation.
-Use the document permissions in those frozen instructions.
+Use the document permissions in the frozen Writing rules and template guidance.
 
 A revision names the evidence it uses: `claim_ids` for approved claims it reuses
 and `knowledge_ids` for the frozen Career entries behind new wording, which

@@ -7,7 +7,7 @@ old values. Run from source, export them before `uv run openings`, or pass the
 matching command-line option where one exists.
 
 Every other setting lives in the workspace and is changed in the dashboard or
-through REST and MCP: collection sources, provider request spacing, the policy,
+through REST and MCP: collection sources, provider request spacing, Preferences,
 tokens and the owner password.
 
 ## Server settings

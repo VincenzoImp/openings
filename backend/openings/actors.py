@@ -42,6 +42,16 @@ class Actor:
         """True for a scoped agent token, which has no owner authority."""
         return self.kind == "token" and self.token_kind == "agent"
 
+    @property
+    def label(self):
+        """One short attribution: ``owner``, ``agent:<token name>`` or ``system``.
+
+        The owner's session and an owner token are the owner.
+        """
+        if self.is_agent:
+            return f"agent:{self.name or 'token'}"
+        return "owner" if self.kind in ("owner", "token") else "system"
+
 
 SYSTEM = Actor("system")
 OWNER = Actor("owner")

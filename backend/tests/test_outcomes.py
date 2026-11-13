@@ -6,10 +6,9 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from pydantic import ValidationError
 
-from openings.actors import OWNER, acting_as, token_actor
+from openings.actors import acting_as, token_actor
 from openings.errors import DomainError
-from openings.outcomes import ResponseService, no_reply_period, reply_days, today
-from openings.policy import PolicyService
+from openings.outcomes import ResponseService, today
 
 
 def days_ago(days):
@@ -230,66 +229,6 @@ def test_no_reply_closes_only_sent_applications_with_the_day_it_was_concluded(wo
     # The funnel counts the new outcome.
     funnel = workspace.overview()["funnel"]
     assert funnel[0]["outcomes"]["no_response"] == 1
-
-
-def test_the_no_reply_period_comes_from_the_policy_and_lists_the_applications_past_it(workspace):
-    assert reply_days(45) == reply_days("45") == reply_days(" 45 days ") == 45
-    assert reply_days("six weeks") is reply_days(0) is reply_days(True) is reply_days(4000) is None
-    with workspace.db.connect() as conn:
-        assert no_reply_period(conn) == {
-            "days": 30,
-            "source": "default",
-            "item_id": None,
-            "confirmed": False,
-        }
-    old = attempt(workspace, "Synthetic old", status="applied", applied_at=stamp_ago(40))
-    recent = attempt(workspace, "Synthetic recent", status="applied", applied_at=stamp_ago(10))
-    attempt(workspace, "Synthetic interview", status="interview", applied_at=stamp_ago(60))
-    due = workspace.list_applications(no_reply_due=True)
-    assert [item["id"] for item in due["items"]] == [old["id"]]
-    assert due["no_reply"]["due"] == 1 and due["no_reply"]["days"] == 30
-    assert old["id"] not in {
-        item["id"] for item in workspace.list_applications(no_reply_due=False)["items"]
-    }
-
-    policy = PolicyService(workspace)
-    with acting_as(token_actor("token-1", "Synthetic agent", "agent")):
-        proposal = policy.add_item(
-            "decision",
-            {
-                "expected_version": 0,
-                "label": "No response after",
-                "value": 7,
-                "value_type": "number",
-            },
-        )
-    with workspace.db.connect() as conn:
-        period = no_reply_period(conn)
-    assert period == {
-        "days": 7,
-        "source": "policy",
-        "item_id": proposal["item"]["id"],
-        "confirmed": False,
-    }
-    assert {item["id"] for item in workspace.list_applications(no_reply_due=True)["items"]} == {
-        old["id"],
-        recent["id"],
-    }
-    # A confirmed item comes before a proposal.
-    with acting_as(OWNER):
-        confirmed = policy.add_item(
-            "decision",
-            {"expected_version": 1, "label": "No reply", "value": "45 days", "value_type": "text"},
-        )
-    listed = workspace.list_applications(no_reply_due=True)
-    assert listed["no_reply"] == {
-        "days": 45,
-        "source": "policy",
-        "item_id": confirmed["item"]["id"],
-        "confirmed": True,
-        "due": 0,
-    }
-    assert listed["items"] == []
 
 
 def test_ready_filter_separates_preparing_from_ready(workspace):

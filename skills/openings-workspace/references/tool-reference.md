@@ -13,9 +13,8 @@ Step-by-step MCP/REST sequences behind the workflow skills: [Prepare Shortlist](
    attempt, or create Draft with `applications_create` and an idempotency key.
    Starting retains saved interest and removes the job from the pending Shortlist queue. A separate later attempt requires the
    previous one to be closed. Retain the attempt ID for subsequent writes.
-2. Read profile, the policy (`policy_get`), detailed career entries, approved
-   claims with their typed selection fields, selected templates and writing
-   instructions. Summary lists help discovery; fetch the full records
+2. Read profile, Preferences (`preferences_get`), detailed career entries,
+   approved claims with their typed selection fields and selected templates. Summary lists help discovery; fetch the full records
    before writing. Ask for missing facts and keep qualifications accurate.
 3. Call `contexts_create` with the application, selected templates
    and relevant evidence/claims. Omitted selections use available defaults. Use
@@ -23,7 +22,8 @@ Step-by-step MCP/REST sequences behind the workflow skills: [Prepare Shortlist](
    frozen payload or returned `openings://contexts/...` resource.
 4. Write CV, letter and answers from that snapshot. Approved claims provide
    reusable wording; detailed evidence can support accurate new wording. Follow
-   general, template and application instructions and answer limits.
+   the frozen Writing rules and facts, template guidance, application
+   instructions and answer limits.
 5. Download frozen assets through `files_reserve_download`, resolving relative
    URLs against the workspace origin. Compile externally and check page count,
    extracted text and layout. If a compiler is unavailable, save the sources and
@@ -53,38 +53,28 @@ omitting selections uses defaults, while explicit empty evidence/claim lists
 include none. Updating questions preserves compatible live answers; incompatible
 answers reject the update unless deliberately changed or removed in `answers`.
 
-## Policy
+## Preferences
 
-`policy_get` returns the four sections (`decision`, `eligibility`, `writing`,
-`facts`) with their versions and items, and the signals a decision rule may
-name; `policy_get({"section": "writing"})` returns one section. Every write
-takes the current version of the section as `expected_version` and answers with
-the section as it is afterwards; a stale version is `409 conflict` with
-`details.current_version`.
+`preferences_get` returns the owner's Preferences, in their own words: five
+sections, `looking_for` (what I'm looking for), `ruled_out` (what I rule out),
+`facts` (facts about me), `writing` (writing rules) and `working_with_me`
+(instructions you follow), each with `items`, `version`, `updated_at` and
+`updated_by`; and `settings` with `no_reply_days`, `spoken_languages` and their
+`version`. Nothing in them acts automatically: read them and apply them.
 
-- `policy_add(section, value)`: `label`, `statement`, optional `value` (text, a
-  number, true/false or a short list; `value_type: "date"` for a date), `note`,
-  `scope` (`writing` only) and `rule` (`decision` only). Use an
-  `idempotency_key` for retries.
-- `policy_update(item_id, value)`: omitted fields stay; `value`, `scope` and
-  `rule` accept null. `policy_move(item_id, {expected_version, section,
-  target_version})` moves an item to another section.
-  `policy_reorder(section, {expected_version, item_ids})` takes every id of the
-  section in the new order. `policy_remove(item_id, expected_version)` deletes.
-- With an agent token an added or changed item has `confirmed: false`.
-  `policy_confirm` and `enabled: true` on a rule are the owner's (`403
-  forbidden`).
-- A decision `rule` is `{signal, condition: {operator, value}, action}` on
-  `language_required` (`in`/`not_in` a list of languages, by name or code),
-  `posting_language` (`in`/`not_in`), `likely_duplicate` (`at_least` a
-  confidence) or `no_longer_listed` (`is` true). While enabled and confirmed it
-  acts once on each job nobody has reviewed, when the signal arrives: at
-  collection, and for `no_longer_listed` when a board stops listing the posting.
-  `dismiss` dismisses the job as the system, naming the rule in
-  `dismissal.rule`; `flag` records it in `signals.rules`. Jobs the owner adds
-  in the dashboard are never dismissed by a rule. `policy_rule_preview({rule})`
-  counts the jobs waiting in the Inbox a rule would match now, without acting:
-  measure a rule before proposing it.
+- `preferences_update(section, {expected_version, items})` replaces the whole
+  section: read it, edit the list and write it back with the version you read.
+  Items are `{text}` (plain text, Markdown allowed, at most 2,000 characters,
+  at most 200 per section) and, in `writing`, `{text, scope}` with scope `all`,
+  `cv` or `letter`. A stale version is `409 conflict` with
+  `details.current_version`: read again and merge. Keep the owner's wording;
+  add or change only what the owner asked for or confirmed.
+- `settings_update({expected_version, no_reply_days?, spoken_languages?})`
+  changes the no-reply period (1-365 days, default 30) or the spoken languages
+  (ISO 639-1 codes).
+- Removed in 0.24: the former policy and instructions tools return
+  `tool_removed` with a hint. General instructions and template rule statements
+  are Writing rules now.
 
 ## Manage collection and the archive
 
@@ -115,19 +105,23 @@ unavailable and failed results before calling a collection complete.
 
 `sources_yield({since?, until?, min_sample?})` reports, per source and per
 search, what the jobs it first collected became: collected, to review,
-shortlisted, applied, employer responses, dismissed (by rule, agent, owner or
-other, and by rule), likely duplicates and postings no longer listed, with
+shortlisted, applied, employer responses, dismissed (by agent, owner or
+other), likely duplicates and postings no longer listed, with
 searches split by job board. Use it to tune sources (manage-sources).
 
 Every job has `signals` computed at collection without a model: `language`,
 the languages it states as `required` (groups, one of a group suffices) or
 `welcome`, a likely `duplicate` of an earlier job with its confidence, and
 `no_longer_listed` (a company board stopped listing it; `unlisted_at` on the
-observation). `jobs_list` filters by `signal`, `posting_language`,
-`posting_language_not`, `requires`, `dismissed_by` and `rule_id`, and
-`include_counts` returns the size of each queue. A dismissed job has
-`dismissal`: who, when, why (`reason`) and the rule, if one dismissed it.
-`jobs_distinct(job_id, {other_id})` records that a flagged likely duplicate is a
+observation). Signals are labels and filters; nothing dismisses a job
+automatically. `jobs_list` filters by `signal`, `posting_language`,
+`posting_language_not`, `requires` and `dismissed_by`, and
+`include_counts` returns the size of each queue. `hide_unspoken_required: true`
+leaves out jobs whose required languages are outside the owner's
+`spoken_languages`; with true or false the result has `unspoken_required`
+(`spoken_languages`, `count`, `hidden`). A dismissed job has `dismissal`: who,
+when, why (`reason`) and its `category` (`agent`, `owner` or `other`).
+`jobs_distinct(job_id, {other_id})` records that a likely duplicate is a
 different vacancy. Whether a board still lists a posting is
 `signals.no_longer_listed`.
 
@@ -199,9 +193,8 @@ It takes `response_date` (default today) and `response_note`; a duplicate is not
 added. Closing with `outcome: "no_response"` needs a sent application and takes
 `concluded_on` (default today). `applications_list` with `no_reply_due: true`
 lists Applied applications sent before the no-reply cutoff; every list result
-has `no_reply` with `days`, `source` (`policy` or `default`), `item_id`,
-`confirmed` and `due`. The period comes from the Policy decision item labelled
-"No reply" (its first number of days), else 30.
+has `no_reply` with `days`, `source` (`settings` or `default`) and `due`. The
+period comes from the setting `no_reply_days`, else 30.
 
 `insights_get(value)` / `GET /insights` takes `min_sample` (1-100, default 5),
 `applied_since` and `applied_until`. It returns `overall` (sent, responded,

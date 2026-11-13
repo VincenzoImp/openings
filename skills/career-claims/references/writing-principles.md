@@ -30,7 +30,7 @@ A generic promise of efficiency does not replace implementation detail.
 - Keep distinct claims and sufficient source context.
   Do not turn each fact into a separate CV sentence.
 
-The owner request and Openings instructions control the document.
+The owner request and the owner's Writing rules in Openings control the document.
 These sources do not authorize new facts, submission or fixed-template changes.
 
 ## Public sources
