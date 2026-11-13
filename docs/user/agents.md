@@ -136,7 +136,7 @@ skills: discover the tools/resources and their typed input schemas.
    `staleness_list` lists Draft applications whose current revisions were
    built on older inputs and `staleness_get` explains one, naming each
    changed part (for example the Profile `summary` or the policy item "Work
-   authorization"). Profile metadata, preferences, roles, decision items and
+   authorization"). Profile metadata, decision items and
    unconfirmed proposals never make a Draft stale. Contexts stay frozen: refresh by
    preparing a new context and new revisions. The owner submits
    applications and records Applied. Portals and sending are outside Openings.
