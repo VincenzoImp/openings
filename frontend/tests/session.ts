@@ -42,15 +42,13 @@ export async function call(
 ) {
   return page.evaluate(
     async ({ path, method, body, token }) => {
-      const setup = { "X-Openings-E2E-Setup": "1" };
-      const session = await fetch("/api/v1/auth/session", {
-        headers: setup,
-      }).then((response) => response.json());
+      const session = await fetch("/api/v1/auth/session").then((response) =>
+        response.json(),
+      );
       const response = await fetch("/api/v1" + path, {
         method,
         credentials: token ? "omit" : "same-origin",
         headers: {
-          ...setup,
           "Content-Type": "application/json",
           ...(token
             ? { Authorization: "Bearer " + token }
@@ -105,15 +103,13 @@ export async function upload(
 ) {
   return page.evaluate(
     async ({ ownerType, ownerId, name, data, mediaType, sourceSha256 }) => {
-      const setup = { "X-Openings-E2E-Setup": "1" };
-      const session = await fetch("/api/v1/auth/session", {
-        headers: setup,
-      }).then((response) => response.json());
+      const session = await fetch("/api/v1/auth/session").then((response) =>
+        response.json(),
+      );
       const body = Uint8Array.from(atob(data), (char) => char.charCodeAt(0));
       const ticket = await fetch("/api/v1/files/uploads", {
         method: "POST",
         headers: {
-          ...setup,
           "Content-Type": "application/json",
           "X-CSRF-Token": session.csrf_token,
         },
@@ -131,7 +127,7 @@ export async function upload(
       });
       const response = await fetch(ticket.url, {
         method: ticket.method || "PUT",
-        headers: { ...setup, ...ticket.headers },
+        headers: ticket.headers,
         body,
       });
       // Read the answer: an unread body keeps the request open for the page.

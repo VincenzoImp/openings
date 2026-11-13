@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
 import { test, expect, type Page } from "@playwright/test";
 
-// The performance budget of docs/developer/dashboard-design.md: on a synthetic
+// The performance budget of the dashboard: on a synthetic
 // workspace of 25,000 jobs (with their ingest signals) and 500 applications,
 // the Applications list and the jobs to review, 200 rows each, are interactive
 // in under 300 ms after navigation. This project starts its own large

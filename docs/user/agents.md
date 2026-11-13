@@ -89,7 +89,7 @@ skills: discover the tools/resources and their typed input schemas.
    `workspace_info` returns their number as `open_requests`). Take the ones you
    will handle with `requests_take` and report with `requests_complete` or
    `requests_decline`. See [Ask your agent](agent-operated.md#ask-your-agent).
-1. Call `workspace_info`, `capabilities_get`, `profile_get`, `knowledge_list`, `claims_list`,
+1. Call `workspace_info`, `profile_get`, `knowledge_list`, `claims_list`,
    `templates_list` and `instructions_get` as needed. Detailed narratives explain
    the facts; approved claims are reusable wording, not the only allowed wording.
    [Career entries](career.md) separate titles, organizations, partial dates and
