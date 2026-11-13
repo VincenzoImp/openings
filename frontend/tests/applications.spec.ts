@@ -944,6 +944,11 @@ test("documents, revisions, frozen copies and their files are managed in the rev
   await dialog(page).getByLabel("Note").fill("Leads with the data work.");
   await dialog(page).getByRole("button", { name: "Save the revision" }).click();
   await expect(dialog(page)).toHaveCount(0);
+  // The Documents tab can keep the list it read before the files arrived
+  // (seen on a loaded CI runner); open it again for a fresh read.
+  await page.waitForLoadState("networkidle");
+  await go(page, `review?application=${application.id}&tab=documents`);
+  await settled(page);
   const revisions = page.getByRole("list", { name: "Document revisions" });
   await revisions.getByRole("button", { name: /^Open Workflow CV/ }).click();
   await expect(
