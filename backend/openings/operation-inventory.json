@@ -1053,8 +1053,8 @@
         "policy_confirm"
       ],
       "dashboard": "Policy: Confirm",
-      "access": "owner",
-      "notes": "expected_version is the section's version; a stale one returns 409 with details.current_version. Confirms the item as it stands and records who confirmed it. An agent proposes and asks; it never confirms."
+      "notes": "expected_version is the section's version; a stale one returns 409 with details.current_version. Confirms the item as it stands and records who confirmed it. An agent proposes and asks; it never confirms.",
+      "access": "owner"
     },
     {
       "id": "policy.remove",

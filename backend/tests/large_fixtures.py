@@ -35,14 +35,80 @@ def stamp(moment):
     return moment.isoformat(timespec="microseconds")
 
 
-def seed_large(workspace, jobs, applications):
-    """Write ``jobs`` jobs and ``applications`` applications (on the first jobs)."""
+def seed_signals(workspace):
+    """Store ingest signals for every job without them, in bulk.
+
+    ``SignalService.backfill`` computes them one job at a time, which takes
+    seconds per thousand jobs. The large jobs share eight posting texts, so each
+    text is analysed once and its signals stored for every job that uses it; one
+    job in fifty is the likely duplicate of the job before it.
+    """
+    from openings.job_signals import FORMAT
+    from openings.language_signals import text_signals
+
+    found, rows, previous = {}, [], None
+    with workspace.db.transaction() as conn:
+        for index, (job_id, title, posting, version) in enumerate(
+            conn.execute(
+                "SELECT id,title,posting,content_version FROM jobs WHERE id NOT IN "
+                "(SELECT job_id FROM job_signals) ORDER BY created_at,id"
+            ).fetchall()
+        ):
+            key = (title.rsplit(" ", 1)[0], posting)
+            if key not in found:
+                found[key] = text_signals(*key)
+            signals = found[key]
+            duplicate = previous if index % 50 == 49 else None
+            rows.append(
+                (
+                    job_id,
+                    FORMAT,
+                    version,
+                    signals["language"],
+                    signals["language_confidence"],
+                    json.dumps(signals["required"]),
+                    json.dumps(signals["welcome"]),
+                    duplicate,
+                    0.9 if duplicate else None,
+                    stamp(datetime.now(UTC)),
+                )
+            )
+            previous = job_id
+        conn.executemany(
+            "INSERT INTO job_signals(job_id,format,content_version,language,language_confidence,"
+            "required,welcome,duplicate_checked,duplicate_of,duplicate_confidence,computed_at) "
+            "VALUES(?,?,?,?,?,?,?,1,?,?,?)",
+            rows,
+        )
+
+
+def seed_large(workspace, jobs, applications, sources=0):
+    """Write ``jobs`` jobs and ``applications`` applications (on the first jobs).
+
+    With ``sources``, that many company sources are created and four jobs in five
+    are first observed by one of them, so source yield has something to count.
+    """
     now = datetime.now(UTC)
     sha = hashlib.sha256(PDF).hexdigest()
     with workspace.db.transaction() as conn:
         conn.execute(
             "INSERT OR IGNORE INTO blobs(sha256,content,size) VALUES(?,?,?)",
             (sha, PDF, len(PDF)),
+        )
+        source_ids = [new_id() for _ in range(sources)]
+        conn.executemany(
+            "INSERT INTO sources(id,name,kind,config,created_at,updated_at) VALUES(?,?,?,?,?,?)",
+            [
+                (
+                    source_id,
+                    f"{COMPANIES[index % len(COMPANIES)]} board {index}",
+                    "greenhouse",
+                    json.dumps({"board": f"synthetic{index}"}),
+                    stamp(now),
+                    stamp(now),
+                )
+                for index, source_id in enumerate(source_ids)
+            ],
         )
         job_rows, identities, postings = [], [], []
         for index in range(jobs):
@@ -64,7 +130,10 @@ def seed_large(workspace, jobs, applications):
                 )
             )
             identities.append(("url:" + url, job_id))
-            postings.append((new_id(), job_id, "url:" + url, url, "{}", sha, created, created))
+            source = source_ids[index % sources] if sources and index % 5 else None
+            postings.append(
+                (new_id(), job_id, source, "url:" + url, url, "{}", sha, created, created)
+            )
         conn.executemany(
             "INSERT INTO jobs(id,title,company,location,url,posting,triage,metadata,created_at,updated_at) "
             "VALUES(?,?,?,?,?,?,?,?,?,?)",
@@ -72,8 +141,8 @@ def seed_large(workspace, jobs, applications):
         )
         conn.executemany("INSERT INTO job_identities(identity,job_id) VALUES(?,?)", identities)
         conn.executemany(
-            "INSERT INTO postings(id,job_id,identity,url,payload,content_hash,first_seen_at,last_seen_at) "
-            "VALUES(?,?,?,?,?,?,?,?)",
+            "INSERT INTO postings(id,job_id,source_id,identity,url,payload,content_hash,first_seen_at,"
+            "last_seen_at) VALUES(?,?,?,?,?,?,?,?,?)",
             postings,
         )
         for index in range(applications):

@@ -1,71 +1,110 @@
 """REST routes and MCP tools of skills."""
 
+from types import SimpleNamespace
 from typing import Annotated
 
 from fastapi import Query
+from mcp.types import ToolAnnotations
 
 from ..skill_notes import SkillNotesInput, SkillNotesService
 from ..skills import SKILL_FILE, SkillLibrary, list_skills, read_skill
+from .registry import REQUIRED, Operation, Param, Route, Surface, Tool, bind_mcp, bind_rest
+
+READ = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+WRITE = ToolAnnotations(destructiveHint=False, openWorldHint=False)
+
+OPERATIONS = (
+    Operation(
+        "skills.list",
+        "skills",
+        "list",
+        "Archive",
+        "List shipped agent workflow skills",
+        params=(),
+        call=lambda s: list_skills(s.library, s.notes),
+        rest=(Route("GET", "/skills", "skills_list"),),
+        tool=Tool(
+            "skills_list",
+            READ,
+            "List the workflow skills this server ships for agents operating Openings:\nsetup, Inbox review, Shortlist preparation, sources, Career maintenance,\ntracking, interviews and writing, with their reference files and the version\nof each skill's local notes. Read one with skill_get.",
+        ),
+    ),
+    Operation(
+        "skills.notes.read",
+        "skill_notes",
+        "get",
+        "Archive",
+        "Read a skill's local notes for this workspace with earlier versions",
+        params=(Param("name", str),),
+        call=lambda s, name: s.notes.get(name),
+        rest=(Route("GET", "/skills/{name}/notes", "skill_notes_get"),),
+        tool=Tool(
+            "skill_notes_get",
+            READ,
+            "Read a skill's local notes for this workspace: text, version, who wrote it and\nthe earlier versions, newest first.",
+        ),
+    ),
+    Operation(
+        "skills.notes.update",
+        "skill_notes",
+        "update",
+        "Archive",
+        "Replace a skill's local notes",
+        params=(Param("name", str), Param("value", SkillNotesInput)),
+        call=lambda s, name, value: s.notes.update(name, value),
+        rest=(Route("PUT", "/skills/{name}/notes", "skill_notes_update"),),
+        tool=Tool(
+            "skill_notes_update",
+            WRITE,
+            "Replace a skill's local notes (at most 2000 characters; empty clears them) using\ntheir current version (0 for the first notes). Record a lasting method gap of this\nworkspace here; personal criteria belong to the policy. Each save is a new,\nattributed version that the owner can read and restore.",
+        ),
+    ),
+    Operation(
+        "skills.read",
+        "skills",
+        "get",
+        "Archive",
+        "Read a skill or one of its reference files",
+        params=(
+            Param("name", str),
+            Param("path", str, SKILL_FILE, rest=(str, REQUIRED)),
+            Param("local_notes", bool, True, rest=(Annotated[bool, Query()], True)),
+        ),
+        call=lambda s, name, path, local_notes: read_skill(
+            s.library, s.notes, name, path, local_notes
+        ),
+        rest=(
+            Route(
+                "GET",
+                "/skills/{name}",
+                "skill_get",
+                params=(Param("name", str), Param("local_notes", Annotated[bool, Query()], True)),
+                call=lambda s, name, local_notes: read_skill(
+                    s.library, s.notes, name, SKILL_FILE, local_notes
+                ),
+            ),
+            Route("GET", "/skills/{name}/files/{path:path}", "skill_file_get"),
+        ),
+        tool=Tool(
+            "skill_get",
+            READ,
+            "Read a skill's SKILL.md, or one of its listed reference files, as Markdown.\nSKILL.md ends with this workspace's local notes under \"Local notes for this\nworkspace\" (local_notes=false returns the shipped text alone). Relative links\ninside a skill resolve against that skill's directory.",
+        ),
+    ),
+)
+
+
+SURFACES = (Surface("prompt", "<skill name>"),)
 
 
 def register_api(router, library: SkillLibrary, notes: SkillNotesService):
-    @router.get("/skills")
-    def skills_list():
-        return list_skills(library, notes)
-
-    @router.get("/skills/{name}/notes")
-    def skill_notes_get(name: str):
-        return notes.get(name)
-
-    @router.put("/skills/{name}/notes")
-    def skill_notes_update(name: str, value: SkillNotesInput):
-        return notes.update(name, value)
-
-    @router.get("/skills/{name}")
-    def skill_get(name: str, local_notes: Annotated[bool, Query()] = True):
-        return read_skill(library, notes, name, SKILL_FILE, local_notes)
-
-    @router.get("/skills/{name}/files/{path:path}")
-    def skill_file_get(name: str, path: str, local_notes: Annotated[bool, Query()] = True):
-        return read_skill(library, notes, name, path, local_notes)
+    bind_rest(router, OPERATIONS, SimpleNamespace(library=library, notes=notes))
 
 
 def register_mcp(mcp, library: SkillLibrary, notes: SkillNotesService):
-    from mcp.types import ToolAnnotations
+    bind_mcp(mcp, OPERATIONS, SimpleNamespace(library=library, notes=notes))
 
-    read_only = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
-    write = ToolAnnotations(destructiveHint=False, openWorldHint=False)
-
-    @mcp.tool(annotations=read_only)
-    def skills_list() -> dict:
-        """List the workflow skills this server ships for agents operating Openings:
-        setup, Inbox review, Shortlist preparation, sources, Career maintenance,
-        tracking, interviews and writing, with their reference files and the version
-        of each skill's local notes. Read one with skill_get."""
-        return list_skills(library, notes)
-
-    @mcp.tool(annotations=read_only)
-    def skill_get(name: str, path: str = SKILL_FILE, local_notes: bool = True) -> dict:
-        """Read a skill's SKILL.md, or one of its listed reference files, as Markdown.
-        SKILL.md ends with this workspace's local notes under "Local notes for this
-        workspace" (local_notes=false returns the shipped text alone). Relative links
-        inside a skill resolve against that skill's directory."""
-        return read_skill(library, notes, name, path, local_notes)
-
-    @mcp.tool(annotations=read_only)
-    def skill_notes_get(name: str) -> dict:
-        """Read a skill's local notes for this workspace: text, version, who wrote it and
-        the earlier versions, newest first."""
-        return notes.get(name)
-
-    @mcp.tool(annotations=write)
-    def skill_notes_update(name: str, value: SkillNotesInput) -> dict:
-        """Replace a skill's local notes (at most 2000 characters; empty clears them) using
-        their current version (0 for the first notes). Record a lasting method gap of this
-        workspace here; personal criteria belong to the policy. Each save is a new,
-        attributed version that the owner can read and restore."""
-        return notes.update(name, value)
-
+    # One prompt per shipped skill: the skill's instructions with its local notes.
     for item in library.list():
         name = item["name"]
 
