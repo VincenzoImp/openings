@@ -281,8 +281,10 @@ APPLICATIONS = """CREATE TABLE {name} (
 
 def _migrate_10_to_11(conn):
     # Additive: employer responses, the no_response outcome with the day it was
-    # concluded, and one response for each application whose stage already says the
-    # employer answered (outcomes.backfill_responses). The outcome CHECK constraint
+    # concluded, one response for each application whose stage already says the
+    # employer answered (outcomes.backfill_responses), and the part hashes each
+    # context froze (context_inputs.parts, derived from the payloads when the
+    # workspace opens: staleness.backfill_context_inputs). The outcome CHECK constraint
     # changes, so the applications table is built again: every row keeps its rowid
     # and values, its indexes and triggers are recreated, and the tables that
     # reference it keep their rows (upgrade() runs with foreign keys off and checks
@@ -311,6 +313,8 @@ def _migrate_10_to_11(conn):
         if statement.strip():
             conn.execute(statement)
     backfill_responses(conn)
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='context_inputs'").fetchone():
+        conn.execute("ALTER TABLE context_inputs ADD COLUMN parts TEXT")
 
 
 # Each step upgrades from its key to the next version; steps chain inside one transaction.

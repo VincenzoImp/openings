@@ -51,7 +51,7 @@ from .outcomes import (
 from .posting import posting_complete, posting_complete_sql
 from .retention import REFRESH_EVENT, REFRESH_FIELDS, observation_payload
 from .snapshots import collect_unused
-from .staleness import application_staleness
+from .staleness import application_staleness, stale_summary
 
 # Current revision leaves only; a parent's PDF or approval never counts for its child.
 _LEAVES = (
@@ -1043,9 +1043,9 @@ class Workspace:
             row["preparation"] = self._application_preparation(connection, [application_id])[
                 application_id
             ]
-            row["stale_inputs"] = application_staleness(connection, [application_id])[
-                application_id
-            ]["inputs"]
+            row.update(
+                stale_summary(application_staleness(connection, [application_id])[application_id])
+            )
             row["responses"] = responses_of(connection, [application_id])[application_id]
             row["last_response"] = last_responses(connection, [application_id])[application_id]
         return row
@@ -1206,7 +1206,7 @@ class Workspace:
             )
             item["job"] = self._compact_job(raw)
             item["preparation"] = preparation[item["id"]]
-            item["stale_inputs"] = staleness[item["id"]]["inputs"]
+            item.update(stale_summary(staleness[item["id"]]))
             item["last_response"] = answers[item["id"]]
             items.append(item)
         return {
