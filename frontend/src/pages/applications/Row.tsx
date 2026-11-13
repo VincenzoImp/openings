@@ -15,7 +15,7 @@ import {
 import { Respond } from "./Respond";
 
 export const COLUMNS =
-  "28px minmax(190px, 2.2fr) 92px minmax(110px, 1.1fr) minmax(130px, 1.3fr) minmax(150px, 1.5fr) 92px minmax(132px, max-content)";
+  "28px minmax(180px, 2fr) 92px minmax(150px, 1.3fr) minmax(130px, 1.2fr) minmax(150px, 1.4fr) 92px minmax(132px, max-content)";
 export const HEAD = [
   { name: "Select", hidden: true },
   { name: "Role and company" },
