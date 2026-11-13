@@ -6,63 +6,45 @@ import {
   type Application,
   type Json,
   type ListResult,
-  type StaleInput,
   type Staleness,
   type WorkspaceFile,
 } from "../../api";
 import { Button, ErrorBanner, Loading, Tag } from "../../design";
 import { Pager, plural } from "../../library/common";
+import {
+  changeName,
+  changeState,
+  comparisonNotes,
+  concerned,
+} from "../../library/staleness";
 import { dayTime } from "../../library/time";
 import { useResource, useWorkspace } from "../../state";
 import { ContextDialog } from "./ContextDialog";
 import { kindLabels } from "./model";
 
 const NONE = { items: [], total: 0 };
-const inputNames: Record<StaleInput, string> = {
-  profile: "Profile",
-  instructions: "General instructions",
-  template: "Template",
-  knowledge: "Career entry",
-  claim: "Claim",
-};
-const states = {
-  changed: "changed",
-  deleted: "deleted",
-  unapproved: "no longer approved",
-};
 
 /** What changed in the record since the current revisions were written. */
-function Changes({ application }: { application: Application }) {
-  const report = useResource<Staleness | null>(
-    `/applications/${application.id}/staleness`,
-    null,
-  );
-  if (report.error)
-    return <ErrorBanner message={report.error} retry={report.reload} />;
-  if (!report.data) return <Loading label="Comparing the inputs…" />;
-  const stale = report.data.documents.filter((item) => item.status === "stale");
+function Changes({ report }: { report: Staleness }) {
+  const stale = report.documents.filter((item) => item.status === "stale");
   return (
     <div className="stack">
       <ul
         className="list"
         aria-label="Inputs changed since the documents were written"
       >
-        {report.data.changes.map((change) => (
-          <li key={`${change.input}-${change.id ?? ""}`}>
-            <span className="grow">
-              {inputNames[change.input]}
-              {change.label ? ` "${change.label}"` : ""}
-            </span>
-            <span className="caption">
-              {states[change.state]}
-              {change.state === "changed" &&
-              change.frozen_version !== null &&
-              change.current_version !== null
-                ? ` · version ${change.frozen_version} → ${change.current_version}`
-                : ""}
-            </span>
-          </li>
-        ))}
+        {report.changes.map((change) => {
+          const only = concerned(change, report, kindLabels);
+          return (
+            <li key={`${change.input}-${change.id ?? ""}`}>
+              <span className="grow">{changeName(change)}</span>
+              <span className="caption">
+                {changeState(change)}
+                {only ? ` · ${only} only` : ""}
+              </span>
+            </li>
+          );
+        })}
       </ul>
       {stale.length > 0 && (
         <p className="caption">
@@ -73,6 +55,35 @@ function Changes({ application }: { application: Application }) {
         </p>
       )}
     </div>
+  );
+}
+
+/** The comparison of the frozen copies the current revisions use. */
+function Comparison({
+  application,
+  stale,
+}: {
+  application: Application;
+  stale: boolean;
+}) {
+  const report = useResource<Staleness | null>(
+    `/applications/${application.id}/staleness`,
+    null,
+  );
+  if (report.error)
+    return <ErrorBanner message={report.error} retry={report.reload} />;
+  if (!report.data)
+    return stale ? <Loading label="Comparing the inputs…" /> : null;
+  const notes = comparisonNotes(report.data);
+  return (
+    <>
+      {report.data.changes.length > 0 && <Changes report={report.data} />}
+      {notes.map((note) => (
+        <p key={note} className="caption">
+          {note}
+        </p>
+      ))}
+    </>
   );
 }
 
@@ -145,7 +156,7 @@ export function Inputs({ application }: { application: Application }) {
           Prepare a frozen copy
         </Button>
       </div>
-      {stale ? <Changes application={application} /> : null}
+      <Comparison application={application} stale={Boolean(stale)} />
       {contexts.error && (
         <ErrorBanner message={contexts.error} retry={contexts.reload} />
       )}
