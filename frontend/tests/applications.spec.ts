@@ -931,7 +931,6 @@ test("the timeline records responses, notes and who made each change", async ({
         method: "PATCH",
         credentials: "omit",
         headers: {
-          "X-Openings-E2E-Setup": "1",
           "Content-Type": "application/json",
           Authorization: "Bearer " + token,
         },
@@ -1049,9 +1048,7 @@ test("the agent is asked from the review page and the application is deleted", a
   await expect(page).toHaveURL(/#applications$/);
   const left = await page.evaluate(
     (id) =>
-      fetch(`/api/v1/applications/${id}`, {
-        headers: { "X-Openings-E2E-Setup": "1" },
-      }).then((response) => response.status),
+      fetch(`/api/v1/applications/${id}`).then((response) => response.status),
     application.id,
   );
   expect(left).toBe(404);

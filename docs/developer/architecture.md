@@ -43,14 +43,13 @@ flowchart LR
 | `backend/openings/skills.py`, `skill_notes.py` | Shipped skills served read-only; per-workspace local notes appended when a skill is served |
 | `skills/` | Agent workflow skills (Agent Skills format) and their shared references |
 
-The [operation inventory](../../backend/openings/operation-inventory.json) is
-generated from the operation declarations (see below), packaged with the app and
-served by authenticated `GET /api/v1/capabilities` and `capabilities_get`. OpenAPI at `/api/openapi.json` and discovered MCP schemas are
-authoritative for individual input fields. The generated
-[parity matrix](parity.md) shows each operation's REST route, MCP tool and real
-dashboard path with the browser tests that used it, and the documented
-exemptions; `pytest` and the browser tests in CI fail on any other difference
-(see [Contributing](../../CONTRIBUTING.md#parity)). Read [REST](../user/api.md) and
+The running OpenAPI schema at `/api/openapi.json` and MCP `tools/list` are the
+contract. Authenticated `GET /api/v1/capabilities` and `capabilities_get` list,
+computed from the operation declarations (see below), the version, the schema,
+the caller's token kind and each operation's MCP name, main REST route and
+owner-only access. Parity runs one way: every dashboard action is a REST
+operation, and every operation that is not owner-only is also an MCP tool;
+`backend/tests/test_parity.py` checks it. Read [REST](../user/api.md) and
 [agent](../user/agents.md) guides for usable examples.
 
 ## Module map
@@ -70,7 +69,7 @@ belongs to the module of its concern.
 | `documents/` | `contexts.py` frozen contexts and their staleness reports; `revisions.py` creation, cited evidence, review, comparison and deletion; `sources.py` the source and PDF of a CV or letter and its derived text; `text.py` readable text of a TeX source; `latex.py` what CV and letter class commands print; `files.py` owned files and scoped transfer grants; `models.py` inputs; `upgrade.py` the schema 12 to 13 step |
 | `career/` | `profile.py` Profile and instructions; `entries.py` Career entries; `claims.py`; `templates.py`; `imports.py`; `models.py` inputs and defaults; `records.py` row helpers shared with documents |
 | `policy/` | `service.py` item writes, confirmation and rule preview; `models.py` sections, the signal registry `SIGNALS` and inputs; `records.py` records as read and the frozen policy; `upgrade.py` the schema 9 to 10 step; `profile_upgrade.py` the Profile part of the schema 13 to 14 step |
-| `interfaces/` | One module per area declaring its operations and binding them to its service: `core.py` (workspace, jobs, notes, applications, overview), `career.py`, `documents.py`, `discovery.py`, `activity.py`, `agent_requests.py`, `policy.py`, `outcomes.py`, `insights.py`, `source_yield.py`, `skills.py` and `system.py` (sign-in, tokens, inventory, backup, restore, examples, export); `registry.py` the declaration and its binding |
+| `interfaces/` | One module per area declaring its operations and binding them to its service: `core.py` (workspace, jobs, notes, applications, overview), `career.py`, `documents.py`, `discovery.py`, `activity.py`, `agent_requests.py`, `policy.py`, `outcomes.py`, `insights.py`, `source_yield.py`, `skills.py` and `system.py` (sign-in, tokens, capabilities, backup, restore, examples, export); `registry.py` the declaration and its binding |
 
 Services never import FastAPI routing or MCP registration; `interfaces/` binds
 them, and `app.py` calls each area in a fixed order. Smaller concerns stay single
@@ -81,11 +80,12 @@ limit, split it the same way rather than growing it.
 ## Operation declarations
 
 Each logical operation is declared once, as an `Operation` in its area's
-`interfaces/` module (`OPERATIONS`): its inventory id, group and label, its
+`interfaces/` module (`OPERATIONS`): its id, group and label, its
 `resource` and `verb`, its parameters (`Param`), the service call, its REST
 routes (`Route`: method, path, route name, status code) and its MCP tool
 (`Tool`: annotations, description), and `access="owner"` where the service
-requires owner authority. `registry.bind_rest` and `registry.bind_mcp` generate
+requires owner authority. An owner-only operation may have no tool (REST only);
+every other operation has one. `registry.bind_rest` and `registry.bind_mcp` generate
 the FastAPI routes and MCP tools from it, both calling the same service code:
 
 - A parameter is declared once with its MCP annotation and default; `Param.rest`
@@ -97,11 +97,11 @@ the FastAPI routes and MCP tools from it, both calling the same service code:
   that reach the network; an async call makes both transports async.
 - `custom=True` marks a route or tool registered by hand next to the
   declarations, because it needs the HTTP request, cookies, streamed bytes or
-  the MCP context: browser sessions, the password change, the inventory,
+  the MCP context: browser sessions, the password change, the capabilities,
   backup, restore, export, file transfers and `workspace_info`. It is still
-  declared, so the inventory lists it.
-- `EXEMPTIONS` declare the documented transport differences (session routes,
-  health, the MCP transport, examples, raw transfers, immutable records) and
+  declared, so the parity test and the capabilities list cover it.
+- `EXEMPTIONS` declare the transport-only routes with a one-line reason
+  (session routes, health, the MCP transport, examples) and
   `SURFACES` the hand-registered MCP resource and prompts.
 
 REST routes are registered in declaration order, which matters for matching
@@ -122,16 +122,16 @@ in `idempotency_keys` (`idempotency.py`: the table, the key, a SHA-256 of the
 request and the record's id; a key whose record is gone is free again).
 
 A tool has that one name and that one shape. The earlier names and the flat
-list arguments, kept as deprecated aliases in 0.22, were removed in 0.23 (the
-[upgrade guide](../user/upgrading-0.23.md) maps each to its tool), and
+list arguments, kept as deprecated aliases in 0.22, were removed in 0.23 (see
+[CHANGELOG.md](../../CHANGELOG.md)), and
 `OpeningsMCP.call_tool` refuses an argument a tool does not take with
 `422 validation` instead of ignoring it, so a filter passed beside `value` is
 never dropped silently.
 
-`scripts/inventory.py` writes `operation-inventory.json` from the declarations
-and `interfaces/inventory-notes.json`, which holds the inventory's order,
-dashboard locations and remarks. `pytest` fails while the file is out of date,
-or when a declared route, tool or surface is not registered.
+`backend/tests/test_parity.py` fails when an `/api/v1` route belongs to no
+operation or transport exemption, or to more than one, or when an operation that
+is not owner-only has no MCP tool; `test_interfaces.py` fails when a declared
+route, tool or surface is not registered.
 
 ## Data and workflow rules
 
@@ -300,7 +300,7 @@ or when a declared route, tool or surface is not registered.
   so the owner can turn it into notes.
 - **Token scope:** a token is `owner` or `agent`. Owner-only operations call
   `actors.require_owner` in the shared service, so REST and MCP refuse an agent
-  token alike with `403 forbidden`; the inventory marks them `access: owner` and
+  token alike with `403 forbidden`; `/api/v1/capabilities` marks them `access: owner` and
   `test_interfaces.py` calls each one. Scoped operational grants (backup, export,
   restore) carry the requesting actor. A backup made for an agent token has the
   installation's password hash, session secret and tokens removed from the copy.
@@ -498,11 +498,9 @@ cannot overwrite a current result. See [source configuration](../user/sources.md
 Add behavior in the shared service before exposing it through REST, MCP and the
 dashboard: the method goes in the module of its concern (see the module map),
 and one `Operation` declaration in the area's `interfaces/` module gives its
-route and tool. Add its dashboard location to `interfaces/inventory-notes.json`
-and run `uv run python scripts/inventory.py`; build its dashboard path with a
-browser test that uses it and record the evidence with
-`uv run python scripts/parity_matrix.py --e2e`. Keep
-operator/bootstrap and raw-byte transport differences explicit.
+route and tool. A dashboard action calls that REST operation; a browser test
+covers the workflow. Keep operator/bootstrap and raw-byte transport differences
+explicit.
 
 Provider adapters emit bounded structured postings and use the shared HTTP gate.
 Keep endpoint-specific parsing in the adapter, preserve partial successful results
@@ -511,6 +509,3 @@ and canonical filter metadata, and test failed/empty/malformed responses. The
 its pinned upstream source and local transport changes.
 
 Use the focused checks and manual workflow guidance in [Contributing](../../CONTRIBUTING.md).
-
-The accepted product direction is in the [redesign proposal](proposal-redesign.md);
-the dashboard design and its static prototypes are in [dashboard design](dashboard-design.md).

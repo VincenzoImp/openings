@@ -130,7 +130,10 @@ jobs:
             --data '{"password":"synthetic-release-password"}' --output /dev/null
           curl --silent --fail --cookie /tmp/openings-cookie \
             http://127.0.0.1:18080/api/v1/capabilities --output /tmp/openings-capabilities.json
-          python -c "import json,os; p=json.load(open('/tmp/openings-capabilities.json')); assert p['version']==os.environ['VERSION']"
+          python -c "import json,os; p=json.load(open('/tmp/openings-capabilities.json')); assert p['version']==os.environ['VERSION'] and p['operations']"
+          curl --silent --fail --cookie /tmp/openings-cookie \
+            http://127.0.0.1:18080/api/v1/skills --output /tmp/openings-skills.json
+          python -c "import json,pathlib; served={s['name'] for s in json.load(open('/tmp/openings-skills.json'))['items']}; shipped={p.parent.name for p in pathlib.Path('skills').glob('*/SKILL.md')}; assert served==shipped and served, (served, shipped)"
           curl --silent --fail http://127.0.0.1:18080/ --output /tmp/openings-index.html
           python -c "assert '<div id=\"root\"></div>' in open('/tmp/openings-index.html').read()"
       - name: Record the tested digest
