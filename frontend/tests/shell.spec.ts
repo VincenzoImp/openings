@@ -301,25 +301,27 @@ test("a screen that fails to load offers a reload", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("no horizontal page scroll from 360 to 1600 px on every screen", async ({
-  page,
-}) => {
-  test.skip(
-    test.info().project.name !== "chromium",
-    "Widths are set by the test; one project is enough.",
-  );
-  test.setTimeout(180000);
-  const api = (path: string) =>
-    page.evaluate(
-      (path) => fetch("/api/v1" + path).then((response) => response.json()),
-      path,
+// One test per width, so the workers share them.
+for (const width of [360, 390, 600, 860, 861, 1024, 1280, 1600])
+  test(`no horizontal page scroll at ${width} px on every screen`, async ({
+    page,
+  }) => {
+    test.skip(
+      test.info().project.name !== "chromium",
+      "Widths are set by the test; one project is enough.",
     );
-  const ready = (await api("/applications?status=draft&ready=true&limit=1"))
-    .items[0];
-  const sent = (await api("/applications?status=interview&limit=1")).items[0];
-  // A job with every kind of signal: a likely duplicate of a job in progress.
-  const flagged = (await api("/jobs?signal=likely_duplicate&limit=1")).items[0];
-  for (const width of [360, 390, 600, 860, 861, 1024, 1280, 1600]) {
+    test.setTimeout(60000);
+    const api = (path: string) =>
+      page.evaluate(
+        (path) => fetch("/api/v1" + path).then((response) => response.json()),
+        path,
+      );
+    const ready = (await api("/applications?status=draft&ready=true&limit=1"))
+      .items[0];
+    const sent = (await api("/applications?status=interview&limit=1")).items[0];
+    // A job with every kind of signal: a likely duplicate of a job in progress.
+    const flagged = (await api("/jobs?signal=likely_duplicate&limit=1"))
+      .items[0];
     await page.setViewportSize({ width, height: 900 });
     for (const [route, title] of [
       ["today", "Today"],
@@ -360,5 +362,4 @@ test("no horizontal page scroll from 360 to 1600 px on every screen", async ({
         `${route} at ${width}px`,
       ).toBeLessThanOrEqual(width);
     }
-  }
-});
+  });
