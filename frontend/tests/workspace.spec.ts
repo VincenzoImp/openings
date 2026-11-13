@@ -1,4 +1,5 @@
-import { test, expect, type Page, type BrowserContext } from "./fixtures";
+import { test, expect, type Page } from "./fixtures";
+import { ownerSession } from "./session";
 
 function syntheticPdf() {
   const stream = "BT /F1 18 Tf 40 440 Td (Synthetic application CV) Tj ET";
@@ -50,19 +51,7 @@ async function go(page: Page, hash: string) {
 }
 const top = (page: Page) => page.locator("dialog[open]").last();
 const errors = new WeakMap<Page, string[]>();
-let ownerCookies: Parameters<BrowserContext["addCookies"]>[0] = [];
-test.beforeAll(async ({ browser }, info) => {
-  const context = await browser.newContext({
-    baseURL: info.project.use.baseURL,
-  });
-  const page = await context.newPage();
-  await page.goto("/");
-  await page.locator("input[name=password]").fill("synthetic-browser-password");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.locator(".main h1")).toBeVisible();
-  ownerCookies = await context.cookies();
-  await context.close();
-});
+const ownerCookies = ownerSession();
 test.beforeEach(async ({ page }) => {
   errors.set(page, []);
   page.on("pageerror", (error) => errors.get(page)!.push(error.message));

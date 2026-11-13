@@ -7,17 +7,11 @@ from fastapi.testclient import TestClient
 
 from openings.app import create_app
 from openings.duplicate_signals import normalize_company, normalize_title, posting_fingerprint
-from openings.workspace import Workspace
 
 BODY = " ".join(
     f"Design reliable Python services and review practical API change number {index}."
     for index in range(30)
 )
-
-
-@pytest.fixture
-def workspace(tmp_path):
-    return Workspace(tmp_path / "workspace.sqlite")
 
 
 def ingest(workspace, url, title="Backend Engineer", company="Example Labs", **extra):

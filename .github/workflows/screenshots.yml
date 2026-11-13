@@ -1,0 +1,54 @@
+name: Screenshots
+
+# Images of every dashboard screen (frontend/tests/screenshots.spec.ts) at
+# desktop and mobile widths in both themes, uploaded as the `screenshots`
+# artifact for visual review of a pull request that changes the dashboard.
+# Not a required check: it compares nothing, it only shows.
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - 'backend/tests/dashboard_server.py'
+      - '.github/workflows/screenshots.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-24.04
+    # Same image as the e2e shards in ci.yml; keep the tag equal to @playwright/test.
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe
+      options: --ipc=host
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.13.8'
+          python-version: '3.14'
+          enable-cache: true
+      - run: uv sync --locked
+      - run: npm --prefix frontend ci
+      - run: npm --prefix frontend run build
+      - run: npm --prefix frontend run screenshots
+      - name: Upload screenshots
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: screenshots
+          path: frontend/screenshots/
+          if-no-files-found: error
+          retention-days: 14

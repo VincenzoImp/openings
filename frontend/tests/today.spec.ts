@@ -12,8 +12,7 @@ import {
 // Today, the first screen, on the synthetic workspace of
 // backend/tests/today_fixtures.py: ready applications with deadlines, a
 // blocked one, sent applications of different ages, the agent's runs and
-// questions, and collection runs. The four projects share one server, so a
-// test that changes something makes its own records.
+// questions, and collection runs. Each test starts from the seeded workspace (fixtures.ts).
 const cookies: Cookies = ownerSession();
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {
