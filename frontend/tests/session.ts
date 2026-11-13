@@ -27,3 +27,54 @@ export async function go(page: Page, hash: string) {
 /** The narrow layout: bottom bar instead of the sidebar. */
 export const isNarrow = (page: Page) =>
   (page.viewportSize()?.width ?? 1440) <= 860;
+
+/**
+ * A REST call of the test itself, as the owner or with an API token. The
+ * header marks it as setup, so it is not evidence of a dashboard path.
+ */
+export async function call(
+  page: Page,
+  path: string,
+  method = "GET",
+  body?: unknown,
+  token?: string,
+) {
+  return page.evaluate(
+    async ({ path, method, body, token }) => {
+      const setup = { "X-Openings-E2E-Setup": "1" };
+      const session = await fetch("/api/v1/auth/session", {
+        headers: setup,
+      }).then((response) => response.json());
+      const response = await fetch("/api/v1" + path, {
+        method,
+        credentials: token ? "omit" : "same-origin",
+        headers: {
+          ...setup,
+          "Content-Type": "application/json",
+          ...(token
+            ? { Authorization: "Bearer " + token }
+            : { "X-CSRF-Token": session.csrf_token }),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      const value = await response.json();
+      if (!response.ok) throw Error(JSON.stringify(value));
+      return value;
+    },
+    { path, method, body, token },
+  );
+}
+
+/** A card of a screen, by its heading. */
+export const card = (page: Page, title: string) =>
+  page.locator("section.card").filter({
+    has: page.getByRole("heading", { name: title, exact: true }),
+  });
+
+/** The page never scrolls sideways. */
+export async function fitsViewport(page: Page) {
+  const width = page.viewportSize()!.width;
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(width);
+}

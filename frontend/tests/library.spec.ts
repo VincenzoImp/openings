@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
   errors.set(page, []);
   page.on("pageerror", (error) => errors.get(page)!.push(error.message));
   await page.context().addCookies(cookies);
-  await go(page, "overview");
+  await go(page, "today");
 });
 test.afterEach(async ({ page }) => {
   expect(errors.get(page)).toEqual([]);

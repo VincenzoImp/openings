@@ -16,12 +16,33 @@ covers local builds.
 
 ## Finding your way
 
-The navigation has three groups. **Work** holds Overview, Applications, Jobs (the
+The navigation has three groups. **Work** holds Today, Applications, Jobs (the
 Inbox and Shortlist queues, with Dismissed, All jobs and Possible duplicates as
-tabs) and Activity. **Library** holds Career and Templates. **System** holds
+tabs) and Activity. **Library** holds Career, Policy and Templates. **System** holds
 Collection and Settings. The numbers beside Applications and Activity count the
 applications ready to apply and the agent's open questions; the line at the bottom
 names the agent while one of its runs is open.
+
+**Today** is the first screen. A sentence counts what waits for you, and the
+cards below answer three questions:
+
+- **Ready to apply:** the applications your agent marked ready, closest deadline
+  first, then priority. **Review** opens the application.
+- **Needs your decision:** the agent's open questions, answered in place, and
+  applications blocked by a requirement. **Not now** only folds the answer box
+  away; the question stays open.
+- **What happened:** the pipeline (Preparing, Ready, Applied, Interview, Offer,
+  each a link to its list), the agent's runs and collection **since your last
+  visit**, and the applications **waiting for a reply** longer than the period of
+  the "No reply" decision in your Policy (30 days when it has none), with
+  **Record replies** to open them.
+
+"Since your last visit" starts where your previous visit ended: a visit lasts
+while Today keeps being opened and ends after 30 minutes without it, so reloading
+or looking at a run and coming back changes nothing. The browser remembers the
+visit; on the first visit, or when the browser keeps no site data, Today shows
+the last 7 days and says so. **Progress** at the bottom counts sent applications
+by the furthest stage they reached, for all time or a period.
 
 On a phone the bottom bar shows the four Work destinations and **More**, which
 opens Library and System. The top bar switches between the light and dark theme

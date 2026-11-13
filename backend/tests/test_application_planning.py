@@ -274,6 +274,57 @@ def test_readiness_follows_current_revisions_and_sorts_by_plan(tmp_path):
         workspace.list_applications(readiness="maybe")
 
 
+def test_applications_filter_by_the_time_they_were_applied(tmp_path):
+    app = create_app(tmp_path / "applied.sqlite", start_worker=False)
+    app.state.auth.setup("synthetic-password")
+    workspace = app.state.workspace
+    token = app.state.auth.create_token("Synthetic tracking client")["token"]
+    headers = {"Authorization": "Bearer " + token, "Accept": "application/json, text/event-stream"}
+
+    def applied(title, when):
+        job = workspace.ingest_job({"title": title, "company": "Example", "posting": "Build."})
+        created = workspace.create_application({"job_id": job["id"]})
+        fields = {"status": "applied", "applied_at": when} if when else {}
+        return workspace.update_application(
+            created["id"], {"expected_version": created["version"], "note": title, **fields}
+        )["id"]
+
+    old = applied("Old", "2026-09-01T09:00:00Z")
+    recent = applied("Recent", "2026-11-01T09:00:00Z")
+    applied("Preparing", None)
+
+    def ids(**query):
+        return [item["id"] for item in workspace.list_applications(**query)["items"]]
+
+    assert ids(status="applied", applied_until="2026-10-12T00:00:00+00:00") == [old]
+    assert ids(applied_since="2026-10-12T00:00:00+00:00") == [recent]
+    # An application never recorded as applied has no time to compare.
+    assert set(ids(applied_until="2027-01-01T00:00:00+00:00")) == {old, recent}
+    waiting = workspace.list_applications(status="applied", applied_until="2026-10-12", limit=1)
+    assert (waiting["total"], waiting["stage_counts"]["applied"]) == (1, 1)
+    with TestClient(app, base_url="http://localhost:8080", headers=headers) as client:
+        # A date without a time includes its whole day, as the other ranges do.
+        rest = client.get("/api/v1/applications", params={"applied_until": "2026-09-01"})
+        assert [item["id"] for item in rest.json()["items"]] == [old]
+        mcp = client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "applications_list",
+                    "arguments": {"value": {"applied_until": "2026-09-01"}},
+                },
+            },
+        ).json()["result"]
+        assert (
+            mcp.get("structuredContent") or json.loads(mcp["content"][0]["text"])
+        ) == rest.json()
+        invalid = client.get("/api/v1/applications", params={"applied_since": "soon"})
+        assert invalid.status_code == 422
+
+
 @pytest.mark.parametrize("transport", ["rest", "mcp"])
 def test_planning_fields_have_rest_and_mcp_parity(tmp_path, transport):
     app = create_app(tmp_path / f"parity-{transport}.sqlite", start_worker=False)

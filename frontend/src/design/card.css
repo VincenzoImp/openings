@@ -11,10 +11,14 @@
   padding: var(--s3) var(--s4);
   border-bottom: 1px solid var(--line);
 }
-.card > .body {
+/* A header whose text has several lines keeps its tag at the top. */
+.card > header.top {
+  align-items: flex-start;
+}
+.card .body {
   padding: var(--s4);
 }
-.card > footer {
+.card footer {
   display: flex;
   align-items: center;
   gap: var(--s3);

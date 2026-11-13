@@ -1,3 +1,5 @@
+// "Ask your agent" on a job or an application, for the pages written before
+// the design system. Activity has the full list (pages/activity/Requests.tsx).
 import { useState, type FormEvent } from "react";
 import {
   actorLabel,
@@ -7,26 +9,9 @@ import {
   type ListResult,
   type RequestState,
 } from "../api";
-import { useResource, useUrlState, useWorkspace } from "../state";
-import {
-  Button,
-  Dialog,
-  Empty,
-  ErrorBox,
-  Field,
-  Icon,
-  Loading,
-  Pagination,
-  PendingResults,
-} from "../ui";
-import {
-  RecordLink,
-  subjectNames,
-  type Links,
-  type Open,
-} from "./ActivityLinks";
+import { useResource, useWorkspace } from "../state";
+import { Button, Dialog, ErrorBox, Field, Icon } from "../ui";
 
-const PAGE = 30;
 const empty = { items: [], total: 0 };
 const states: Record<RequestState, { label: string; tone: string }> = {
   open: { label: "Waiting for the agent", tone: "amber" },
@@ -38,23 +23,12 @@ const states: Record<RequestState, { label: string; tone: string }> = {
 const LIMITS =
   "Your agent reads requests at the start of its next run. A request cannot make it submit an application, contact an employer or record Applied.";
 
-function StateTag({ request }: { request: AgentRequest }) {
-  return (
-    <span className={`tag ${states[request.state].tone}`}>
-      {states[request.state].label}
-    </span>
-  );
-}
-
-/** Write a request, optionally about one job, application or Career entry. */
 function RequestForm({
   subjectType,
   subjectId,
-  label = "Request for your agent",
 }: {
-  subjectType?: "job" | "application";
-  subjectId?: string;
-  label?: string;
+  subjectType: "job" | "application";
+  subjectId: string;
 }) {
   const { mutate, pending } = useWorkspace();
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -66,9 +40,8 @@ function RequestForm({
       () =>
         api("/requests", "POST", {
           text,
-          ...(subjectId
-            ? { subject_type: subjectType, subject_id: subjectId }
-            : {}),
+          subject_type: subjectType,
+          subject_id: subjectId,
         }),
       "Request saved. Your agent reads it at its next run.",
     );
@@ -76,7 +49,7 @@ function RequestForm({
   }
   return (
     <form onSubmit={submit} className="request-form">
-      <Field label={label} hint={LIMITS}>
+      <Field label="Request for your agent" hint={LIMITS}>
         <textarea
           name="text"
           rows={3}
@@ -94,26 +67,13 @@ function RequestForm({
   );
 }
 
-function Outcome({ request, onRun }: { request: AgentRequest; onRun?: Open }) {
-  const run = request.run_id && onRun && (
-    <>
-      {" · "}
-      <button
-        type="button"
-        className="inline-link"
-        onClick={() => onRun(request.run_id!)}
-      >
-        View run
-      </button>
-    </>
-  );
+function Outcome({ request }: { request: AgentRequest }) {
   if (request.state === "open") return null;
   if (request.state === "taken")
     return (
       <p className="muted smalltext">
         Taken by {actorLabel(request.taken_by)} ·{" "}
         {formatTime(request.taken_at || undefined)}
-        {run}
       </p>
     );
   if (request.state === "withdrawn")
@@ -132,58 +92,26 @@ function Outcome({ request, onRun }: { request: AgentRequest; onRun?: Open }) {
         {request.state === "done" ? "Completed" : "Declined"} by{" "}
         {actorLabel(request.resolved_by)} ·{" "}
         {formatTime(request.resolved_at || undefined)}
-        {run}
       </div>
     </div>
   );
 }
 
-function RequestCard({
-  request,
-  onRun,
-  compact = false,
-  ...links
-}: Partial<Links> & {
-  request: AgentRequest;
-  onRun?: Open;
-  compact?: boolean;
-}) {
+function RequestCard({ request }: { request: AgentRequest }) {
   const { mutate, pending } = useWorkspace();
-  const subject = request.subject;
   return (
-    <article
-      className={`request-card ${compact ? "" : "card sectioncard"}`}
-      aria-label={request.text}
-    >
-      {subject && !compact && (
-        <p className="smalltext question-subject">
-          {subject.deleted || !links.onOpenJob || !links.onOpenApplication ? (
-            <span className="muted">
-              {subjectNames[subject.type]}: {subject.label}
-              {subject.deleted ? " (deleted)" : ""}
-            </span>
-          ) : (
-            <RecordLink
-              onOpenJob={links.onOpenJob}
-              onOpenApplication={links.onOpenApplication}
-              type={subject.type}
-              id={subject.id}
-              jobId={subject.type === "job" ? subject.id : null}
-              applicationId={subject.type === "application" ? subject.id : null}
-              label={subject.label}
-            />
-          )}
-        </p>
-      )}
+    <article className="request-card" aria-label={request.text}>
       <div className="request-head">
         <p className="request-text">{request.text}</p>
-        <StateTag request={request} />
+        <span className={`tag ${states[request.state].tone}`}>
+          {states[request.state].label}
+        </span>
       </div>
       <p className="muted smalltext">
         Written by {actorLabel(request.created_by)} ·{" "}
         {formatTime(request.created_at)}
       </p>
-      <Outcome request={request} onRun={onRun} />
+      <Outcome request={request} />
       {(request.state === "open" || request.state === "taken") && (
         <div className="actions">
           <Button
@@ -208,98 +136,7 @@ function RequestCard({
   );
 }
 
-/** The Requests tab of Activity: write a request and follow what the agent did with each. */
-export function Requests({ onRun, ...links }: Links & { onRun: Open }) {
-  const [state, setState] = useUrlState("state", ""),
-    [offset, setOffset] = useUrlState("offset", "0");
-  const resource = useResource<ListResult<AgentRequest>>(
-    `/requests?limit=${PAGE}&offset=${offset}${state ? "&state=" + state : ""}`,
-    empty,
-  );
-  return (
-    <>
-      <section className="card sectioncard">
-        <RequestForm label="Ask your agent" />
-      </section>
-      <div className="toolbar activity-toolbar">
-        <Field label="State">
-          <select
-            value={state}
-            onChange={(event) => {
-              setOffset("0");
-              setState(event.target.value);
-            }}
-          >
-            <option value="">All requests</option>
-            {Object.entries(states).map(([value, item]) => (
-              <option key={value} value={value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-      {resource.error && (
-        <ErrorBox message={resource.error} retry={resource.reload} />
-      )}
-      {resource.loading ? (
-        <Loading />
-      ) : resource.data.items.length ? (
-        <>
-          <PendingResults pending={resource.refreshing} />
-          {resource.data.items.map((request) => (
-            <RequestCard
-              key={`${request.id}-${request.version}`}
-              request={request}
-              onRun={onRun}
-              {...links}
-            />
-          ))}
-          <Pagination
-            offset={Number(offset)}
-            total={resource.data.total}
-            limit={PAGE}
-            onChange={(value) => setOffset(String(value))}
-            label="Request pages"
-          />
-        </>
-      ) : (
-        !resource.error && (
-          <div className="card">
-            <Empty title={state ? "No requests in this state" : "No requests"}>
-              {state
-                ? "Choose another state to see the other requests."
-                : "Write what your agent should do next. It reads open requests at the start of every run and reports the result here."}
-            </Empty>
-          </div>
-        )
-      )}
-    </>
-  );
-}
-
-/** The requests a run handled, in the run detail. */
-export function RunRequests({ items }: { items?: AgentRequest[] }) {
-  if (!items?.length)
-    return <p className="muted">This run handled no requests.</p>;
-  return (
-    <ul className="report-list">
-      {items.map((request) => (
-        <li key={request.id}>
-          <StateTag request={request} /> {request.text}
-          {request.result && (
-            <>
-              <br />
-              <span className="muted">{request.result}</span>
-            </>
-          )}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** "Ask your agent" on a job or an application: write a request about this record. */
+/** Write a request about this record and see the earlier ones. */
 export function AskAgent({
   subjectType,
   subjectId,
@@ -350,7 +187,6 @@ export function AskAgent({
                 <RequestCard
                   key={`${request.id}-${request.version}`}
                   request={request}
-                  compact
                 />
               ))}
               {resource.data.total > resource.data.items.length && (

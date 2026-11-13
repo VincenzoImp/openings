@@ -88,7 +88,15 @@ checks:
   token pair in the design document's colour table from
   `frontend/src/design/tokens.css`. Change a colour in both places.
 - **Keyboard.** `frontend/tests/shell.spec.ts` operates the navigation, the More
-  sheet, the theme and the density from the keyboard alone.
+  sheet, the theme and the density from the keyboard alone;
+  `frontend/tests/today.spec.ts` answers a question on Today and
+  `frontend/tests/activity.spec.ts` moves through the Activity tabs and opens a
+  run's report the same way.
+
+The browser tests run on the synthetic workspace of
+`backend/tests/dashboard_server.py` and `backend/tests/today_fixtures.py`. The
+four projects share one server, so a test that changes data makes its own
+records and reads the numbers it compares from the API.
 
 New screens use the components in `frontend/src/design` and add no global styles.
 `frontend/src/legacy.css` belongs to the pages written before the design system:

@@ -70,7 +70,7 @@ test("an actor chip names the agent's token and keeps the agent colour for agent
 
 test("every shipped hash route still opens its screen, and design names are aliases", () => {
   for (const route of [
-    "overview",
+    "today",
     "activity",
     "inbox",
     "shortlist",
@@ -82,13 +82,19 @@ test("every shipped hash route still opens its screen, and design names are alia
     "settings",
   ])
     assert.equal(routes.routeOf("#" + route), route);
-  assert.equal(routes.routeOf(""), "overview");
-  assert.equal(routes.routeOf("#no-such-page"), "overview");
+  assert.equal(routes.routeOf(""), "today");
+  assert.equal(routes.routeOf("#no-such-page"), "today");
   assert.equal(routes.routeOf("#inbox?queue=duplicates"), "inbox");
-  assert.equal(routes.routeOf("#today"), "overview");
+  // Overview was the first screen before Today; its links open Today.
+  assert.equal(routes.routeOf("#overview"), "today");
+  assert.equal(routes.routeOf("#overview?since=2026-01-01"), "today");
   assert.equal(routes.routeOf("#jobs?q=python"), "inbox");
   assert.equal(routes.canonicalHash("#jobs?q=python"), "#inbox?q=python");
-  assert.equal(routes.canonicalHash("#today"), "#overview");
+  assert.equal(routes.canonicalHash("#overview"), "#today");
+  assert.equal(
+    routes.canonicalHash("#overview?since=2026-01-01"),
+    "#today?since=2026-01-01",
+  );
   assert.equal(routes.canonicalHash("#career?section=knowledge"), null);
 });
 
@@ -99,7 +105,7 @@ test("navigation has three groups, and both job queues belong to Jobs", () => {
       group.items.map((item) => item.label),
     ]),
     [
-      ["Work", ["Overview", "Applications", "Jobs", "Activity"]],
+      ["Work", ["Today", "Applications", "Jobs", "Activity"]],
       ["Library", ["Career", "Policy", "Templates"]],
       ["System", ["Collection", "Settings"]],
     ],

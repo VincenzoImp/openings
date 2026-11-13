@@ -119,7 +119,7 @@ in its current stage.
 Use the list or Kanban view to move between **Preparing**, **Applied**, **Interview**,
 **Offer** and **Closed**. Closing an attempt records **Accepted**, **Not selected**
 or **Not pursued**; choose an outcome explicitly. Events retain the recorded
-journey, including an interview before a later rejection. The overview funnel
+journey, including an interview before a later rejection. **Progress** on Today
 follows those recorded stages. The submission date can be corrected or cleared.
 
 On narrow screens the initial application view is a compact list. Choose **Board**

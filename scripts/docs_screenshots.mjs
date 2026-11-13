@@ -54,6 +54,8 @@ async function settle() {
 async function shot(name) {
   await settle();
   await page.evaluate(() => document.activeElement?.blur());
+  // No hover state from the last click.
+  await page.mouse.move(0, 0);
   // Show the default address instead of the temporary port.
   await page.evaluate((origin) => {
     const walker = document.createTreeWalker(
@@ -77,8 +79,9 @@ async function applicationId(company) {
   }, company);
 }
 
-await open("overview");
-await shot("overview");
+await open("today");
+await page.getByRole("heading", { name: "Ready to apply" }).waitFor();
+await shot("today");
 
 await open("inbox");
 await shot("inbox");
@@ -157,9 +160,19 @@ await page.getByRole("article").first().waitFor();
 await shot("activity-requests");
 
 await open("activity?section=runs");
-await page.getByRole("button", { name: /review-inbox/ }).click();
-await page.getByRole("heading", { name: "Changes made" }).waitFor();
+await page
+  .getByRole("button", { name: /review-inbox/ })
+  .first()
+  .click();
+await page
+  .locator("article.report")
+  .getByRole("heading", { name: "Summary" })
+  .waitFor();
 await shot("activity-run");
+
+await open("activity?section=timeline");
+await page.getByRole("heading", { name: "Today", exact: true }).waitFor();
+await shot("activity-timeline");
 
 await open(`applications?application=${await applicationId("Lumen Health")}`);
 await dialog().getByRole("tab", { name: "History", exact: true }).click();

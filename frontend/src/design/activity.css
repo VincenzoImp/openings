@@ -1,0 +1,193 @@
+/* Two columns, question, pipeline strip, filter chips, stats and report
+   pieces: what Today and Activity are made of. */
+.cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: var(--s5);
+  align-items: start;
+}
+/* The home screen has more air: its cards use the next step of the scale. */
+.roomy {
+  --s4: var(--s5);
+}
+.roomy > * + * {
+  margin-top: var(--s5);
+}
+
+/* A question for the owner, with its answer controls */
+.question {
+  padding: var(--s4);
+  border-top: 1px solid var(--line);
+}
+.question:first-child,
+.card > :is(header, .filters) + .question {
+  border-top: 0;
+}
+.question .ask,
+.question .asked {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.question .ask {
+  font-size: var(--t-lg);
+  line-height: 1.35;
+}
+.question .why {
+  margin-top: var(--s1);
+  color: var(--ink-2);
+}
+.question .about {
+  margin-top: var(--s1);
+}
+.question .answer,
+.question .answered {
+  margin-top: var(--s3);
+}
+.answer .write {
+  display: grid;
+  gap: var(--s2);
+}
+.answer .row + .write {
+  margin-top: var(--s3);
+}
+.answered {
+  padding-left: var(--s3);
+  border-left: 3px solid var(--accent);
+}
+
+.pipeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--line);
+  overflow: hidden;
+}
+.pipeline a {
+  padding: var(--s3) var(--s4);
+  background: var(--card);
+  text-decoration: none;
+}
+.pipeline a:hover {
+  background: var(--hover);
+}
+.pipeline a:focus-visible {
+  outline-offset: -2px;
+}
+.pipeline strong,
+.stat strong {
+  display: block;
+  font: 400 var(--t-xl) / 1.2 var(--serif);
+}
+.pipeline .is-ready strong {
+  color: var(--ready);
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--s3) var(--s5);
+  margin: 0;
+}
+.stat dd {
+  margin: 0;
+}
+
+/* Filter chips: <button class="chip" aria-pressed> */
+.chips,
+.filterbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+}
+.filterbar {
+  gap: var(--s2) var(--s3);
+  margin-bottom: var(--s3);
+}
+.filterbar .input,
+.toggle .input {
+  width: auto;
+  max-width: 100%;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--control);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink-2);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.chip:hover {
+  background: var(--hover);
+}
+.chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Report: counts with what they count, plain lists */
+.report .sub > * + * {
+  margin-top: var(--s2);
+}
+.sub > .list {
+  margin: 0 calc(-1 * var(--s4));
+}
+.counts dt {
+  color: var(--ink);
+  font-weight: 600;
+  text-align: right;
+}
+.plain {
+  margin: 0;
+  padding-left: 18px;
+}
+.plain li + li {
+  margin-top: var(--s1);
+}
+/* A list whose items start with a tag instead of a bullet */
+.tagged {
+  padding: 0;
+  list-style: none;
+}
+/* Records to pick one from, inside a form */
+.picks {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.picks > li {
+  min-height: 36px;
+  padding: var(--s2) var(--s3);
+}
+.page-head strong {
+  color: var(--ink);
+}
+@media (min-width: 861px) {
+  /* The form comes first in the document and sits beside the list. */
+  .aside-first > :first-child {
+    grid-column: 2;
+  }
+  .aside-first > :last-child {
+    grid-column: 1;
+    grid-row: 1;
+  }
+}
+@media (max-width: 860px) {
+  .cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pipeline a {
+    padding: var(--s3) var(--s1);
+    text-align: center;
+  }
+  .chip {
+    min-height: 44px;
+  }
+}

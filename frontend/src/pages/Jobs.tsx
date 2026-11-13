@@ -42,7 +42,7 @@ import {
   Tabs,
   PendingResults,
 } from "../ui";
-import { AskAgent } from "./Requests";
+import { AskAgent } from "./AskAgent";
 
 const blankJobs: ListResult<Job> = { items: [], total: 0 };
 export function AddJob({

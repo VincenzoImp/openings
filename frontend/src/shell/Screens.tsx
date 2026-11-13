@@ -6,7 +6,7 @@ import { SCREENS } from "./routes";
 // pointer or focus reaches its navigation link). The first screen's JavaScript
 // stays within the budget checked by scripts/budget.mjs.
 const loaders = {
-  overview: () => import("../pages/Overview"),
+  today: () => import("../pages/Today"),
   activity: () => import("../pages/Activity"),
   jobs: () => import("../pages/Jobs"),
   applications: () => import("../pages/Applications"),
@@ -30,7 +30,7 @@ export function preloadScreen(route: string) {
     });
 }
 
-export const OverviewPage = lazy(loaders.overview);
+export const TodayPage = lazy(loaders.today);
 export const ActivityPage = lazy(loaders.activity);
 export const CollectionPage = lazy(loaders.collection);
 export const CareerPage = lazy(loaders.career);

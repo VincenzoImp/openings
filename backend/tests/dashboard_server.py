@@ -17,12 +17,13 @@ from pathlib import Path
 import uvicorn
 from fastapi.testclient import TestClient
 
-from openings.actors import OWNER, acting_as, token_actor
+from openings.actors import OWNER, acting_as
 from openings.app import create_app
 from openings.career import ClaimCreate, KnowledgeCreate, ProfileUpdate, TemplateCreate
 from openings.common import new_id, now
 from openings.documents import ContextCreate
 from openings.policy import SECTIONS
+from today_fixtures import seed_today
 
 RUN_PATH = "/__e2e__/run"
 ROOT = Path(__file__).resolve().parents[2]
@@ -48,7 +49,7 @@ def identified(app, token):
     return serve
 
 
-def seed_library(app):
+def seed_library(app, agent):
     """A Profile, typed claims, template rules and the example policy, with one copied value."""
     career, policy = app.state.career, app.state.policy
     career.update_profile(
@@ -148,7 +149,6 @@ def seed_library(app):
         )
     )
     example = json.loads((ROOT / "examples/policy.json").read_text())
-    agent = token_actor("synthetic-agent", "career-agent", "agent")
     for section in SECTIONS:
         for item in example[section]:
             item = dict(item)
@@ -185,29 +185,33 @@ def main():
         path = Path(directory) / "workspace.sqlite"
         app = create_app(path, start_worker=False)
         workspace, career = app.state.workspace, app.state.career
+        # One client for setup and seeding: an application starts its MCP sessions once.
         with TestClient(app) as client:
             client.post("/api/v1/auth/setup", json={"password": "synthetic-browser-password"})
-        for index in range(35):
-            evidence = career.create_knowledge(
-                KnowledgeCreate(
-                    kind="project",
-                    title=f"Synthetic project {index:02d}",
-                    organization="Example Labs",
-                    narrative="Built reliable Python services.",
-                    skills=["Python"],
+            for index in range(35):
+                evidence = career.create_knowledge(
+                    KnowledgeCreate(
+                        kind="project",
+                        title=f"Synthetic project {index:02d}",
+                        organization="Example Labs",
+                        narrative="Built reliable Python services.",
+                        skills=["Python"],
+                    )
                 )
-            )
-            career.create_claim(
-                ClaimCreate(
-                    knowledge_id=evidence["id"], text=f"Synthetic claim {index:02d}", approved=True
+                career.create_claim(
+                    ClaimCreate(
+                        knowledge_id=evidence["id"],
+                        text=f"Synthetic claim {index:02d}",
+                        approved=True,
+                    )
                 )
-            )
-            career.create_template(
-                TemplateCreate(
-                    name=f"Synthetic CV {index:02d}", tex="Synthetic TeX", is_default=index == 0
+                career.create_template(
+                    TemplateCreate(
+                        name=f"Synthetic CV {index:02d}", tex="Synthetic TeX", is_default=index == 0
+                    )
                 )
-            )
-        seed_library(app)
+            # Before the numbered jobs, so those stay the newest records of every list.
+            seed_today(app, client, lambda agent: seed_library(app, agent))
         for index in range(jobs):
             job = workspace.ingest_job(
                 {

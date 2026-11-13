@@ -468,6 +468,60 @@ def test_runs_list_filters_by_status_workflow_and_time(services):
     assert activity.list_runs({"started_until": first["started_at"]})["total"] == 1
 
 
+def test_runs_list_finds_runs_active_since_a_time(services):
+    workspace, activity = services
+    job = add_job(workspace)
+    with acting_as(AGENT):
+        old = activity.start_run({"workflow": "review-inbox"})
+        activity.finish_run(old["id"], {"expected_version": 1, "summary": "Done."})
+    with acting_as(OTHER):
+        long = activity.start_run({"workflow": "prepare-shortlist"})
+    # Both started long ago; only the second changed something afterwards.
+    workspace.db.execute(
+        "UPDATE runs SET started_at='2026-01-01T00:00:00.000000+00:00',"
+        "last_activity_at='2026-01-01T00:10:00.000000+00:00'"
+    )
+    with acting_as(OTHER):
+        workspace.set_triage(job["id"], "saved", job["version"])
+    since = "2026-01-02T00:00:00Z"
+    assert [item["id"] for item in activity.list_runs({"active_since": since})["items"]] == [
+        long["id"]
+    ]
+    assert activity.list_runs({"started_since": since})["total"] == 0
+    assert activity.list_runs({"active_since": "2026-01-01"})["total"] == 2
+    with pytest.raises(ValueError, match="ISO8601"):
+        activity.list_runs({"active_since": "yesterday"})
+
+
+def test_changes_filter_by_several_kinds_of_record_and_name_their_run(services):
+    workspace, activity = services
+    job = add_job(workspace)
+    with acting_as(AGENT):
+        run = activity.start_run({"workflow": "review-inbox"})
+        workspace.add_note(job["id"], {"body": "Synthetic note."})
+        asked = activity.ask_question({"question": "Synthetic question?"})
+    with acting_as(OWNER):
+        workspace.set_triage(job["id"], "saved", job["version"])
+    kinds = lambda **filters: sorted(item["kind"] for item in events(workspace, **filters))
+    assert kinds(subject_types=["note", "question"]) == ["note_added", "question_asked"]
+    assert kinds(subject_types=["job"]) == ["job_added", "triage_changed"]
+    assert kinds(subject_types=["template"]) == []
+    # An event from before schema 8 has no stored subject: it belongs to its job.
+    workspace.db.execute(
+        "UPDATE events SET subject_type=NULL,subject_id=NULL WHERE kind='job_added'"
+    )
+    assert kinds(subject_types=["job"]) == ["job_added", "triage_changed"]
+    assert kinds(subject_types=["application"]) == []
+    with pytest.raises(ValueError):
+        activity.list_events({"subject_types": [""]})
+    # Changes, questions and requests name the workflow of their run.
+    by_kind = {item["kind"]: item for item in events(workspace)}
+    assert by_kind["note_added"]["run_workflow"] == "review-inbox"
+    assert by_kind["triage_changed"]["run_workflow"] is None
+    assert activity.get_question(asked["id"])["run_workflow"] == "review-inbox"
+    assert activity.get_run(run["id"])["questions"][0]["run_workflow"] == "review-inbox"
+
+
 def test_question_lifecycle_versions_and_answers_since(services):
     workspace, activity = services
     job = add_job(workspace)
@@ -818,6 +872,16 @@ def test_rest_and_mcp_expose_the_same_runs_questions_and_changes(app):
                 f"/api/v1/events?run_id={run['id']}",
                 "events_list",
                 {"value": {"run_id": run["id"]}},
+            ),
+            (
+                "/api/v1/events?subject_types=question&subject_types=job",
+                "events_list",
+                {"value": {"subject_types": ["question", "job"]}},
+            ),
+            (
+                "/api/v1/runs?active_since=2026-01-01",
+                "runs_list",
+                {"value": {"active_since": "2026-01-01"}},
             ),
             (
                 f"/api/v1/applications/{'missing'}/events",

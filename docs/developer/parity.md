@@ -32,11 +32,11 @@ How to read the evidence:
 | Owner only (refused for an agent token) | 9 |
 | Without a working dashboard path | 9 |
 | Reached only through another operation | 5 |
-| With inputs the dashboard never mentions | 10 |
+| With inputs the dashboard never mentions | 11 |
 | With free-form JSON edited as raw JSON | 6 |
 | With different REST and MCP input names | 1 |
-| With a dashboard path exercised by e2e | 74 |
-| With a dashboard path but no e2e evidence | 29 |
+| With a dashboard path exercised by e2e | 75 |
+| With a dashboard path but no e2e evidence | 28 |
 
 ## Gaps
 
@@ -50,8 +50,8 @@ code calls the route and no browser test reached it.
 | `skills.read` | `GET /skills/{name}`<br>`GET /skills/{name}/files/{path}` | `skill_get` | Settings: Connect an agent | Settings lists the served skills by name and description; their text and reference files cannot be opened. |
 | `jobs.resolve` | `GET /jobs/resolve` | `jobs_resolve` | Job details: Possible duplicates (identity matches are merged on ingestion) | No lookup of a job by URL, external key or title and company. Job details open Possible duplicates (`jobs.duplicates`) instead. |
 | `runs.start` | `POST /runs` | `runs_start` | Activity: Runs (read only) | Runs belong to API tokens: a dashboard session has no runs. Activity shows runs, their reports and their changes read-only. |
-| `runs.update` | `PATCH /runs/{run_id}` | `runs_update` | Activity: run detail (read only) | Runs belong to API tokens: a dashboard session has no runs. |
-| `runs.finish` | `POST /runs/{run_id}/finish` | `runs_finish` | Activity: run detail (read only) | Runs belong to API tokens: a dashboard session has no runs. |
+| `runs.update` | `PATCH /runs/{run_id}` | `runs_update` | Activity: run report (read only) | Runs belong to API tokens: a dashboard session has no runs. |
+| `runs.finish` | `POST /runs/{run_id}/finish` | `runs_finish` | Activity: run report (read only) | Runs belong to API tokens: a dashboard session has no runs. |
 | `questions.ask` | `POST /questions` | `questions_ask` | Activity: Questions (answer only) | Agents ask questions for the owner; the dashboard answers and withdraws them. |
 | `requests.take` | `POST /requests/{request_id}/take` | `requests_take` | Activity: Requests (read only) | Agents take, complete and decline requests with an API token; the dashboard writes and withdraws them. |
 | `requests.complete` | `POST /requests/{request_id}/complete` | `requests_complete` | Activity: Requests (read only) | Agents take, complete and decline requests with an API token; the dashboard writes and withdraws them. |
@@ -79,12 +79,13 @@ operation. They can be set over REST or MCP only.
 |---|---|---|
 | `jobs.create` | `raw`, `source_key` | `raw` and `source_key` are collector fields for scripted imports. |
 | `policy.add` | `idempotency_key`, `position` | The form sends the fields it shows; `position` and `idempotency_key` serve agents and scripts (a new item goes to the end, then the arrows move it). |
-| `applications.list` | `ready_since`, `ready_until` | The Ready to apply queue filters by `readiness=ready` with `sort=ready`; the time range serves agents and scripts. |
+| `applications.list` | `applied_since`, `ready_since`, `ready_until` | The Ready to apply queue filters by `readiness=ready` with `sort=ready`; Today's Waiting for a reply and Record replies filter Applied by `applied_until`. The other time ranges serve agents and scripts. |
 | `applications.create` | `deadline`, `priority`, `questions`, `requirements` | Starting an application sends the job only; plan fields and questions are edited afterwards (`applications.update`). |
 | `contexts.create` | `template_id` | The context dialog sends `template_ids`; `template_id` is the single-template form of the same input. |
-| `events.list` | `since`, `token_id`, `until` | Activity filters changes by who made them and by run; the other filters serve agents and scripts. |
-| `runs.list` | `started_since`, `started_until`, `token_id` | Activity filters runs by status only. |
-| `questions.list` | `answered_since` | Activity filters questions by state; `answered_since` and the subject filters serve the agent's next run. |
+| `events.list` | `application_id`, `job_id`, `subject_id`, `subject_type` | The Activity timeline filters changes by who made them (owner, API tokens or one token, system, not recorded), by kind of record (`subject_types`), by period and by run; the job, application and subject filters serve the record histories, agents and scripts. |
+| `runs.list` | `started_since`, `started_until`, `token_id` | Activity filters runs by status; Today lists the runs active since the last visit (`active_since`). The workflow, token and start-time filters serve agents and scripts. |
+| `runs.read` | `changes_offset` | The report counts all changes of a run and names the records of the first 100 (`changes_limit`); its link opens the timeline filtered by the run, which pages through every change. `changes_offset` serves agents and scripts. |
+| `questions.list` | `answered_since`, `run_id`, `subject_id`, `subject_type` | Today and Activity filter questions by state; `answered_since` and the subject filters serve the agent's next run. |
 | `requests.list` | `updated_since` | Activity filters requests by state and the Ask your agent dialog by subject; `run_id` and `updated_since` serve agents. |
 | `requests.create` | `idempotency_key` | — |
 
@@ -141,7 +142,7 @@ missing from the inventory.
 
 ### Dashboard paths without e2e evidence
 
-`workspace.capabilities`, `jobs.create`, `jobs.triage`, `jobs.bulk`, `jobs.merge`, `jobs.delete`, `notes.read`, `notes.update`, `notes.delete`, `collection.update`, `sources.preview`, `sources.create`, `sources.bulk`, `tasks.list`, `tasks.read`, `tasks.cancel`, `tasks.retry`, `applications.create`, `applications.delete`, `applications.bulk`, `contexts.read`, `applications.staleness`, `documents.delete`, `backup.download`, `backup.restore`, `questions.withdraw`, `password.update`, `collection.runs.read`, `collection.runs.cancel`
+`workspace.capabilities`, `jobs.create`, `jobs.triage`, `jobs.bulk`, `jobs.merge`, `jobs.delete`, `notes.read`, `notes.update`, `notes.delete`, `collection.update`, `sources.preview`, `sources.create`, `sources.bulk`, `tasks.list`, `tasks.read`, `tasks.cancel`, `tasks.retry`, `applications.create`, `applications.delete`, `applications.bulk`, `contexts.read`, `applications.staleness`, `documents.delete`, `backup.download`, `backup.restore`, `password.update`, `collection.runs.read`, `collection.runs.cancel`
 
 ## Matrix
 
@@ -153,8 +154,8 @@ missing from the inventory.
 | `workspace.capabilities`<br>Read supported logical operations and transport exceptions | `GET /capabilities` | `capabilities_get` | any | Settings: capabilities/help | pages/Settings.tsx | structured | **0** |
 | `skills.list`<br>List shipped agent workflow skills | `GET /skills` | `skills_list` | any | Settings: Connect an agent | pages/Settings.tsx | structured | 4 |
 | `skills.read`<br>Read a skill or one of its reference files | `GET /skills/{name}`<br>`GET /skills/{name}/files/{path}` | `skill_get` | any | Settings: Connect an agent | **none** | — | — |
-| `overview.read`<br>Read submitted-attempt funnel and activity for a period | `GET /overview` | `overview_get` | any | Overview: period selector and funnel | pages/Overview.tsx | structured | 34 |
-| `jobs.list`<br>Search/filter/sort paginated job summaries | `GET /jobs` | `jobs_search` | any | Inbox: search, filters, pagination | pages/Jobs.tsx<br>pages/Settings.tsx<br>shell/Shell.tsx | structured | 60 |
+| `overview.read`<br>Read submitted-attempt funnel and activity for a period | `GET /overview` | `overview_get` | any | Today: Progress (period and stages reached); Decisions (jobs needing the full posting) | pages/Today.tsx | structured | 35 |
+| `jobs.list`<br>Search/filter/sort paginated job summaries | `GET /jobs` | `jobs_search` | any | Inbox: search, filters, pagination | pages/Jobs.tsx<br>pages/Settings.tsx<br>pages/activity/RequestForm.tsx<br>shell/Shell.tsx | structured | 65 |
 | `jobs.read`<br>Read full posting, metadata and source provenance | `GET /jobs/{job_id}` | `job_get` | any | Inbox: job detail | pages/Jobs.tsx | structured | 8 |
 | `jobs.create`<br>Import a URL, pasted posting or structured job | `POST /jobs` | `job_ingest` | any | Inbox: Add job | pages/Jobs.tsx | raw JSON: metadata | **0** |
 | `jobs.update`<br>Correct job fields and metadata | `PATCH /jobs/{job_id}` | `job_update` | any | Inbox: edit job | pages/Jobs.tsx | raw JSON: metadata | 1 |
@@ -191,7 +192,7 @@ missing from the inventory.
 | `tasks.cancel`<br>Cancel queued/running work | `POST /tasks/{task_id}/cancel` | `tasks_cancel` | any | Settings: cancel task | pages/Settings.tsx | structured | **0** |
 | `tasks.retry`<br>Explicitly retry failed/cancelled work | `POST /tasks/{task_id}/retry` | `tasks_retry` | any | Settings: retry task | pages/Settings.tsx | structured | **0** |
 | `sources.schemas`<br>Discover source fields, defaults and collection options | `GET /sources/schemas` | `sources_schemas` | any | Collection: source fields and defaults | pages/CollectionForms.tsx | structured | 1 |
-| `collection.runs.list`<br>List logical collection invocations | `GET /collection/runs` | `collection_runs_list` | any | Collection: run history | pages/Settings.tsx | structured | 1 |
+| `collection.runs.list`<br>List logical collection invocations | `GET /collection/runs` | `collection_runs_list` | any | Collection: run history | pages/Settings.tsx<br>pages/Today.tsx | structured | 36 |
 | `collection.runs.read`<br>Read frozen collection settings, progress and results | `GET /collection/runs/{run_id}` | `collection_runs_get` | any | Collection: source run details | pages/Settings.tsx | structured | **0** |
 | `collection.runs.cancel`<br>Stop current collection work | `POST /collection/runs/{run_id}/cancel` | `collection_runs_cancel` | any | Collection: Stop current run | pages/Companies.tsx<br>pages/Settings.tsx | structured | **0** |
 
@@ -201,7 +202,7 @@ missing from the inventory.
 |---|---|---|---|---|---|---|---|
 | `profile.read`<br>Read profile, links, metadata and version | `GET /career/profile` | `career_get_profile` | any | Career: profile | pages/career/ProfileCard.tsx | structured | 9 |
 | `profile.update`<br>Edit profile/preferences/contact | `PATCH /career/profile` | `career_update_profile` | any | Career: profile and Other details | pages/career/ProfileCard.tsx | structured | 1 |
-| `knowledge.list`<br>Search/filter paginated career entries summaries | `GET /career/knowledge` | `knowledge_list` | any | Career: career entries: list/search | pages/Applications.tsx<br>pages/Career.tsx | structured | 10 |
+| `knowledge.list`<br>Search/filter paginated career entries summaries | `GET /career/knowledge` | `knowledge_list` | any | Career: career entries: list/search | pages/Applications.tsx<br>pages/Career.tsx<br>pages/activity/RequestForm.tsx | structured | 10 |
 | `knowledge.read`<br>Read full career entries | `GET /career/knowledge/{knowledge_id}` | `knowledge_get` | any | Career: career entries: detail | pages/career/EntryEditor.tsx | structured | 8 |
 | `knowledge.create`<br>Create career entries | `POST /career/knowledge` | `knowledge_create` | any | Career: career entries: add | pages/career/EntryEditor.tsx | structured | 1 |
 | `knowledge.update`<br>Edit career entries with version protection | `PATCH /career/knowledge/{knowledge_id}` | `knowledge_update` | any | Career: career entries: edit and Other details | pages/career/EntryEditor.tsx | structured | 1 |
@@ -220,7 +221,7 @@ missing from the inventory.
 | `instructions.update`<br>Edit general document writing instructions | `PATCH /instructions` | `instructions_update` | any | Templates: general instructions | pages/templates/Dialogs.tsx | structured | 1 |
 | `career.preview_import`<br>Preview JSON/text career import without mutation | `POST /career/import/preview` | `career_preview_import` | any | Career: import preview | pages/career/ImportDialog.tsx | structured | 1 |
 | `career.import`<br>Confirm append-only evidence and optional versioned profile import | `POST /career/import` | `career_import` | any | Career: confirm import | pages/career/ImportDialog.tsx | structured | 1 |
-| `policy.read`<br>Read the owner's policy, or one section | `GET /policy`<br>`GET /policy/{section}` | `policy_get` | any | Policy: sections and items | pages/Policy.tsx | structured | 6 |
+| `policy.read`<br>Read the owner's policy, or one section | `GET /policy`<br>`GET /policy/{section}` | `policy_get` | any | Policy: sections and items | pages/Policy.tsx | structured | 36 |
 | `policy.add`<br>Add a policy item | `POST /policy/{section}/items` | `policy_add` | any | Policy: Add a rule / Add a fact | pages/policy/Section.tsx | structured | 1 |
 | `policy.update`<br>Edit a policy item | `PATCH /policy/items/{item_id}` | `policy_update` | any | Policy: Edit; the rule switch | pages/policy/Section.tsx | structured | 3 |
 | `policy.move`<br>Move a policy item to another section | `POST /policy/items/{item_id}/move` | `policy_move` | any | Policy: Move to section | — | structured | 1 |
@@ -232,7 +233,7 @@ missing from the inventory.
 
 | Operation | REST | MCP | Access | Dashboard location | Dashboard code | Editor | E2E |
 |---|---|---|---|---|---|---|---|
-| `applications.list`<br>Search/filter/sort paginated application summaries | `GET /applications` | `applications_list` | any | Applications: list/Kanban filters | pages/Applications.tsx<br>pages/Jobs.tsx<br>shell/Shell.tsx | structured | 60 |
+| `applications.list`<br>Search/filter/sort paginated application summaries | `GET /applications` | `applications_list` | any | Applications: list/Kanban filters | pages/Applications.tsx<br>pages/Jobs.tsx<br>pages/Today.tsx<br>pages/activity/RequestForm.tsx<br>shell/Shell.tsx | structured | 65 |
 | `applications.read`<br>Read full attempt, questions/answers, requirements and job | `GET /applications/{application_id}` | `application_get` | any | Applications: attempt detail | pages/Applications.tsx | structured | 7 |
 | `applications.create`<br>Start application preparation (draft) | `POST /applications` | `application_create` | any | Inbox: Start application | pages/Jobs.tsx | structured | **0** |
 | `applications.update`<br>Record stage, outcome, priority, deadline, employer requirements, questions/answers and application instructions | `PATCH /applications/{application_id}` | `application_update` | any | Applications: progress, planning, requirements and questions/answers | pages/Applications.tsx | raw JSON: answers | 2 |
@@ -264,7 +265,7 @@ missing from the inventory.
 | `export.records`<br>Download portable JSON records without file bytes | `GET /export` | `workspace_export` | any | Settings: export records | pages/Settings.tsx | structured | 1 |
 | `backup.download`<br>Download a consistent SQLite backup including bytes | `GET /backup` | `workspace_backup` | any | Settings: download backup | pages/Settings.tsx | structured | **0** |
 | `backup.restore`<br>Replace workspace data from a SQLite backup | `POST /backup/restore` | `workspace_restore_upload` | owner | Settings: restore backup | pages/Settings.tsx | structured | **0** |
-| `tokens.list`<br>List API token metadata and kinds | `GET /tokens` | `tokens_list` | owner | Settings: access tokens with their kind | pages/Settings.tsx | structured | 4 |
+| `tokens.list`<br>List API token metadata and kinds | `GET /tokens` | `tokens_list` | owner | Settings: access tokens with their kind | pages/Settings.tsx<br>pages/activity/Timeline.tsx | structured | 7 |
 | `tokens.create`<br>Create a named owner or agent API token | `POST /tokens` | `token_create` | owner | Settings: create access token (owner or agent) | pages/Settings.tsx | structured | 1 |
 | `tokens.revoke`<br>Revoke an API token | `DELETE /tokens/{token_id}` | `token_revoke` | owner | Settings: revoke access token | pages/Settings.tsx | structured | 1 |
 | `password.update`<br>Change owner password and rotate owner sessions | `POST /auth/password` | `owner_password_update` | owner | Settings: change password | pages/Settings.tsx | structured | **0** |
@@ -273,21 +274,21 @@ missing from the inventory.
 
 | Operation | REST | MCP | Access | Dashboard location | Dashboard code | Editor | E2E |
 |---|---|---|---|---|---|---|---|
-| `events.list`<br>List recorded changes with actor, run and subject | `GET /events` | `events_list` | any | Activity: Changes; run detail | pages/Activity.tsx | structured | 3 |
-| `runs.list`<br>List agent runs by status, workflow, token or start time | `GET /runs` | `runs_list` | any | Activity: Runs | pages/Activity.tsx<br>shell/Shell.tsx | structured | 60 |
-| `runs.read`<br>Read an agent run with its report, questions and changes | `GET /runs/{run_id}` | `runs_get` | any | Activity: run detail | pages/Activity.tsx | structured | 2 |
+| `events.list`<br>List recorded changes with actor, run and subject | `GET /events` | `events_list` | any | Activity: Timeline; run report | pages/activity/Timeline.tsx | structured | 5 |
+| `runs.list`<br>List agent runs by status, workflow, token or start time | `GET /runs` | `runs_list` | any | Today: Since your last visit; Activity: Runs | pages/Today.tsx<br>pages/activity/Runs.tsx<br>shell/Shell.tsx | structured | 65 |
+| `runs.read`<br>Read an agent run with its report, questions and changes | `GET /runs/{run_id}` | `runs_get` | any | Activity: run report | pages/activity/RunReport.tsx<br>pages/activity/Timeline.tsx | structured | 4 |
 | `runs.start`<br>Open an agent run for the calling API token | `POST /runs` | `runs_start` | any | Activity: Runs (read only) | **none** | — | — |
-| `runs.update`<br>Record a progress note on the calling token's open run | `PATCH /runs/{run_id}` | `runs_update` | any | Activity: run detail (read only) | **none** | — | — |
-| `runs.finish`<br>Close the calling token's run with its report | `POST /runs/{run_id}/finish` | `runs_finish` | any | Activity: run detail (read only) | **none** | — | — |
-| `questions.list`<br>List questions for the owner by state, subject, run or answer time | `GET /questions` | `questions_list` | any | Activity: Questions; navigation count | pages/Activity.tsx<br>shell/Shell.tsx | structured | 60 |
+| `runs.update`<br>Record a progress note on the calling token's open run | `PATCH /runs/{run_id}` | `runs_update` | any | Activity: run report (read only) | **none** | — | — |
+| `runs.finish`<br>Close the calling token's run with its report | `POST /runs/{run_id}/finish` | `runs_finish` | any | Activity: run report (read only) | **none** | — | — |
+| `questions.list`<br>List questions for the owner by state, subject, run or answer time | `GET /questions` | `questions_list` | any | Today: Needs your decision; Activity: Questions; navigation count | pages/Today.tsx<br>pages/activity/Questions.tsx<br>shell/Shell.tsx | structured | 65 |
 | `questions.read`<br>Read one question for the owner | `GET /questions/{question_id}` | `questions_get` | any | Activity: Questions | via `questions.list` | — | — |
 | `questions.ask`<br>Ask the owner a question tied to a job, application, Career entry or nothing | `POST /questions` | `questions_ask` | any | Activity: Questions (answer only) | **none** | — | — |
-| `questions.answer`<br>Answer a question for the owner | `POST /questions/{question_id}/answer` | `questions_answer` | owner | Activity: Questions: answer | pages/Activity.tsx | structured | 1 |
-| `questions.withdraw`<br>Withdraw an open question | `POST /questions/{question_id}/withdraw` | `questions_withdraw` | any | Activity: Questions: withdraw | pages/Activity.tsx | structured | **0** |
-| `requests.list`<br>List requests for the agent by state, subject, run or change time | `GET /requests` | `requests_list` | any | Activity: Requests; job and application: Ask your agent | pages/Requests.tsx | structured | 14 |
+| `questions.answer`<br>Answer a question for the owner | `POST /questions/{question_id}/answer` | `questions_answer` | owner | Today: Needs your decision; Activity: Questions: answer | pages/activity/QuestionItem.tsx | structured | 2 |
+| `questions.withdraw`<br>Withdraw an open question | `POST /questions/{question_id}/withdraw` | `questions_withdraw` | any | Activity: Questions: withdraw | pages/activity/QuestionItem.tsx | structured | 1 |
+| `requests.list`<br>List requests for the agent by state, subject, run or change time | `GET /requests` | `requests_list` | any | Activity: Requests; job and application: Ask your agent | pages/AskAgent.tsx<br>pages/activity/Requests.tsx | structured | 15 |
 | `requests.read`<br>Read one request for the agent | `GET /requests/{request_id}` | `requests_get` | any | Activity: Requests | via `requests.list` | — | — |
-| `requests.create`<br>Write a request for the agent tied to a job, application, Career entry or nothing | `POST /requests` | `requests_create` | owner | Activity: Requests: write a request; job and application: Ask your agent | pages/Requests.tsx | structured | 1 |
+| `requests.create`<br>Write a request for the agent tied to a job, application, Career entry or nothing | `POST /requests` | `requests_create` | owner | Activity: Requests: write a request; job and application: Ask your agent | pages/AskAgent.tsx<br>pages/activity/RequestForm.tsx | structured | 1 |
 | `requests.take`<br>Take an open request for the calling token's run | `POST /requests/{request_id}/take` | `requests_take` | any | Activity: Requests (read only) | **none** | — | — |
 | `requests.complete`<br>Complete a request with its result | `POST /requests/{request_id}/complete` | `requests_complete` | any | Activity: Requests (read only) | **none** | — | — |
 | `requests.decline`<br>Decline a request with a reason | `POST /requests/{request_id}/decline` | `requests_decline` | any | Activity: Requests (read only) | **none** | — | — |
-| `requests.withdraw`<br>Withdraw an open or taken request | `POST /requests/{request_id}/withdraw` | `requests_withdraw` | owner | Activity: Requests: withdraw | pages/Requests.tsx | structured | 1 |
+| `requests.withdraw`<br>Withdraw an open or taken request | `POST /requests/{request_id}/withdraw` | `requests_withdraw` | owner | Activity: Requests: withdraw | pages/AskAgent.tsx<br>pages/activity/Requests.tsx | structured | 1 |
