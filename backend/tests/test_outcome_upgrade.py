@@ -16,6 +16,7 @@ from openings.operations import restore_database
 from openings.workspace import Workspace
 from outcome_fixtures import make_schema_ten
 from schema_fixtures import columns, index_names, table_names
+from timeline_fixtures import SCHEMA_THIRTEEN_NOTE_COLUMNS as NEW_NOTES
 
 CHILDREN = ("events", "notes", "documents", "contexts", "questions", "requests")
 
@@ -117,7 +118,12 @@ def schema_ten_workspace(path):
 
 def snapshot(conn):
     """Every row a schema 10 file holds that the upgrade must keep, with its rowid."""
-    names = ",".join(f'"{row[0]}"' for row in columns(conn, "applications"))
+    # Schema 13 moves applications.note to a pinned note (test_timeline_upgrade.py).
+    names = ",".join(f'"{row[0]}"' for row in columns(conn, "applications") if row[0] != "note")
+    notes = ",".join(f'"{row[0]}"' for row in columns(conn, "notes") if row[0] not in NEW_NOTES)
+    copied = (
+        " WHERE origin<>'upgrade'" if "origin" in {row[0] for row in columns(conn, "notes")} else ""
+    )
     return {
         "applications": conn.execute(
             f"SELECT rowid,{names} FROM applications ORDER BY rowid"
@@ -125,14 +131,21 @@ def snapshot(conn):
         **{
             table: conn.execute(f"SELECT rowid,* FROM {table} ORDER BY rowid").fetchall()
             for table in CHILDREN
+            if table != "notes"
         },
+        "notes": conn.execute(f"SELECT rowid,{notes} FROM notes{copied} ORDER BY rowid").fetchall(),
         "indexes": sorted(
             conn.execute(
                 "SELECT name,sql FROM sqlite_master WHERE type='index' AND tbl_name='applications'"
             ).fetchall()
         ),
         "references": {
-            table: conn.execute(f"PRAGMA foreign_key_list({table})").fetchall()
+            # Without the numbering: schema 13 adds the notes' reference to runs.
+            table: sorted(
+                tuple(row)[2:]
+                for row in conn.execute(f"PRAGMA foreign_key_list({table})")
+                if row[2] != "runs" or table != "notes"
+            )
             for table in (*CHILDREN, "applications")
         },
     }
@@ -155,7 +168,7 @@ def test_upgrade_keeps_every_row_and_backfills_exactly(tmp_path):
     workspace = Workspace(path)
     fresh = Database(tmp_path / "fresh.sqlite")
     with closing(sqlite3.connect(path)) as conn, closing(sqlite3.connect(fresh.path)) as reference:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 12
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 13
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert not conn.execute("PRAGMA foreign_key_check").fetchall()
         assert table_names(conn) == table_names(reference)
@@ -174,7 +187,9 @@ def test_upgrade_keeps_every_row_and_backfills_exactly(tmp_path):
         # The table holds the new definition and accepts the new outcome.
         assert conn.execute("SELECT sql FROM sqlite_master WHERE name='applications'").fetchone()[
             0
-        ] == APPLICATIONS.format(name='"applications"')
+        ] == APPLICATIONS.format(name='"applications"').replace(
+            "note TEXT NOT NULL DEFAULT '', ", ""
+        )
         backfilled = conn.execute(
             "SELECT application_id,kind,date,estimated,origin,note,created_by_kind,version "
             "FROM responses ORDER BY kind"

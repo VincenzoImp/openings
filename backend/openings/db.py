@@ -11,7 +11,7 @@ from pathlib import Path
 from .errors import DomainError
 from .posting import posting_complete
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 SCHEMA_SQL = Path(__file__).with_name("schema.sql")
 TEMP_PREFIX = ".openings-temp-"
 
@@ -263,8 +263,9 @@ def _migrate_9_to_10(conn):
     migrate_profile(conn)
 
 
-# The applications table of schema 11; schema.sql holds the same text. Changing a
-# CHECK constraint in SQLite means building the table again (_migrate_10_to_11).
+# The applications table of schema 11; schema.sql holds the same text without
+# note, which schema 13 dropped. Changing a CHECK constraint in SQLite means
+# building the table again (_migrate_10_to_11).
 APPLICATIONS = """CREATE TABLE {name} (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
  status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','applied','interview','offer','closed')),
@@ -331,6 +332,15 @@ def _migrate_11_to_12(conn):
     job_signals.migrate(conn)
 
 
+def _migrate_12_to_13(conn):
+    # The breaking group of 0.22. One timeline: notes gain their author's run and a
+    # pin, and each application note becomes a pinned note with the same text
+    # (applications.note is dropped).
+    from .workspace import timeline_upgrade
+
+    timeline_upgrade.migrate(conn)
+
+
 # Each step upgrades from its key to the next version; steps chain inside one transaction.
 MIGRATIONS = {
     5: _migrate_5_to_6,
@@ -340,6 +350,7 @@ MIGRATIONS = {
     9: _migrate_9_to_10,
     10: _migrate_10_to_11,
     11: _migrate_11_to_12,
+    12: _migrate_12_to_13,
 }
 
 
