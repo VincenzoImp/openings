@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.20.0 — 2026-11-13
+
+What employers answered, what it tells you, and one page to review and send an application.
+
+- **Employer responses:** record an interview, rejection, offer or other answer with its date and note, from the Applications list, the review page or the API (`/applications/{id}/responses`, `/responses/{id}`; MCP `responses_*`). Moving a sent application to Interview or Offer, or closing it as Rejected, records the matching response.
+- **No reply:** the `no_response` outcome with `concluded_on`. The no-reply period comes from the Policy's "No reply" decision item (30 days without one); `GET /applications?no_reply_due=true` lists applications past it, and Today and Insights close them after listing them.
+- **Insights** (`GET /insights`, MCP `insights_get`): response, interview and offer rates and the time to a first answer for sent applications, by role family, seniority, location, source and month. A rate is withheld below a minimum sample (default 5). Role family and seniority come from fixed English, German, French and Italian keyword tables.
+- **Review page** for each application: posting, CV and letter side by side, Before you send, Download, Mark applied, Not pursuing and the place in the Ready queue; answers, requirements, timeline, inputs, documents and details in tabs. Old application links open it.
+- **Applications** is rebuilt as a pipeline (Preparing, Ready, Applied, Interview, Offer, Closed) with a list, a board and bulk actions. Progress moved from Today to Applications → Insights.
+- **Staleness by part:** "Built on older inputs" now compares only what documents use: the Profile name, headline, contact, links and summary; confirmed eligibility, writing and fact items of the policy; the instructions, and each frozen template, Career entry and claim by content. Profile metadata, preferences and roles, positions, names, default flags, claim selection fields, free-form metadata and whitespace-only edits no longer mark a Draft stale, and a change undone is current again. Reports and the dashboard name each changed part; a writing rule scoped to the CV or the letter only affects that document.
+- Fixed: a frozen context with an unreadable payload no longer stops the workspace from opening.
+
+**Database schema 11 (additive).** A schema 5–10 workspace is upgraded automatically at start in one transaction. The upgrade adds the `responses` table, rebuilds `applications` for `no_response` and `concluded_on` (every row, index and trigger kept, references checked before committing), records one response for each application already in Interview or Offer and each sent rejected one (marked estimated when no stage event dates it), and stores content hashes of every frozen context's inputs. Restore accepts schema 11 and upgrades a copy of an older backup. A schema 11 workspace cannot be opened by 0.19 or earlier: back up before upgrading.
+
 ## 0.19.0 — 2026-11-13
 
 Your decisions in your own words, and a first screen that tells you what to do next.
