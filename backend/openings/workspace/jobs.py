@@ -1,4 +1,4 @@
-"""Job records: full and compact reads, filters, search and queue counts."""
+"""Job records: full and compact reads, filters, search and triage counts."""
 
 import json
 import re
@@ -122,7 +122,6 @@ class JobReads:
         created_since=None,
         created_until=None,
         complete=None,
-        queue=None,
         signal=None,
         posting_language=None,
         posting_language_not=None,
@@ -160,24 +159,10 @@ class JobReads:
         if triage == "active":
             conditions.append("j.triage!='dismissed'")
         elif triage:
-            if triage not in ("inbox", "saved", "dismissed"):
-                raise DomainError(422, "triage", "Choose inbox, saved or dismissed.")
+            if triage not in ("new", "shortlisted", "dismissed"):
+                raise DomainError(422, "triage", "Choose new, shortlisted or dismissed.")
             conditions.append("j.triage=?")
             args.append(triage)
-        if queue is not None:
-            if queue not in {"inbox", "shortlist", "applications", "dismissed"}:
-                raise DomainError(
-                    422, "queue", "Choose inbox, shortlist, applications or dismissed."
-                )
-            if queue in {"inbox", "shortlist"}:
-                conditions.append(
-                    "j.triage=? AND NOT EXISTS (SELECT 1 FROM applications WHERE job_id=j.id)"
-                )
-                args.append("inbox" if queue == "inbox" else "saved")
-            elif queue == "applications":
-                conditions.append("EXISTS (SELECT 1 FROM applications WHERE job_id=j.id)")
-            else:
-                conditions.append("j.triage='dismissed'")
         if company:
             conditions.append("j.company=?")
             args.append(company)
@@ -222,7 +207,6 @@ class JobReads:
         created_since=None,
         created_until=None,
         complete=None,
-        queue=None,
         include_facets=False,
         signal=None,
         posting_language=None,
@@ -251,7 +235,6 @@ class JobReads:
                 created_since,
                 created_until,
                 complete,
-                queue,
                 dismissed_by=dismissed_by,
                 rule_id=rule_id,
                 **signal_filters,
@@ -319,14 +302,12 @@ class JobReads:
         return {**result, "facets": facets}
 
     def _job_counts(self, connection, q="", **filters):
-        """Jobs of each queue and dismissed jobs by who dismissed them, for the same filters."""
+        """Jobs of each triage and dismissed jobs by who dismissed them, for the same filters."""
         where, args = self._job_filters(q, **filters)
-        attempt = "EXISTS(SELECT 1 FROM applications a WHERE a.job_id=j.id)"
         row = connection.execute(
             "SELECT count(*),"
-            f"coalesce(sum(j.triage='inbox' AND NOT {attempt}),0),"
-            f"coalesce(sum(j.triage='saved' AND NOT {attempt}),0),"
-            f"coalesce(sum({attempt}),0),"
+            "coalesce(sum(j.triage='new'),0),"
+            "coalesce(sum(j.triage='shortlisted'),0),"
             "coalesce(sum(j.triage='dismissed'),0),"
             + ",".join(
                 f"coalesce(sum(j.triage='dismissed' AND {sql}),0)" for sql in DISMISSED_BY.values()
@@ -337,9 +318,8 @@ class JobReads:
         ).fetchone()
         return {
             "all": row[0],
-            "inbox": row[1],
-            "shortlist": row[2],
-            "applications": row[3],
-            "dismissed": row[4],
-            "dismissed_by": dict(zip(DISMISSED_BY, row[5:], strict=True)),
+            "new": row[1],
+            "shortlisted": row[2],
+            "dismissed": row[3],
+            "dismissed_by": dict(zip(DISMISSED_BY, row[4:], strict=True)),
         }

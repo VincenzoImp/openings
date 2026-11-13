@@ -574,8 +574,8 @@ test("a template's source, typed rules, assets and sample are managed end to end
   await go(page, "templates");
   await page.getByRole("button", { name: "Add a template" }).click();
   await expect(
-    dialog(page).getByRole("link", { name: "cover-letter.tex" }),
-  ).toHaveAttribute("href", "/api/v1/examples/cover-letter.tex");
+    dialog(page).getByRole("link", { name: "letter.tex" }),
+  ).toHaveAttribute("href", "/api/v1/examples/letter.tex");
   await dialog(page).getByLabel("Name").fill(name);
   await dialog(page)
     .getByLabel("Document", { exact: true })

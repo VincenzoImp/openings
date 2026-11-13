@@ -4,7 +4,7 @@ import { Button, Dialog, ErrorBanner, Field, Loading } from "../../design";
 import { useResource, useWorkspace } from "../../state";
 
 export const kindLabels = { resume: "CV", cover_letter: "Letter" } as const;
-const EXAMPLES = ["resume.tex", "cover-letter.tex"];
+const EXAMPLES = ["cv.tex", "letter.tex"];
 
 function KindAndDefault({ template }: { template?: Template }) {
   return (

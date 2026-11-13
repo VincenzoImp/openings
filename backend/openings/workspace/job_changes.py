@@ -233,8 +233,12 @@ class JobChanges:
         return self.job_summary(job_id)
 
     def set_triage(self, job_id, triage, expected_version, reason=None):
-        """Set inbox/saved/dismissed. A dismissal records who made it and, optionally, why."""
-        if triage not in {"inbox", "saved", "dismissed"}:
+        """Set new/shortlisted/dismissed. A dismissal records who made it and, optionally, why.
+
+        Shortlisting starts the job's application and undoing it removes that
+        application while it is empty, in the same transaction (``shortlist.py``).
+        """
+        if triage not in {"new", "shortlisted", "dismissed"}:
             raise DomainError(422, "triage", "Unknown job disposition.")
         if reason and triage != "dismissed":
             raise DomainError(422, "triage_reason", "A reason goes with a dismissal only.")
@@ -242,7 +246,11 @@ class JobChanges:
             row = c.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
             check_version(row, expected_version)
             if row["triage"] != triage:
+                if row["triage"] == "shortlisted":
+                    self.leave_shortlist(c, job_id)
                 self._triage(c, row, triage, current_actor(), reason=reason or "")
+                if triage == "shortlisted":
+                    self.start_from_shortlist(c, job_id)
             elif triage == "dismissed" and reason is not None and reason != row["dismissed_reason"]:
                 c.execute(
                     "UPDATE jobs SET dismissed_reason=?,version=version+1,updated_at=? WHERE id=?",

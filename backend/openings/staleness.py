@@ -68,7 +68,7 @@ RECORD_SOURCES = {
     "claim": ("claims", "claims", ()),
 }
 # The document kind a writing scope concerns; "all" concerns every kind.
-SCOPE_KINDS = {"cv": "resume", "letter": "cover_letter"}
+SCOPE_KINDS = {"cv": "cv", "letter": "letter"}
 # Bump when the stored parts change shape: rows of another format are derived again.
 PARTS_FORMAT = 2
 LABEL_CHARS = 120
@@ -546,7 +546,7 @@ def application_staleness(connection, application_ids) -> dict[str, dict]:
     leaves = [
         dict(row)
         for row in connection.execute(
-            "SELECT d.id,d.application_id,d.context_id,d.kind,d.title,d.review_state,d.created_at "
+            "SELECT d.id,d.application_id,d.context_id,d.kind,d.title,d.created_at "
             f"FROM documents d WHERE d.application_id IN ({_placeholders(application_ids)}) "
             "AND NOT EXISTS(SELECT 1 FROM documents child WHERE child.previous_id=d.id) "
             "ORDER BY d.kind,d.created_at,d.id",
@@ -567,7 +567,6 @@ def application_staleness(connection, application_ids) -> dict[str, dict]:
                 "document_id": leaf["id"],
                 "kind": leaf["kind"],
                 "title": leaf["title"],
-                "review_state": leaf["review_state"],
                 "context_id": leaf["context_id"],
                 "context_created_at": frozen["created_at"] if frozen else None,
                 "status": "no_context" if not frozen else "stale" if changes else "current",

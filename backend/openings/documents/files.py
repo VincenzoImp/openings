@@ -11,13 +11,23 @@ from urllib.parse import quote
 
 from fastapi import Request
 
-from ..actors import acting_as, current_actor, from_columns
+from ..actors import current_actor, from_columns
 from ..career.records import _get, _page
 from ..common import check_version, encode, new_id, now
 from ..errors import DomainError, conflict, missing
 from ..transfers import SnapshotResponse
-from .models import OWNER_COLUMNS, OWNER_TABLES, OwnerType, UploadReservation
-from .sources import check_source_bytes, check_upload, refresh_text
+from .models import OWNER_COLUMNS, OWNER_TABLES, SOURCE_KINDS, OwnerType, UploadReservation
+from .pdf import pdf_text
+from .sources import (
+    PDF,
+    check_source_bytes,
+    check_upload,
+    is_complete,
+    is_pdf,
+    media,
+    refresh_text,
+    store_pdf_text,
+)
 from .text import is_tex_source
 
 FILE_VERSION = 1
@@ -32,9 +42,17 @@ class FileOperations:
         row = _get(conn, OWNER_TABLES[owner_type], owner_id, "File owner")
         if writable and owner_type == "context":
             conflict("Frozen context files are immutable.")
-        if writable and owner_type == "document" and row["review_state"] != "draft":
-            conflict(
-                "Approved documents are immutable. Create a new revision before uploading files."
+        if (
+            writable
+            and owner_type == "document"
+            and row["kind"] in SOURCE_KINDS
+            and is_complete(conn, row)
+        ):
+            raise DomainError(
+                409,
+                "revision_complete",
+                "This revision is complete (its PDF is stored) and cannot change. "
+                "Create a new revision with previous_id instead.",
             )
         if owner_type == "job":
             return row, row["id"]
@@ -139,23 +157,27 @@ class FileOperations:
                 422, "source_sha256", "Only a document revision's PDF names its source."
             )
         with self.db.transaction() as conn:
-            owner, job_id = self._owner(conn, value.owner_type, value.owner_id, writable=True)
-            payload = value.model_dump()
-            payload["sha256"] = value.sha256.lower() if value.sha256 else None
-            payload["source_sha256"] = value.source_sha256.lower() if value.source_sha256 else None
-            if value.owner_type == "document":
-                check_upload(
-                    conn,
-                    owner,
-                    value.name,
-                    value.media_type,
-                    payload["sha256"],
-                    payload["source_sha256"],
-                )
-            payload["job_id"] = job_id
-            # The raw upload carries only the grant, so the grant remembers who reserved it.
-            payload["actor"] = list(current_actor().columns())
-            return self._new_grant(conn, payload, "PUT")
+            return self.upload_grant(conn, value)
+
+    def upload_grant(self, conn, value: UploadReservation) -> dict:
+        """A one-shot PUT grant for one file of an owner, checked in the caller's transaction."""
+        owner, job_id = self._owner(conn, value.owner_type, value.owner_id, writable=True)
+        payload = value.model_dump()
+        payload["sha256"] = value.sha256.lower() if value.sha256 else None
+        payload["source_sha256"] = value.source_sha256.lower() if value.source_sha256 else None
+        if value.owner_type == "document":
+            check_upload(
+                conn,
+                owner,
+                value.name,
+                value.media_type,
+                payload["sha256"],
+                payload["source_sha256"],
+            )
+        payload["job_id"] = job_id
+        # The raw upload carries only the grant, so the grant remembers who reserved it.
+        payload["actor"] = list(current_actor().columns())
+        return self._new_grant(conn, payload, "PUT")
 
     def reserve_download(self, file_id: str) -> dict:
         """Obtain a short-lived GET transfer for one existing file; resolve its URL against this workspace origin."""
@@ -213,11 +235,14 @@ class FileOperations:
             b"%PDF-"
         ):
             raise DomainError(422, "pdf_header", "The uploaded file is not a PDF.")
-        source = scope["owner_type"] == "document" and is_tex_source(
-            scope["name"], scope["media_type"]
-        )
+        document = scope["owner_type"] == "document"
+        source = document and is_tex_source(scope["name"], scope["media_type"])
         if source:
             check_source_bytes(bytes(data))
+        # The text of a PDF is read before the write transaction; it is kept only for
+        # a revision without a TeX source.
+        pdf = document and is_pdf(scope["name"], scope["media_type"])
+        text = pdf_text(bytes(data)) if pdf else None
         with self.db.transaction() as conn:
             grant, current = self._grant(token, "PUT", conn)
             self._owner(conn, current["owner_type"], current["owner_id"], writable=False)
@@ -250,6 +275,9 @@ class FileOperations:
                         current.get("source_sha256"),
                     )
                 file_id = new_id()
+                if pdf and media(current["media_type"]) == PDF:
+                    # Stored without parameters, as Ready and completeness compare it.
+                    current["media_type"] = PDF
                 conn.execute(
                     "INSERT OR IGNORE INTO blobs(sha256,content,size) VALUES(?,?,?)",
                     (actual_sha, bytes(data), len(data)),
@@ -279,6 +307,8 @@ class FileOperations:
                     )
                     if source:
                         refresh_text(conn, current["owner_id"])
+                    elif pdf and owner["kind"] in SOURCE_KINDS:
+                        store_pdf_text(conn, current["owner_id"], text)
                 uploader = from_columns(*(current.get("actor") or ()))
                 self._file_event(
                     conn,
@@ -289,8 +319,6 @@ class FileOperations:
                     current.get("job_id"),
                     uploader,
                 )
-                if current["owner_type"] == "document":
-                    self._clear_ready_for_file(conn, current["owner_id"], uploader)
             current["file_id"] = file_id
             conn.execute(
                 "UPDATE transfer_grants SET used=1,payload=? WHERE token_hash=?",
@@ -298,17 +326,6 @@ class FileOperations:
             )
             result = _get(conn, "files", file_id, "File")
         return self._file_record(result)
-
-    def _clear_ready_for_file(self, conn, document_id, actor):
-        """A file added to a current revision changes what Ready was judged on."""
-        row = conn.execute(
-            "SELECT application_id FROM documents d WHERE d.id=? AND NOT EXISTS("
-            "SELECT 1 FROM documents child WHERE child.previous_id=d.id)",
-            (document_id,),
-        ).fetchone()
-        if row:
-            with acting_as(actor):
-                self.workspace.clear_ready(conn, row["application_id"], "file_uploaded")
 
     def _file_event(self, conn, kind, file_id, owner_type, owner_id, job_id, actor=None):
         application_id = None

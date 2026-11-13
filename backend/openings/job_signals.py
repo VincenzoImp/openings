@@ -91,7 +91,7 @@ SIGNAL_FILTERS = {
 }
 # A job nobody has reviewed: in the Inbox, without an application or a triage change.
 UNTOUCHED_SQL = (
-    "j.triage='inbox' AND NOT EXISTS(SELECT 1 FROM applications a WHERE a.job_id=j.id) "
+    "j.triage='new' AND NOT EXISTS(SELECT 1 FROM applications a WHERE a.job_id=j.id) "
     "AND NOT EXISTS(SELECT 1 FROM events e WHERE e.job_id=j.id AND e.kind='triage_changed')"
 )
 _BATCH = 200
@@ -436,7 +436,7 @@ class SignalService:
                 + SIGNALS_SQL.format(alias="j")
                 + ","
                 + UNLISTED_SQL.format(alias="j")
-                + " FROM jobs j WHERE j.triage='inbox' AND NOT EXISTS("
+                + " FROM jobs j WHERE j.triage='new' AND NOT EXISTS("
                 "SELECT 1 FROM applications a WHERE a.job_id=j.id) ORDER BY j.created_at DESC,j.id"
             ).fetchall()
             matched, pending = [], 0

@@ -15,7 +15,6 @@ from ..models import (
     ApplicationInput,
     ApplicationPatch,
     ApplicationQuery,
-    ApplicationReady,
     DistinctInput,
     DuplicateQuery,
     JobBulk,
@@ -100,7 +99,7 @@ OPERATIONS = (
         rest=(Route("GET", "/jobs", "jobs"),),
         tool=Tool(
             READ_ONLY,
-            "Search compact paginated job summaries with location/source/remote/date/queue filters; include_facets=true adds filter value lists and include_counts=true the size of each queue. Each job has its ingest signals (posting language, languages the posting requires or welcomes, the earlier job it likely duplicates with a confidence, whether the source no longer lists it, policy rules that matched) and, when dismissed, its dismissal (who, why, which rule). Filter by signal, posting_language, posting_language_not, requires, dismissed_by or rule_id. Read jobs_get for full content.",
+            "Search compact paginated job summaries with triage (new, shortlisted, dismissed, active), location, source, remote and date filters; include_facets=true adds filter value lists and include_counts=true the number of jobs by triage. Each job has its ingest signals (posting language, languages the posting requires or welcomes, the earlier job it likely duplicates with a confidence, whether the source no longer lists it, policy rules that matched) and, when dismissed, its dismissal (who, why, which rule). Filter by signal, posting_language, posting_language_not, requires, dismissed_by or rule_id. Read jobs_get for full content.",
         ),
     ),
     Operation(
@@ -114,7 +113,7 @@ OPERATIONS = (
         rest=(Route("POST", "/jobs/bulk", "bulk_jobs"),),
         tool=Tool(
             REMOVE,
-            "Apply saved/dismissed/inbox/forget to at most 200 explicit job IDs/versions, with per-item results; reason (dismissed only) is stored on each dismissal. Forget is permanent.",
+            "Apply shortlisted/dismissed/new/forget to at most 200 explicit job IDs/versions, with per-item results; shortlisted starts each job's application, and new or dismissed undoes a shortlist whose application is still empty (application_has_work otherwise). reason (dismissed only) is stored on each dismissal. Forget is permanent.",
         ),
     ),
     Operation(
@@ -200,7 +199,7 @@ OPERATIONS = (
         rest=(Route("POST", "/jobs/{job_id}/triage", "triage"),),
         tool=Tool(
             WRITE,
-            "Set inbox/saved/dismissed and return the compact job summary. Use queue=inbox/shortlist/applications for actionable queues; saved is retained interest. When dismissing, give a short reason (shown to the owner beside the dismissal); the dismissal records who made it and can be restored.",
+            "Set new/shortlisted/dismissed and return the compact job summary. shortlisted starts the job's application (stage Shortlisted, CV and letter required) when it has no open one; moving a shortlisted job back to new or dismissed deletes that application only while it is empty (no documents, notes, replies, requirements or answers), otherwise 409 application_has_work names what exists. When dismissing, give a short reason (shown to the owner beside the dismissal); the dismissal records who made it and can be restored.",
         ),
     ),
     Operation(
@@ -296,7 +295,7 @@ OPERATIONS = (
         ),
         tool=Tool(
             READ_ONLY,
-            "Read the timeline of a job (job_id) or of an application (application_id): its notes and recorded changes in one list, pinned notes first, then newest first. A job's timeline includes its applications' entries; an application's includes its job's. Each entry has type (note or event), kind (note, event or response), scope (job or application), actor (who), run and either note (body, version, pinned) or event (kind, payload of identifiers and field names, subject). Filter by kinds, who (owner, agent, system, unknown), scope, since and until; counts gives the entries of each kind for the other filters. Page with limit and offset.",
+            "Read the timeline of a job (job_id) or of an application (application_id): its notes and recorded changes in one list, pinned notes first, then newest first. A job's timeline includes its applications' entries; an application's includes its job's. Each entry has type (note or event), kind (note, event or reply), scope (job or application), actor (who), run and either note (body, version, pinned) or event (kind, payload of identifiers and field names, subject). Filter by kinds, who (owner, agent, system, unknown), scope, since and until; counts gives the entries of each kind for the other filters. Page with limit and offset.",
         ),
     ),
     Operation(
@@ -355,7 +354,7 @@ OPERATIONS = (
         rest=(Route("GET", "/applications", "applications"),),
         tool=Tool(
             READ_ONLY,
-            "Read paginated application summaries, stage totals and the ready count. Filter by exact job_id, query, stage, outcome, company or readiness (readiness=ready is the stored Ready step; reviewed passes every check but is not marked; ready=false lists the Preparing ones not marked); applied_since and applied_until filter by the time recorded as applied; no_reply_due=true lists the Applied applications past the no-reply period, to propose closing them as no_response. Each row has its last_response; no_reply gives the period, its source (the policy's No reply decision item and whether the owner confirmed it, or the 30-day default) and the number due. Sort by deadline, priority or ready time.",
+            "Read paginated application summaries and stage counts (shortlisted, ready, applied, interview, offer, closed). Each row has ready, computed (Shortlisted, every required document has a current complete revision, no open blocking requirement), and missing (cv, letter, requirement:<id>), and its last_reply. Filter by exact job_id, query, stage (ready is the Shortlisted ones that are Ready), outcome, company, needs (documents: Shortlisted and missing a document; reply_overdue: Applied without a reply past the no-reply period, to close as no_response by hand), applied_since and applied_until. no_reply gives the period, its source and the number overdue. Sort by deadline or priority.",
         ),
     ),
     Operation(
@@ -407,13 +406,13 @@ OPERATIONS = (
         "applications",
         "bulk",
         "Applications and documents",
-        "Close, reopen, mark ready, unmark ready or delete selected application attempts",
+        "Close, reopen or delete selected application attempts",
         params=(Param("value", ApplicationBulk),),
         call=lambda s, value: s.bulk_applications(value),
         rest=(Route("POST", "/applications/bulk", "bulk_applications"),),
         tool=Tool(
             REMOVE,
-            "Close (with outcome: accepted, rejected, not_pursued or no_response), reopen (to a non-Closed stage), mark_ready, unmark_ready or delete at most 200 explicit application IDs/versions, with per-item results. Closing as rejected records a rejection response dated today; no_response needs a sent application and is concluded today. Delete is permanent.",
+            "Close (with outcome: accepted, rejected, not_pursued or no_response), reopen (to a non-Closed stage) or delete at most 200 explicit application IDs/versions, with per-item results. no_response needs a sent application and is concluded today: close the overdue ones (needs=reply_overdue) this way when the owner asks. Record an employer's answer with applications_update reply instead. Delete is permanent.",
         ),
     ),
     Operation(
@@ -421,13 +420,13 @@ OPERATIONS = (
         "applications",
         "create",
         "Applications and documents",
-        "Start application preparation (draft)",
+        "Start an application (stage Shortlisted)",
         params=(Param("value", ApplicationInput),),
         call=lambda s, value: s.create_application(value),
         rest=(Route("POST", "/applications", "create_application"),),
         tool=Tool(
             WRITE,
-            "Create a draft attempt, optionally with priority, deadline and employer requirements. This never sends an application or generates documents. Write standing guidance as the application's pinned note (notes_create with application_id and pinned=true).",
+            "Start an application in stage Shortlisted and shortlist its job, optionally with the documents Ready needs (required_documents, default cv and letter), priority, deadline and employer requirements. Shortlisting a job with jobs_triage starts one too. This never sends an application or generates documents. Write standing guidance as the application's pinned note (notes_create with application_id and pinned=true).",
         ),
     ),
     Operation(
@@ -441,7 +440,7 @@ OPERATIONS = (
         rest=(Route("GET", "/applications/{application_id}", "get_application"),),
         tool=Tool(
             READ_ONLY,
-            "Read a single application, its job, employer requirements, derived readiness, the stored Ready step (ready_at, ready_by), its employer responses and its pinned note (pinned_note), the owner's standing guidance. timeline_get lists its notes and changes.",
+            "Read a single application, its job, employer requirements, required_documents, ready and missing (computed), its employer replies and its pinned note (pinned_note), the owner's standing guidance. timeline_get lists its notes and changes.",
         ),
     ),
     Operation(
@@ -449,27 +448,13 @@ OPERATIONS = (
         "applications",
         "update",
         "Applications and documents",
-        "Record stage, outcome, priority, deadline, employer requirements, questions/answers and application instructions",
+        "Record stage, Mark applied, an employer reply, outcome, priority, deadline, required documents, employer requirements and questions/answers",
         params=(Param("application_id", str), Param("value", ApplicationPatch)),
         call=lambda s, application_id, value: s.update_application(application_id, value),
         rest=(Route("PATCH", "/applications/{application_id}", "edit_application"),),
         tool=Tool(
             WRITE,
-            "Record progress, priority, deadline, employer requirements and questions/answers explicitly; editing documents never marks sent. Moving to Interview or Offer, or closing as rejected (or accepted without an offer on record), records the matching employer response dated response_date (today by default) with response_note. Close as no_response (with concluded_on, today by default) only a sent application whose employer did not answer within the no-reply period. Record only what the owner reported. The returned job is the compact summary. Standing guidance is the pinned note: edit it with notes_update and notes_pin.",
-        ),
-    ),
-    Operation(
-        "applications.ready",
-        "applications",
-        "ready",
-        "Applications and documents",
-        "Mark a Preparing application ready to apply, or clear the mark",
-        params=(Param("application_id", str), Param("value", ApplicationReady)),
-        call=lambda s, application_id, value: s.set_ready(application_id, value),
-        rest=(Route("POST", "/applications/{application_id}/ready", "ready_application"),),
-        tool=Tool(
-            WRITE,
-            "Mark a Preparing application ready to apply (ready=true) or clear the mark (ready=false), using its current version. Refused with application_not_ready naming the failed check (stage, blocked, none, missing_pdf, unreviewed). The mark is cleared automatically when a revision, context, file or blocking requirement changes. This never submits anything.",
+            "Record progress, priority, deadline, required documents, employer requirements and questions/answers explicitly; editing documents never marks sent. Mark applied is the owner's act (status=applied; applied_at defaults to now): never set it unless the owner says they sent the application; status=shortlisted undoes it while there is no reply. reply records an employer reply the owner reported (kind interview, rejection, offer or other; date defaults to today) and moves the stage with it in one change: interview to Interview, offer to Offer, rejection closes as rejected, other leaves the stage; reply with id corrects or removes one. Close as no_response (with concluded_on, today by default) only a sent application whose employer did not answer within the no-reply period, when the owner asks. The returned job is the compact summary. Standing guidance is the pinned note: edit it with notes_update and notes_pin.",
         ),
     ),
     Operation(
@@ -526,7 +511,7 @@ def register_core_mcp(mcp, workspace, requests):
             "actor": current_actor().describe(),
             "open_requests": requests.count_open(),
             "storage": storage_status(workspace.db),
-            "workflow": "Read open requests for the agent first. Read career, templates and stored instructions; prepare a frozen context; write and compile externally; save document revisions and PDF/source files; track progress explicitly.",
+            "workflow": "Read open requests for the agent first. Read career, templates and stored instructions; prepare a frozen context; write and compile externally; save CV and letter revisions with their PDF (and TeX source); an application is Ready when its required documents are complete. Mark applied and replies are recorded only as the owner reports them.",
         }
 
     bind_mcp(mcp, OPERATIONS, workspace)

@@ -14,7 +14,6 @@ from . import (
     discovery,
     documents,
     insights,
-    outcomes,
     policy,
     skills,
     source_yield,
@@ -31,7 +30,6 @@ AREAS = (
     activity,
     agent_requests,
     policy,
-    outcomes,
     insights,
     source_yield,
 )

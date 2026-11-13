@@ -2,7 +2,7 @@
 
 Only employer responses count. The sample is the sent applications: those with
 ``applied_at``, in Applied, Interview or Offer, or with a recorded response.
-Drafts and attempts closed without being sent are counted apart (``excluded``),
+Shortlisted applications and attempts closed without being sent are counted apart (``excluded``),
 and jobs an agent dismissed never had an application, so neither is ever read
 as an employer signal.
 
@@ -536,7 +536,7 @@ class InsightsService:
             ).fetchall()
             answers = defaultdict(list)
             for application_id, kind, day in conn.execute(
-                "SELECT application_id,kind,date FROM responses"
+                "SELECT application_id,kind,date FROM replies"
             ):
                 answers[application_id].append((kind, day))
             no_reply = no_reply_period(conn)
@@ -545,7 +545,7 @@ class InsightsService:
                 "AND applied_at IS NOT NULL AND applied_at<?",
                 (no_reply_cutoff(no_reply["days"]),),
             ).fetchone()[0]
-        excluded = {"preparing": 0, "closed_unsent": 0}
+        excluded = {"shortlisted": 0, "closed_unsent": 0}
         sample = []
         for row in rows:
             responses = answers.get(row["id"], [])
@@ -553,7 +553,7 @@ class InsightsService:
                 row["applied_at"] or row["status"] in {"applied", "interview", "offer"} or responses
             )
             if not sent:
-                excluded["preparing" if row["status"] == "draft" else "closed_unsent"] += 1
+                excluded["shortlisted" if row["status"] == "shortlisted" else "closed_unsent"] += 1
                 continue
             applied = row["applied_at"]
             if (value.applied_since or value.applied_until) and not applied:

@@ -173,9 +173,9 @@ class ContextOperations:
                 conn, context_id, encoded, [{**asset, "name": asset["path"]} for asset in assets]
             )
             store_context_inputs(conn, context_id, timestamp, encoded)
-            if job["triage"] != "saved":
+            if job["triage"] != "shortlisted":
                 conn.execute(
-                    "UPDATE jobs SET triage='saved',version=version+1,updated_at=? WHERE id=?",
+                    "UPDATE jobs SET triage='shortlisted',version=version+1,updated_at=? WHERE id=?",
                     (timestamp, job["id"]),
                 )
             self.workspace.event(
@@ -186,7 +186,6 @@ class ContextOperations:
                 conn,
                 subject=("context", context_id),
             )
-            self.workspace.clear_ready(conn, value.application_id, "context_prepared")
         return self.get_context(context_id)
 
     @staticmethod
@@ -258,12 +257,12 @@ class ContextOperations:
 
     def list_staleness(
         self,
-        status: StalenessStage = "draft",
+        status: StalenessStage = "shortlisted",
         stale_only: bool = True,
         limit: int = 50,
         offset: int = 0,
     ) -> dict:
-        """List applications in one stage (default draft; "all" for every stage) whose current revisions were built on older inputs, with each changed part (as staleness_get). stale_only=false also lists current ones. Read-only."""
+        """List applications in one stage (default shortlisted; "all" for every stage) whose current revisions were built on older inputs, with each changed part (as staleness_get). stale_only=false also lists current ones. Read-only."""
         _page(limit, offset)
         where, params = ("AND a.status=?", [status]) if status != "all" else ("", [])
         with self.db.connect() as conn:
