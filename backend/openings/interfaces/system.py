@@ -26,6 +26,7 @@ from ..operations import (
     storage_status,
 )
 from ..transfers import SnapshotResponse
+from .registry import Exemption, Operation, Param, Route, Tool, bind_mcp, bind_rest
 
 
 class PasswordInput(Input):
@@ -74,6 +75,198 @@ class RecordsResponse(SnapshotResponse):
             media_type="application/json",
             headers={"Content-Disposition": 'attachment; filename="openings-export.json"'},
         )
+
+
+def export_grant(auth):
+    return {
+        "url": "/api/v1/export",
+        "method": "GET",
+        "headers": {"X-Operational-Token": auth.operation_ticket("export")},
+        "expires_in": 120,
+    }
+
+
+def backup_grant(auth):
+    return {
+        "url": "/api/v1/backup",
+        "method": "GET",
+        "headers": {"X-Operational-Token": auth.operation_ticket("backup")},
+        "expires_in": 120,
+    }
+
+
+def restore_grant(auth):
+    require_owner("restore a backup")
+    return {
+        "url": "/api/v1/backup/restore",
+        "method": "POST",
+        "headers": {
+            "X-Operational-Token": auth.operation_ticket("restore"),
+            "Content-Type": "application/vnd.sqlite3",
+        },
+        "expires_in": 120,
+    }
+
+
+READ = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+WRITE = ToolAnnotations(destructiveHint=False, openWorldHint=False)
+REMOVE = ToolAnnotations(destructiveHint=True, openWorldHint=False)
+GROUP = "Workspace access and portability"
+
+# Hand-written routes and tools (custom) are registered in register_system: browser
+# sessions and cookies, the inventory itself, and streamed backup, restore and export.
+OPERATIONS = (
+    Operation(
+        "password.update",
+        "password",
+        "update",
+        GROUP,
+        "Change owner password and rotate owner sessions",
+        access="owner",
+        params=(Param("value", PasswordInput),),
+        call=lambda s, value: s.change_password(value.password),
+        rest=(Route("POST", "/auth/password", "change_password", custom=True),),
+        tool=Tool(
+            "owner_password_update",
+            REMOVE,
+            "Change the owner password and invalidate all browser sessions; API/MCP tokens remain valid. Owner only: an agent token is refused with forbidden.",
+        ),
+    ),
+    Operation(
+        "workspace.capabilities",
+        "capabilities",
+        "get",
+        "Archive",
+        "Read supported logical operations and transport exceptions",
+        rest=(Route("GET", "/capabilities", "capabilities", custom=True),),
+        tool=Tool("capabilities_get", READ, custom=True),
+    ),
+    Operation(
+        "tokens.list",
+        "tokens",
+        "list",
+        GROUP,
+        "List API token metadata and kinds",
+        access="owner",
+        call=lambda s: s.list_tokens(),
+        rest=(Route("GET", "/tokens", "tokens"),),
+        tool=Tool(
+            "tokens_list",
+            READ,
+            "List installation API/MCP token metadata with each token's kind; stored token secrets are never returned. Owner only: an agent token is refused with forbidden.",
+        ),
+    ),
+    Operation(
+        "tokens.create",
+        "tokens",
+        "create",
+        GROUP,
+        "Create a named owner or agent API token",
+        access="owner",
+        params=(Param("value", TokenInput),),
+        call=lambda s, value: s.create_token(value.name, value.kind),
+        rest=(Route("POST", "/tokens", "token"),),
+        tool=Tool(
+            "token_create",
+            WRITE,
+            "Create a named API/MCP token of kind owner (full access, the default) or agent (scoped). Save its secret; it is returned only once. Owner only: an agent token is refused with forbidden.",
+        ),
+    ),
+    Operation(
+        "tokens.revoke",
+        "tokens",
+        "delete",
+        GROUP,
+        "Revoke an API token",
+        access="owner",
+        params=(Param("token_id", str),),
+        call=lambda s, token_id: s.revoke_token(token_id),
+        rest=(Route("DELETE", "/tokens/{token_id}", "revoke"),),
+        tool=Tool(
+            "token_revoke",
+            REMOVE,
+            "Revoke an API/MCP token, including the current token if selected. Owner only: an agent token is refused with forbidden.",
+        ),
+    ),
+    Operation(
+        "backup.download",
+        "backups",
+        "create",
+        GROUP,
+        "Download a consistent SQLite backup including bytes",
+        call=backup_grant,
+        rest=(Route("GET", "/backup", "backup", custom=True),),
+        tool=Tool(
+            "workspace_backup",
+            READ,
+            "Reserve a scoped HTTP download of a consistent SQLite backup, including file bytes. A backup taken with an agent token omits the owner password hash, session secret and API tokens; it still restores completely.",
+        ),
+    ),
+    Operation(
+        "backup.restore",
+        "backups",
+        "restore",
+        GROUP,
+        "Replace workspace data from a SQLite backup",
+        access="owner",
+        call=restore_grant,
+        rest=(Route("POST", "/backup/restore", "restore", custom=True),),
+        tool=Tool(
+            "workspace_restore_upload",
+            REMOVE,
+            "Reserve a scoped raw SQLite upload that replaces workspace data; installation authentication stays unchanged. Owner only: an agent token is refused with forbidden.",
+        ),
+    ),
+    Operation(
+        "export.records",
+        "records",
+        "export",
+        GROUP,
+        "Download portable JSON records without file bytes",
+        call=export_grant,
+        rest=(Route("GET", "/export", "export", custom=True),),
+        tool=Tool(
+            "workspace_export",
+            READ,
+            "Reserve a redacted JSON records export. File bytes and installation authentication are excluded; use backup for a full snapshot.",
+        ),
+    ),
+)
+
+EXEMPTIONS = (
+    Exemption(
+        "auth.bootstrap_session",
+        "Credential bootstrap and browser session transport precede authenticated domain tools; MCP uses bearer authentication. Logout revokes every browser session; API/MCP tokens remain valid.",
+        rest=(
+            Route("GET", "/auth/session", "session", custom=True),
+            Route("POST", "/auth/setup", "setup", custom=True),
+            Route("POST", "/auth/login", "login", custom=True),
+            Route("POST", "/auth/logout", "logout", custom=True),
+        ),
+    ),
+    Exemption(
+        "health.deployment",
+        "Deployment liveness and service installation/startup are transport or operator concerns, not domain CRUD.",
+        rest=(Route("GET", "/health", "health", custom=True, absolute=True),),
+    ),
+    Exemption(
+        "mcp.transport",
+        "MCP initialization/discovery/session/resource transport is protocol infrastructure; no simulated dashboard button or MCP wrapper is required.",
+        rest=(
+            Route("POST", "/mcp/", "mcp", custom=True, absolute=True),
+            Route("GET", "/mcp/", "mcp", custom=True, absolute=True),
+            Route("DELETE", "/mcp/", "mcp", custom=True, absolute=True),
+        ),
+    ),
+    Exemption(
+        "reference.examples",
+        "Shipped static reference files are convenience downloads, not private workspace records; agents may use REST or repository examples.",
+        rest=(
+            Route("GET", "/examples", "examples", custom=True),
+            Route("GET", "/examples/{name}", "example_file", custom=True),
+        ),
+    ),
+)
 
 
 def register_system(router, mcp, workspace, auth, public_url):
@@ -136,42 +329,11 @@ def register_system(router, mcp, workspace, auth, public_url):
     mcp.tool(
         name="capabilities_get",
         description="Read the logical operation matrix, REST routes, MCP tools and dashboard locations.",
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False),
+        annotations=READ,
     )(capabilities)
 
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
-    )
-    def tokens_list() -> dict:
-        """List installation API/MCP token metadata with each token's kind; stored token secrets are never returned. Owner only: an agent token is refused with forbidden."""
-        return auth.list_tokens()
-
-    @mcp.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=False))
-    def token_create(value: TokenInput) -> dict:
-        """Create a named API/MCP token of kind owner (full access, the default) or agent (scoped). Save its secret; it is returned only once. Owner only: an agent token is refused with forbidden."""
-        return auth.create_token(value.name, value.kind)
-
-    @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
-    def token_revoke(token_id: str) -> dict:
-        """Revoke an API/MCP token, including the current token if selected. Owner only: an agent token is refused with forbidden."""
-        return auth.revoke_token(token_id)
-
-    @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
-    def owner_password_update(value: PasswordInput) -> dict:
-        """Change the owner password and invalidate all browser sessions; API/MCP tokens remain valid. Owner only: an agent token is refused with forbidden."""
-        return auth.change_password(value.password)
-
-    @router.get("/tokens")
-    def tokens():
-        return auth.list_tokens()
-
-    @router.post("/tokens")
-    def token(value: TokenInput):
-        return auth.create_token(value.name, value.kind)
-
-    @router.delete("/tokens/{token_id}")
-    def revoke(token_id: str):
-        return auth.revoke_token(token_id)
+    bind_rest(router, OPERATIONS, auth)
+    bind_mcp(mcp, OPERATIONS, auth)
 
     @router.get("/backup")
     def backup():
@@ -330,41 +492,3 @@ def register_system(router, mcp, workspace, auth, public_url):
                 yield ',"settings":' + json.dumps(settings, ensure_ascii=False) + "}"
 
         return RecordsResponse(records())
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
-    )
-    def workspace_export() -> dict:
-        """Reserve a redacted JSON records export. File bytes and installation authentication are excluded; use backup for a full snapshot."""
-        return {
-            "url": "/api/v1/export",
-            "method": "GET",
-            "headers": {"X-Operational-Token": auth.operation_ticket("export")},
-            "expires_in": 120,
-        }
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
-    )
-    def workspace_backup() -> dict:
-        """Reserve a scoped HTTP download of a consistent SQLite backup, including file bytes. A backup taken with an agent token omits the owner password hash, session secret and API tokens; it still restores completely."""
-        return {
-            "url": "/api/v1/backup",
-            "method": "GET",
-            "headers": {"X-Operational-Token": auth.operation_ticket("backup")},
-            "expires_in": 120,
-        }
-
-    @mcp.tool(annotations=ToolAnnotations(destructiveHint=True, openWorldHint=False))
-    def workspace_restore_upload() -> dict:
-        """Reserve a scoped raw SQLite upload that replaces workspace data; installation authentication stays unchanged. Owner only: an agent token is refused with forbidden."""
-        require_owner("restore a backup")
-        return {
-            "url": "/api/v1/backup/restore",
-            "method": "POST",
-            "headers": {
-                "X-Operational-Token": auth.operation_ticket("restore"),
-                "Content-Type": "application/vnd.sqlite3",
-            },
-            "expires_in": 120,
-        }

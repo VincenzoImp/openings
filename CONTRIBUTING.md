@@ -73,6 +73,18 @@ the jobs to review take 300 ms or more to show 200 rows (the median of seven
 loads). CI runs Chromium at both widths and the
 performance project. Browser binaries are development tools, outside the core.
 
+### Backend time budgets
+
+`backend/tests/test_performance_budgets.py` builds a synthetic workspace of
+25,000 jobs with their ingest signals, 500 applications, 20 sources and 60 frozen
+contexts in a few seconds, and fails when the median of five reads exceeds its
+budget: the Applications list, the reads of Today, the job inbox (with counts
+and facets), text search, the overview, the staleness report, insights and source
+yield. The budgets are about six times the time measured on a laptop, so a slower
+CI runner passes and a real regression does not. It runs with `pytest`; select it
+alone with `uv run pytest -m performance`. Never raise a budget to make a change
+pass: make the read faster, or explain in the pull request why it must cost more.
+
 ### Dashboard budgets
 
 The [dashboard design](docs/developer/dashboard-design.md) sets budgets that CI
@@ -113,6 +125,17 @@ or worktrees can overlap. Set `OPENINGS_E2E_PORT` to choose the port, for exampl
 `OPENINGS_E2E_PORT=18084 npm run test:e2e`. The run gives its server a one-time
 token and stops before the first test if the port is already in use or the server
 that answers there is not the one it started.
+
+### Operation inventory
+
+`backend/openings/operation-inventory.json` is generated from the operation
+declarations in `backend/openings/interfaces/` and the remarks in
+`interfaces/inventory-notes.json`. After declaring or changing an operation,
+regenerate it; `pytest` fails while it is out of date:
+
+```bash
+uv run python scripts/inventory.py
+```
 
 ### Parity matrix
 
@@ -166,7 +189,7 @@ uv run python backend/tests/agent_roundtrip.py --tectonic /path/to/tectonic
 | `frontend` | React dashboard calling REST |
 | `examples` | Synthetic career data and LaTeX templates |
 | `skills/` | Agent workflow skills (Agent Skills format) and their shared references |
-| `scripts/` | Release version tool, package smoke check, parity matrix and documentation screenshots |
+| `scripts/` | Release version tool, package smoke check, operation inventory, parity matrix and documentation screenshots |
 | `docs/user` | Setup, workflow and operator guides |
 | `docs/developer` | Architecture and extension boundaries |
 

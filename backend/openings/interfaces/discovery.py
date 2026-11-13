@@ -1,7 +1,5 @@
 """REST routes and MCP tools of discovery."""
 
-import asyncio
-
 from fastapi import Query
 from mcp.types import ToolAnnotations
 
@@ -15,257 +13,338 @@ from ..discovery import (
     SourcePreview,
     SourceRun,
 )
+from .registry import Operation, Param, Route, Tool, bind_mcp, bind_rest
+
+READ = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+CHANGE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)
+
+OPERATIONS = (
+    Operation(
+        "collection.read",
+        "collection",
+        "get",
+        "Collection",
+        "Read global collection state and status",
+        params=(),
+        call=lambda s: s.get_collection(),
+        rest=(Route("GET", "/collection", "collection_get"),),
+        tool=Tool(
+            "collection_get",
+            READ,
+            "Read the global automatic collection switch, counts and next queued run.",
+        ),
+    ),
+    Operation(
+        "collection.update",
+        "collection",
+        "update",
+        "Collection",
+        "Enable or pause scheduled collection globally",
+        params=(Param("value", CollectionWrite),),
+        call=lambda s, value: s.update_collection(value),
+        rest=(Route("PATCH", "/collection", "collection_update"),),
+        tool=Tool(
+            "collection_update",
+            CHANGE,
+            "Pause/resume automatic collection with version protection; manual run remains available.",
+        ),
+    ),
+    Operation(
+        "providers.list",
+        "providers",
+        "list",
+        "Collection",
+        "Read provider capabilities, policies and runtime",
+        params=(),
+        call=lambda s: s.list_providers(),
+        rest=(Route("GET", "/providers", "providers_list"),),
+        tool=Tool(
+            "providers_list",
+            READ,
+            "Read supported providers, editable HTTP safeguards and persisted window/cooldown diagnostics.",
+        ),
+    ),
+    Operation(
+        "providers.update",
+        "providers",
+        "update",
+        "Collection",
+        "Edit versioned provider HTTP policy",
+        params=(Param("provider_id", str), Param("value", ProviderPatch)),
+        call=lambda s, provider_id, value: s.update_provider(provider_id, value),
+        rest=(Route("PATCH", "/providers/{provider_id}", "providers_update"),),
+        tool=Tool(
+            "providers_update",
+            CHANGE,
+            "Edit a provider policy using its version. Runtime/cooldown are read-only and shared by all runs.",
+        ),
+    ),
+    Operation(
+        "collection.runs.list",
+        "collection_runs",
+        "list",
+        "Collection",
+        "List logical collection invocations",
+        params=(
+            Param("limit", int, 50),
+            Param("offset", int, 0),
+            Param("source_id", str | None, None),
+            Param("state", str | None, None),
+            Param("summary", bool, True),
+        ),
+        call=lambda s, limit, offset, source_id, state, summary: s.list_runs(
+            limit, offset, source_id, state, summary
+        ),
+        rest=(Route("GET", "/collection/runs", "collection_runs_list"),),
+        tool=Tool(
+            "collection_runs_list",
+            READ,
+            "List logical collections with cumulative provider counts, waiting and processing time. summary=false adds frozen source snapshots and full task payloads/results.",
+        ),
+    ),
+    Operation(
+        "collection.runs.read",
+        "collection_runs",
+        "get",
+        "Collection",
+        "Read frozen collection settings, progress and results",
+        params=(Param("run_id", str),),
+        call=lambda s, run_id: s.get_run(run_id),
+        rest=(Route("GET", "/collection/runs/{run_id}", "collection_runs_get"),),
+        tool=Tool(
+            "collection_runs_get",
+            READ,
+            "Read frozen acquisition settings and provider tasks for one collection invocation.",
+        ),
+    ),
+    Operation(
+        "collection.runs.cancel",
+        "collection_runs",
+        "cancel",
+        "Collection",
+        "Stop current collection work",
+        params=(Param("run_id", str),),
+        call=lambda s, run_id: s.cancel_run(run_id),
+        rest=(Route("POST", "/collection/runs/{run_id}/cancel", "collection_runs_cancel"),),
+        tool=Tool(
+            "collection_runs_cancel",
+            CHANGE,
+            "Stop current collection work while retaining jobs already archived.",
+        ),
+    ),
+    Operation(
+        "sources.schemas",
+        "sources",
+        "schemas",
+        "Collection",
+        "Discover source fields, defaults and collection options",
+        params=(),
+        call=lambda s: s.source_schemas(),
+        rest=(Route("GET", "/sources/schemas", "sources_schemas"),),
+        tool=Tool(
+            "sources_schemas",
+            READ,
+            "Discover supported source fields/defaults, schedule variants and temporary run options.",
+        ),
+    ),
+    Operation(
+        "sources.list",
+        "sources",
+        "list",
+        "Collection",
+        "List saved searches/company feeds and health",
+        params=(Param("limit", int, 100), Param("offset", int, 0), Param("summary", bool, True)),
+        call=lambda s, limit, offset, summary: s.list_sources(limit, offset, summary),
+        rest=(Route("GET", "/sources", "sources_list"),),
+        tool=Tool(
+            "sources_list",
+            READ,
+            "List saved portal searches and selected company/feed sources, schedules and outcomes. summary=false adds last-run diagnostics and full task records.",
+        ),
+    ),
+    Operation(
+        "sources.preview",
+        "sources",
+        "preview",
+        "Collection",
+        "Preview a source without storing jobs",
+        params=(Param("value", SourcePreview),),
+        call=lambda s, value: s.preview_source(value),
+        rest=(Route("POST", "/sources/preview", "sources_preview"),),
+        tool=Tool(
+            "sources_preview",
+            ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=True),
+            "Preview a saved-search/company/feed configuration without saving jobs; shared request spacing and cooldowns apply.",
+            offload=True,
+        ),
+    ),
+    Operation(
+        "sources.create",
+        "sources",
+        "create",
+        "Collection",
+        "Save a typed search or company/feed source",
+        params=(Param("value", SourceCreate),),
+        call=lambda s, value: s.create_source(value),
+        rest=(Route("POST", "/sources", "sources_create", status_code=201),),
+        tool=Tool(
+            "sources_create",
+            ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True),
+            "Create one explicit saved query/location or company/feed source; individually paused by default.",
+            offload=True,
+        ),
+    ),
+    Operation(
+        "sources.bulk",
+        "sources",
+        "bulk",
+        "Collection",
+        "Enable, pause, run, configure or delete selected sources",
+        params=(Param("value", SourceBulk),),
+        call=lambda s, value: s.bulk_sources(value),
+        rest=(Route("POST", "/sources/bulk", "sources_bulk"),),
+        tool=Tool(
+            "sources_bulk",
+            ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=True),
+            "Enable, pause, run, configure or delete selected versioned sources; inspect each result/error.",
+        ),
+    ),
+    Operation(
+        "sources.read",
+        "sources",
+        "get",
+        "Collection",
+        "Read full source configuration",
+        params=(Param("source_id", str),),
+        call=lambda s, source_id: s.get_source(source_id),
+        rest=(Route("GET", "/sources/{source_id}", "sources_get"),),
+        tool=Tool(
+            "sources_get", READ, "Read a source's complete editable configuration and version."
+        ),
+    ),
+    Operation(
+        "sources.update",
+        "sources",
+        "update",
+        "Collection",
+        "Edit source configuration, schedule or enabled state",
+        params=(Param("source_id", str), Param("value", SourcePatch)),
+        call=lambda s, source_id, value: s.update_source(source_id, value),
+        rest=(Route("PATCH", "/sources/{source_id}", "sources_update"),),
+        tool=Tool(
+            "sources_update",
+            ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True),
+            "Update or pause a source with optimistic version protection.",
+            offload=True,
+        ),
+    ),
+    Operation(
+        "sources.delete",
+        "sources",
+        "delete",
+        "Collection",
+        "Delete a source while retaining archived jobs",
+        params=(Param("source_id", str), Param("expected_version", int, rest=(int, Query(ge=1)))),
+        call=lambda s, source_id, expected_version: s.delete_source(source_id, expected_version),
+        rest=(Route("DELETE", "/sources/{source_id}", "sources_delete"),),
+        tool=Tool(
+            "sources_delete",
+            ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=False),
+            "Remove a versioned source while retaining archived jobs and collection history.",
+        ),
+    ),
+    Operation(
+        "sources.run",
+        "sources",
+        "run",
+        "Collection",
+        "Queue one immediate collection",
+        params=(Param("source_id", str), Param("value", SourceRun)),
+        call=lambda s, source_id, value: s.queue_collection(
+            source_id, expected_version=value.expected_version, overrides=value.overrides
+        ),
+        rest=(Route("POST", "/sources/{source_id}/run", "sources_run"),),
+        tool=Tool(
+            "sources_run",
+            ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True),
+            "Run a versioned source with frozen optional overrides; shared request spacing and cooldowns apply.",
+        ),
+    ),
+    Operation(
+        "tasks.list",
+        "tasks",
+        "list",
+        "Collection",
+        "List/filter paginated collection tasks",
+        params=(
+            Param("limit", int, 50),
+            Param("offset", int, 0),
+            Param("state", str | None, None),
+            Param("kind", str | None, None),
+            Param("source_id", str | None, None),
+            Param("job_id", str | None, None),
+        ),
+        call=lambda s, limit, offset, state, kind, source_id, job_id: s.list_tasks(
+            limit, offset, state, kind, source_id, job_id
+        ),
+        rest=(Route("GET", "/tasks", "tasks_list"),),
+        tool=Tool(
+            "tasks_list",
+            READ,
+            "Filter collection work by state/kind/source/job, with readable labels and diagnostics.",
+        ),
+    ),
+    Operation(
+        "tasks.read",
+        "tasks",
+        "get",
+        "Collection",
+        "Read task progress, result and diagnostics",
+        params=(Param("task_id", str),),
+        call=lambda s, task_id: s.get_task(task_id),
+        rest=(Route("GET", "/tasks/{task_id}", "tasks_get"),),
+        tool=Tool(
+            "tasks_get",
+            READ,
+            "Read one task's inputs, result, HTTP diagnostics, lease and next run time.",
+        ),
+    ),
+    Operation(
+        "tasks.cancel",
+        "tasks",
+        "cancel",
+        "Collection",
+        "Cancel queued/running work",
+        params=(Param("task_id", str),),
+        call=lambda s, task_id: s.cancel_task(task_id),
+        rest=(Route("POST", "/tasks/{task_id}/cancel", "tasks_cancel"),),
+        tool=Tool(
+            "tasks_cancel",
+            CHANGE,
+            "Cancel queued/running work; already stored jobs and documents are kept.",
+        ),
+    ),
+    Operation(
+        "tasks.retry",
+        "tasks",
+        "retry",
+        "Collection",
+        "Explicitly retry failed/cancelled work",
+        params=(Param("task_id", str),),
+        call=lambda s, task_id: s.retry_task(task_id),
+        rest=(Route("POST", "/tasks/{task_id}/retry", "tasks_retry"),),
+        tool=Tool(
+            "tasks_retry",
+            ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True),
+            "Retry failed/cancelled work; collection keeps its frozen inputs and saved progress.",
+        ),
+    ),
+)
 
 
 def register_api(router, service: DiscoveryService):
-    @router.get("/collection")
-    def collection_get():
-        return service.get_collection()
-
-    @router.patch("/collection")
-    def collection_update(value: CollectionWrite):
-        return service.update_collection(value)
-
-    @router.get("/providers")
-    def providers_list():
-        return service.list_providers()
-
-    @router.patch("/providers/{provider_id}")
-    def providers_update(provider_id: str, value: ProviderPatch):
-        return service.update_provider(provider_id, value)
-
-    @router.get("/collection/runs")
-    def collection_runs_list(
-        limit: int = 50,
-        offset: int = 0,
-        source_id: str | None = None,
-        state: str | None = None,
-        summary: bool = True,
-    ):
-        return service.list_runs(limit, offset, source_id, state, summary)
-
-    @router.get("/collection/runs/{run_id}")
-    def collection_runs_get(run_id: str):
-        return service.get_run(run_id)
-
-    @router.post("/collection/runs/{run_id}/cancel")
-    def collection_runs_cancel(run_id: str):
-        return service.cancel_run(run_id)
-
-    @router.get("/sources/schemas")
-    def sources_schemas():
-        return service.source_schemas()
-
-    @router.get("/sources")
-    def sources_list(limit: int = 100, offset: int = 0, summary: bool = True):
-        return service.list_sources(limit, offset, summary)
-
-    @router.post("/sources/preview")
-    def sources_preview(value: SourcePreview):
-        return service.preview_source(value)
-
-    @router.post("/sources", status_code=201)
-    def sources_create(value: SourceCreate):
-        return service.create_source(value)
-
-    @router.post("/sources/bulk")
-    def sources_bulk(value: SourceBulk):
-        return service.bulk_sources(value)
-
-    @router.get("/sources/{source_id}")
-    def sources_get(source_id: str):
-        return service.get_source(source_id)
-
-    @router.patch("/sources/{source_id}")
-    def sources_update(source_id: str, value: SourcePatch):
-        return service.update_source(source_id, value)
-
-    @router.delete("/sources/{source_id}")
-    def sources_delete(source_id: str, expected_version: int = Query(ge=1)):
-        return service.delete_source(source_id, expected_version)
-
-    @router.post("/sources/{source_id}/run")
-    def sources_run(source_id: str, value: SourceRun):
-        return service.queue_collection(
-            source_id, expected_version=value.expected_version, overrides=value.overrides
-        )
-
-    @router.get("/tasks")
-    def tasks_list(
-        limit: int = 50,
-        offset: int = 0,
-        state: str | None = None,
-        kind: str | None = None,
-        source_id: str | None = None,
-        job_id: str | None = None,
-    ):
-        return service.list_tasks(limit, offset, state, kind, source_id, job_id)
-
-    @router.get("/tasks/{task_id}")
-    def tasks_get(task_id: str):
-        return service.get_task(task_id)
-
-    @router.post("/tasks/{task_id}/cancel")
-    def tasks_cancel(task_id: str):
-        return service.cancel_task(task_id)
-
-    @router.post("/tasks/{task_id}/retry")
-    def tasks_retry(task_id: str):
-        return service.retry_task(task_id)
+    bind_rest(router, OPERATIONS, service)
 
 
 def register_mcp(mcp, service: DiscoveryService):
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
-    )
-    def sources_schemas() -> dict:
-        """Discover supported source fields/defaults, schedule variants and temporary run options."""
-        return service.source_schemas()
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
-    )
-    def collection_runs_list(
-        limit: int = 50,
-        offset: int = 0,
-        source_id: str | None = None,
-        state: str | None = None,
-        summary: bool = True,
-    ) -> dict:
-        """List logical collections with cumulative provider counts, waiting and processing time. summary=false adds frozen source snapshots and full task payloads/results."""
-        return service.list_runs(limit, offset, source_id, state, summary)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
-    )
-    def collection_runs_get(run_id: str) -> dict:
-        """Read frozen acquisition settings and provider tasks for one collection invocation."""
-        return service.get_run(run_id)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)
-    )
-    def collection_runs_cancel(run_id: str) -> dict:
-        """Stop current collection work while retaining jobs already archived."""
-        return service.cancel_run(run_id)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
-    )
-    def collection_get() -> dict:
-        """Read the global automatic collection switch, counts and next queued run."""
-        return service.get_collection()
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)
-    )
-    def collection_update(value: CollectionWrite) -> dict:
-        """Pause/resume automatic collection with version protection; manual run remains available."""
-        return service.update_collection(value)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
-    )
-    def providers_list() -> dict:
-        """Read supported providers, editable HTTP safeguards and persisted window/cooldown diagnostics."""
-        return service.list_providers()
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)
-    )
-    def providers_update(provider_id: str, value: ProviderPatch) -> dict:
-        """Edit a provider policy using its version. Runtime/cooldown are read-only and shared by all runs."""
-        return service.update_provider(provider_id, value)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=True)
-    )
-    def sources_bulk(value: SourceBulk) -> dict:
-        """Enable, pause, run, configure or delete selected versioned sources; inspect each result/error."""
-        return service.bulk_sources(value)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
-    )
-    def sources_list(limit: int = 100, offset: int = 0, summary: bool = True) -> dict:
-        """List saved portal searches and selected company/feed sources, schedules and outcomes. summary=false adds last-run diagnostics and full task records."""
-        return service.list_sources(limit, offset, summary)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
-    )
-    def sources_get(source_id: str) -> dict:
-        """Read a source's complete editable configuration and version."""
-        return service.get_source(source_id)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=True)
-    )
-    async def sources_preview(value: SourcePreview) -> dict:
-        """Preview a saved-search/company/feed configuration without saving jobs; shared request spacing and cooldowns apply."""
-        return await asyncio.to_thread(service.preview_source, value)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True)
-    )
-    async def sources_create(value: SourceCreate) -> dict:
-        """Create one explicit saved query/location or company/feed source; individually paused by default."""
-        return await asyncio.to_thread(service.create_source, value)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True)
-    )
-    async def sources_update(source_id: str, value: SourcePatch) -> dict:
-        """Update or pause a source with optimistic version protection."""
-        return await asyncio.to_thread(service.update_source, source_id, value)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=False)
-    )
-    def sources_delete(source_id: str, expected_version: int) -> dict:
-        """Remove a versioned source while retaining archived jobs and collection history."""
-        return service.delete_source(source_id, expected_version)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True)
-    )
-    def sources_run(source_id: str, value: SourceRun) -> dict:
-        """Run a versioned source with frozen optional overrides; shared request spacing and cooldowns apply."""
-        return service.queue_collection(
-            source_id, expected_version=value.expected_version, overrides=value.overrides
-        )
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
-    )
-    def tasks_list(
-        limit: int = 50,
-        offset: int = 0,
-        state: str | None = None,
-        kind: str | None = None,
-        source_id: str | None = None,
-        job_id: str | None = None,
-    ) -> dict:
-        """Filter collection work by state/kind/source/job, with readable labels and diagnostics."""
-        return service.list_tasks(limit, offset, state, kind, source_id, job_id)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
-    )
-    def tasks_get(task_id: str) -> dict:
-        """Read one task's inputs, result, HTTP diagnostics, lease and next run time."""
-        return service.get_task(task_id)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)
-    )
-    def tasks_cancel(task_id: str) -> dict:
-        """Cancel queued/running work; already stored jobs and documents are kept."""
-        return service.cancel_task(task_id)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=True)
-    )
-    def tasks_retry(task_id: str) -> dict:
-        """Retry failed/cancelled work; collection keeps its frozen inputs and saved progress."""
-        return service.retry_task(task_id)
+    bind_mcp(mcp, OPERATIONS, service)

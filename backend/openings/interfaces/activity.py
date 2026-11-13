@@ -3,6 +3,7 @@
 from typing import Annotated
 
 from fastapi import Query
+from mcp.types import ToolAnnotations
 
 from ..activity import (
     ActivityService,
@@ -16,115 +17,190 @@ from ..activity import (
     RunStart,
     RunUpdate,
 )
+from .registry import Operation, Param, Route, Tool, bind_mcp, bind_rest, query_model
+
+READ = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+WRITE = ToolAnnotations(destructiveHint=False, openWorldHint=False)
+
+OPERATIONS = (
+    Operation(
+        "events.list",
+        "events",
+        "list",
+        "Agent activity",
+        "List recorded changes with actor, run and subject",
+        params=(query_model(EventQuery),),
+        call=lambda s, value: s.list_events(value),
+        rest=(Route("GET", "/events", "events_list"),),
+        tool=Tool(
+            "events_list",
+            READ,
+            "List recorded changes, newest first, with actor, run (run_id, run_workflow) and subject. Filter by run_id, job_id, application_id, subject, subject_types (several kinds of record), actor, kind or time.",
+        ),
+    ),
+    Operation(
+        "runs.list",
+        "runs",
+        "list",
+        "Agent activity",
+        "List agent runs by status, workflow, token or start time",
+        params=(query_model(RunQuery),),
+        call=lambda s, value: s.list_runs(value),
+        rest=(Route("GET", "/runs", "runs_list"),),
+        tool=Tool(
+            "runs_list",
+            READ,
+            "List agent runs, newest first, by status (open, finished, interrupted), workflow, token, start time or active_since (last activity). An open run without recent activity is reported as interrupted.",
+        ),
+    ),
+    Operation(
+        "runs.start",
+        "runs",
+        "start",
+        "Agent activity",
+        "Open an agent run for the calling API token",
+        params=(Param("value", RunStart),),
+        call=lambda s, value: s.start_run(value),
+        rest=(Route("POST", "/runs", "runs_start", status_code=201),),
+        tool=Tool(
+            "runs_start",
+            WRITE,
+            "Open an agent run (workflow name and scope). Later writes by this token attach to it automatically. One open run per token: a second start returns run_open naming the open run unless supersede=true.",
+        ),
+    ),
+    Operation(
+        "runs.read",
+        "runs",
+        "get",
+        "Agent activity",
+        "Read an agent run with its report, questions and changes",
+        params=(
+            Param("run_id", str),
+            Param("changes_limit", int, 50, rest=(Annotated[int, Query(ge=1, le=200)], 50)),
+            Param("changes_offset", int, 0, rest=(Annotated[int, Query(ge=0)], 0)),
+        ),
+        call=lambda s, run_id, changes_limit, changes_offset: s.get_run(
+            run_id, changes_limit, changes_offset
+        ),
+        rest=(Route("GET", "/runs/{run_id}", "runs_get"),),
+        tool=Tool(
+            "runs_get",
+            READ,
+            "Read one agent run: status, stored report, questions asked and a page of the changes it made.",
+        ),
+    ),
+    Operation(
+        "runs.update",
+        "runs",
+        "update",
+        "Agent activity",
+        "Record a progress note on the calling token's open run",
+        params=(Param("run_id", str), Param("value", RunUpdate)),
+        call=lambda s, run_id, value: s.update_run(run_id, value),
+        rest=(Route("PATCH", "/runs/{run_id}", "runs_update"),),
+        tool=Tool(
+            "runs_update",
+            WRITE,
+            "Record a progress note or correct the scope of this token's open run, using its current version.",
+        ),
+    ),
+    Operation(
+        "runs.finish",
+        "runs",
+        "finish",
+        "Agent activity",
+        "Close the calling token's run with its report",
+        params=(Param("run_id", str), Param("value", RunFinish)),
+        call=lambda s, run_id, value: s.finish_run(run_id, value),
+        rest=(Route("POST", "/runs/{run_id}/finish", "runs_finish"),),
+        tool=Tool(
+            "runs_finish",
+            WRITE,
+            "Close this token's open run with its report: summary, changes, not done, checks, limits and method. Change counts by kind are derived from the recorded events.",
+        ),
+    ),
+    Operation(
+        "questions.list",
+        "questions",
+        "list",
+        "Agent activity",
+        "List questions for the owner by state, subject, run or answer time",
+        params=(query_model(QuestionQuery),),
+        call=lambda s, value: s.list_questions(value),
+        rest=(Route("GET", "/questions", "questions_list"),),
+        tool=Tool(
+            "questions_list",
+            READ,
+            "List questions for the owner by state, subject or run. answered_since returns the answers given at or after a time, oldest first.",
+        ),
+    ),
+    Operation(
+        "questions.ask",
+        "questions",
+        "ask",
+        "Agent activity",
+        "Ask the owner a question tied to a job, application, Career entry or nothing",
+        params=(Param("value", QuestionAsk),),
+        call=lambda s, value: s.ask_question(value),
+        rest=(Route("POST", "/questions", "questions_ask", status_code=201),),
+        tool=Tool(
+            "questions_ask",
+            WRITE,
+            "Ask the owner a question tied to a job, an application, a Career entry (knowledge) or nothing, with why it matters and optional choices. Use an idempotency key for retries.",
+        ),
+    ),
+    Operation(
+        "questions.read",
+        "questions",
+        "get",
+        "Agent activity",
+        "Read one question for the owner",
+        params=(Param("question_id", str),),
+        call=lambda s, question_id: s.get_question(question_id),
+        rest=(Route("GET", "/questions/{question_id}", "questions_get"),),
+        tool=Tool(
+            "questions_get",
+            READ,
+            "Read one question for the owner with its state, answer, who asked and who answered.",
+        ),
+    ),
+    Operation(
+        "questions.answer",
+        "questions",
+        "answer",
+        "Agent activity",
+        "Answer a question for the owner",
+        access="owner",
+        params=(Param("question_id", str), Param("value", QuestionAnswer)),
+        call=lambda s, question_id, value: s.answer_question(question_id, value),
+        rest=(Route("POST", "/questions/{question_id}/answer", "questions_answer"),),
+        tool=Tool(
+            "questions_answer",
+            WRITE,
+            "Record the owner's answer (text and/or one of the choices) using the question's current version. Owner only: an agent token is refused with forbidden; an owner token records an answer only when the owner gave it.",
+        ),
+    ),
+    Operation(
+        "questions.withdraw",
+        "questions",
+        "withdraw",
+        "Agent activity",
+        "Withdraw an open question",
+        params=(Param("question_id", str), Param("value", QuestionWithdraw)),
+        call=lambda s, question_id, value: s.withdraw_question(question_id, value),
+        rest=(Route("POST", "/questions/{question_id}/withdraw", "questions_withdraw"),),
+        tool=Tool(
+            "questions_withdraw",
+            WRITE,
+            "Withdraw an open question that no longer needs an answer, using its current version. The record stays readable.",
+        ),
+    ),
+)
 
 
 def register_api(router, activity: ActivityService):
-    @router.get("/events")
-    def events_list(value: Annotated[EventQuery, Query()]):
-        return activity.list_events(value)
-
-    @router.get("/runs")
-    def runs_list(value: Annotated[RunQuery, Query()]):
-        return activity.list_runs(value)
-
-    @router.post("/runs", status_code=201)
-    def runs_start(value: RunStart):
-        return activity.start_run(value)
-
-    @router.get("/runs/{run_id}")
-    def runs_get(
-        run_id: str,
-        changes_limit: Annotated[int, Query(ge=1, le=200)] = 50,
-        changes_offset: Annotated[int, Query(ge=0)] = 0,
-    ):
-        return activity.get_run(run_id, changes_limit, changes_offset)
-
-    @router.patch("/runs/{run_id}")
-    def runs_update(run_id: str, value: RunUpdate):
-        return activity.update_run(run_id, value)
-
-    @router.post("/runs/{run_id}/finish")
-    def runs_finish(run_id: str, value: RunFinish):
-        return activity.finish_run(run_id, value)
-
-    @router.get("/questions")
-    def questions_list(value: Annotated[QuestionQuery, Query()]):
-        return activity.list_questions(value)
-
-    @router.post("/questions", status_code=201)
-    def questions_ask(value: QuestionAsk):
-        return activity.ask_question(value)
-
-    @router.get("/questions/{question_id}")
-    def questions_get(question_id: str):
-        return activity.get_question(question_id)
-
-    @router.post("/questions/{question_id}/answer")
-    def questions_answer(question_id: str, value: QuestionAnswer):
-        return activity.answer_question(question_id, value)
-
-    @router.post("/questions/{question_id}/withdraw")
-    def questions_withdraw(question_id: str, value: QuestionWithdraw):
-        return activity.withdraw_question(question_id, value)
+    bind_rest(router, OPERATIONS, activity)
 
 
 def register_mcp(mcp, activity: ActivityService):
-    from mcp.types import ToolAnnotations
-
-    read = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
-    write = ToolAnnotations(destructiveHint=False, openWorldHint=False)
-
-    @mcp.tool(annotations=read)
-    def events_list(value: EventQuery | None = None) -> dict:
-        """List recorded changes, newest first, with actor, run (run_id, run_workflow) and subject. Filter by run_id, job_id, application_id, subject, subject_types (several kinds of record), actor, kind or time."""
-        return activity.list_events(value)
-
-    @mcp.tool(annotations=write)
-    def runs_start(value: RunStart) -> dict:
-        """Open an agent run (workflow name and scope). Later writes by this token attach to it automatically. One open run per token: a second start returns run_open naming the open run unless supersede=true."""
-        return activity.start_run(value)
-
-    @mcp.tool(annotations=write)
-    def runs_update(run_id: str, value: RunUpdate) -> dict:
-        """Record a progress note or correct the scope of this token's open run, using its current version."""
-        return activity.update_run(run_id, value)
-
-    @mcp.tool(annotations=write)
-    def runs_finish(run_id: str, value: RunFinish) -> dict:
-        """Close this token's open run with its report: summary, changes, not done, checks, limits and method. Change counts by kind are derived from the recorded events."""
-        return activity.finish_run(run_id, value)
-
-    @mcp.tool(annotations=read)
-    def runs_get(run_id: str, changes_limit: int = 50, changes_offset: int = 0) -> dict:
-        """Read one agent run: status, stored report, questions asked and a page of the changes it made."""
-        return activity.get_run(run_id, changes_limit, changes_offset)
-
-    @mcp.tool(annotations=read)
-    def runs_list(value: RunQuery | None = None) -> dict:
-        """List agent runs, newest first, by status (open, finished, interrupted), workflow, token, start time or active_since (last activity). An open run without recent activity is reported as interrupted."""
-        return activity.list_runs(value)
-
-    @mcp.tool(annotations=write)
-    def questions_ask(value: QuestionAsk) -> dict:
-        """Ask the owner a question tied to a job, an application, a Career entry (knowledge) or nothing, with why it matters and optional choices. Use an idempotency key for retries."""
-        return activity.ask_question(value)
-
-    @mcp.tool(annotations=read)
-    def questions_list(value: QuestionQuery | None = None) -> dict:
-        """List questions for the owner by state, subject or run. answered_since returns the answers given at or after a time, oldest first."""
-        return activity.list_questions(value)
-
-    @mcp.tool(annotations=read)
-    def questions_get(question_id: str) -> dict:
-        """Read one question for the owner with its state, answer, who asked and who answered."""
-        return activity.get_question(question_id)
-
-    @mcp.tool(annotations=write)
-    def questions_answer(question_id: str, value: QuestionAnswer) -> dict:
-        """Record the owner's answer (text and/or one of the choices) using the question's current version. Owner only: an agent token is refused with forbidden; an owner token records an answer only when the owner gave it."""
-        return activity.answer_question(question_id, value)
-
-    @mcp.tool(annotations=write)
-    def questions_withdraw(question_id: str, value: QuestionWithdraw) -> dict:
-        """Withdraw an open question that no longer needs an answer, using its current version. The record stays readable."""
-        return activity.withdraw_question(question_id, value)
+    bind_mcp(mcp, OPERATIONS, activity)
