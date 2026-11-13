@@ -1,10 +1,10 @@
-"""Job changes: ingest, corrections, triage, rule dismissals and permanent deletion."""
+"""Job changes: ingest, corrections, triage and permanent deletion."""
 
 import hashlib
 import json
 from urllib.parse import urlsplit
 
-from ..actors import SYSTEM, current_actor
+from ..actors import current_actor
 from ..common import check_version, new_id, now
 from ..db import encode
 from ..errors import DomainError
@@ -34,7 +34,7 @@ class JobChanges:
         """Store a posting as a new job or as a refresh of the job it identifies.
 
         A new job gets its text signals in the same transaction, then its duplicate
-        and the policy rules (``SignalService.after_ingest``). A caller holding the
+        (``SignalService.after_ingest``). A caller holding the
         database lock passes ``defer_signals`` and runs that step after releasing it.
         A request with an idempotency key gives the same job when retried; ``digest``
         is the fingerprint of the request as sent, before a URL was read.
@@ -167,15 +167,14 @@ class JobChanges:
                 )
             remember(c, "jobs", value.idempotency_key, digest, job_id)
         if prior is None and not defer_signals:
-            # A job the owner adds in the dashboard is never dismissed by a rule.
-            self.signals.after_ingest(job_id, apply_rules=current_actor().kind != "owner")
+            self.signals.after_ingest(job_id)
         result = self.get_job(job_id)
         result["created"] = prior is None
         return result
 
     @staticmethod
     def _refresh_text_signals(conn, job_id):
-        """Text signals follow the title and posting; the duplicate and rules stay."""
+        """Text signals follow the title and posting; the duplicate stays."""
         row = conn.execute(
             "SELECT title,posting,content_version FROM jobs WHERE id=?", (job_id,)
         ).fetchone()
@@ -259,20 +258,18 @@ class JobChanges:
                 self.event("job_edited", job_id, payload={"fields": ["dismissed_reason"]}, conn=c)
         return self.job_summary(job_id)
 
-    def _triage(self, conn, row, triage, actor, rule=None, reason=""):
+    def _triage(self, conn, row, triage, actor, reason=""):
         """Move a job to another triage state, keeping the record of a dismissal."""
         stamp = now()
         if triage == "dismissed":
             conn.execute(
                 "UPDATE jobs SET triage=?,dismissed_at=?,dismissed_by_kind=?,dismissed_by_id=?,"
-                "dismissed_by_name=?,dismissed_by_token_kind=?,dismissed_rule_id=?,"
-                "dismissed_rule_label=?,dismissed_reason=?,version=version+1,updated_at=? WHERE id=?",
+                "dismissed_by_name=?,dismissed_by_token_kind=?,"
+                "dismissed_reason=?,version=version+1,updated_at=? WHERE id=?",
                 (
                     triage,
                     stamp,
                     *actor.columns(),
-                    rule["item_id"] if rule else None,
-                    rule["label"] if rule else None,
                     reason,
                     stamp,
                     row["id"],
@@ -286,20 +283,12 @@ class JobChanges:
             conn.execute(
                 "UPDATE jobs SET triage=?,dismissed_at=NULL,dismissed_by_kind=NULL,"
                 "dismissed_by_id=NULL,dismissed_by_name=NULL,dismissed_by_token_kind=NULL,"
-                "dismissed_rule_id=NULL,dismissed_rule_label=NULL,dismissed_reason='',"
+                "dismissed_reason='',"
                 "version=version+1,updated_at=? WHERE id=?",
                 (triage, stamp, row["id"]),
             )
         payload = {"from": row["triage"], "to": triage}
-        if rule:
-            payload["rule"] = {"item_id": rule["item_id"]}
         self.event("triage_changed", row["id"], payload=payload, conn=conn, actor=actor)
-
-    def dismiss_by_rule(self, conn, job_id, rule):
-        """Dismiss a job for a policy rule, as the system, naming the rule."""
-        row = conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
-        if row is not None and row["triage"] != "dismissed":
-            self._triage(conn, row, "dismissed", SYSTEM, rule=rule)
 
     def forget_job(self, job_id, expected_version, collect=True):
         """Delete a job; bulk callers pass collect=False and collect blobs once."""

@@ -44,11 +44,29 @@ def error_text(domain: DomainError) -> str:
     return json.dumps({"error": body}, default=str)
 
 
+# Tools removed in 0.24, with what replaces each, for an agent that still calls them.
+_PREFERENCES = "Removed in 0.24: the policy became Preferences. Use preferences_get and preferences_update (one whole section at a time); the no-reply period and spoken languages are settings_update."
+REMOVED_TOOLS = {
+    "policy_get": _PREFERENCES,
+    "policy_add": _PREFERENCES,
+    "policy_update": _PREFERENCES,
+    "policy_move": _PREFERENCES,
+    "policy_remove": _PREFERENCES,
+    "policy_reorder": _PREFERENCES,
+    "policy_confirm": _PREFERENCES,
+    "policy_rule_preview": "Removed in 0.24 with the automatic rules: nothing is dismissed automatically. Filter jobs_list (signal, requires, hide_unspoken_required) and dismiss with jobs_bulk.",
+    "instructions_get": "Removed in 0.24: general instructions are Writing rules in Preferences (preferences_get, section writing).",
+    "instructions_update": "Removed in 0.24: general instructions are Writing rules in Preferences (preferences_update, section writing).",
+}
+
+
 class OpeningsMCP(MCPServer):
     """Return REST-shaped error bodies; the SDK runs sync tools in worker threads."""
 
     async def call_tool(self, name, arguments, context=None):
         try:
+            if name in REMOVED_TOOLS and self._tool_manager.get_tool(name) is None:
+                raise DomainError(404, "tool_removed", REMOVED_TOOLS[name], {"tool": name})
             self._refuse_unknown_arguments(name, arguments)
             return await super().call_tool(name, arguments, context)
         except DomainError as error:

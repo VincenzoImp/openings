@@ -43,6 +43,7 @@ import json
 import logging
 import math
 import os
+import re
 import shutil
 import sqlite3
 import uuid
@@ -173,9 +174,19 @@ NOT_ARCHIVED_214 = {
 
 # Every schema-15 table, parents before the tables that reference them.
 TABLES = (
-    Table("settings"),
+    # #213: the general instructions become Writing rules (``PREFERENCE_SECTIONS``).
+    Table("settings", where="o.key<>'instructions'"),
     Table("api_tokens"),
-    Table("jobs", columns={"triage": TRIAGE_214}),
+    # #213: the label of the policy rule that dismissed a job becomes its reason.
+    # #214: the triage words of 0.24.
+    Table(
+        "jobs",
+        columns={
+            "dismissed_reason": "CASE WHEN o.dismissed_reason='' AND o.dismissed_rule_label "
+            "IS NOT NULL THEN o.dismissed_rule_label ELSE o.dismissed_reason END",
+            "triage": TRIAGE_214,
+        },
+    ),
     Table("sources"),
     Table("postings"),
     Table("job_identities"),
@@ -186,7 +197,17 @@ TABLES = (
     Table("notes"),
     Table("knowledge"),
     Table("claims"),
-    Table("templates", columns={"kind": KIND_214}),
+    # #213: rule statements leave the template for Writing rules; the rest stays.
+    # #214: the template kinds of 0.24.
+    Table(
+        "templates",
+        columns={
+            "rules": "CASE WHEN o.rules IS NOT NULL AND json_valid(o.rules) THEN "
+            "CASE WHEN json_type(o.rules,'$.statements') IS NULL THEN o.rules "
+            "ELSE json_remove(o.rules,'$.statements') END ELSE '{}' END",
+            "kind": KIND_214,
+        },
+    ),
     Table("contexts"),
     Table("context_inputs"),
     Table("documents", columns=DOCUMENTS_214),
@@ -201,8 +222,7 @@ TABLES = (
     Table("snapshot_parts"),
     Table("snapshot_list_items"),
     Table("context_parts"),
-    Table("policy_sections"),
-    Table("policy_items"),
+    Table("preference_sections", fresh=True),
     Table("replies", source="responses", columns=REPLIES_214),
     Table("skill_notes"),
     Table("job_signals"),
@@ -222,9 +242,7 @@ JSON_REPAIRS = {
     "claims": _repairs(metadata="'{}'"),
     "templates": _repairs(rules="'{}'"),
     "contexts": _repairs(frame="'[]'"),
-    "context_inputs": _repairs(
-        templates="'[]'", knowledge="'[]'", claims="'[]'", policy="NULL", parts="NULL"
-    ),
+    "context_inputs": _repairs(templates="'[]'", knowledge="'[]'", claims="'[]'", parts="NULL"),
     "documents": _repairs(content="'{}'"),
     "transfer_grants": _repairs(payload="'{}'"),
     "tasks": _repairs(payload="'{}'", result="'{}'"),
@@ -239,6 +257,260 @@ SECTIONS = (*SECTIONS_214,)
 
 # Dropped columns not written to ``dropped_columns``, each with the reason.
 NOT_ARCHIVED = {**NOT_ARCHIVED_214}
+
+# --- #213 Preferences replace Policy -------------------------------------------------
+#
+# ``policy_sections`` and ``policy_items`` become five free-text sections in
+# ``preference_sections``; the general instructions and the rule statements of
+# templates become Writing rules; the "No reply" item and the language rule become
+# the settings ``no_reply_days`` and ``spoken_languages`` (setting ``workspace``).
+# Each item's label, statement and note are kept byte for byte inside its new text.
+# The originals are archived whole under ``policy``.
+
+PREFERENCE_SECTIONS = (
+    Section("policy.sections", "SELECT * FROM old.policy_sections", tables=("policy_sections",)),
+    Section(
+        "policy.items",
+        "SELECT * FROM old.policy_items ORDER BY section,position,created_at,id",
+        tables=("policy_items",),
+    ),
+    Section(
+        "policy.general_instructions",
+        "SELECT key,data,version,updated_at FROM old.settings WHERE key='instructions'",
+    ),
+    Section(
+        "policy.template_rules",
+        "SELECT id,name,kind,rules FROM old.templates WHERE CASE WHEN rules IS NOT NULL AND "
+        "json_valid(rules) THEN json_type(rules,'$.statements') IS NOT NULL ELSE 1 END",
+    ),
+)
+SECTIONS = (*SECTIONS, *PREFERENCE_SECTIONS)
+NOT_ARCHIVED = {
+    **NOT_ARCHIVED,
+    "context_inputs.instructions_version": "derived from the frozen payload, which is kept",
+    "context_inputs.policy": "derived from the frozen payload, which is kept",
+}
+PREFERENCES_SETTING = "workspace"
+_POLICY_ORDER = ("decision", "eligibility", "writing", "facts")
+_NO_REPLY_LABEL = re.compile(r"\bno[\s-]?(reply|response)\b", re.IGNORECASE)
+_DAYS = re.compile(r"^\s*(\d{1,4})(\s*days?)?\s*$", re.IGNORECASE)
+# English language names a language rule may hold, with their ISO 639-1 code.
+_LANGUAGES = {
+    "english": "en",
+    "german": "de",
+    "french": "fr",
+    "italian": "it",
+    "spanish": "es",
+    "dutch": "nl",
+    "flemish": "nl",
+    "portuguese": "pt",
+    "polish": "pl",
+    "swedish": "sv",
+    "danish": "da",
+    "norwegian": "no",
+    "finnish": "fi",
+    "czech": "cs",
+    "russian": "ru",
+    "japanese": "ja",
+    "chinese": "zh",
+    "mandarin": "zh",
+    "arabic": "ar",
+    "turkish": "tr",
+    "korean": "ko",
+}
+
+
+def _rendered(value):
+    """A typed policy value as plain text."""
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    if isinstance(value, (int, float, str)):
+        return str(value)
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return ", ".join(value)
+    return json.dumps(value, ensure_ascii=False, separators=(", ", ": "))
+
+
+def _statement_text(label, statement):
+    """``label: statement``, or the statement alone when it repeats the label."""
+    if not statement:
+        return label
+    if not label or label.strip().casefold() in statement.casefold():
+        return statement
+    return f"{label}: {statement}"
+
+
+def _actor_label(kind, name, token_kind):
+    if kind == "token" and token_kind == "agent":
+        return f"agent:{name or 'token'}"
+    return "owner" if kind in ("owner", "token") else "system"
+
+
+def _loaded(text):
+    try:
+        return json.loads(text) if text is not None else None
+    except ValueError:
+        return text
+
+
+def _policy_text(item):
+    """The text of one policy item, with its value, note, rule and confirmation."""
+    text = _statement_text(item["label"], item["statement"])
+    value = _loaded(item["value"])
+    if value is not None:
+        rendered = _rendered(value)
+        text = f"{text}: {rendered}" if not item["statement"] else f"{text} ({rendered})"
+    if item["note"]:
+        text += f" — note: {item['note']}"
+    rule = _loaded(item["rule"])
+    if isinstance(rule, dict):
+        condition = rule.get("condition") or {}
+        text += (
+            f" (Automatic rule removed in 0.24: {rule.get('signal')} "
+            f"{condition.get('operator')} {_rendered(condition.get('value'))} → "
+            f"{rule.get('action')})"
+        )
+    if item["confirmed_at"] is None:
+        by = _actor_label(
+            item["updated_by_kind"] or item["created_by_kind"],
+            item["updated_by_name"] or item["created_by_name"],
+            item["updated_by_token_kind"] or item["created_by_token_kind"],
+        )
+        text = f"(proposed by {by}, not confirmed) {text}"
+    return text
+
+
+def _reply_days(value):
+    """The days a "No reply" value states (45, "45" or "45 days"), within 1-365."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)) and float(value).is_integer():
+        days = int(value)
+    elif isinstance(value, str) and (match := _DAYS.match(value)):
+        days = int(match.group(1))
+    else:
+        return None
+    return days if 1 <= days <= 365 else None
+
+
+def _language_codes(values):
+    codes = []
+    for value in values if isinstance(values, list) else ():
+        key = str(value).strip().casefold()
+        code = key if re.fullmatch(r"[a-z]{2}", key) else _LANGUAGES.get(key)
+        if code and code not in codes:
+            codes.append(code)
+    return codes
+
+
+def _paragraphs(text):
+    return [part.strip() for part in re.split(r"\n\s*\n", text or "") if part.strip()]
+
+
+def _decision_target(item, rule, no_reply, languages):
+    """Where a decision item goes; a language rule adds its languages to ``languages``."""
+    condition = rule.get("condition") or {}
+    if no_reply and item["id"] == no_reply[0]:
+        return "facts"
+    if rule.get("signal") == "language_required" and condition.get("operator") == "not_in":
+        for code in _language_codes(condition.get("value")):
+            if code not in languages:
+                languages.append(code)
+        return "facts"
+    return "ruled_out" if rule.get("action") == "dismiss" else "looking_for"
+
+
+def _template_rules(conn):
+    """Writing rules from the rule statements of each template."""
+    result = []
+    for template in conn.execute(
+        "SELECT name,kind,rules FROM old.templates ORDER BY kind DESC,name,id"
+    ):
+        rules = _loaded(template["rules"])
+        statements = rules.get("statements") if isinstance(rules, dict) else None
+        if not isinstance(statements, list):
+            continue
+        scope = "cv" if template["kind"] == "resume" else "letter"
+        for statement in sorted(
+            (item for item in statements if isinstance(item, dict)),
+            key=lambda item: item.get("position") if isinstance(item.get("position"), int) else 0,
+        ):
+            text = _statement_text(
+                str(statement.get("label") or ""), str(statement.get("statement") or "")
+            )
+            if text:
+                result.append(
+                    {"text": f"{text} (from template {template['name']})", "scope": scope}
+                )
+    return result
+
+
+def fold_preferences(conn):
+    """Fill ``preference_sections`` and the ``workspace`` setting from schema 14."""
+    sections = {name: [] for name in ("looking_for", "ruled_out", "facts", "writing")}
+    no_reply, languages = None, []
+    conn.row_factory = sqlite3.Row
+    try:
+        items = sorted(
+            (dict(row) for row in conn.execute("SELECT * FROM old.policy_items")),
+            key=lambda item: (
+                _POLICY_ORDER.index(item["section"]),
+                item["position"],
+                item["created_at"],
+                item["id"],
+            ),
+        )
+        # The no-reply period: a confirmed item before a proposal, then policy order.
+        for item in sorted(items, key=lambda item: item["confirmed_at"] is None):
+            if item["section"] == "decision" and _NO_REPLY_LABEL.search(item["label"] or ""):
+                days = _reply_days(_loaded(item["value"]))
+                if days is not None:
+                    no_reply = (item["id"], days)
+                    break
+        for item in items:
+            text, rule = _policy_text(item), _loaded(item["rule"])
+            if item["section"] == "decision":
+                target = _decision_target(
+                    item, rule if isinstance(rule, dict) else {}, no_reply, languages
+                )
+                sections[target].append({"text": text})
+            elif item["section"] == "writing":
+                sections["writing"].append({"text": text, "scope": item["scope"] or "all"})
+            else:
+                sections["facts"].append({"text": text})
+        for row in conn.execute("SELECT data FROM old.settings WHERE key='instructions'"):
+            general = _loaded(row["data"])
+            general = general.get("general") if isinstance(general, dict) else None
+            for paragraph in _paragraphs(general if isinstance(general, str) else ""):
+                sections["writing"].append({"text": paragraph, "scope": "all"})
+        sections["writing"] += _template_rules(conn)
+    finally:
+        conn.row_factory = None
+    stamp = datetime.now(UTC).isoformat(timespec="microseconds")
+    for name, values in sections.items():
+        if values:
+            conn.execute(
+                "UPDATE main.preference_sections SET items=?,version=1,updated_at=?,"
+                "updated_by='system' WHERE section=?",
+                (_dump(values), stamp, name),
+            )
+    setting = {}
+    if no_reply:
+        setting["no_reply_days"] = no_reply[1]
+    if languages:
+        setting["spoken_languages"] = languages
+    if not setting:
+        return {}
+    conn.execute(
+        "INSERT INTO main.settings(key,data,version,updated_at) VALUES(?,?,1,?)",
+        (PREFERENCES_SETTING, _dump(setting), stamp),
+    )
+    return {"settings": 1}
+
+
+# --- end #213 ------------------------------------------------------------------------
 
 # Functions run after the copy in the same transaction, in order. Each takes the
 # connection (schema 15 as ``main``, schema 14 as ``old``) and returns the number
@@ -309,7 +581,7 @@ def _archive_ready_marks(conn):
 
 
 FOLDS_214 = (_start_shortlisted, _archive_ready_marks)
-FOLDS = (*FOLDS_214,)
+FOLDS = (fold_preferences, *FOLDS_214)
 
 # Values the upgrade must keep: (what, query over schema 15, query over schema 14).
 INVARIANTS = (
@@ -347,6 +619,11 @@ INVARIANTS = (
             "SELECT count(*) FROM old.documents d WHERE kind IN ('resume','cover_letter') AND EXISTS("
             "SELECT 1 FROM old.files f WHERE f.document_id=d.id AND f.media_type='application/pdf')"
         ),
+    ),
+    (
+        "dismissed jobs (#213 keeps rule dismissals)",
+        "SELECT count(*) FROM main.jobs WHERE triage='dismissed'",
+        "SELECT count(*) FROM old.jobs WHERE triage='dismissed'",
     ),
     (
         "bytes of stored files",

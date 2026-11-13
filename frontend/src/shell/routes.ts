@@ -37,7 +37,7 @@ export const NAV: NavGroup[] = [
     group: "Library",
     items: [
       { id: "career", label: "Career" },
-      { id: "policy", label: "Policy" },
+      { id: "preferences", label: "Preferences" },
       { id: "templates", label: "Templates" },
     ],
   },
@@ -61,7 +61,7 @@ export const SCREENS: Record<string, string> = {
   jobs: "Jobs",
   activity: "Activity",
   career: "Career",
-  policy: "Policy",
+  preferences: "Preferences",
   templates: "Templates",
   collection: "Collection",
   settings: "Settings",

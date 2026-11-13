@@ -16,7 +16,7 @@ import {
   CareerPage,
   CollectionPage,
   JobsPage,
-  PolicyPage,
+  PreferencesPage,
   Screen,
   SettingsPage,
   SetupPage,
@@ -294,8 +294,8 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
                   <CollectionPage />
                 ) : route === "career" ? (
                   <CareerPage />
-                ) : route === "policy" ? (
-                  <PolicyPage />
+                ) : route === "preferences" ? (
+                  <PreferencesPage />
                 ) : route === "templates" ? (
                   <TemplatesPage />
                 ) : route === "setup" ? (

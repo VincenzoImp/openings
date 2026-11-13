@@ -2,8 +2,9 @@
 
 Two saved searches and two company boards, jobs in English, German, French and
 Italian, a likely duplicate of a job with an application, a posting a board no
-longer lists, dismissals by the owner's language rule, by the agent and by the
-owner, and a question for the owner about one job. Everything is fictional.
+longer lists, postings that require German (hidden by the spoken-languages filter,
+never dismissed), dismissals by the agent and by the owner, and a question for the
+owner about one job. Everything is fictional.
 """
 
 import json
@@ -83,7 +84,7 @@ def agent_actor(app):
 
 def seed_jobs(app):
     """Sources, jobs with signals and dismissals of every kind; returns the job ids by key."""
-    workspace, policy, activity = app.state.workspace, app.state.policy, app.state.activity
+    workspace, activity = app.state.workspace, app.state.activity
     agent = agent_actor(app)
     sources = {}
     with workspace.db.transaction() as conn:
@@ -99,11 +100,6 @@ def seed_jobs(app):
                 "VALUES(?,?,?,?,1,?,?)",
                 (sources[key], name, kind, json.dumps(config), now(), now()),
             )
-    # The owner switches the language rule of the example policy on.
-    decision = policy.get_policy("decision")
-    rule = next(item for item in decision["items"] if item["label"] == "Languages outside my list")
-    with acting_as(OWNER):
-        policy.update_item(rule["id"], {"expected_version": decision["version"], "enabled": True})
 
     def collect(key, title, company, location, posting, source, board="linkedin", **extra):
         url = (
@@ -259,11 +255,11 @@ def seed_jobs(app):
 
     with acting_as(agent):
         triage("lumen-platform", "shortlisted")
-        triage("orbit-junior", "dismissed", "Junior role; your policy targets mid to senior level.")
+        triage("orbit-junior", "dismissed", "Junior role; you look for mid to senior level.")
         activity.ask_question(
             {
                 "question": "This role includes night on-call once a month. Shortlist it?",
-                "why": "Your policy says nothing about on-call work at night.",
+                "why": "Your Preferences say nothing about on-call work at night.",
                 "subject_type": "job",
                 "subject_id": ids["orbit-sre"],
             }

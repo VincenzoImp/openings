@@ -216,7 +216,7 @@ async def exercise(base, token, folder, tectonic):
                     and "roles" not in context["payload"]["profile"]
                 )
                 checks["stored_instructions_in_context"] = (
-                    bool(context["payload"]["instructions"]["general"])
+                    bool(context["payload"]["preferences"]["writing"]["items"])
                     and context["payload"]["instructions"]["template_append"][template["id"]]
                     == "Use concise evidence-backed bullets."
                 )

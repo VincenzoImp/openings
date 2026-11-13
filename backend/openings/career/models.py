@@ -8,8 +8,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
-from ..common import new_id
-
 DEFAULT_PROFILE = {
     "name": "",
     "headline": "",
@@ -20,13 +18,6 @@ DEFAULT_PROFILE = {
     "links": [],
     "metadata": {},
 }
-
-
-DEFAULT_GUIDANCE = (
-    "Use only the supplied career evidence. Never invent qualifications, dates or metrics. "
-    "Select relevant approved claims or write accurate new wording from detailed evidence. "
-    "Respect the template and answer limits; make missing facts visible."
-)
 
 
 class Input(BaseModel):
@@ -67,7 +58,7 @@ class ProfileUpdate(NonNullUpdate):
     links: list[dict[str, str]] | None = Field(default=None, max_length=50)
     metadata: dict[str, Any] | None = Field(
         default=None,
-        description="Free-form extension values. Decision rules, eligibility, writing rules and confirmed facts belong in the policy.",
+        description="Free-form extension values. What the owner wants, facts employers ask about and writing rules belong in Preferences.",
     )
 
 
@@ -232,9 +223,8 @@ class ClaimUpdate(NonNullUpdate):
 
 
 RULES_DESCRIPTION = (
-    "Typed limits max_pages, max_bullets and max_bullet_chars; statements, a list of rule "
-    "statements {id, label, statement, scope, position} (id and position are filled in); "
-    "any other key is free-form."
+    "Typed limits max_pages, max_bullets and max_bullet_chars; any other key (such as engine "
+    "or date_format) is free-form. Writing rules belong in Preferences, not in a template."
 )
 
 
@@ -271,11 +261,6 @@ class TemplateUpdate(NonNullUpdate):
     @classmethod
     def validate_rules(cls, value):
         return validate_rules(value) if value is not None else None
-
-
-class InstructionsUpdate(Input):
-    expected_version: int = Field(ge=0, strict=True)
-    general: str = Field(max_length=30000)
 
 
 class ImportPreview(Input):
@@ -328,42 +313,8 @@ def validate_rules(value):
         ):
             raise ValueError(f"{key} must be an integer between {low} and {high}.")
     if "statements" in value:
-        value = {**value, "statements": _rule_statements(value["statements"])}
-    return value
-
-
-def _rule_statements(items):
-    """The typed list of a template's rule statements, in order, each with an id."""
-    if not isinstance(items, list) or len(items) > 200:
-        raise ValueError("statements is a list of at most 200 rule statements.")
-    result, seen = [], set()
-    for position, item in enumerate(items):
-        if not isinstance(item, dict) or set(item) - {
-            "id",
-            "label",
-            "statement",
-            "scope",
-            "position",
-        }:
-            raise ValueError("A rule statement has id, label, statement, scope and position.")
-        statement, label, scope = item.get("statement"), item.get("label", ""), item.get("scope")
-        if not isinstance(statement, str) or not statement.strip() or len(statement) > 4000:
-            raise ValueError("A rule statement has 1–4000 characters.")
-        if not isinstance(label, str) or len(label) > 200:
-            raise ValueError("A rule statement's label has at most 200 characters.")
-        if scope is not None and (not isinstance(scope, str) or len(scope) > 100):
-            raise ValueError("A rule statement's scope is a short text.")
-        identifier = item.get("id") or new_id()
-        if not isinstance(identifier, str) or len(identifier) > 100 or identifier in seen:
-            raise ValueError("Rule statement ids are distinct short texts.")
-        seen.add(identifier)
-        result.append(
-            {
-                "id": identifier,
-                "label": label.strip(),
-                "statement": statement.strip(),
-                "scope": (scope.strip() or None) if scope else None,
-                "position": position,
-            }
+        raise ValueError(
+            "Templates hold no rule statements since 0.24: write them as Writing rules in "
+            "Preferences (preferences_update with section writing)."
         )
-    return result
+    return value

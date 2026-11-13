@@ -75,7 +75,7 @@ export default function SetupPage() {
             <RecordStep
               facts={setup.facts}
               profile={setup.profile}
-              policy={setup.policy}
+              preferences={setup.preferences}
               questions={setup.questions}
               onNext={() => choose("next")}
             />

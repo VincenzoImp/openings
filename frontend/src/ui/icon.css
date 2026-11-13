@@ -1,0 +1,41 @@
+@layer ui {
+  .ui-icon {
+    flex: none;
+  }
+  .ui-glyph {
+    flex: none;
+    width: 14px;
+    height: 14px;
+  }
+  .ui-glyph[data-stage="shortlisted"],
+  .ui-glyph[data-stage="closed"] {
+    color: var(--text-3);
+  }
+  .ui-glyph[data-stage="ready"] {
+    color: var(--accent);
+  }
+  .ui-glyph[data-stage="applied"] {
+    color: var(--text-2);
+  }
+  .ui-glyph[data-stage="interview"] {
+    color: var(--warning);
+  }
+  .ui-glyph[data-stage="offer"] {
+    color: var(--success);
+  }
+  .ui-glyph-check {
+    stroke: var(--bg);
+  }
+  .ui-mark {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    border-radius: 7px;
+    background: var(--primary);
+    color: var(--on-primary);
+  }
+  .ui-mark svg {
+    width: 58%;
+    height: 58%;
+  }
+}

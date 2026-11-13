@@ -13,7 +13,6 @@ from openings.app import create_app
 from openings.career import (
     CareerService,
     ClaimCreate,
-    InstructionsUpdate,
     KnowledgeCreate,
     KnowledgeUpdate,
     ProfileUpdate,
@@ -23,6 +22,7 @@ from openings.common import new_id, now
 from openings.db import Database
 from openings.documents import ContextCreate, DocumentCreate, DocumentService
 from openings.operations import remove_installation_credentials, restore_database
+from openings.preferences import PreferencesService
 from openings.snapshots import payload_text, store_context
 from openings.workspace import Workspace
 from timeline_fixtures import guided_application
@@ -75,10 +75,8 @@ def seed(path, *, entries=6, claims=4, applications=3, narrative=60, seed=3):
             summary=words(rng, 80),
         )
     )
-    career.update_instructions(
-        InstructionsUpdate(
-            expected_version=career.get_instructions()["version"], general=words(rng, 120)
-        )
+    PreferencesService(workspace).update_preferences(
+        "writing", {"expected_version": 0, "items": [{"text": words(rng, 120)[:1900]}]}
     )
     knowledge, claim_ids = [], []
     for index in range(entries):

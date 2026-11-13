@@ -99,7 +99,7 @@ OPERATIONS = (
         rest=(Route("GET", "/jobs", "jobs"),),
         tool=Tool(
             READ_ONLY,
-            "Search compact paginated job summaries with triage (new, shortlisted, dismissed, active), location, source, remote and date filters; include_facets=true adds filter value lists and include_counts=true the number of jobs by triage. Each job has its ingest signals (posting language, languages the posting requires or welcomes, the earlier job it likely duplicates with a confidence, whether the source no longer lists it, policy rules that matched) and, when dismissed, its dismissal (who, why, which rule). Filter by signal, posting_language, posting_language_not, requires, dismissed_by or rule_id. Read jobs_get for full content.",
+            "Search compact paginated job summaries with triage (new, shortlisted, dismissed, active), location, source, remote and date filters; include_facets=true adds filter value lists and include_counts=true the number of jobs by triage. Each job has its ingest signals (posting language, languages the posting requires or welcomes, the earlier job it likely duplicates with a confidence, whether the source no longer lists it) and, when dismissed, its dismissal (who and why). Filter by signal, posting_language, posting_language_not, requires or dismissed_by; hide_unspoken_required=true leaves out jobs requiring a language the owner does not speak. Read jobs_get for full content.",
         ),
     ),
     Operation(
@@ -354,7 +354,7 @@ OPERATIONS = (
         rest=(Route("GET", "/applications", "applications"),),
         tool=Tool(
             READ_ONLY,
-            "Read paginated application summaries and stage counts (shortlisted, ready, applied, interview, offer, closed). Each row has ready, computed (Shortlisted, every required document has a current complete revision, no open blocking requirement), and missing (cv, letter, requirement:<id>), and its last_reply. Filter by exact job_id, query, stage (ready is the Shortlisted ones that are Ready), outcome, company, needs (documents: Shortlisted and missing a document; reply_overdue: Applied without a reply past the no-reply period, to close as no_response by hand), applied_since and applied_until. no_reply gives the period, its source and the number overdue. Sort by deadline or priority.",
+            "Read paginated application summaries and stage counts (shortlisted, ready, applied, interview, offer, closed). Each row has ready, computed (Shortlisted, every required document has a current complete revision, no open blocking requirement), and missing (cv, letter, requirement:<id>), and its last_reply. Filter by exact job_id, query, stage (ready is the Shortlisted ones that are Ready), outcome, company, needs (documents: Shortlisted and missing a document; reply_overdue: Applied without a reply past the no-reply period, to close as no_response by hand), applied_since and applied_until. no_reply gives the period in days, its source (settings when the owner set no_reply_days, else the 30-day default) and the number overdue. Sort by deadline or priority.",
         ),
     ),
     Operation(
@@ -511,7 +511,7 @@ def register_core_mcp(mcp, workspace, requests):
             "actor": current_actor().describe(),
             "open_requests": requests.count_open(),
             "storage": storage_status(workspace.db),
-            "workflow": "Read open requests for the agent first. Read career, templates and stored instructions; prepare a frozen context; write and compile externally; save CV and letter revisions with their PDF (and TeX source); an application is Ready when its required documents are complete. Mark applied and replies are recorded only as the owner reports them.",
+            "workflow": "Read open requests for the agent first. Read Preferences, career and templates; prepare a frozen context; write and compile externally; save CV and letter revisions with their PDF (and TeX source); an application is Ready when its required documents are complete. Mark applied and replies are recorded only as the owner reports them.",
         }
 
     bind_mcp(mcp, OPERATIONS, workspace)

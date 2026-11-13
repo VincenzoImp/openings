@@ -226,7 +226,7 @@ export function TemplateDetail({
         onChange={onTab}
         items={[
           { id: "source", label: "Source" },
-          { id: "rules", label: "Rules" },
+          { id: "rules", label: "Guidance" },
           { id: "assets", label: "Assets", count: assets.data.total },
           { id: "preview", label: "Preview" },
         ]}

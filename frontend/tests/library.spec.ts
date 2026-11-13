@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "./fixtures";
 import { go, isNarrow, ownerSession, type Cookies } from "./session";
 
-// The Library screens built with the design system: Policy, Career and
+// The Library screens built with the design system: Preferences, Career and
 // Templates. Every dashboard path of their operations is exercised here. Each
 // test starts from the seeded workspace (fixtures.ts).
 const cookies: Cookies = ownerSession();
@@ -53,9 +53,10 @@ const sectionCard = (page: Page, title: string) =>
   page.locator("section.card").filter({
     has: page.getByRole("heading", { name: title, exact: true }),
   });
-const policyItem = async (page: Page, section: string, label: string) =>
-  (await call(page, `/policy/${section}`)).items.find(
-    (item: any) => item.label === label,
+/** One section of Preferences, as REST returns it. */
+const section = async (page: Page, name: string) =>
+  (await call(page, "/preferences")).sections.find(
+    (item: any) => item.section === name,
   );
 /** On a narrow screen a list and its detail are shown one at a time. */
 async function show(page: Page, pane: string) {
@@ -69,162 +70,147 @@ const dialog = (page: Page) => page.locator("dialog[open]").last();
 const saved = (page: Page, text: string | RegExp) =>
   expect(page.locator(".toast").last()).toContainText(text);
 
-test("policy items are added, edited, confirmed, switched, moved, reordered and removed", async ({
+test("preferences statements are added, edited, scoped, reordered and deleted", async ({
   page,
 }) => {
-  const label = unique("Languages");
-  await go(page, "policy");
-  const facts = sectionCard(page, "Facts");
-  await facts.getByRole("button", { name: "Add a fact" }).click();
-  const form = facts.getByRole("form", { name: "New fact" });
-  await form.getByLabel("Label").fill(label);
-  await form.getByLabel("Statement").fill("Spoken at work.");
-  await form.getByLabel("Kind of value").selectOption("list");
-  await form.getByLabel("Value", { exact: true }).fill("English, Italian");
-  await form.getByRole("button", { name: "Add a fact" }).click();
-  const row = facts.locator("li").filter({ hasText: label });
-  await expect(row).toContainText("English · Italian");
-  await expect(row).toContainText("Confirmed");
-  await expect(row.locator(".actor")).toHaveClass(/owner/);
-  // REST returns the item the dashboard shows.
-  const stored = await policyItem(page, "facts", label);
-  expect([stored.value, stored.value_type, stored.confirmed]).toEqual([
-    ["English", "Italian"],
-    "list",
-    true,
-  ]);
+  const fact = unique("Fact");
+  await go(page, "preferences");
+  const facts = sectionCard(page, "Facts about me");
+  // The statement an agent added is shown like any other.
+  await expect(
+    facts.locator("li").filter({
+      hasText: "Interviews on Tuesday or Thursday after 16:00.",
+    }),
+  ).toBeVisible();
+  await facts.getByRole("button", { name: "Add to Facts about me" }).click();
+  const form = facts.getByRole("form", {
+    name: "New statement in Facts about me",
+  });
+  await form.getByLabel("Statement").fill(fact);
+  await form.getByRole("button", { name: "Save" }).click();
+  await saved(page, "Added to Facts about me.");
+  const row = facts.locator("li").filter({ hasText: fact });
+  await expect(row).toBeVisible();
+  // REST returns what the dashboard shows, at the end of the section.
+  expect((await section(page, "facts")).items.at(-1)).toEqual({ text: fact });
 
-  await row.getByRole("button", { name: `Edit ${label}` }).click();
-  const edit = facts.getByRole("form", { name: `Edit the fact ${label}` });
-  await edit.getByLabel("Statement").fill("Spoken and written at work.");
-  await edit.getByLabel("Note").fill("Checked in the test.");
-  await edit.getByRole("button", { name: "Save fact" }).click();
-  await expect(row).toContainText("Spoken and written at work.");
-  await expect(row).toContainText("Note: Checked in the test.");
+  const edited = unique("Edited");
+  await row.getByRole("button", { name: `Edit ${fact}` }).click();
+  const edit = facts.getByRole("form", { name: `Edit the statement ${fact}` });
+  await edit.getByLabel("Statement").fill(edited);
+  await edit.getByRole("button", { name: "Save" }).click();
+  const editedRow = facts.locator("li").filter({ hasText: edited });
+  await expect(editedRow).toBeVisible();
+  await expect(facts.locator("li").filter({ hasText: fact })).toHaveCount(0);
 
   // It moves up from the keyboard-operable buttons, one place at a time.
-  const before = (await call(page, "/policy/facts")).items.map(
-    (item: any) => item.label,
+  const before = (await section(page, "facts")).items.map(
+    (item: any) => item.text,
   );
-  await row.getByRole("button", { name: `Move ${label} up` }).click();
+  await editedRow.getByRole("button", { name: `Move ${edited} up` }).click();
   await saved(page, "Order saved.");
-  const after = (await call(page, "/policy/facts")).items.map(
-    (item: any) => item.label,
+  const after = (await section(page, "facts")).items.map(
+    (item: any) => item.text,
   );
-  expect(after.indexOf(label)).toBe(before.indexOf(label) - 1);
+  expect(after.indexOf(edited)).toBe(before.indexOf(edited) - 1);
+  expect(after.length).toBe(before.length);
 
-  // An agent proposes a rule on a signal and a fact; only the owner confirms.
-  const agent = await call(page, "/tokens", "POST", {
-    name: unique("Policy agent"),
-    kind: "agent",
+  // Only a writing rule has a scope.
+  await expect(facts.getByLabel("Applies to")).toHaveCount(0);
+  const rule = unique("Rule");
+  const writing = sectionCard(page, "Writing rules");
+  await writing.getByRole("button", { name: "Add to Writing rules" }).click();
+  const ruleForm = writing.getByRole("form", {
+    name: "New statement in Writing rules",
   });
-  const rule = unique("No longer listed");
-  const proposal = unique("Relocation");
-  const decision = await call(page, "/policy/decision");
-  await call(
-    page,
-    "/policy/decision/items",
-    "POST",
-    {
-      expected_version: decision.version,
-      label: rule,
-      statement: "Dismiss jobs whose source stops listing them.",
-      rule: {
-        signal: "no_longer_listed",
-        condition: { operator: "is", value: true },
-        action: "dismiss",
-      },
-    },
-    agent.token,
-  );
-  await call(
-    page,
-    "/policy/facts/items",
-    "POST",
-    {
-      expected_version: (await call(page, "/policy/facts")).version,
-      label: proposal,
-      statement: "No relocation outside Switzerland.",
-    },
-    agent.token,
-  );
-  await page.reload();
-  const ruleRow = sectionCard(page, "Decision")
-    .locator("li")
-    .filter({ hasText: rule });
-  await expect(ruleRow).toContainText("Proposed");
-  await expect(ruleRow).toContainText("Uses a signal: no longer listed");
-  await expect(ruleRow).toContainText(
-    /It matches \d+ of the \d+ jobs? in New now/,
-  );
-  await expect(ruleRow.locator(".actor")).toHaveClass(/agent/);
-  const toggle = ruleRow.getByRole("switch");
-  await expect(toggle).not.toBeChecked();
-  await ruleRow.getByRole("button", { name: `Confirm: ${rule}` }).click();
-  await expect(ruleRow).toContainText("Confirmed");
-  await toggle.click();
-  await expect(toggle).toBeChecked();
-  await expect(ruleRow).toContainText("Applied automatically: on");
-  const enabled = await policyItem(page, "decision", rule);
-  expect([enabled.enabled, enabled.confirmed]).toEqual([true, true]);
-  expect(enabled.confirmed_by.kind).toBe("owner");
+  await ruleForm.getByLabel("Statement").fill(rule);
+  await ruleForm.getByLabel("Applies to").selectOption("cv");
+  await ruleForm.getByRole("button", { name: "Save" }).click();
+  const ruleRow = writing.locator("li").filter({ hasText: rule });
+  await expect(ruleRow.locator(".tag")).toHaveText("CV");
+  expect((await section(page, "writing")).items.at(-1)).toEqual({
+    text: rule,
+    scope: "cv",
+  });
 
-  // A proposed fact is sorted into another section, then confirmed there.
-  const proposed = page
-    .locator("section.card li")
-    .filter({ hasText: proposal });
-  await proposed
-    .getByLabel(`Move ${proposal} to a section`)
-    .selectOption("eligibility");
-  const moved = sectionCard(page, "Eligibility")
-    .locator("li")
-    .filter({ hasText: proposal });
-  await expect(moved).toBeVisible();
-  await moved
-    .getByRole("button", { name: `Confirm as a fact: ${proposal}` })
-    .click();
-  await expect(moved).toContainText("Confirmed");
-  expect((await policyItem(page, "eligibility", proposal)).confirmed).toBe(
-    true,
-  );
-
-  // Removal asks first and names the item.
-  for (const [section, name, noun] of [
-    ["Facts", label, "fact"],
-    ["Decision", rule, "rule"],
-    ["Eligibility", proposal, "fact"],
-  ]) {
-    await sectionCard(page, section)
-      .getByRole("button", { name: `Remove ${name}` })
+  // Deleting is in the statement's menu, and asks first.
+  for (const [card, text] of [
+    [facts, edited],
+    [writing, rule],
+  ] as const) {
+    const item = card.locator("li").filter({ hasText: text });
+    await item
+      .getByRole("button", { name: `More actions for ${text}` })
       .click();
-    await expect(dialog(page)).toContainText(name);
+    await item.getByRole("button", { name: `Delete ${text}` }).click();
+    await expect(dialog(page)).toContainText(text);
     await dialog(page)
-      .getByRole("button", { name: `Remove ${noun}`, exact: true })
+      .getByRole("button", { name: "Delete statement", exact: true })
       .click();
-    await expect(
-      sectionCard(page, section).locator("li").filter({ hasText: name }),
-    ).toHaveCount(0);
+    await expect(card.locator("li").filter({ hasText: text })).toHaveCount(0);
   }
-  expect(await policyItem(page, "facts", label)).toBeUndefined();
+  expect((await section(page, "facts")).items).toEqual(
+    before
+      .filter((text: string) => text !== edited)
+      .map((text: string) => ({
+        text,
+      })),
+  );
 });
 
-test("keyboard only: a policy item is edited, saved and moved", async ({
+test("the languages spoken and the no-reply period are set under Facts about me", async ({
   page,
 }) => {
-  const label = unique("Notice");
-  const writing = await call(page, "/policy/writing");
-  await call(page, "/policy/writing/items", "POST", {
-    expected_version: writing.version,
-    label,
-    statement: "One month.",
+  await go(page, "preferences");
+  const facts = sectionCard(page, "Facts about me");
+  const spoken = facts.getByRole("list", { name: "Languages I speak" });
+  await expect(spoken.getByRole("button")).toHaveText(["English", "Italian"]);
+  await spoken.getByRole("button", { name: "Remove Italian" }).click();
+  await saved(page, "Italian removed.");
+  await expect(spoken.getByRole("button")).toHaveText(["English"]);
+  const add = facts.getByRole("form", { name: "Add a language" });
+  await add.getByLabel("Language").selectOption("de");
+  await add.getByRole("button", { name: "Add language" }).click();
+  await expect(spoken.getByRole("button")).toHaveText(["English", "German"]);
+  const days = facts.getByLabel("Count an application as no reply after");
+  await expect(days).toHaveValue("45");
+  await days.fill("60");
+  await facts
+    .getByRole("form", { name: "Following up" })
+    .getByRole("button", { name: "Save" })
+    .click();
+  await saved(page, "after 60 days count as no reply");
+  const settings = (await call(page, "/preferences")).settings;
+  expect([settings.spoken_languages, settings.no_reply_days]).toEqual([
+    ["en", "de"],
+    60,
+  ]);
+  // The applications read the period from the settings.
+  expect((await call(page, "/applications?limit=1")).no_reply).toMatchObject({
+    days: 60,
+    source: "settings",
   });
-  await go(page, "policy");
-  const section = sectionCard(page, "Writing");
-  await section.getByRole("button", { name: `Edit ${label}` }).focus();
+});
+
+test("keyboard only: a statement is edited, saved, moved and deleted", async ({
+  page,
+}) => {
+  const text = unique("Notice");
+  const writing = await section(page, "writing");
+  await call(page, "/preferences/writing", "PUT", {
+    expected_version: writing.version,
+    items: [...writing.items, { text, scope: "all" }],
+  });
+  await go(page, "preferences");
+  const card = sectionCard(page, "Writing rules");
+  await card.getByRole("button", { name: `Edit ${text}` }).focus();
   await page.keyboard.press("Enter");
-  // The form opens with focus in its first field.
-  const form = section.getByRole("form", { name: `Edit the rule ${label}` });
-  await expect(form.getByLabel("Label")).toBeFocused();
+  // The form opens with focus in its text.
+  const form = card.getByRole("form", { name: `Edit the statement ${text}` });
+  await expect(form.getByLabel("Statement")).toBeFocused();
+  const changed = unique("Two months");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type(changed);
   // Safari reaches every control with Option+Tab; the other browsers with Tab.
   const tab =
     page.context().browser()?.browserType().name() === "webkit"
@@ -233,69 +219,67 @@ test("keyboard only: a policy item is edited, saved and moved", async ({
   await page.keyboard.press(tab);
   await expect(form.getByLabel("Applies to")).toBeFocused();
   await page.keyboard.press(tab);
-  await expect(form.getByLabel("Statement")).toBeFocused();
-  await page.keyboard.press("ControlOrMeta+a");
-  await page.keyboard.type("Two months to the end of a month.");
-  // Enter in a single-line field saves the form.
-  await page.keyboard.press("Shift+" + tab);
-  await page.keyboard.press("Shift+" + tab);
-  await expect(form.getByLabel("Label")).toBeFocused();
+  await expect(form.getByRole("button", { name: "Save" })).toBeFocused();
   await page.keyboard.press("Enter");
-  const row = section.locator("li").filter({ hasText: label });
-  await expect(row).toContainText("Two months to the end of a month.");
+  const row = card.locator("li").filter({ hasText: changed });
+  await expect(row.locator(".prose")).toHaveText(changed);
   await expect(row.locator(".tag")).toHaveText("All documents");
-  const stored = await policyItem(page, "writing", label);
-  expect([stored.statement, stored.scope]).toEqual([
-    "Two months to the end of a month.",
-    "all",
-  ]);
+  expect((await section(page, "writing")).items.at(-1)).toEqual({
+    text: changed,
+    scope: "all",
+  });
 
   // Reordering keeps focus on the button that was pressed.
-  const up = row.getByRole("button", { name: `Move ${label} up` });
+  const up = row.getByRole("button", { name: `Move ${changed} up` });
   await up.focus();
   await page.keyboard.press("Enter");
   await saved(page, "Order saved.");
   await expect(up).toBeFocused();
-  const order = (await call(page, "/policy/writing")).items.map(
-    (item: any) => item.label,
+  const order = (await section(page, "writing")).items.map(
+    (item: any) => item.text,
   );
-  expect(order.indexOf(label)).toBe(order.length - 2);
+  expect(order.indexOf(changed)).toBe(order.length - 2);
 
-  // Escape leaves the confirmation; Enter on its button removes the item.
-  await row.getByRole("button", { name: `Remove ${label}` }).focus();
+  // Escape leaves the confirmation; Enter on its button deletes the statement.
+  const more = row.getByRole("button", { name: `More actions for ${changed}` });
+  await more.focus();
+  await page.keyboard.press("Enter");
+  await expect(more).toHaveAttribute("aria-expanded", "true");
+  await row.getByRole("button", { name: `Delete ${changed}` }).focus();
   await page.keyboard.press("Enter");
   await expect(dialog(page)).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.locator("dialog[open]")).toHaveCount(0);
-  await row.getByRole("button", { name: `Remove ${label}` }).focus();
+  await more.focus();
   await page.keyboard.press("Enter");
-  await dialog(page).getByRole("button", { name: "Remove rule" }).focus();
+  await row.getByRole("button", { name: `Delete ${changed}` }).focus();
+  await page.keyboard.press("Enter");
+  await dialog(page).getByRole("button", { name: "Delete statement" }).focus();
   await page.keyboard.press("Enter");
   await expect(row).toHaveCount(0);
 });
 
-test("a policy conflict reloads the section and keeps the unsaved text", async ({
+test("a preferences conflict reloads the section and keeps the unsaved text", async ({
   page,
 }) => {
-  const label = unique("Salary");
+  const text = unique("Salary");
   const other = unique("Elsewhere");
-  const facts = await call(page, "/policy/facts");
-  const created = await call(page, "/policy/facts/items", "POST", {
+  const facts = await section(page, "facts");
+  const created = await call(page, "/preferences/facts", "PUT", {
     expected_version: facts.version,
-    label,
-    statement: "Expected salary.",
+    items: [...facts.items, { text }],
   });
-  await go(page, "policy");
-  const section = sectionCard(page, "Facts");
-  await section.getByRole("button", { name: `Edit ${label}` }).click();
-  const form = section.getByRole("form", { name: `Edit the fact ${label}` });
+  await go(page, "preferences");
+  const card = sectionCard(page, "Facts about me");
+  await card.getByRole("button", { name: `Edit ${text}` }).click();
+  const form = card.getByRole("form", { name: `Edit the statement ${text}` });
   await form.getByLabel("Statement").fill("My unsaved statement.");
-  // Another session adds an item: the section has a newer version.
-  const added = await call(page, "/policy/facts/items", "POST", {
-    expected_version: created.section.version,
-    label: other,
+  // Another session adds a statement: the section has a newer version.
+  const added = await call(page, "/preferences/facts", "PUT", {
+    expected_version: created.version,
+    items: [...created.items, { text: other }],
   });
-  await form.getByRole("button", { name: "Save fact" }).click();
+  await form.getByRole("button", { name: "Save" }).click();
   await expect(form.getByRole("alert")).toContainText(
     "changed in another session. Your text is kept",
   );
@@ -303,29 +287,38 @@ test("a policy conflict reloads the section and keeps the unsaved text", async (
     "My unsaved statement.",
   );
   // The latest list is shown beside the form, and saving again succeeds.
-  await expect(section.locator("li").filter({ hasText: other })).toBeVisible();
-  await form.getByRole("button", { name: "Save fact" }).click();
+  await expect(card.locator("li").filter({ hasText: other })).toBeVisible();
+  await form.getByRole("button", { name: "Save" }).click();
   await expect(
-    section.locator("li").filter({ hasText: "My unsaved statement." }),
+    card.locator("li").filter({ hasText: "My unsaved statement." }),
   ).toBeVisible();
+  await expect(card.locator("li").filter({ hasText: text })).toHaveCount(0);
   // A button pressed on a stale section says so and shows the latest state.
   // The save above may still be finishing, so read the version once it has.
   await page.waitForLoadState("networkidle");
-  const current = await call(page, "/policy/facts");
-  await call(
-    page,
-    `/policy/items/${added.item.id}?expected_version=${current.version}`,
-    "DELETE",
-  );
-  await section.getByRole("button", { name: `Remove ${label}` }).click();
-  await dialog(page).getByRole("button", { name: "Remove fact" }).click();
+  const current = await section(page, "facts");
+  expect(current.items.map((item: any) => item.text)).toEqual([
+    ...added.items
+      .map((item: any) => item.text)
+      .filter((item: string) => item !== other && item !== text),
+    "My unsaved statement.",
+    other,
+  ]);
+  await call(page, "/preferences/facts", "PUT", {
+    expected_version: current.version,
+    items: current.items.filter((item: any) => item.text !== other),
+  });
+  const mine = card.locator("li").filter({ hasText: "My unsaved statement." });
+  await mine
+    .getByRole("button", { name: "Move My unsaved statement. down" })
+    .click();
   await expect(page.locator(".toast.error").last()).toContainText(
     "changed in another session",
   );
-  await expect(section.locator("li").filter({ hasText: other })).toHaveCount(0);
-  await section.getByRole("button", { name: `Remove ${label}` }).click();
-  await dialog(page).getByRole("button", { name: "Remove fact" }).click();
-  await expect(section.locator("li").filter({ hasText: label })).toHaveCount(0);
+  await expect(card.locator("li").filter({ hasText: other })).toHaveCount(0);
+  await expect(
+    mine.getByRole("button", { name: "Move My unsaved statement. down" }),
+  ).toBeDisabled();
 });
 
 test("the profile is saved with typed fields and free-form details edited as rows", async ({
@@ -336,7 +329,7 @@ test("the profile is saved with typed fields and free-form details edited as row
   await go(page, "career");
   const profile = page.getByRole("form", { name: "Profile" });
   await profile.getByLabel("Headline").fill(headline);
-  // Target roles and preferences are policy items since 0.23, not Profile fields.
+  // Target roles and preferences are Preferences statements, not Profile fields.
   await expect(profile.getByLabel("Target roles")).toHaveCount(0);
   await expect(profile.getByLabel("Preferences")).toHaveCount(0);
   const details = profile.getByRole("group", {
@@ -594,57 +587,36 @@ test("a template's source, typed rules, assets and sample are managed end to end
   await saved(page, "Source saved.");
   expect((await read()).tex).toBe("\\documentclass{letter}\n% v2");
 
-  // Rules: limits, rule statements in order, and the free-form rest as rows.
-  await detail.getByRole("tab", { name: "Rules" }).click();
+  // Guidance: the text and the limits. Other keys (an agent's engine) are
+  // not shown and are kept; writing rules live in Preferences.
+  const current = await read();
+  await call(page, `/templates/${current.id}`, "PATCH", {
+    expected_version: current.version,
+    rules: { engine: "lualatex" },
+  });
+  await page.reload();
+  await expect(page.locator(".page-head")).toContainText(
+    "Writing rules live in Preferences.",
+  );
+  await expect(
+    page.locator(".page-head").getByRole("link", { name: "Preferences" }),
+  ).toHaveAttribute("href", "#preferences");
+  await detail.getByRole("tab", { name: "Guidance" }).click();
   await expect(page.locator("textarea[name=rules]")).toHaveCount(0);
+  await expect(detail.getByText("Other settings")).toHaveCount(0);
   await detail
     .getByLabel("Guidance for this template")
     .fill("Three paragraphs.");
   await detail.getByLabel("Pages").fill("1");
-  for (const [label, rule] of [
-    ["Opening", "Name the role first."],
-    ["Closing", "End with availability."],
-  ]) {
-    await detail.getByRole("button", { name: "Add a rule" }).click();
-    const group = detail.getByRole("group", { name: "Rule", exact: true });
-    await group.getByLabel("Label").fill(label);
-    await group.getByLabel("Rule").fill(rule);
-    await detail.getByRole("button", { name: "Done", exact: true }).click();
-  }
-  await detail.getByRole("button", { name: "Move Closing up" }).click();
-  const settings = detail.getByRole("group", {
-    name: "Other settings as keys and values",
-  });
-  await settings.getByRole("button", { name: "Add a setting" }).click();
-  await settings.getByLabel("Key", { exact: true }).fill("engine");
-  await settings.getByLabel("Value of engine").fill("lualatex");
-  await detail.getByRole("button", { name: "Save rules" }).click();
-  await saved(page, "Rules saved.");
-  let stored = await read();
-  expect(stored.guidance).toBe("Three paragraphs.");
-  expect(stored.rules.max_pages).toBe(1);
-  expect(stored.rules.engine).toBe("lualatex");
-  expect(
-    stored.rules.statements.map((rule: any) => [rule.label, rule.position]),
-  ).toEqual([
-    ["Closing", 0],
-    ["Opening", 1],
-  ]);
-  // A saved statement is edited and another removed.
-  await detail.getByRole("button", { name: "Edit Opening" }).click();
-  await detail
-    .getByRole("group", { name: "Edit Opening" })
-    .getByLabel("Rule")
-    .fill("Name the role and one result.");
-  await detail.getByRole("button", { name: "Done", exact: true }).click();
-  await detail.getByRole("button", { name: "Remove Closing" }).click();
-  await detail.getByRole("button", { name: "Save rules" }).click();
-  // The toast of the first save may still be shown, so wait for the record.
+  await detail.getByRole("button", { name: "Save", exact: true }).click();
+  await saved(page, "Saved. Applications that were already prepared");
   await expect
-    .poll(async () =>
-      (await read()).rules.statements.map((rule: any) => rule.statement),
-    )
-    .toEqual(["Name the role and one result."]);
+    .poll(async () => (await read()).rules)
+    .toEqual({
+      engine: "lualatex",
+      max_pages: 1,
+    });
+  expect((await read()).guidance).toBe("Three paragraphs.");
 
   // Assets: files are added and listed; a PDF becomes the sample under Preview.
   await detail.getByRole("tab", { name: /^Assets/ }).click();
@@ -673,7 +645,7 @@ test("a template's source, typed rules, assets and sample are managed end to end
   await detail.getByRole("tab", { name: "Preview" }).click();
   await expect(detail.getByText("No preview yet")).toBeVisible();
 
-  // Name, kind and default; the general instructions; removal.
+  // Name, kind and default; removal.
   await detail.getByRole("button", { name: "Rename" }).click();
   await dialog(page)
     .getByLabel("Name")
@@ -684,14 +656,9 @@ test("a template's source, typed rules, assets and sample are managed end to end
   ).toBeVisible();
   await detail.getByRole("button", { name: "Make default" }).click();
   await expect(detail.locator("header .tag")).toHaveText("Default Letter");
-  await page.getByRole("button", { name: "General instructions" }).click();
-  const general = `Use clear international English. ${Date.now()}`;
-  await dialog(page)
-    .getByLabel("Instructions for every document")
-    .fill(general);
-  await dialog(page).getByRole("button", { name: "Save instructions" }).click();
-  await expect(page.locator("dialog[open]")).toHaveCount(0);
-  expect((await call(page, "/instructions")).general).toBe(general);
+  await expect(
+    page.getByRole("button", { name: "General instructions" }),
+  ).toHaveCount(0);
   await detail.getByRole("button", { name: "Delete", exact: true }).click();
   await dialog(page).getByRole("button", { name: "Remove template" }).click();
   await expect(
@@ -709,7 +676,7 @@ test("links of earlier versions open the rebuilt screens", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: template.name, exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Rules" })).toHaveAttribute(
+  await expect(page.getByRole("tab", { name: "Guidance" })).toHaveAttribute(
     "aria-selected",
     "true",
   );
@@ -732,8 +699,8 @@ test("links of earlier versions open the rebuilt screens", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Edit entry: Synthetic project 07" }),
   ).toBeVisible();
-  await go(page, "policy");
+  await go(page, "preferences");
   await expect(
-    page.getByRole("heading", { name: "Policy", level: 1 }),
+    page.getByRole("heading", { name: "Preferences", level: 1 }),
   ).toBeVisible();
 });

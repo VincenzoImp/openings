@@ -12,21 +12,16 @@ recording one moves the stage when its kind implies it (``stage_after_reply``) i
 the same transaction and with one event; a correction or removal never moves it.
 
 "No reply" is not a reply but an outcome, ``no_response``, closed by hand after
-the no-reply period: the number in the policy's decision item labelled "No reply"
-(``no_reply_period``), or 30 days. Nothing closes an application automatically.
+the no-reply period: the setting ``no_reply_days`` (``no_reply_period``), 30 days by
+default. Nothing closes an application automatically.
 """
 
-import json
-import re
 from datetime import UTC, datetime, timedelta
 
 from .actors import current_actor, pop_actor
 from .common import new_id, now
 from .errors import DomainError
-
-DEFAULT_REPLY_DAYS = 30
-_NO_REPLY_LABEL = re.compile(r"\bno[\s-]?(reply|response)\b", re.IGNORECASE)
-_DAYS = re.compile(r"^\s*(\d{1,4})(\s*days?)?\s*$", re.IGNORECASE)
+from .preferences import no_reply_days
 
 SENT_SQL = "(app.applied_at IS NOT NULL OR app.status IN ('applied','interview','offer'))"
 
@@ -99,41 +94,10 @@ def last_replies(conn, application_ids):
     return result
 
 
-def reply_days(value):
-    """The number of days a policy value states: 45, "45" or "45 days"; None otherwise."""
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)) and float(value).is_integer():
-        days = int(value)
-    elif isinstance(value, str) and (match := _DAYS.match(value)):
-        days = int(match.group(1))
-    else:
-        return None
-    return days if 1 <= days <= 3650 else None
-
-
 def no_reply_period(conn):
-    """The no-reply period: the policy's "No reply" decision item with a number of days.
-
-    A confirmed item comes before a proposal, then the section's order. Without
-    one the period is 30 days. ``confirmed`` tells an agent whether the owner set
-    the rule under which it may close applications as no_response.
-    """
-    for row in conn.execute(
-        "SELECT id,label,value,confirmed_at FROM policy_items WHERE section='decision' "
-        "AND value IS NOT NULL ORDER BY confirmed_at IS NULL,position,created_at,id"
-    ):
-        if not _NO_REPLY_LABEL.search(row[1] or ""):
-            continue
-        days = reply_days(json.loads(row[2]))
-        if days is not None:
-            return {
-                "days": days,
-                "source": "policy",
-                "item_id": row[0],
-                "confirmed": row[3] is not None,
-            }
-    return {"days": DEFAULT_REPLY_DAYS, "source": "default", "item_id": None, "confirmed": False}
+    """The no-reply period: ``{days, source}``, source ``settings`` or ``default`` (30 days)."""
+    days, source = no_reply_days(conn)
+    return {"days": days, "source": source}
 
 
 def no_reply_cutoff(days):

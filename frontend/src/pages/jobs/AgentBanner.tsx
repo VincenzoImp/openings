@@ -33,8 +33,8 @@ export function AgentBanner() {
     return (
       <Banner tone="info">
         <strong>New jobs wait here for review.</strong> An agent with the
-        review-inbox skill reviews them against your policy and leaves what it
-        cannot decide for you. You can shortlist or dismiss any job yourself.
+        review-inbox skill reviews them against your preferences and leaves what
+        it cannot decide for you. You can shortlist or dismiss any job yourself.
       </Banner>
     );
   const changed = countsLine(run.change_counts || {});

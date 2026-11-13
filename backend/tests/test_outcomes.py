@@ -8,8 +8,8 @@ from pydantic import ValidationError
 
 from openings.actors import OWNER, acting_as, token_actor
 from openings.errors import DomainError
-from openings.outcomes import no_reply_period, reply_days, today
-from openings.policy import PolicyService
+from openings.outcomes import no_reply_period, today
+from openings.preferences import PreferencesService
 
 
 def days_ago(days):
@@ -213,10 +213,8 @@ def test_no_reply_closes_only_sent_applications_by_hand(workspace):
 
 
 def test_the_no_reply_period_lists_overdue_applications_and_closes_nothing(workspace):
-    assert reply_days(45) == reply_days("45") == reply_days(" 45 days ") == 45
-    assert reply_days("six weeks") is reply_days(0) is reply_days(True) is reply_days(4000) is None
     with workspace.db.connect() as conn:
-        assert no_reply_period(conn)["days"] == 30
+        assert no_reply_period(conn) == {"days": 30, "source": "default"}
     old = attempt(workspace, "Synthetic old", status="applied", applied_at=stamp_ago(40))
     answered = attempt(workspace, "Synthetic answered", status="applied", applied_at=stamp_ago(50))
     reply(workspace, answered, kind="other")
@@ -229,26 +227,15 @@ def test_the_no_reply_period_lists_overdue_applications_and_closes_nothing(works
     # Nothing closes automatically: listing and reading leave the stage.
     assert workspace.get_application(old["id"])["status"] == "applied"
 
-    policy = PolicyService(workspace)
-    with acting_as(token_actor("token-1", "Synthetic agent", "agent")):
-        policy.add_item(
-            "decision",
-            {
-                "expected_version": 0,
-                "label": "No response after",
-                "value": 7,
-                "value_type": "number",
-            },
-        )
+    preferences = PreferencesService(workspace)
+    with acting_as(OWNER):
+        settings = preferences.update_settings({"expected_version": 0, "no_reply_days": 7})
     assert {item["id"] for item in workspace.list_applications(needs="reply_overdue")["items"]} == {
         old["id"],
         recent["id"],
     }
     with acting_as(OWNER):
-        policy.add_item(
-            "decision",
-            {"expected_version": 1, "label": "No reply", "value": "45 days", "value_type": "text"},
-        )
+        preferences.update_settings({"expected_version": settings["version"], "no_reply_days": 45})
     listed = workspace.list_applications(needs="reply_overdue")
-    assert listed["no_reply"]["days"] == 45 and listed["no_reply"]["overdue"] == 0
-    assert listed["items"] == []
+    assert listed["no_reply"]["days"] == 45 and listed["no_reply"]["source"] == "settings"
+    assert listed["no_reply"]["overdue"] == 0 and listed["items"] == []

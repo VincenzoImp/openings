@@ -1,11 +1,11 @@
 import { useState } from "react";
-import type { Policy, Profile } from "../../api";
+import type { Preferences, Profile } from "../../api";
 import { Banner, Button, Icon, Tag } from "../../design";
 import { plural } from "../../library/common";
 import { confirmLeave } from "../../state";
 import { SourceEditor } from "../collection/SourceEditor";
 import { recordItems, type ItemId, type SetupFacts } from "./model";
-import { PolicyBasics } from "./PolicyBasics";
+import { PreferenceBasics } from "./PreferenceBasics";
 import { ProfileBasics } from "./ProfileBasics";
 
 const STATE = {
@@ -22,18 +22,18 @@ const LOOK: Partial<Record<ItemId, string>> = {
 
 /**
  * The record the agent builds, as a checklist read from the workspace. The
- * Profile, the Policy basics and a first search can also be filled in here.
+ * Profile, the Preferences basics and a first search can also be filled in here.
  */
 export function RecordStep({
   facts,
   profile,
-  policy,
+  preferences,
   questions,
   onNext,
 }: {
   facts: SetupFacts;
   profile: Profile;
-  policy: Policy;
+  preferences: Preferences;
   questions: number;
   onNext: () => void;
 }) {
@@ -70,7 +70,9 @@ export function RecordStep({
       <ul className="list checklist" aria-label="Your record">
         {items.map((item, index) => {
           const formId = `setup-${item.id}`;
-          const editable = ["profile", "policy", "searches"].includes(item.id);
+          const editable = ["profile", "preferences", "searches"].includes(
+            item.id,
+          );
           return (
             <li key={item.id}>
               <span className={`step-mark ${item.state}`} aria-hidden="true">
@@ -123,8 +125,11 @@ export function RecordStep({
                       profile={profile}
                       onDone={() => setOpen(null)}
                     />
-                  ) : item.id === "policy" ? (
-                    <PolicyBasics policy={policy} noReply={facts.noReply} />
+                  ) : item.id === "preferences" ? (
+                    <PreferenceBasics
+                      preferences={preferences}
+                      noReply={facts.noReply}
+                    />
                   ) : (
                     <SourceEditor search onClose={() => setOpen(null)} />
                   )}

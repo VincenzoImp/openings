@@ -78,10 +78,6 @@ OWNER_ONLY_CALLS = {
         {"json": {"expected_version": 1}},
         {"request_id": "missing", "value": {"expected_version": 1}},
     ),
-    "policy.confirm": (
-        {"json": {"expected_version": 1}},
-        {"item_id": "missing", "value": {"expected_version": 1}},
-    ),
 }
 
 
