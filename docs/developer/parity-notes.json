@@ -97,6 +97,9 @@
     },
     "policy.read": {
       "note": "The screen reads the whole policy; `GET /policy/{section}` serves agents that need one section."
+    },
+    "runs.read": {
+      "note": "The report counts all changes of a run and names the records of the first 100 (`changes_limit`); its link opens the timeline filtered by the run, which pages through every change. `changes_offset` serves agents and scripts."
     }
   }
 }

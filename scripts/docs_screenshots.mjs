@@ -54,6 +54,8 @@ async function settle() {
 async function shot(name) {
   await settle();
   await page.evaluate(() => document.activeElement?.blur());
+  // No hover state from the last click.
+  await page.mouse.move(0, 0);
   // Show the default address instead of the temporary port.
   await page.evaluate((origin) => {
     const walker = document.createTreeWalker(
