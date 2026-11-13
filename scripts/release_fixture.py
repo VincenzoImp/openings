@@ -22,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 # Runs inside the tag's worktree and environment: seed, fill the gaps, dump.
-DRIVER = r'''
+DRIVER = r"""
 import contextlib, gzip, sqlite3, sys, tempfile
 from pathlib import Path
 import uvicorn
@@ -88,7 +88,7 @@ with contextlib.closing(sqlite3.connect(path)) as conn:
     text = "\n".join(statements) + f"\nPRAGMA user_version={version};\n"
 out.write_bytes(gzip.compress(text.encode(), mtime=0))
 print(f"Schema {version} fixture: {out} ({out.stat().st_size} bytes)")
-'''
+"""
 
 
 def main():

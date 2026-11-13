@@ -401,7 +401,9 @@ def _plan(conn):
             values.append(expression)
         where = f" WHERE {table.where}" if table.where else ""
         source = f'FROM old."{table.origin}" AS o{where}'
-        insert = f'INSERT INTO main."{table.name}"({_quoted(names)}) SELECT {",".join(values)} {source}'
+        insert = (
+            f'INSERT INTO main."{table.name}"({_quoted(names)}) SELECT {",".join(values)} {source}'
+        )
         copies.append((table, insert, f"SELECT count(*) {source}"))
         key = _key(origin)
         selected = ",".join(f'o."{name}"' if name != "rowid" else "o.rowid" for name in key)
@@ -415,7 +417,7 @@ def _plan(conn):
                     f'WHERE o."{name}" IS NOT {default if default is not None else "NULL"}',
                 )
             )
-        for name, replacement in repairs.items():
+        for name in repairs:
             if name in origin and name not in table.columns:
                 sections.append(
                     Section(
@@ -428,11 +430,7 @@ def _plan(conn):
         if name not in used and name not in archived:
             sections.append(Section(f"dropped_tables.{name}", f'SELECT * FROM old."{name}"'))
     # A generated section is written only when it holds something.
-    sections = [
-        section
-        for section in sections
-        if section in SECTIONS or _count(conn, section) > 0
-    ]
+    sections = [section for section in sections if section in SECTIONS or _count(conn, section) > 0]
     return copies, sections
 
 
@@ -676,7 +674,7 @@ def _verify(source, target, archive, report):
             for section in sections:
                 top, _, sub = section.name.partition(".")
                 value = data[top][sub] if sub else data[top]
-                if not (_archived(value, section) == report["archive"][section.name]):
+                if _archived(value, section) != report["archive"][section.name]:
                     failures.append(f"the archive section {section.name} is incomplete")
             if {section.name for section in sections} != set(report["archive"]):
                 failures.append("the archive does not hold the expected sections")

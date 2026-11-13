@@ -158,7 +158,9 @@ def restore_database(workspace, source_path):
         # upgrade at startup.
         upgraded = workspace.db.temp_file("upgrade")
         path = workspace.db.path
-        archive = path.with_name(f"{path.stem}.pre-{m15.RELEASE}-archive-restored-{utc_stamp()}.json")
+        archive = path.with_name(
+            f"{path.stem}.pre-{m15.RELEASE}-archive-restored-{utc_stamp()}.json"
+        )
         try:
             try:
                 CONVERSIONS[version](source_path, upgraded, archive)
