@@ -3,16 +3,18 @@
 Providers are synthetic and nothing sleeps: the lane's idle waits advance the clock.
 """
 
+import json
 import logging
 import threading
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from openings import discovery as module, retention
+from discovery_fixtures import patch_discovery
+from openings import retention
 from openings.collectors import policy
 from openings.collectors.policy import ProviderDeferred, ProviderPatch
-from openings.discovery import CollectionWrite, DiscoveryService, SourceCreate, SourcePatch
+from openings.discovery import CollectionWrite, DiscoveryService, SourceCreate, SourcePatch, network
 from openings.errors import DomainError
 from openings.worker import Worker
 from openings.workspace import Workspace
@@ -61,8 +63,8 @@ def clock(monkeypatch):
         def now(cls, tz=None):
             return clock.moment.astimezone(tz) if tz else clock.moment.replace(tzinfo=None)
 
-    monkeypatch.setattr(module, "datetime", Frozen)
-    monkeypatch.setattr(module, "now", clock.stamp)
+    patch_discovery(monkeypatch, "datetime", Frozen)
+    patch_discovery(monkeypatch, "now", clock.stamp)
     monkeypatch.setattr(policy, "now", clock.stamp)
     monkeypatch.setattr(retention, "now", clock.stamp)
     monkeypatch.setattr(policy.time, "time", lambda: clock.moment.timestamp())
@@ -130,7 +132,7 @@ def test_transient_failures_back_off_then_fail_without_sleeping(lane, clock, mon
         attempts.append(clock.elapsed)
         raise DomainError(502, "source_http", "The source returned HTTP 503.")
 
-    monkeypatch.setattr(module, "fetch_postings", feed)
+    patch_discovery(monkeypatch, "fetch_postings", feed)
     stopping = collect(worker, clock, idle=200)
     # The first retry waits 15 seconds, the second 60; the third failure is final.
     assert attempts == [0, 15, 75]
@@ -156,7 +158,7 @@ def test_invalid_configuration_fails_once_without_retry(lane, clock, monkeypatch
         attempts.append(clock.elapsed)
         raise DomainError(422, "invalid_board", "This board does not exist.")
 
-    monkeypatch.setattr(module, "fetch_postings", feed)
+    patch_discovery(monkeypatch, "fetch_postings", feed)
     collect(worker, clock, idle=200)
     failed = service.get_task(task["id"])
     assert attempts == [0]
@@ -181,7 +183,7 @@ def test_counts_accumulate_across_a_provider_wait_and_a_retry(lane, clock, monke
         emit(source, "1", "2", "3")
         return []
 
-    monkeypatch.setattr(module, "fetch_postings", feed)
+    patch_discovery(monkeypatch, "fetch_postings", feed)
     collect(worker, clock, idle=400)
     assert attempts == [0, 300, 315]
     done = service.get_task(task["id"])
@@ -197,8 +199,8 @@ def test_counts_accumulate_across_a_provider_wait_and_a_retry(lane, clock, monke
         None,
     ]
     assert [entry["attempt"] for entry in done["result"]["attempt_history"]] == [1, 2, 3]
-    assert module.json.loads(seen[1]["result"])["received"] == 1
-    assert module.json.loads(seen[2]["result"])["received"] == 2
+    assert json.loads(seen[1]["result"])["received"] == 1
+    assert json.loads(seen[2]["result"])["received"] == 2
     assert service.get_run(task["run_id"])["counts"]["created"] == 3
     assert titles(workspace) == ["Engineer 1", "Engineer 2", "Engineer 3"]
 
@@ -220,12 +222,12 @@ def test_long_provider_wait_releases_the_lane_for_other_work(lane, clock, monkey
 
     def feed(source):
         attempts.append((source["kind"], clock.elapsed))
-        budget = module.HTTP_BUDGET.get()
+        budget = network.HTTP_BUDGET.get()
         budget.before("GET", urls[source["kind"]])
         budget.after(200)
         return [posting("1", source["kind"])]
 
-    monkeypatch.setattr(module, "fetch_postings", feed)
+    patch_discovery(monkeypatch, "fetch_postings", feed)
     collect(worker, clock, idle=5)
     # The blocked task yielded at once; the other provider ran without waiting for it.
     assert attempts == [("greenhouse", 1), ("lever", 1)]
@@ -254,7 +256,7 @@ def test_server_cooldown_survives_a_restart_and_holds_every_task(lane, clock, mo
     sent = []
 
     def feed(source):
-        budget = module.HTTP_BUDGET.get()
+        budget = network.HTTP_BUDGET.get()
         budget.before("GET", BOARD_URL)
         sent.append(clock.elapsed)
         if len(sent) == 1:
@@ -263,7 +265,7 @@ def test_server_cooldown_survives_a_restart_and_holds_every_task(lane, clock, mo
         budget.after(200)
         return [posting(source["config"]["board"], source["config"]["board"])]
 
-    monkeypatch.setattr(module, "fetch_postings", feed)
+    patch_discovery(monkeypatch, "fetch_postings", feed)
     collect(worker, clock, idle=3)
     until = (START + timedelta(seconds=121)).isoformat(timespec="microseconds")
     # One throttled response; the second task was held by the gate before any request.
@@ -309,7 +311,7 @@ def test_expired_lease_is_reclaimed_and_stale_work_cannot_overwrite_it(lane, clo
             return [posting("stale")]
         return [posting("current")]
 
-    monkeypatch.setattr(module, "fetch_postings", feed)
+    patch_discovery(monkeypatch, "fetch_postings", feed)
     collect(worker, clock)
     done = service.get_task(task["id"])
     assert attempts == [0, 91]
@@ -354,7 +356,7 @@ def test_heartbeat_keeps_a_long_task_leased(lane, clock, monkeypatch):
         return [posting("1")]
 
     monkeypatch.setattr(service, "heartbeat", observed)
-    monkeypatch.setattr(module, "fetch_postings", feed)
+    patch_discovery(monkeypatch, "fetch_postings", feed)
     collect(worker, clock)
     done = service.get_task(task["id"])
     assert done["state"] == "succeeded" and done["attempts"] == 1
@@ -442,12 +444,12 @@ def test_cancelling_the_run_stops_active_work_for_good(lane, clock, monkeypatch)
         emit(source, "1")
         service.cancel_run(task["run_id"])
         with pytest.raises(DomainError) as refused:
-            module.HTTP_BUDGET.get().before("GET", BOARD_URL)
+            network.HTTP_BUDGET.get().before("GET", BOARD_URL)
         assert refused.value.code == "task_cancelled"
         emit(source, "2")
         pytest.fail("A cancelled run kept collecting.")
 
-    monkeypatch.setattr(module, "fetch_postings", feed)
+    patch_discovery(monkeypatch, "fetch_postings", feed)
     collect(worker, clock, idle=200)
     cancelled = service.get_task(task["id"])
     # The interrupted attempt is neither recorded as a failure nor retried.
@@ -465,7 +467,7 @@ def test_missed_daily_slots_coalesce_into_one_run(lane, clock, monkeypatch):
     _, service, worker = lane
     schedule = {"kind": "daily", "times": ["06:00", "12:00", "18:00"], "timezone": "UTC"}
     source = make_source(service, enabled=True, schedule=schedule)
-    monkeypatch.setattr(module, "fetch_postings", lambda source: [posting("1")])
+    patch_discovery(monkeypatch, "fetch_postings", lambda source: [posting("1")])
 
     def runs():
         return service.list_runs(source_id=source["id"])["items"]
@@ -547,7 +549,7 @@ def test_stop_releases_the_lease_and_a_restart_uses_a_new_owner(tmp_path, monkey
         if service.get_task(task["id"])["state"] == "succeeded":
             finished.set()
 
-    monkeypatch.setattr(module, "fetch_postings", feed)
+    patch_discovery(monkeypatch, "fetch_postings", feed)
     monkeypatch.setattr(service, "run_task", observed)
     try:
         worker.start()

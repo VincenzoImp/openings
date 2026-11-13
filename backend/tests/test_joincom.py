@@ -5,7 +5,7 @@ import json
 import pytest
 
 from openings.collectors import company
-from openings.discovery import html_text
+from openings.discovery.feeds import html_text
 from openings.errors import DomainError
 
 

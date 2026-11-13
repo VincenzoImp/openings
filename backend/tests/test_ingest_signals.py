@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from openings import discovery as module
+from discovery_fixtures import patch_discovery
 from openings.actors import OWNER, acting_as, token_actor
 from openings.app import create_app
 from openings.discovery import DiscoveryService, SourceCreate
@@ -374,7 +374,7 @@ def test_a_board_that_stops_listing_a_posting_marks_it_and_its_rule_acts(tmp_pat
         snapshot["on_checkpoint"]({"complete": True, "pending_details": 0})
         return []
 
-    monkeypatch.setattr(module, "fetch_postings", collect)
+    patch_discovery(monkeypatch, "fetch_postings", collect)
 
     def run():
         service.queue_collection(source["id"])

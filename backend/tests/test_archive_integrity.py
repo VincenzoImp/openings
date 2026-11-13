@@ -8,8 +8,9 @@ from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
 from openings.db import Database
-from openings.documents import DocumentCreate, DocumentService, UploadReservation, register_api
+from openings.documents import DocumentCreate, DocumentService, UploadReservation
 from openings.errors import DomainError
+from openings.interfaces.documents import register_api
 from openings.operations import restore_database
 from openings.workspace import Workspace
 
