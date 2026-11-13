@@ -21,7 +21,13 @@ export const NAV: NavGroup[] = [
     group: "Work",
     items: [
       { id: "today", label: "Today" },
-      { id: "applications", label: "Applications", count: "ready" },
+      // The review page of one application belongs to Applications.
+      {
+        id: "applications",
+        label: "Applications",
+        routes: ["applications", "review"],
+        count: "ready",
+      },
       // Inbox and Shortlist are the two queues of one Jobs destination; the
       // page keeps both routes until it is rebuilt (stage 4).
       {
@@ -57,6 +63,7 @@ export const TAB_BAR = ["today", "applications", "inbox", "activity"];
 export const SCREENS: Record<string, string> = {
   today: "Today",
   applications: "Applications",
+  review: "Application review",
   inbox: "Inbox",
   shortlist: "Shortlist",
   activity: "Activity",
@@ -77,20 +84,76 @@ export const ALIASES: Record<string, string> = {
 };
 
 /** Screens built with the design system; the others keep the older stylesheet. */
-export const REBUILT = ["today", "activity", "career", "policy", "templates"];
+export const REBUILT = [
+  "today",
+  "applications",
+  "review",
+  "activity",
+  "career",
+  "policy",
+  "templates",
+];
 
 export const HOME = "today";
 
 /** The screen a location hash shows; an unknown route shows the home screen. */
 export function routeOf(hash: string) {
-  const name = hash.replace(/^#/, "").split("?")[0];
+  const [name, query = ""] = hash.replace(/^#/, "").split("?");
+  // An application is shown on its own page, from any screen's address.
+  if (new URLSearchParams(query).has("application")) return "review";
   const route = ALIASES[name] ?? name;
   return route in SCREENS ? route : HOME;
 }
 
-/** The hash rewritten to its canonical route, keeping the query; null if it already is. */
+// The stage filter of the old Applications page: Preparing no longer includes
+// the Ready applications, and `readiness=ready` alone was the Ready queue.
+const OLD_STAGES: Record<string, string> = {
+  draft: "preparing",
+  applied: "applied",
+  interview: "interview",
+  offer: "offer",
+  closed: "closed",
+};
+function upgradeApplications(params: URLSearchParams) {
+  let changed = false;
+  const status = params.get("status");
+  if (status) {
+    params.delete("status");
+    params.set("stage", OLD_STAGES[status] || "all");
+    changed = true;
+  }
+  const stage = params.get("stage");
+  if (params.get("readiness") === "ready" && (!stage || stage === "all")) {
+    params.delete("readiness");
+    params.set("stage", "ready");
+    changed = true;
+  }
+  return changed;
+}
+
+/**
+ * The hash rewritten to its canonical route, keeping the query; null if it
+ * already is. An application opened over any screen (`?application=`, the old
+ * drawer, with `detail=` for its tab) is its review page, and the old
+ * Overview's period (`#overview?since=`) is the Progress of Insights.
+ */
 export function canonicalHash(hash: string) {
-  const [name, query] = hash.replace(/^#/, "").split("?");
+  const [name, query = ""] = hash.replace(/^#/, "").split("?");
+  const params = new URLSearchParams(query);
+  const application = params.get("application");
+  if (application && name !== "review") {
+    const next = new URLSearchParams({ application });
+    const detail = params.get("detail");
+    if (detail === "posting") next.set("pane", "posting");
+    else if (detail) next.set("tab", detail);
+    return `#review?${next}`;
+  }
+  if (name === "overview" && (params.has("since") || params.has("until"))) {
+    params.set("section", "insights");
+    return `#applications?${params}`;
+  }
+  if (name === "applications" && upgradeApplications(params))
+    return `#applications?${params}`;
   if (!(name in ALIASES)) return null;
   return `#${ALIASES[name]}${query ? "?" + query : ""}`;
 }
@@ -103,14 +166,8 @@ export function destinationOf(route: string) {
   return null;
 }
 
-/** An object opened over the current screen, from `?job=` or `?application=`. */
+/** A job opened over the current screen, from `?job=`. */
 export function overlayOf(hash: string) {
-  const params = new URLSearchParams(hash.split("?")[1] || "");
-  const job = params.get("job"),
-    application = params.get("application");
-  return job
-    ? { kind: "job" as const, id: job }
-    : application
-      ? { kind: "application" as const, id: application }
-      : null;
+  const job = new URLSearchParams(hash.split("?")[1] || "").get("job");
+  return job ? { kind: "job" as const, id: job } : null;
 }

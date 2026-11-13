@@ -10,6 +10,7 @@ const loaders = {
   activity: () => import("../pages/Activity"),
   jobs: () => import("../pages/Jobs"),
   applications: () => import("../pages/Applications"),
+  review: () => import("../pages/Review"),
   collection: () => import("../pages/Companies"),
   career: () => import("../pages/Career"),
   policy: () => import("../pages/Policy"),
@@ -46,16 +47,8 @@ export const JobDrawer = lazy(() =>
 export const AddJob = lazy(() =>
   loaders.jobs().then((module) => ({ default: module.AddJob })),
 );
-export const ApplicationsPage = lazy(() =>
-  loaders.applications().then((module) => ({
-    default: module.ApplicationsPage,
-  })),
-);
-export const ApplicationDrawer = lazy(() =>
-  loaders.applications().then((module) => ({
-    default: module.ApplicationDrawer,
-  })),
-);
+export const ApplicationsPage = lazy(loaders.applications);
+export const ReviewPage = lazy(loaders.review);
 
 interface BoundaryProps {
   /** What failed, for the message: "Applications" or "this job". */
