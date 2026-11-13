@@ -140,8 +140,11 @@ For development commands and release gates, see [Contributing](../../CONTRIBUTIN
 
 ## Upgrade the workspace format
 
-Back up before upgrading. 0.22 upgrades a workspace to schema 13 on start and
-changes stored data: read [Upgrading to 0.22](upgrading-0.22.md) first. On start, a schema 9 workspace (0.18) is upgraded to
+Back up before upgrading. 0.23 upgrades a workspace to schema 14 on start and
+removes what 0.19 to 0.22 deprecated, keeping every value: read
+[Upgrading to 0.23](upgrading-0.23.md) first. A schema 12 workspace (0.21)
+also goes through 0.22's change of stored data: read
+[Upgrading to 0.22](upgrading-0.22.md). On start, a schema 9 workspace (0.18) is upgraded to
 schema 10 (0.19) in one transaction. Schema 10 only adds: the
 [policy](policy.md), three typed fields on claims and the policy versions a
 prepared application records. The Profile's free-form `metadata` is copied into

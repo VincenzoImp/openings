@@ -347,7 +347,7 @@ when that issue lands; the table says which parts those are.
   | Job drawer, Notes and history | The job's timeline: changes and notes, add, edit, delete |
   | Job drawer, Files | **Details**, Files |
   | Job drawer, Edit (raw metadata JSON) | **Details**, Correct the job, metadata in the key/value editor |
-  | Job drawer, Availability field | Removed from the dashboard: `availability` is deprecated, readable and writable over REST and MCP; the No longer listed signal replaces it |
+  | Job drawer, Availability field | Removed from the dashboard; the No longer listed signal replaces it. 0.23 removed the field from REST, MCP and storage (a set value is kept as a note on the job) |
   | Merge duplicate | **Same vacancy: merge**, or **Details**, Merge with another job |
   | Forget job | **Details**, Forget, and the selection bar |
   | Add job | **Add a job**, with the address looked up first |
