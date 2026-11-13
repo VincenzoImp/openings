@@ -8,7 +8,7 @@ export function Tag({
   className,
   children,
 }: {
-  tone?: Tone | "green" | "amber";
+  tone?: Tone;
   className?: string;
   children: ReactNode;
 }) {

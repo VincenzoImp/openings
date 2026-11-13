@@ -14,11 +14,6 @@ const KB = 1000;
 const BUDGET = { first: 110 * KB, later: 40 * KB, css: 15 * KB };
 const HOME = "src/pages/Today.tsx";
 
-// A temporary allowance for one old page that cannot meet its budget yet:
-//   "src/pages/Name.tsx": { limit: 45 * KB, until: "stage 3", reason: "…" }
-// Each entry names the stage of issue #135 that removes it. None is needed.
-const ALLOWANCES = {};
-
 const dist = new URL("../dist/", import.meta.url);
 let manifest;
 try {
@@ -68,19 +63,12 @@ const screens = Object.keys(manifest)
   .sort();
 for (const key of screens) {
   const own = scripts(closure(key)).filter((file) => !firstFiles.has(file));
-  const allowance = ALLOWANCES[key];
   add(
     `Screen ${key.replace(/^src\/pages\//, "").replace(/\.tsx$/, "")}`,
     total(own),
-    allowance?.limit ?? BUDGET.later,
-    allowance ? `allowance until ${allowance.until}: ${allowance.reason}` : "",
+    BUDGET.later,
   );
 }
-for (const key of Object.keys(ALLOWANCES))
-  if (!manifest[key]?.isDynamicEntry) {
-    console.error(`Allowance for ${key}, which is not a screen: remove it.`);
-    process.exit(1);
-  }
 const styles = new Set(
   Object.values(manifest).flatMap((chunk) => chunk.css || []),
 );

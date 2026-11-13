@@ -20,7 +20,7 @@ export function lockPageScroll() {
 }
 
 /**
- * A modal dialog, or a drawer on the right edge. The browser keeps focus
+ * A modal dialog. The browser keeps focus
  * inside it; closing asks before discarding unsaved edits and returns focus
  * to the control that opened it.
  */
@@ -28,14 +28,12 @@ export function Dialog({
   title,
   children,
   onClose,
-  drawer = false,
   footer,
   className,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
-  drawer?: boolean;
   footer?: ReactNode;
   className?: string;
 }) {
@@ -53,15 +51,10 @@ export function Dialog({
       if (last?.isConnected) last.focus({ preventScroll: true });
     };
   }, []);
-  // The second class of each part is the name the older pages style against.
   return (
     <dialog
       ref={ref}
-      className={cx(
-        "dialog native-dialog",
-        drawer ? "drawer" : "modal",
-        className,
-      )}
+      className={cx("dialog", className)}
       aria-labelledby={id}
       onCancel={(event) => {
         event.preventDefault();
@@ -80,7 +73,7 @@ export function Dialog({
           close();
       }}
     >
-      <div className={cx("dialog-head", drawer ? "drawerhead" : "modalhead")}>
+      <div className="dialog-head">
         <IconButton
           icon="close"
           label="Close dialog"
@@ -89,12 +82,8 @@ export function Dialog({
         />
         <h2 id={id}>{title}</h2>
       </div>
-      <div
-        className={cx("dialog-body", drawer ? "drawercontent" : "modalcontent")}
-      >
-        {children}
-      </div>
-      {footer && <div className="dialog-foot drawerfoot">{footer}</div>}
+      <div className="dialog-body">{children}</div>
+      {footer && <div className="dialog-foot">{footer}</div>}
       <Notification inDialog />
     </dialog>
   );
