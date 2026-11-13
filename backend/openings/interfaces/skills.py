@@ -8,7 +8,6 @@ from pydantic import BaseModel, ConfigDict
 from ..skill_notes import SkillNotesInput, SkillNotesService
 from ..skills import SKILL_FILE, SkillLibrary, list_skills, read_skill
 from .registry import (
-    Alias,
     Operation,
     Param,
     Route,
@@ -98,19 +97,6 @@ OPERATIONS = (
                 "/skills/{name}/files/{path:path}",
                 "skill_file_get",
                 params=(Param("name", str), Param("path", str), query_model(SkillRead)),
-            ),
-        ),
-        aliases=(
-            Alias(
-                "skill_get",
-                params=(
-                    Param("name", str),
-                    Param("path", str, SKILL_FILE),
-                    Param("local_notes", bool, True),
-                ),
-                call=lambda s, name, path, local_notes: read_skill(
-                    s.library, s.notes, name, path, local_notes
-                ),
             ),
         ),
         tool=Tool(

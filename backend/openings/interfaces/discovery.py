@@ -88,7 +88,6 @@ OPERATIONS = (
         tool=Tool(
             READ,
             "List logical collections with cumulative provider counts, waiting and processing time, by source_id or state. summary=false adds frozen source snapshots and full task payloads/results.",
-            legacy=tuple(CollectionRunQuery.model_fields),
         ),
     ),
     Operation(
@@ -145,7 +144,6 @@ OPERATIONS = (
         tool=Tool(
             READ,
             "List saved portal searches and selected company/feed sources, schedules and outcomes. summary=false adds last-run diagnostics and full task records.",
-            legacy=tuple(SourceQuery.model_fields),
         ),
     ),
     Operation(
@@ -260,7 +258,6 @@ OPERATIONS = (
         tool=Tool(
             READ,
             "Filter collection work by state/kind/source/job, with readable labels and diagnostics.",
-            legacy=tuple(TaskQuery.model_fields),
         ),
     ),
     Operation(

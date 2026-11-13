@@ -119,8 +119,6 @@ def test_edits_documents_never_use_leave_drafts_current(drafted):
     services, application_id, items, _ = drafted
     services.profile(
         metadata={"notes": "Changed", "search": {"queries": ["python"]}},
-        preferences="Remote only.",
-        roles="Platform engineer",
     )
     services.update(items["remote"], statement="Remote or hybrid.")
     services.add("decision", "No agencies")
@@ -312,7 +310,7 @@ def test_older_contexts_compare_what_they_froze_and_say_what_they_cannot(tmp_pat
     path = tmp_path / "legacy.sqlite"
     workspace, knowledge, _, _, applications = seed(path, applications=3)
     services = Services(workspace)
-    services.profile(metadata={"rules": "Synthetic rules"}, preferences="Remote.")
+    services.profile(metadata={"rules": "Synthetic rules"})
     del workspace, services
     make_schema_eight(path)
     legacy = legacy_prepare_context(path, applications[0], knowledge_ids=knowledge[:1])["id"]
@@ -361,7 +359,7 @@ def test_older_contexts_compare_what_they_froze_and_say_what_they_cannot(tmp_pat
     assert second["changes"][0]["current_version"] == profile_version
 
     # The Profile's own rules and later policy changes are not compared for these.
-    services.profile(metadata={}, preferences="", roles="")
+    services.profile(metadata={})
     services.add("eligibility", "Work authorization", statement="EU citizen.")
     assert services.report(applications[0])["stale"] is False
     services.profile(summary="Changed summary.")

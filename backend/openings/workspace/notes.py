@@ -4,8 +4,8 @@ A note's scope is its job, or one application of that job when
 ``application_id`` is set. Each note records who wrote it and, for a token with
 an open run, that run. A job and an application each have at most one pinned
 note (partial unique indexes); pinning a note unpins the one pinned in its
-scope, and both changes are recorded. The application's pinned note is what
-the deprecated ``application.note`` field reads and writes until 0.23.
+scope, and both changes are recorded. The application's pinned note is its
+standing guidance, which a new frozen context includes.
 """
 
 from ..actors import current_actor, pop_actor
@@ -103,8 +103,8 @@ class Notes:
         )
         return note_id
 
-    def delete_note(self, note_id, expected_version=None):
-        """Delete a note with its current version; without one (deprecated, until 0.23) as it stands."""
+    def delete_note(self, note_id, expected_version):
+        """Delete a note with its current version."""
         with self.db.transaction() as c:
             row = c.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
             if row is None:
@@ -189,8 +189,6 @@ class Notes:
             (job_id,),
         ).fetchone()
 
-    # The deprecated application note (until 0.23) ----------------------------
-
     def pinned_application_notes(self, conn, application_ids):
         """The pinned note of each application, or None."""
         result = dict.fromkeys(application_ids)
@@ -203,18 +201,3 @@ class Notes:
         ):
             result[row["application_id"]] = note_record(row)
         return result
-
-    def write_application_note(self, conn, job_id, application_id, text):
-        """Apply a write of the deprecated ``note`` field to the application's pinned note.
-
-        The same text is no change; other text edits the pinned note, or adds one
-        pinned when there is none; empty text unpins it, so nothing is lost.
-        """
-        row = self._pinned_row(conn, job_id, application_id)
-        if row is None:
-            if text:
-                self.insert_note(conn, job_id, application_id, text, pinned=True)
-        elif not text:
-            self._set_pin(conn, row, None, "note_unpinned")
-        else:
-            self.edit_note_body(conn, row, text)

@@ -128,8 +128,8 @@ observation). `jobs_list` filters by `signal`, `posting_language`,
 `include_counts` returns the size of each queue. A dismissed job has
 `dismissal`: who, when, why (`reason`) and the rule, if one dismissed it.
 `jobs_distinct(job_id, {other_id})` records that a flagged likely duplicate is a
-different vacancy. The manual `availability` field is deprecated and read by
-nothing.
+different vacancy. Whether a board still lists a posting is
+`signals.no_longer_listed`.
 
 Use `jobs_list` with `value.queue="inbox"` to review new jobs and
 `jobs_triage` / `jobs_bulk` to save or dismiss selected versioned jobs. Read full
@@ -301,11 +301,10 @@ removed), `scope` (`job` or `application`), `actor`, `run` and either `note`
 with `limit` and `offset`. REST serves the same entries at
 `GET /jobs/{id}/timeline` and `GET /applications/{id}/timeline`.
 
-`application.note` is deprecated since 0.22 and removed in 0.23: it reads the
-pinned note's text (`pinned_note` holds the note itself), and writing it edits
-the pinned note, adds one when there is none, or unpins it when empty. A frozen
-context still carries the pinned note as `application.note` and
-`instructions.application_note`.
+An application's standing guidance is its pinned note: `applications_get`
+returns it as `pinned_note`; write it with `notes_create` (`application_id`,
+`pinned: true`), `notes_update` and `notes_pin`. A frozen context carries the
+pinned note as `application.note` and `instructions.application_note`.
 
 ## Scripting and transfers
 

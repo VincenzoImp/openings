@@ -83,8 +83,8 @@ to new jobs as they are collected: those jobs arrive dismissed with
 rule. Rules never act on jobs already in the Inbox, so apply the statement of
 every decision item yourself, enabled or not. To suggest a rule, measure it
 first with `policy_rule_preview` and propose it with `policy_add`; only the
-owner enables it. Profile `preferences` and `roles` stay readable until the policy
-holds their content; record no new criteria there.
+owner enables it. Target roles and preferences are decision items of the
+policy too.
 Explain the fit or mismatch with specific facts, not a keyword score.
 Missing evidence does not establish that a skill or experience is absent.
 

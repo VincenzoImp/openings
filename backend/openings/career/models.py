@@ -16,8 +16,6 @@ DEFAULT_PROFILE = {
     "location": "",
     "email": "",
     "phone": "",
-    "roles": "",
-    "preferences": "",
     "summary": "",
     "links": [],
     "metadata": {},
@@ -65,16 +63,6 @@ class ProfileUpdate(NonNullUpdate):
     location: str | None = Field(default=None, max_length=300)
     email: str | None = Field(default=None, max_length=300)
     phone: str | None = Field(default=None, max_length=100)
-    roles: str | None = Field(
-        default=None,
-        max_length=3000,
-        description="Deprecated: record target roles as decision items of the policy (policy_add). Still stored and returned until the breaking release.",
-    )
-    preferences: str | None = Field(
-        default=None,
-        max_length=10000,
-        description="Deprecated: record preferences as decision items of the policy (policy_add). Still stored and returned until the breaking release.",
-    )
     summary: str | None = Field(default=None, max_length=20000)
     links: list[dict[str, str]] | None = Field(default=None, max_length=50)
     metadata: dict[str, Any] | None = Field(

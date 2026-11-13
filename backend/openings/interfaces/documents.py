@@ -11,12 +11,11 @@ from ..documents import (
     DocumentCreate,
     DocumentService,
     ReviewUpdate,
-    StalenessStage,
     UploadReservation,
 )
 from ..documents.models import ContextQuery, DocumentQuery, FileQuery, StalenessQuery
 from .registry import (
-    Alias,
+    REQUIRED,
     Exemption,
     Operation,
     Param,
@@ -41,13 +40,8 @@ DELETE = ToolAnnotations(
     readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False
 )
 
-# A delete that took no version before 0.22 still accepts none until 0.23 (#167).
-OPTIONAL_VERSION = Param(
-    "expected_version",
-    int | None,
-    None,
-    rest=(Annotated[int | None, Query(ge=1)], None),
-)
+# Every delete names the version it deletes (a file's version is always 1).
+EXPECTED_VERSION = Param("expected_version", int, rest=(Annotated[int, Query(ge=1)], REQUIRED))
 
 OPERATIONS = (
     Operation(
@@ -59,9 +53,7 @@ OPERATIONS = (
         params=(query_model(ContextQuery),),
         call=lambda s, value: s.list_contexts(**(value or ContextQuery()).model_dump()),
         rest=(Route("GET", "/contexts", "list_contexts"),),
-        tool=Tool(
-            LOOKUP, DocumentService.list_contexts.__doc__, legacy=tuple(ContextQuery.model_fields)
-        ),
+        tool=Tool(LOOKUP, DocumentService.list_contexts.__doc__),
     ),
     Operation(
         "contexts.create",
@@ -72,7 +64,6 @@ OPERATIONS = (
         params=(Param("value", ContextCreate),),
         call=lambda s, value: s.prepare_context(value),
         rest=(Route("POST", "/contexts", "prepare_context", status_code=201),),
-        aliases=("application_prepare_context",),
         tool=Tool(ADD, method="prepare_context"),
     ),
     Operation(
@@ -98,7 +89,6 @@ OPERATIONS = (
         tool=Tool(
             LOOKUP,
             DocumentService.list_documents.__doc__,
-            legacy=tuple(DocumentQuery.model_fields),
         ),
     ),
     Operation(
@@ -143,20 +133,6 @@ OPERATIONS = (
         params=(query_model(StalenessQuery),),
         call=lambda s, value: s.list_staleness(**(value or StalenessQuery()).model_dump()),
         rest=(Route("GET", "/staleness", "list_staleness"),),
-        aliases=(
-            Alias(
-                "applications_staleness",
-                params=(
-                    Param("status", StalenessStage, "draft"),
-                    Param("stale_only", bool, True),
-                    Param("limit", int, 50),
-                    Param("offset", int, 0),
-                ),
-                call=lambda s, status, stale_only, limit, offset: s.list_staleness(
-                    status, stale_only, limit, offset
-                ),
-            ),
-        ),
         tool=Tool(LOOKUP, DocumentService.list_staleness.__doc__),
     ),
     Operation(
@@ -168,7 +144,6 @@ OPERATIONS = (
         params=(Param("application_id", str),),
         call=lambda s, application_id: s.application_staleness(application_id),
         rest=(Route("GET", "/applications/{application_id}/staleness", "application_staleness"),),
-        aliases=("application_staleness",),
         tool=Tool(LOOKUP, method="application_staleness"),
     ),
     Operation(
@@ -188,7 +163,7 @@ OPERATIONS = (
         "delete",
         "Applications and documents",
         "Delete an entire revision and its files",
-        params=(Param("document_id", str), OPTIONAL_VERSION),
+        params=(Param("document_id", str), EXPECTED_VERSION),
         call=lambda s, document_id, expected_version: s.delete_document(
             document_id, expected_version
         ),
@@ -204,7 +179,7 @@ OPERATIONS = (
         params=(query_model(FileQuery),),
         call=lambda s, value: s.list_files(**(value or FileQuery()).model_dump()),
         rest=(Route("GET", "/files", "list_files"),),
-        tool=Tool(LOOKUP, DocumentService.list_files.__doc__, legacy=tuple(FileQuery.model_fields)),
+        tool=Tool(LOOKUP, DocumentService.list_files.__doc__),
     ),
     Operation(
         "files.upload",
@@ -258,7 +233,7 @@ OPERATIONS = (
         "delete",
         "Applications and documents",
         "Delete a live knowledge/template/job asset",
-        params=(Param("file_id", str), OPTIONAL_VERSION),
+        params=(Param("file_id", str), EXPECTED_VERSION),
         call=lambda s, file_id, expected_version: s.delete_file(file_id, expected_version),
         rest=(Route("DELETE", "/files/{file_id}", "delete_file"),),
         tool=Tool(DELETE, DocumentService.delete_file.__doc__),

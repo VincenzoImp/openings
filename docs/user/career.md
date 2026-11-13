@@ -96,10 +96,10 @@ Prepared application contexts freeze the selected entries, claims, dates and
 ordering. Later edits affect future contexts. Review generated wording and files
 before recording a submission.
 
-The Profile fields `preferences` and `roles` are deprecated: record them as
-Decision items of the [Policy](policy.md). They stay readable and writable, and
-the Profile shows them under **Target roles and preferences, kept from earlier
-versions**.
+Target roles and preferences are Decision items of the [Policy](policy.md).
+The Profile had `preferences` and `roles` fields until 0.22; 0.23 removed them
+after checking that the policy holds their text (see
+[Upgrading to 0.23](upgrading-0.23.md)).
 
 Import previews keep the pasted text while you review it. Leaving an unfinished
 import asks before discarding it. If a versioned editor reports a conflict, review

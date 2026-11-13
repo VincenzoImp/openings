@@ -56,7 +56,7 @@ async def test_file_stream_survives_thread_changes_and_original_deletion(tmp_pat
 
     monkeypatch.setattr(starlette.responses, "iterate_in_threadpool", alternate_threads)
     response = documents.file_response(record["id"])
-    documents.delete_file(record["id"])
+    documents.delete_file(record["id"], 1)
     messages = []
 
     async def send(message):

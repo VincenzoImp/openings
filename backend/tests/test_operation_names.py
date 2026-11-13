@@ -1,4 +1,4 @@
-"""One name and one argument shape per operation (#167), and the aliases kept until 0.23."""
+"""One name and one argument shape per operation (#167); the earlier names are gone (0.23)."""
 
 import json
 import re
@@ -12,8 +12,7 @@ from openings.actors import OWNER, acting_as
 from openings.app import create_app
 from openings.career import ClaimCreate, KnowledgeCreate
 from openings.documents import DocumentCreate, UploadReservation
-from openings.interfaces import GUIDE_PATH, catalog, with_upgrade_tables
-from openings.interfaces.registry import REMOVAL, deprecation
+from openings.interfaces import catalog
 
 ROOT = Path(__file__).resolve().parents[2]
 # Resources that name one record of the workspace, or a mass noun, stay singular.
@@ -32,6 +31,62 @@ SINGULAR = {
     "timeline",
     "workspace",
 }
+# The tool names before 0.22, kept as deprecated aliases in 0.22 and removed in 0.23.
+REMOVED_NAMES = {
+    "application_create": "applications_create",
+    "application_delete": "applications_delete",
+    "application_get": "applications_get",
+    "application_history": "applications_history",
+    "application_prepare_context": "contexts_create",
+    "application_ready": "applications_ready",
+    "application_staleness": "staleness_get",
+    "application_update": "applications_update",
+    "applications_staleness": "staleness_list",
+    "career_get_profile": "profile_get",
+    "career_update_profile": "profile_update",
+    "collection_yield": "sources_yield",
+    "job_distinct": "jobs_distinct",
+    "job_forget": "jobs_delete",
+    "job_get": "jobs_get",
+    "job_ingest": "jobs_create",
+    "job_merge": "jobs_merge",
+    "job_triage": "jobs_triage",
+    "job_update": "jobs_update",
+    "jobs_search": "jobs_list",
+    "note_add": "notes_create",
+    "note_delete": "notes_delete",
+    "note_get": "notes_get",
+    "note_update": "notes_update",
+    "responses_add": "responses_create",
+    "responses_remove": "responses_delete",
+    "skill_get": "skills_get",
+    "token_create": "tokens_create",
+    "token_revoke": "tokens_revoke",
+    "workspace_restore_upload": "workspace_restore",
+}
+# The tools that took their filters or options as flat arguments before 0.22, and
+# beside value in 0.22; from 0.23 only inside value (with these identifiers flat).
+FLAT_BEFORE = {
+    "knowledge_list": set(),
+    "claims_list": set(),
+    "templates_list": set(),
+    "contexts_list": set(),
+    "documents_list": set(),
+    "files_list": set(),
+    "collection_runs_list": set(),
+    "sources_list": set(),
+    "tasks_list": set(),
+    "runs_get": {"run_id"},
+}
+# Where an earlier name may still appear: the upgrade guides that map it, the
+# release history and the accepted proposal, which records the earlier state.
+MAY_NAME_EARLIER = {
+    "CHANGELOG.md",
+    "docs/user/upgrading-0.22.md",
+    "docs/user/upgrading-0.23.md",
+    "docs/developer/proposal-redesign.md",
+}
+GUIDE = ROOT / "docs/user/upgrading-0.23.md"
 
 
 async def call(mcp, name, arguments=None):
@@ -72,100 +127,46 @@ def test_every_tool_is_named_from_its_declaration():
     for operation in operations:
         assert operation.resource in SINGULAR or operation.resource.endswith("s"), operation.id
         assert not hasattr(operation.tool, "name"), operation.id
-    aliases = [alias.name for operation in operations for alias in operation.alias_entries]
-    assert len(aliases) == len(set(aliases)) and not set(aliases) & set(names)
+        assert not hasattr(operation, "aliases"), operation.id
 
 
-async def test_every_alias_is_its_operation_under_an_earlier_name(app):
-    """Same handler (or, for an earlier shape, the same call), annotations and a deprecation."""
-    operations, _, _ = catalog()
-    manager = app.state.mcp._tool_manager
-    reshaped = set()
-    for operation in operations:
-        tool = manager.get_tool(operation.canonical_name)
-        for alias in operation.alias_entries:
-            registered = manager.get_tool(alias.name)
-            assert registered.description.startswith(deprecation(operation.canonical_name))
-            assert registered.description.endswith(tool.description)
-            assert registered.annotations == tool.annotations
-            if alias.params is None:
-                assert registered.fn is tool.fn, alias.name
-                assert registered.parameters == tool.parameters
-            else:
-                reshaped.add(alias.name)
-    # The aliases that keep the arguments they took before 0.22, tested below.
-    assert reshaped == {"applications_staleness", "note_delete", "skill_get"}
-    assert deprecation("jobs_get") == f"Deprecated alias of jobs_get; removed in {REMOVAL}."
+async def test_the_earlier_names_are_gone_and_each_has_its_tool(app):
+    tools = {tool.name for tool in await app.state.mcp.list_tools()}
+    assert not set(REMOVED_NAMES) & tools
+    assert set(REMOVED_NAMES.values()) <= tools
+    for name in REMOVED_NAMES:
+        with pytest.raises(ToolError, match=f"Unknown tool: {name}"):
+            await app.state.mcp.call_tool(name, {})
 
 
-async def test_aliases_return_what_their_tools_return(app):
+async def test_filters_beside_value_are_refused_not_ignored(app):
     data = seed(app)
     mcp = app.state.mcp
-    job_id, application_id = data["job"]["id"], data["application"]["id"]
-    same_input = {
-        "job_get": ("jobs_get", {"job_id": job_id}),
-        "jobs_search": ("jobs_list", {"value": {"queue": "inbox"}}),
-        "note_get": ("notes_get", {"note_id": data["note"]["id"]}),
-        "application_get": ("applications_get", {"application_id": application_id}),
-        "application_history": ("applications_history", {"application_id": application_id}),
-        "application_staleness": ("staleness_get", {"application_id": application_id}),
-        "career_get_profile": ("profile_get", {}),
-        "collection_yield": ("sources_yield", {"value": {"min_sample": 1}}),
-    }
-    for alias, (name, arguments) in same_input.items():
-        assert await call(mcp, alias, arguments) == await call(mcp, name, arguments), alias
-    # Aliases that keep their earlier, flat arguments.
-    assert await call(
-        mcp, "applications_staleness", {"status": "all", "stale_only": False, "limit": 5}
-    ) == await call(
-        mcp, "staleness_list", {"value": {"status": "all", "stale_only": False, "limit": 5}}
-    )
-    assert await call(
-        mcp, "skill_get", {"name": "openings-workspace", "local_notes": False}
-    ) == await call(
-        mcp, "skills_get", {"name": "openings-workspace", "value": {"local_notes": False}}
-    )
-    # A write through an alias is the same operation.
-    triaged = await call(
-        mcp,
-        "job_triage",
-        {
-            "job_id": job_id,
-            "value": {
-                "triage": "saved",
-                "expected_version": (await call(mcp, "jobs_get", {"job_id": job_id}))["version"],
-            },
-        },
-    )
-    assert triaged["triage"] == "saved"
-    # note_delete took no version; notes_delete requires it.
-    assert (await refused(mcp, "notes_delete", {"note_id": data["note"]["id"]}))["code"] == (
-        "validation"
-    )
-    assert await call(mcp, "note_delete", {"note_id": data["note"]["id"]}) == {"deleted": True}
-
-
-async def test_tools_that_took_flat_arguments_still_accept_them_beside_value(app):
-    data = seed(app)
-    mcp = app.state.mcp
-    flat = await call(mcp, "knowledge_list", {"q": "Synthetic", "summary": False})
-    assert flat == await call(
-        mcp, "knowledge_list", {"value": {"q": "Synthetic", "summary": False}}
-    )
-    assert flat["items"][0]["narrative"] == "Built it."
-    assert await call(mcp, "claims_list", {"knowledge_id": data["entry"]["id"]}) == await call(
-        mcp, "claims_list", {"value": {"knowledge_id": data["entry"]["id"]}}
-    )
-    error = await refused(mcp, "documents_list", {"limit": 5, "value": {"limit": 5}})
-    assert error["code"] == "validation" and error["details"][0]["field"] == ["limit"]
-    operations, _, _ = catalog()
     tools = {tool.name: tool for tool in await mcp.list_tools()}
-    for operation in operations:
-        if operation.tool and operation.tool.legacy:
-            properties = tools[operation.canonical_name].input_schema["properties"]
-            assert "value" in properties
-            for name in operation.tool.legacy:
-                assert REMOVAL in properties[name]["description"], (operation.id, name)
+    for name, identifiers in FLAT_BEFORE.items():
+        assert set(tools[name].input_schema["properties"]) == {"value", *identifiers}, name
+    error = await refused(mcp, "knowledge_list", {"q": "Synthetic", "summary": False})
+    assert error["code"] == "validation"
+    assert sorted(item["field"] for item in error["details"]) == [["q"], ["summary"]]
+    error = await refused(mcp, "documents_list", {"limit": 5, "value": {"limit": 5}})
+    assert error["details"][0]["field"] == ["limit"]
+    full = await call(mcp, "knowledge_list", {"value": {"q": "Synthetic", "summary": False}})
+    assert full["items"][0]["narrative"] == "Built it."
+    assert (await call(mcp, "claims_list", {"value": {"knowledge_id": data["entry"]["id"]}}))[
+        "total"
+    ] == 1
+
+
+async def test_no_schema_or_description_marks_anything_deprecated(app):
+    """What 0.19 to 0.22 deprecated is gone from REST and MCP, not merely marked."""
+    pattern = re.compile(r"deprecat|removed in 0\.23|until 0\.23", re.IGNORECASE)
+    for tool in await app.state.mcp.list_tools():
+        assert not pattern.search(json.dumps(tool.input_schema)), tool.name
+        assert not pattern.search(tool.description or ""), tool.name
+    openapi = json.dumps(app.openapi())
+    assert not pattern.search(openapi)
+    for field in ('"availability"', '"preferences"', '"roles"'):
+        assert field not in openapi, field
 
 
 async def test_lists_return_summaries_by_default_with_limit_offset_and_total(app):
@@ -194,20 +195,30 @@ async def test_lists_return_summaries_by_default_with_limit_offset_and_total(app
     assert "narrative" not in (await call(mcp, "knowledge_list"))["items"][0]
 
 
-async def test_every_delete_takes_expected_version(app):
+async def test_every_delete_requires_expected_version(app):
     operations, _, _ = catalog()
     tools = {tool.name: tool for tool in await app.state.mcp.list_tools()}
+    paths = app.openapi()["paths"]
     deletes = [
         operation
         for operation in operations
         if any(route.method == "DELETE" and not route.custom for route in operation.rest)
     ]
-    assert {operation.id for operation in deletes} >= {"notes.delete", "files.delete"}
+    assert {operation.id for operation in deletes} >= {
+        "notes.delete",
+        "documents.delete",
+        "files.delete",
+    }
     for operation in deletes:
         if operation.id == "tokens.revoke":
             continue  # a token has no version: revoking is not a versioned delete
-        schema = tools[operation.canonical_name].input_schema["properties"]
-        assert "expected_version" in schema, operation.id
+        schema = tools[operation.canonical_name].input_schema
+        assert "expected_version" in schema.get("required", []), operation.id
+        for route in operation.rest:
+            if route.method == "DELETE":
+                parameters = paths["/api/v1" + route.path]["delete"]["parameters"]
+                version = next(p for p in parameters if p["name"] == "expected_version")
+                assert version["required"] is True, operation.id
 
 
 def test_notes_revisions_and_files_are_deleted_with_their_version(app):
@@ -221,15 +232,17 @@ def test_notes_revisions_and_files_are_deleted_with_their_version(app):
         stale = client.delete(f"/api/v1/notes/{note['id']}?expected_version=9")
         assert stale.status_code == 409
         assert stale.json()["error"]["details"] == {"current_version": note["version"]}
+        # Without a version: refused, and the note stays.
+        missing = client.delete(f"/api/v1/notes/{note['id']}")
+        assert missing.status_code == 422
+        assert app.state.workspace.get_note(note["id"])["body"] == "Synthetic note."
         deleted = client.delete(f"/api/v1/notes/{note['id']}?expected_version={note['version']}")
         assert deleted.status_code == 200
-        # Without a version: accepted until 0.23, deprecated.
-        other = app.state.workspace.add_note(data["job"]["id"], {"body": "Another note."})
-        assert client.delete(f"/api/v1/notes/{other['id']}").status_code == 200
 
         revision = documents.create_document(
             DocumentCreate(application_id=data["application"]["id"], kind="other", content={"a": 1})
         )
+        assert client.delete(f"/api/v1/documents/{revision['id']}").status_code == 422
         assert (
             client.delete(f"/api/v1/documents/{revision['id']}?expected_version=2").json()["error"][
                 "code"
@@ -255,8 +268,89 @@ def test_notes_revisions_and_files_are_deleted_with_their_version(app):
         )
         stored = client.put(grant["url"], headers=grant["headers"], content=content).json()
         assert documents.get_file(stored["id"])["version"] == 1
+        assert client.delete(f"/api/v1/files/{stored['id']}").status_code == 422
         assert client.delete(f"/api/v1/files/{stored['id']}?expected_version=2").status_code == 409
         assert client.delete(f"/api/v1/files/{stored['id']}?expected_version=1").status_code == 200
+
+
+async def test_mcp_deletes_without_a_version_are_refused(app):
+    data = seed(app)
+    mcp = app.state.mcp
+    revision = app.state.documents.create_document(
+        DocumentCreate(application_id=data["application"]["id"], kind="other", content={"a": 1})
+    )
+    for name, arguments in (
+        ("notes_delete", {"note_id": data["note"]["id"]}),
+        ("documents_delete", {"document_id": revision["id"]}),
+        ("files_delete", {"file_id": "missing"}),
+    ):
+        error = await refused(mcp, name, arguments)
+        assert error["code"] == "validation", name
+        assert error["details"][0]["field"] == ["expected_version"], name
+    assert app.state.workspace.get_note(data["note"]["id"])["version"] == 1
+
+
+async def test_removed_fields_are_refused_on_rest_and_mcp_and_never_returned(app):
+    """The application note, the job's availability and the Profile's preferences and roles."""
+    data = seed(app)
+    mcp = app.state.mcp
+    job, application = app.state.workspace.get_job(data["job"]["id"]), data["application"]
+    app.state.auth.setup("synthetic-password")
+    token = app.state.auth.create_token("Synthetic owner token")["token"]
+    profile_version = app.state.career.get_profile()["version"]
+    writes = (
+        ("POST", "/applications", "applications_create", {}, {"job_id": job["id"], "note": "x"}),
+        (
+            "PATCH",
+            f"/applications/{application['id']}",
+            "applications_update",
+            {"application_id": application["id"]},
+            {"expected_version": application["version"], "note": "x"},
+        ),
+        (
+            "PATCH",
+            f"/jobs/{job['id']}",
+            "jobs_update",
+            {"job_id": job["id"]},
+            {"expected_version": job["version"], "availability": "closed"},
+        ),
+        (
+            "PATCH",
+            "/career/profile",
+            "profile_update",
+            {},
+            {"expected_version": profile_version, "roles": "Engineer"},
+        ),
+        (
+            "PATCH",
+            "/career/profile",
+            "profile_update",
+            {},
+            {"expected_version": profile_version, "preferences": "Remote"},
+        ),
+    )
+    with TestClient(app, base_url="http://localhost:8080") as client:
+        client.headers["Authorization"] = "Bearer " + token
+        for method, path, tool, identifiers, body in writes:
+            response = client.request(method, "/api/v1" + path, json=body)
+            assert response.status_code == 422, (path, body)
+            error = await refused(mcp, tool, {**identifiers, "value": body})
+            assert error["code"] == "validation", (tool, body)
+        assert "note" not in client.get(f"/api/v1/applications/{application['id']}").json()
+        assert "availability" not in client.get(f"/api/v1/jobs/{job['id']}").json()
+        assert "availability" not in client.get("/api/v1/jobs").json()["items"][0]
+        profile = client.get("/api/v1/career/profile").json()
+        assert not {"preferences", "roles"} & set(profile)
+        preview = client.post(
+            "/api/v1/career/import/preview",
+            json={"text": json.dumps({"profile": {"name": "Alex", "roles": "Engineer"}})},
+        )
+        assert preview.status_code == 422
+        assert preview.json()["error"]["code"] == "import_validation"
+    # Nothing was written.
+    assert app.state.workspace.get_job(job["id"])["version"] == job["version"]
+    assert app.state.career.get_profile()["version"] == profile_version
+    assert app.state.workspace.list_applications()["total"] == 1
 
 
 async def test_every_create_accepts_an_idempotency_key(app):
@@ -330,37 +424,44 @@ async def test_a_retried_create_returns_its_record_and_a_reused_key_is_refused(a
     assert again["id"] != note["id"]
 
 
-def deprecated_names():
-    operations, _, _ = catalog()
-    return {alias.name for operation in operations for alias in operation.alias_entries}
+def shipped_text_files():
+    """Every text the product ships or documents, by path from the repository root."""
+    patterns = (
+        "*.md",
+        "skills/**/*",
+        "docs/**/*.md",
+        "docs/**/*.json",
+        "examples/**/*",
+        "frontend/src/**/*",
+        "frontend/tests/**/*",
+        "scripts/*",
+        "backend/openings/**/*.json",
+        "backend/tests/agent_roundtrip.py",
+    )
+    for pattern in patterns:
+        for path in ROOT.glob(pattern):
+            name = str(path.relative_to(ROOT))
+            if path.is_file() and name not in MAY_NAME_EARLIER and "node_modules" not in name:
+                try:
+                    yield name, path.read_text()
+                except UnicodeDecodeError:
+                    continue
 
 
-async def test_shipped_skills_docs_and_descriptions_use_no_deprecated_name(app):
-    """The upgrade guide maps old names; the accepted proposal records the earlier state."""
-    pattern = re.compile(r"(?<![\w{.-])(" + "|".join(sorted(deprecated_names())) + r")(?!\w)")
-    exempt = {"docs/user/upgrading-0.22.md", "docs/developer/proposal-redesign.md"}
-    files = [
-        *ROOT.glob("skills/**/*.md"),
-        *ROOT.glob("docs/**/*.md"),
-        *ROOT.glob("examples/**/*.md"),
-        ROOT / "README.md",
-    ]
-    found = {
-        str(path.relative_to(ROOT)): sorted(set(pattern.findall(path.read_text())))
-        for path in files
-        if str(path.relative_to(ROOT)) not in exempt
-    }
-    assert not {path: names for path, names in found.items() if names}
-    names = deprecated_names()
+async def test_no_earlier_name_remains_outside_the_upgrade_guides(app):
+    pattern = re.compile(r"(?<![\w{.-])(" + "|".join(sorted(REMOVED_NAMES)) + r")(?!\w)")
+    found = {name: sorted(set(pattern.findall(text))) for name, text in shipped_text_files()}
+    assert not {name: names for name, names in found.items() if names}
     for tool in await app.state.mcp.list_tools():
-        if tool.name not in names:
-            assert not pattern.findall(tool.description or ""), tool.name
+        assert not pattern.findall(tool.description or ""), tool.name
+        assert not pattern.findall(json.dumps(tool.input_schema)), tool.name
     for prompt in await app.state.mcp.list_prompts():
         assert not pattern.findall(prompt.description or ""), prompt.name
 
 
-def test_the_upgrade_guide_lists_every_alias_from_the_declarations():
-    guide = (ROOT / GUIDE_PATH).read_text()
-    assert guide == with_upgrade_tables(guide), "Run `uv run python scripts/inventory.py`."
-    for name in deprecated_names():
-        assert f"| `{name}` |" in guide
+def test_the_upgrade_guide_maps_every_earlier_name_to_its_tool():
+    guide = GUIDE.read_text()
+    for old, new in REMOVED_NAMES.items():
+        assert f"| `{old}` | `{new}` |" in guide, old
+    for name in FLAT_BEFORE:
+        assert f"| `{name}` |" in guide, name

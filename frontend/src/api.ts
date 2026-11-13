@@ -307,8 +307,6 @@ export interface Application extends Versioned {
   job_id: string;
   status: Stage;
   outcome: string | null;
-  /** @deprecated since 0.22: the text of `pinned_note`; removed in 0.23. */
-  note: string;
   /** The application's pinned note: its standing guidance. */
   pinned_note?: Note | null;
   questions: Question[];
@@ -401,8 +399,6 @@ export interface Profile {
   location: string;
   email: string;
   phone: string;
-  roles: string;
-  preferences: string;
   summary: string;
   links: unknown[];
   metadata: Json;

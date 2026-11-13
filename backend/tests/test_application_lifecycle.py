@@ -148,7 +148,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             {
                 "value": {
                     "job_id": job["id"],
-                    "note": "Keep this intent",
+                    "priority": 2,
                     "idempotency_key": "start",
                 }
             },
@@ -160,7 +160,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             {
                 "value": {
                     "job_id": job["id"],
-                    "note": "Keep this intent",
+                    "priority": 2,
                     "idempotency_key": "start",
                 }
             },
@@ -173,14 +173,12 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             {
                 "value": {
                     "job_id": job["id"],
-                    "note": "Must not overwrite the existing intent",
+                    "priority": 5,
                 }
             },
             error=409,
         )
-        assert (
-            client.get(f"/api/v1/applications/{attempt['id']}").json()["note"] == "Keep this intent"
-        )
+        assert client.get(f"/api/v1/applications/{attempt['id']}").json()["priority"] == 2
         listed = call(
             "applications_list",
             "GET",
@@ -254,11 +252,22 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
                 "application_id": attempt["id"],
                 "value": {
                     "expected_version": attempt["version"],
-                    "note": "Outcome remains rejected",
+                    "priority": 1,
                 },
             },
         )
         assert attempt["outcome"] == "rejected"
+        # The application note field was removed in 0.23: its pinned note replaces it.
+        call(
+            "applications_update",
+            "PATCH",
+            path,
+            {
+                "application_id": attempt["id"],
+                "value": {"expected_version": attempt["version"], "note": "Removed field"},
+            },
+            error=422,
+        )
         call(
             "applications_delete",
             "DELETE",
