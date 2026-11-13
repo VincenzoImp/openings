@@ -30,9 +30,6 @@ from .errors import DomainError, conflict, missing
 from .models import Input, Versioned, past_day
 
 ResponseKind = Literal["rejection", "interview", "offer", "other"]
-RESPONSE_KINDS = ("rejection", "interview", "offer", "other")
-# How a response was recorded: by hand, with a stage change, or by the 0.20 upgrade.
-ORIGINS = ("manual", "stage", "upgrade")
 DEFAULT_REPLY_DAYS = 30
 _NO_REPLY_LABEL = re.compile(r"\bno[\s-]?(reply|response)\b", re.IGNORECASE)
 _DAYS = re.compile(r"^\s*(\d{1,4})(\s*days?)?\s*$", re.IGNORECASE)
@@ -284,10 +281,6 @@ class ResponseService:
                 "This application already has a response of this kind on that day.",
                 {"response_id": row[0]},
             )
-
-    def get_response(self, response_id):
-        with self.db.connect() as conn:
-            return self._read(conn, response_id)
 
     def list_responses(self, application_id):
         """The employer responses of one application, newest day first."""
