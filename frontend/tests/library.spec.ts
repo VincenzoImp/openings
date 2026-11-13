@@ -26,15 +26,13 @@ async function call(
 ) {
   return page.evaluate(
     async ({ path, method, body, token }) => {
-      const setup = { "X-Openings-E2E-Setup": "1" };
-      const session = await fetch("/api/v1/auth/session", {
-        headers: setup,
-      }).then((response) => response.json());
+      const session = await fetch("/api/v1/auth/session").then((response) =>
+        response.json(),
+      );
       const response = await fetch("/api/v1" + path, {
         method,
         credentials: token ? "omit" : "same-origin",
         headers: {
-          ...setup,
           "Content-Type": "application/json",
           ...(token
             ? { Authorization: "Bearer " + token }

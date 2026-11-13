@@ -11,9 +11,8 @@ import {
 } from "./session";
 
 // Automated accessibility checks (axe) on every screen, in both themes; the
-// Playwright projects supply the desktop and the narrow width. The budget in
-// docs/developer/dashboard-design.md: no serious or critical finding against
-// WCAG 2.2 AA.
+// Playwright projects supply the desktop and the narrow width. The budget: no
+// serious or critical finding against WCAG 2.2 AA.
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 const SCREENS = [
@@ -132,11 +131,10 @@ test("an agent opens a run and the navigation shows its status line", async ({
   await go(page, "today");
   const workflow = `accessibility ${info.project.name} ${Date.now()}`;
   await page.evaluate(async (workflow) => {
-    const setup = { "X-Openings-E2E-Setup": "1" };
-    const json = { ...setup, "Content-Type": "application/json" };
-    const session = await fetch("/api/v1/auth/session", {
-      headers: setup,
-    }).then((response) => response.json());
+    const json = { "Content-Type": "application/json" };
+    const session = await fetch("/api/v1/auth/session").then((response) =>
+      response.json(),
+    );
     const agent = await fetch("/api/v1/tokens", {
       method: "POST",
       headers: { ...json, "X-CSRF-Token": session.csrf_token },
@@ -216,10 +214,7 @@ for (const theme of ["light", "dark"]) {
       await go(page, "today");
       const api = (path: string) =>
         page.evaluate(
-          (path) =>
-            fetch("/api/v1" + path, {
-              headers: { "X-Openings-E2E-Setup": "1" },
-            }).then((response) => response.json()),
+          (path) => fetch("/api/v1" + path).then((response) => response.json()),
           path,
         );
       const flagged = (await api("/jobs?signal=likely_duplicate&limit=1"))
@@ -278,10 +273,7 @@ for (const theme of ["light", "dark"]) {
       await go(page, "today");
       const api = (path: string) =>
         page.evaluate(
-          (path) =>
-            fetch("/api/v1" + path, {
-              headers: { "X-Openings-E2E-Setup": "1" },
-            }).then((response) => response.json()),
+          (path) => fetch("/api/v1" + path).then((response) => response.json()),
           path,
         );
       const ready = (
