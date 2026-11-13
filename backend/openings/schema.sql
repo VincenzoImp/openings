@@ -48,16 +48,19 @@ CREATE TABLE IF NOT EXISTS posting_details (
  checked_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS posting_details_job ON posting_details(job_id);
+-- applications: kept identical to db.APPLICATIONS. concluded_on is the day an
+-- application closed as no_response was concluded (schema 11).
 CREATE TABLE IF NOT EXISTS applications (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
  status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','applied','interview','offer','closed')),
- outcome TEXT CHECK(outcome IS NULL OR outcome IN ('accepted','rejected','not_pursued')),
+ outcome TEXT CHECK(outcome IS NULL OR outcome IN ('accepted','rejected','not_pursued','no_response')),
  note TEXT NOT NULL DEFAULT '', questions TEXT NOT NULL DEFAULT '[]', answers TEXT NOT NULL DEFAULT '{}',
  version INTEGER NOT NULL DEFAULT 1, idempotency_key TEXT UNIQUE, applied_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
  priority INTEGER CHECK(priority IS NULL OR priority BETWEEN 1 AND 5),
  deadline TEXT CHECK(deadline IS NULL OR (length(deadline)=10 AND date(deadline)=deadline)),
  requirements TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(requirements) AND json_type(requirements)='array'),
- ready_at TEXT, ready_by_kind TEXT, ready_by_id TEXT, ready_by_name TEXT, ready_by_token_kind TEXT
+ ready_at TEXT, ready_by_kind TEXT, ready_by_id TEXT, ready_by_name TEXT, ready_by_token_kind TEXT,
+ concluded_on TEXT CHECK(concluded_on IS NULL OR (length(concluded_on)=10 AND date(concluded_on)=concluded_on))
 );
 -- An agent run: opened by an API token, closed with a stored report.
 CREATE TABLE IF NOT EXISTS runs (
@@ -314,4 +317,20 @@ CREATE TABLE IF NOT EXISTS policy_items (
 );
 CREATE INDEX IF NOT EXISTS policy_items_section ON policy_items(section,position);
 INSERT OR IGNORE INTO policy_sections(section) VALUES ('decision'),('eligibility'),('writing'),('facts');
-PRAGMA user_version=10;
+-- Employer responses to sent applications (outcomes.py, schema 11). estimated marks a
+-- day the 0.20 upgrade took from updated_at because no stage-change event dated it.
+CREATE TABLE IF NOT EXISTS responses (
+ id TEXT PRIMARY KEY, application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+ kind TEXT NOT NULL CHECK(kind IN ('rejection','interview','offer','other')),
+ date TEXT NOT NULL CHECK(length(date)=10 AND date(date)=date),
+ note TEXT NOT NULL DEFAULT '',
+ estimated INTEGER NOT NULL DEFAULT 0 CHECK(estimated IN (0,1)),
+ origin TEXT NOT NULL DEFAULT 'manual' CHECK(origin IN ('manual','stage','upgrade')),
+ created_by_kind TEXT, created_by_id TEXT, created_by_name TEXT, created_by_token_kind TEXT,
+ updated_by_kind TEXT, updated_by_id TEXT, updated_by_name TEXT, updated_by_token_kind TEXT,
+ idempotency_key TEXT UNIQUE, version INTEGER NOT NULL DEFAULT 1,
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS responses_application ON responses(application_id,date);
+CREATE UNIQUE INDEX IF NOT EXISTS responses_once ON responses(application_id,kind,date) WHERE kind<>'other';
+PRAGMA user_version=11;

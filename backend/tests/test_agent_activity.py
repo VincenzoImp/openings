@@ -28,6 +28,7 @@ from openings.errors import DomainError
 from openings.operations import restore_database
 from openings.worker import Worker
 from openings.workspace import Workspace
+from outcome_fixtures import SCHEMA_ELEVEN_COLUMNS
 from schema_fixtures import (
     SCHEMA_EIGHT_COLUMNS,
     columns,
@@ -695,7 +696,7 @@ def test_schema_seven_upgrade_preserves_rows_and_matches_a_new_workspace(tmp_pat
                 continue
             assert sorted(columns(conn, table)) == sorted(columns(reference, table)), table
         for table, rows in before.items():
-            added = SCHEMA_EIGHT_COLUMNS.get(table, ())
+            added = SCHEMA_EIGHT_COLUMNS.get(table, ()) + SCHEMA_ELEVEN_COLUMNS.get(table, ())
             names = [row[0] for row in columns(conn, table) if row[0] not in added]
             assert (
                 conn.execute(f"SELECT {','.join(names)} FROM {table} ORDER BY 1").fetchall() == rows

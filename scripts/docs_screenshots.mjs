@@ -17,7 +17,11 @@ if (!base || !password || !out) {
   process.exit(2);
 }
 
-const browser = await chromium.launch();
+// The full Chromium shows PDFs in a frame, as the owner's browser does; the
+// headless shell cannot. Fall back to it when only the shell is installed.
+const browser = await chromium
+  .launch({ channel: "chromium" })
+  .catch(() => chromium.launch());
 const context = await browser.newContext({
   baseURL: base,
   viewport: { width: 1440, height: 1000 },
@@ -48,7 +52,10 @@ async function open(hash) {
   await settle();
 }
 async function settle() {
-  await page.waitForLoadState("networkidle");
+  // A PDF in a frame may keep the network busy in a browser without a viewer.
+  await page
+    .waitForLoadState("networkidle", { timeout: 8000 })
+    .catch(() => {});
   await page.waitForTimeout(400);
 }
 async function shot(name) {
@@ -71,12 +78,27 @@ async function shot(name) {
   await page.screenshot({ path: path.join(out, name + ".png") });
   console.log("captured", name);
 }
-async function applicationId(company) {
-  return page.evaluate(async (company) => {
-    const response = await fetch("/api/v1/applications?status=draft&limit=50");
-    const { items } = await response.json();
-    return items.find((item) => item.job?.company === company).id;
-  }, company);
+async function applicationId(company, title) {
+  return page.evaluate(
+    async ([company, title]) => {
+      const response = await fetch("/api/v1/applications?limit=200");
+      const { items } = await response.json();
+      return items.find(
+        (item) =>
+          item.job?.company === company && (!title || item.job?.title === title),
+      ).id;
+    },
+    [company, title],
+  );
+}
+/** The review page has read its record and its documents. */
+async function review(id, tab = "") {
+  await page.goto(`/#review?application=${id}${tab ? "&tab=" + tab : ""}`);
+  await page.reload();
+  await page.locator(".main h1").waitFor();
+  await page.waitForLoadState("load");
+  await page.locator(".loading").first().waitFor({ state: "detached" }).catch(() => {});
+  await page.waitForTimeout(1500);
 }
 
 await open("today");
@@ -95,33 +117,51 @@ if (!(await page.getByRole("heading", { name: "Possible duplicates" }).count()))
 await page.getByLabel("Confidence").selectOption("0.85");
 await shot("duplicates");
 
-await open("applications");
-await page.getByRole("button", { name: "Board", exact: true }).click();
-await page.getByLabel("Sort applications").selectOption("deadline");
+await open("applications?sort=deadline");
 await shot("applications");
 
-await page.getByRole("button", { name: "List", exact: true }).click();
-await settle();
-await page.getByLabel("Filter application stage").selectOption("draft");
-await page.getByLabel("Sort applications").selectOption("deadline");
-await settle();
-const boxes = page.locator(".application-select input");
-await boxes.nth(0).check();
-await boxes.nth(2).check();
+await open("applications?stage=preparing&sort=deadline");
+const boxes = page.locator("[role=table] [role=rowgroup] input[type=checkbox]");
+await boxes.nth(1).check();
+await boxes.nth(3).check();
 await shot("applications-planning");
 
-await open(`applications?application=${await applicationId("Northstar Labs")}`);
-await dialog().waitFor();
+await open("applications?view=board");
+await shot("applications-board");
+
+await open("applications?stage=applied&sort=applied");
+await page
+  .getByRole("row")
+  .filter({ hasText: "Tidewater Energy" })
+  .getByRole("button", { name: /^Record response/ })
+  .click();
+await page.getByRole("button", { name: "Rejection", exact: true }).click();
+await page.getByLabel("Note").fill("The role was filled internally.");
+await page.evaluate(() => document.activeElement?.blur());
+await shot("respond");
+
+await open("applications?section=insights");
+await shot("insights");
+
+await review(await applicationId("Fjord Analytics", "Python Engineer"));
+await shot("review");
+
+await review(await applicationId("Northstar Labs", "Python Engineer"), "documents");
+await page
+  .getByRole("list", { name: "Document revisions" })
+  .getByRole("button", { name: /^Open/ })
+  .first()
+  .click();
+await settle();
+await page.locator("#more").evaluate((tabs) => tabs.scrollIntoView());
 await shot("documents");
 
-await open(
-  `applications?application=${await applicationId("Lumen Health")}&detail=requirements`,
-);
-await dialog().waitFor();
+await review(await applicationId("Lumen Health"), "requirements");
+await page.locator("#more").evaluate((tabs) => tabs.scrollIntoView());
 await shot("requirements");
 
-await open(`applications?application=${await applicationId("Orbit Works")}`);
-await dialog().getByRole("region", { name: "Ready to apply" }).waitFor();
+await review(await applicationId("Orbit Works"), "details");
+await page.locator("#more").evaluate((tabs) => tabs.scrollIntoView());
 await shot("application-ready");
 
 await open("collection");
@@ -174,8 +214,8 @@ await open("activity?section=timeline");
 await page.getByRole("heading", { name: "Today", exact: true }).waitFor();
 await shot("activity-timeline");
 
-await open(`applications?application=${await applicationId("Lumen Health")}`);
-await dialog().getByRole("tab", { name: "History", exact: true }).click();
+await review(await applicationId("Sable Insurance"), "timeline");
+await page.locator("#more").evaluate((tabs) => tabs.scrollIntoView());
 await shot("application-history");
 
 await browser.close();

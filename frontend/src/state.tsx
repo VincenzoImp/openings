@@ -427,6 +427,7 @@ function affected(read: string, changed: string) {
       "career",
       "templates",
       "instructions",
+      "responses",
     ].includes(b);
   if (a === "career" || a === "templates") return b === "files";
   if (a === "documents") return b === "files";

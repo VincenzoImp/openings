@@ -738,7 +738,7 @@ def test_schema_nine_upgrade_copies_the_profile_and_touches_no_existing_row(tmp_
     workspace = Workspace(path)
     fresh = Database(tmp_path / "fresh.sqlite")
     with sqlite3.connect(path) as conn, sqlite3.connect(fresh.path) as reference:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 10
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert not conn.execute("PRAGMA foreign_key_check").fetchall()
         assert table_names(conn) == table_names(reference)

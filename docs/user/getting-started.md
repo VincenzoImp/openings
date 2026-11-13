@@ -27,7 +27,8 @@ names the agent while one of its runs is open.
 cards below answer three questions:
 
 - **Ready to apply:** the applications your agent marked ready, closest deadline
-  first, then priority. **Review** opens the application.
+  first, then priority. **Review** opens the application's review page, where
+  you check the CV and letter beside the posting and mark it applied.
 - **Needs your decision:** the agent's open questions, answered in place, and
   applications blocked by a requirement. **Not now** only folds the answer box
   away; the question stays open.
@@ -35,14 +36,14 @@ cards below answer three questions:
   each a link to its list), the agent's runs and collection **since your last
   visit**, and the applications **waiting for a reply** longer than the period of
   the "No reply" decision in your Policy (30 days when it has none), with
-  **Record replies** to open them.
+  **Record replies** to open them and **Close N as no reply**.
 
 "Since your last visit" starts where your previous visit ended: a visit lasts
 while Today keeps being opened and ends after 30 minutes without it, so reloading
 or looking at a run and coming back changes nothing. The browser remembers the
 visit; on the first visit, or when the browser keeps no site data, Today shows
-the last 7 days and says so. **Progress** at the bottom counts sent applications
-by the furthest stage they reached, for all time or a period.
+the last 7 days and says so. How your applications fare is under
+**Applications**, **Insights**.
 
 On a phone the bottom bar shows the four Work destinations and **More**, which
 opens Library and System. The top bar switches between the light and dark theme

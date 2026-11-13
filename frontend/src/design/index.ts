@@ -22,6 +22,10 @@ export { Split } from "./Split";
 export { Question, AnswerControls } from "./Question";
 export { Pipeline, Stats, Stat, type PipelineStep } from "./Pipeline";
 export { Chips, FilterBar, type ChipOption } from "./Chips";
+export { GridTable, GridRow, Cell } from "./Grid";
+export { RateBar, percent } from "./Rate";
+export { Panes, type PaneItem } from "./Panes";
+export { ResponseForm } from "./ResponseForm";
 export {
   ReportSection,
   CountList,

@@ -109,6 +109,74 @@ def seed_today(app, client, before_open_run):
             },
         )
 
+    # What employers answered: an interview, a rejection, an application closed as
+    # no reply and a Draft closed without being sent (left out of Insights).
+    with acting_as(OWNER):
+        for title, company, location, sent, moves in (
+            (
+                "Research Software Engineer",
+                "Alpine Research",
+                "Lausanne, Switzerland",
+                24,
+                [{"status": "interview", "response_date": (today - timedelta(days=16))}],
+            ),
+            (
+                "Engineering Lead",
+                "Northstar Labs",
+                "Zurich, Switzerland",
+                23,
+                [
+                    {
+                        "status": "closed",
+                        "outcome": "rejected",
+                        "response_date": (today - timedelta(days=11)),
+                        "response_note": "Position filled internally.",
+                    }
+                ],
+            ),
+            (
+                "Backend Engineer",
+                "Cedar Systems",
+                "Remote, Europe",
+                57,
+                [
+                    {
+                        "status": "closed",
+                        "outcome": "no_response",
+                        "concluded_on": (today - timedelta(days=12)),
+                    }
+                ],
+            ),
+            (
+                "Data Analyst",
+                "Orbit Works",
+                "Remote, Europe",
+                None,
+                [{"status": "closed", "outcome": "not_pursued"}],
+            ),
+        ):
+            application = start(title, company, location)
+            if sent:
+                application = workspace.update_application(
+                    application["id"],
+                    {
+                        "expected_version": application["version"],
+                        "status": "applied",
+                        "applied_at": ago(days=sent),
+                    },
+                )
+            for move in moves:
+                application = workspace.update_application(
+                    application["id"],
+                    {
+                        "expected_version": application["version"],
+                        **{
+                            key: value.isoformat() if hasattr(value, "isoformat") else value
+                            for key, value in move.items()
+                        },
+                    },
+                )
+
     with acting_as(OWNER):
         cedar = start("Site Reliability Engineer", "Cedar Systems", "Bern, Switzerland")
         asked = requests.create_request(

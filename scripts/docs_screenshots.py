@@ -39,9 +39,15 @@ def day(offset):
     return (TODAY + timedelta(days=offset)).isoformat()
 
 
-def synthetic_pdf(title):
-    """A one-page PDF with a single line of text, built without dependencies."""
-    stream = f"BT /F1 16 Tf 40 440 Td ({title}) Tj ET"
+def synthetic_pdf(title, lines=()):
+    """A one-page PDF with a title and a few lines of text, built without dependencies."""
+    escape = lambda text: text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    body = "".join(
+        f" 0 -22 Td ({escape(line)}) Tj" for line in lines if line.isascii()
+    )
+    stream = (
+        f"BT /F1 16 Tf 40 450 Td ({escape(title)}) Tj /F1 9 Tf 0 -12 Td{body} ET"
+    )
     objects = [
         "<< /Type /Catalog /Pages 2 0 R >>",
         "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -184,7 +190,9 @@ class Seeder:
             tex = "\\begin{document}\n" + "\n".join(line.replace("%", "\\%") for line in lines)
             tex += "\n\\end{document}\n"
             self.upload(document, "source.tex", "application/x-tex", tex.encode())
-            self.upload(document, f"{kind}.pdf", "application/pdf", synthetic_pdf(title))
+            self.upload(
+                document, f"{kind}.pdf", "application/pdf", synthetic_pdf(title, lines)
+            )
         if approve:
             current = self.call("GET", f"/documents/{document['id']}")
             self.call(
@@ -605,7 +613,59 @@ def seed(s: Seeder):
         outcome="not_pursued",
     )
 
+    answers(s)
     activity(s, lumen, cedar, orbit)
+
+
+def answers(s: Seeder):
+    """Applications sent weeks ago with the employers' answers, for Insights."""
+    history = [
+        # title, company, location, source, days ago sent, answer, days to answer
+        ("Data Engineer", "Basalt Analytics", "Zurich, Switzerland", "greenhouse", 70, "interview", 6),
+        ("Senior Data Engineer", "Fjordline Data", "Zurich, Switzerland", "lever", 64, "rejection", 12),
+        ("Data Engineer", "Granite Metrics", "Remote, Europe", "linkedin", 58, None, None),
+        ("Data Platform Engineer", "Larch Systems", "Basel, Switzerland", "greenhouse", 55, "interview", 9),
+        ("Analytics Engineer", "Meadow Health", "Zurich, Switzerland", "linkedin", 52, "rejection", 21),
+        ("Data Engineer", "Pine Logistics", "Remote, Europe", "indeed", 49, None, None),
+        ("Backend Engineer", "Quarry Bank", "Zurich, Switzerland", "linkedin", 46, "rejection", 4),
+        ("Backend Developer", "Rowan Retail", "Geneva, Switzerland", "indeed", 44, None, None),
+        ("Senior Backend Engineer", "Sable Insurance", "Zurich, Switzerland", "greenhouse", 41, "interview", 7),
+        ("Backend Engineer", "Thistle Payments", "Remote, Europe", "linkedin", 38, None, None),
+        ("Python Developer", "Umber Labs", "Basel, Switzerland", "lever", 35, "rejection", 10),
+        ("Platform Engineer", "Vale Energy", "Zurich, Switzerland", "greenhouse", 33, "offer", 25),
+        ("Site Reliability Engineer", "Willow Grid", "Remote, Europe", "linkedin", 30, None, None),
+        ("Data Engineer", "Yew Robotics", "Zurich, Switzerland", "ashby", 28, "rejection", 8),
+    ]
+    for title, company, location, source, sent, answer, after in history:
+        app = s.application(s.job(title, company, location, source), "applied")
+        app = s.patch_application(app, applied_at=f"{day(-sent)}T09:00:00+00:00")
+        if answer is None:
+            if sent > 45:
+                s.patch_application(app, status="closed", outcome="no_response")
+            continue
+        move = {
+            "interview": {"status": "interview"},
+            "offer": {"status": "offer"},
+            "rejection": {"status": "closed", "outcome": "rejected"},
+        }[answer]
+        if company != "Sable Insurance":
+            s.patch_application(app, **move, response_date=day(after - sent))
+            continue
+        # One application with a note on the answer and on the attempt, for its timeline.
+        s.patch_application(
+            app,
+            **move,
+            response_date=day(after - sent),
+            response_note="Phone screen with the hiring manager, then a technical round.",
+        )
+        s.owner(
+            "POST",
+            f"/jobs/{app['job_id']}/notes",
+            json={
+                "body": "Ask about the on-call rotation in the technical round.",
+                "application_id": app["id"],
+            },
+        )
 
 
 def activity(s: Seeder, lumen, cedar, orbit):

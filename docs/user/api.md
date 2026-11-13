@@ -37,6 +37,7 @@ Paste the posting when extraction cannot obtain the complete text.
 | Archive | `GET/POST /jobs`, `GET /jobs/resolve`, `GET /jobs/duplicates`, `POST /jobs/bulk`, `GET/PATCH/DELETE /jobs/{id}`, `POST /jobs/{id}/triage`, `/merge`, `GET/POST /jobs/{id}/notes` |
 | Notes | `GET/PATCH/DELETE /notes/{id}` plus job-owned list/create routes |
 | Applications | `GET/POST /applications`, `POST /applications/bulk`, `GET/PATCH/DELETE /applications/{id}`, `GET /applications/{id}/events`, `GET /applications/{id}/staleness`, `GET /staleness` |
+| Employer responses | `GET/POST /applications/{id}/responses`, `PATCH/DELETE /responses/{id}`; `GET /insights` |
 | Career | `GET/PATCH /career/profile`, CRUD `/career/knowledge` and `/career/claims`, `POST /career/import/preview` then `/career/import` |
 | Policy | `GET /policy`, `GET /policy/{section}`, `POST /policy/{section}/items`, `POST /policy/{section}/reorder`, `PATCH/DELETE /policy/items/{id}`, `POST /policy/items/{id}/confirm`, `/move` |
 | Templates/guidance | CRUD `/templates`, `GET/PATCH /instructions` |
@@ -122,15 +123,63 @@ an unresolved blocking requirement or leaving Preparing. `readiness=ready`,
 queue; the list also returns `ready_count`, and the overview `ready`.
 `applied_since` and `applied_until` filter by the time an application was
 recorded as applied: `status=applied&applied_until=2026-10-12` lists the ones
-still waiting for a reply since that day.
+still waiting for a reply since that day. `no_reply_due=true` lists the Applied
+applications sent longer ago than the no-reply period, and `ready=false` the
+Preparing ones not marked ready. Every list returns `no_reply`: the period in
+`days`, its `source` (`policy`, the number in the Decision item labelled "No
+reply", with `item_id` and whether it is `confirmed`; otherwise `default`, 30
+days) and how many applications are `due`. Each row has its `last_response`
+(`kind`, `date`, `estimated`, `count`) and `concluded_on`.
 Create and `PATCH` accept `priority` (1 highest to 5), `deadline` (`YYYY-MM-DD`)
 and `requirements`, a list of `{id, kind, text, blocking, resolved, note}`.
 A requirements patch replaces the whole list; keep existing `id` values. `null`
 clears `priority` or `deadline`.
 
 Application changes use `PATCH /applications/{id}` and its `expected_version`.
-Entering Closed requires an explicit outcome: `accepted`, `rejected` or
-`not_pursued`. Send `applied_at: null` to clear the submission date.
+Entering Closed requires an explicit outcome: `accepted`, `rejected` (by the
+employer), `not_pursued` (stopped by you) or `no_response` (no answer within the
+no-reply period; only for a sent application, with `concluded_on`, today by
+default). Send `applied_at: null` to clear the submission date.
+
+### Employer responses and insights
+
+A response records what an employer did about a sent application: `kind`
+(`rejection`, `interview`, `offer` or `other`), the `date` it arrived (not in the
+future), a `note`, who recorded it and a `version`. Moving an application to
+Interview or Offer, or closing it as `rejected` (or `accepted` without an offer
+on record) records the matching response; `response_date` and `response_note`
+on the same `PATCH` set its day (today by default) and note. A response of the
+same kind on the same day is never recorded twice.
+
+```json
+PATCH /applications/APPLICATION_ID
+{"expected_version": 6, "status": "interview", "response_date": "2026-11-06"}
+```
+
+`POST /applications/{id}/responses` with `{"kind": "other", "date":
+"2026-11-04", "note": "Asked for references.", "idempotency_key": "…"}` adds a
+response without moving the stage; it is refused with 409
+`application_not_sent` for an application never sent, and with 409
+`response_exists` (`details.response_id`) for a second one of a kind on a day.
+`PATCH /responses/{id}` corrects `kind`, `date` or `note` with
+`expected_version` (a corrected date is no longer `estimated`), and `DELETE
+/responses/{id}?expected_version=1` removes one. The application read lists its
+`responses`. Responses that the 0.20 upgrade derived from an application's stage
+have `origin: "upgrade"`; their day comes from the stage change that moved the
+application there, or is `estimated` from its last change.
+
+`GET /insights` reports how employers answered the sent applications: `sent`,
+`responded`, `interviews` (an interview or offer response), `offers`,
+`rejections`, `no_reply`, `waiting`, the `response_rate`, `interview_rate` and
+`offer_rate`, and the `median_days_to_response` (first response day minus the
+`applied_at` day), overall and in `groups` by `role_family`, `seniority`,
+`location`, `source_kind`, `source` and `month` applied, plus a
+`time_to_response` table. A rate is `null` with `withheld: "too_few_sent"` when
+fewer than `min_sample` applications (default 5, 1 to 100) were sent; a median
+needs as many dated answers. `applied_since` and `applied_until` narrow the
+sample. Drafts and attempts closed without being sent are counted in
+`excluded`, never in a rate. Role family and seniority come from the job title
+(see [Applications](applications.md#insights)).
 Updating `questions` without `answers` preserves compatible existing answers.
 Incompatible answers reject the update atomically; explicitly update or remove
 only the affected answer when that is intended.
@@ -293,8 +342,10 @@ nothing is merged automatically.
 ```
 
 `reopen` takes `status` (`draft`, `applied`, `interview` or `offer`) and only
-applies to Closed attempts; `delete` takes neither field. Each result item has
-`ok` and either `result` or `error`.
+applies to Closed attempts; `delete` takes neither field. Closing with
+`no_response` applies only to sent attempts; list them first with
+`GET /applications?no_reply_due=true`. Each result item has `ok` and either
+`result` or `error`.
 
 ## Collection recipes
 

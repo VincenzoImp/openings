@@ -11,7 +11,7 @@ import { plural } from "../../library/common";
 import type { Fresh } from "../../library/useFresh";
 import { QuestionItem } from "../activity/QuestionItem";
 import { useAct, type Links } from "../activity/records";
-import { applicationHref } from "./Ready";
+import { reviewHref } from "../applications/links";
 
 const role = (application: Application) =>
   [application.job?.title, application.job?.company]
@@ -28,10 +28,7 @@ function Blocked({ application }: { application: Application }) {
       lead={<Tag tone="danger">Blocking requirement</Tag>}
     >
       <div className="answer">
-        <a
-          className="btn sm"
-          href={applicationHref(application.id, "requirements")}
-        >
+        <a className="btn sm" href={reviewHref(application.id, "requirements")}>
           Open the requirements
         </a>
       </div>
@@ -79,7 +76,7 @@ export function Decisions({
             {moreBlocked > 0 && (
               <a
                 className="btn quiet sm"
-                href="#applications?readiness=blocked&view=list"
+                href="#applications?stage=preparing&readiness=blocked"
               >
                 {plural(moreBlocked, "more blocked application")}
               </a>

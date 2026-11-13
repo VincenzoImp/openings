@@ -26,6 +26,7 @@ from .duplicates import (
 from .errors import DomainError, conflict, missing
 from .identities import job_identities, normalize_url
 from .models import (
+    OUTCOMES,
     ApplicationBulk,
     ApplicationInput,
     ApplicationPatch,
@@ -37,6 +38,15 @@ from .models import (
     JobResolve,
     NoteInput,
     NotePatch,
+)
+from .outcomes import (
+    last_responses,
+    no_reply_cutoff,
+    no_reply_period,
+    not_sent,
+    record_response,
+    responses_of,
+    today,
 )
 from .posting import posting_complete, posting_complete_sql
 from .retention import REFRESH_EVENT, REFRESH_FIELDS, observation_payload
@@ -1036,6 +1046,8 @@ class Workspace:
             row["stale_inputs"] = application_staleness(connection, [application_id])[
                 application_id
             ]["inputs"]
+            row["responses"] = responses_of(connection, [application_id])[application_id]
+            row["last_response"] = last_responses(connection, [application_id])[application_id]
         return row
 
     @staticmethod
@@ -1081,8 +1093,19 @@ class Workspace:
         ready_until=None,
         applied_since=None,
         applied_until=None,
+        ready=None,
+        no_reply_due=None,
     ):
         conditions, args = [], []
+        with self.db.connect() as connection:
+            no_reply = no_reply_period(connection)
+        due_sql = "(app.status='applied' AND app.applied_at IS NOT NULL AND app.applied_at<?)"
+        cutoff = no_reply_cutoff(no_reply["days"])
+        if no_reply_due is not None:
+            conditions.append(due_sql if no_reply_due else "NOT " + due_sql)
+            args.append(cutoff)
+        if ready is not None:
+            conditions.append("app.ready_at IS " + ("NOT NULL" if ready else "NULL"))
         if readiness:
             if readiness not in READINESS:
                 raise DomainError(
@@ -1113,7 +1136,7 @@ class Workspace:
             conditions.append("app.status=?")
             args.append(status)
         if outcome:
-            if outcome not in ("accepted", "rejected", "not_pursued"):
+            if outcome not in OUTCOMES:
                 raise DomainError(422, "application_outcome", "Choose a valid application outcome.")
             conditions.append("app.outcome=?")
             args.append(outcome)
@@ -1138,7 +1161,7 @@ class Workspace:
             "ready": "app.ready_at IS NULL,app.ready_at,app.updated_at DESC",
         }.get(sort, "app.updated_at DESC")
         with self.db.connect() as connection:
-            projection = "app.id,app.job_id,app.status,app.outcome,app.version,app.applied_at,app.created_at,app.updated_at,"
+            projection = "app.id,app.job_id,app.status,app.outcome,app.version,app.applied_at,app.created_at,app.updated_at,app.concluded_on,"
             projection += "app.priority,app.deadline,"
             projection += "app.ready_at,app.ready_by_kind,app.ready_by_id,app.ready_by_name,"
             projection += "app.ready_by_token_kind,"
@@ -1169,8 +1192,13 @@ class Workspace:
             ):
                 counts[row["status"]] = row["n"]
                 ready_count += row["ready"]
-            preparation = self._application_preparation(connection, [row["id"] for row in rows])
-            staleness = application_staleness(connection, [row["id"] for row in rows])
+            identifiers = [row["id"] for row in rows]
+            preparation = self._application_preparation(connection, identifiers)
+            staleness = application_staleness(connection, identifiers)
+            answers = last_responses(connection, identifiers)
+            no_reply["due"] = connection.execute(
+                "SELECT count(*) FROM applications app WHERE " + due_sql, (cutoff,)
+            ).fetchone()[0]
         items = []
         for raw in rows:
             item = self._ready_by(
@@ -1179,12 +1207,14 @@ class Workspace:
             item["job"] = self._compact_job(raw)
             item["preparation"] = preparation[item["id"]]
             item["stale_inputs"] = staleness[item["id"]]["inputs"]
+            item["last_response"] = answers[item["id"]]
             items.append(item)
         return {
             "items": items,
             "total": total,
             "stage_counts": counts,
             "ready_count": ready_count,
+            "no_reply": no_reply,
         }
 
     def delete_application(self, application_id, expected_version, collect=True):
@@ -1400,7 +1430,9 @@ class Workspace:
         value = (
             value if isinstance(value, ApplicationPatch) else ApplicationPatch.model_validate(value)
         )
-        changes = value.model_dump(exclude_unset=True, exclude={"expected_version"})
+        changes = value.model_dump(
+            exclude_unset=True, exclude={"expected_version", "response_date", "response_note"}
+        )
         with self.db.transaction() as c:
             row = c.execute("SELECT * FROM applications WHERE id=?", (application_id,)).fetchone()
             check_version(row, value.expected_version)
@@ -1420,6 +1452,21 @@ class Workspace:
                         422, "application_outcome", "Close the application to record an outcome."
                     )
                 changes["outcome"] = None
+            # The day "no reply" was concluded belongs to that outcome only.
+            if changes["outcome"] == "no_response":
+                changes["concluded_on"] = (
+                    changes.get("concluded_on")
+                    or (row["concluded_on"] if row["outcome"] == "no_response" else None)
+                    or today()
+                )
+            elif changes.get("concluded_on"):
+                raise DomainError(
+                    422,
+                    "application_concluded_on",
+                    "concluded_on applies only to an application closed as no_response.",
+                )
+            else:
+                changes["concluded_on"] = None
             questions = (
                 changes.get("questions")
                 if changes.get("questions") is not None
@@ -1445,6 +1492,28 @@ class Workspace:
                 and "applied_at" not in changes
             ):
                 changes["applied_at"] = now()
+            sent = changes.get("applied_at", row["applied_at"])
+            if changes["outcome"] == "no_response" and not sent:
+                raise DomainError(
+                    409,
+                    "application_not_sent",
+                    "Only an application recorded as sent can be closed as no reply.",
+                )
+            answered = self._stage_responses(c, row, status, changes["outcome"])
+            given = value.response_date is not None or value.response_note is not None
+            if given and not answered:
+                raise DomainError(
+                    422,
+                    "application_response",
+                    "response_date and response_note apply only to a change that records an "
+                    "employer response: moving to Interview or Offer, or closing as rejected or "
+                    "accepted.",
+                )
+            if answered and not sent:
+                # A Draft closed as rejected was never sent: no employer answered it.
+                if given:
+                    raise not_sent()
+                answered = []
             actual = {}
             for key, val in changes.items():
                 if key == "status" and val is None:
@@ -1474,7 +1543,43 @@ class Workspace:
                     item["blocking"] and not item["resolved"] for item in changes["requirements"]
                 ):
                     self.clear_ready(c, application_id, "blocking_requirement")
+            for kind in answered:
+                record_response(
+                    self,
+                    c,
+                    row,
+                    kind,
+                    value.response_date or today(),
+                    value.response_note or "",
+                    origin="stage",
+                )
         return self.get_application(application_id, compact_job=True)
+
+    @staticmethod
+    def _stage_responses(conn, row, status, outcome):
+        """The employer responses a stage change records.
+
+        Reaching Interview from Preparing or Applied is an interview invitation;
+        reaching Offer from an earlier stage is an offer; closing as rejected is a
+        rejection; closing as accepted is an offer unless one is on record.
+        """
+        before, previous = row["status"], row["outcome"]
+        kinds = []
+        if status == "interview" and before in {"draft", "applied"}:
+            kinds.append("interview")
+        if status == "offer" and before in {"draft", "applied", "interview"}:
+            kinds.append("offer")
+        if status == "closed" and (before, previous) != ("closed", outcome):
+            if outcome == "rejected":
+                kinds.append("rejection")
+            elif (
+                outcome == "accepted"
+                and not conn.execute(
+                    "SELECT 1 FROM responses WHERE application_id=? AND kind='offer'", (row["id"],)
+                ).fetchone()
+            ):
+                kinds.append("offer")
+        return kinds
 
     def set_ready(self, application_id, value):
         """Mark a Preparing application ready to apply, or clear the mark.
@@ -1624,7 +1729,13 @@ class Workspace:
             {
                 "stage": s,
                 "count": 0,
-                "outcomes": {"waiting": 0, "rejected": 0, "not_pursued": 0, "accepted": 0},
+                "outcomes": {
+                    "waiting": 0,
+                    "rejected": 0,
+                    "not_pursued": 0,
+                    "accepted": 0,
+                    "no_response": 0,
+                },
             }
             for s in stages
         ]

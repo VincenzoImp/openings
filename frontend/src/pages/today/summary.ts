@@ -57,21 +57,3 @@ export function todaySummary(counts: TodayCounts, lastRun = ""): Summary {
     };
   return { lead: "Nothing is waiting for you.", rest: lastRun, quiet: true };
 }
-
-/** Days after which an application counts as waiting long, when the policy does not say. */
-export const DEFAULT_REPLY_DAYS = 30;
-/** The period of the policy's "No reply" decision item: a number, or text such as "45 days". */
-export function replyDays(items: { label: string; value: unknown }[]) {
-  for (const item of items) {
-    if (!/\bno[\s-]?(reply|response)\b/i.test(item.label)) continue;
-    const text =
-      typeof item.value === "number"
-        ? String(item.value)
-        : typeof item.value === "string"
-          ? (/^\s*(\d{1,4})(\s*days?)?\s*$/i.exec(item.value)?.[1] ?? "")
-          : "";
-    const days = text ? Number(text) : NaN;
-    if (Number.isInteger(days) && days >= 1 && days <= 3650) return days;
-  }
-  return DEFAULT_REPLY_DAYS;
-}

@@ -65,6 +65,75 @@ export async function call(
   );
 }
 
+/** A one-page PDF with one line of text. */
+export function syntheticPdf(text = "Synthetic application CV") {
+  const stream = `BT /F1 18 Tf 40 440 Td (${text}) Tj ET`;
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 400 500] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+  ];
+  let data = "%PDF-1.4\n";
+  const offsets = [0];
+  for (const [index, object] of objects.entries()) {
+    offsets.push(Buffer.byteLength(data));
+    data += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  }
+  const xref = Buffer.byteLength(data);
+  data +=
+    "xref\n0 6\n0000000000 65535 f \n" +
+    offsets
+      .slice(1)
+      .map((offset) => String(offset).padStart(10, "0") + " 00000 n \n")
+      .join("") +
+    `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Buffer.from(data);
+}
+
+/** Attach a file to a record as the test's own setup, not as a dashboard path. */
+export async function upload(
+  page: Page,
+  ownerType: string,
+  ownerId: string,
+  name: string,
+  bytes: Buffer,
+  mediaType = "application/pdf",
+) {
+  return page.evaluate(
+    async ({ ownerType, ownerId, name, data, mediaType }) => {
+      const setup = { "X-Openings-E2E-Setup": "1" };
+      const session = await fetch("/api/v1/auth/session", {
+        headers: setup,
+      }).then((response) => response.json());
+      const body = Uint8Array.from(atob(data), (char) => char.charCodeAt(0));
+      const ticket = await fetch("/api/v1/files/uploads", {
+        method: "POST",
+        headers: {
+          ...setup,
+          "Content-Type": "application/json",
+          "X-CSRF-Token": session.csrf_token,
+        },
+        body: JSON.stringify({
+          owner_type: ownerType,
+          owner_id: ownerId,
+          name,
+          size: body.length,
+          media_type: mediaType,
+        }),
+      }).then((response) => response.json());
+      const response = await fetch(ticket.url, {
+        method: ticket.method || "PUT",
+        headers: { ...setup, ...ticket.headers },
+        body,
+      });
+      if (!response.ok) throw Error(await response.text());
+    },
+    { ownerType, ownerId, name, data: bytes.toString("base64"), mediaType },
+  );
+}
+
 /** A card of a screen, by its heading. */
 export const card = (page: Page, title: string) =>
   page.locator("section.card").filter({

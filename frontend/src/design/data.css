@@ -1,0 +1,350 @@
+/* Grid table, rate bar, selection bar, board, response form and review panes:
+   what Applications and its review page are made of. */
+/* A scrolling container holds its hidden labels: they would widen the page. */
+.grid-wrap,
+.board {
+  position: relative;
+  overflow-x: auto;
+}
+.input.search {
+  width: 240px;
+}
+.review-more {
+  margin-top: var(--s5);
+  scroll-margin-top: calc(var(--topbar) + var(--s4));
+}
+.pane footer {
+  min-height: 49px;
+}
+.on-soft {
+  padding: var(--s3) var(--s4);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}
+.on-soft .caption {
+  color: var(--ink-2);
+}
+.list.requirements > li {
+  display: block;
+}
+.revision-row > .revision {
+  flex: 1 1 100%;
+}
+.grid-table {
+  min-width: 900px;
+}
+.grid-row {
+  display: grid;
+  grid-template-columns: var(--cols);
+  gap: 0 var(--s3);
+  align-items: center;
+  min-height: var(--row);
+  padding: var(--s2) var(--s4);
+  border-top: 1px solid var(--line);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 64px;
+}
+.grid-head .grid-row {
+  min-height: 0;
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  content-visibility: visible;
+}
+.grid-head + [role="rowgroup"] > .grid-row:first-child {
+  border-top: 0;
+}
+.grid-row > [role="cell"] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* A tag in a narrow cell wraps instead of running into the next column. */
+.grid-row .tag {
+  max-width: 100%;
+  white-space: normal;
+}
+.grid-row .full {
+  grid-column: 1 / -1;
+}
+.grid-row .actions {
+  justify-self: end;
+  white-space: nowrap;
+}
+.grid-row .meta,
+.grid-table .meta {
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+}
+.grid-row .title {
+  font-weight: 600;
+  text-decoration: none;
+}
+.grid-row a.title:hover {
+  text-decoration: underline;
+}
+.grid-row.is-selected,
+.grid-row.expansion {
+  background: var(--accent-soft);
+}
+.grid-row.expansion {
+  border-top: 0;
+  content-visibility: visible;
+}
+.is-selected .caption,
+.expansion .caption,
+.expansion .hint {
+  color: var(--ink-2);
+}
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+}
+.bulkbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  padding: var(--s2) var(--s4);
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--line);
+}
+.bulkbar .muted {
+  color: var(--ink-2);
+}
+
+/* A rate or share: the bar supports the number written beside it. */
+.meter {
+  height: 8px;
+  min-width: 56px;
+  border-radius: 999px;
+  background: var(--hover);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.meter > span {
+  display: block;
+  width: var(--value, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.meter.attention > span {
+  background: var(--attention);
+}
+.rate {
+  display: grid;
+  grid-template-columns: minmax(56px, 1fr) max-content;
+  align-items: center;
+  gap: var(--s3);
+  min-width: 150px;
+}
+.tiles .stats {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--s3);
+}
+.tiles .stat {
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.measure {
+  max-width: 68ch;
+}
+.insight-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s5);
+  align-items: start;
+}
+
+/* Board: one column per stage, scrolling inside its own container. */
+.board {
+  display: grid;
+  grid-template-columns: repeat(var(--columns, 5), minmax(190px, 1fr));
+  gap: var(--s3);
+  padding: var(--s4);
+  overflow-x: auto;
+}
+.board h3 {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 var(--s1) var(--s2);
+}
+.tile {
+  display: block;
+  margin-bottom: var(--s2);
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  text-decoration: none;
+}
+.tile:hover {
+  border-color: var(--line-strong);
+}
+.tile strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.tile .tags {
+  margin-top: var(--s1);
+}
+
+/* The form that records an employer response. */
+.respond {
+  display: grid;
+  grid-template-columns: max-content 168px minmax(0, 1fr) max-content;
+  gap: var(--s3) var(--s4);
+  align-items: end;
+  padding: var(--s2) 0;
+}
+.respond fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.respond legend {
+  padding: 0 0 var(--s1);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+.respond .segmented {
+  flex-wrap: wrap;
+}
+.respond-caption {
+  grid-column: 1 / -1;
+}
+
+/* Review: posting, CV and letter side by side; one at a time on a phone. */
+.panes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s4);
+}
+.pane,
+.pane > .card {
+  display: flex;
+  flex-direction: column;
+}
+.pane > .card {
+  flex: 1;
+}
+.pane .scroll {
+  flex: 1;
+  max-height: min(68vh, 760px);
+  overflow: auto;
+  padding: var(--s4);
+}
+.pane .frame {
+  height: min(64vh, 720px);
+  background: #fff;
+}
+.review-more .list > li {
+  padding-left: 0;
+  padding-right: 0;
+}
+.paper {
+  min-height: 100%;
+  padding: 28px 30px;
+  border: 1px solid var(--line-strong);
+  background: #fff;
+  color: #1d1d1b;
+  box-shadow: var(--shadow);
+  font: 12px/1.5 var(--serif);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.posting {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pane-switch {
+  margin-bottom: var(--s3);
+}
+.review-head {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: var(--s4);
+}
+.review-head h1 {
+  margin: var(--s2) 0 var(--s1);
+}
+@media (max-width: 860px) {
+  .grid-table {
+    min-width: 0;
+  }
+  /* Only a control in the head (select all) stays; the names go to the cells. */
+  .grid-head [role="columnheader"]:not(:has(input)) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .grid-head .grid-row:not(:has(input)) {
+    display: none;
+  }
+  .grid-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s2) var(--s3);
+    padding: var(--s3) var(--s4);
+    contain-intrinsic-size: auto 160px;
+  }
+  .grid-row .tags {
+    margin-top: var(--s1);
+  }
+  /* Touch targets of at least 24px in a stacked row. */
+  .grid-table input[type="checkbox"] {
+    width: 24px;
+    height: 24px;
+  }
+  .grid-row .title {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+  }
+  .grid-row > [data-empty] {
+    display: none;
+  }
+  .grid-row .primary {
+    flex: 1 1 60%;
+  }
+  .grid-row .full,
+  .grid-row .actions {
+    flex: 1 1 100%;
+  }
+  .grid-row [data-label]::before {
+    content: attr(data-label) ": ";
+    color: var(--ink-2);
+    font-size: var(--t-sm);
+  }
+  .bulkbar > strong {
+    flex: 1 1 100%;
+  }
+  .grow-row {
+    flex: 1 1 100%;
+  }
+  .search-field {
+    flex: 1 1 160px;
+  }
+  .input.search {
+    width: 100%;
+  }
+  .respond,
+  .insight-grid,
+  .panes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pane[data-shown="false"] {
+    display: none;
+  }
+  .pane .scroll {
+    max-height: none;
+  }
+}

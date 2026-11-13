@@ -1,6 +1,6 @@
 ---
 name: track-applications
-description: Review the Openings application pipeline - Draft readiness and priority, stale or expired postings, follow-ups and recorded outcomes - and record owner-reported progress without submitting anything.
+description: Review the Openings application pipeline - Draft readiness and priority, stale or expired postings, follow-ups, employer responses, no-reply closures and outcome insights - and record owner-reported progress without submitting anything.
 compatibility: Requires access to the Openings MCP server or REST API, as described in the openings-workspace skill.
 ---
 
@@ -72,19 +72,49 @@ posting or owner states, and an owner-agreed `priority`, on the application.
 
 ## Follow-ups and outcomes
 
-For Applied and Interview stages, report the time since the last recorded event
-and postings that disappeared. Suggest follow-ups; never send them.
+For Applied and Interview stages, report the time since the sent date and the
+last recorded response (`last_response` in the list), and postings that
+disappeared. Suggest follow-ups; never send them.
 
-When the owner reports a submission, interview, offer, rejection or withdrawal,
-record it with the current operation and expected version, with the date the
-owner gives. Use Closed with `not_pursued` only for the owner's or an authorized
-decision not to continue, never for an employer rejection.
+Record only outcomes the owner reported: never infer one from silence, mail or a
+portal. When the owner reports a submission, record Applied with `applied_at`.
+When the owner reports an employer's answer, record it with the day it arrived:
+
+- an interview, offer or rejection: `application_update` with the stage
+  (`interview`, `offer`, or `closed` with `outcome: "rejected"`), the current
+  `expected_version` and `response_date`; the matching response is recorded
+  with it. A second interview while already in Interview, or another answer
+  such as a request for references, is `responses_add` with `kind`
+  (`interview` or `other`), `date`, a short `note` and an `idempotency_key`;
+- a mistaken record: `responses_update` or `responses_remove` with the
+  response's `expected_version`. A response marked `estimated` got its date
+  from the upgrade; correct it when the owner knows the day.
+
+Use Closed with `not_pursued` only for the owner's or an authorized decision not
+to continue, never for an employer rejection.
+
+## No reply
+
+`applications_list` with `no_reply_due: true` lists Applied applications sent
+longer ago than the no-reply period; the result's `no_reply` gives the period's
+`days`, its `source` (`policy` or `default`, 30 days) and whether the owner
+`confirmed` the Policy item. Report them with their sent dates and propose
+closing them as no reply. Close them (`application_update` or
+`applications_bulk` with `outcome: "no_response"` and `concluded_on`, today
+when omitted) only when the owner asks or a confirmed "No reply" decision item
+says to; otherwise ask with one `questions_ask` that lists them. Never close an
+Interview or Offer as no reply.
 
 ## Patterns
 
-When enough outcomes exist, summarize employer responses (interview, offer,
-rejection, no reply) by role type, seniority, location and source, with counts.
+Read `insights_get` for employer answers: response, interview and offer rates,
+the median days to a first answer, and groups by role family, seniority,
+location, source kind, named source and month. A group below `min_sample`
+(default 5) has `withheld` instead of a rate: report its counts, never a rate
+computed from them, and do not lower `min_sample` to make a point. Drafts never
+sent are counted apart in `excluded`; dismissed jobs never had an application.
 Do not read Drafts the owner closed without applying as preferences: the owner
-applies to every feasible prepared Draft, and closures record feasibility. Present patterns as observations for the owner to weigh, not
-as changes to the policy. Report using the shared
+applies to every feasible prepared Draft, and closures record feasibility.
+Present patterns as observations for the owner to weigh, not as changes to the
+policy. Report using the shared
 [run report](../openings-workspace/references/run-report.md).

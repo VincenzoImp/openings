@@ -42,10 +42,22 @@
       "note": "The Rules tab edits the typed limits, the rule statements and the free-form rest of `rules` as rows."
     },
     "applications.update": {
-      "note": "Answers have one control per question; raw JSON is the advanced fallback."
+      "note": "Answers have one control per question on the review page. The response form moves the stage with `response_date` and `response_note` (Other uses `responses.add`), and closes as no reply with `concluded_on`."
     },
     "applications.list": {
-      "note": "The Ready to apply queue filters by `readiness=ready` with `sort=ready`; Today's Waiting for a reply and Record replies filter Applied by `applied_until`. The other time ranges serve agents and scripts."
+      "note": "The Preparing and Ready chips filter Draft by `ready=false` and `ready=true`; the Ready to apply queue filters by `readiness=ready` with `sort=ready`; Waiting for a reply and Close as no reply use `no_reply_due`. The other time ranges serve agents and scripts."
+    },
+    "responses.add": {
+      "note": "The response form builds its body in `pages/applications/recording.ts`, which sends `kind`, `date` and `note`; the Timeline's Record a response opens the same form."
+    },
+    "contexts.list": {
+      "note": "Inputs lists the application's frozen copies 20 at a time; `q` serves agents and scripts."
+    },
+    "templates.list": {
+      "note": "Templates and the frozen-copy dialog read the templates as one page of summaries; `offset` serves agents and scripts."
+    },
+    "insights.read": {
+      "note": "Insights uses the default minimum sample of 5 and `applied_since` for the last 90 days; `min_sample` and `applied_until` serve agents and scripts."
     },
     "runs.start": {
       "note": "Runs belong to API tokens: a dashboard session has no runs. Activity shows runs, their reports and their changes read-only."

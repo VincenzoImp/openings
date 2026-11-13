@@ -144,7 +144,43 @@ the application `version`: read it again before the next update.
 `applications_list` reads the queue with `readiness: "ready"`, `sort: "ready"`,
 `ready_since` and `ready_until`, and returns `ready_count`. `applied_since` and
 `applied_until` filter by the time an application was recorded as applied;
-with `status: "applied"`, `applied_until` lists those still waiting for a reply.
+`ready: false` with `status: "draft"` lists Preparing applications not marked
+ready.
+
+## Employer responses, no reply and insights
+
+`responses_list(application_id)`, `responses_add(application_id, value)`,
+`responses_update(response_id, value)` and `responses_remove(response_id,
+expected_version)` manage an application's employer answers. A response has
+`kind` (`rejection`, `interview`, `offer`, `other`), `date` (not in the future;
+today when omitted), `note`, `estimated`, `origin` (`manual`, `stage`,
+`upgrade`), who created and updated it, and `version`. Adding takes an
+`idempotency_key`; one per kind and day (except `other`) returns
+`409 response_exists` with `details.response_id`, and a Draft never sent returns
+`409 application_not_sent`. Adding never moves the stage; removing never moves
+it back. `application_get` returns `responses` and `last_response`; list rows
+carry `last_response`.
+
+`application_update` records the matching response when it moves a sent
+application: to `interview` from Preparing or Applied, to `offer` from an
+earlier stage, or to `closed` with `outcome: "rejected"` (accepting without an
+offer on record also records one). Closing a Draft never sent as rejected
+records nothing.
+It takes `response_date` (default today) and `response_note`; a duplicate is not
+added. Closing with `outcome: "no_response"` needs a sent application and takes
+`concluded_on` (default today). `applications_list` with `no_reply_due: true`
+lists Applied applications sent before the no-reply cutoff; every list result
+has `no_reply` with `days`, `source` (`policy` or `default`), `item_id`,
+`confirmed` and `due`. The period comes from the Policy decision item labelled
+"No reply" (its first number of days), else 30.
+
+`insights_get(value)` / `GET /insights` takes `min_sample` (1-100, default 5),
+`applied_since` and `applied_until`. It returns `overall` (sent, responded,
+interviews, offers, rejections, no reply, waiting, the three rates,
+`median_days_to_response`, `timed`, `undated`), `time_to_response` buckets,
+`groups` (`role_family`, `seniority`, `location`, `source_kind`, `source`,
+`month`) and `excluded` (`preparing`, `closed_unsent`). A rate or median below
+the sample is `null` with `withheld`.
 
 ## Requests for the agent
 

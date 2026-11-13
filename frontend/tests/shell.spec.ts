@@ -194,11 +194,48 @@ test("keyboard only: More opens, keeps focus, closes with Escape and navigates",
 test("design names are aliases and old routes keep their deep links", async ({
   page,
 }) => {
-  // Overview became Today; its links, with their period, open Today.
+  // Overview became Today; its links with a period open the Progress of
+  // Applications, Insights, where the numbers of Overview are now.
+  await go(page, "overview");
+  await expect(page).toHaveURL(/#today$/);
   await go(page, "overview?since=2026-01-01");
-  await expect(page.locator(".main h1")).toHaveText("Today");
-  await expect(page).toHaveURL(/#today\?since=2026-01-01$/);
+  await expect(page.locator(".main h1")).toHaveText("Applications");
+  await expect(page).toHaveURL(
+    /#applications\?since=2026-01-01&section=insights$/,
+  );
   await expect(page.getByLabel("Sent from")).toHaveValue("2026-01-01");
+  // The old Applications page: its stage filter and the drawer's address.
+  await go(page, "applications?status=draft&view=list");
+  await expect(page).toHaveURL(/#applications\?view=list&stage=preparing$/);
+  await expect(
+    page.getByRole("group", { name: "Stage" }).getByRole("button", {
+      name: /^Preparing/,
+    }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await go(page, "applications?readiness=ready&sort=ready");
+  await expect(page).toHaveURL(/#applications\?sort=ready&stage=ready$/);
+  const [first] = (
+    await page.evaluate(() =>
+      fetch("/api/v1/applications?status=applied&limit=1", {
+        headers: { "X-Openings-E2E-Setup": "1" },
+      }).then((response) => response.json()),
+    )
+  ).items;
+  await go(page, `applications?application=${first.id}&detail=history`);
+  await expect(page).toHaveURL(
+    new RegExp(`#review\\?application=${first.id}&tab=history$`),
+  );
+  await expect(page.getByRole("tab", { name: "Timeline" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await go(page, `today?application=${first.id}`);
+  await expect(page.locator(".main h1")).toHaveText(first.job.title);
+  const applications = page
+    .getByRole("navigation", { name: "Main" })
+    .getByRole("link", { name: /^Applications/ });
+  if (!isNarrow(page))
+    await expect(applications).toHaveAttribute("aria-current", "page");
   await go(page, "jobs?queue=dismissed");
   await expect(page).toHaveURL(/#inbox\?queue=dismissed$/);
   await expect(page.getByRole("tab", { name: "Dismissed" })).toHaveAttribute(
@@ -269,13 +306,28 @@ test("no horizontal page scroll from 360 to 1600 px on every screen", async ({
     test.info().project.name !== "chromium",
     "Widths are set by the test; one project is enough.",
   );
-  test.setTimeout(120000);
+  test.setTimeout(180000);
+  const api = (path: string) =>
+    page.evaluate(
+      (path) =>
+        fetch("/api/v1" + path, {
+          headers: { "X-Openings-E2E-Setup": "1" },
+        }).then((response) => response.json()),
+      path,
+    );
+  const ready = (await api("/applications?status=draft&ready=true&limit=1"))
+    .items[0];
+  const sent = (await api("/applications?status=interview&limit=1")).items[0];
   for (const width of [360, 390, 600, 860, 861, 1024, 1280, 1600]) {
     await page.setViewportSize({ width, height: 900 });
     for (const [route, title] of [
       ["today", "Today"],
       ["applications", "Applications"],
-      ["applications?view=list", "Applications"],
+      ["applications?view=board", "Applications"],
+      ["applications?section=insights", "Applications"],
+      [`review?application=${ready.id}`, ready.job.title],
+      [`review?application=${sent.id}&tab=timeline`, sent.job.title],
+      [`review?application=${ready.id}&tab=details`, ready.job.title],
       ["inbox", "Inbox"],
       ["activity", "Activity"],
       ["activity?section=requests", "Activity"],
