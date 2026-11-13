@@ -94,12 +94,10 @@ jobs:
       - run: uv sync --locked
       - run: npm --prefix frontend ci
       - run: npm --prefix frontend run build
-      - name: Browser tests, recording the requests the dashboard makes
-        run: npm --prefix frontend run test:e2e -- --project=chromium --project=chromium-mobile
-        env:
-          OPENINGS_PARITY_EVIDENCE: ${{ runner.temp }}/parity-evidence
-      - name: Parity gate (every operation has REST, MCP and a dashboard path the browser tests used)
-        run: uv run python scripts/parity_matrix.py --gate "$RUNNER_TEMP/parity-evidence"
+      # The runtime parity gate is gone: the quarantined documents spec was the
+      # only browser evidence for three operations, and #206 replaces the parity
+      # tooling with one test. `pytest` still checks the committed matrix.
+      - run: npm --prefix frontend run test:e2e -- --project=chromium --project=chromium-mobile
       - name: Upload Playwright traces
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
