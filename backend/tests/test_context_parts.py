@@ -614,7 +614,7 @@ def test_unreferenced_parts_and_bytes_are_collected_with_their_last_context(tmp_
     calls = {"each": 0, "once": 0}
     original = Database.collect_blobs
     monkeypatch.setattr(
-        "openings.workspace.collect_unused",
+        "openings.workspace.application_changes.collect_unused",
         lambda conn: calls.__setitem__("each", calls["each"] + 1),
     )
     monkeypatch.setattr(

@@ -6,7 +6,6 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-import openings.workspace as workspace_module
 from duplicate_benchmark import (
     benchmark_jobs,
     grouped_pairs,
@@ -30,7 +29,8 @@ from openings.duplicates import (
     DuplicateIndex,
     score_pair,
 )
-from openings.workspace import Workspace
+from openings.errors import DomainError
+from openings.workspace import Workspace, identity
 
 TEXT = " ".join(
     f"Plan dependable warehouse routes and review supplier change number {index} with care."
@@ -390,16 +390,16 @@ def test_one_job_is_scored_against_its_blocks_only(benchmark, monkeypatch):
     }
     assert workspace.likely_duplicates({"title": "Beekeeper", "company": "Nowhere"}) == []
     assert workspace.db.one("SELECT count(*) n, sum(version) v FROM jobs") == before
-    with pytest.raises(workspace_module.DomainError):
+    with pytest.raises(DomainError):
         workspace.likely_duplicates("absent")
 
 
 def test_features_are_read_again_only_for_changed_jobs(tmp_path, monkeypatch):
     workspace = Workspace(tmp_path / "workspace.sqlite")
     computed = []
-    original = workspace_module.job_features
+    original = identity.job_features
     monkeypatch.setattr(
-        workspace_module, "job_features", lambda job: computed.append(job["id"]) or original(job)
+        identity, "job_features", lambda job: computed.append(job["id"]) or original(job)
     )
     # Each new job is read once, for its likely-duplicate signal at ingest.
     jobs = [
@@ -502,9 +502,9 @@ def test_a_background_warm_up_spares_the_first_request(tmp_path, monkeypatch):
         )
     workspace.warm_duplicates().join(timeout=10)
     computed = []
-    original = workspace_module.job_features
+    original = identity.job_features
     monkeypatch.setattr(
-        workspace_module, "job_features", lambda job: computed.append(job["id"]) or original(job)
+        identity, "job_features", lambda job: computed.append(job["id"]) or original(job)
     )
     assert workspace.duplicate_jobs({})["items"][0]["size"] == 2
     assert computed == []
