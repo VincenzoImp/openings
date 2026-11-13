@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Dialog, Field } from "../../design";
 import { useWorkspace } from "../../state";
 
@@ -15,6 +15,9 @@ export function DismissDialog({
 }) {
   const { pending } = useWorkspace();
   const [reason, setReason] = useState("");
+  const field = useRef<HTMLInputElement>(null);
+  // After the dialog opened (its effect runs first): the reason is what to type.
+  useEffect(() => field.current?.focus(), []);
   return (
     <Dialog
       title={`Dismiss ${what}?`}
@@ -39,6 +42,7 @@ export function DismissDialog({
         </p>
         <Field label="Why (optional)" hint="Shown beside the dismissal.">
           <input
+            ref={field}
             value={reason}
             maxLength={500}
             onChange={(event) => setReason(event.target.value)}

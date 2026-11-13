@@ -207,7 +207,7 @@ test("import protection and nested dialogs restore scroll after browser Back", a
     .click();
   await expect(page.locator("dialog[open]")).toHaveCount(1);
   await page.goBack();
-  await expect(page.locator(".main h1")).toHaveText("Inbox");
+  await expect(page.locator(".main h1")).toHaveText("Jobs");
   await expect(page.locator("dialog[open]")).toHaveCount(0);
   await expect
     .poll(() => page.evaluate(() => document.body.style.overflow))

@@ -62,11 +62,11 @@ export default defineConfig({
       testIgnore: PERFORMANCE,
       use: { browserName: "webkit", viewport: { width: 390, height: 844 } },
     },
-    // The performance budget starts its own large workspace (5,000 jobs).
+    // The performance budget starts its own large workspace (25,000 jobs).
     {
       name: "chromium-performance",
       testMatch: PERFORMANCE,
-      timeout: 240000,
+      timeout: 300000,
       use: { browserName: "chromium", viewport: { width: 1440, height: 1000 } },
     },
   ],

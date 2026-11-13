@@ -156,7 +156,9 @@ test("policy items are added, edited, confirmed, switched, moved, reordered and 
     .filter({ hasText: rule });
   await expect(ruleRow).toContainText("Proposed");
   await expect(ruleRow).toContainText("Uses a signal: no longer listed");
-  await expect(ruleRow).toContainText("Signals arrive in a later release");
+  await expect(ruleRow).toContainText(
+    /It matches \d+ of the \d+ jobs? to review now/,
+  );
   await expect(ruleRow.locator(".actor")).toHaveClass(/agent/);
   const toggle = ruleRow.getByRole("switch");
   await expect(toggle).not.toBeChecked();

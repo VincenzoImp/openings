@@ -2,7 +2,7 @@
   "format": "openings-parity-notes-v1",
   "operations": {
     "jobs.resolve": {
-      "note": "No lookup of a job by URL, external key or title and company. Job details open Possible duplicates (`jobs.duplicates`) instead."
+      "note": "Add a job looks the address up when it is typed and offers to open the job already in the workspace; `source_key` serves collectors and scripts."
     },
     "sources.run": {
       "via": [
@@ -24,7 +24,7 @@
       "note": "Rows use `stale_inputs`, `stale_changes` and `stale_changes_total` in the application list; details use the per-application report. There is no workspace-wide staleness view."
     },
     "jobs.create": {
-      "note": "`raw` and `source_key` are collector fields for scripted imports."
+      "note": "Add a job sends the address, role, company, location and pasted text; other details are corrected afterwards as keys and values (`jobs.update`). `raw`, `source_key` and `source_id` are collector fields for scripted imports."
     },
     "applications.create": {
       "note": "Starting an application sends the job only; plan fields and questions are edited afterwards (`applications.update`)."
@@ -109,6 +109,21 @@
     },
     "runs.read": {
       "note": "The report counts all changes of a run and names the records of the first 100 (`changes_limit`); its link opens the timeline filtered by the run, which pages through every change. `changes_offset` serves agents and scripts."
+    },
+    "jobs.list": {
+      "note": "Jobs filters by tab (queue), search, signal, text completeness, who dismissed and rule, and the All tab by company, place, source, work style and added from; `posting_language`, `posting_language_not`, `requires`, `job_type`, `remote` and `created_until` also serve agents and scripts."
+    },
+    "jobs.update": {
+      "note": "Correct the job edits role, company, place, address, text and the other details as keys and values. `availability` is deprecated since 0.21: whether the source still lists the posting is the no_longer_listed signal."
+    },
+    "jobs.duplicates": {
+      "note": "A job's Possible copies lists its group at the default confidence; `queue`, `match_location` and `offset` page the workspace-wide list for agents and scripts."
+    },
+    "files.list": {
+      "note": "A job's Files lists all of its files; `q` serves agents and scripts."
+    },
+    "collection.yield": {
+      "note": "Yield offers the last 30 or 90 days and all time (`since`); `until` and `min_sample` serve agents and scripts."
     }
   }
 }
