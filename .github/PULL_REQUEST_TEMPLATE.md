@@ -18,7 +18,7 @@
 
 ## Contract
 
-- [ ] Business logic lives in shared services; dashboard, REST and MCP keep parity, and `operation-inventory.json` is updated for new operations
+- [ ] Business logic lives in shared services; dashboard, REST and MCP keep parity, and new operations are declared in `interfaces/` with `operation-inventory.json` regenerated
 - [ ] Versioned updates, immutable contexts/revisions, exact file ownership and deletion rules still hold
 - [ ] Database changes include a migration, backup/restore handling and a CHANGELOG note on the schema
 - [ ] Dashboard changes checked with populated data at desktop and mobile widths, keyboard access and loading/error states

@@ -114,6 +114,17 @@ or worktrees can overlap. Set `OPENINGS_E2E_PORT` to choose the port, for exampl
 token and stops before the first test if the port is already in use or the server
 that answers there is not the one it started.
 
+### Operation inventory
+
+`backend/openings/operation-inventory.json` is generated from the operation
+declarations in `backend/openings/interfaces/` and the remarks in
+`interfaces/inventory-notes.json`. After declaring or changing an operation,
+regenerate it; `pytest` fails while it is out of date:
+
+```bash
+uv run python scripts/inventory.py
+```
+
 ### Parity matrix
 
 [docs/developer/parity.md](docs/developer/parity.md) is generated from the operation
@@ -166,7 +177,7 @@ uv run python backend/tests/agent_roundtrip.py --tectonic /path/to/tectonic
 | `frontend` | React dashboard calling REST |
 | `examples` | Synthetic career data and LaTeX templates |
 | `skills/` | Agent workflow skills (Agent Skills format) and their shared references |
-| `scripts/` | Release version tool, package smoke check, parity matrix and documentation screenshots |
+| `scripts/` | Release version tool, package smoke check, operation inventory, parity matrix and documentation screenshots |
 | `docs/user` | Setup, workflow and operator guides |
 | `docs/developer` | Architecture and extension boundaries |
 

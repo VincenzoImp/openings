@@ -128,8 +128,8 @@ OPERATIONS = (
     ),
     Operation(
         "applications.staleness_list",
-        "applications",
-        "staleness_list",
+        "staleness",
+        "list",
         "Applications and documents",
         "List attempts whose current revisions use outdated inputs",
         params=(
@@ -146,8 +146,8 @@ OPERATIONS = (
     ),
     Operation(
         "applications.staleness",
-        "applications",
         "staleness",
+        "get",
         "Applications and documents",
         "Report whether an attempt's current revisions use outdated inputs",
         params=(Param("application_id", str),),

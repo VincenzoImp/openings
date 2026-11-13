@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openings.app import create_app
+from openings.interfaces import catalog, inventory_text
 
 
 def route_path(path):
@@ -46,6 +47,41 @@ async def test_operation_inventory_covers_runtime_interfaces(tmp_path):
         name for operation in inventory["operations"] for name in operation["mcp"]
     }
     assert all(tool.annotations is not None for tool in tools.values())
+
+
+def test_operation_inventory_is_generated_from_the_declarations():
+    """operation-inventory.json is what scripts/inventory.py writes from the declarations."""
+    path = Path(__file__).resolve().parents[2] / "backend/openings/operation-inventory.json"
+    assert path.read_text() == inventory_text(), "Run `uv run python scripts/inventory.py`."
+
+
+@pytest.mark.asyncio
+async def test_every_declared_route_tool_and_surface_is_registered(tmp_path):
+    """Declarations and the running app agree; each operation has a unique canonical name."""
+    app = create_app(tmp_path / "declared.sqlite", start_worker=False)
+    operations, exemptions, surfaces = catalog()
+    paths = app.openapi()["paths"]
+    for operation in operations:
+        for route in operation.rest:
+            schema = paths.get("/api/v1" + route.path.replace(":path", ""), {})
+            assert route.method.lower() in schema, (operation.id, route.method, route.path)
+            if not route.custom:
+                assert schema[route.method.lower()]["operationId"].startswith(route.name + "_")
+    for exemption in exemptions:
+        for route in exemption.rest:
+            if not route.absolute:
+                assert route.method.lower() in paths["/api/v1" + route.path], exemption.id
+    tools = {tool.name for tool in await app.state.mcp.list_tools()}
+    declared = {operation.tool.name for operation in operations if operation.tool}
+    assert tools == declared
+    templates = {item.uri_template for item in await app.state.mcp.list_resource_templates()}
+    prompts = await app.state.mcp.list_prompts()
+    assert templates == {surface.name for surface in surfaces if surface.kind == "resource"}
+    assert prompts and any(surface.kind == "prompt" for surface in surfaces)
+    names = [operation.canonical_name for operation in operations]
+    assert len(names) == len(set(names))
+    assert all(re.fullmatch(r"[a-z]+(_[a-z]+)*", name) for name in names)
+    assert len({operation.id for operation in operations}) == len(operations)
 
 
 def test_parity_matrix_is_current():

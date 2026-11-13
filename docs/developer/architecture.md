@@ -43,8 +43,8 @@ flowchart LR
 | `skills/` | Agent workflow skills (Agent Skills format) and their shared references |
 
 The [operation inventory](../../backend/openings/operation-inventory.json) is
-packaged with the app and served by authenticated `GET /api/v1/capabilities` and
-`capabilities_get`. OpenAPI at `/api/openapi.json` and discovered MCP schemas are
+generated from the operation declarations (see below), packaged with the app and
+served by authenticated `GET /api/v1/capabilities` and `capabilities_get`. OpenAPI at `/api/openapi.json` and discovered MCP schemas are
 authoritative for individual input fields. The generated
 [parity matrix](parity.md) shows each operation's REST route, MCP tool and real
 dashboard path, and lists every gap. Read [REST](../user/api.md) and
@@ -67,14 +67,50 @@ belongs to the module of its concern.
 | `documents/` | `contexts.py` frozen contexts and their staleness reports; `revisions.py` content validation, review, consistency and deletion; `files.py` owned files and scoped transfer grants; `models.py` inputs |
 | `career/` | `profile.py` Profile and instructions; `entries.py` Career entries; `claims.py`; `templates.py`; `imports.py`; `models.py` inputs and defaults; `records.py` row helpers shared with documents |
 | `policy/` | `service.py` item writes, confirmation and rule preview; `models.py` sections, the signal registry `SIGNALS` and inputs; `records.py` records as read and the frozen policy; `upgrade.py` the schema 9 to 10 step |
-| `interfaces/` | One module per area binding its service, with `register_api` for REST routes and `register_mcp` for MCP tools: `career.py`, `documents.py`, `discovery.py`, `activity.py`, `agent_requests.py`, `policy.py`, `outcomes.py`, `insights.py`, `source_yield.py`, `skills.py`; `core.py` (`register_core`, `register_core_mcp`: workspace, jobs, notes, applications, overview) and `system.py` (`register_system`, both transports: sign-in, tokens, inventory, backup, restore, examples, export) |
+| `interfaces/` | One module per area declaring its operations and binding them to its service: `core.py` (workspace, jobs, notes, applications, overview), `career.py`, `documents.py`, `discovery.py`, `activity.py`, `agent_requests.py`, `policy.py`, `outcomes.py`, `insights.py`, `source_yield.py`, `skills.py` and `system.py` (sign-in, tokens, inventory, backup, restore, examples, export); `registry.py` the declaration and its binding |
 
 Services never import FastAPI routing or MCP registration; `interfaces/` binds
-them, and `app.py` calls each area in a fixed order, which is the order of the
-OpenAPI paths and the MCP tool list. Smaller concerns stay single modules
-(`activity.py`, `outcomes.py`, `insights.py`, `staleness.py`, `job_signals.py`
-and the others in the code map). When a module approaches the limit, split it the
-same way rather than growing it.
+them, and `app.py` calls each area in a fixed order. Smaller concerns stay single
+modules (`activity.py`, `outcomes.py`, `insights.py`, `staleness.py`,
+`job_signals.py` and the others in the code map). When a module approaches the
+limit, split it the same way rather than growing it.
+
+## Operation declarations
+
+Each logical operation is declared once, as an `Operation` in its area's
+`interfaces/` module (`OPERATIONS`): its inventory id, group and label, its
+`resource` and `verb`, its parameters (`Param`), the service call, its REST
+routes (`Route`: method, path, route name, status code) and its MCP tool
+(`Tool`: name, annotations, description), and `access="owner"` where the service
+requires owner authority. `registry.bind_rest` and `registry.bind_mcp` generate
+the FastAPI routes and MCP tools from it, both calling the same service code:
+
+- A parameter is declared once with its MCP annotation and default; `Param.rest`
+  gives REST's when it differs (a query model through `query_model`, a bounded
+  integer). A route or tool can replace the parameters or the call for itself,
+  as when one tool has two REST routes.
+- `Tool.method` makes the service method itself the tool (Career, documents);
+  `Tool.offload` runs the call in a worker thread from an async tool, for tools
+  that reach the network; an async call makes both transports async.
+- `custom=True` marks a route or tool registered by hand next to the
+  declarations, because it needs the HTTP request, cookies, streamed bytes or
+  the MCP context: browser sessions, the password change, the inventory,
+  backup, restore, export, file transfers and `workspace_info`. It is still
+  declared, so the inventory lists it.
+- `EXEMPTIONS` declare the documented transport differences (session routes,
+  health, the MCP transport, examples, raw transfers, immutable records) and
+  `SURFACES` the hand-registered MCP resource and prompts.
+
+REST routes are registered in declaration order, which matters for matching
+(`/jobs/resolve` before `/jobs/{job_id}`); MCP tools follow the same order within
+an area. `canonical_name` (`<resource>_<verb>`) is the name of the naming scheme
+of decision 11; today every tool keeps its current `Tool.name`, and `aliases`
+will list the earlier names when the scheme is adopted.
+
+`scripts/inventory.py` writes `operation-inventory.json` from the declarations
+and `interfaces/inventory-notes.json`, which holds the inventory's order,
+dashboard locations and remarks. `pytest` fails while the file is out of date,
+or when a declared route, tool or surface is not registered.
 
 ## Data and workflow rules
 
@@ -365,8 +401,9 @@ cannot overwrite a current result. See [source configuration](../user/sources.md
 
 Add behavior in the shared service before exposing it through REST, MCP and the
 dashboard: the method goes in the module of its concern (see the module map),
-its route and tool in the area's `interfaces/` module. Update the operation
-inventory when adding an operation. Keep
+and one `Operation` declaration in the area's `interfaces/` module gives its
+route and tool. Add its dashboard location to `interfaces/inventory-notes.json`
+and run `uv run python scripts/inventory.py`. Keep
 operator/bootstrap and raw-byte transport differences explicit.
 
 Provider adapters emit bounded structured postings and use the shared HTTP gate.
