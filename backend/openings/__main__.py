@@ -1,10 +1,12 @@
 import argparse
 import ipaddress
+import logging
 import os
 
 import uvicorn
 
 from .app import create_app
+from .errors import DomainError
 
 
 def trusted_proxies(value):
@@ -45,8 +47,20 @@ def main():
     )
     args = parser.parse_args()
     options = proxy_options(args.trusted_proxies)
+    # Openings' own messages (pre-upgrade copies, backups, compaction) beside uvicorn's.
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
+    logger = logging.getLogger("openings")
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    try:
+        app = create_app(args.database)
+    except DomainError as error:
+        # A workspace that cannot be opened safely (format, room for the pre-upgrade copy).
+        raise SystemExit(f"Openings did not start: {error.message}") from None
     uvicorn.run(
-        create_app(args.database),
+        app,
         host=args.host,
         port=args.port,
         log_level="info",

@@ -89,6 +89,10 @@ an answer. The actions end the task:
   with the time, and its Ready history stays in the timeline. If the application
   is no longer ready (another session changed a document, for example), it is
   refused and says why; review it again.
+  Once it is marked, the next Ready application opens, in Today's order, and
+  the confirmation offers **Undo** for six seconds: it returns the application
+  to Ready, without a sent day. After the last Ready application the page says
+  **All sent** and links back to Today.
 - **Not pursuing** closes it as Not pursued; its documents and history stay.
 
 Below, six tabs hold the rest:

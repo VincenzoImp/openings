@@ -62,6 +62,10 @@ OWNER_ONLY_CALLS = {
     "tokens.create": ({"json": {"name": "Escalation"}}, {"value": {"name": "Escalation"}}),
     "tokens.revoke": ({}, {"token_id": "missing"}),
     "backup.restore": ({"content": b"SQLite format 3\x00"}, {}),
+    # REST only: kept copies never reach MCP (test_backups.py).
+    "backups.list": ({}, {}),
+    "backups.download": ({}, {}),
+    "backups.delete": ({}, {}),
     "questions.answer": (
         {"json": {"expected_version": 1, "answer": "Synthetic"}},
         {"question_id": "missing", "value": {"expected_version": 1, "answer": "Synthetic"}},
@@ -86,7 +90,7 @@ def test_owner_only_operations_refuse_an_agent_token_on_rest_and_mcp(tmp_path):
     app = create_app(tmp_path / "access.sqlite", start_worker=False)
     app.state.auth.setup("synthetic-password")
     agent = app.state.auth.create_token("Synthetic agent", "agent")["token"]
-    owner = app.state.auth.create_token("Synthetic owner token")["token"]
+    owner = app.state.auth.create_token("Synthetic owner token", "owner")["token"]
     marked = {
         operation.id: {
             "rest": [

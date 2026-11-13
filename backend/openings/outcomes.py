@@ -63,9 +63,12 @@ class ResponseInput(Input):
     kind: ResponseKind = Field(
         description="rejection, interview (an invitation), offer or other (any other employer answer)."
     )
-    date: str = Field(description="The day the employer responded: YYYY-MM-DD, not in the future.")
+    date: str = Field(
+        default_factory=today,
+        description="The day the employer responded: YYYY-MM-DD, not in the future; today when omitted.",
+    )
     note: str = Field(default="", max_length=2000)
-    idempotency_key: str | None = Field(default=None, max_length=100)
+    idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
 
     @field_validator("date")
     @classmethod

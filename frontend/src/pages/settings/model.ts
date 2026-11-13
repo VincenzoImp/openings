@@ -17,6 +17,32 @@ export interface Storage {
   retention_days: number;
   kept_runs_per_source: number;
 }
+/** A copy the server keeps: a daily backup or a copy taken before an upgrade. */
+export interface KeptBackup {
+  name: string;
+  kind: "scheduled" | "pre_upgrade";
+  size_bytes: number;
+  created_at: string;
+}
+export interface BackupAttempt {
+  attempted_at: string;
+  outcome: "ok" | "skipped" | "failed";
+  name: string | null;
+  error: string | null;
+}
+export interface KeptBackups {
+  items: KeptBackup[];
+  total: number;
+  schedule: {
+    enabled: boolean;
+    keep: number;
+    interval_hours: number;
+    last_at: string | null;
+    age_hours: number | null;
+    ok: boolean;
+    last_attempt: BackupAttempt | null;
+  };
+}
 export interface WorkspaceInfo {
   origin?: string;
   name?: string;

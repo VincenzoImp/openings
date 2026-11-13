@@ -13,7 +13,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 from starlette.background import BackgroundTask
 
-from .. import __version__
+from .. import __version__, backups
 from ..actors import current_actor, require_owner
 from ..auth import COOKIE, MAX_AGE
 from ..db import SCHEMA_VERSION
@@ -36,6 +36,7 @@ from .registry import (
     bind_mcp,
     bind_rest,
     capability_entries,
+    renamed,
 )
 
 
@@ -46,8 +47,8 @@ class PasswordInput(Input):
 class TokenInput(Input):
     name: str = Field(min_length=1, max_length=100)
     kind: Literal["owner", "agent"] = Field(
-        default="owner",
-        description="owner has full access; agent cannot change the owner password, manage tokens, restore a backup, answer questions for the owner or write requests for the agent.",
+        default="agent",
+        description="agent (the default) is scoped; owner has full access; agent cannot change the owner password, manage tokens, restore a backup, answer questions for the owner or write requests for the agent.",
     )
     idempotency_key: str | None = Field(
         default=None,
@@ -227,6 +228,35 @@ OPERATIONS = (
             "Reserve a scoped raw SQLite upload that replaces workspace data; installation authentication stays unchanged. Owner only: an agent token is refused with forbidden.",
         ),
     ),
+    # Kept copies hold the whole workspace, including the password hash, the session
+    # secret and token hashes: owner-only REST, never an MCP tool.
+    Operation(
+        "backups.list",
+        "backups",
+        "list",
+        GROUP,
+        "List scheduled backups and pre-upgrade copies",
+        access="owner",
+        rest=(Route("GET", "/backups", "backups", custom=True),),
+    ),
+    Operation(
+        "backups.download",
+        "backups",
+        "download",
+        GROUP,
+        "Download a scheduled backup or a pre-upgrade copy",
+        access="owner",
+        rest=(Route("GET", "/backups/{name}", "backup_file", custom=True),),
+    ),
+    Operation(
+        "backups.delete",
+        "backups",
+        "delete",
+        GROUP,
+        "Delete a pre-upgrade copy",
+        access="owner",
+        rest=(Route("DELETE", "/backups/{name}", "delete_backup_file", custom=True),),
+    ),
     Operation(
         "export.records",
         "workspace",
@@ -347,7 +377,7 @@ def register_system(router, mcp, workspace, auth, public_url):
         name="capabilities_get",
         description="Read the version, the schema, this token's kind and each operation's MCP name and main REST route; access is owner on owner-only operations. Use tools/list for tool schemas.",
         annotations=READ,
-    )(capabilities)
+    )(renamed(capabilities, "capabilities_get"))
 
     bind_rest(router, OPERATIONS, auth)
     bind_mcp(mcp, OPERATIONS, auth)
@@ -406,6 +436,36 @@ def register_system(router, mcp, workspace, auth, public_url):
         finally:
             workspace.maintenance = False
             workspace.db.remove_temp(name)
+
+    @router.get("/backups")
+    def backup_files():
+        require_owner("list the kept backups")
+        status = backups.status(workspace.db)
+        items = backups.listing(workspace.db)
+        return {
+            "items": items,
+            "total": len(items),
+            "schedule": {
+                "enabled": status["enabled"],
+                "keep": status["keep"],
+                "interval_hours": backups.INTERVAL_HOURS,
+                "last_at": status["last_at"],
+                "age_hours": status["age_hours"],
+                "ok": status["ok"],
+                "last_attempt": status["last_attempt"],
+            },
+        }
+
+    @router.get("/backups/{name}")
+    def backup_file(name: str):
+        require_owner("download a kept backup")
+        _, path = backups.find(workspace.db, name)
+        return FileResponse(path, media_type="application/vnd.sqlite3", filename=path.name)
+
+    @router.delete("/backups/{name}")
+    def delete_backup_file(name: str):
+        require_owner("delete a pre-upgrade copy")
+        return backups.delete_pre_upgrade(workspace.db, name)
 
     @router.get("/examples")
     def examples():
