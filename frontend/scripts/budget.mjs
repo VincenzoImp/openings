@@ -12,7 +12,7 @@ import { gzipSync } from "node:zlib";
 
 const KB = 1000;
 const BUDGET = { first: 110 * KB, later: 40 * KB, css: 15 * KB };
-const HOME = "src/pages/Overview.tsx";
+const HOME = "src/pages/Today.tsx";
 
 // A temporary allowance for one old page that cannot meet its budget yet:
 //   "src/pages/Name.tsx": { limit: 45 * KB, until: "stage 3", reason: "…" }

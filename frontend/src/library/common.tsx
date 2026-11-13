@@ -1,7 +1,32 @@
 // Small pieces the Library screens (Career, Policy, Templates) share.
 import type { ReactNode } from "react";
-import { Button, Dialog } from "../design";
+import { Button, Dialog, ErrorBanner, Loading } from "../design";
 import { useWorkspace } from "../state";
+import type { Fresh } from "./useFresh";
+
+/**
+ * The content of a card that reads a record: a loading line, the error with
+ * a retry, or the content once the record is there.
+ */
+export function Loaded<T>({
+  from,
+  label,
+  children,
+}: {
+  from: Fresh<T>;
+  /** What is loading: "Loading runs…". */
+  label: string;
+  children: (data: T) => ReactNode;
+}) {
+  if (from.error)
+    return (
+      <div className="body">
+        <ErrorBanner message={from.error} retry={from.reload} />
+      </div>
+    );
+  if (from.loading) return <Loading label={label} />;
+  return children(from.data);
+}
 
 export function PageHead({
   title,

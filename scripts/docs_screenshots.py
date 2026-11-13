@@ -540,6 +540,34 @@ def seed(s: Seeder):
         json={"expected_version": current["version"], "guidance": "Two pages. Publications first."},
     )
 
+    # Two more Drafts the agent hands over complete: Today lists them closest deadline first.
+    for title, company, location, source, fields in (
+        (
+            "Python Engineer",
+            "Fjord Analytics",
+            "Remote, Europe",
+            "ashby",
+            {"deadline": day(1), "priority": 1},
+        ),
+        (
+            "Data Platform Engineer",
+            "Quartz Systems",
+            "Basel, Switzerland",
+            "lever",
+            {"deadline": day(5), "priority": 1},
+        ),
+    ):
+        ready = s.application(s.job(title, company, location, source), **fields)
+        context = s.call("POST", "/contexts", json={"application_id": ready["id"]})
+        s.document(ready, context, "resume", "Engineering CV", cv_lines, approve=True)
+        s.document(ready, context, "cover_letter", "Cover letter", letter_lines, approve=True)
+        current = s.call("GET", f"/applications/{ready['id']}")
+        s.call(
+            "POST",
+            f"/applications/{ready['id']}/ready",
+            json={"expected_version": current["version"]},
+        )
+
     cedar = s.application(
         s.job("Site Reliability Engineer", "Cedar Systems", "Zurich, Switzerland", "indeed"),
         priority=4,
@@ -550,6 +578,13 @@ def seed(s: Seeder):
     s.application(
         s.job("Product Engineer", "Harbor Studio", "Geneva, Switzerland", "linkedin"), "applied"
     )
+    # Sent long ago without a reply: Today asks the owner to record what happened.
+    for title, company, location, source, days in (
+        ("Data Engineer", "Tidewater Energy", "Bern, Switzerland", "greenhouse", 63),
+        ("Analytics Engineer", "Sample Grid", "Remote, Europe", "lever", 51),
+    ):
+        sent = s.application(s.job(title, company, location, source), "applied")
+        s.patch_application(sent, applied_at=f"{day(-days)}T09:00:00+00:00")
     s.application(
         s.job("Research Software Engineer", "Alpine Research", "Lausanne, Switzerland", "rss"),
         "interview",

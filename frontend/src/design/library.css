@@ -493,17 +493,6 @@ img.frame {
 }
 
 /* Pieces of the Library screens */
-.card .body {
-  padding: var(--s4);
-}
-.card footer {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  flex-wrap: wrap;
-  padding: var(--s3) var(--s4);
-  border-top: 1px solid var(--line);
-}
 .card h2[tabindex],
 .card.detail {
   scroll-margin-top: calc(var(--topbar) + var(--s4));

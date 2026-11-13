@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
   errors.set(page, []);
   page.on("pageerror", (error) => errors.get(page)!.push(error.message));
   await page.context().addCookies(cookies);
-  await go(page, "overview");
+  await go(page, "today");
 });
 test.afterEach(async ({ page }) => {
   expect(errors.get(page)).toEqual([]);
@@ -45,7 +45,7 @@ test("keyboard only: skip link, navigation, theme and density", async ({
   ).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(main(page)).toBeFocused();
-  expect(page.url()).toContain("#overview");
+  expect(page.url()).toContain("#today");
 
   // Navigation by keyboard: focus the Applications link and press Enter.
   const nav = page.getByRole("navigation", { name: "Main" });
@@ -104,7 +104,7 @@ test("keyboard only: the sidebar reaches every destination in its group", async 
     "System",
   ]);
   await expect(nav.getByRole("link")).toHaveText([
-    /^Overview/,
+    /^Today/,
     /^Applications/,
     /^Jobs/,
     /^Activity/,
@@ -122,7 +122,7 @@ test("keyboard only: the sidebar reaches every destination in its group", async 
     order.push((await focused(page)).split(":")[1]);
   }
   expect(order.map((label) => label.replace(/\d.*$/, ""))).toEqual([
-    "Overview",
+    "Today",
     "Applications",
     "Jobs",
     "Activity",
@@ -143,7 +143,7 @@ test("keyboard only: More opens, keeps focus, closes with Escape and navigates",
   test.skip(!isNarrow(page), "The bottom bar exists on narrow screens.");
   const bar = page.getByRole("navigation", { name: "Main" });
   await expect(bar.getByRole("link")).toHaveText([
-    /^Overview/,
+    /^Today/,
     /^Applications/,
     /^Jobs/,
     /^Activity/,
@@ -194,9 +194,11 @@ test("keyboard only: More opens, keeps focus, closes with Escape and navigates",
 test("design names are aliases and old routes keep their deep links", async ({
   page,
 }) => {
-  await go(page, "today");
-  await expect(page.locator(".main h1")).toHaveText("Overview");
-  await expect(page).toHaveURL(/#overview$/);
+  // Overview became Today; its links, with their period, open Today.
+  await go(page, "overview?since=2026-01-01");
+  await expect(page.locator(".main h1")).toHaveText("Today");
+  await expect(page).toHaveURL(/#today\?since=2026-01-01$/);
+  await expect(page.getByLabel("Sent from")).toHaveValue("2026-01-01");
   await go(page, "jobs?queue=dismissed");
   await expect(page).toHaveURL(/#inbox\?queue=dismissed$/);
   await expect(page.getByRole("tab", { name: "Dismissed" })).toHaveAttribute(
@@ -212,7 +214,7 @@ test("design names are aliases and old routes keep their deep links", async ({
     await expect(jobs).toHaveAttribute("aria-current", "page");
   }
   await go(page, "no-such-screen");
-  await expect(page.locator(".main h1")).toHaveText("Overview");
+  await expect(page.locator(".main h1")).toHaveText("Today");
 });
 
 test("navigation counts come from the workspace and the agent line shows an open run", async ({
@@ -232,10 +234,11 @@ test("navigation counts come from the workspace and the agent line shows an open
     .getByRole("link", { name: /^Applications/ });
   if (ready)
     await expect(applications).toHaveAccessibleName(
-      new RegExp(`^Applications, ${ready} application`),
+      // Browsers differ on a space before the comma of the hidden count.
+      new RegExp(`^Applications ?, ${ready} application`),
     );
   else await expect(applications.locator(".count")).toHaveCount(0);
-  // No run is open in the synthetic workspace: the status line is absent.
+  // The status line shows exactly when a run is open (the synthetic agent has one).
   const runs = await api("/runs?status=open&limit=1");
   if (!isNarrow(page))
     await expect(page.locator(".sidebar-foot")).toHaveCount(runs.total ? 1 : 0);
@@ -270,11 +273,14 @@ test("no horizontal page scroll from 360 to 1600 px on every screen", async ({
   for (const width of [360, 390, 600, 860, 861, 1024, 1280, 1600]) {
     await page.setViewportSize({ width, height: 900 });
     for (const [route, title] of [
-      ["overview", "Overview"],
+      ["today", "Today"],
       ["applications", "Applications"],
       ["applications?view=list", "Applications"],
       ["inbox", "Inbox"],
       ["activity", "Activity"],
+      ["activity?section=requests", "Activity"],
+      ["activity?section=runs", "Activity"],
+      ["activity?section=timeline", "Activity"],
       ["career?section=knowledge", "Career"],
       ["career?section=claims", "Career"],
       ["policy", "Policy"],

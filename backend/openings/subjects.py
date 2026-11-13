@@ -23,9 +23,12 @@ def select(table, alias):
     return (
         f"SELECT {alias}.*,j.title AS job_title,j.company AS job_company,a.job_id AS application_job_id,"
         "aj.title AS application_title,aj.company AS application_company,"
-        f"k.title AS knowledge_title,k.organization AS knowledge_organization FROM {table} {alias} "
+        "k.title AS knowledge_title,k.organization AS knowledge_organization,"
+        # The workflow of the run the record belongs to, so a list names it without a read per row.
+        f"run.workflow AS run_workflow FROM {table} {alias} "
         f"LEFT JOIN jobs j ON j.id={alias}.job_id LEFT JOIN applications a ON a.id={alias}.application_id "
-        f"LEFT JOIN jobs aj ON aj.id=a.job_id LEFT JOIN knowledge k ON k.id={alias}.knowledge_id"
+        f"LEFT JOIN jobs aj ON aj.id=a.job_id LEFT JOIN knowledge k ON k.id={alias}.knowledge_id "
+        f"LEFT JOIN runs run ON run.id={alias}.run_id"
     )
 
 

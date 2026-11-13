@@ -85,7 +85,7 @@
       "mcp": [
         "overview_get"
       ],
-      "dashboard": "Overview: period selector and funnel",
+      "dashboard": "Today: Progress (period and stages reached); Decisions (jobs needing the full posting)",
       "notes": "since/until select the submitted-attempt cohort; counts are independent of loaded pages. ready counts Preparing attempts marked ready."
     },
     {
@@ -1036,7 +1036,7 @@
         "applications_list"
       ],
       "dashboard": "Applications: list/Kanban filters",
-      "notes": "q, job_id, status, outcome, company, readiness (blocked/none/missing_pdf/unreviewed/reviewed/ready), ready_since, ready_until, sort (updated/newest/oldest/company/stage/applied/deadline/priority/ready), limit, offset; job_id is exact; stage_counts and ready_count span all matching records. readiness=ready is the stored Ready step; reviewed passes every check but is not marked ready. Rows include priority, deadline, readiness, ready_at, ready_by and unresolved/blocking requirement counts; full requirements are on the attempt read."
+      "notes": "q, job_id, status, outcome, company, readiness (blocked/none/missing_pdf/unreviewed/reviewed/ready), ready_since, ready_until, applied_since, applied_until, sort (updated/newest/oldest/company/stage/applied/deadline/priority/ready), limit, offset; job_id is exact; stage_counts and ready_count span all matching records. readiness=ready is the stored Ready step; reviewed passes every check but is not marked ready. Rows include priority, deadline, readiness, ready_at, ready_by and unresolved/blocking requirement counts; full requirements are on the attempt read."
     },
     {
       "id": "applications.read",
@@ -1477,7 +1477,7 @@
       "mcp": [
         "events_list"
       ],
-      "dashboard": "Activity: Changes; run detail"
+      "dashboard": "Activity: Timeline; run report"
     },
     {
       "id": "runs.list",
@@ -1492,8 +1492,8 @@
       "mcp": [
         "runs_list"
       ],
-      "dashboard": "Activity: Runs",
-      "notes": "An open run without recent activity is reported as interrupted."
+      "dashboard": "Today: Since your last visit; Activity: Runs",
+      "notes": "status, workflow, token_id, started_since, started_until, active_since (last activity at or after a time). An open run without recent activity is reported as interrupted."
     },
     {
       "id": "runs.read",
@@ -1508,7 +1508,7 @@
       "mcp": [
         "runs_get"
       ],
-      "dashboard": "Activity: run detail"
+      "dashboard": "Activity: run report"
     },
     {
       "id": "runs.start",
@@ -1539,7 +1539,7 @@
       "mcp": [
         "runs_update"
       ],
-      "dashboard": "Activity: run detail (read only)",
+      "dashboard": "Activity: run report (read only)",
       "notes": "Runs belong to API tokens; a dashboard session has no runs."
     },
     {
@@ -1555,7 +1555,7 @@
       "mcp": [
         "runs_finish"
       ],
-      "dashboard": "Activity: run detail (read only)",
+      "dashboard": "Activity: run report (read only)",
       "notes": "Runs belong to API tokens; a dashboard session has no runs."
     },
     {
@@ -1571,7 +1571,7 @@
       "mcp": [
         "questions_list"
       ],
-      "dashboard": "Activity: Questions; navigation count"
+      "dashboard": "Today: Needs your decision; Activity: Questions; navigation count"
     },
     {
       "id": "questions.read",
@@ -1617,7 +1617,7 @@
       "mcp": [
         "questions_answer"
       ],
-      "dashboard": "Activity: Questions: answer",
+      "dashboard": "Today: Needs your decision; Activity: Questions: answer",
       "notes": "An answer is the owner's. An owner token records it only when the owner gave it.",
       "access": "owner"
     },

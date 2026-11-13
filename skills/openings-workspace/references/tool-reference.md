@@ -142,7 +142,9 @@ an `application_ready_cleared` event with `reason`: `document_created`,
 or `left_preparing` (`unmarked` for an explicit clear). Every clearing changes
 the application `version`: read it again before the next update.
 `applications_list` reads the queue with `readiness: "ready"`, `sort: "ready"`,
-`ready_since` and `ready_until`, and returns `ready_count`.
+`ready_since` and `ready_until`, and returns `ready_count`. `applied_since` and
+`applied_until` filter by the time an application was recorded as applied;
+with `status: "applied"`, `applied_until` lists those still waiting for a reply.
 
 ## Requests for the agent
 
@@ -172,7 +174,7 @@ one. `runs_update` stores a progress `note`; `runs_finish` closes the run with
 run's current `expected_version`. `runs_get` returns the report, the questions
 asked and a page of the changes made (`changes_limit`, `changes_offset`);
 `runs_list` filters by `status` (`open`, `finished`, `interrupted`), `workflow`,
-`token_id` and start time. An open run without a write or note for two hours is
+`token_id`, start time and `active_since` (last activity at or after a time). An open run without a write or note for two hours is
 reported as `interrupted`; it stays open, and a later write revives it.
 
 `questions_ask` takes `question`, `why`, optional `subject_type` (`job`,
@@ -189,8 +191,9 @@ name.
 
 `events_list` reads the change log, newest first, by `run_id`, `job_id`,
 `application_id`, `subject_type`/`subject_id`, `actor` (`owner`, `token`,
-`system`, `unknown`), `kind` or time. Every entry carries `actor` (for a token,
-with `token_kind` `owner` or `agent`), `run_id` and `subject`; `application_history` returns the same fields. Changes recorded
+`system`, `unknown`), `kind` or time; `subject_types` takes several kinds of
+record at once. Every entry carries `actor` (for a token, with `token_kind`
+`owner` or `agent`), `run_id` with `run_workflow`, and `subject`; `application_history` returns the same fields. Changes recorded
 before version 0.17 have the actor `unknown (before 0.17)`. Payloads hold
 identifiers, changed field names and versions, never record content. Deleting an
 application or forgetting a job removes that record's own history and leaves one
