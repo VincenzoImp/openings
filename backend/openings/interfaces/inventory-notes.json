@@ -98,19 +98,31 @@
     },
     {
       "id": "notes.list",
-      "dashboard": "Jobs: job timeline; Application review: Timeline"
+      "dashboard": "Jobs: job timeline; Application review: Timeline (through the timeline)",
+      "notes": "Every note of the job and its applications with scope, author, run, pinned and origin; pinned first, then newest first."
+    },
+    {
+      "id": "timeline.read",
+      "dashboard": "Jobs: job timeline; Application review: Timeline",
+      "notes": "One list of notes and attributed events, pinned notes first, then newest first. A job's timeline includes its applications' entries; an application's includes its job's, not those of the job's other applications. Filters: kinds (note, event, response), who (owner, agent, system, unknown), scope (job, application), since, until; counts per kind follow every filter but kinds. note_added and note_edited events are represented by the note. REST and MCP return identical entries."
     },
     {
       "id": "notes.read",
-      "dashboard": "Jobs: job timeline, Edit this note"
+      "dashboard": "Jobs: job timeline, Edit this note; Application review: Timeline, Edit this note"
     },
     {
       "id": "notes.create",
-      "dashboard": "Jobs: job timeline, Add the note; Application review: Timeline"
+      "dashboard": "Jobs: job timeline, Add the note; Application review: Timeline, Add the note; Details, Pinned note",
+      "notes": "application_id writes the note on that application of the job; pinned=true pins it. The note records its author and the author's open run."
     },
     {
       "id": "notes.update",
-      "dashboard": "Jobs: job timeline, Edit this note"
+      "dashboard": "Jobs: job timeline, Edit this note; Application review: Timeline, Edit this note; Details, Pinned note"
+    },
+    {
+      "id": "notes.pin",
+      "dashboard": "Jobs: job timeline, Pin/Unpin; Application review: Timeline, Pin/Unpin; Details, Pinned note, Unpin",
+      "notes": "expected_version; pinned (default true). At most one pinned note per job and per application: pinning unpins the note pinned in the same scope, with a note_unpinned event naming the replacement. Unpinning keeps the note."
     },
     {
       "id": "notes.delete",
@@ -339,17 +351,17 @@
     {
       "id": "applications.read",
       "dashboard": "Applications: attempt detail",
-      "notes": "readiness is derived from current revision leaves and unresolved blocking requirements; ready is reported only for an application marked ready (ready_at, ready_by) whose checks still pass."
+      "notes": "readiness is derived from current revision leaves and unresolved blocking requirements; ready is reported only for an application marked ready (ready_at, ready_by) whose checks still pass. pinned_note is the application's pinned note; note, its text, is deprecated since 0.22 and removed in 0.23."
     },
     {
       "id": "applications.create",
       "dashboard": "Jobs: Start application (the selected job or a Shortlist row)",
-      "notes": "At most one non-Closed attempt per job. A conflicting new request reports the active application ID; idempotency keys support retries. Starting retains saved interest and leaves the pending Shortlist queue; it never submits or generates documents. Optional priority (1 highest to 5), deadline (YYYY-MM-DD) and structured employer requirements."
+      "notes": "At most one non-Closed attempt per job. A conflicting new request reports the active application ID; idempotency keys support retries. Starting retains saved interest and leaves the pending Shortlist queue; it never submits or generates documents. Optional priority (1 highest to 5), deadline (YYYY-MM-DD) and structured employer requirements. note is deprecated since 0.22 (removed in 0.23): non-empty, it creates the application's pinned note."
     },
     {
       "id": "applications.update",
       "dashboard": "Applications: progress, planning, requirements and questions/answers",
-      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history. Entering Closed requires an explicit outcome: accepted, rejected, not_pursued or no_response (no answer within the no-reply period; only for a sent application, with concluded_on, today by default). Moving to Interview or Offer, or closing as rejected (or accepted without an offer on record) records the matching employer response, dated response_date (today by default) with response_note; a response of that kind on that day is never repeated, and its date stays correctable with responses.update. Reopening enforces one open attempt per job. applied_at, priority or deadline null clears the value. requirements replaces the whole list; keep existing ids. The returned job is the compact job summary. Leaving Preparing or adding/unresolving a blocking requirement clears the stored Ready step."
+      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history. Entering Closed requires an explicit outcome: accepted, rejected, not_pursued or no_response (no answer within the no-reply period; only for a sent application, with concluded_on, today by default). Moving to Interview or Offer, or closing as rejected (or accepted without an offer on record) records the matching employer response, dated response_date (today by default) with response_note; a response of that kind on that day is never repeated, and its date stays correctable with responses.update. Reopening enforces one open attempt per job. applied_at, priority or deadline null clears the value. requirements replaces the whole list; keep existing ids. The returned job is the compact job summary. Leaving Preparing or adding/unresolving a blocking requirement clears the stored Ready step. note is deprecated since 0.22 (removed in 0.23): it edits the pinned note, adds it pinned when there is none, or unpins it when empty, without changing the application version."
     },
     {
       "id": "applications.ready",
@@ -368,7 +380,8 @@
     },
     {
       "id": "applications.history",
-      "dashboard": "Applications: history"
+      "dashboard": "Application review: Timeline (through the timeline)",
+      "notes": "The application's events only; timeline.read lists them with its notes and its job's entries."
     },
     {
       "id": "responses.list",

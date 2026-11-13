@@ -35,7 +35,7 @@ Paste the posting when extraction cannot obtain the complete text.
 | Area | Routes under `/api/v1` |
 |---|---|
 | Archive | `GET/POST /jobs`, `GET /jobs/resolve`, `GET /jobs/duplicates`, `POST /jobs/bulk`, `GET/PATCH/DELETE /jobs/{id}`, `POST /jobs/{id}/triage`, `/merge`, `/distinct`, `GET/POST /jobs/{id}/notes` |
-| Notes | `GET/PATCH/DELETE /notes/{id}` plus job-owned list/create routes |
+| Notes and timelines | `GET/PATCH/DELETE /notes/{id}`, `POST /notes/{id}/pin` plus job-owned list/create routes; `GET /jobs/{id}/timeline`, `GET /applications/{id}/timeline` |
 | Applications | `GET/POST /applications`, `POST /applications/bulk`, `GET/PATCH/DELETE /applications/{id}`, `GET /applications/{id}/events`, `GET /applications/{id}/staleness`, `GET /staleness` |
 | Employer responses | `GET/POST /applications/{id}/responses`, `PATCH/DELETE /responses/{id}`; `GET /insights` |
 | Career | `GET/PATCH /career/profile`, CRUD `/career/knowledge` and `/career/claims`, `POST /career/import/preview` then `/career/import` |
@@ -274,18 +274,60 @@ they are still stored and returned. Template `rules` hold the typed limits,
 `statements` (a list of `{id, label, statement, scope, position}`; `id` and
 `position` are filled in) and any other free-form key.
 
+## Notes and the timeline
+
+A note belongs to a job, or to one of its applications when `application_id` is
+given. It records its `author` and, for a token with an open run, that `run`.
+`pinned: true` pins it on creation; `POST /notes/{id}/pin` with
+`{"expected_version": N, "pinned": true}` pins an existing note and `false`
+unpins it. A job and an application each have at most one pinned note: pinning
+another one unpins it, with a `note_unpinned` change naming the replacement.
+
+```bash
+# A pinned note on an application: its standing guidance.
+curl -sS -X POST "$OPENINGS_URL/api/v1/jobs/$JOB/notes" -H "Authorization: Bearer $OPENINGS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"body": "Lead with the platform work.", "application_id": "'"$APPLICATION"'", "pinned": true}'
+# The application's notes and changes with its job's, notes and responses only.
+curl -sS "$OPENINGS_URL/api/v1/applications/$APPLICATION/timeline?kinds=note&kinds=response&limit=50" \
+  -H "Authorization: Bearer $OPENINGS_TOKEN"
+```
+
+`GET /jobs/{id}/timeline` lists the notes and recorded changes of a job and of
+all its applications; `GET /applications/{id}/timeline` those of one
+application and of its job, not of the job's other applications. Pinned notes
+come first, then everything newest first. Each entry has `type` (`note` or
+`event`), `kind` (`note`, `event`, or `response` for an employer response
+recorded, corrected or removed), `scope` (`{"type": "job" | "application",
+"id"}`), `actor`, `run` and either `note` (`body`, `version`, `updated_at`,
+`pinned`, `pinned_at`, `origin`) or `event` (`kind`, `payload`, `subject`).
+Event payloads hold identifiers, field names and versions, never text; adding
+or editing a note is shown by the note itself. Filters: `kinds`, `who` (`owner`
+for the dashboard or an owner token, `agent`, `system`, `unknown`), `scope`
+(`job` or `application`), `since` and `until`; `counts` gives the entries of
+each kind for the other filters; `limit` (at most 200) and `offset` page.
+`timeline_get` returns the same entries over MCP.
+
+The application `note` field is deprecated since 0.22 and is removed in 0.23.
+`GET /applications/{id}` returns `pinned_note` (the note record, or null) and
+`note`, its text. On create and `PATCH`, `note` still works: it edits the pinned
+note, adds one pinned when there is none, or unpins it when empty, without
+changing the application's version. `q` on the application list searches the
+pinned notes. A frozen context carries the pinned note as `application.note`
+and `instructions.application_note`, as before.
+
 ## Runs, questions and the change log
 
 Each write records its actor: `owner` for the dashboard session, `token` with the
 token's id, name and `token_kind` (`owner` or `agent`), or `system`. History entries (`GET /applications/{id}/events`,
 `GET /events`, the overview activity) return `actor`, `run_id` and `subject`;
-notes return `author`. Entries from before version 0.17 have
+notes return `author` and `run`. Entries from before version 0.17 have
 `actor.kind = "unknown"`. A source refresh is an entry only when it changed the
 title, company, location or posting text (`job_refreshed`, with the field names);
 the `posting_updated` kind of earlier releases no longer exists.
 
 `GET /workspace` and `workspace_info` return `schema_version` (the database
-schema of this release, 12 in 0.21) and `storage`: `database_bytes`,
+schema of this release, 13 in 0.22) and `storage`: `database_bytes`,
 `free_bytes` on the data volume, `restore_limit_bytes` (the largest backup a
 restore accepts now), `restore_limit_configured_bytes` (the optional
 `OPENINGS_MAX_RESTORE_MB` bound, or null), `retention_days` and

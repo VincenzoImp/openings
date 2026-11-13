@@ -66,7 +66,7 @@
       "note": "Runs belong to API tokens: a dashboard session has no runs."
     },
     "events.list": {
-      "note": "The Activity timeline filters changes by who made them (owner, API tokens or one token, system, not recorded), by kind of record (`subject_types`), by period and by run; the job, application and subject filters serve the record histories, agents and scripts."
+      "note": "The Activity timeline filters changes by who made them (owner, API tokens or one token, system, not recorded), by kind of record (`subject_types`), by period and by run; the job, application and subject filters serve agents and scripts; the job and application timelines read `timeline.read`."
     },
     "runs.list": {
       "note": "Activity filters runs by status; Today lists the runs active since the last visit (`active_since`). The workflow, token and start-time filters serve agents and scripts."
@@ -88,6 +88,21 @@
     },
     "requests.list": {
       "note": "Activity filters requests by state and the Ask your agent dialog by subject; `run_id` and `updated_since` serve agents."
+    },
+    "notes.list": {
+      "via": [
+        "timeline.read"
+      ],
+      "note": "The job and application timelines list every note with its scope, author, run and pin."
+    },
+    "applications.history": {
+      "via": [
+        "timeline.read"
+      ],
+      "note": "The application's Timeline lists its events with its notes and its job's entries."
+    },
+    "timeline.read": {
+      "note": "The timelines filter by kind (notes, changes, responses), who, scope (on an application) and period, and page by 30; `limit` up to 200 serves agents and scripts."
     },
     "requests.read": {
       "via": [

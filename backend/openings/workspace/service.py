@@ -16,6 +16,7 @@ from .job_changes import JobChanges
 from .jobs import JobReads
 from .notes import Notes
 from .overview import Overview
+from .timeline import Timeline
 
 
 class Workspace(
@@ -23,6 +24,7 @@ class Workspace(
     JobChanges,
     JobIdentity,
     Notes,
+    Timeline,
     ApplicationReads,
     ApplicationChanges,
     BulkChanges,

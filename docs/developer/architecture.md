@@ -62,7 +62,7 @@ belongs to the module of its concern.
 
 | Package | Modules |
 |---|---|
-| `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage, rule dismissals and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py`; `applications.py` derived readiness, preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, responses, Ready and deletion; `bulk.py` per-item bulk results; `overview.py` the funnel |
+| `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage, rule dismissals and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py` notes, their author, run and pin, and the deprecated application note; `timeline.py` the timeline of a job or an application; `timeline_upgrade.py` the timeline part of the schema 12 to 13 step; `applications.py` derived readiness, preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, responses, Ready and deletion; `bulk.py` per-item bulk results; `overview.py` the funnel |
 | `discovery/` | `service.py` the provider gate (`http_budget`, `fetch_bytes`); `models.py` typed inputs; `network.py` the public-address policy and the bounded fetch; `resolution.py` board detection and source configuration; `feeds.py` posting readers (Lever, Ashby, RSS) and adapter dispatch; `sources.py` source schemas, preview and writes; `runs.py` the global switch, provider policies, queueing, scheduling and run records; `tasks.py` leases, retry and running one collection |
 | `documents/` | `contexts.py` frozen contexts and their staleness reports; `revisions.py` content validation, review, consistency and deletion; `files.py` owned files and scoped transfer grants; `models.py` inputs |
 | `career/` | `profile.py` Profile and instructions; `entries.py` Career entries; `claims.py`; `templates.py`; `imports.py`; `models.py` inputs and defaults; `records.py` row helpers shared with documents |
@@ -223,6 +223,21 @@ or when a declared route, tool or surface is not registered.
   for a token with an open run, that run. Payloads hold identifiers, field names
   and versions, never content. Events of a job or application are deleted with
   it; the deletion itself stays recorded.
+- **Timeline:** a note belongs to a job, or to one of its applications
+  (`application_id`), and records its author and run. A job and an application
+  each have at most one pinned note (`pinned_at`; two partial unique indexes);
+  pinning a note unpins the previous one, both recorded as `note_pinned` and
+  `note_unpinned`. `Workspace.timeline` is the one read of a job's or an
+  application's notes and events: a `UNION ALL` of both tables with the scope
+  (`job`, or `application` when the row has an `application_id`), the kind
+  (`note`, `event`, or `response` for an event whose subject is a response), the
+  actor and the run, filtered by kind, who, scope and period, ordered pinned
+  first and then by time, with counts by kind. An application's timeline holds
+  its rows and its job's rows without an application. `note_added` and
+  `note_edited` are not entries: the note is. The application's pinned note is
+  what the deprecated `application.note` reads and writes until 0.23, and what
+  a new context freezes as `application.note` and
+  `instructions.application_note`.
 - **Runs and questions:** a token has one open run (a partial unique index); its
   writes attach to it. A run without activity is reported as interrupted but
   only an explicit supersede closes it. A finished run stores its report and
@@ -277,7 +292,18 @@ memory and releasing SQLite readers before cancellation or thread changes.
 Backups use SQLite's online backup API. A restore preserves
 installation authentication, recent provider request history and later cooldowns.
 
-Workspaces and backups use schema 12 (0.21). Opening schema 11 is an additive
+Workspaces and backups use schema 13 (0.22), the breaking group. The timeline
+part of `_migrate_12_to_13` (`workspace/timeline_upgrade.py`) adds `run_id`,
+`pinned_at` and `origin` to `notes`, copies each non-empty `applications.note`
+into one pinned note of its application (`origin='upgrade'`) attributed to the
+actor and run of the last event that set it (the last `application_updated`
+naming `note`, else `application_created`) and dated by it, else by the
+application's `updated_at`, compares every copy with its source byte for byte,
+then drops `applications.note`. It writes no event and changes no other value;
+frozen contexts are not touched. Restore accepts schema 13 and upgrades a copy
+of a schema 5 to 12 backup.
+
+Schema 12 (0.21) was an additive change. Opening schema 11 is an additive
 change in one transaction (`_migrate_11_to_12`): it adds the `skill_notes` table
 (`skill_notes.migrate`) and, through `job_signals.migrate`, the `job_signals`
 table, the dismissal record columns of `jobs` (`dismissed_at`, `dismissed_by_*`,
@@ -358,8 +384,8 @@ applications gain `ready_at` with who set it, API tokens gain a kind, and the
 owner tokens with unchanged access. Schema 6 is upgraded through schema 7 in the same
 transaction (application priority, deadline and requirements), and schema 5
 through schema 6 (removing obsolete derived data and preserving owned records and
-immutable snapshots). Restore accepts schema 12 and upgrades a copy of a schema 5,
-6, 7, 8, 9, 10 or 11 backup. Other historical formats require the matching release.
+immutable snapshots). Restore accepts schema 13 and upgrades a copy of a schema 5,
+6, 7, 8, 9, 10, 11 or 12 backup. Other historical formats require the matching release.
 
 ## Acquisition
 

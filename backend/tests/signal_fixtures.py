@@ -3,6 +3,8 @@
 import sqlite3
 from contextlib import closing
 
+from timeline_fixtures import make_schema_twelve
+
 # What schema 12 (0.21) added to a schema 11 file.
 # skill_notes is the local notes of skills (#168), job_signals the ingest signals (#166).
 SCHEMA_TWELVE_TABLES = ("job_signals", "skill_notes")
@@ -29,6 +31,7 @@ SCHEMA_TWELVE_COLUMNS = {
 
 def make_schema_eleven(path):
     """Remove what schema 12 added from a current workspace file, keeping every other value."""
+    make_schema_twelve(path)  # first undo schema 13
     with closing(sqlite3.connect(path)) as conn:
         if conn.execute(
             "SELECT count(*) FROM events WHERE kind IN ('duplicate_cleared','skill_notes_updated') OR "

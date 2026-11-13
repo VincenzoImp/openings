@@ -52,7 +52,10 @@ queue, application, context, document and file semantics used by both. Shared
 references also define the [employer requirements preflight](references/employer-requirements.md)
 and the [run, report, requests and questions](references/run-report.md) record used by every workflow. The
 [tool reference](references/tool-reference.md) lists step-by-step MCP/REST
-sequences for documents, collection and transfers.
+sequences for documents, collection, notes and the timeline, and transfers.
+Read a job's or an application's notes and changes in one list with
+`timeline_get`; its pinned notes come first and hold the owner's standing
+guidance.
 Read current schemas before constructing requests; the connected service owns
 field names and supported operations.
 
