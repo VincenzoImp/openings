@@ -311,6 +311,8 @@ test("a policy conflict reloads the section and keeps the unsaved text", async (
     section.locator("li").filter({ hasText: "My unsaved statement." }),
   ).toBeVisible();
   // A button pressed on a stale section says so and shows the latest state.
+  // The save above may still be finishing, so read the version once it has.
+  await page.waitForLoadState("networkidle");
   const current = await call(page, "/policy/facts");
   await call(
     page,
