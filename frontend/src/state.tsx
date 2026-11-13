@@ -10,6 +10,18 @@ import {
 import { ApiError, api, copyText, type ListResult } from "./api";
 import { createPortal } from "react-dom";
 import { Toast } from "./design/Toast";
+/** A button inside a toast, such as Undo. */
+export interface ToastAction {
+  label: string;
+  run: () => void;
+}
+interface ToastState {
+  message: string;
+  error: boolean;
+  action?: ToastAction;
+  /** Changes with every notification, so a repeated message restarts its timer. */
+  id: number;
+}
 interface Store {
   revision: number;
   refresh: () => void;
@@ -18,10 +30,11 @@ interface Store {
     action: () => Promise<unknown>,
     message?: string,
   ) => Promise<boolean>;
-  notify: (message: string, error?: boolean) => void;
-  toast: { message: string; error: boolean } | null;
+  notify: (message: string, error?: boolean, action?: ToastAction) => void;
+  toast: ToastState | null;
   dismiss: () => void;
 }
+let toastIds = 0;
 const Context = createContext<Store | null>(null);
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [revision, setRevision] = useState(0),
@@ -30,19 +43,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       path: string;
     } | null>(null),
     [pending, setPending] = useState(0),
-    [toast, setToast] = useState<{ message: string; error: boolean } | null>(
-      null,
-    );
+    [toast, setToast] = useState<ToastState | null>(null);
   const refresh = useCallback(() => setRevision((n) => n + 1), []);
   const notify = useCallback(
-    (message: string, error = false) => setToast({ message, error }),
+    (message: string, error = false, action?: ToastAction) =>
+      setToast({ message, error, action, id: ++toastIds }),
     [],
   );
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 6500);
-    return () => clearTimeout(timer);
-  }, [toast]);
+  const dismiss = useCallback(() => setToast(null), []);
   const mutate = useCallback(
     async (action: () => Promise<unknown>, message = "Saved.") => {
       const submitted = takeSubmittedForm();
@@ -111,7 +119,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         mutate,
         notify,
         toast,
-        dismiss: () => setToast(null),
+        dismiss,
       }}
     >
       {children}
@@ -280,8 +288,10 @@ export function Notification({ inDialog = false }: { inDialog?: boolean }) {
   const { toast, dismiss } = useWorkspace();
   return toast ? (
     <Toast
+      key={toast.id}
       message={toast.message}
       error={toast.error}
+      action={toast.action}
       inDialog={inDialog}
       onDismiss={dismiss}
     />

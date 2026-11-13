@@ -248,3 +248,29 @@ export function responseLine(
 /** True when the owner records an employer response from this row. */
 export const awaitsAnswer = (app: Application) =>
   ["applied", "interview", "offer"].includes(app.status);
+
+export type BulkAction =
+  "no_reply" | "close" | "reopen" | "mark_ready" | "unmark_ready" | "delete";
+type BulkFields = Pick<
+  Application,
+  "status" | "applied_at" | "ready_at" | "readiness"
+>;
+/** Whether one bulk action applies to one application, as the server decides. */
+const BULK_VALID: Record<BulkAction, (app: BulkFields) => boolean> = {
+  no_reply: (app) =>
+    ["applied", "interview", "offer"].includes(app.status) ||
+    (app.status !== "closed" && !!app.applied_at),
+  close: (app) => app.status !== "closed",
+  reopen: (app) => app.status === "closed",
+  mark_ready: (app) =>
+    app.status === "draft" && !app.ready_at && app.readiness === "reviewed",
+  unmark_ready: (app) => app.status === "draft" && !!app.ready_at,
+  delete: () => true,
+};
+/** The bulk actions valid for every selected application, in the bar's order. */
+export function bulkActions(selected: BulkFields[]): BulkAction[] {
+  if (!selected.length) return [];
+  return (Object.keys(BULK_VALID) as BulkAction[]).filter((action) =>
+    selected.every(BULK_VALID[action]),
+  );
+}

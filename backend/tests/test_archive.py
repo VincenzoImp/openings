@@ -288,7 +288,7 @@ def test_http_validates_answers_dates_and_rotation_preserves_tokens(tmp_path):
     with TestClient(app) as client:
         owner = client.post("/api/v1/auth/setup", json={"password": "synthetic-password"}).json()
         client.headers["X-CSRF-Token"] = owner["csrf_token"]
-        token = client.post("/api/v1/tokens", json={"name": "automation"}).json()
+        token = client.post("/api/v1/tokens", json={"name": "automation", "kind": "owner"}).json()
         created = client.post("/api/v1/jobs", json={"posting": "Role details"}).json()
         attempt = client.post(
             "/api/v1/applications",

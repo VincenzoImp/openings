@@ -297,7 +297,12 @@ def test_glassdoor_failed_detail_batch_retains_all_candidates_for_retry(
         SourceCreate(
             name="Engineering",
             kind="jobspy",
-            config={"query": "engineer", "providers": ["glassdoor"], "results_wanted": 2},
+            config={
+                "query": "engineer",
+                "country": "usa",
+                "providers": ["glassdoor"],
+                "results_wanted": 2,
+            },
         )
     )
     queued = service.queue_collection(source["id"])
@@ -333,7 +338,12 @@ def test_glassdoor_valid_empty_detail_results_finish_as_unavailable(tmp_path, mo
         SourceCreate(
             name="Engineering",
             kind="jobspy",
-            config={"query": "engineer", "providers": ["glassdoor"], "results_wanted": 2},
+            config={
+                "query": "engineer",
+                "country": "usa",
+                "providers": ["glassdoor"],
+                "results_wanted": 2,
+            },
         )
     )
     queued = service.queue_collection(source["id"])

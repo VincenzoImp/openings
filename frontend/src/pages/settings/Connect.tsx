@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { copyText } from "../../api";
-import { Button, SegmentedControl } from "../../design";
+import { CodeBlock, SegmentedControl } from "../../design";
 import { useWorkspace } from "../../state";
 
 const GUIDE =
@@ -42,13 +42,6 @@ export function Connect({ origin }: { origin: string }) {
         <h2 id="connect-title" className="grow">
           Connect an agent
         </h2>
-        <Button
-          size="sm"
-          icon="copy"
-          onClick={() => copy(snippet, "Configuration")}
-        >
-          Copy
-        </Button>
       </header>
       <div className="body stack">
         <p>
@@ -66,21 +59,24 @@ export function Connect({ origin }: { origin: string }) {
             { id: "json", label: "Other (JSON)" },
           ]}
         />
-        <pre className="code" tabIndex={0} aria-label="MCP configuration">
+        <CodeBlock
+          label="MCP configuration"
+          copyLabel="Copy the MCP configuration"
+          onCopy={() => copy(snippet, "Configuration")}
+        >
           {snippet}
-        </pre>
+        </CodeBlock>
         <dl className="dl">
           <dt>MCP</dt>
-          <dd className="mono">
-            {endpoint}{" "}
-            <button
-              type="button"
-              className="link"
-              onClick={() => copy(endpoint, "MCP address")}
+          <dd>
+            <CodeBlock
+              inline
+              label="MCP address"
+              copyLabel="Copy the MCP address"
+              onCopy={() => copy(endpoint, "MCP address")}
             >
-              Copy
-              <span className="sr"> the MCP address</span>
-            </button>
+              {endpoint}
+            </CodeBlock>
           </dd>
           <dt>REST</dt>
           <dd className="mono">{origin}/api</dd>

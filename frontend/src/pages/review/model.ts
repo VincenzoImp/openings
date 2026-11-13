@@ -122,6 +122,17 @@ export function queuePlace<T extends { id: string }>(queue: T[], id: string) {
   };
 }
 
+/**
+ * The Ready application to review after `id` is marked applied: the one after
+ * it in the queue, or the first other one when it was the last or not listed.
+ */
+export function nextReady<T extends { id: string }>(queue: T[], id: string) {
+  const index = queue.findIndex((item) => item.id === id);
+  const others = queue.filter((item) => item.id !== id);
+  if (!others.length) return null;
+  return index < 0 ? others[0] : queue[index + 1] || others[0];
+}
+
 /** The tab an address of the old application drawer (`detail=`) meant. */
 export function tabOf(value: string) {
   const old: Record<string, string> = {
