@@ -132,7 +132,7 @@ export function RecordLink({
     </a>
   );
   if (applicationId)
-    return open(`#applications?application=${applicationId}`, () =>
+    return open(`#review?application=${applicationId}`, () =>
       onOpenApplication(applicationId),
     );
   if (jobId) return open(`#inbox?job=${jobId}`, () => onOpenJob(jobId));

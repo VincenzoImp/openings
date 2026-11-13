@@ -64,7 +64,7 @@ jobs:
       - run: npm --prefix frontend test
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
-      - run: npm --prefix frontend run test:e2e -- --project=chromium --project=chromium-mobile
+      - run: npm --prefix frontend run test:e2e -- --project=chromium --project=chromium-mobile --project=chromium-performance
       - run: npm --prefix frontend audit --audit-level=moderate
 
   container:

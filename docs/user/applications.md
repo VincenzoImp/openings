@@ -1,8 +1,8 @@
-# Application documents and tracking
+# Applications
 
 An application holds its notes, form questions, answers, prepared contexts,
-document revisions and progress. A job can have one open application at a time
-and retain earlier closed attempts.
+document revisions, progress and the employer's answers. A job can have one open
+application at a time and retain earlier closed attempts.
 
 ## Prepare the library
 
@@ -29,109 +29,220 @@ jobs without application attempts. Shortlist is your ready-to-prepare queue.
 ![Shortlist of selected jobs awaiting application preparation](../images/shortlist.png)
 
 From Shortlist, open a job and choose **Start application**. This creates an
-application in **Preparing** (`draft` in REST/MCP) and removes the job from
-Shortlist automatically. Add its questions or notes and prepare documents in
-**Applications**. Saving a job creates no application; collecting jobs does not
-start preparation.
+application in **Preparing** (`draft` in REST/MCP), removes the job from
+Shortlist and opens the application's page. Saving a job creates no application;
+collecting jobs does not start preparation. The job shows its application stage
+and opens the existing attempt when one is already underway. After closing an
+attempt, you can deliberately start another.
 
-The job shows its application stage and opens the existing attempt when one is
-already underway. After closing an attempt, you can deliberately start another.
-Keep the application in **Preparing** while preparing files. Prepare a context with
-the selected templates and relevant career entries or claims.
+## The pipeline
 
-The context freezes the posting, profile, approved claims, instructions, questions,
-templates and exact asset bytes. Later edits affect newly prepared contexts;
-existing documents retain the material used to write them.
+**Applications** has two tabs, **Pipeline** and **Insights**. The pipeline counts
+every stage with a chip: **Preparing**, **Ready** (a stage of its own: Preparing
+counts only the applications not marked ready), **Applied**, **Interview**,
+**Offer** and **Closed**. Search by role or company, filter by readiness or
+outcome, and sort by deadline, priority, the time an application has been ready,
+the time it was sent or the last change.
 
-In the application, **Documents** comes first. Expand **Prepare with your agent**
-to prepare or download a frozen context. The chooser supports search and selecting
-or clearing matching entries, claims and templates. Claims follow their owning
-entries: excluding an entry also excludes its claims. Omitted entry/claim selections
-use all eligible material; an explicitly empty selection includes none. An empty
-template selection uses your defaults.
+![Applications: stage chips with their counts, filters, and the list with plan tags, documents, the employer's answer and the next action](../images/applications.png)
+
+Each row shows the role and company, the stage, the plan (priority, deadline and
+a blocking requirement for an application being prepared; the day it was sent
+otherwise), the state of the CV and letter, what the employer answered (or how
+long the wait is, highlighted once it is longer than the no-reply period) and
+the next action: **Review** a ready application, **Decide** on a blocking
+requirement, **Answer** your agent's question, or **Record response** for one
+that was sent. **Board** shows the open stages side by side; **Show closed**
+adds the closed ones and **N more** opens the rest of a stage in the list.
+
+![Applications as a board: Preparing, Ready, Applied, Interview and Offer, with their tags](../images/applications-board.png)
+
+Select rows (or every row shown) to act on them together: **Close as no reply**,
+**Close…** with an outcome, **Reopen…** to a stage, **Mark ready**, **Not ready**
+or **Delete…**. Each application is changed on its own; one that cannot be, such
+as a Draft closed as no reply or a second open attempt for one job, is named
+without stopping the others.
+
+![Preparing applications sorted by deadline with two selected and the actions on them](../images/applications-planning.png)
+
+## Review and apply
+
+An application opens on its own page, from Today's **Review**, a row of the
+list or any link to it. The posting, the current CV and the current letter stand
+side by side with their PDFs; on a phone a switch shows one at a time and the
+main actions stay in a bar at the bottom.
+
+![The review page: tags, its place in the Ready queue, the posting, the CV and the letter with their PDFs, and Mark applied](../images/review.png)
+
+Above them, the page says where the application stands: its stage, deadline and
+priority, and for a ready one its place in the Ready queue in Today's order
+(closest deadline first) with a link to the next one. **Before you send** names
+the requirements that are not resolved and the required form questions without
+an answer. The actions end the task:
+
+- **Download CV and letter** saves both PDFs; **Open the posting** opens the
+  employer's page.
+- **Mark applied** records that you sent it: the application moves to Applied
+  with the time, and its Ready history stays in the timeline. If the application
+  is no longer ready (another session changed a document, for example), it is
+  refused and says why; review it again.
+- **Not pursuing** closes it as Not pursued; its documents and history stay.
+
+Below, six tabs hold the rest:
+
+| Tab | What it holds |
+|---|---|
+| **Answers** | One control per form question, with the live answers; **Copy all**; add, edit and remove questions. |
+| **Requirements** | The employer's conditions, each blocking or not and resolved or not, with your note. |
+| **Timeline** | The employer's responses, every change with who made it, and the notes on the application. |
+| **Inputs** | The frozen copies of your record the documents were written from, their files, and what changed since. |
+| **Documents** | Every document revision: open, approve, revise, add files, delete. |
+| **Details** | Stage and outcome, priority, deadline, the time sent, the application note, the Ready step, requests for your agent, the job and deletion. |
+
+Old links to an application (`#applications?application=…&detail=…`) open this
+page on the matching tab.
 
 ## Write, compile and upload
+
+Under **Inputs**, **Prepare a frozen copy** freezes the posting, profile, policy,
+approved claims, instructions, questions, templates and exact asset bytes for
+your agent, and downloads it. The chooser supports search and selecting or
+clearing matching entries, claims and templates. Claims follow their owning
+entries: excluding an entry also excludes its claims. Omitted entry/claim
+selections use all eligible material; an explicitly empty selection includes
+none. An empty template selection uses your defaults. Later edits affect newly
+prepared copies; existing documents keep the material used to write them.
 
 Connect an [external agent through MCP](agents.md), or work manually. Ask it to
 read the prepared context, write the CV, cover letter and answers, compile LaTeX
 on its computer, and upload PDF and source files to the appropriate document
 revision. It uses its own model access and tools.
 
-For manual work, create the document in the application and upload its files.
-Keep each PDF with the source revision that produced it. Form answers have both
-an archived document revision and live application answers; update the live answers
-when you want to reuse them in the application form.
+For manual work, choose **Add a document** under **Documents**, with its text,
+the frozen copy it was written from and its PDF or source. Keep each PDF with
+the source revision that produced it. Form answers have both an archived
+document revision and live application answers; update the live answers under
+**Answers** when you want to reuse them in the application form.
 
-![Application workspace with document revisions](../images/documents.png)
+![The Documents tab with a revision open: its text, its source and PDF, the source check and its actions](../images/documents.png)
 
-## Review and submit
-
-Open the uploaded PDF and check wording, dates, layout and page count. Approve the
-reviewed revision when ready. An expanded revision with a `.tex` source shows
+Open the PDF and check wording, dates, layout and page count. Approve the
+reviewed revision when ready. An open revision with a `.tex` source shows
 whether its saved content appears in that source. When they differ, the
 differing values are listed and approval becomes **Approve with differences**,
 for intentional cases only; otherwise save a corrected revision or upload the
-matching source. For changed content, create a new revision and upload
-its new files. Approved revisions keep their content and attachments fixed.
+matching source. For changed content, choose **New revision** and upload its
+new files. Approved revisions keep their content and attachments fixed. Click a
+file name to preview a supported PDF, image or text file with its size and hash.
 
-Cards and the document list distinguish **Needs PDF**, **PDF to review** and
-**Approved PDF** using current revisions and their own attachments. Form-answer
-and other content-only revisions can show **Content saved** without requiring a PDF.
-These labels
-describe stored files and review, not submission or an automatic quality check.
-**Built on older inputs** marks an application whose current revisions use a
-context frozen before a later change to the Profile, general guidance, a selected
-template, Career entry or claim. The application's Documents tab lists what
-changed. Frozen contexts never change; to refresh, prepare a new context and save
-new revisions.
-Click a filename to preview a supported PDF, image or text file; use **Details**
-for its hash and metadata. Unsupported formats remain downloadable.
+The list shows the state of the CV and letter from the current revisions:
+**None**, **Written, without PDF**, **Written, not approved**, **CV approved,
+letter not yet** or **CV and letter approved**. **Inputs changed since
+written** marks an application whose current revisions use a frozen copy made
+before a later change to the Profile, general guidance, a selected template, a
+Career entry or a claim; **Inputs** lists what changed. Frozen copies never
+change; to refresh, prepare a new one and save new revisions.
 
 Editing a form question keeps compatible live answers. If a changed type, option
-or limit makes an answer invalid, the editor shows the saved answer and requires
-an explicit choice before clearing it. Frozen contexts and document revisions stay
-unchanged.
+or limit makes an answer invalid, the editor shows why and requires an explicit
+choice before clearing it. Frozen copies and document revisions stay unchanged.
 
-## Mark ready and submit
+## Mark ready
 
 **Ready** is a stored step inside Preparing: someone, you or your agent, judged
-the application complete. In the application, **Mark ready** is available once
+the application complete. Under **Details**, **Mark ready** is available once
 every current revision has its PDF and is approved and no blocking requirement is
-unresolved; otherwise the panel names what is missing. The application shows who
-marked it and when, and **Not ready** removes the mark.
+unresolved; otherwise it names what is missing. It shows who marked the
+application and when, and **Not ready** removes the mark.
 
-![Application marked ready by the agent, with who marked it and when](../images/application-ready.png)
+![Details of an application marked ready by the agent, with its plan, the request that led to it and the job](../images/application-ready.png)
 
 The mark describes exactly what was judged, so Openings clears it when that
-changes: a new document revision or context, a deleted revision, a file added to
-a current revision, a blocking requirement added or reopened, or the application
-leaving Preparing. The History tab records each clearing with its reason and who
-caused it. Mark the application ready again after reviewing the change.
+changes: a new document revision or frozen copy, a deleted revision, a file added
+to a current revision, a blocking requirement added or reopened, or the
+application leaving Preparing. The timeline records each clearing with its
+reason and who caused it. Mark the application ready again after reviewing the
+change. Marking ready, preparing documents or uploading a PDF never submits
+anything.
 
-**Ready to apply** above the list is your queue: it shows how many Preparing
-applications are marked ready and lists them longest-waiting first. Submit
-through the employer's portal, then record **Applied**. Marking ready, preparing
-documents or uploading a PDF never submits anything and leaves the application
-in its current stage.
+## Record what the employer did
 
-## Follow progress
+You send each application through the employer's portal yourself; then record
+**Applied** (Mark applied on the review page, or the stage under Details). When
+the employer answers, choose **Record response** on its row, or on its page:
 
-Use the list or Kanban view to move between **Preparing**, **Applied**, **Interview**,
-**Offer** and **Closed**. Closing an attempt records **Accepted**, **Not selected**
-or **Not pursued**; choose an outcome explicitly. Events retain the recorded
-journey, including an interview before a later rejection. **Progress** on Today
-follows those recorded stages. The submission date can be corrected or cleared.
+![Recording an employer's rejection on an Applied row: the answer, its date and a note](../images/respond.png)
 
-On narrow screens the initial application view is a compact list. Choose **Board**
-or **List** to remember a preference. Stage shortcuts filter the whole result set;
-board columns show when only part of a stage is loaded and link to the full stage.
+| Answer | What it records |
+|---|---|
+| **Interview** | An interview response, and the application moves to Interview (a second interview keeps it there). |
+| **Rejection** | A rejection response, and the application closes as Rejected. |
+| **Offer** | An offer response, and the application moves to Offer. |
+| **No reply** | No response: the application closes as No reply on the day you concluded it. |
+| **Other** | Another answer, such as a request for references; the stage does not change. |
+
+The date is the day the answer arrived; it defaults to today and cannot be in
+the future. Moving a stage under **Details**, or closing as Rejected, records the
+matching response the same way, with the day you give. The **Timeline** lists
+the responses with who recorded them; **Edit** corrects a day, kind or note and
+**Remove** deletes one recorded by mistake without changing the stage. The
+upgrade to 0.20 added one response to each application already in Interview or
+Offer and each rejected one that was sent, dated by the stage change that moved
+it there; a response marked **Estimated date** took the day of the
+application's last change instead, so correct it if you know better.
+
+**No reply** is a fourth way to close, with Accepted, Rejected and Not pursued.
+The no-reply period is the number of days in your Policy's Decision item
+labelled "No reply" (for example "45 days"), or 30 days without one. Today's
+**Waiting for a reply** counts the Applied applications sent longer ago,
+**Record replies** lists them and **Close N as no reply** closes them after
+listing them; Insights offers the same. Your agent may close them too, but only
+under a "No reply" rule you confirmed in the Policy; otherwise it asks you.
+
+## Insights
+
+The **Insights** tab shows how employers answered the applications you sent.
+
+![Insights: applications sent, the share that got an answer and led to an interview, offers, the median time to an answer, and tables by role family, source and location](../images/insights.png)
+
+- **Only employer answers count.** The sample is the sent applications: those
+  with a sent date, in Applied, Interview or Offer, or with a response. Drafts
+  you never sent and applications closed without being sent are counted apart,
+  and jobs your agent dismissed never had an application.
+- **Got an answer** is the share with any response; **Led to an interview** the
+  share with an interview or an offer response; **Offers** the number with an
+  offer. **Median time to an answer** is the day of the first response minus the
+  day it was sent; applications without a sent date are counted but not timed.
+- **Small samples are not read.** A rate is shown from 5 sent applications in
+  its group, and the median and the time table from 5 dated answers; below that
+  the group shows its counts and "Too few to show a rate". REST and MCP take a
+  different `min_sample` (1 to 100).
+- Groups: **role family** and **seniority** read from the job title, **source**
+  (the collection source that found the job, else the board it came from, else
+  added by hand), **location** (the first part, "Zurich" of "Zurich,
+  Switzerland") and **month sent**. **Last 90 days** narrows it to applications
+  sent in that time.
+- **Progress** at the end shows, for a period of sending, how far the sent
+  applications went: reached each stage, waiting there, rejected, no reply or not
+  pursued.
+
+Role family and seniority come from fixed keywords in English, German, French
+and Italian, never from a model: for example *Data Engineer*, *Dateningenieur*,
+*Ingénieur de données* and *Ingegnere dei dati* are Data engineering; *Senior*,
+*erfahrener*, *confirmé* and *esperto* are Senior; *Werkstudent*, *stagiaire* and
+*stagista* are Intern or trainee. The first family that matches wins, the more
+specific first (*Analytics Engineer* is Analytics, *Python Engineer* Backend);
+a title without a known word is Unknown, and most titles state no seniority. The
+families are Engineering management, Data science and ML, Analytics, Data
+engineering, Platform and reliability, Security, Mobile, Full stack, Frontend,
+Backend, Quality and testing, Research, Product, Design and Software
+engineering.
 
 ## Plan and track requirements
 
 Each application can have a **priority** (P1 highest to P5 lowest) and the
-employer's **deadline**, set under **Details**. Cards and list rows show them;
-a past deadline on an application still in Preparing is marked overdue. Sort
-Applications by **Deadline**, **Priority** or **Ready**, and filter by **readiness**:
+employer's **deadline**, set under **Details**. Rows show them; a past deadline
+on an application still in Preparing is marked overdue. Filter by **readiness**:
 
 | Readiness | REST/MCP value | Meaning |
 |---|---|---|
@@ -147,22 +258,17 @@ revision does not count. It does not check the content or submit anything.
 Before version 0.17 `ready` meant that the checks passed; that state is now
 `reviewed`, and `ready` is the stored step.
 
-![Applications list sorted by deadline, with priority and deadline tags, readiness, a blocking requirement and the bulk action bar](../images/applications-planning.png)
-
 **Requirements** records employer conditions: authorship rules (such as no
 AI-written applications), attachments, references, format, language, eligibility
 and dates. Mark a requirement **Blocking** when documents must not be prepared or
 submitted until it is settled, and **Resolved** with a note once you decide.
-Unresolved blocking requirements appear at the top of the application. They are
-stored on the application, not in job details, so source refreshes of the job
-continue.
+They are stored on the application, not in job details, so source refreshes of
+the job continue.
 
-![Application Requirements tab with a blocking authorship requirement and a resolved eligibility requirement](../images/requirements.png)
+![The Requirements tab with a blocking authorship requirement and a resolved eligibility requirement](../images/requirements.png)
 
-Open **Posting** in an application to read the job without leaving your current
-filters. Rare job maintenance actions live under **Job details, sources & maintenance**.
-
-![Application board showing compact cards across stages](../images/applications.png)
+The posting is beside the documents on the review page; **Job details** opens
+the job with its notes, files and maintenance actions.
 
 ## Keep, dismiss or delete
 
@@ -176,21 +282,16 @@ filters. Rare job maintenance actions live under **Job details, sources & mainte
 | Forget job | Permanently remove the job, identities and owned application history/files. Future collection can find it again. |
 
 Closing an application keeps it in Applications, including its history and
-files. The **History** tab lists each recorded change with who made it: you in
-the dashboard, a named API token or the system. Entries from before version
-0.17 show "unknown (before 0.17)".
+files. The **Timeline** lists each recorded change with who made it: you in the
+dashboard, a named API token or the system. Entries from before version 0.17
+show "unknown (before 0.17)".
 
-![Application history with a question asked by the agent and answered by the owner](../images/application-history.png)
+![The Timeline tab: an employer response, the changes with who made each and a note](../images/application-history.png)
 
 Closing never returns the job to Inbox or Shortlist. To cancel preparation
 without losing documents, close it as **Not pursued**. Deleting the final attempt
-is permanent and deliberately returns a saved job to Shortlist; the confirmation
-explains this. Other retained attempts keep it out of pending queues.
-
-In the Applications **List** view, select attempts across pages to close them
-with one outcome, reopen Closed attempts to a stage, mark them ready, or delete
-them. Each attempt is checked separately; a failure, such as another open attempt
-for the same job or a missing PDF, is listed without blocking the others.
+is permanent and deliberately returns a saved job to Shortlist. Other retained
+attempts keep it out of pending queues.
 
 The **Possible duplicates** tab beside Inbox groups records that probably
 describe one vacancy, for example the same posting collected from several job

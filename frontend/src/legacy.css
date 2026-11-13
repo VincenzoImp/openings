@@ -128,29 +128,7 @@
   font-size: 17px;
   color: var(--faint);
 }
-:where(.legacy) .dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #8c9c7f;
-  vertical-align: middle;
-}
-:where(.legacy) .dot.applied {
-  background: #8e9cb1;
-}
-:where(.legacy) .dot.interview {
-  background: #a69ab8;
-}
-:where(.legacy) .dot.offer {
-  background: #c8ad74;
-}
-:where(.legacy) .dot.closed {
-  background: #af958c;
-}
-:where(.legacy) .dot.draft {
-  background: #aaa99c;
-}
+
 :where(.legacy) .activity {
   display: flex;
   gap: 12px;
@@ -160,19 +138,7 @@
 :where(.legacy) .activity:last-child {
   padding-bottom: 0;
 }
-:where(.legacy) .activity-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--hover);
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-  flex-shrink: 0;
-}
-:where(.legacy) .activity-icon .icon {
-  width: 12px;
-}
+
 :where(.legacy) .activity strong {
   font-size: 11px;
   font-weight: 500;
@@ -262,33 +228,7 @@
   font-size: 10px;
   color: var(--muted);
 }
-:where(.legacy) .kanban {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(190px, 1fr));
-  gap: 15px;
-  overflow-x: auto;
-  padding-bottom: 12px;
-  min-height: 410px;
-}
-:where(.legacy) .application-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 15px 14px;
-  margin-bottom: 10px;
-  cursor: pointer;
-  box-shadow: 0 2px 3px #00000002;
-}
-:where(.legacy) .application-card:hover {
-  border-color: var(--faint);
-  transform: translateY(-1px);
-}
-:where(.legacy) .application-card h3 {
-  font-size: 11px;
-  line-height: 1.55;
-  font-weight: 500;
-  min-height: 34px;
-}
+
 :where(.legacy) .companygrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
@@ -592,10 +532,6 @@
     max-width: none;
     min-width: 180px;
   }
-  :where(.legacy) .kanban {
-    margin-right: -23px;
-    padding-right: 23px;
-  }
 }
 @media (max-width: 600px) {
   :where(.legacy) h1 {
@@ -667,12 +603,7 @@
   :where(.legacy) .sectiontitle h2 {
     font-size: 23px;
   }
-  :where(.legacy) .kanban {
-    margin-right: -17px;
-    padding-right: 17px;
-    gap: 10px;
-    grid-template-columns: repeat(5, 200px);
-  }
+
   :where(.legacy) .note {
     font-size: 10px;
   }
@@ -753,87 +684,7 @@
 :where(.legacy) .list-footer .actions {
   justify-content: flex-end;
 }
-:where(.legacy) .application-card {
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  width: 100%;
-  text-align: left;
-  border: 1px solid var(--line);
-  background: var(--card);
-  border-radius: 9px;
-  box-shadow: 0 1px 2px #24251f04;
-  margin-bottom: 10px;
-  min-height: 0;
-}
-:where(.legacy) .application-card:hover {
-  border-color: var(--accent);
-  box-shadow: 0 3px 10px #24251f09;
-}
-:where(.legacy) .application-card .companyline {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-size: 11px;
-  color: var(--muted);
-}
-:where(.legacy) .application-card > strong {
-  font-size: 13px;
-  line-height: 1.5;
-  font-weight: 550;
-}
-:where(.legacy) .application-card footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 7px;
-  padding-top: 10px;
-  color: var(--muted);
-  font-size: 10px;
-  margin-top: auto;
-}
-:where(.legacy) .application-card footer > span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-:where(.legacy) .application-card footer .icon {
-  width: 14px;
-  height: 14px;
-}
-:where(.legacy) .application-card .outcome {
-  align-self: flex-start;
-  font-size: 10px;
-}
-:where(.legacy) .kanban-column {
-  min-width: 0;
-  padding: 10px;
-  background: var(--hover);
-  border-radius: 10px;
-  min-height: 420px;
-}
-:where(.legacy) .kanban-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--muted);
-  font-size: 12px;
-  padding: 7px 5px 17px;
-}
-:where(.legacy) .kanban-head > span:first-child {
-  color: var(--ink);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-:where(.legacy) .boardcaption {
-  display: flex;
-  justify-content: space-between;
-  gap: 18px;
-  color: var(--muted);
-  font-size: 12px;
-  margin-bottom: 17px;
-}
+
 :where(.legacy) .textbutton {
   display: block;
   padding: 6px 0;
@@ -888,69 +739,7 @@
   padding: 0;
   border: 0;
 }
-:where(.legacy) .stage-control {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 12px 0 23px;
-  font-size: 12px;
-  color: var(--muted);
-}
-:where(.legacy) .stage-control select {
-  max-width: 175px;
-}
-:where(.legacy) .context-panel {
-  border: 1px solid var(--line);
-  background: var(--card);
-  border-radius: 9px;
-  padding: 20px;
-  margin-bottom: 25px;
-}
-:where(.legacy) .context-panel p {
-  font-size: 12px;
-  line-height: 1.8;
-  margin: 8px 0 17px;
-}
-:where(.legacy) .context-panel .actions {
-  align-items: stretch;
-}
-:where(.legacy) .context-panel select {
-  flex: 1;
-  min-width: 130px;
-  max-width: 260px;
-  font-size: 12px;
-}
-:where(.legacy) .document-card {
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--card);
-  padding: 18px;
-  margin-bottom: 15px;
-}
-:where(.legacy) .document-card > header {
-  display: flex;
-  justify-content: space-between;
-  gap: 15px;
-}
-:where(.legacy) .document-card > header h3 {
-  font-size: 15px;
-}
-:where(.legacy) .document-card > header p {
-  font-size: 11px;
-  margin-top: 5px;
-}
-:where(.legacy) .document-text {
-  padding: 17px 0;
-  white-space: pre-wrap;
-  font-size: 13px;
-  line-height: 1.8;
-  overflow-wrap: anywhere;
-}
-:where(.legacy) .document-text pre {
-  white-space: pre-wrap;
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
+
 :where(.legacy) .documentrow {
   padding: 12px;
 }
@@ -1169,9 +958,6 @@
     grid-template-columns: minmax(0, 1fr) 115px 74px 30px;
     gap: 10px;
   }
-  :where(.legacy) .kanban {
-    grid-template-columns: repeat(5, minmax(195px, 1fr));
-  }
 }
 @media (max-width: 600px) {
   :where(.legacy) .jobrow {
@@ -1202,19 +988,7 @@
   :where(.legacy) .toolbar > .search {
     flex: 1 1 100%;
   }
-  :where(.legacy) .boardcaption {
-    font-size: 11px;
-    flex-wrap: wrap;
-  }
-  :where(.legacy) .boardcaption > span:last-child {
-    display: none;
-  }
-  :where(.legacy) .kanban {
-    grid-template-columns: repeat(5, 220px);
-  }
-  :where(.legacy) .application-card {
-    min-height: 160px;
-  }
+
   :where(.legacy) .sectioncard {
     padding: 20px;
   }
@@ -1237,40 +1011,12 @@
   :where(.legacy) .token-form select {
     flex: 1 1 auto;
   }
-  :where(.legacy) .context-panel .actions {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-  :where(.legacy) .context-panel select {
-    max-width: none;
-  }
+
   :where(.legacy) .new-token .actions .btn {
     flex: 1;
   }
 }
-:where(.legacy) .manage-questions {
-  margin-bottom: 22px;
-  font-size: 12px;
-}
-:where(.legacy) .manage-questions summary {
-  cursor: pointer;
-  color: var(--muted);
-  margin-bottom: 12px;
-}
-:where(.legacy) .question-entry {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border-bottom: 1px solid var(--line);
-  padding: 10px 0;
-}
-:where(.legacy) .question-entry > span {
-  flex: 1;
-  line-height: 1.7;
-}
-:where(.legacy) .question-entry .iconbtn {
-  flex-shrink: 0;
-}
+
 /* Native dialogs live in the browser's top layer; feedback must live there too. */
 
 :where(.legacy) .settings-grid {
@@ -1291,8 +1037,7 @@
   max-width: none;
 }
 
-:where(.legacy) .provider-choices,
-:where(.legacy) .selection-box {
+:where(.legacy) .provider-choices {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 16px;
@@ -1300,8 +1045,7 @@
   min-width: 0;
 }
 
-:where(.legacy) .provider-choices legend,
-:where(.legacy) .selection-box legend {
+:where(.legacy) .provider-choices legend {
   padding: 0 6px;
   color: var(--muted);
   font-size: 12px;
@@ -1320,8 +1064,7 @@
   padding-top: 14px;
 }
 :where(.legacy) .advanced-json summary,
-:where(.legacy) .provenance summary,
-:where(.legacy) .context-history summary {
+:where(.legacy) .provenance summary {
   cursor: pointer;
   color: var(--muted);
   font-size: 12px;
@@ -1461,86 +1204,7 @@
 :where(.legacy) .preview-result > p {
   margin-top: 8px;
 }
-:where(.legacy) .application-filters > select {
-  max-width: 170px;
-}
-:where(.legacy) .application-card {
-  display: block;
-  position: relative;
-}
-:where(.legacy) .application-card.is-dragged {
-  opacity: 0.45;
-}
-:where(.legacy) .kanban.is-dragging .kanban-column {
-  outline: 1px dashed var(--line);
-}
-:where(.legacy) .application-card .companyline {
-  padding-right: 26px;
-  min-height: 22px;
-}
-:where(.legacy) .application-card .companyline > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-:where(.legacy) .application-location {
-  display: block;
-  color: var(--muted);
-  font-size: 11px;
-  margin-top: 6px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-:where(.legacy) .stage-menu-trigger {
-  position: absolute;
-  right: 7px;
-  top: 7px;
-}
-:where(.legacy) .stage-menu-options {
-  position: fixed;
-  inset: auto;
-  width: 150px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: 0 6px 20px #24251f18;
-  padding: 6px;
-}
-:where(.legacy) .stage-menu-options > span {
-  display: block;
-  padding: 5px 8px;
-  font-size: 10px;
-  color: var(--muted);
-}
-:where(.legacy) .stage-menu-options > button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 8px;
-  font-size: 12px;
-  border-radius: 5px;
-}
-:where(.legacy) .stage-menu-options > button:hover:not(:disabled),
-:where(.legacy) .stage-menu-options > button:focus-visible {
-  background: var(--hover);
-}
-:where(.legacy) .application-open {
-  display: block;
-  text-align: left;
-  width: 100%;
-  padding: 0;
-}
-:where(.legacy) .application-open > strong {
-  display: block;
-  font-size: 13px;
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
+
 :where(.legacy) .json-readout {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -1565,17 +1229,7 @@
   margin-top: 12px;
   overflow-wrap: anywhere;
 }
-:where(.legacy) .context-history {
-  margin-top: 18px;
-}
-:where(.legacy) .selection-box .checkline {
-  align-items: start;
-  margin: 12px 0;
-}
-:where(.legacy) .selection-box .checkline input {
-  margin-top: 4px;
-  flex-shrink: 0;
-}
+
 :where(.legacy) .jobrow {
   grid-template-columns:
     20px minmax(180px, 1fr) minmax(120px, 0.45fr)
@@ -1626,10 +1280,6 @@
   }
   :where(.legacy) .provider-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  :where(.legacy) .application-filters > select {
-    max-width: none;
-    flex: 1;
   }
 }
 @media (max-width: 600px) {
@@ -1691,14 +1341,7 @@
   :where(.legacy) .companyfoot {
     gap: 8px;
   }
-  :where(.legacy) .application-filters .search {
-    flex-basis: 100%;
-  }
-  :where(.legacy) .application-filters > select {
-    width: calc(50% - 6px);
-    flex: 1;
-    min-width: 130px;
-  }
+
   :where(.legacy) .settings-grid .settingrow {
     gap: 16px;
     align-items: start;
@@ -1714,32 +1357,7 @@
     gap: 6px;
   }
 }
-:where(.legacy) .document-filters {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(100px, 0.8fr) minmax(
-      105px,
-      0.8fr
-    );
-  gap: 8px;
-  margin: 18px 0;
-}
-:where(.legacy) .context-files {
-  padding-top: 16px;
-}
-:where(.legacy) .context-files > section {
-  margin-top: 18px;
-}
-:where(.legacy) .context-files > section > h3 {
-  margin-bottom: 10px;
-}
-@media (max-width: 600px) {
-  :where(.legacy) .document-filters {
-    grid-template-columns: 1fr 1fr;
-  }
-  :where(.legacy) .document-filters > input {
-    grid-column: 1/-1;
-  }
-}
+
 :where(.legacy) .formgrid > .full {
   grid-column: 1/-1;
 }
@@ -2047,119 +1665,18 @@
   padding-left: 20px;
 }
 /* Preparation and review share the same revision-specific state in every view. */
-:where(.legacy) .preparation-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  margin: 12px 0;
-  font-size: 12px;
-  color: var(--muted);
-}
-:where(.legacy) .preparation-item.approved {
-  color: var(--accent);
-}
-:where(.legacy) .preparation-item.stale {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--danger);
-}
-:where(.legacy) .preparation-item.stale .icon {
-  width: 14px;
-  height: 14px;
-}
-:where(.legacy) .stale-notice,
-:where(.legacy) .source-check.mismatch {
-  margin: 12px 0;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--danger);
-  border-radius: 8px;
-  background: var(--card);
-  font-size: 13px;
-}
-:where(.legacy) .stale-notice h3 {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 6px;
-  font-size: 14px;
-  color: var(--danger);
-}
-:where(.legacy) .stale-notice p,
-:where(.legacy) .source-check p {
-  margin: 0 0 6px;
-}
-:where(.legacy) .stale-notice ul,
-:where(.legacy) .source-check ul {
-  margin: 6px 0;
-  padding-left: 20px;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
-}
-:where(.legacy) .source-check {
-  margin: 10px 0;
-  font-size: 13px;
-  color: var(--muted);
-}
-:where(.legacy) .source-check.ok {
-  color: var(--accent);
-}
-:where(.legacy) .source-check p:first-child {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-}
-:where(.legacy) .source-check code {
-  margin-right: 6px;
-  font-size: 12px;
-  color: var(--muted);
-}
-:where(.legacy) .application-next {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 12px 0;
-  font-size: 12px;
-}
-:where(.legacy) .stage-overview {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 16px 0;
-}
-:where(.legacy) .stage-overview .btn span {
-  margin-left: 8px;
-  font-variant-numeric: tabular-nums;
-}
-:where(.legacy) .stage-page-link {
-  padding: 8px 4px;
-  font-size: 12px;
-}
-:where(.legacy) .agent-preparation {
-  margin-bottom: 22px;
-}
-:where(.legacy) .agent-preparation > summary,
+
 :where(.legacy) .job-maintenance > summary {
   cursor: pointer;
   font-weight: 600;
 }
-:where(.legacy) .agent-preparation[open] > summary {
-  margin-bottom: 16px;
-}
+
 :where(.legacy) .job-maintenance {
   border-top: 1px solid var(--line);
   padding-top: 18px;
   margin-top: 24px;
 }
-:where(.legacy) .choice-options {
-  max-height: 260px;
-  overflow: auto;
-  margin-top: 12px;
-}
-:where(.legacy) .selection-actions {
-  margin-top: 12px;
-}
+
 :where(.legacy) .conflict-recovery {
   display: block;
   margin-top: 20px;
@@ -2190,82 +1707,14 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-:where(.legacy) .application-list {
-  overflow: auto;
-}
-:where(.legacy) .application-list td[data-label="Stage"] select {
-  min-width: 118px;
-}
+
 @media (max-width: 600px) {
-  :where(.legacy) .application-list {
-    background: none;
-    border: none;
-    overflow: visible;
-  }
-  :where(.legacy) .application-list .table {
-    display: block;
-    min-width: 0;
-  }
-  :where(.legacy) .application-list thead {
-    display: none;
-  }
-  :where(.legacy) .application-list tbody {
-    display: grid;
-    gap: 14px;
-  }
-  :where(.legacy) .application-list tr {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 12px;
-    padding: 18px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--card);
-  }
-  :where(.legacy) .application-list td {
-    display: block;
-    min-width: 0;
-    padding: 0;
-    border: none;
-    overflow-wrap: anywhere;
-  }
-  :where(.legacy) .application-list td:first-child {
-    grid-column: 1 / -1;
-  }
-  :where(.legacy) .application-list td::before {
-    content: attr(data-label);
-    display: block;
-    color: var(--muted);
-    font-size: 11px;
-    margin-bottom: 6px;
-  }
-  :where(.legacy) .application-list .preparation-summary {
-    margin: 0;
-  }
-  :where(.legacy) .stage-overview .btn {
-    flex: 1 0 29%;
-  }
   :where(.legacy) .documentrow {
     gap: 6px;
   }
 }
 /* Application planning: priority, deadline and employer requirements. */
-:where(.legacy) .plan-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 8px;
-}
-:where(.legacy) .plan-tags .tag {
-  font-size: 10px;
-}
-:where(.legacy) .plan-tags .icon {
-  width: 11px;
-  height: 11px;
-}
-:where(.legacy) .application-card .plan-tags {
-  margin-top: 0;
-}
+
 /* Requests for the agent. */
 :where(.legacy) .request-form textarea {
   width: 100%;
@@ -2337,110 +1786,7 @@
   }
 }
 /* Ready as a stored step of a Preparing application. */
-:where(.legacy) .ready-tag {
-  align-self: flex-start;
-  font-size: 10px;
-}
-:where(.legacy) .ready-tag .icon {
-  width: 11px;
-  height: 11px;
-}
-:where(.legacy) td .ready-tag {
-  margin-bottom: 5px;
-}
-:where(.legacy) .ready-panel {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin: 0 0 20px;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--card);
-}
-:where(.legacy) .ready-panel.is-ready {
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  background: color-mix(in srgb, var(--accent) 7%, var(--card));
-}
-:where(.legacy) .ready-panel strong {
-  font-size: 13px;
-}
-:where(.legacy) .ready-panel p {
-  margin: 3px 0 0;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.5;
-}
-:where(.legacy) .ready-panel .btn {
-  flex: none;
-}
-:where(.legacy) .stage-overview .ready-queue {
-  margin-left: auto;
-}
-@media (max-width: 600px) {
-  :where(.legacy) .ready-panel {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  :where(.legacy) .stage-overview .ready-queue {
-    margin-left: 0;
-    flex: 1 0 100%;
-  }
-}
-:where(.legacy) .drawer-meta + .plan-tags {
-  margin: 0 0 12px;
-}
-:where(.legacy) .requirement-alert {
-  color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 8%, var(--card));
-  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
-  margin-bottom: 14px;
-}
-:where(.legacy) .requirement-alert ul {
-  margin: 6px 0;
-  padding-left: 18px;
-}
-:where(.legacy) .requirement-row {
-  display: grid;
-  gap: 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 10px 14px 14px;
-  margin: 0;
-  min-width: 0;
-}
-:where(.legacy) .requirement-row legend {
-  padding: 0 6px;
-  font-size: 11px;
-  color: var(--muted);
-}
-:where(.legacy) .requirement-row.is-blocking {
-  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
-}
-:where(.legacy) .requirement-row.is-blocking legend {
-  color: var(--danger);
-}
-:where(.legacy) .requirement-row.is-resolved legend {
-  color: var(--accent);
-}
-:where(.legacy) .requirement-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 8px 16px;
-}
-:where(.legacy) .requirement-head .field {
-  flex: 1 1 160px;
-  margin: 0;
-}
-:where(.legacy) .requirement-head .checkline {
-  margin-bottom: 8px;
-}
-:where(.legacy) .requirement-head .iconbtn {
-  margin-left: auto;
-  margin-bottom: 4px;
-}
+
 :where(.legacy) .duplicate-filters .checkline {
   margin: 0;
   font-size: 11px;
@@ -2518,29 +1864,7 @@
     flex-basis: calc(100% - 40px);
   }
 }
-:where(.legacy) .application-select {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-:where(.legacy) .application-select > input {
-  width: 15px;
-  height: 15px;
-  margin-top: 3px;
-  flex: none;
-  accent-color: var(--accent);
-}
-:where(.legacy) .application-list .selection-head {
-  border-radius: 10px 10px 0 0;
-}
-@media (max-width: 600px) {
-  :where(.legacy) .application-list .selection-head {
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    margin-bottom: 14px;
-    flex-wrap: wrap;
-  }
-}
+
 /* A link inside a sentence. */
 :where(.legacy) .inline-link {
   display: inline;

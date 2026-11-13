@@ -48,6 +48,11 @@ from .documents import (
     register_mcp as register_document_mcp,
 )
 from .errors import DomainError
+from .insights import (
+    InsightsService,
+    register_api as register_insights_api,
+    register_mcp as register_insights_mcp,
+)
 from .limits import REQUEST_LIMIT, BodyLimit
 from .mcp_server import OpeningsMCP
 from .models import Input
@@ -56,6 +61,11 @@ from .operations import (
     remove_installation_credentials,
     restore_database,
     storage_status,
+)
+from .outcomes import (
+    ResponseService,
+    register_api as register_response_api,
+    register_mcp as register_response_mcp,
 )
 from .policy import (
     PolicyService,
@@ -139,6 +149,8 @@ def create_app(database=None, start_worker=True):
     activity = ActivityService(workspace)
     requests = RequestService(workspace)
     policy = PolicyService(workspace)
+    responses = ResponseService(workspace)
+    insights = InsightsService(workspace)
     workspace.discovery = discovery
     workspace.worker = Worker(workspace, discovery) if start_worker else None
     allowed_hosts = ["localhost:*", "127.0.0.1:*", "[::1]:*"]
@@ -157,6 +169,8 @@ def create_app(database=None, start_worker=True):
     register_activity_mcp(mcp, activity)
     register_request_mcp(mcp, requests)
     register_policy_mcp(mcp, policy)
+    register_response_mcp(mcp, responses)
+    register_insights_mcp(mcp, insights)
     skills = SkillLibrary()
     register_skills_mcp(mcp, skills)
 
@@ -184,6 +198,7 @@ def create_app(database=None, start_worker=True):
     app.state.career, app.state.documents, app.state.discovery = career, documents, discovery
     app.state.activity, app.state.requests = activity, requests
     app.state.policy = policy
+    app.state.responses, app.state.insights = responses, insights
     app.add_middleware(BodyLimit)
     # The client address is the real one only when uvicorn trusts the proxy
     # (OPENINGS_TRUSTED_PROXIES); otherwise every proxied client shares one bucket.
@@ -489,6 +504,7 @@ def create_app(database=None, start_worker=True):
                 "jobs",
                 "postings",
                 "applications",
+                "responses",
                 "notes",
                 "events",
                 "runs",
@@ -582,6 +598,8 @@ def create_app(database=None, start_worker=True):
     register_activity_api(router, activity)
     register_request_api(router, requests)
     register_policy_api(router, policy)
+    register_response_api(router, responses)
+    register_insights_api(router, insights)
     app.include_router(router)
     # Building the transport also creates the session manager the lifespan runs.
     app.mount(

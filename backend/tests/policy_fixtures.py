@@ -3,6 +3,8 @@
 import sqlite3
 from contextlib import closing
 
+from outcome_fixtures import make_schema_ten
+
 SCHEMA_TEN_TABLES = ("policy_items", "policy_sections")
 SCHEMA_TEN_INDEXES = ("policy_items_section",)
 SCHEMA_TEN_COLUMNS = {
@@ -13,6 +15,7 @@ SCHEMA_TEN_COLUMNS = {
 
 def make_schema_nine(path):
     """Remove what schema 10 added from a current workspace file, keeping every other value."""
+    make_schema_ten(path)  # first undo schema 11
     with closing(sqlite3.connect(path)) as conn:
         for index in SCHEMA_TEN_INDEXES:
             conn.execute(f"DROP INDEX {index}")

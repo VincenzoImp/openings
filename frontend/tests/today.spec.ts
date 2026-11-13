@@ -56,10 +56,16 @@ test("Today answers the owner's three questions with the workspace's own numbers
     page,
     "/applications?readiness=blocked&status=draft&limit=1",
   );
-  // The synthetic policy's "No reply" decision says 45 days.
-  const waiting = await call(
-    page,
-    `/applications?status=applied&applied_until=${dayBefore(45)}&limit=1`,
+  // The synthetic policy's "No reply" decision says 45 days; the server reads it.
+  const waiting = await call(page, "/applications?no_reply_due=true&limit=1");
+  expect(waiting.no_reply.days).toBe(45);
+  expect(waiting.total).toBe(
+    (
+      await call(
+        page,
+        `/applications?status=applied&applied_until=${dayBefore(45)}&limit=1`,
+      )
+    ).total,
   );
   expect(ready.total).toBeGreaterThan(5);
   expect(waiting.total).toBeGreaterThanOrEqual(3);
@@ -95,7 +101,7 @@ test("Today answers the owner's three questions with the workspace's own numbers
   await expect(readyCard.locator(".btn.primary")).toHaveCount(1);
   await expect(rows.first().locator(".btn.primary")).toHaveAttribute(
     "href",
-    `#applications?application=${ready.items[0].id}`,
+    `#review?application=${ready.items[0].id}`,
   );
   await expect(
     rows.filter({ hasText: "Python Engineer" }).locator(".tag").first(),
@@ -111,7 +117,7 @@ test("Today answers the owner's three questions with the workspace's own numbers
   });
   await expect(more).toHaveAttribute(
     "href",
-    "#applications?readiness=ready&sort=ready&view=list",
+    "#applications?stage=ready&sort=deadline",
   );
 
   // Needs your decision: the newest open questions, answered in place, and
@@ -163,7 +169,7 @@ test("Today answers the owner's three questions with the workspace's own numbers
     first.getByRole("link", { name: "Open the requirements" }),
   ).toHaveAttribute(
     "href",
-    `#applications?application=${stopped[0].id}&detail=requirements`,
+    `#review?application=${stopped[0].id}&tab=requirements`,
   );
 
   // The pipeline strip: each stage counted, each a link to its list.
@@ -179,6 +185,18 @@ test("Today answers the owner's three questions with the workspace's own numbers
   await expect(pipeline.getByRole("link")).toHaveText(
     stages.map(([label, value]) => `${value}${label}`),
   );
+  // Preparing no longer includes the Ready ones: each step opens its own stage.
+  expect(
+    await pipeline
+      .getByRole("link")
+      .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
+  ).toEqual([
+    "#applications?stage=preparing",
+    "#applications?stage=ready&sort=deadline",
+    "#applications?stage=applied",
+    "#applications?stage=interview",
+    "#applications?stage=offer",
+  ]);
 
   // Since your last visit: the first visit covers the last 7 days.
   const since = card(page, "Since your last visit");
@@ -201,35 +219,35 @@ test("Today answers the owner's three questions with the workspace's own numbers
     String(counts.stage_counts.applied),
   );
   await expect(wait).toContainText(
-    `${waiting.total} applications were sent more than 45 days ago.`,
+    `${waiting.total} applications were sent more than 45 days ago without an answer.`,
   );
-  await expect(wait.getByRole("button", { name: /no reply/i })).toHaveCount(0);
-
-  // The progress of sent applications stays on Today until Insights exists.
-  const progress = card(page, "Progress");
-  await expect(
-    progress.getByRole("table", {
-      name: "Sent applications by the furthest stage they reached",
-    }),
-  ).toBeVisible();
-  await progress.getByLabel("Sent from").fill("2000-01-01");
-  await expect(page).toHaveURL(/#today\?since=2000-01-01$/);
-  await expect(progress).toContainText("In this period");
-  await progress.getByRole("button", { name: "All time" }).click();
-  await expect(page).toHaveURL(/#today$/);
+  // Closing them as no reply lists them first; keeping them open changes nothing.
+  await wait
+    .getByRole("button", { name: `Close ${waiting.total} as no reply` })
+    .click();
+  const dialog = page.locator("dialog[open]");
+  await expect(dialog.getByRole("listitem")).toHaveCount(waiting.total);
+  await dialog.getByRole("button", { name: "Keep them open" }).click();
+  await expect(dialog).toHaveCount(0);
+  // The progress of sent applications moved to Applications, Insights.
+  await expect(card(page, "Progress")).toHaveCount(0);
+  await expect(wait.getByRole("link", { name: "Insights" })).toHaveAttribute(
+    "href",
+    "#applications?section=insights",
+  );
   await fitsViewport(page);
 
-  // Record replies opens Applied, sent before the period.
+  // Record replies opens Applied past the period.
   await wait.getByRole("link", { name: "Record replies" }).click();
-  await expect(page).toHaveURL(
-    new RegExp(`#applications\\?status=applied&applied_until=${dayBefore(45)}`),
-  );
+  await expect(page).toHaveURL(/#applications\?stage=applied&waiting=1/);
   await expect(
-    page.getByRole("button", { name: /^Sent on or before .*: remove/ }),
+    page.getByRole("button", {
+      name: /^No reply for more than 45 days ?: remove this filter$/,
+    }),
   ).toBeVisible();
-  await expect(page.locator(".boardcaption")).toContainText(
-    `${waiting.total} application attempts`,
-  );
+  await expect(
+    page.getByRole("table", { name: "Applications" }).getByRole("row"),
+  ).toHaveCount(waiting.total + 1);
 
   // A stage of the pipeline opens Applications with that stage.
   await go(page, "today");
@@ -237,8 +255,13 @@ test("Today answers the owner's three questions with the workspace's own numbers
     .getByRole("navigation", { name: "Pipeline" })
     .getByRole("link", { name: /Interview$/ })
     .click();
-  await expect(page).toHaveURL(/#applications\?status=interview/);
+  await expect(page).toHaveURL(/#applications\?stage=interview/);
   await expect(page.locator(".main h1")).toHaveText("Applications");
+  await expect(
+    page.getByRole("group", { name: "Stage" }).getByRole("button", {
+      name: /^Interview/,
+    }),
+  ).toHaveAttribute("aria-pressed", "true");
 });
 
 test("keyboard only: the owner answers the agent's questions on Today", async ({
@@ -398,7 +421,6 @@ test("every card of Today has its empty, loading and error state", async ({
     ["Needs your decision", "No decision is waiting"],
     ["Since your last visit", "Nothing new"],
     ["Waiting for a reply", "No long wait"],
-    ["Progress", "No sent applications"],
   ])
     await expect(
       card(page, title).getByRole("heading", { name: state }),
@@ -464,7 +486,7 @@ test("on a phone the bottom bar never covers the end of Today", async ({
   const bar = await page
     .getByRole("navigation", { name: "Main" })
     .boundingBox();
-  const last = await card(page, "Progress").boundingBox();
+  const last = await card(page, "Waiting for a reply").boundingBox();
   expect(last!.y + last!.height).toBeLessThanOrEqual(bar!.y);
   await fitsViewport(page);
 });
