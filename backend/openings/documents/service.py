@@ -1,4 +1,4 @@
-"""Frozen application context, immutable documents and bounded SQLite file transfers."""
+"""DocumentService: upload limits, composed with contexts, revisions and files."""
 
 from __future__ import annotations
 
