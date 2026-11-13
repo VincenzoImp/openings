@@ -72,8 +72,7 @@ test("every shipped hash route still opens its screen, and design names are alia
   for (const route of [
     "today",
     "activity",
-    "inbox",
-    "shortlist",
+    "jobs",
     "applications",
     "collection",
     "career",
@@ -84,12 +83,33 @@ test("every shipped hash route still opens its screen, and design names are alia
     assert.equal(routes.routeOf("#" + route), route);
   assert.equal(routes.routeOf(""), "today");
   assert.equal(routes.routeOf("#no-such-page"), "today");
-  assert.equal(routes.routeOf("#inbox?queue=duplicates"), "inbox");
+  // Inbox and Shortlist were screens before Jobs; their links open its tabs.
+  assert.equal(routes.routeOf("#inbox"), "jobs");
+  assert.equal(routes.routeOf("#shortlist"), "jobs");
+  assert.equal(routes.routeOf("#inbox?queue=duplicates"), "jobs");
+  assert.equal(routes.canonicalHash("#inbox"), "#jobs");
+  assert.equal(routes.canonicalHash("#inbox?q=python"), "#jobs?q=python");
+  assert.equal(routes.canonicalHash("#shortlist"), "#jobs?section=shortlist");
+  assert.equal(
+    routes.canonicalHash("#inbox?queue=dismissed"),
+    "#jobs?section=dismissed",
+  );
+  assert.equal(
+    routes.canonicalHash("#inbox?queue=all&complete=false"),
+    "#jobs?complete=false&section=all",
+  );
+  assert.equal(
+    routes.canonicalHash("#inbox?queue=duplicates"),
+    "#jobs?signal=likely_duplicate",
+  );
+  assert.equal(
+    routes.canonicalHash("#jobs?queue=shortlist"),
+    "#jobs?section=shortlist",
+  );
+  assert.equal(routes.canonicalHash("#jobs?q=python"), null);
   // Overview was the first screen before Today; its links open Today.
   assert.equal(routes.routeOf("#overview"), "today");
   assert.equal(routes.routeOf("#overview?since=2026-01-01"), "today");
-  assert.equal(routes.routeOf("#jobs?q=python"), "inbox");
-  assert.equal(routes.canonicalHash("#jobs?q=python"), "#inbox?q=python");
   assert.equal(routes.canonicalHash("#overview"), "#today");
   // Overview's period is the Progress of Applications, Insights.
   assert.equal(
@@ -102,7 +122,7 @@ test("every shipped hash route still opens its screen, and design names are alia
   assert.equal(routes.destinationOf("review").item.label, "Applications");
 });
 
-test("navigation has three groups, and both job queues belong to Jobs", () => {
+test("navigation has three groups, and the old job queues belong to Jobs", () => {
   assert.deepEqual(
     routes.NAV.map((group) => [
       group.group,
@@ -114,8 +134,11 @@ test("navigation has three groups, and both job queues belong to Jobs", () => {
       ["System", ["Collection", "Settings"]],
     ],
   );
-  assert.equal(routes.destinationOf("shortlist").item.label, "Jobs");
-  assert.equal(routes.destinationOf("inbox").group, "Work");
+  assert.equal(
+    routes.destinationOf(routes.routeOf("#shortlist")).item.label,
+    "Jobs",
+  );
+  assert.equal(routes.destinationOf("jobs").group, "Work");
   assert.equal(routes.destinationOf("settings").group, "System");
   assert.equal(routes.TAB_BAR.length, 4);
   // Every screen is reachable from the navigation.
@@ -123,13 +146,22 @@ test("navigation has three groups, and both job queues belong to Jobs", () => {
     assert.ok(routes.destinationOf(route), route);
 });
 
-test("a job opens over a screen; an application opens its review page", () => {
-  assert.deepEqual(routes.overlayOf("#inbox?job=abc"), {
-    kind: "job",
-    id: "abc",
-  });
-  assert.equal(routes.overlayOf("#applications?application=x1"), null);
-  assert.equal(routes.overlayOf("#applications?view=list"), null);
+test("a job opens in Jobs; an application opens its review page", () => {
+  // The old drawer's address, with its tab, from any screen.
+  assert.equal(routes.canonicalHash("#today?job=abc"), "#jobs?job=abc");
+  assert.equal(
+    routes.canonicalHash("#applications?view=list&job=abc"),
+    "#jobs?job=abc",
+  );
+  assert.equal(
+    routes.canonicalHash("#inbox?job=abc&detail=notes"),
+    "#jobs?job=abc",
+  );
+  assert.equal(
+    routes.canonicalHash("#jobs?job=abc&detail=files"),
+    "#jobs?job=abc",
+  );
+  assert.equal(routes.canonicalHash("#jobs?section=all&job=abc"), null);
   // The old drawer's address, with its tab, from any screen.
   assert.equal(
     routes.canonicalHash("#applications?application=x1&detail=requirements"),

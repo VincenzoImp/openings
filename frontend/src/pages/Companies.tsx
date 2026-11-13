@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SourceYieldView } from "./collection/Yield";
 import {
   api,
   date,
@@ -181,6 +182,45 @@ export default function CompaniesPage() {
     const timer = setInterval(resource.reload, 5000);
     return () => clearInterval(timer);
   }, [collecting]);
+  const tabs = (
+    <Tabs
+      label="Collection sections"
+      value={tab}
+      onChange={(id) => {
+        setTab(id);
+        setFilters({ offset: "0" });
+        setSelection({});
+      }}
+      items={[
+        {
+          id: "searches",
+          label: "Saved searches",
+          count: resource.data.items.filter((s) => isSavedSearch(s.kind))
+            .length,
+        },
+        {
+          id: "companies",
+          label: "Companies",
+          count: resource.data.items.filter((s) => !isSavedSearch(s.kind))
+            .length,
+        },
+        { id: "yield", label: "Yield" },
+      ]}
+    />
+  );
+  // What each source yielded is a view of its own (collection/Yield.tsx).
+  if (tab === "yield")
+    return (
+      <>
+        <Heading
+          title="Collection"
+          description="What each saved search and company board brought, from collected jobs to employer answers."
+        />
+        <CollectionControl compact />
+        {tabs}
+        <SourceYieldView />
+      </>
+    );
   return (
     <>
       <Heading
@@ -195,29 +235,7 @@ export default function CompaniesPage() {
         </Button>
       </Heading>
       <CollectionControl compact />
-      <Tabs
-        label="Collection sections"
-        value={tab}
-        onChange={(id) => {
-          setTab(id);
-          setFilters({ offset: "0" });
-          setSelection({});
-        }}
-        items={[
-          {
-            id: "searches",
-            label: "Saved searches",
-            count: resource.data.items.filter((s) => isSavedSearch(s.kind))
-              .length,
-          },
-          {
-            id: "companies",
-            label: "Companies",
-            count: resource.data.items.filter((s) => !isSavedSearch(s.kind))
-              .length,
-          },
-        ]}
-      />
+      {tabs}
       <p className="collection-explainer">
         {tab === "searches"
           ? "Search only the keywords and locations you choose, on your selected job boards. Each saved search has its own schedule."

@@ -28,14 +28,8 @@ export const NAV: NavGroup[] = [
         routes: ["applications", "review"],
         count: "ready",
       },
-      // Inbox and Shortlist are the two queues of one Jobs destination; the
-      // page keeps both routes until it is rebuilt (stage 4).
-      {
-        id: "inbox",
-        label: "Jobs",
-        routes: ["inbox", "shortlist"],
-        count: "inbox",
-      },
+      // To review (the old Inbox), Shortlist, Dismissed and All are tabs of Jobs.
+      { id: "jobs", label: "Jobs", count: "inbox" },
       { id: "activity", label: "Activity", count: "questions" },
     ],
   },
@@ -57,15 +51,14 @@ export const NAV: NavGroup[] = [
 ];
 
 /** The destinations of the bottom bar on narrow screens; the rest is under More. */
-export const TAB_BAR = ["today", "applications", "inbox", "activity"];
+export const TAB_BAR = ["today", "applications", "jobs", "activity"];
 
 /** Titles of the screens, by route. */
 export const SCREENS: Record<string, string> = {
   today: "Today",
   applications: "Applications",
   review: "Application review",
-  inbox: "Inbox",
-  shortlist: "Shortlist",
+  jobs: "Jobs",
   activity: "Activity",
   career: "Career",
   policy: "Policy",
@@ -80,7 +73,8 @@ export const SCREENS: Record<string, string> = {
  */
 export const ALIASES: Record<string, string> = {
   overview: "today",
-  jobs: "inbox",
+  inbox: "jobs",
+  shortlist: "jobs",
 };
 
 /** Screens built with the design system; the others keep the older stylesheet. */
@@ -88,6 +82,7 @@ export const REBUILT = [
   "today",
   "applications",
   "review",
+  "jobs",
   "activity",
   "career",
   "policy",
@@ -131,11 +126,34 @@ function upgradeApplications(params: URLSearchParams) {
   return changed;
 }
 
+// The queues of the old Inbox page, as tabs and filters of Jobs.
+const OLD_QUEUES: Record<string, Record<string, string>> = {
+  inbox: {},
+  shortlist: { section: "shortlist" },
+  dismissed: { section: "dismissed" },
+  all: { section: "all" },
+  applications: { section: "all" },
+  duplicates: { signal: "likely_duplicate" },
+};
+/** `#inbox`, `#shortlist` and `#jobs?queue=…` as the tabs of Jobs. */
+function upgradeJobs(name: string, params: URLSearchParams) {
+  const queue =
+    params.get("queue") ?? (name === "shortlist" ? "shortlist" : null);
+  params.delete("queue");
+  for (const [key, value] of Object.entries(OLD_QUEUES[queue || "inbox"] || {}))
+    params.set(key, value);
+  // The old drawer's tab; the job's page shows everything at once.
+  params.delete("detail");
+  return `#jobs${params.size ? "?" + params : ""}`;
+}
+
 /**
  * The hash rewritten to its canonical route, keeping the query; null if it
  * already is. An application opened over any screen (`?application=`, the old
- * drawer, with `detail=` for its tab) is its review page, and the old
- * Overview's period (`#overview?since=`) is the Progress of Insights.
+ * drawer, with `detail=` for its tab) is its review page, a job opened over any
+ * screen (`?job=`) is selected in Jobs, the old Inbox and Shortlist and their
+ * `queue=` are the tabs of Jobs, and the old Overview's period
+ * (`#overview?since=`) is the Progress of Insights.
  */
 export function canonicalHash(hash: string) {
   const [name, query = ""] = hash.replace(/^#/, "").split("?");
@@ -147,6 +165,19 @@ export function canonicalHash(hash: string) {
     if (detail === "posting") next.set("pane", "posting");
     else if (detail) next.set("tab", detail);
     return `#review?${next}`;
+  }
+  const job = params.get("job");
+  if (job && !["jobs", "inbox", "shortlist"].includes(name))
+    return `#jobs?${new URLSearchParams({ job })}`;
+  if (
+    name === "inbox" ||
+    name === "shortlist" ||
+    (name === "jobs" && params.has("queue"))
+  )
+    return upgradeJobs(name, params);
+  if (name === "jobs" && params.has("detail")) {
+    params.delete("detail");
+    return `#jobs${params.size ? "?" + params : ""}`;
   }
   if (name === "overview" && (params.has("since") || params.has("until"))) {
     params.set("section", "insights");
@@ -164,10 +195,4 @@ export function destinationOf(route: string) {
       if (item.id === route || item.routes?.includes(route))
         return { group: group.group, item };
   return null;
-}
-
-/** A job opened over the current screen, from `?job=`. */
-export function overlayOf(hash: string) {
-  const job = new URLSearchParams(hash.split("?")[1] || "").get("job");
-  return job ? { kind: "job" as const, id: job } : null;
 }

@@ -233,14 +233,18 @@ export function Details({
           </Button>
         </div>
       </form>
-      <AskAgent application={application} {...links} />
+      <AskAgent
+        subjectType="application"
+        subjectId={application.id}
+        {...links}
+      />
       <section className="stack" aria-labelledby="job-title">
         <h3 id="job-title">The job</h3>
         <p className="muted">
           Its posting, notes, files and every application to it are on the job.
         </p>
         <div className="row">
-          <a className="btn sm" href={`#inbox?job=${application.job_id}`}>
+          <a className="btn sm" href={`#jobs?job=${application.job_id}`}>
             Open the job
           </a>
           <Button

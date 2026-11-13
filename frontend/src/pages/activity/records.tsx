@@ -135,7 +135,7 @@ export function RecordLink({
     return open(`#review?application=${applicationId}`, () =>
       onOpenApplication(applicationId),
     );
-  if (jobId) return open(`#inbox?job=${jobId}`, () => onOpenJob(jobId));
+  if (jobId) return open(`#jobs?job=${jobId}`, () => onOpenJob(jobId));
   const screen = type && id ? screenOf(type, id) : undefined;
   if (screen) return <a href={screen}>{text}</a>;
   return type ? text : null;

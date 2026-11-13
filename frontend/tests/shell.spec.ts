@@ -236,18 +236,23 @@ test("design names are aliases and old routes keep their deep links", async ({
     .getByRole("link", { name: /^Applications/ });
   if (!isNarrow(page))
     await expect(applications).toHaveAttribute("aria-current", "page");
-  await go(page, "jobs?queue=dismissed");
-  await expect(page).toHaveURL(/#inbox\?queue=dismissed$/);
-  await expect(page.getByRole("tab", { name: "Dismissed" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  // Inbox and Shortlist are two queues of the one Jobs destination.
+  // The old Inbox and Shortlist addresses open the tabs of Jobs.
   const jobs = page
     .getByRole("navigation", { name: "Main" })
     .getByRole("link", { name: /^Jobs/ });
-  for (const route of ["inbox", "shortlist"]) {
+  for (const [route, url, tab] of [
+    ["jobs?queue=dismissed", /#jobs\?section=dismissed$/, /^Dismissed/],
+    ["inbox?queue=dismissed", /#jobs\?section=dismissed$/, /^Dismissed/],
+    ["inbox", /#jobs$/, /^To review/],
+    ["shortlist", /#jobs\?section=shortlist$/, /^Shortlist/],
+    ["inbox?queue=all", /#jobs\?section=all$/, /^All$/],
+  ] as const) {
     await go(page, route);
+    await expect(page).toHaveURL(url);
+    await expect(page.getByRole("tab", { name: tab })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     await expect(jobs).toHaveAttribute("aria-current", "page");
   }
   await go(page, "no-such-screen");
@@ -318,6 +323,8 @@ test("no horizontal page scroll from 360 to 1600 px on every screen", async ({
   const ready = (await api("/applications?status=draft&ready=true&limit=1"))
     .items[0];
   const sent = (await api("/applications?status=interview&limit=1")).items[0];
+  // A job with every kind of signal: a likely duplicate of a job in progress.
+  const flagged = (await api("/jobs?signal=likely_duplicate&limit=1")).items[0];
   for (const width of [360, 390, 600, 860, 861, 1024, 1280, 1600]) {
     await page.setViewportSize({ width, height: 900 });
     for (const [route, title] of [
@@ -328,7 +335,10 @@ test("no horizontal page scroll from 360 to 1600 px on every screen", async ({
       [`review?application=${ready.id}`, ready.job.title],
       [`review?application=${sent.id}&tab=timeline`, sent.job.title],
       [`review?application=${ready.id}&tab=details`, ready.job.title],
-      ["inbox", "Inbox"],
+      ["jobs", "Jobs"],
+      [`jobs?job=${flagged.id}`, "Jobs"],
+      ["jobs?section=dismissed", "Jobs"],
+      ["jobs?section=all", "Jobs"],
       ["activity", "Activity"],
       ["activity?section=requests", "Activity"],
       ["activity?section=runs", "Activity"],
@@ -339,6 +349,7 @@ test("no horizontal page scroll from 360 to 1600 px on every screen", async ({
       ["templates", "Templates"],
       ["templates?section=rules", "Templates"],
       ["collection", "Collection"],
+      ["collection?section=yield", "Collection"],
       ["settings", "Settings"],
     ]) {
       await page.goto("/#" + route);

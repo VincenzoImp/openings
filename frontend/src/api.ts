@@ -48,6 +48,59 @@ export interface ApplicationSummary extends Versioned {
   status: Stage;
   outcome: string | null;
 }
+/** A policy rule that matched a job when it was collected. */
+export interface MatchedRule {
+  item_id: string;
+  label: string;
+  action: "dismiss" | "flag";
+}
+/** What collection found out about a job, without a model. */
+export interface JobSignals {
+  /** False until the signals of a job collected before 0.21 are computed. */
+  computed: boolean;
+  language: string | null;
+  language_confidence: number | null;
+  /** Groups of language codes; one language of a group is enough. */
+  required: string[][];
+  welcome: string[];
+  duplicate_checked: boolean;
+  duplicate: {
+    job_id: string;
+    confidence: number;
+    tier: "high" | "medium" | "low";
+  } | null;
+  no_longer_listed: boolean;
+  unlisted_at: string | null;
+  rules: MatchedRule[];
+}
+export type DismissedBy = "rule" | "agent" | "owner" | "other";
+export interface Dismissal {
+  at: string | null;
+  by: Actor;
+  category: DismissedBy;
+  rule: { item_id: string; label: string } | null;
+  reason: string;
+}
+/** One sighting of a posting by a source. */
+export interface Observation {
+  id: string;
+  source_id: string | null;
+  source_name: string | null;
+  source_kind: string | null;
+  identity: string;
+  url: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  unlisted_at: string | null;
+}
+export interface JobCounts {
+  all: number;
+  inbox: number;
+  shortlist: number;
+  applications: number;
+  dismissed: number;
+  dismissed_by: Record<DismissedBy, number>;
+}
 export interface Job extends Versioned {
   title: string;
   company: string;
@@ -59,15 +112,62 @@ export interface Job extends Versioned {
   is_remote?: boolean | null;
   date_posted?: string;
   job_type?: string;
-  postings?: Json[];
+  postings?: Observation[];
   triage: Triage;
   metadata: Json;
   salary?: string | Json | number;
   source?: string;
-  availability?: string;
   notes?: Note[];
   application: ApplicationSummary | null;
   application_count: number;
+  signals: JobSignals;
+  dismissal: Dismissal | null;
+}
+export interface JobList extends ListResult<Job> {
+  counts?: JobCounts;
+}
+export interface RulePreview {
+  matches: number;
+  inbox: number;
+  pending: number;
+  examples: { id: string; title: string; company: string }[];
+}
+export interface YieldCounts {
+  collected: number;
+  to_review: number;
+  shortlisted: number;
+  applied: number;
+  responded: number;
+  interviews: number;
+  offers: number;
+  dismissed: number;
+  likely_duplicates: number;
+  no_longer_listed: number;
+}
+export interface YieldRow extends YieldCounts {
+  source_id: string | null;
+  name: string;
+  kind: "search" | "company" | "feed" | "manual";
+  kind_label: string;
+  source_kind: string | null;
+  enabled: boolean | null;
+  last_run_at: string | null;
+  last_error: string | null;
+  providers: (YieldCounts & { provider: string; label: string })[];
+  dismissed_by: Record<DismissedBy, number>;
+  dismissed_by_rule: { item_id: string; label: string; dismissed: number }[];
+  kept_rate: number | null;
+  withheld: string | null;
+}
+export interface SourceYield {
+  period: { since: string | null; until: string | null };
+  min_sample: number;
+  items: YieldRow[];
+  total: YieldCounts &
+    Pick<
+      YieldRow,
+      "name" | "dismissed_by" | "dismissed_by_rule" | "kept_rate" | "withheld"
+    > & { sources: number };
 }
 export interface DuplicateJob extends Versioned {
   title: string;

@@ -1,28 +1,29 @@
 import type { FormEvent } from "react";
-import {
-  api,
-  type AgentRequest,
-  type Application,
-  type ListResult,
-} from "../../api";
+import { api, type AgentRequest, type ListResult } from "../../api";
 import { Button, ErrorBanner, Field } from "../../design";
 import { useFresh } from "../../library/useFresh";
 import { RequestItem } from "../activity/Requests";
 import { useAct, type Links } from "../activity/records";
 
 const NONE: ListResult<AgentRequest> = { items: [], total: 0 };
+const EXAMPLES = {
+  application: "For example: rewrite the letter with more on data pipelines.",
+  job: "For example: find out whether this team hires remotely.",
+};
 
-/** Requests for the agent about this application: write one, follow the earlier ones. */
+/** Requests for the agent about an application or a job: write one, follow the earlier ones. */
 export function AskAgent({
-  application,
+  subjectType,
+  subjectId,
   ...links
-}: Links & { application: Application }) {
+}: Links & { subjectType: "application" | "job"; subjectId: string }) {
   const requests = useFresh<ListResult<AgentRequest>>(
-    `/requests?subject_type=application&subject_id=${application.id}&limit=10`,
+    `/requests?subject_type=${subjectType}&subject_id=${subjectId}&limit=10`,
     NONE,
     ["requests"],
   );
   const { act, busy } = useAct(requests.reload);
+  const titleId = `ask-${subjectType}-title`;
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -32,8 +33,8 @@ export function AskAgent({
       () =>
         api("/requests", "POST", {
           text,
-          subject_type: "application",
-          subject_id: application.id,
+          subject_type: subjectType,
+          subject_id: subjectId,
         }),
       "Request saved. Your agent reads it at its next run.",
     );
@@ -43,11 +44,11 @@ export function AskAgent({
     }
   }
   return (
-    <section className="stack" aria-labelledby="ask-title">
-      <h3 id="ask-title">Ask your agent</h3>
+    <section className="stack" aria-labelledby={titleId}>
+      <h3 id={titleId}>Ask your agent</h3>
       <form className="stack" onSubmit={send}>
         <Field
-          label="A request about this application"
+          label={`A request about this ${subjectType}`}
           hint="Your agent reads it at the start of its next run. It never submits an application, contacts an employer or records Applied for you."
         >
           <textarea
@@ -55,7 +56,7 @@ export function AskAgent({
             rows={3}
             maxLength={4000}
             required
-            placeholder="For example: rewrite the letter with more on data pipelines."
+            placeholder={EXAMPLES[subjectType]}
           />
         </Field>
         <div className="row">

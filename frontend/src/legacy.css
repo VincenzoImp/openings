@@ -185,37 +185,6 @@
 :where(.legacy) .smalltext {
   font-size: 10px;
 }
-:where(.legacy) .joblist {
-  overflow: hidden;
-}
-:where(.legacy) .jobrow {
-  display: grid;
-  grid-template-columns: 38px minmax(180px, 1fr) 150px 35px;
-  align-items: center;
-  gap: 13px;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--line);
-  cursor: pointer;
-}
-:where(.legacy) .jobrow:last-child {
-  border-bottom: 0;
-}
-:where(.legacy) .jobrow:hover {
-  background: var(--hover);
-}
-:where(.legacy) .jobtitle {
-  font-size: 12px;
-  font-weight: 550;
-  margin-bottom: 4px;
-}
-:where(.legacy) .jobmeta {
-  font-size: 10px;
-  color: var(--muted);
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex-wrap: wrap;
-}
 :where(.legacy) .date {
   font-size: 10px;
   color: var(--muted);
@@ -280,17 +249,6 @@
 }
 :where(.legacy) .sectiontitle h2 {
   font-size: 22px;
-}
-:where(.legacy) .section-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-  border-top: 1px solid var(--line);
-  margin-top: 23px;
-  padding-top: 18px;
-  font-size: 10px;
-  color: var(--muted);
 }
 :where(.legacy) .source-editor {
   background: var(--paper);
@@ -432,38 +390,6 @@
 :where(.legacy) .drawerfoot .actions {
   gap: 6px;
 }
-:where(.legacy) .documentrow {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--card);
-  margin-bottom: 10px;
-}
-:where(.legacy) .documentrow .doccopy {
-  flex: 1;
-}
-:where(.legacy) .documentrow strong {
-  font-size: 11px;
-  font-weight: 500;
-  display: block;
-}
-:where(.legacy) .documentrow small {
-  display: block;
-  font-size: 9px;
-  color: var(--muted);
-  margin-top: 3px;
-}
-:where(.legacy) .pdf-preview {
-  width: 100%;
-  height: 440px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #deded7;
-  margin-top: 15px;
-}
 :where(.legacy) .modal .field {
   margin-bottom: 15px;
 }
@@ -482,19 +408,6 @@
 :where(.legacy) .modal .note {
   margin-top: 17px;
 }
-:where(.legacy) .filepick {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  overflow: hidden;
-}
-:where(.legacy) .inline-link {
-  font-size: 11px;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  color: var(--muted);
-}
 :where(.legacy) .hint {
   font-size: 10px;
   color: var(--muted);
@@ -510,16 +423,6 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-}
-@media (max-width: 1120px) {
-  :where(.legacy) .jobrow {
-    grid-template-columns: 35px minmax(150px, 1fr) 110px 30px;
-    gap: 10px;
-    padding: 19px;
-  }
-  :where(.legacy) .jobrow .location-col {
-    font-size: 9px;
-  }
 }
 @media (max-width: 850px) {
   :where(.legacy) .toolbar {
@@ -553,25 +456,6 @@
   :where(.legacy) .toolbar .smalltext {
     display: none;
   }
-  :where(.legacy) .jobrow {
-    grid-template-columns: 32px minmax(0, 1fr);
-    gap: 11px;
-    padding: 18px 15px;
-  }
-  :where(.legacy) .jobrow .location-col,
-  :where(.legacy) .jobrow > .iconbtn {
-    display: none;
-  }
-  :where(.legacy) .jobtitle {
-    font-size: 11px;
-  }
-  :where(.legacy) .jobmeta {
-    font-size: 9px;
-    gap: 5px;
-  }
-  :where(.legacy) .jobmeta .tag:not(.posting-status) {
-    display: none;
-  }
   :where(.legacy) .date {
     font-size: 9px;
   }
@@ -590,9 +474,6 @@
   }
   :where(.legacy) .sectioncard {
     padding: 20px;
-  }
-  :where(.legacy) .section-footer {
-    align-items: flex-start;
   }
   :where(.legacy) .table {
     min-width: 550px;
@@ -616,14 +497,9 @@
 :where(.legacy) .smalltext,
 :where(.legacy) .hint,
 :where(.legacy) .field small,
-:where(.legacy) .settingrow p,
-:where(.legacy) .section-footer {
+:where(.legacy) .settingrow p {
   font-size: 12px;
 }
-:where(.legacy) .jobtitle {
-  font-size: 14px;
-}
-:where(.legacy) .jobmeta,
 :where(.legacy) .companyfacts {
   font-size: 11px;
 }
@@ -645,37 +521,6 @@
 }
 :where(.legacy) .search {
   min-width: 170px;
-}
-:where(.legacy) .jobrow {
-  grid-template-columns: minmax(0, 1fr) minmax(90px, 160px) 85px 35px;
-  gap: 16px;
-}
-:where(.legacy) .jobmain {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-  padding: 0;
-  text-align: left;
-}
-:where(.legacy) .jobmain > div {
-  min-width: 0;
-}
-:where(.legacy) .jobmain .jobtitle {
-  display: block;
-  line-height: 1.5;
-}
-:where(.legacy) .jobmain .jobmeta {
-  flex-wrap: wrap;
-  margin-top: 5px;
-}
-:where(.legacy) .jobrow .location-col {
-  font-size: 12px;
-  color: var(--muted);
-  overflow-wrap: anywhere;
-}
-:where(.legacy) .joblist {
-  overflow: hidden;
 }
 :where(.legacy) .list-footer {
   gap: 16px;
@@ -705,11 +550,6 @@
 :where(.legacy) .form-section {
   margin-top: 23px;
 }
-:where(.legacy) .drawer-meta {
-  margin-bottom: 22px;
-  font-size: 12px;
-  line-height: 1.8;
-}
 :where(.legacy) .drawercontent > .tabs {
   margin-bottom: 25px;
   margin-top: 0;
@@ -717,69 +557,6 @@
 :where(.legacy) .drawerfoot > .actions {
   justify-content: flex-end;
   flex: 1;
-}
-:where(.legacy) .external-link {
-  display: inline-flex;
-  margin-bottom: 18px;
-}
-:where(.legacy) .note-entry {
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--card);
-  margin-bottom: 14px;
-}
-:where(.legacy) .note-entry p {
-  white-space: pre-wrap;
-  color: var(--ink);
-  font-size: 13px;
-}
-:where(.legacy) .note-entry .section-footer {
-  margin-top: 10px;
-  padding: 0;
-  border: 0;
-}
-
-:where(.legacy) .documentrow {
-  padding: 12px;
-}
-:where(.legacy) .documentrow .doccopy {
-  min-width: 0;
-}
-:where(.legacy) .documentrow strong {
-  overflow-wrap: anywhere;
-  font-size: 12px;
-}
-:where(.legacy) .documentrow small {
-  font-size: 11px;
-}
-:where(.legacy) .document-files {
-  margin-top: 14px;
-}
-:where(.legacy) .upload-button {
-  position: relative;
-  cursor: pointer;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  margin-top: 10px;
-}
-:where(.legacy) .upload-button input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-  width: 100%;
-}
-:where(.legacy) .upload-button:focus-within {
-  outline: 2px solid var(--accent);
-}
-:where(.legacy) .upload-button.disabled {
-  opacity: 0.5;
-  pointer-events: none;
-}
-:where(.legacy) .pdf-preview {
-  height: 480px;
-  background: var(--shell);
 }
 :where(.legacy) .full-grid {
   grid-column: 1/-1;
@@ -891,10 +668,6 @@
 :where(.legacy) .formgrid > .field + .field {
   margin-top: 0;
 }
-:where(.legacy) .section-footer {
-  gap: 16px;
-  line-height: 1.7;
-}
 :where(.legacy) .token-list .settingrow {
   padding: 15px 0;
 }
@@ -953,31 +726,7 @@
 :where(.legacy) .task-entry .source-error {
   display: block;
 }
-@media (max-width: 1150px) {
-  :where(.legacy) .jobrow {
-    grid-template-columns: minmax(0, 1fr) 115px 74px 30px;
-    gap: 10px;
-  }
-}
 @media (max-width: 600px) {
-  :where(.legacy) .jobrow {
-    grid-template-columns: minmax(0, 1fr) 70px;
-    gap: 12px;
-    padding: 18px 15px;
-  }
-  :where(.legacy) .jobrow > .location-col,
-  :where(.legacy) .jobrow > .iconbtn {
-    display: none;
-  }
-  :where(.legacy) .jobmain {
-    gap: 11px;
-  }
-  :where(.legacy) .jobtitle {
-    font-size: 13px;
-  }
-  :where(.legacy) .jobmeta {
-    font-size: 11px;
-  }
   :where(.legacy) .toolbar {
     display: flex;
   }
@@ -1063,8 +812,7 @@
   margin: 20px 0;
   padding-top: 14px;
 }
-:where(.legacy) .advanced-json summary,
-:where(.legacy) .provenance summary {
+:where(.legacy) .advanced-json summary {
   cursor: pointer;
   color: var(--muted);
   font-size: 12px;
@@ -1082,23 +830,15 @@
   border: 0;
   padding: 0;
 }
-:where(.legacy) .collection-caption,
-:where(.legacy) .selection-head {
+:where(.legacy) .collection-caption {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
   margin: 16px 0;
 }
-:where(.legacy) .collection-caption .checkline,
-:where(.legacy) .selection-head .checkline {
+:where(.legacy) .collection-caption .checkline {
   margin: 0;
-}
-:where(.legacy) .selection-head {
-  margin: 0;
-  padding: 14px 22px;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface);
 }
 :where(.legacy) .bulkbar {
   display: flex;
@@ -1118,21 +858,6 @@
 :where(.legacy) .bulkbar .btn {
   font-size: 12px;
   padding: 7px 11px;
-}
-:where(.legacy) .filter-panel {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--card);
-  margin-bottom: 20px;
-}
-:where(.legacy) .filter-panel > summary {
-  padding: 13px 18px;
-  cursor: pointer;
-  font-size: 12px;
-}
-:where(.legacy) .filter-panel > summary span {
-  margin-left: 8px;
-  font-size: 11px;
 }
 :where(.legacy) .filter-grid {
   display: grid;
@@ -1215,34 +940,6 @@
   max-height: 65vh;
   overflow: auto;
 }
-:where(.legacy) .hash-value {
-  font-family: monospace;
-  font-size: 11px;
-  overflow-wrap: anywhere;
-}
-:where(.legacy) .provenance {
-  margin: 20px 0;
-  border-block: 1px solid var(--line);
-  padding: 14px 0;
-}
-:where(.legacy) .provenance article {
-  margin-top: 12px;
-  overflow-wrap: anywhere;
-}
-
-:where(.legacy) .jobrow {
-  grid-template-columns:
-    20px minmax(180px, 1fr) minmax(120px, 0.45fr)
-    100px 26px;
-}
-:where(.legacy) .jobrow .row-select {
-  width: 15px;
-  height: 15px;
-}
-:where(.legacy) .jobrow .location-col small {
-  display: block;
-  color: var(--accent);
-}
 @media (min-width: 1650px) {
   :where(.legacy) .provider-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1272,12 +969,6 @@
   :where(.legacy) .filter-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  :where(.legacy) .jobrow {
-    grid-template-columns: 18px minmax(120px, 1fr) 90px 25px;
-  }
-  :where(.legacy) .jobrow .location-col {
-    display: none;
-  }
   :where(.legacy) .provider-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1293,10 +984,6 @@
     gap: 12px;
     padding: 14px;
   }
-  :where(.legacy) .filter-panel > summary span {
-    display: block;
-    margin-left: 14px;
-  }
   :where(.legacy) .collection-control.compact {
     padding: 17px;
   }
@@ -1307,23 +994,6 @@
   :where(.legacy) .collection-caption > a {
     max-width: 140px;
     text-align: right;
-  }
-  :where(.legacy) .selection-head {
-    padding: 12px 15px;
-  }
-  :where(.legacy) .selection-head > span {
-    display: none;
-  }
-  :where(.legacy) .jobrow {
-    grid-template-columns: 18px minmax(0, 1fr) 72px;
-    gap: 9px;
-    padding-inline: 14px;
-  }
-  :where(.legacy) .jobrow .jobmain {
-    gap: 9px;
-  }
-  :where(.legacy) .jobrow > .iconbtn {
-    display: none;
   }
   :where(.legacy) .bulkbar {
     gap: 7px;
@@ -1361,11 +1031,6 @@
 :where(.legacy) .formgrid > .full {
   grid-column: 1/-1;
 }
-:where(.legacy) .file-filters {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(120px, 0.6fr);
-  gap: 12px;
-}
 /* Source icons describe the type; company branding is never fabricated. */
 :where(.legacy) .source-icon {
   display: grid;
@@ -1383,21 +1048,6 @@
   line-height: 1.7;
   margin: 12px 0 18px;
   max-width: 800px;
-}
-:where(.legacy) .jobrow .location-col time {
-  display: block;
-  color: var(--faint);
-  font-size: 10px;
-  margin-top: 4px;
-}
-:where(.legacy) .mobile-job-location {
-  display: none;
-}
-@media (max-width: 950px) {
-  :where(.legacy) .jobmeta .mobile-job-location {
-    display: block;
-    flex-basis: 100%;
-  }
 }
 :where(.legacy) .password-form .form-actions {
   justify-content: flex-end;
@@ -1591,91 +1241,6 @@
     width: 100%;
   }
 }
-:where(.legacy) .job-shortlist {
-  display: inline-flex;
-  color: var(--accent);
-}
-:where(.legacy) .job-shortlist .icon {
-  width: 13px;
-  height: 13px;
-  fill: currentColor;
-}
-:where(.legacy) .job-application-stage {
-  font-size: 10px;
-}
-:where(.legacy) .job-application-summary {
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--hover);
-  margin: 0 0 20px;
-}
-:where(.legacy) .job-application-summary p {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.6;
-  margin: 4px 0 0;
-}
-:where(.legacy) .job-application-summary .sectiontitle {
-  gap: 12px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-}
-:where(.legacy) .job-application-summary .sectiontitle > div {
-  flex: 1;
-  min-width: 180px;
-}
-:where(.legacy) .job-application-summary summary {
-  color: var(--muted);
-  font-size: 11px;
-  cursor: pointer;
-}
-:where(.legacy) .application-history-link {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line);
-  color: var(--ink);
-  font-size: 12px;
-  text-align: left;
-}
-:where(.legacy) .application-history-link > span {
-  flex: 1;
-  min-width: 0;
-}
-:where(.legacy) .application-history-link time {
-  color: var(--muted);
-  font-size: 11px;
-  white-space: nowrap;
-}
-:where(.legacy) .application-history-link .icon {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-}
-:where(.legacy) .job-bulk-errors {
-  margin: 12px 0;
-}
-:where(.legacy) .job-bulk-errors ul {
-  max-height: 180px;
-  overflow: auto;
-  line-height: 1.7;
-  padding-left: 20px;
-}
-/* Preparation and review share the same revision-specific state in every view. */
-
-:where(.legacy) .job-maintenance > summary {
-  cursor: pointer;
-  font-weight: 600;
-}
-
-:where(.legacy) .job-maintenance {
-  border-top: 1px solid var(--line);
-  padding-top: 18px;
-  margin-top: 24px;
-}
 
 :where(.legacy) .conflict-recovery {
   display: block;
@@ -1690,194 +1255,4 @@
   min-height: 0;
   padding: 12px 0;
   justify-content: flex-start;
-}
-:where(.legacy) .file-preview-dialog {
-  width: min(900px, calc(100vw - 32px));
-}
-:where(.legacy) .file-image {
-  display: block;
-  max-width: 100%;
-  max-height: 65dvh;
-  object-fit: contain;
-  margin: auto;
-}
-:where(.legacy) .file-text {
-  max-height: 60dvh;
-  overflow: auto;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-@media (max-width: 600px) {
-  :where(.legacy) .documentrow {
-    gap: 6px;
-  }
-}
-/* Application planning: priority, deadline and employer requirements. */
-
-/* Requests for the agent. */
-:where(.legacy) .request-form textarea {
-  width: 100%;
-}
-:where(.legacy) .request-form .actions {
-  margin-top: 10px;
-}
-:where(.legacy) .request-card + .request-card {
-  margin-top: 14px;
-}
-:where(.legacy) .request-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-:where(.legacy) .request-head .tag {
-  flex: none;
-  margin-top: 2px;
-}
-:where(.legacy) .request-text {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-:where(.legacy) .request-card .smalltext {
-  margin: 6px 0 0;
-}
-:where(.legacy) .request-result {
-  margin-top: 10px;
-}
-:where(.legacy) .request-result strong {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-:where(.legacy) .request-card > .actions {
-  margin-top: 10px;
-}
-:where(.legacy) .ask-agent {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 0 0 16px;
-}
-:where(.legacy) .request-history {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-}
-:where(.legacy) .request-history h3 {
-  margin: 0 0 10px;
-  font-size: 12px;
-}
-:where(.legacy) .request-history .request-card {
-  padding: 10px 0;
-  border-top: 1px solid var(--line);
-}
-:where(.legacy) .request-history .request-card:first-of-type {
-  border-top: 0;
-  padding-top: 0;
-}
-@media (max-width: 600px) {
-  :where(.legacy) .request-head {
-    flex-direction: column-reverse;
-    gap: 6px;
-  }
-}
-/* Ready as a stored step of a Preparing application. */
-
-:where(.legacy) .duplicate-filters .checkline {
-  margin: 0;
-  font-size: 11px;
-}
-:where(.legacy) .duplicate-groups {
-  display: grid;
-  gap: 14px;
-}
-:where(.legacy) .duplicate-group {
-  overflow: hidden;
-}
-:where(.legacy) .duplicate-group > header {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface);
-  border-radius: 10px 10px 0 0;
-  font-size: 12px;
-}
-:where(.legacy) .duplicate-row {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 18px;
-  border-bottom: 1px solid var(--line);
-  color: var(--ink);
-  text-align: left;
-}
-:where(.legacy) .duplicate-row:last-child {
-  border-bottom: none;
-}
-:where(.legacy) .duplicate-row > span:first-child {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-  overflow-wrap: anywhere;
-}
-:where(.legacy) .duplicate-row .jobtitle {
-  margin: 0;
-}
-:where(.legacy) button.duplicate-row:hover {
-  background: var(--surface);
-}
-:where(.legacy) .duplicate-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 7px;
-  font-size: 11px;
-  color: var(--muted);
-}
-:where(.legacy) .duplicate-panel {
-  display: grid;
-  gap: 8px;
-  margin: 16px 0;
-  font-size: 12px;
-}
-:where(.legacy) .duplicate-panel .duplicate-row {
-  padding: 10px 0;
-}
-@media (max-width: 600px) {
-  :where(.legacy) .duplicate-filters {
-    flex-wrap: wrap;
-  }
-  :where(.legacy) .duplicate-row {
-    flex-wrap: wrap;
-    padding: 12px 14px;
-  }
-  :where(.legacy) .duplicate-row > span:first-child {
-    flex-basis: calc(100% - 40px);
-  }
-}
-
-/* A link inside a sentence. */
-:where(.legacy) .inline-link {
-  display: inline;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-:where(.legacy) .inline-link:hover {
-  color: var(--accent);
 }
