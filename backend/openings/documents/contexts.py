@@ -5,7 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 
-from ..career import DEFAULT_GUIDANCE, DEFAULT_PROFILE, _get, _page, _setting
+from ..career.models import DEFAULT_GUIDANCE, DEFAULT_PROFILE
+from ..career.records import _get, _page, _setting
 from ..common import decode_record, encode, new_id, now
 from ..errors import DomainError, conflict, missing
 from ..policy import frozen_policy

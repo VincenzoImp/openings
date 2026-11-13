@@ -12,7 +12,7 @@ from urllib.parse import quote
 from fastapi import Request
 
 from ..actors import acting_as, current_actor, from_columns
-from ..career import _get, _page
+from ..career.records import _get, _page
 from ..common import encode, new_id, now
 from ..errors import DomainError, conflict, missing
 from ..transfers import SnapshotResponse

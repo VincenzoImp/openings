@@ -8,7 +8,7 @@ from typing import Any, Literal
 
 from pydantic import Field, field_validator
 
-from ..career import Input
+from ..career.models import Input
 
 OwnerType = Literal["knowledge", "template", "document", "context", "job"]
 
