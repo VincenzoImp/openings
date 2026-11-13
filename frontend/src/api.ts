@@ -5,6 +5,36 @@ export interface ListResult<T> {
   stage_counts?: Record<string, number>;
   ready_count?: number;
   facets?: Record<string, string[]>;
+  /** On the application list: the no-reply period and how many wait past it. */
+  no_reply?: NoReply;
+}
+/** The period after which a sent application has had no reply, from the policy. */
+export interface NoReply {
+  days: number;
+  source: "policy" | "default";
+  item_id: string | null;
+  confirmed: boolean;
+  /** Applied applications sent longer ago than `days`. */
+  due?: number;
+}
+export type ResponseKind = "rejection" | "interview" | "offer" | "other";
+/** An employer's answer to a sent application. */
+export interface EmployerResponse {
+  id: string;
+  application_id: string;
+  job_id?: string;
+  kind: ResponseKind;
+  /** The day it arrived, YYYY-MM-DD. */
+  date: string;
+  note: string;
+  /** A day the 0.20 upgrade took from the last change, not from a stage move. */
+  estimated: boolean;
+  origin: "manual" | "stage" | "upgrade";
+  version: number;
+  created_by: Actor;
+  updated_by: Actor;
+  created_at: string;
+  updated_at: string;
 }
 export interface Versioned {
   id: string;
@@ -152,6 +182,16 @@ export interface Application extends Versioned {
     approved: number;
   }[];
   stale_inputs?: StaleInput[];
+  /** The day an application closed as no_response was concluded. */
+  concluded_on?: string | null;
+  responses?: EmployerResponse[];
+  last_response?: {
+    id: string;
+    kind: ResponseKind;
+    date: string;
+    estimated: boolean;
+    count: number;
+  } | null;
 }
 export type StaleInput =
   "profile" | "instructions" | "template" | "knowledge" | "claim";
@@ -525,6 +565,44 @@ export interface OwnerQuestion extends Versioned {
   answered_at: string | null;
   withdrawn_by: Actor | null;
   withdrawn_at: string | null;
+}
+/** Counts and rates of one group of sent applications (insights). */
+export interface InsightMetrics {
+  sent: number;
+  responded: number;
+  interviews: number;
+  offers: number;
+  rejections: number;
+  no_reply: number;
+  waiting: number;
+  response_rate: number | null;
+  interview_rate: number | null;
+  offer_rate: number | null;
+  withheld: "too_few_sent" | null;
+  median_days_to_response: number | null;
+  median_withheld: "too_few_dated_answers" | null;
+  timed: number;
+  undated: number;
+}
+export interface InsightGroup extends InsightMetrics {
+  key: string;
+  label: string;
+}
+export type InsightDimension =
+  "role_family" | "seniority" | "location" | "source_kind" | "source" | "month";
+export interface Insights {
+  min_sample: number;
+  period: { applied_since: string | null; applied_until: string | null };
+  overall: InsightMetrics;
+  time_to_response: {
+    key: string;
+    label: string;
+    count: number;
+    share: number | null;
+  }[];
+  groups: Record<InsightDimension, InsightGroup[]>;
+  excluded: { preparing: number; closed_unsent: number };
+  no_reply: NoReply;
 }
 export interface FunnelStep {
   stage: string;
