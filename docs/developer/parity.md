@@ -27,10 +27,10 @@ How to read the evidence:
 
 | Measure | Operations |
 |---|---|
-| Logical operations in the inventory | 121 |
+| Logical operations in the inventory | 122 |
 | Without REST or without MCP | 0 |
 | Owner only (refused for an agent token) | 9 |
-| Without a working dashboard path | 13 |
+| Without a working dashboard path | 14 |
 | Reached only through another operation | 5 |
 | With inputs the dashboard never mentions | 12 |
 | With free-form JSON edited as raw JSON | 6 |
@@ -53,6 +53,7 @@ code calls the route and no browser test reached it.
 | `responses.add` | `POST /applications/{application_id}/responses` | `responses_add` | Applications: Record response on an Applied, Interview or Offer row; Application review: Timeline, Record a response | — |
 | `responses.update` | `PATCH /responses/{response_id}` | `responses_update` | Application review: Timeline, Edit on a response | — |
 | `responses.remove` | `DELETE /responses/{response_id}` | `responses_remove` | Application review: Timeline, Remove on a response | — |
+| `insights.read` | `GET /insights` | `insights_get` | Applications: Insights | — |
 | `runs.start` | `POST /runs` | `runs_start` | Activity: Runs (read only) | Runs belong to API tokens: a dashboard session has no runs. Activity shows runs, their reports and their changes read-only. |
 | `runs.update` | `PATCH /runs/{run_id}` | `runs_update` | Activity: run report (read only) | Runs belong to API tokens: a dashboard session has no runs. |
 | `runs.finish` | `POST /runs/{run_id}/finish` | `runs_finish` | Activity: run report (read only) | Runs belong to API tokens: a dashboard session has no runs. |
@@ -250,6 +251,7 @@ missing from the inventory.
 | `responses.add`<br>Record an employer response to a sent application | `POST /applications/{application_id}/responses` | `responses_add` | any | Applications: Record response on an Applied, Interview or Offer row; Application review: Timeline, Record a response | **none** | — | — |
 | `responses.update`<br>Correct an employer response's kind, day or note | `PATCH /responses/{response_id}` | `responses_update` | any | Application review: Timeline, Edit on a response | **none** | — | — |
 | `responses.remove`<br>Delete an employer response recorded by mistake | `DELETE /responses/{response_id}` | `responses_remove` | any | Application review: Timeline, Remove on a response | **none** | — | — |
+| `insights.read`<br>Read response, interview and offer rates of sent applications, overall and by group | `GET /insights` | `insights_get` | any | Applications: Insights | **none** | — | — |
 | `contexts.list`<br>List/filter compact frozen-context metadata | `GET /contexts` | `contexts_list` | any | Applications: prepared contexts | pages/Applications.tsx | structured | 7 |
 | `contexts.read`<br>Read full frozen context and signature | `GET /contexts/{context_id}` | `contexts_get` | any | Applications: context detail | pages/Applications.tsx | structured | **0** |
 | `contexts.create`<br>Prepare an immutable context for external generation | `POST /contexts` | `application_prepare_context` | any | Applications: prepare context | pages/Applications.tsx | structured | 1 |
