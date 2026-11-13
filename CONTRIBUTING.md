@@ -217,7 +217,7 @@ needs `tectonic`). Regenerate it at release time when the seed changed, and at t
 next schema change for the new previous schema; then delete the older fixture:
 
 ```bash
-uv run python scripts/release_fixture.py --tag v0.23.0 --schema 14
+uv run python scripts/release_fixture.py --tag v0.23.1 --schema 14
 ```
 
 At the next schema change, delete `m15.py`, write the next migration (a new file

@@ -1,6 +1,6 @@
 """Write the real workspace fixture of a released schema from that release's own seed.
 
-    uv run python scripts/release_fixture.py --tag v0.23.0
+    uv run python scripts/release_fixture.py --tag v0.23.1
 
 A temporary worktree at the tag runs the tag's synthetic seed: the browser-test
 workspace of ``backend/tests/dashboard_server.py`` and then the external-agent
