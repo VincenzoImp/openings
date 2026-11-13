@@ -1,15 +1,17 @@
 # Contributing
 
 Read the [architecture](docs/developer/architecture.md) and relevant
-[user guide](docs/README.md) before changing behavior. Keep shared
-services useful through the dashboard, REST and MCP. Code, UI and documentation
+[user guide](docs/README.md) before changing behavior. Keep business logic in
+shared services. Parity runs one way: every dashboard action is a REST operation,
+and every operation that is not owner-only is also an MCP tool; REST and MCP may
+offer more than the dashboard. Code, UI and documentation
 are English; public examples/screenshots contain synthetic data only. Participation
 follows the [code of conduct](CODE_OF_CONDUCT.md); report vulnerabilities privately
 as described in [SECURITY.md](SECURITY.md).
 
 Open an issue with the bug or feature form before large changes. Pull requests use
-the template's checklist: tests, dashboard/REST/MCP parity, synthetic fixtures and
-updated documentation.
+the template's checklist: tests, one-way parity, synthetic fixtures and updated
+documentation.
 
 ## Run locally
 
@@ -88,8 +90,7 @@ pass: make the read faster, or explain in the pull request why it must cost more
 
 ### Dashboard budgets
 
-The [dashboard design](docs/developer/dashboard-design.md) sets budgets that CI
-checks:
+The dashboard has budgets that CI checks:
 
 - **Size.** `npm --prefix frontend run budget` reads the build and fails when the
   first screen's compressed JavaScript exceeds 110 kB, a later screen adds more
@@ -100,8 +101,8 @@ checks:
   WCAG 2.2 AA. Add a new screen or tab to its list, and fix a finding where it
   is; there are no exclusions.
 - **Contrast.** `frontend/tests/contrast.test.mjs` computes the contrast of every
-  token pair in the design document's colour table from
-  `frontend/src/design/tokens.css`. Change a colour in both places.
+  colour token on the backgrounds it is used on from
+  `frontend/src/design/tokens.css` and holds it to WCAG AA.
 - **Keyboard.** `frontend/tests/shell.spec.ts` operates the navigation, the More
   sheet, the theme and the density from the keyboard alone;
   `frontend/tests/today.spec.ts` answers a question on Today,
@@ -126,77 +127,21 @@ or worktrees can overlap. Set `OPENINGS_E2E_PORT` to choose the port, for exampl
 token and stops before the first test if the port is already in use or the server
 that answers there is not the one it started.
 
-### Operation inventory
-
-`backend/openings/operation-inventory.json` is generated from the operation
-declarations in `backend/openings/interfaces/` and the remarks in
-`interfaces/inventory-notes.json`. After declaring or changing an operation,
-regenerate it; `pytest` fails while it is out of date:
-
-```bash
-uv run python scripts/inventory.py
-```
-
 ### Parity
 
-The rule: every operation exists on REST and MCP alike, and the dashboard offers
-it through a path that a browser test really uses. CI fails a pull request that
-breaks it:
-
-- `uv run pytest` runs `scripts/parity_matrix.py --check`
-  (`backend/tests/test_interfaces.py`) and `backend/tests/test_parity_gate.py`.
-  They fail when [the matrix](docs/developer/parity.md) is out of date, when an
-  operation lacks REST or MCP, when a dashboard path has no browser test in the
-  recorded evidence (`docs/developer/parity-e2e.json`), when a REST input has no
-  dashboard control or a name differs between REST and MCP, or when the
-  dashboard source names an `/api/v1` route outside the inventory.
-- The browser tests in CI run with `OPENINGS_PARITY_EVIDENCE` set: the fixture
-  in `frontend/tests/fixtures.ts` writes, per test, the REST requests the
-  dashboard itself sent (Chromium desktop; the helpers' setup requests are left
-  out). The next step, `scripts/parity_matrix.py --gate <directory>`, fails when
-  an operation has no dashboard path in that run, or when the dashboard called a
-  route outside the inventory. Every spec imports `test` from `./fixtures`.
-
-A difference can be documented instead of closed only with a reason, in
-`docs/developer/parity-notes.json`: `exempt` for an operation only an API token
-performs (an agent's run, its questions, taking a request), `via` with a `note`
-for one the dashboard reaches through another operation, `inputs` for a REST input
-that serves agents and scripts (top-level `inputs` applies to every operation),
-`interfaces` for an input on one interface only, and `answered_by_test` when a
-browser test gives the server's answer itself because the real one would disturb
-the other tests. A reason that no longer applies fails the check, so the notes
-stay true.
-
-After changing an operation, a route, a tool or the dashboard's REST calls,
-regenerate the matrix:
-
-```bash
-uv run python scripts/parity_matrix.py
-```
-
-After changing the browser tests or the dashboard's requests, re-record which
-operations the dashboard really called (needs the built dashboard and Playwright
-Chromium; about three minutes) and commit the evidence with the change:
-
-```bash
-uv run python scripts/parity_matrix.py --e2e
-```
+Parity runs one way: every dashboard action is a REST operation, and every
+operation that is not owner-only is also an MCP tool. REST and MCP may offer
+more than the dashboard, and an owner-only operation may be REST only.
+`backend/tests/test_parity.py` computes this from the operation declarations in
+`backend/openings/interfaces/`: every `/api/v1` route belongs to exactly one
+operation or to a transport exemption with a one-line reason, and every
+operation that is not owner-only has exactly one MCP tool with its name.
 
 ### Documentation screenshots
 
 `docs/images/*.png` come from a synthetic workspace (fictional people, companies
-and documents) at 1440×1000 in the light theme. After a visible dashboard change,
-build the dashboard, install Playwright Chromium and regenerate them:
-
-```bash
-npm --prefix frontend run build
-(cd frontend && npx playwright install chromium)
-uv run python scripts/docs_screenshots.py
-```
-
-The script serves a temporary database on a free local port, captures every image
-and deletes the database. Check each image before committing; add new captures to
-`scripts/docs_screenshots.mjs`.
+and documents) at 1440×1000 in the light theme. Check each image before
+committing it.
 
 ### Agent round trip
 
@@ -214,7 +159,7 @@ uv run python backend/tests/agent_roundtrip.py --tectonic /path/to/tectonic
 | `frontend` | React dashboard calling REST |
 | `examples` | Synthetic career data and LaTeX templates |
 | `skills/` | Agent workflow skills (Agent Skills format) and their shared references |
-| `scripts/` | Release version tool, package smoke check, operation inventory, parity matrix and documentation screenshots |
+| `scripts/` | Release version tool and package smoke check |
 | `docs/user` | Setup, workflow and operator guides |
 | `docs/developer` | Architecture and extension boundaries |
 

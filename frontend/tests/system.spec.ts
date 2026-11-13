@@ -421,7 +421,6 @@ test("Settings creates an agent token that is refused owner operations", async (
           method,
           credentials: "omit",
           headers: {
-            "X-Openings-E2E-Setup": "1",
             "Content-Type": "application/json",
             Authorization: "Bearer " + secret,
           },

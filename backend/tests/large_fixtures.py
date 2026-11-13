@@ -1,6 +1,6 @@
 """A large synthetic workspace for the performance budget of the dashboard.
 
-The design budget (docs/developer/dashboard-design.md) is measured on 5,000 jobs
+The dashboard's performance budget is measured on 5,000 jobs
 and 500 applications. Writing them one by one through the services takes
 minutes, so this writes the same rows the services would in one transaction:
 jobs with their identities and observations, applications in every stage with
