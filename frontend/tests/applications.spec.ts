@@ -734,13 +734,13 @@ test("documents, revisions, frozen copies and their files are managed in the rev
   await dialog(page).getByLabel("Text").fill("Changed synthetic document.");
   await dialog(page).getByRole("button", { name: "Save the revision" }).click();
   await expect(dialog(page)).toHaveCount(0);
-  await expect(revisions.getByRole("listitem")).toHaveCount(2);
+  await expect(revisions.locator(":scope > li")).toHaveCount(2);
   await revisions.getByRole("button", { name: /^Open/ }).first().click();
   await page.getByRole("button", { name: "Delete revision" }).click();
   await dialog(page)
     .getByRole("button", { name: "Delete the revision" })
     .click();
-  await expect(revisions.getByRole("listitem")).toHaveCount(1);
+  await expect(revisions.locator(":scope > li")).toHaveCount(1);
 
   // An input changes after the copy: the Inputs tab says what changed.
   const instructions = await call(page, "/instructions");
