@@ -64,7 +64,12 @@ jobs:
       - run: npm --prefix frontend test
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
-      - run: npm --prefix frontend run test:e2e -- --project=chromium --project=chromium-mobile --project=chromium-performance
+      - name: Browser tests, recording the requests the dashboard makes
+        run: npm --prefix frontend run test:e2e -- --project=chromium --project=chromium-mobile --project=chromium-performance
+        env:
+          OPENINGS_PARITY_EVIDENCE: ${{ runner.temp }}/parity-evidence
+      - name: Parity gate (every operation has REST, MCP and a dashboard path the browser tests used)
+        run: uv run python scripts/parity_matrix.py --gate "$RUNNER_TEMP/parity-evidence"
       - run: npm --prefix frontend audit --audit-level=moderate
 
   container:

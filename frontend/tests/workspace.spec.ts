@@ -1,4 +1,4 @@
-import { test, expect, type Page, type BrowserContext } from "@playwright/test";
+import { test, expect, type Page, type BrowserContext } from "./fixtures";
 
 function syntheticPdf() {
   const stream = "BT /F1 18 Tf 40 440 Td (Synthetic application CV) Tj ET";

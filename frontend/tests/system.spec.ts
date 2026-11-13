@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { test, expect, type Page } from "./fixtures";
 import {
   call,
   card,
@@ -131,8 +132,54 @@ test("a saved search is added, switched on, run once, stopped and removed", asyn
     .getByRole("button", { name: `Remove ${name}` })
     .click();
   await dialog(page).getByRole("button", { name: "Remove source" }).click();
-  await toast(page, "Sources removed");
+  await toast(page, `${name} was removed. Its jobs are kept.`);
   await expect(sourceRow(page, name)).toHaveCount(0);
+});
+
+test("a preview through paused providers asks no job board and saves nothing", async ({
+  page,
+}) => {
+  // The browser tests never reach a job board: both search providers are
+  // paused in the request gate for the preview, then set back as they were.
+  const providers = async () =>
+    (await call(page, "/providers")).items.filter((item: { id: string }) =>
+      ["linkedin", "indeed"].includes(item.id),
+    ) as { id: string; version: number; policy: { enabled: boolean } }[];
+  const before = await providers();
+  const gate = async (enabled: (id: string) => boolean) => {
+    for (const provider of await providers())
+      await call(page, `/providers/${provider.id}`, "PATCH", {
+        enabled: enabled(provider.id),
+        expected_version: provider.version,
+      });
+  };
+  await gate(() => false);
+  try {
+    const sources = (await call(page, "/sources?limit=1")).total;
+    await go(page, "collection");
+    await page
+      .locator(".page-head")
+      .getByRole("button", { name: "Add a search", exact: true })
+      .click();
+    const editor = page.locator("section", {
+      has: page.getByRole("heading", { name: "New search" }),
+    });
+    await editor.getByLabel("Name", { exact: true }).fill(unique("Preview"));
+    await editor.getByLabel("Keywords").fill("synthetic engineer");
+    await editor.getByLabel("Location", { exact: true }).fill("Zurich");
+    await editor.getByRole("button", { name: "Preview results" }).click();
+    await toast(page, "Preview complete. No job was saved.");
+    const result = editor.getByRole("region", { name: /^Preview:/ });
+    await expect(result).toContainText("Preview: 0 matches");
+    await expect(result).toContainText("LinkedIn: provider paused.");
+    await expect(result).toContainText("Indeed: provider paused.");
+    await editor.getByRole("button", { name: "Cancel", exact: true }).click();
+    expect((await call(page, "/sources?limit=1")).total).toBe(sources);
+  } finally {
+    await gate(
+      (id) => before.find((provider) => provider.id === id)!.policy.enabled,
+    );
+  }
 });
 
 test("sources filter by kind and act in bulk, with run-only limits", async ({
@@ -462,4 +509,69 @@ test("backup, records export and a guarded restore", async ({ page }) => {
   await restore.getByLabel("Type RESTORE to confirm").fill("RESTORE");
   await expect(button).toBeEnabled();
   await fitsViewport(page);
+  // A file that is not a backup is refused and the workspace stays as it was.
+  await button.click();
+  await toast(page, "Select a SQLite database backup.");
+  // The backup downloaded above restores: the workspace is what it was a
+  // moment ago, and the owner stays signed in.
+  const jobs = (await call(page, "/jobs?limit=1")).total;
+  await restore.getByLabel("Backup file").setInputFiles({
+    name: "openings-backup.sqlite",
+    mimeType: "application/vnd.sqlite3",
+    buffer: readFileSync(await (await backup).path()),
+  });
+  await restore.getByLabel("Type RESTORE to confirm").fill("RESTORE");
+  const reloaded = page.waitForEvent("load");
+  await button.click();
+  await reloaded;
+  await expect(page.locator(".main h1")).toHaveText("Settings");
+  expect((await call(page, "/jobs?limit=1")).total).toBe(jobs);
+});
+
+test("the password form and the list of operations", async ({ page }) => {
+  // A real change signs out every browser session, the shared one of these
+  // tests too: the test answers the request as the server does.
+  // test_archive.py changes the password over REST and MCP.
+  const sent: unknown[] = [];
+  await page.route("**/api/v1/auth/password", (route) => {
+    sent.push(route.request().postDataJSON());
+    return route.fulfill({
+      json: {
+        updated: true,
+        sign_in_required: true,
+        api_tokens_preserved: true,
+      },
+    });
+  });
+  await go(page, "settings?section=workspace");
+  const password = card(page, "Change the password");
+  await password
+    .getByLabel("New password", { exact: true })
+    .fill("synthetic-new-password");
+  await password
+    .getByLabel("Confirm the new password")
+    .fill("synthetic-other-password");
+  await password.getByRole("button", { name: "Change the password" }).click();
+  await toast(page, "The passwords do not match.");
+  expect(sent).toEqual([]);
+  await password
+    .getByLabel("Confirm the new password")
+    .fill("synthetic-new-password");
+  await password.getByRole("button", { name: "Change the password" }).click();
+  // Every browser session signs in again.
+  await expect(
+    page.getByRole("button", { name: "Sign in", exact: true }),
+  ).toBeVisible();
+  expect(sent).toEqual([{ password: "synthetic-new-password" }]);
+  await page.unroute("**/api/v1/auth/password");
+  // The session was not really ended: loading the page again signs back in.
+  await page.goto("/#settings?section=agents");
+  await page.reload();
+  await expect(page.locator(".main h1")).toHaveText("Settings");
+  // The operations an agent can call, as the workspace serves them.
+  const list = page.waitForEvent("popup");
+  await page.getByRole("link", { name: "Available operations" }).click();
+  const operations = await list;
+  await expect(operations.locator("body")).toContainText('"operations"');
+  await operations.close();
 });

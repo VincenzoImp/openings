@@ -1,8 +1,8 @@
 # Dashboard design
 
-Status: **proposed**, waiting for the maintainer's approval (owner checkpoint 2,
-issue #150). It designs the dashboard for the product accepted in the
-[redesign proposal](proposal-redesign.md); issue #135 implements it.
+Status: **approved** on 2026-11-11 (owner checkpoint 2, issue #150) and
+implemented by issue #135 in the seven stages below. It designs the dashboard for
+the product accepted in the [redesign proposal](proposal-redesign.md).
 
 The design has three parts: the information architecture, a design system, and
 static [prototypes](prototypes/index.html) of every main screen. Open
@@ -473,6 +473,67 @@ when that issue lands; the table says which parts those are.
   skill an agent reads over MCP and REST; versions and a conflict; a reference
   file; a run's method added as a note; the notes saved by keyboard). The axe
   and overflow checks cover every new tab.
+
+**Stage 7, Onboarding and removal.**
+
+- **The setup guide** (`pages/Setup.tsx`, `pages/setup/`, `#setup`; `#onboarding`
+  is its alias) follows the prototype: three steps as a stepper (`Stepper` in
+  `frontend/src/design`, a tab list whose tabs are numbered steps, with arrow
+  keys in both directions since the steps stack on a phone). **Connect your
+  agent** has the token form and the client configuration of Settings, Agent
+  access, and says whether the agent has called: waiting for the first call
+  (a token never used), or connected with the token and its last call. **Your
+  record** is the checklist of the prototype, read from the workspace: Profile,
+  Policy, First searches, Career entries, Claims and Templates, each done,
+  in progress or not started, with the agent's open questions above it. The
+  first three can be filled in by hand under their row: the Profile's name,
+  headline, place and email; the facts employers ask about (Eligibility) and
+  the no-reply period (the "No reply" decision item, written as "N days"); and
+  a first search with the form of Collection. The others link to Career and
+  Templates. **First applications** says how every day works.
+- **Progress is derived, never stored** (`pages/setup/model.ts`, unit-tested).
+  The agent step is done once a token has been used, the record when its six
+  parts are; the guide opens on the first step that is not done and does not
+  move while the agent works, though it reads the workspace again every 10
+  seconds. The prototype's "A call was refused" line is not built: a refused
+  call is not recorded.
+- **First run** (`shell/setup.ts`). A visit to the home screen of a workspace
+  with no Profile name, no Career entry, no source, no API token and no job
+  opens the guide instead of Today. The shell checks this only when the To
+  review and Preparing counts it already reads are both zero. What the browser
+  did is remembered in `localStorage` (`openings-setup`): `started` when the
+  guide opened by itself, then `done` or `skipped`; `seen` when the workspace
+  already had data. While it is `started`, Today offers **Continue setting
+  up** and **Not now**. **Skip for now** goes to Today. Settings, Workspace has
+  **Open the setup guide**. No setting is stored on the server: another browser
+  of a still-empty workspace opens the guide once too.
+- **Removal.** The last compatibility pieces of the pages written before the
+  design system are deleted: the `.legacy` wrapper and its width rule and the
+  `REBUILT` list (every screen renders in `.screen`), the older button and tag
+  names (`small`, `subtle`, `danger-fill`, `green`, `amber`), the dialog's
+  drawer variant and the class names the older pages styled against, the
+  budget allowances and accessibility exclusions for pages a later stage would
+  rebuild, the raw JSON helper `jsonValue` and other unused helpers. The
+  shell's rewrites of old addresses stay, so bookmarks keep working.
+- **Parity (#136).** One Run once or Remove of a single source calls its own
+  route (`sources.run`, `sources.delete`) instead of a bulk action of one; Jobs,
+  All, **More filters** adds the posting's language, a language it is not
+  written in and a language it requires (`posting_language`,
+  `posting_language_not`, `requires`). The browser tests now use a preview
+  through paused providers, a real restore of a backup, the password form and
+  the list of operations. The [matrix](parity.md) has no gap: each remaining
+  difference is documented with its reason, and `pytest` and CI fail on any
+  other (CONTRIBUTING, Parity).
+- Checks: `frontend/tests/setup.spec.ts` (a first run answered as an empty
+  workspace opens the guide; the steps by keyboard; Today's offer to continue;
+  skipping; opening it again from Settings; the Profile and Policy basics, a
+  first search and an agent token on the real workspace), axe on each step and
+  with each form open, the overflow check at both widths, and
+  `frontend/tests/setup.test.mjs` for the derived progress. Every project of
+  the browser tests passes, WebKit included: a select now draws its own arrow,
+  because WebKit sized a native menu by its text (23 px) and ignored the
+  height of the other controls, and the axe check treats the sticky top bar
+  like the bottom bar when it covers a target.
 
 ## Not decided here
 

@@ -86,25 +86,47 @@ export function Sources({
     return () => clearInterval(timer);
   }, [collecting]);
 
+  // One source to run or remove uses its own route; several, the bulk action.
+  async function one(action: string, source: Source, extra: Json) {
+    if (action === "run")
+      await api(`/sources/${source.id}/run`, "POST", {
+        expected_version: source.version,
+        ...extra,
+      });
+    else
+      await api(
+        `/sources/${source.id}?expected_version=${source.version}`,
+        "DELETE",
+      );
+    return { succeeded: 1, failed: 0, items: [{ id: source.id }] };
+  }
   async function batch(action: string, items = chosen, extra: Json = {}) {
     if (updating || sources.error) return false;
     let result: Batch | undefined;
+    const single = items.length === 1 && ["run", "delete"].includes(action);
     const ok = await mutate(
       async () => {
-        result = await api<Batch>("/sources/bulk", "POST", {
-          action,
-          items: items.map((s) => ({ id: s.id, expected_version: s.version })),
-          ...extra,
-        });
+        result = single
+          ? await one(action, items[0], extra)
+          : await api<Batch>("/sources/bulk", "POST", {
+              action,
+              items: items.map((s) => ({
+                id: s.id,
+                expected_version: s.version,
+              })),
+              ...extra,
+            });
       },
       action === "run"
-        ? items.length === 1
+        ? single
           ? `${items[0].name} is collecting.`
           : "Collection runs queued."
         : action === "configure"
           ? "Collection settings saved."
           : action === "delete"
-            ? "Sources removed. Their jobs are kept."
+            ? single
+              ? `${items[0].name} was removed. Its jobs are kept.`
+              : "Sources removed. Their jobs are kept."
             : action === "enable"
               ? "Sources switched on."
               : "Sources paused.",

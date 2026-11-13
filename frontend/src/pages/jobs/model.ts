@@ -40,6 +40,11 @@ export const DEFAULTS = {
   job_type: "",
   created_since: "",
   created_until: "",
+  /** The language the posting is written in, by code (`en`). */
+  posting_language: "",
+  posting_language_not: "",
+  /** A language the posting requires. */
+  requires: "",
   offset: "0",
   job: "",
 };
@@ -58,6 +63,9 @@ export const NARROWING: (keyof Filters)[] = [
   "job_type",
   "created_since",
   "created_until",
+  "posting_language",
+  "posting_language_not",
+  "requires",
 ];
 
 export const SIGNAL_FILTERS: Record<string, string> = {
@@ -143,6 +151,8 @@ export const LANGUAGES: Record<string, string> = {
   ko: "Korean",
 };
 export const languageName = (code: string) => LANGUAGES[code] || code;
+/** The languages a posting's own language is recognised in. */
+export const POSTING_LANGUAGES = ["en", "de", "fr", "it"];
 const either = (codes: string[]) => codes.map(languageName).join(" or ");
 
 export type Tone = "ready" | "attention" | "danger" | "info" | "agent";
