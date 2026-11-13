@@ -7,10 +7,22 @@ import sys
 from pathlib import Path
 
 import pytest
+from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
+from mcp.types import ToolAnnotations
 
 from openings.app import create_app
 from openings.interfaces import catalog, inventory_text
+from openings.interfaces.registry import (
+    Operation,
+    Param,
+    Route,
+    Tool,
+    bind_mcp,
+    bind_rest,
+    inventory,
+)
+from openings.mcp_server import OpeningsMCP
 
 
 def route_path(path):
@@ -184,3 +196,45 @@ def test_owner_only_operations_refuse_an_agent_token_on_rest_and_mcp(tmp_path):
                 continue  # A real restore is covered by test_token_scopes.py.
             for name in marked[identifier]["mcp"]:
                 assert over_mcp(owner, name, OWNER_ONLY_CALLS[identifier][1]) != "forbidden"
+
+
+class Greeter:
+    def greet(self, name, loud):
+        return {"greeting": ("HELLO " if loud else "Hello ") + name}
+
+
+@pytest.mark.asyncio
+async def test_one_declaration_gives_a_route_a_tool_its_aliases_and_an_inventory_entry():
+    """A synthetic operation, declared once, binds to REST and MCP under every name."""
+    operation = Operation(
+        "greetings.read",
+        "greetings",
+        "get",
+        "Synthetic",
+        "Greet someone",
+        params=(Param("name", str), Param("loud", bool, False)),
+        call=lambda s, name, loud: s.greet(name, loud),
+        rest=(Route("GET", "/greetings/{name}", "greeting_get"),),
+        tool=Tool("greetings_get", ToolAnnotations(readOnlyHint=True), "Greet someone."),
+        aliases=("greeting_get",),
+    )
+    assert operation.canonical_name == "greetings_get"
+    router, mcp = APIRouter(prefix="/api/v1"), OpeningsMCP("Synthetic")
+    bind_rest(router, (operation,), Greeter())
+    bind_mcp(mcp, (operation,), Greeter())
+    app = FastAPI()
+    app.include_router(router)
+    with TestClient(app) as client:
+        assert client.get("/api/v1/greetings/Ada?loud=true").json() == {"greeting": "HELLO Ada"}
+    assert app.openapi()["paths"]["/api/v1/greetings/{name}"]["get"]["summary"] == "Greeting Get"
+    tools = {tool.name: tool for tool in await mcp.list_tools()}
+    assert set(tools) == {"greetings_get", "greeting_get"}
+    alias, tool = tools["greeting_get"], tools["greetings_get"]
+    assert alias.description == "Deprecated alias of greetings_get. Greet someone."
+    assert alias.input_schema["properties"] == tool.input_schema["properties"]
+    result = await mcp.call_tool("greeting_get", {"name": "Ada"})
+    assert "Hello Ada" in result.content[0].text
+    notes = {"operations": [{"id": "greetings.read", "dashboard": "None"}], "exceptions": []}
+    entry = inventory((operation,), (), notes)["operations"][0]
+    assert entry["rest"] == [{"method": "GET", "path": "/api/v1/greetings/{name}"}]
+    assert entry["mcp"] == ["greetings_get", "greeting_get"]

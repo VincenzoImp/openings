@@ -104,8 +104,11 @@ the FastAPI routes and MCP tools from it, both calling the same service code:
 REST routes are registered in declaration order, which matters for matching
 (`/jobs/resolve` before `/jobs/{job_id}`); MCP tools follow the same order within
 an area. `canonical_name` (`<resource>_<verb>`) is the name of the naming scheme
-of decision 11; today every tool keeps its current `Tool.name`, and `aliases`
-will list the earlier names when the scheme is adopted.
+of decision 11; today every tool keeps its current `Tool.name`. When the scheme
+is adopted, `Tool.name` becomes the canonical name and `aliases` lists the
+earlier ones: `bind_mcp` registers each alias as the same tool, its description
+starting "Deprecated alias of <name>.", and the inventory lists it after the
+tool's name.
 
 `scripts/inventory.py` writes `operation-inventory.json` from the declarations
 and `interfaces/inventory-notes.json`, which holds the inventory's order,

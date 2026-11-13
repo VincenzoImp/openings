@@ -177,21 +177,28 @@ def bind_mcp(mcp, operations, service):
         if tool is None or tool.custom:
             continue
         if tool.method:
-            mcp.add_tool(
-                getattr(service, tool.method), name=tool.name, annotations=tool.annotations
+            function = getattr(service, tool.method)
+        else:
+            params = tool.params if tool.params is not None else operation.params
+            function = _function(
+                tool.name,
+                _mcp_params(params),
+                tool.call or operation.call,
+                service,
+                offload=tool.offload,
+                returns=dict,
+                doc=tool.description,
             )
-            continue
-        params = tool.params if tool.params is not None else operation.params
-        function = _function(
-            tool.name,
-            _mcp_params(params),
-            tool.call or operation.call,
-            service,
-            offload=tool.offload,
-            returns=dict,
-            doc=tool.description,
-        )
         mcp.add_tool(function, name=tool.name, annotations=tool.annotations)
+        for alias in operation.aliases:
+            # The same tool under an earlier name, until the aliases are removed.
+            description = function.__doc__ or ""
+            mcp.add_tool(
+                function,
+                name=alias,
+                description=f"Deprecated alias of {tool.name}. {description}".strip(),
+                annotations=tool.annotations,
+            )
 
 
 def _routes(routes):
