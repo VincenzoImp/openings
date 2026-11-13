@@ -9,7 +9,7 @@ from openings.collectors.policy import (
     ProviderPatch,
     ProviderStore,
 )
-from openings.discovery import html_text
+from openings.discovery.feeds import html_text
 from openings.posting import matches_filters
 from openings.workspace import Workspace
 

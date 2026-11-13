@@ -6,10 +6,11 @@ from datetime import UTC, datetime
 import pytest
 import requests
 
-from openings import discovery as module
+from discovery_fixtures import patch_discovery
 from openings._vendor.jobspy import glassdoor, linkedin
 from openings.collectors import policy
 from openings.collectors.policy import ProviderDeferred, ProviderPatch
+from openings.common import now
 from openings.discovery import DiscoveryService, SourceCreate
 from openings.workspace import Workspace
 
@@ -65,11 +66,11 @@ def test_complete_jobs_only_across_batch_cooldown_and_restart(tmp_path, monkeypa
     workspace.discovery = service
     workspace.set_settings("profile", {"summary": "Backend engineer"})
     service.update_provider("linkedin", ProviderPatch(expected_version=1, min_interval_seconds=0))
-    monkeypatch.setattr(module, "public_url", lambda url: url)
+    patch_discovery(monkeypatch, "public_url", lambda url: url)
     monkeypatch.setattr(policy, "REQUEST_BATCH_SIZE", 2)
     clock = [datetime.fromtimestamp(policy.time.time(), UTC).timestamp()]
     monkeypatch.setattr(policy.time, "time", lambda: clock[0])
-    monkeypatch.setattr(module, "now", lambda: datetime.fromtimestamp(clock[0], UTC).isoformat())
+    patch_discovery(monkeypatch, "now", lambda: datetime.fromtimestamp(clock[0], UTC).isoformat())
     calls = []
 
     def send(method, url, **kwargs):
@@ -129,7 +130,7 @@ def test_linkedin_provider_access_failure_stops_detail_loop(tmp_path, monkeypatc
     workspace = Workspace(tmp_path / "access.sqlite")
     service = DiscoveryService(workspace)
     service.update_provider("linkedin", ProviderPatch(expected_version=1, min_interval_seconds=0))
-    monkeypatch.setattr(module, "public_url", lambda url: url)
+    patch_discovery(monkeypatch, "public_url", lambda url: url)
     calls = []
 
     def send(method, url, **kwargs):
@@ -163,7 +164,7 @@ def test_transient_detail_failure_retries_the_run_without_spending_posting_attem
     workspace = Workspace(tmp_path / "transient.sqlite")
     service = DiscoveryService(workspace)
     service.update_provider("linkedin", ProviderPatch(expected_version=1, min_interval_seconds=0))
-    monkeypatch.setattr(module, "public_url", lambda url: url)
+    patch_discovery(monkeypatch, "public_url", lambda url: url)
     calls = []
     fail_once = True
 
@@ -195,7 +196,7 @@ def test_transient_detail_failure_retries_the_run_without_spending_posting_attem
     assert first["result"]["attempt_history"][-1]["reason"] == "provider_response"
     checkpoint = service.get_task(first["id"], include_checkpoint=True)["payload"]["checkpoint"]
     assert checkpoint["detail_attempts"] == {} and len(calls) == 2
-    service.db.execute("UPDATE tasks SET next_run_at=? WHERE id=?", (module.now(), first["id"]))
+    service.db.execute("UPDATE tasks SET next_run_at=? WHERE id=?", (now(), first["id"]))
     final = run_next(service)
     assert final["state"] == "succeeded" and final["result"]["created"] == 2
     assert final["result"]["pending_descriptions"] == 0
@@ -211,7 +212,7 @@ def test_removed_individual_postings_finish_unavailable_without_retrying_the_pro
     workspace = Workspace(tmp_path / "removed.sqlite")
     service = DiscoveryService(workspace)
     service.update_provider("linkedin", ProviderPatch(expected_version=1, min_interval_seconds=0))
-    monkeypatch.setattr(module, "public_url", lambda url: url)
+    patch_discovery(monkeypatch, "public_url", lambda url: url)
     calls = []
 
     def send(method, url, **kwargs):
@@ -262,7 +263,7 @@ def test_glassdoor_failed_detail_batch_retains_all_candidates_for_retry(
     workspace = Workspace(tmp_path / "glassdoor.sqlite")
     service = DiscoveryService(workspace)
     service.update_provider("glassdoor", ProviderPatch(expected_version=1, min_interval_seconds=0))
-    monkeypatch.setattr(module, "public_url", lambda url: url)
+    patch_discovery(monkeypatch, "public_url", lambda url: url)
     calls = []
     fail_once = True
 
@@ -308,7 +309,7 @@ def test_glassdoor_failed_detail_batch_retains_all_candidates_for_retry(
     assert first["result"]["unavailable_descriptions"] == 0
     checkpoint = service.get_task(first["id"], include_checkpoint=True)["payload"]["checkpoint"]
     assert checkpoint["detail_attempts"] == {} and calls == ["JobDetails"]
-    service.db.execute("UPDATE tasks SET next_run_at=? WHERE id=?", (module.now(), first["id"]))
+    service.db.execute("UPDATE tasks SET next_run_at=? WHERE id=?", (now(), first["id"]))
     final = run_next(service)
     assert final["state"] == "succeeded" and final["result"]["created"] == 2
     assert final["result"]["pending_descriptions"] == 0
@@ -320,7 +321,7 @@ def test_glassdoor_valid_empty_detail_results_finish_as_unavailable(tmp_path, mo
     workspace = Workspace(tmp_path / "glassdoor-empty.sqlite")
     service = DiscoveryService(workspace)
     service.update_provider("glassdoor", ProviderPatch(expected_version=1, min_interval_seconds=0))
-    monkeypatch.setattr(module, "public_url", lambda url: url)
+    patch_discovery(monkeypatch, "public_url", lambda url: url)
     calls = []
 
     def send(method, url, **kwargs):
@@ -339,9 +340,7 @@ def test_glassdoor_valid_empty_detail_results_finish_as_unavailable(tmp_path, mo
     glassdoor_checkpoint(service, queued["id"])
     for _ in range(3):
         final = run_next(service)
-        service.db.execute(
-            "UPDATE tasks SET next_run_at=? WHERE id=?", (module.now(), queued["id"])
-        )
+        service.db.execute("UPDATE tasks SET next_run_at=? WHERE id=?", (now(), queued["id"]))
     assert final["state"] == "succeeded" and final["result"]["created"] == 0
     assert final["result"]["pending_descriptions"] == 0
     assert final["result"]["unavailable_descriptions"] == 2

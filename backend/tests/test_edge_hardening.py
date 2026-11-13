@@ -9,9 +9,11 @@ import pytest
 from fastapi.testclient import TestClient
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from openings import __main__ as entrypoint, discovery as module
+from discovery_fixtures import patch_discovery
+from openings import __main__ as entrypoint
 from openings.app import create_app
 from openings.auth import COOKIE, LoginGuard
+from openings.discovery import network
 from openings.errors import DomainError
 
 PASSWORD = "synthetic-password"
@@ -235,7 +237,7 @@ def synthetic_resolver(monkeypatch, answers):
         family = socket.AF_INET6 if ":" in address else socket.AF_INET
         return [(family, socket.SOCK_STREAM, 6, "", (address, port))]
 
-    monkeypatch.setattr(module.socket, "getaddrinfo", resolve)
+    monkeypatch.setattr(network.socket, "getaddrinfo", resolve)
     return calls
 
 
@@ -243,7 +245,7 @@ def test_rebinding_after_the_url_check_is_refused_before_connecting(monkeypatch,
     port = local_server.server_address[1]
     calls = synthetic_resolver(monkeypatch, {"rebind.test": ["93.184.216.34", "127.0.0.1"]})
     with pytest.raises(DomainError) as refused:
-        module.fetch_bytes(f"http://rebind.test:{port}/secret")
+        network.fetch_bytes(f"http://rebind.test:{port}/secret")
     assert refused.value.code == "private_url"
     assert calls == ["rebind.test", "rebind.test"]
     assert local_server.seen == []
@@ -252,21 +254,21 @@ def test_rebinding_after_the_url_check_is_refused_before_connecting(monkeypatch,
 def test_connections_use_the_checked_address(monkeypatch, local_server):
     port = local_server.server_address[1]
     # Treat the synthetic server as public; the name itself is unresolvable by the system.
-    monkeypatch.setattr(module, "is_public_address", lambda address: address == "127.0.0.1")
+    patch_discovery(monkeypatch, "is_public_address", lambda address: address == "127.0.0.1")
     synthetic_resolver(monkeypatch, {"pinned.test": ["127.0.0.1", "127.0.0.1"]})
-    assert module.fetch_bytes(f"http://pinned.test:{port}/page") == b"internal"
+    assert network.fetch_bytes(f"http://pinned.test:{port}/page") == b"internal"
     assert local_server.seen == ["/page"]
 
 
 def test_every_redirect_hop_is_pinned(monkeypatch, local_server):
     port = local_server.server_address[1]
     local_server.redirect = f"http://rebind.test:{port}/secret"
-    monkeypatch.setattr(module, "is_public_address", lambda address: address == "127.0.0.1")
+    patch_discovery(monkeypatch, "is_public_address", lambda address: address == "127.0.0.1")
     synthetic_resolver(
         monkeypatch,
         {"start.test": ["127.0.0.1", "127.0.0.1"], "rebind.test": ["127.0.0.1", "10.0.0.8"]},
     )
     with pytest.raises(DomainError) as refused:
-        module.fetch_bytes(f"http://start.test:{port}/start")
+        network.fetch_bytes(f"http://start.test:{port}/start")
     assert refused.value.code == "private_url"
     assert local_server.seen == ["/start"]

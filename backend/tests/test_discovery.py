@@ -4,13 +4,10 @@ from datetime import UTC, datetime
 
 import pytest
 
-from openings import discovery as module
-from openings.discovery import (
-    DiscoveryService,
-    SourceCreate,
-    next_due,
-)
+from discovery_fixtures import patch_discovery
+from openings.discovery import DiscoveryService, SourceCreate
 from openings.errors import DomainError
+from openings.scheduling import next_due
 from openings.workspace import Workspace
 
 
@@ -85,7 +82,7 @@ def test_source_failure_is_isolated(case, monkeypatch):
             }
         ]
 
-    monkeypatch.setattr(module, "fetch_postings", feed)
+    patch_discovery(monkeypatch, "fetch_postings", feed)
     service.queue_collection(first["id"])
     service.queue_collection(second["id"])
     run_next(service)
@@ -110,6 +107,6 @@ def test_cancel_between_claim_and_collection_does_not_touch_source(case, monkeyp
     service.queue_collection(source["id"])
     task = service.claim_task("test-worker")
     service.cancel_task(task["id"])
-    monkeypatch.setattr(module, "fetch_postings", lambda source: pytest.fail("Cancelled fetch"))
+    patch_discovery(monkeypatch, "fetch_postings", lambda source: pytest.fail("Cancelled fetch"))
     service.run_task(task, "test-worker")
     assert service.get_source(source["id"])["last_run_at"] is None

@@ -6,9 +6,10 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from openings import discovery as module
+from discovery_fixtures import patch_discovery
 from openings.app import create_app
 from openings.collectors.policy import ProviderDeferred
+from openings.common import encode, now
 from openings.discovery import (
     CollectionWrite,
     DiscoveryService,
@@ -92,14 +93,14 @@ def test_frozen_options_resume_with_cumulative_unique_observations(collection, m
         source["on_checkpoint"]({"page": 2, "complete": True, "pending_details": 0})
         return []
 
-    monkeypatch.setattr(module, "fetch_postings", collect)
+    patch_discovery(monkeypatch, "fetch_postings", collect)
     first = run_next(service)
     assert first["state"] == "queued"
     assert first["result"]["created"] == 1
     assert (
         service.get_task(first["id"], include_checkpoint=True)["payload"]["checkpoint"]["page"] == 1
     )
-    workspace.db.execute("UPDATE tasks SET next_run_at=? WHERE id=?", (module.now(), queued["id"]))
+    workspace.db.execute("UPDATE tasks SET next_run_at=? WHERE id=?", (now(), queued["id"]))
     second = run_next(service)
     assert second["state"] == "succeeded"
     assert second["result"]["received"] == second["result"]["created"] == 1
@@ -149,7 +150,7 @@ def test_pause_and_delete_preserve_run_history(collection, monkeypatch):
     queued = service.queue_collection(source["id"], manual=False)
     service.update_collection(CollectionWrite(expected_version=0, enabled=False))
     assert service.get_task(queued["id"])["state"] == "queued"
-    monkeypatch.setattr(module, "fetch_postings", lambda source: [])
+    patch_discovery(monkeypatch, "fetch_postings", lambda source: [])
     assert run_next(service)["state"] == "succeeded"
     service.delete_source(source["id"], source["version"])
     run = service.get_run(queued["run_id"])
@@ -206,9 +207,9 @@ def test_explicit_retry_preserves_progress_and_renews_error_allowance(collection
     workspace.db.execute(
         "UPDATE tasks SET state='failed',attempts=3,result=?,payload=json_set(payload,'$.checkpoint',json(?),'$.observed_identities',json(?)) WHERE id=?",
         (
-            module.encode({"created": 2, "failure_attempts": 3}),
-            module.encode({"page": 2}),
-            module.encode(["known"]),
+            encode({"created": 2, "failure_attempts": 3}),
+            encode({"page": 2}),
+            encode(["known"]),
             queued["id"],
         ),
     )
@@ -218,8 +219,8 @@ def test_explicit_retry_preserves_progress_and_renews_error_allowance(collection
     claimed = service.claim_task("worker", "collect")
     assert claimed["attempts"] == 4 and claimed["payload"]["checkpoint"] == {"page": 2}
     assert claimed["result"]["created"] == 2 and claimed["result"]["failure_attempts"] == 0
-    monkeypatch.setattr(
-        module,
+    patch_discovery(
+        monkeypatch,
         "fetch_postings",
         lambda source: (_ for _ in ()).throw(DomainError(502, "temporary", "Try later.")),
     )

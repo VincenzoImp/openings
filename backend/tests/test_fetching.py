@@ -6,7 +6,7 @@ import json
 import httpx
 import pytest
 
-from openings import discovery as module
+from discovery_fixtures import patch_discovery
 from openings.collectors.policy import ProviderPatch
 from openings.discovery import DiscoveryService
 from openings.fetching import (
@@ -43,7 +43,7 @@ def web(tmp_path, monkeypatch):
     service = DiscoveryService(workspace)
     for provider in ("manual", "greenhouse", "lever", "ashby"):
         service.update_provider(provider, ProviderPatch(expected_version=1, min_interval_seconds=0))
-    monkeypatch.setattr(module, "public_url", lambda url: url)
+    patch_discovery(monkeypatch, "public_url", lambda url: url)
     service.routes, service.calls = {}, []
 
     def send(request):
@@ -55,7 +55,7 @@ def web(tmp_path, monkeypatch):
 
     original = httpx.Client
     monkeypatch.setattr(
-        module.httpx,
+        httpx,
         "Client",
         lambda **kwargs: original(**{**kwargs, "transport": httpx.MockTransport(send)}),
     )

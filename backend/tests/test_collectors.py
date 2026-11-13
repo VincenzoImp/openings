@@ -9,9 +9,10 @@ from email.utils import format_datetime
 import httpx
 import pytest
 
-from openings import discovery as module
+from discovery_fixtures import patch_discovery
 from openings.collectors import company
 from openings.collectors.policy import ProviderDeferred, ProviderPatch, retry_after
+from openings.common import now
 from openings.discovery import (
     CollectionWrite,
     DiscoveryService,
@@ -20,8 +21,9 @@ from openings.discovery import (
     SourceCreate,
     SourcePreview,
     SourceVersion,
-    fetch_postings,
+    feeds,
 )
+from openings.discovery.feeds import fetch_postings
 from openings.errors import DomainError
 from openings.workspace import Workspace
 
@@ -31,9 +33,9 @@ def collection(tmp_path, monkeypatch):
     workspace = Workspace(tmp_path / "collection.sqlite")
     service = DiscoveryService(workspace)
     workspace.discovery = service
-    monkeypatch.setattr(module, "public_url", lambda url: url)
+    patch_discovery(monkeypatch, "public_url", lambda url: url)
     # Provider sessions connect only to checked addresses; every host is the local test server.
-    monkeypatch.setattr(module, "public_addresses", lambda host, port: ["127.0.0.1"])
+    patch_discovery(monkeypatch, "public_addresses", lambda host, port: ["127.0.0.1"])
     return workspace, service
 
 
@@ -63,8 +65,8 @@ def test_only_complete_postings_supply_preserved_body_metadata(collection, monke
             }
         )
     observed = {}
-    monkeypatch.setattr(
-        module, "fetch_postings", lambda value: observed.update(value["known"]) or []
+    patch_discovery(
+        monkeypatch, "fetch_postings", lambda value: observed.update(value["known"]) or []
     )
     service.queue_collection(source["id"])
     task = service.claim_task("test-collector", kind="collect")
@@ -91,7 +93,7 @@ def test_every_http_attempt_obeys_persisted_cooldown(collection, monkeypatch, he
 
     original = httpx.Client
     monkeypatch.setattr(
-        module.httpx,
+        httpx,
         "Client",
         lambda **kwargs: original(**{**kwargs, "transport": httpx.MockTransport(send)}),
     )
@@ -100,11 +102,11 @@ def test_every_http_attempt_obeys_persisted_cooldown(collection, monkeypatch, he
     assert len(calls) == 2
     runtime = service.providers.get("manual")["runtime"]
     assert runtime["requests_hour"] == 2 and runtime["last_status"] == 429
-    assert runtime["cooldown_until"] > module.now()
+    assert runtime["cooldown_until"] > now()
     restarted = DiscoveryService(Workspace(workspace.db.path))
     with pytest.raises(ProviderDeferred) as caught:
         restarted.fetch_bytes("https://example.org/next")
-    assert caught.value.next_run_at > module.now()
+    assert caught.value.next_run_at > now()
     assert len(calls) == 2
     assert restarted.providers.get("manual")["runtime"]["total_requests"] == 2
     with pytest.raises(DomainError) as conflict:
@@ -209,7 +211,7 @@ def test_preview_manual_and_worker_share_provider_gate(collection, monkeypatch):
         return httpx.Response(429, headers={"Retry-After": "120"})
 
     monkeypatch.setattr(
-        module.httpx,
+        httpx,
         "Client",
         lambda **kwargs: original(**{**kwargs, "transport": httpx.MockTransport(send)}),
     )
@@ -226,7 +228,7 @@ def test_preview_manual_and_worker_share_provider_gate(collection, monkeypatch):
     claimed = service.claim_task("owner", "collect")
     service.run_task(claimed, "owner")
     deferred = service.get_task(task["id"])
-    assert deferred["state"] == "queued" and deferred["next_run_at"] > module.now()
+    assert deferred["state"] == "queued" and deferred["next_run_at"] > now()
     assert deferred["result"]["diagnostics"][0]["state"] == "deferred"
     assert service.get_source(source["id"])["next_run_at"] == deferred["next_run_at"]
     assert len(calls) == 1
@@ -244,8 +246,8 @@ def test_cancelled_task_never_reserves_another_request(collection):
 
 
 def test_feed_unknown_location_is_retained_when_location_filters_are_set(monkeypatch):
-    monkeypatch.setattr(
-        module,
+    patch_discovery(
+        monkeypatch,
         "fetch_bytes",
         lambda *args, **kwargs: (
             b"<rss><channel><item><guid>1</guid><title>API Engineer</title><link>https://example.org/1</link><description>Build APIs</description></item></channel></rss>"
@@ -285,15 +287,13 @@ def test_company_clients_fetch_all_details_and_reuse_complete_cached_bodies():
         "kind": "bamboohr",
         "config": {"board": "example"},
     }
-    rows = company.collect(source, request, module.html_text)
+    rows = company.collect(source, request, feeds.html_text)
     assert len(calls) == 3
     assert len(rows) == 2 and all(row["posting"] == "Build APIs" for row in rows)
     calls.clear()
-    source["detail_checked"] = {
-        key: module.now() for key in ("bamboohr:example:1", "bamboohr:example:2")
-    }
+    source["detail_checked"] = {key: now() for key in ("bamboohr:example:1", "bamboohr:example:2")}
     company.collect(
-        source, request, module.html_text, known={"bamboohr:example:1", "bamboohr:example:2"}
+        source, request, feeds.html_text, known={"bamboohr:example:1", "bamboohr:example:2"}
     )
     assert len(calls) == 1
 
@@ -393,7 +393,7 @@ def test_company_partial_rows_survive_detail_failure_and_keep_prior_metadata(
         return httpx.Response(429, headers={"Retry-After": "90"})
 
     monkeypatch.setattr(
-        module.httpx,
+        httpx,
         "Client",
         lambda **kwargs: original(**{**kwargs, "transport": httpx.MockTransport(send)}),
     )
@@ -412,15 +412,15 @@ def test_company_partial_rows_survive_detail_failure_and_keep_prior_metadata(
             "name": "Example",
             "kind": "bamboohr",
             "config": {"board": "example", "max_results": 1},
-            "detail_checked": {"bamboohr:example:1": module.now()},
+            "detail_checked": {"bamboohr:example:1": now()},
         },
         lambda *args, **kwargs: json.dumps(
             {"result": [{"id": 1, "jobOpeningName": "API Engineer"}]}
         ).encode(),
-        module.html_text,
+        feeds.html_text,
         known=old,
     )
-    refreshed = module.normalize_posting(rows[0])
+    refreshed = feeds.normalize_posting(rows[0])
     assert refreshed["metadata"]["date_posted"] == "2026-10-29"
     updated = workspace.ingest_job(refreshed)
     assert updated["content_version"] == job["content_version"]
@@ -432,7 +432,7 @@ def test_all_sources_use_canonical_filter_metadata_and_reject_invalid_query_coun
     from openings.collectors.jobspy import JobSpyConfig
 
     _, service = collection
-    row = module.normalize_posting(
+    row = feeds.normalize_posting(
         {
             "metadata": {
                 "remote": True,
@@ -469,11 +469,11 @@ def test_run_now_promotes_scheduled_work_and_long_provider_pause_keeps_a_valid_n
     task = service.claim_task("worker", "collect")
     service.run_task(task, "worker")
     paused = service.get_task(manual["id"])
-    assert paused["state"] == "queued" and paused["next_run_at"] > module.now()
+    assert paused["state"] == "queued" and paused["next_run_at"] > now()
     assert paused["attempts"] == 1000
     assert service.providers.get("greenhouse")["runtime"]["total_requests"] == 0
     policy(service, "greenhouse", enabled=True)
-    assert service.get_task(manual["id"])["next_run_at"] <= module.now()
+    assert service.get_task(manual["id"])["next_run_at"] <= now()
 
 
 @pytest.mark.asyncio

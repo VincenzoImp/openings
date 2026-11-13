@@ -6,10 +6,10 @@ from urllib.parse import parse_qs, urlsplit
 import httpx
 import pytest
 
-from openings import discovery as module
+from discovery_fixtures import patch_discovery
 from openings.collectors import company
 from openings.collectors.policy import ProviderPatch
-from openings.discovery import DiscoveryService, SourceCreate
+from openings.discovery import DiscoveryService, Filters, SourceCreate, feeds
 from openings.errors import DomainError
 from openings.workspace import Workspace
 
@@ -19,7 +19,7 @@ def test_cross_provider_redirect_is_rejected_before_destination_request(tmp_path
     discovery = DiscoveryService(workspace)
     discovery.update_provider("manual", ProviderPatch(expected_version=1, min_interval_seconds=0))
     discovery.update_provider("linkedin", ProviderPatch(expected_version=1, enabled=False))
-    monkeypatch.setattr(module, "public_url", lambda url: url)
+    patch_discovery(monkeypatch, "public_url", lambda url: url)
     calls = []
     target = "https://www.linkedin.com/jobs/view/123"
 
@@ -29,7 +29,7 @@ def test_cross_provider_redirect_is_rejected_before_destination_request(tmp_path
 
     original = httpx.Client
     monkeypatch.setattr(
-        module.httpx,
+        httpx,
         "Client",
         lambda **kwargs: original(**{**kwargs, "transport": httpx.MockTransport(send)}),
     )
@@ -78,7 +78,7 @@ def test_detail_refresh_rotates_across_pages_and_sources_without_material_timest
         calls.append(parts.path.rsplit("/", 1)[-1])
         return json.dumps({"jobAd": {"sections": {"jobDescription": {"text": body[0]}}}}).encode()
 
-    monkeypatch.setattr(module, "fetch_bytes", fetch)
+    patch_discovery(monkeypatch, "fetch_bytes", fetch)
 
     def run(selected=source):
         discovery.queue_collection(selected["id"])
@@ -95,7 +95,7 @@ def test_detail_refresh_rotates_across_pages_and_sources_without_material_timest
                 "title": "Engineer",
                 "company": "Example",
                 "posting": body[0],
-                "metadata": module.normalize_posting(
+                "metadata": feeds.normalize_posting(
                     {
                         "metadata": {
                             "source": "smartrecruiters",
@@ -161,7 +161,7 @@ def test_greenhouse_filters_metadata_before_bounded_detail_requests(tmp_path, mo
             name="Example",
             kind="greenhouse",
             config={"board": "example"},
-            filters=module.Filters(titles=["Engineer"]),
+            filters=Filters(titles=["Engineer"]),
         )
     )
     calls = []
@@ -181,7 +181,7 @@ def test_greenhouse_filters_metadata_before_bounded_detail_requests(tmp_path, mo
             ).encode()
         return json.dumps({"content": "Build APIs"}).encode()
 
-    monkeypatch.setattr(module, "fetch_bytes", fetch)
+    patch_discovery(monkeypatch, "fetch_bytes", fetch)
     discovery.queue_collection(source["id"])
     task = discovery.claim_task("owner", "collect")
     discovery.run_task(task, "owner")
@@ -208,7 +208,7 @@ def test_collection_retains_other_results_and_bounds_identity_conflict_report(
     )
     rows = [{"source_key": "bamboohr:example:1", "posting": "Ambiguous posting"} for _ in range(25)]
     rows.insert(10, {"source_key": "bamboohr:example:new", "posting": "A new complete job"})
-    monkeypatch.setattr(module, "fetch_postings", lambda source: rows)
+    patch_discovery(monkeypatch, "fetch_postings", lambda source: rows)
     queued = discovery.queue_collection(source["id"])
     task = discovery.claim_task("owner", "collect")
     discovery.run_task(task, "owner")
@@ -241,7 +241,7 @@ def test_later_listing_page_failure_stages_metadata_without_archiving_empty_jobs
             {"content": [{"id": str(i), "name": "Engineer"} for i in range(100)]}
         ).encode()
 
-    monkeypatch.setattr(module, "fetch_bytes", fetch)
+    patch_discovery(monkeypatch, "fetch_bytes", fetch)
     discovery.queue_collection(source["id"])
     task = discovery.claim_task("owner", "collect")
     discovery.run_task(task, "owner")
@@ -266,7 +266,7 @@ def test_bounded_description_is_explicitly_incomplete():
         )
         return json.dumps(payload).encode()
 
-    item = company.collect(source, request, module.html_text)[0]
+    item = company.collect(source, request, feeds.html_text)[0]
     assert len(item["posting"]) == 200000 and item["metadata"]["description_complete"] is False
 
 
@@ -297,7 +297,7 @@ def test_bamboohr_filters_before_result_and_detail_caps():
         )
         return json.dumps(payload).encode()
 
-    rows = company.collect(source, request, module.html_text)
+    rows = company.collect(source, request, feeds.html_text)
     assert len(rows) == 1 and rows[0]["title"] == "Engineer"
     assert calls == [
         "https://example.bamboohr.com/careers/list",
@@ -337,7 +337,7 @@ def test_workday_filters_later_metadata_pages_and_reports_candidate_cap():
         details.append(url)
         return json.dumps({"jobPostingInfo": {"jobDescription": "Build APIs"}}).encode()
 
-    rows = company.collect(source, request, module.html_text)
+    rows = company.collect(source, request, feeds.html_text)
     assert listing_calls == list(range(0, 200, 20)) and len(details) == 1
     assert rows[0]["source_key"].endswith("/job/150")
     assert source["candidate_capped"] is True
