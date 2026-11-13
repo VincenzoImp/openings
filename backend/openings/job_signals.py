@@ -43,37 +43,6 @@ from .posting import matches_filters
 
 LOG = logging.getLogger(__name__)
 
-# Mirrored in schema.sql; the 11 -> 12 migration creates the same objects.
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS job_signals (
- job_id TEXT PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
- format INTEGER NOT NULL, content_version INTEGER NOT NULL,
- language TEXT, language_confidence REAL,
- required TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(required)),
- welcome TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(welcome)),
- duplicate_checked INTEGER NOT NULL DEFAULT 0 CHECK(duplicate_checked IN (0,1)),
- duplicate_of TEXT REFERENCES jobs(id) ON DELETE SET NULL, duplicate_confidence REAL,
- distinct_from TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(distinct_from)),
- rules TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(rules)),
- computed_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS job_signals_duplicate ON job_signals(duplicate_of);
-CREATE INDEX IF NOT EXISTS job_signals_language ON job_signals(language);
-CREATE INDEX IF NOT EXISTS postings_unlisted ON postings(job_id) WHERE unlisted_at IS NOT NULL;
-CREATE INDEX IF NOT EXISTS jobs_dismissed_rule ON jobs(dismissed_rule_id) WHERE dismissed_rule_id IS NOT NULL;
-"""
-# Columns schema 12 adds to existing tables, in the order schema.sql lists them.
-JOB_COLUMNS = (
-    "dismissed_at TEXT",
-    "dismissed_by_kind TEXT",
-    "dismissed_by_id TEXT",
-    "dismissed_by_name TEXT",
-    "dismissed_by_token_kind TEXT",
-    "dismissed_rule_id TEXT",
-    "dismissed_rule_label TEXT",
-    "dismissed_reason TEXT NOT NULL DEFAULT ''",
-)
-POSTING_COLUMNS = ("unlisted_at TEXT",)
 # The compact signals of a job in list queries (one primary-key read per row).
 SIGNALS_SQL = (
     "(SELECT json_object('format',s.format,'language',s.language,'language_confidence',"
@@ -322,65 +291,6 @@ def unlist_missing(conn, source, started_at, stamp):
         if job_id not in marked:
             marked.append(job_id)
     return marked
-
-
-def backfill_unlisted(conn):
-    """Schema 11 to 12: postings missed by the last complete run of each board.
-
-    The last succeeded collection task of every company source that inspected the
-    whole board (not capped) is read back: an observation of that board that the
-    run did not see again (``last_seen_at`` before the run started) is no longer
-    listed since the task finished.
-    """
-    marked = 0
-    for snapshot, started_at, finished_at in conn.execute(
-        "SELECT r.source_snapshot,json_extract(t.result,'$.started_at'),t.updated_at "
-        "FROM tasks t JOIN collection_runs r ON r.id=t.run_id "
-        "WHERE t.kind='collect' AND t.state='succeeded' AND t.source_id IS NOT NULL "
-        "AND json_valid(t.result) AND json_extract(t.result,'$.started_at') IS NOT NULL "
-        "AND coalesce(json_extract(t.result,'$.candidate_capped'),0)=0 "
-        "AND coalesce(json_extract(t.result,'$.result_capped'),0)=0 "
-        "AND t.rowid=(SELECT t2.rowid FROM tasks t2 WHERE t2.source_id=t.source_id "
-        "AND t2.kind='collect' AND t2.state='succeeded' ORDER BY t2.updated_at DESC,t2.rowid DESC LIMIT 1)"
-    ).fetchall():
-        try:
-            source = json.loads(snapshot)
-        except ValueError:
-            continue
-        if isinstance(source, dict):
-            marked += len(unlist_missing(conn, source, started_at, finished_at))
-    return marked
-
-
-def backfill_dismissals(conn):
-    """Schema 11 to 12: who dismissed each dismissed job, from its last dismissal event."""
-    conn.execute(
-        "UPDATE jobs SET (dismissed_at,dismissed_by_kind,dismissed_by_id,dismissed_by_name,"
-        "dismissed_by_token_kind)=(SELECT e.created_at,e.actor_kind,e.actor_id,e.actor_name,"
-        "e.actor_token_kind FROM events e WHERE e.job_id=jobs.id AND e.kind='triage_changed' "
-        "AND json_valid(e.payload) AND json_extract(e.payload,'$.to')='dismissed' "
-        "ORDER BY e.created_at DESC,e.rowid DESC LIMIT 1) WHERE triage='dismissed'"
-    )
-
-
-def migrate(conn):
-    """Schema 11 to 12: signal storage, the dismissal record and listing observations.
-
-    Additive. Existing rows keep every value; the new job columns are filled for
-    dismissed jobs from their last dismissal event, and postings a board stopped
-    listing are marked from its last complete run. The text and duplicate signals
-    of existing jobs are computed after the upgrade (``SignalService.backfill``).
-    """
-    for column in JOB_COLUMNS:
-        conn.execute("ALTER TABLE jobs ADD COLUMN " + column)
-    for column in POSTING_COLUMNS:
-        conn.execute("ALTER TABLE postings ADD COLUMN " + column)
-    # executescript would commit the surrounding upgrade, so run each statement.
-    for statement in SCHEMA.split(";\n"):
-        if statement.strip():
-            conn.execute(statement)
-    backfill_dismissals(conn)
-    backfill_unlisted(conn)
 
 
 class SignalService:

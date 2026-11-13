@@ -47,7 +47,7 @@ def test_unsupported_formats_are_rejected_without_modifying_the_database(tmp_pat
         connection.execute("CREATE TABLE marker(value TEXT)")
         connection.execute("INSERT INTO marker VALUES('preserve')")
     original = archive.read_bytes()
-    with pytest.raises(DomainError, match="Unsupported workspace"):
+    with pytest.raises(DomainError, match="older than 0.23"):
         Database(archive)
     target = Workspace(tmp_path / "current.sqlite")
     job = target.ingest_job({"posting": "Build APIs"})

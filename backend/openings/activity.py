@@ -16,7 +16,8 @@ from . import subjects
 from .actors import current_actor, describe, pop_actor, require_owner
 from .agent_requests import REQUESTS, request_record
 from .common import check_version, encode, new_id, now
-from .errors import DomainError, conflict, missing
+from .errors import DomainError, missing
+from .idempotency import fingerprint, remember, replay
 from .models import Input, normalized_date
 from .subjects import SubjectType
 
@@ -354,7 +355,6 @@ class ActivityService:
             self._counts(conn, row["id"]) if stored == "open" else json.loads(row["change_counts"])
         )
         row.pop("change_counts")
-        row.pop("idempotency_key")
         result = {
             **row,
             "status": "interrupted" if idle else stored,
@@ -398,15 +398,13 @@ class ActivityService:
         value = value if isinstance(value, RunStart) else RunStart.model_validate(value)
         actor = self._token_actor("open")
         run_id, stamp, superseded = new_id(), now(), None
+        # The same key from another token is another run.
+        digest = fingerprint({**value.model_dump(mode="json"), "by": actor.id})
         with self.db.transaction() as conn:
-            if value.idempotency_key:
-                old = conn.execute(
-                    "SELECT * FROM runs WHERE idempotency_key=?", (value.idempotency_key,)
-                ).fetchone()
-                if old:
-                    if old["token_id"] != actor.id or old["workflow"] != value.workflow:
-                        conflict("This idempotency key was used for another run.")
-                    return self._run(conn, old, full=True)
+            replayed = replay(conn, "runs", value.idempotency_key, digest)
+            if replayed:
+                row = conn.execute("SELECT * FROM runs WHERE id=?", (replayed,)).fetchone()
+                return self._run(conn, row, full=True)
             current = conn.execute(
                 "SELECT * FROM runs WHERE token_id=? AND status='open'", (actor.id,)
             ).fetchone()
@@ -424,7 +422,7 @@ class ActivityService:
                     (stamp, run_id, encode(self._counts(conn, superseded)), stamp, superseded),
                 )
             conn.execute(
-                "INSERT INTO runs(id,token_id,token_name,token_kind,workflow,scope,idempotency_key,started_at,last_activity_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO runs(id,token_id,token_name,token_kind,workflow,scope,started_at,last_activity_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
                 (
                     run_id,
                     actor.id,
@@ -432,12 +430,12 @@ class ActivityService:
                     actor.token_kind,
                     value.workflow.strip(),
                     value.scope,
-                    value.idempotency_key,
                     stamp,
                     stamp,
                     stamp,
                 ),
             )
+            remember(conn, "runs", value.idempotency_key, digest, run_id)
             result = self._run(
                 conn, conn.execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone(), full=True
             )
@@ -600,7 +598,6 @@ class ActivityService:
             current = row["state"] == name
             row[name + "_by"] = resolved if current else None
             row[name + "_at"] = stamp if current else None
-        row.pop("idempotency_key")
         return row
 
     def _read_question(self, conn, question_id):
@@ -618,20 +615,12 @@ class ActivityService:
         value = value if isinstance(value, QuestionAsk) else QuestionAsk.model_validate(value)
         actor = current_actor()
         question_id, stamp = new_id(), now()
+        # The same key from another writer is another question.
+        digest = fingerprint({**value.model_dump(mode="json"), "by": [actor.kind, actor.id]})
         with self.db.transaction() as conn:
-            if value.idempotency_key:
-                old = conn.execute(
-                    "SELECT id,question,asked_by_kind,asked_by_id FROM questions WHERE idempotency_key=?",
-                    (value.idempotency_key,),
-                ).fetchone()
-                if old:
-                    if (old["question"], old["asked_by_kind"], old["asked_by_id"]) != (
-                        value.question,
-                        actor.kind,
-                        actor.id,
-                    ):
-                        conflict("This idempotency key was used for another question.")
-                    return self._read_question(conn, old["id"])
+            replayed = replay(conn, "questions", value.idempotency_key, digest)
+            if replayed:
+                return self._read_question(conn, replayed)
             job_id, label = (
                 self._subject(conn, value.subject_type, value.subject_id)
                 if value.subject_type
@@ -639,7 +628,7 @@ class ActivityService:
             )
             references = subjects.references(value.subject_type, value.subject_id)
             conn.execute(
-                "INSERT INTO questions(id,subject_type,job_id,application_id,knowledge_id,subject_label,question,why,choices,asked_by_kind,asked_by_id,asked_by_name,asked_by_token_kind,run_id,idempotency_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO questions(id,subject_type,job_id,application_id,knowledge_id,subject_label,question,why,choices,asked_by_kind,asked_by_id,asked_by_name,asked_by_token_kind,run_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     question_id,
                     value.subject_type,
@@ -652,11 +641,11 @@ class ActivityService:
                     encode(value.choices),
                     *actor.columns(),
                     self.workspace.open_run_id(conn, actor),
-                    value.idempotency_key,
                     stamp,
                     stamp,
                 ),
             )
+            remember(conn, "questions", value.idempotency_key, digest, question_id)
             self._question_event(
                 conn, "question_asked", question_id, job_id, references["application_id"]
             )

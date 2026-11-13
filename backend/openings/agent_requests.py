@@ -17,7 +17,8 @@ from pydantic import Field, field_validator, model_validator
 from . import subjects
 from .actors import current_actor, pop_actor, require_owner
 from .common import check_version, new_id, now
-from .errors import DomainError, conflict, missing
+from .errors import DomainError, missing
+from .idempotency import fingerprint, remember, replay
 from .models import Input, normalized_date
 from .subjects import SubjectType
 
@@ -105,7 +106,6 @@ def request_record(row):
     for prefix in ("taken_by", "resolved_by"):
         actor = pop_actor(row, prefix)
         row[prefix] = None if actor["kind"] == "unknown" else actor
-    row.pop("idempotency_key")
     return row
 
 
@@ -205,20 +205,12 @@ class RequestService:
         value = value if isinstance(value, RequestCreate) else RequestCreate.model_validate(value)
         actor = current_actor()
         request_id, stamp = new_id(), now()
+        # The same key from another writer is another request.
+        digest = fingerprint({**value.model_dump(mode="json"), "by": [actor.kind, actor.id]})
         with self.db.transaction() as conn:
-            if value.idempotency_key:
-                old = conn.execute(
-                    "SELECT id,text,created_by_kind,created_by_id FROM requests WHERE idempotency_key=?",
-                    (value.idempotency_key,),
-                ).fetchone()
-                if old:
-                    if (old["text"], old["created_by_kind"], old["created_by_id"]) != (
-                        value.text,
-                        actor.kind,
-                        actor.id,
-                    ):
-                        conflict("This idempotency key was used for another request.")
-                    return self._read(conn, old["id"])
+            replayed = replay(conn, "requests", value.idempotency_key, digest)
+            if replayed:
+                return self._read(conn, replayed)
             _, label = (
                 subjects.resolve(conn, value.subject_type, value.subject_id)
                 if value.subject_type
@@ -226,7 +218,7 @@ class RequestService:
             )
             references = subjects.references(value.subject_type, value.subject_id)
             conn.execute(
-                "INSERT INTO requests(id,subject_type,job_id,application_id,knowledge_id,subject_label,text,created_by_kind,created_by_id,created_by_name,created_by_token_kind,idempotency_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO requests(id,subject_type,job_id,application_id,knowledge_id,subject_label,text,created_by_kind,created_by_id,created_by_name,created_by_token_kind,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     request_id,
                     value.subject_type,
@@ -236,11 +228,11 @@ class RequestService:
                     label,
                     value.text,
                     *actor.columns(),
-                    value.idempotency_key,
                     stamp,
                     stamp,
                 ),
             )
+            remember(conn, "requests", value.idempotency_key, digest, request_id)
             self._event(conn, "request_created", {"id": request_id, **references})
             return self._read(conn, request_id)
 

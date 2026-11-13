@@ -6,8 +6,6 @@ text with the same "Local notes for this workspace" section.
 
 import hashlib
 import json
-import sqlite3
-from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -15,12 +13,7 @@ from fastapi.testclient import TestClient
 
 from openings.actors import acting_as, token_actor
 from openings.app import create_app
-from openings.db import SCHEMA_VERSION, Database, upgrade
-from openings.operations import restore_database
 from openings.skill_notes import HEADING, MAX_LENGTH
-from openings.workspace import Workspace
-from schema_fixtures import table_names
-from signal_fixtures import make_schema_eleven
 
 ROOT = Path(__file__).resolve().parents[2] / "skills"
 SKILL = "review-inbox"
@@ -214,40 +207,6 @@ def test_the_list_describes_reference_files_and_notes(client, owner):
     assert items[SKILL]["local_notes"]["version"] == 1
     assert items[SKILL]["local_notes"]["length"] == len(NOTE)
     assert workspace["local_notes"] is None
-
-
-def schema_eleven(path):
-    Database(path)
-    make_schema_eleven(path)
-
-
-def test_a_schema_eleven_workspace_gains_the_table(tmp_path):
-    path = tmp_path / "schema11.sqlite"
-    schema_eleven(path)
-    with closing(sqlite3.connect(path)) as conn:
-        assert "skill_notes" not in table_names(conn)
-    Workspace(path)
-    fresh = Database(tmp_path / "fresh.sqlite")
-    with closing(sqlite3.connect(path)) as conn, closing(sqlite3.connect(fresh.path)) as reference:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 14
-        assert table_names(conn) == table_names(reference)
-        sql = "SELECT sql FROM sqlite_master WHERE name='skill_notes'"
-        assert conn.execute(sql).fetchone() == reference.execute(sql).fetchone()
-
-    # The upgrade step itself creates the table, before schema.sql is applied.
-    stepped = tmp_path / "stepped.sqlite"
-    schema_eleven(stepped)
-    with closing(sqlite3.connect(stepped)) as conn:
-        upgrade(conn)
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
-        assert "skill_notes" in table_names(conn)
-
-    source = tmp_path / "backup11.sqlite"
-    schema_eleven(source)
-    target = Workspace(tmp_path / "live.sqlite")
-    restore_database(target, source)
-    assert target.db.one("PRAGMA user_version")["user_version"] == SCHEMA_VERSION
-    assert target.db.all("SELECT * FROM skill_notes") == []
 
 
 def test_the_run_list_carries_the_method_section(app):

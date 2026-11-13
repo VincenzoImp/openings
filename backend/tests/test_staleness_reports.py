@@ -170,8 +170,6 @@ def _knowledge_patch(entry):
 def test_context_input_summaries_are_stored_and_rebuilt(tmp_path):
     import sqlite3
 
-    from openings.db import Database
-
     path = tmp_path / "summaries.sqlite"
     app = create_app(path, start_worker=False)
     workspace, career, documents = app.state.workspace, app.state.career, app.state.documents
@@ -201,12 +199,8 @@ def test_context_input_summaries_are_stored_and_rebuilt(tmp_path):
             (context["id"],),
         ).fetchone()
         assert stored is not None and template["id"] in stored[1] and entry["id"] in stored[2]
-        # A restored or older workspace may lack summaries: reads and startup derive them.
+        # A restored workspace may lack summaries: reads derive them.
         conn.execute("DELETE FROM context_inputs")
     assert documents.list_staleness(stale_only=False)["total"] == 1
-    with sqlite3.connect(path) as conn:
-        assert conn.execute("SELECT count(*) FROM context_inputs").fetchone()[0] == 1
-        conn.execute("DROP TABLE context_inputs")
-    Database(path)
     with sqlite3.connect(path) as conn:
         assert conn.execute("SELECT count(*) FROM context_inputs").fetchone()[0] == 1

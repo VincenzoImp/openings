@@ -174,7 +174,7 @@ def test_notes_record_their_author_and_run(tmp_path):
     assert before_run["author"]["name"] == "Synthetic agent" and before_run["run"] is None
     assert in_run["run"] == {"id": run["id"], "workflow": "review-inbox"}
     assert system["author"]["kind"] == "system"
-    assert (owner["scope"], owner["origin"], owner["pinned"]) == ("job", "manual", False)
+    assert (owner["scope"], owner["pinned"]) == ("job", False)
     # The run report counts the note it wrote.
     assert ActivityService(workspace).get_run(run["id"])["change_counts"] == {"note_added": 1}
 

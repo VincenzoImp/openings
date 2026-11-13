@@ -22,7 +22,7 @@ OPERATIONS = (
         rest=(Route("GET", "/applications/{application_id}/responses", "responses_list"),),
         tool=Tool(
             READ,
-            "Read the employer responses of one application (rejection, interview, offer, other), newest day first, with who recorded each and whether its day is estimated.",
+            "Read the employer responses of one application (rejection, interview, offer, other), newest day first, with who recorded each.",
         ),
     ),
     Operation(
@@ -57,7 +57,7 @@ OPERATIONS = (
         rest=(Route("PATCH", "/responses/{response_id}", "responses_update"),),
         tool=Tool(
             WRITE,
-            "Correct a response's kind, day or note with its current version. A corrected day clears estimated.",
+            "Correct a response's kind, day or note with its current version.",
         ),
     ),
     Operation(

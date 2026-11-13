@@ -7,12 +7,11 @@ whole response. Finished collection runs and tasks older than the retention peri
 are removed in small batches, except the most recent runs of every source.
 """
 
-import json
 import logging
 import os
 from datetime import datetime, timedelta
 
-from .common import encode, now
+from .common import now
 
 LOG = logging.getLogger(__name__)
 # Job fields the owner reads; a refresh that changes none of them is a re-sighting.
@@ -26,7 +25,6 @@ PRUNE_BATCH = 500
 # Days an idempotency key keeps answering retries before it is forgotten.
 IDEMPOTENCY_KEY_DAYS = 30
 _FINISHED = "('succeeded','failed','cancelled')"
-_VISIBLE = "value IN ('title','company','location','posting')"
 
 
 def observation_payload(data):
@@ -43,47 +41,6 @@ def observation_payload(data):
     if data.get("source_key") is not None:
         kept["source_key"] = data["source_key"]
     return kept
-
-
-def trim_history(conn):
-    """Schema 8 to 9: drop re-sighting events and the unused part of provider payloads.
-
-    Runs inside the upgrade transaction. A ``posting_updated`` event that names a
-    visible field becomes ``job_refreshed`` with those field names; every other one
-    recorded nothing the job does not already hold and is deleted.
-    """
-    conn.execute(
-        "DELETE FROM events WHERE kind='posting_updated' AND NOT CASE WHEN json_valid(payload) "
-        f"THEN EXISTS(SELECT 1 FROM json_each(events.payload,'$.fields') WHERE {_VISIBLE}) "
-        "ELSE 0 END"
-    )
-    conn.execute(
-        "UPDATE events SET kind=?,payload=json_object('fields',json((SELECT "
-        f"json_group_array(value) FROM json_each(events.payload,'$.fields') WHERE {_VISIBLE}))) "
-        "WHERE kind='posting_updated'",
-        (REFRESH_EVENT,),
-    )
-    # A closed agent run stores its change counts by kind; keep them equal to its events.
-    for run_id, stored in conn.execute(
-        "SELECT id,change_counts FROM runs WHERE json_type(change_counts,'$.posting_updated') "
-        "IS NOT NULL"
-    ).fetchall():
-        counts = json.loads(stored)
-        counts.pop("posting_updated")
-        kept = conn.execute(
-            "SELECT count(*) FROM events WHERE run_id=? AND kind=?", (run_id, REFRESH_EVENT)
-        ).fetchone()[0]
-        if kept:
-            counts[REFRESH_EVENT] = kept
-        conn.execute("UPDATE runs SET change_counts=? WHERE id=?", (encode(counts), run_id))
-    # Same values as observation_payload, computed by SQLite without loading the rows.
-    conn.execute(
-        "UPDATE postings SET payload=json_patch('{}',json_object("
-        "'raw',json(CASE WHEN json_type(payload,'$.raw.job_url_direct')<>'null' THEN "
-        "json_object('job_url_direct',json_extract(payload,'$.raw.job_url_direct')) END),"
-        "'source_key',json_extract(payload,'$.source_key'))) "
-        "WHERE json_valid(payload) AND payload<>'{}'"
-    )
 
 
 def retention_days():

@@ -15,7 +15,7 @@ confirmed acts on new jobs as their signals arrive (job_signals.py).
 
 ``PolicyService`` is in service.py; models.py holds the sections, the signal
 registry ``SIGNALS`` and the inputs, records.py the records as read and the
-frozen policy, upgrade.py the schema 9 to 10 step.
+frozen policy.
 """
 
 from .models import (
