@@ -1,4 +1,4 @@
-"""The schema 14 to 15 upgrade, on the real fixture written by v0.23.0's own seed.
+"""The schema 14 to 15 upgrade, on the real fixture written by v0.23.1's own seed.
 
 Each later change of the unreleased migration adds its own block of data
 mapping assertions below ("Data mapping").
