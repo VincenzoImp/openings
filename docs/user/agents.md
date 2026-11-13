@@ -15,7 +15,7 @@ Agent access**:
 | **Agent** (recommended for an agent) | The whole job search: jobs, applications, documents, Career, collection, runs and questions. |
 | **Owner** | Everything, the same as your dashboard session. |
 
-![Access tokens in Settings: an agent token, an owner token and the form that offers an agent token first](../images/access-tokens.png)
+![Access tokens in Settings: the tokens with their kinds, marked Owner only, and the form that offers an agent token first](../images/access-tokens.png)
 
 An agent token is refused, with `403 forbidden` on REST and MCP, when it tries to:
 
@@ -55,9 +55,29 @@ serves them to connected agents: `skills_list`, `skill_get(name, path)` and one 
 prompt per skill, also at `GET /api/v1/skills`. Start with
 [`setup-openings`](../../skills/setup-openings/SKILL.md) for a new workspace or
 [`openings-workspace`](../../skills/openings-workspace/SKILL.md) for the basics.
-**Settings → Agent access** shows client configuration snippets and the skill list.
+**Settings → Agent access** shows client configuration snippets; **Settings →
+Skills** shows each skill's text and reference files.
 
-![Settings → Agent access with the MCP endpoint, a Claude Code configuration snippet and the served workflow skills](../images/agent-access.png)
+A workspace never edits a shipped skill. It keeps **local notes** for a skill
+instead: up to 2,000 characters, appended to the served `SKILL.md` (by
+`skill_get`, the skill's MCP prompt and `GET /api/v1/skills/{name}`) under
+"Local notes for this workspace", with the version, the day and who wrote them.
+`skill_get(name, local_notes=false)` returns the shipped text alone; reference
+files never carry notes. Read the notes and their earlier versions with
+`skill_notes_get(name)` and replace them with `skill_notes_update(name, value)`
+(`expected_version`, 0 for the first notes, and the whole `text`; empty clears
+them). The owner edits them under **Settings → Skills**, where earlier versions
+can be read and used again; a run report's **Method** section offers what the
+run lacked as a note (**Add to the local notes of …**), and each skill lists
+the method sections of its recent runs as suggestions. An agent token may
+write notes too: record a lasting gap in how a workflow fits this workspace,
+for example a step it always needs here. Each save is an attributed version the
+owner can read and restore. Personal criteria (what to apply to, eligibility,
+writing rules) belong to the policy, never to skill notes.
+
+![Settings → Skills: a skill's local notes with who wrote them, a suggestion from a recent run, the read-only skill text and its reference files](../images/skills.png)
+
+![Settings → Agent access with the API tokens, the token form and a Claude Code configuration snippet](../images/agent-access.png)
 
 To let an agent run the whole search for you, see
 [Agent-operated job search](agent-operated.md). MCP remains usable without the
@@ -149,8 +169,9 @@ its name at the time) or the system. Use one token per agent.
    `subject_type` (`job`, `application`, `knowledge`) with `subject_id`, and
    optional `choices`. The owner answers in the dashboard under **Activity**.
 3. Close with `runs_finish(run_id, value)`: `expected_version`, `summary`,
-   `changes`, `not_done`, `checks`, `limits` and `method`. Openings adds the
-   change counts by kind. `runs_update` stores a progress note meanwhile.
+   `changes`, `not_done`, `checks`, `limits` and `method` (what the workflow
+   lacked; the owner may turn it into the skill's local notes, and `runs_list`
+   returns it with each run). Openings adds the change counts by kind. `runs_update` stores a progress note meanwhile.
 
 `runs_get` returns a run with its report, questions and a page of its changes;
 `runs_list` filters by status, workflow, token and start time; `events_list`

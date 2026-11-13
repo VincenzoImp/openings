@@ -2,7 +2,7 @@
 
 ## Portable backup
 
-Use **Settings → Workspace → Backup**, authenticated `GET /api/v1/backup`, or the MCP
+Use **Settings → Backup and restore → Download a backup**, authenticated `GET /api/v1/backup`, or the MCP
 `workspace_backup` download grant. These create a consistent SQLite snapshot while
 the service runs, including PDF/source bytes, templates, career data, job history
 and settings.
@@ -18,14 +18,15 @@ A backup downloaded with an agent token omits the owner password hash, the
 session secret and the API tokens, and restores like any other backup. To start
 a server directly on such a file, set the owner password again.
 The database is not encrypted. A JSON export is useful for reading records, but
-omits binary file contents and is not a restorable backup. Download it through
-Settings, `GET /api/v1/export`, or the scoped `workspace_export` MCP grant. Use the
+omits binary file contents and is not a restorable backup. Download it with
+**Export records** in the same tab, `GET /api/v1/export`, or the scoped `workspace_export` MCP grant. Use the
 backup action to capture changes from an active WAL journal consistently.
 
 ## Restore or move hosts
 
 On the destination host, install the same Openings release and set its owner
-password. Restore through Settings or `POST /api/v1/backup/restore` with the raw
+password. Restore under **Settings → Backup and restore** (marked Owner only:
+choose the file and type RESTORE to confirm) or `POST /api/v1/backup/restore` with the raw
 SQLite body, as the owner or with an owner token; an agent token is refused.
 Restore accepts the current database format and checks integrity and
 foreign keys before replacement. It preserves the destination installation's owner credentials/API tokens, clears
@@ -48,7 +49,7 @@ needs 3 × *B* + *D* + 64 MiB free, plus *B* − *D* when the backup is the larg
 one: about four times the size when you restore a workspace over itself. A larger
 upload is refused before it is written, with `413 backup_size` and the backup
 size, the free space and the space needed in the error details; the room is
-checked again before the database is replaced. **Settings → Workspace** and
+checked again before the database is replaced. **Settings → Backup and restore** and
 `GET /api/v1/workspace` (`workspace_info`) show the database size, the free space
 and the largest backup that fits now (`storage`). `OPENINGS_MAX_RESTORE_MB` is an
 optional upper bound, unset by default; it can only lower the limit. Copies left
@@ -84,7 +85,8 @@ running work, including the progress stored with it, is never removed. The
 change-log entries of a removed run or task (queued, cancelled, retried) go with
 it unless an agent run recorded them. Job and application history is never
 pruned. The worker does this at start and every six hours, in small batches;
-Settings → Workspace shows the period in use.
+Settings → Workspace, Retention shows the period in use; Collection → Runs and
+tasks lists what is kept.
 
 A source refresh that only sees a posting again is recorded on the posting
 (`last_seen_at` in the job's sources), not as an event. When a refresh changes
@@ -96,7 +98,8 @@ stored.
 ## Access controls
 
 Settings supports named API tokens of two kinds, independent token revocation and
-owner password changes. An **agent** token cannot change the password, manage
+owner password changes; the parts that need owner authority (tokens, restore,
+the password) are marked **Owner only**. An **agent** token cannot change the password, manage
 tokens, restore a backup or answer a question for the owner; an **owner** token
 has full access ([token kinds](agents.md#token-kinds)). Tokens created before
 version 0.17 are owner tokens. A password change rotates browser sessions and

@@ -159,7 +159,7 @@ export function SourceYieldView() {
         <Banner tone="attention" title={`“${noisy.name}” is noisy`}>
           It collected {plural(noisy.collected, "job")} and {noisy.shortlisted}{" "}
           {noisy.shortlisted === 1 ? "was" : "were"} kept. Narrow its terms or
-          places, or pause it, under Saved searches or Companies.
+          places, or pause it, in Sources.
         </Banner>
       )}
       <Card

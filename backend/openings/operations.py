@@ -20,10 +20,18 @@ MIB = 1024**2
 
 
 def database_bytes(db):
-    """Bytes the workspace takes on the data volume: the file and its write-ahead log."""
-    return sum(
-        path.stat().st_size for path in (db.path, Path(str(db.path) + "-wal")) if path.is_file()
-    )
+    """Bytes the workspace takes on the data volume: the file and its write-ahead log.
+
+    The log can disappear between two calls when the last connection closes, so a
+    missing file counts as zero bytes instead of failing the read.
+    """
+    total = 0
+    for path in (db.path, Path(str(db.path) + "-wal")):
+        try:
+            total += path.stat().st_size
+        except FileNotFoundError:
+            pass
+    return total
 
 
 def replace_room(source, database):

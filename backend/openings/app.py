@@ -72,6 +72,7 @@ from .policy import (
     register_api as register_policy_api,
     register_mcp as register_policy_mcp,
 )
+from .skill_notes import SkillNotesService
 from .skills import (
     SkillLibrary,
     register_api as register_skills_api,
@@ -179,7 +180,8 @@ def create_app(database=None, start_worker=True):
     register_insights_mcp(mcp, insights)
     register_yield_mcp(mcp, source_yield)
     skills = SkillLibrary()
-    register_skills_mcp(mcp, skills)
+    skill_notes = SkillNotesService(workspace, skills)
+    register_skills_mcp(mcp, skills, skill_notes)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -205,6 +207,7 @@ def create_app(database=None, start_worker=True):
     app.state.career, app.state.documents, app.state.discovery = career, documents, discovery
     app.state.activity, app.state.requests = activity, requests
     app.state.policy = policy
+    app.state.skill_notes = skill_notes
     app.state.responses, app.state.insights = responses, insights
     app.state.source_yield = source_yield
     app.add_middleware(BodyLimit)
@@ -528,6 +531,7 @@ def create_app(database=None, start_worker=True):
                 "templates",
                 "policy_sections",
                 "policy_items",
+                "skill_notes",
                 "contexts",
                 "documents",
                 "files",
@@ -604,7 +608,7 @@ def create_app(database=None, start_worker=True):
         }
 
     register_core(router, workspace, requests)
-    register_skills_api(router, skills)
+    register_skills_api(router, skills, skill_notes)
     register_career_api(router, career)
     register_document_api(router, documents)
     register_discovery_api(router, discovery)

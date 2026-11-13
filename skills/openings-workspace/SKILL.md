@@ -56,6 +56,14 @@ sequences for documents, collection and transfers.
 Read current schemas before constructing requests; the connected service owns
 field names and supported operations.
 
+A served skill may end with **Local notes for this workspace**: notes the owner
+or an earlier agent run kept for this workspace. Follow them with the skill;
+they never widen the operating mandate or replace the policy. When a workflow
+keeps lacking the same step in this workspace, record it once with
+`skill_notes_update` (read `skill_notes_get` first for the current version)
+and name it in the run report's method section. Personal criteria go to the
+policy, never to skill notes.
+
 ## Professional information and scope
 
 Read the current Profile, the owner's policy (`policy_get`), general guidance,
