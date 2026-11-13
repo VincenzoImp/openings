@@ -634,11 +634,12 @@ test("a template's source, typed rules, assets and sample are managed end to end
   await detail.getByRole("button", { name: "Done", exact: true }).click();
   await detail.getByRole("button", { name: "Remove Closing" }).click();
   await detail.getByRole("button", { name: "Save rules" }).click();
-  await saved(page, "Rules saved.");
-  stored = await read();
-  expect(stored.rules.statements.map((rule: any) => rule.statement)).toEqual([
-    "Name the role and one result.",
-  ]);
+  // The toast of the first save may still be shown, so wait for the record.
+  await expect
+    .poll(async () =>
+      (await read()).rules.statements.map((rule: any) => rule.statement),
+    )
+    .toEqual(["Name the role and one result."]);
 
   // Assets: files are added and listed; a PDF becomes the sample under Preview.
   await detail.getByRole("tab", { name: /^Assets/ }).click();
