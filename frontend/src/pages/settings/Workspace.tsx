@@ -142,6 +142,22 @@ export function Workspace({
             </p>
           </div>
         </section>
+        <section className="card" aria-labelledby="setup-title">
+          <header>
+            <h2 id="setup-title">Setup guide</h2>
+          </header>
+          <div className="body stack">
+            <p>
+              The steps of a new workspace and what is done: your agent, your
+              profile, your policy and a first search.
+            </p>
+            <div className="row">
+              <a className="btn sm" href="#setup">
+                Open the setup guide
+              </a>
+            </div>
+          </div>
+        </section>
       </div>
       <Password />
       <p className="caption">

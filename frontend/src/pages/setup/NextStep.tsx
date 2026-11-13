@@ -1,0 +1,55 @@
+import { EmptyState } from "../../design";
+import { plural } from "../../library/common";
+
+/** How every day works once the record is complete. */
+export function NextStep({ applications }: { applications: number }) {
+  return (
+    <section className="card" aria-labelledby="next-title">
+      <header>
+        <h2 id="next-title" className="grow">
+          First applications
+        </h2>
+      </header>
+      <div className="body stack">
+        <p>When the record is complete, this is how every day works:</p>
+        <ol className="next-list">
+          <li>
+            <strong>Collection finds jobs</strong> on the schedule of your
+            searches. Jobs that break a rule you switched on are dismissed at
+            once, and can be restored.
+          </li>
+          <li>
+            <strong>Your agent reviews them</strong> against your policy,
+            shortlists the credible ones and writes a CV and a letter for each.
+          </li>
+          <li>
+            <strong>You read what is ready</strong>, with the posting beside the
+            documents, send the application yourself and mark it applied.
+          </li>
+          <li>
+            <strong>You record the employer's answer.</strong> After a few weeks
+            Insights shows which roles and sources answer.
+          </li>
+        </ol>
+        {applications ? (
+          <p>
+            Your workspace has {plural(applications, "application")}; Today
+            shows the ones ready for you.
+          </p>
+        ) : (
+          <EmptyState title="No application yet">
+            The first ones usually appear within a day of the first search.
+          </EmptyState>
+        )}
+        <div className="row">
+          <a className="btn primary" href="#today">
+            Go to Today
+          </a>
+          <a className="btn quiet" href="#jobs">
+            Add a job by its address
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}

@@ -65,32 +65,20 @@ export const SCREENS: Record<string, string> = {
   templates: "Templates",
   collection: "Collection",
   settings: "Settings",
+  setup: "Set up",
 };
 
 /**
  * Other names of a screen: the one it had in an earlier version (Overview is
- * now Today) and names from the approved design without their own screen yet.
+ * now Today) and the design's name of the setup guide (Onboarding).
  */
 export const ALIASES: Record<string, string> = {
   overview: "today",
   inbox: "jobs",
   shortlist: "jobs",
   skills: "settings",
+  onboarding: "setup",
 };
-
-/** Screens built with the design system; the others keep the older stylesheet. */
-export const REBUILT = [
-  "today",
-  "applications",
-  "review",
-  "jobs",
-  "activity",
-  "career",
-  "policy",
-  "templates",
-  "collection",
-  "settings",
-];
 
 export const HOME = "today";
 

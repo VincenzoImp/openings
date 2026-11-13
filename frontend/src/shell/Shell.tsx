@@ -19,9 +19,11 @@ import {
   PolicyPage,
   Screen,
   SettingsPage,
+  SetupPage,
   TemplatesPage,
   TodayPage,
 } from "./Screens";
+import { markSetup, readNewWorkspace, setupMark } from "./setup";
 import { TopBar } from "./TopBar";
 import {
   THEME_KEY,
@@ -32,7 +34,7 @@ import {
   type Density,
   type Theme,
 } from "./preferences";
-import { HOME, REBUILT, SCREENS, canonicalHash, routeOf } from "./routes";
+import { HOME, SCREENS, canonicalHash, routeOf } from "./routes";
 
 const NARROW = "(max-width: 860px)";
 const emptyList = { items: [], total: 0 };
@@ -184,6 +186,23 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
   useEffect(() => {
     if (!narrow) setMore(false);
   }, [narrow]);
+  // A workspace nobody has set up opens on the setup guide instead of Today,
+  // once per browser (shell/setup.ts). Only a visit to the home screen counts,
+  // and only while nothing waits in Jobs or Applications.
+  const landing = useRef(/^#?(today)?$/.test(location.hash));
+  useEffect(() => {
+    if (!landing.current || inbox.loading || applications.loading) return;
+    landing.current = false;
+    if (setupMark() || inbox.data.total || applications.data.total) return;
+    void readNewWorkspace().then((fresh) => {
+      if (!fresh) return markSetup("seen");
+      markSetup("started");
+      if (routeOf(location.hash) !== HOME) return;
+      history.replaceState(null, "", "#setup");
+      lastRoute.current = location.hash;
+      setRoute("setup");
+    });
+  }, [inbox.loading, applications.loading]);
 
   function navigate(target: string) {
     if (!confirmLeave()) return;
@@ -255,8 +274,7 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
             ref={main}
             inert={more}
           >
-            {/* Every screen is built with the design system (stage 4 removed the last old page). */}
-            <div className={REBUILT.includes(route) ? "screen" : "legacy"}>
+            <div className="screen">
               <Screen route={route}>
                 {route === "today" ? (
                   <TodayPage onOpenJob={openJob} onOpenApplication={openApp} />
@@ -280,6 +298,8 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
                   <PolicyPage />
                 ) : route === "templates" ? (
                   <TemplatesPage />
+                ) : route === "setup" ? (
+                  <SetupPage />
                 ) : (
                   <SettingsPage
                     onLogout={() =>
