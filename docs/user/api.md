@@ -587,9 +587,12 @@ it was built from:
 
 The file record returns `source_sha256` (null for every other file and for PDFs
 uploaded before 0.22). When the source arrives the server derives the revision's
-`text`: the document body with comments, layout settings and markup removed,
-macros the source defines expanded, accents composed and the breaks TeX makes
-(paragraphs, `\\`, items, headings) kept as lines. No TeX runtime is used, so
+`text`, as a reader sees it in the PDF: the document body with macros the source
+defines expanded; the personal data, entries, openings and closings of moderncv,
+`letter` and `scrlttr2` printed where the class prints them; link text without
+the address; comments, settings and markup removed; accents composed; and the
+breaks TeX makes (paragraphs, `\\`, items, headings) kept as lines. An unknown
+command contributes the text of its arguments. No TeX runtime is used, so
 the text is for review, search and comparison; the PDF shows the layout.
 `GET /documents/{id}` returns `text`, `source_sha256`, `claim_ids`,
 `knowledge_ids`, `note`, `files` and `legacy_content` (the content a CV or

@@ -64,7 +64,7 @@ belongs to the module of its concern.
 |---|---|
 | `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage, rule dismissals and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py` notes, their author, run and pin, and the deprecated application note; `timeline.py` the timeline of a job or an application; `timeline_upgrade.py` the timeline part of the schema 12 to 13 step; `applications.py` derived readiness, preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, responses, Ready and deletion; `bulk.py` per-item bulk results; `overview.py` the funnel |
 | `discovery/` | `service.py` the provider gate (`http_budget`, `fetch_bytes`); `models.py` typed inputs; `network.py` the public-address policy and the bounded fetch; `resolution.py` board detection and source configuration; `feeds.py` posting readers (Lever, Ashby, RSS) and adapter dispatch; `sources.py` source schemas, preview and writes; `runs.py` the global switch, provider policies, queueing, scheduling and run records; `tasks.py` leases, retry and running one collection |
-| `documents/` | `contexts.py` frozen contexts and their staleness reports; `revisions.py` creation, cited evidence, review, comparison and deletion; `sources.py` the source and PDF of a CV or letter and its derived text; `text.py` readable text of a TeX source; `files.py` owned files and scoped transfer grants; `models.py` inputs; `upgrade.py` the schema 12 to 13 step |
+| `documents/` | `contexts.py` frozen contexts and their staleness reports; `revisions.py` creation, cited evidence, review, comparison and deletion; `sources.py` the source and PDF of a CV or letter and its derived text; `text.py` readable text of a TeX source; `latex.py` what CV and letter class commands print; `files.py` owned files and scoped transfer grants; `models.py` inputs; `upgrade.py` the schema 12 to 13 step |
 | `career/` | `profile.py` Profile and instructions; `entries.py` Career entries; `claims.py`; `templates.py`; `imports.py`; `models.py` inputs and defaults; `records.py` row helpers shared with documents |
 | `policy/` | `service.py` item writes, confirmation and rule preview; `models.py` sections, the signal registry `SIGNALS` and inputs; `records.py` records as read and the frozen policy; `upgrade.py` the schema 9 to 10 step |
 | `interfaces/` | One module per area declaring its operations and binding them to its service: `core.py` (workspace, jobs, notes, applications, overview), `career.py`, `documents.py`, `discovery.py`, `activity.py`, `agent_requests.py`, `policy.py`, `outcomes.py`, `insights.py`, `source_yield.py`, `skills.py` and `system.py` (sign-in, tokens, inventory, backup, restore, examples, export); `registry.py` the declaration and its binding |
@@ -153,10 +153,15 @@ or when a declared route, tool or surface is not registered.
   are stored (`documents/sources.py`). It stores no content (`content` stays
   `{}`), only the claim and Career entry ids it cites, an optional note and the
   text derived from its source when the source arrives (`documents.text`).
-  `documents/text.py` derives it without a TeX runtime: the body after
-  `\begin{document}`, comments and layout settings removed, the source's own
-  `\newcommand`/`\def` macros expanded a bounded number of times, accents
-  composed, and the breaks TeX makes kept as lines. The same source always gives
+  `documents/text.py` derives it without a TeX runtime, as a reader sees the
+  PDF: the body after `\begin{document}`, the source's own `\newcommand`/`\def`
+  macros expanded a bounded number of times, the commands of CV and letter
+  classes printed as they print (`documents/latex.py`: the moderncv title from
+  the preamble's personal data at `\makecvtitle`, `\cventry`/`\cvitem` columns,
+  the moderncv, `letter` and `scrlttr2` openings, closings and sender details,
+  link text), comments, settings and the options of unknown commands removed
+  (their brace arguments stay as text), accents composed, and the breaks TeX
+  makes kept as lines. The same source always gives
   the same text, so the stored text can be checked against it; a parser change
   needs a schema step that derives it again. Approval of a CV or letter requires
   its source and PDF. `compare_documents` diffs two revisions' text by line with
