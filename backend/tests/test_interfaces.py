@@ -62,6 +62,10 @@ OWNER_ONLY_CALLS = {
     "tokens.create": ({"json": {"name": "Escalation"}}, {"value": {"name": "Escalation"}}),
     "tokens.revoke": ({}, {"token_id": "missing"}),
     "backup.restore": ({"content": b"SQLite format 3\x00"}, {}),
+    # REST only: kept copies never reach MCP (test_backups.py).
+    "backups.list": ({}, {}),
+    "backups.download": ({}, {}),
+    "backups.delete": ({}, {}),
     "questions.answer": (
         {"json": {"expected_version": 1, "answer": "Synthetic"}},
         {"question_id": "missing", "value": {"expected_version": 1, "answer": "Synthetic"}},

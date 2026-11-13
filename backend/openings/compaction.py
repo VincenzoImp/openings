@@ -21,6 +21,31 @@ ROOM_FACTOR = 2
 ROOM_MARGIN = 64 * 1024**2
 
 
+def disk_free(directory):
+    """Free bytes on the volume that holds ``directory``; every room check reads this."""
+    return shutil.disk_usage(directory).free
+
+
+def has_room(directory, needed):
+    """Whether the volume of ``directory`` has ``needed`` free bytes, and how many it has."""
+    free = disk_free(directory)
+    return free >= needed, free
+
+
+def fsync_directory(directory):
+    """Make a rename or deletion in ``directory`` durable; a no-op where unsupported."""
+    try:
+        handle = os.open(directory, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(handle)
+    except OSError:
+        pass
+    finally:
+        os.close(handle)
+
+
 def free_space(conn):
     """Return (free bytes inside the file, file bytes)."""
     page = conn.execute("PRAGMA page_size").fetchone()[0]
@@ -44,7 +69,7 @@ def compact(db):
             if free < minimum or free * 4 < total:
                 return 0
             needed = ROOM_FACTOR * (total - free) + ROOM_MARGIN
-            if shutil.disk_usage(db.path.parent).free < needed:
+            if not has_room(db.path.parent, needed)[0]:
                 LOG.warning(
                     "Database not compacted: %d MB are free inside the file, but rewriting it "
                     "needs %d MB of free disk space.",
