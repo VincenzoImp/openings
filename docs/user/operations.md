@@ -140,59 +140,17 @@ For development commands and release gates, see [Contributing](../../CONTRIBUTIN
 
 ## Upgrade the workspace format
 
-Back up before upgrading. 0.23 upgrades a workspace to schema 14 on start and
-removes what 0.19 to 0.22 deprecated, keeping every value: read
-[Upgrading to 0.23](upgrading-0.23.md) first. A schema 12 workspace (0.21)
-also goes through 0.22's change of stored data: read
-[Upgrading to 0.22](upgrading-0.22.md). On start, a schema 9 workspace (0.18) is upgraded to
-schema 10 (0.19) in one transaction. Schema 10 only adds: the
-[policy](policy.md), three typed fields on claims and the policy versions a
-prepared application records. The Profile's free-form `metadata` is copied into
-unconfirmed **Facts** items and its **Preferences** and **Target roles** text
-into unconfirmed **Decision** items; the Profile itself, every Career entry,
-claim and template and every frozen context keep each value they had. A claim
-whose `metadata` has a key `default_in_cv` (true or false), `role` (`core`,
-`supporting` or `bench`) or `group` (a text of at most 100 characters) gets
-that value in the typed field of the same name; nothing else is guessed, and
-the metadata stays.
+Back up before upgrading. A release upgrades the workspace to its schema on
+start, in one transaction, and a restore upgrades a copy of an older backup the
+same way; the uploaded file is not changed. A workspace cannot be opened by an
+earlier release. Workspaces older than 0.23 must be opened once with 0.23 first;
+release history is in [CHANGELOG.md](../../CHANGELOG.md).
 
-A schema 8 workspace (0.17.0) is upgraded through schema 9 in the same
-transaction. Schema 9 changes storage only: the frozen contexts, which each
-held a full copy of your Career record, now share one stored copy of every entry,
-claim and template, and their asset files no longer add file rows. Every context
-still reads back byte for byte with the same signature, and file ids and links
-stay valid; the upgrade checks each context and changes nothing if one differs.
-
-The same step removes what earlier releases stored without using it. Every
-`posting_updated` event that recorded a refresh without a change to the title,
-company, location or posting text is deleted; the others become `job_refreshed`
-events with those field names, and `posting_updated` no longer appears in the
-change log, the overview activity or run change counts. Stored provider responses
-are reduced to the source key and the employer's apply link, so the `payload` of
-`postings` in a JSON export holds only those two values. Identity lookups,
-duplicate candidates, the sources of a job and collection run summaries read the
-same as before. Finished collection runs older than the retention period are
-removed by the worker after the start, not by the upgrade
-([Retention](#retention)). A development database that already has the
-unreleased schema 9 is not changed by this step: its old events and payloads
-stay until the jobs are refreshed or forgotten.
-
-Right after that upgrade the start takes longer once: the database file is
-rewritten without the freed space (seconds on an SSD, longer on slow storage). This needs free
-space on the data volume of about twice the database's new, smaller size plus
-64 MiB. Without it the step is skipped with a log message, the file keeps its
+After an upgrade that frees space, the start takes longer once: the database file
+is rewritten without the freed space (seconds on an SSD, longer on slow storage).
+This needs free space on the data volume of about twice the database's new size
+plus 64 MiB. Without it the step is skipped with a log message, the file keeps its
 size and the freed space is reused by later writes; the next start tries again.
 The same rewrite runs at any start when at least a quarter of the file and
 `OPENINGS_COMPACT_MIN_MB` (default 32) are free, for example after forgetting many
 jobs. An interruption leaves the previous file intact.
-
-A schema 7 workspace is upgraded to schema 8, which shipped with 0.17.0, in the same
-transaction: changes gain their actor and run, notes gain an author, and
-the tables for agent runs and questions for the owner are added. Every existing
-record, version, file and frozen context is kept. Changes recorded before the
-upgrade keep their content and show the actor "unknown (before 0.17)". Schema 6
-(applications gain empty priority, deadline and requirements) and schema 5 (0.10)
-are upgraded through the same chain in the same step. Restore accepts a schema 10
-backup and upgrades a copy of a schema 5, 6, 7, 8 or 9 backup; the uploaded file is
-not changed. A schema 10 workspace cannot be opened by an earlier release. Older
-formats require their matching release.

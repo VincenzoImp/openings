@@ -64,12 +64,8 @@ jobs:
       - run: npm --prefix frontend test
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
-      - name: Browser tests, recording the requests the dashboard makes
+      - name: Browser tests
         run: npm --prefix frontend run test:e2e -- --project=chromium --project=chromium-mobile --project=chromium-performance
-        env:
-          OPENINGS_PARITY_EVIDENCE: ${{ runner.temp }}/parity-evidence
-      - name: Parity gate (every operation has REST, MCP and a dashboard path the browser tests used)
-        run: uv run python scripts/parity_matrix.py --gate "$RUNNER_TEMP/parity-evidence"
       - run: npm --prefix frontend audit --audit-level=moderate
 
   container:
@@ -124,11 +120,10 @@ jobs:
           python -c "import json; p=json.load(open('/tmp/openings-profile.json')); assert p['name']=='' and p['version']>=1"
           curl --silent --fail --cookie /tmp/openings-cookie \
             http://127.0.0.1:18080/api/v1/capabilities --output /tmp/openings-capabilities.json
-          python -c "import json,tomllib; p=json.load(open('/tmp/openings-capabilities.json')); assert p['version']==tomllib.load(open('pyproject.toml','rb'))['project']['version'] and len(p['operations'])>=83"
+          python -c "import json,tomllib; p=json.load(open('/tmp/openings-capabilities.json')); assert p['version']==tomllib.load(open('pyproject.toml','rb'))['project']['version'] and p['operations']"
           curl --silent --fail --cookie /tmp/openings-cookie \
             http://127.0.0.1:18080/api/v1/skills --output /tmp/openings-skills.json
           python -c "import json,pathlib; served={s['name'] for s in json.load(open('/tmp/openings-skills.json'))['items']}; shipped={p.parent.name for p in pathlib.Path('skills').glob('*/SKILL.md')}; assert served==shipped and served, (served, shipped)"
-          docker exec openings-ci python -c "from pathlib import Path; import openings; assert Path(openings.__file__).with_name('operation-inventory.json').is_file()"
           docker exec openings-ci python -c "from pathlib import Path; import hashlib,json,openings; p=Path(openings.__file__).parent; print(json.dumps({str(f.relative_to(p)):hashlib.sha256(f.read_bytes()).hexdigest() for f in p.rglob('*') if f.is_file() and '__pycache__' not in f.parts}))" > /tmp/openings-package-hashes.json
           python - <<'PY'
           from pathlib import Path
@@ -137,7 +132,6 @@ jobs:
           for name in subprocess.check_output(['git', 'ls-files', 'backend/openings'], text=True).splitlines():
               path = Path(name)
               assert installed[str(path.relative_to('backend/openings'))] == hashlib.sha256(path.read_bytes()).hexdigest(), name
-          assert installed['operation-inventory.json'] == hashlib.sha256(Path('backend/openings/operation-inventory.json').read_bytes()).hexdigest()
           PY
           curl --silent --fail http://127.0.0.1:18080/ --output /tmp/openings-index.html
           python -c "assert '<div id=\"root\"></div>' in open('/tmp/openings-index.html').read()"

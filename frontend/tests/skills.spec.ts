@@ -49,7 +49,6 @@ async function mcp(
         method: "POST",
         credentials: "omit",
         headers: {
-          "X-Openings-E2E-Setup": "1",
           "Content-Type": "application/json",
           Accept: "application/json, text/event-stream",
           Authorization: "Bearer " + token,

@@ -137,8 +137,7 @@ signal and nothing is merged. `POST /jobs/{id}/distinct` with
 and is not computed again for that pair. `no_longer_listed` is set when a full
 run of a company board no longer lists the posting (`unlisted_at`), and cleared
 when the board lists it again. `rules` names the Policy rules that matched.
-`computed: false` marks a job whose signals are still being computed after the
-upgrade to 0.21.
+`computed: false` marks a job whose signals are still being computed.
 
 `GET /jobs` filters on them: `signal=likely_duplicate|no_longer_listed|language_required|flagged|pending`,
 `posting_language=de`, `posting_language_not=en`, `requires=de` (codes or names
@@ -148,8 +147,6 @@ such as `German`), `dismissed_by=rule|agent|owner|other`, `rule_id=ITEM_ID` and
 `dismissed`, `all`) and `dismissed_by`, for the same filters.
 
 Whether a company board still lists a posting is `signals.no_longer_listed`.
-(The manual `availability` field was removed in 0.23; a value set by hand is
-kept as a note on its job.)
 
 A Policy rule acts on these signals: see [Policy](policy.md#rules-on-a-signal).
 `POST /policy/rules/preview` with `{"rule": {"signal": "language_required",
@@ -269,8 +266,10 @@ Deleting an application removes that attempt and its contexts/documents/files,
 while preserving the job and other attempts. Frozen contexts and approved
 revisions retain their content; create a new revision/context for changed input.
 
-The authenticated `/capabilities` inventory maps all logical operations to REST,
-MCP and dashboard locations, with explicit bootstrap/transport exceptions. Lists
+The authenticated `/capabilities` list gives the version, the schema, the
+caller's `token_kind` and, for each operation, its MCP `name`, its main REST
+`method` and `path` (relative to `api_base`) and `access: "owner"` when an agent
+token may not call it. OpenAPI and MCP `tools/list` are the full contract. Lists
 support server filters; `/jobs/bulk`, `/applications/bulk` and `/sources/bulk`
 accept at most 200 versioned items and return per-item outcomes. Application `stage_counts` span all matching
 attempts, independent of pagination. Overview accepts `since`/`until` for the
@@ -280,8 +279,7 @@ are nullable; `dates: null` clears them. See [Career](career.md) for structured
 headers, partial dates, skills, ordering and the typed selection fields of a
 claim (`default_in_cv`, `role`, `group`), and [Policy](policy.md) for the
 owner's rules and facts, their section versions and who may confirm an item.
-Target roles and preferences are Decision items of the policy; the Profile has
-no `preferences` or `roles` since 0.23. Template `rules` hold the typed limits,
+Target roles and preferences are Decision items of the policy. Template `rules` hold the typed limits,
 `statements` (a list of `{id, label, statement, scope, position}`; `id` and
 `position` are filled in) and any other free-form key.
 
@@ -337,7 +335,7 @@ title, company, location or posting text (`job_refreshed`, with the field names)
 the `posting_updated` kind of earlier releases no longer exists.
 
 `GET /workspace` and `workspace_info` return `schema_version` (the database
-schema of this release, 14 in 0.23) and `storage`: `database_bytes`,
+schema of this release) and `storage`: `database_bytes`,
 `free_bytes` on the data volume, `restore_limit_bytes` (the largest backup a
 restore accepts now), `restore_limit_configured_bytes` (the optional
 `OPENINGS_MAX_RESTORE_MB` bound, or null), `retention_days` and

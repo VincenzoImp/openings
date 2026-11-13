@@ -216,9 +216,9 @@ test("design names are aliases and old routes keep their deep links", async ({
   await expect(page).toHaveURL(/#applications\?sort=ready&stage=ready$/);
   const [first] = (
     await page.evaluate(() =>
-      fetch("/api/v1/applications?status=applied&limit=1", {
-        headers: { "X-Openings-E2E-Setup": "1" },
-      }).then((response) => response.json()),
+      fetch("/api/v1/applications?status=applied&limit=1").then((response) =>
+        response.json(),
+      ),
     )
   ).items;
   await go(page, `applications?application=${first.id}&detail=history`);
@@ -264,10 +264,7 @@ test("navigation counts come from the workspace and the agent line shows an open
 }) => {
   const api = (path: string) =>
     page.evaluate(
-      (path) =>
-        fetch("/api/v1" + path, {
-          headers: { "X-Openings-E2E-Setup": "1" },
-        }).then((response) => response.json()),
+      (path) => fetch("/api/v1" + path).then((response) => response.json()),
       path,
     );
   const ready = (await api("/applications?status=draft&limit=1")).ready_count;
@@ -314,10 +311,7 @@ test("no horizontal page scroll from 360 to 1600 px on every screen", async ({
   test.setTimeout(180000);
   const api = (path: string) =>
     page.evaluate(
-      (path) =>
-        fetch("/api/v1" + path, {
-          headers: { "X-Openings-E2E-Setup": "1" },
-        }).then((response) => response.json()),
+      (path) => fetch("/api/v1" + path).then((response) => response.json()),
       path,
     );
   const ready = (await api("/applications?status=draft&ready=true&limit=1"))
