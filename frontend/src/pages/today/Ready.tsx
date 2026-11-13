@@ -3,11 +3,7 @@ import { Card, EmptyState, List, ListRow, Tag, cx } from "../../design";
 import { Loaded, plural } from "../../library/common";
 import { deadlineTag } from "../../library/time";
 import type { Fresh } from "../../library/useFresh";
-
-export const READY_QUEUE = "#applications?readiness=ready&sort=ready&view=list";
-/** The page of an application. Stage 3 replaces it with the review screen. */
-export const applicationHref = (id: string, detail = "") =>
-  `#applications?application=${id}${detail ? "&detail=" + detail : ""}`;
+import { READY_QUEUE, reviewHref } from "../applications/links";
 
 /** The Ready queue: closest deadline first, then priority; the first row is the one to act on. */
 export function Ready({ list }: { list: Fresh<ListResult<Application>> }) {
@@ -33,7 +29,7 @@ export function Ready({ list }: { list: Fresh<ListResult<Application>> }) {
                   <ListRow
                     key={application.id}
                     title={title}
-                    href={applicationHref(application.id)}
+                    href={reviewHref(application.id)}
                     meta={[application.job?.company, application.job?.location]
                       .filter(Boolean)
                       .join(" · ")}
@@ -57,7 +53,7 @@ export function Ready({ list }: { list: Fresh<ListResult<Application>> }) {
                     )}
                     <a
                       className={cx("btn sm", index === 0 && "primary")}
-                      href={applicationHref(application.id)}
+                      href={reviewHref(application.id)}
                     >
                       Review<span className="sr"> {title}</span>
                     </a>
