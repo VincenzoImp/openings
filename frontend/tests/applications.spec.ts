@@ -944,9 +944,11 @@ test("documents, revisions, frozen copies and their files are managed in the rev
   await dialog(page).getByLabel("Note").fill("Leads with the data work.");
   await dialog(page).getByRole("button", { name: "Save the revision" }).click();
   await expect(dialog(page)).toHaveCount(0);
-  // The Documents tab can keep the list it read before the files arrived
-  // (seen on a loaded CI runner); open it again for a fresh read.
+  // The Documents tab can show a list read before the save when its reads
+  // answer out of order (seen on a loaded CI runner; the rebuilt screen's
+  // query cache replaces this loader): reload it for a fresh read.
   await page.waitForLoadState("networkidle");
+  await page.goto("about:blank");
   await go(page, `review?application=${application.id}&tab=documents`);
   await settled(page);
   const revisions = page.getByRole("list", { name: "Document revisions" });
