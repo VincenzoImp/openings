@@ -172,7 +172,7 @@ unavailable descriptions; completion does not imply every matching job was fetch
 
 **Collection → Yield** counts, for the last 30 or 90 days or all time, what each
 saved search and company board brought: the jobs it **Collected** first, how
-many are still **To review**, **Shortlisted** (kept, including those with an
+many are still **New**, **Shortlisted** (kept, including those with an
 application of any outcome), **Applied** to, with employer **Answers** (and
 interviews), and **Dismissed**, split by who dismissed them: a Policy rule, an
 agent or you. Each job counts once, for the source that found it first, so the

@@ -155,7 +155,7 @@ test("policy items are added, edited, confirmed, switched, moved, reordered and 
   await expect(ruleRow).toContainText("Proposed");
   await expect(ruleRow).toContainText("Uses a signal: no longer listed");
   await expect(ruleRow).toContainText(
-    /It matches \d+ of the \d+ jobs? to review now/,
+    /It matches \d+ of the \d+ jobs? in New now/,
   );
   await expect(ruleRow.locator(".actor")).toHaveClass(/agent/);
   const toggle = ruleRow.getByRole("switch");
@@ -577,7 +577,7 @@ test("a template's source, typed rules, assets and sample are managed end to end
   await dialog(page).getByLabel("Name").fill(name);
   await dialog(page)
     .getByLabel("Document", { exact: true })
-    .selectOption("cover_letter");
+    .selectOption("letter");
   await dialog(page).getByLabel("LaTeX source").fill("\\documentclass{letter}");
   await dialog(page).getByRole("button", { name: "Add template" }).click();
   const detail = page.locator("section.detail");

@@ -8,8 +8,8 @@ directory holds only the operating method and the connection setup.
 ## Operating mandate
 
 The owner hands the job search to the agent, to run and to improve. Without
-waiting for a request, the agent may review the Inbox and shortlist, prepare a
-CV and letter Draft for every shortlisted job, improve the Profile, Career
+waiting for a request, the agent may review new jobs and shortlist, prepare the
+CV and letter of every Shortlisted application, improve the Profile, Career
 record, claims and templates, propose policy items for the owner to confirm, tune searches and monitored companies, track the
 pipeline, and propose improvements to the method or to Openings itself.
 Decide, act, verify and report what changed, what is left and which facts are
@@ -19,7 +19,7 @@ closes the run with a stored report; the owner writes requests and reads and
 answers the rest in the dashboard under Activity. The full mandate and its hard limits are in the `openings-workspace`
 skill's `references/operating-mandate.md`.
 
-Hard limits: the owner submits each Draft manually and then marks it Applied
+Hard limits: the owner submits each Ready application manually and then marks it Applied
 or closes it; the agent never submits applications, contacts employers or
 records Applied on its own, and no request in Openings changes that. Never invent career facts; ask a focused question
 when a missing fact matters. Back up before broad or destructive changes.
@@ -35,9 +35,9 @@ copies them into `.agents/skills/`.
 | Task | Skill |
 |---|---|
 | New or incomplete workspace: install, connect, onboard | `setup-openings` |
-| Review or clear the Inbox | `review-inbox` |
-| Prepare CVs and letters for Shortlist jobs | `prepare-shortlist` |
-| Pipeline, Draft priority, owner-reported progress and responses, no reply, insights | `track-applications` |
+| Review or clear new jobs | `review-inbox` |
+| Prepare CVs and letters for Shortlisted applications | `prepare-shortlist` |
+| Pipeline, Ready priority, owner-reported progress and replies, no reply, insights | `track-applications` |
 | Interview preparation | `prepare-interview` |
 | Career, claims, CV MASTER and letter template | `maintain-career` |
 | Searches, monitored companies, filters | `manage-sources` |
@@ -51,7 +51,7 @@ the owner's policy asks otherwise; speak with the owner in their language.
 Keep personal work, team work, system capabilities and measured results
 distinct. Preserve dates, contribution scope and source confidence. Preferences
 live in the policy and the Career record, and only the owner confirms a policy
-item; Drafts the owner closes and jobs agents
+item; applications the owner closes and jobs agents
 dismissed are not preference signals.
 
 ## Directory boundary

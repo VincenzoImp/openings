@@ -190,7 +190,7 @@ export function ContextDialog({
               limit={20}
               items={templates.data.items.map((template) => ({
                 id: template.id,
-                label: `${template.name} · ${template.kind === "resume" ? "CV" : "Letter"}`,
+                label: `${template.name} · ${template.kind === "cv" ? "CV" : "Letter"}`,
               }))}
               selected={templateIds}
               onChange={setTemplateIds}

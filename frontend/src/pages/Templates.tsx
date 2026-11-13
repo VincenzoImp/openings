@@ -110,14 +110,14 @@ export default function TemplatesPage() {
                 onChange={(event) => setFilters({ kind: event.target.value })}
               >
                 <option value="">CV and letter</option>
-                <option value="resume">CV</option>
-                <option value="cover_letter">Letter</option>
+                <option value="cv">CV</option>
+                <option value="letter">Letter</option>
               </select>
             </div>
             {!list.data.items.length && (
               <p className="body muted">No template matches.</p>
             )}
-            {(["resume", "cover_letter"] as const)
+            {(["cv", "letter"] as const)
               .filter((kind) =>
                 list.data.items.some((item) => item.kind === kind),
               )

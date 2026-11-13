@@ -18,13 +18,13 @@ const role = (application: Application) =>
     .filter(Boolean)
     .join(" · ") || "An application";
 
-/** An application the agent will not write for until a requirement is resolved. */
+/** An application that is not Ready until a requirement is resolved. */
 function Blocked({ application }: { application: Application }) {
   const count = application.blocking_requirements || 1;
   return (
     <Question
       ask={`${role(application)} is blocked by ${count === 1 ? "a requirement" : `${count} requirements`}.`}
-      why="Your agent does not write documents for this application until you resolve it or decide not to pursue the job."
+      why="It is not Ready until you resolve it or decide not to pursue the job."
       lead={<Tag tone="danger">Blocking requirement</Tag>}
     >
       <div className="answer">
@@ -76,7 +76,7 @@ export function Decisions({
             {moreBlocked > 0 && (
               <a
                 className="btn quiet sm"
-                href="#applications?stage=preparing&readiness=blocked"
+                href="#applications?stage=shortlisted"
               >
                 {plural(moreBlocked, "more blocked application")}
               </a>

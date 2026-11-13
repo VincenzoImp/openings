@@ -9,7 +9,7 @@ type Action = "close" | "reopen" | "delete";
 
 /**
  * The actions on the selected applications: close with an outcome (no reply
- * among them), reopen, mark or unmark ready, delete; only those valid for
+ * among them), reopen, delete; only those valid for
  * every selected application are offered. Each application is changed on its
  * own; the ones that fail are reported, the rest go through.
  */
@@ -74,20 +74,6 @@ export function BulkBar({
           onClick={() => setDialog("reopen")}
         >
           Reopen…
-        </Button>
-      )}
-      {actions.includes("mark_ready") && (
-        <Button size="sm" disabled={pending} onClick={() => run("mark_ready")}>
-          Mark ready
-        </Button>
-      )}
-      {actions.includes("unmark_ready") && (
-        <Button
-          size="sm"
-          disabled={pending}
-          onClick={() => run("unmark_ready")}
-        >
-          Not ready
         </Button>
       )}
       {actions.includes("delete") && (
@@ -168,13 +154,13 @@ export function BulkBar({
                 value={stage}
                 onChange={(event) => setStage(event.target.value)}
               >
-                {(["draft", "applied", "interview", "offer"] as const).map(
-                  (value) => (
-                    <option key={value} value={value}>
-                      {stageLabels[value]}
-                    </option>
-                  ),
-                )}
+                {(
+                  ["shortlisted", "applied", "interview", "offer"] as const
+                ).map((value) => (
+                  <option key={value} value={value}>
+                    {stageLabels[value]}
+                  </option>
+                ))}
               </select>
             </Field>
           </div>

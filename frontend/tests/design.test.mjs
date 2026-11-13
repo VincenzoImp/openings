@@ -87,7 +87,7 @@ test("every shipped hash route still opens its screen, and design names are alia
   assert.equal(routes.routeOf("#inbox?queue=duplicates"), "jobs");
   assert.equal(routes.canonicalHash("#inbox"), "#jobs");
   assert.equal(routes.canonicalHash("#inbox?q=python"), "#jobs?q=python");
-  assert.equal(routes.canonicalHash("#shortlist"), "#jobs?section=shortlist");
+  assert.equal(routes.canonicalHash("#shortlist"), "#jobs?section=shortlisted");
   assert.equal(
     routes.canonicalHash("#inbox?queue=dismissed"),
     "#jobs?section=dismissed",
@@ -102,7 +102,7 @@ test("every shipped hash route still opens its screen, and design names are alia
   );
   assert.equal(
     routes.canonicalHash("#jobs?queue=shortlist"),
-    "#jobs?section=shortlist",
+    "#jobs?section=shortlisted",
   );
   assert.equal(routes.canonicalHash("#jobs?q=python"), null);
   // Overview was the first screen before Today; its links open Today.

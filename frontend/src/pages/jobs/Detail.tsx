@@ -69,8 +69,42 @@ function Signals({ job, own }: { job: Job; own: Set<string> | null }) {
   );
 }
 
+/** The words of what an application holds, from an application_has_work refusal. */
+const WORK: Record<string, string> = {
+  started_separately: "it was started on its own",
+  stage: "it moved past Shortlisted",
+  documents: "documents",
+  contexts: "frozen copies of your record",
+  notes: "notes",
+  replies: "employer replies",
+  requirements: "requirements",
+  questions: "form questions",
+  answers: "form answers",
+};
+/** A triage refused because the job's application has work, said in words. */
+export function triageError(error: unknown) {
+  if (
+    error instanceof ApiError &&
+    error.code === "application_has_work" &&
+    Array.isArray(error.details?.work)
+  ) {
+    const work = (error.details.work as string[]).map(
+      (item) => WORK[item] || item,
+    );
+    return new ApiError(
+      `The application of this job has work in it (${work.join(", ")}), so it stays shortlisted. Close or delete the application first.`,
+      error.status,
+      error.code,
+      error.path,
+      error.details,
+    );
+  }
+  return error;
+}
+
 /**
- * Shortlist, dismiss, restore and start or open an application. On a narrow
+ * Shortlist (which starts the application) and dismiss a new job; open the
+ * application of a shortlisted one; restore a dismissed one. On a narrow
  * screen they stay in a bar above the bottom navigation.
  */
 function Actions({
@@ -88,20 +122,23 @@ function Actions({
   const [dismissing, setDismissing] = useState(false);
   const key = useRef<string | null>(null);
   async function triage(value: string, message: string, reason?: string) {
-    // In To review and the Shortlist the job leaves the list: show the next.
+    // In New and Shortlisted the job leaves the list: show the next.
     const next = leaving(job.id);
-    const ok = await mutate(
-      () =>
-        api(`/jobs/${job.id}/triage`, "POST", {
+    const ok = await mutate(async () => {
+      try {
+        await api(`/jobs/${job.id}/triage`, "POST", {
           triage: value,
           expected_version: job.version,
           ...(reason ? { reason } : {}),
-        }),
-      message,
-    );
+        });
+      } catch (error) {
+        throw triageError(error);
+      }
+    }, message);
     if (ok) next?.();
     return ok;
   }
+  /** A new application for a shortlisted job whose applications are all closed. */
   async function start() {
     let created: Application | undefined;
     key.current ||= newId();
@@ -123,11 +160,12 @@ function Actions({
         }
         throw error;
       }
-    }, "Application started. Your agent prepares its documents.");
+    }, "Application started.");
     if (ok && created) onOpenApplication(created.id);
   }
   const application = job.application;
   const open = application && application.status !== "closed";
+  const fresh = job.triage === "new";
   return (
     <>
       <ActionBar sticky label="Actions on this job">
@@ -135,42 +173,35 @@ function Actions({
           <Button
             variant="primary"
             disabled={pending}
-            onClick={() =>
-              triage(job.application_count ? "saved" : "inbox", "Restored.")
-            }
+            onClick={() => triage("new", "Restored.")}
           >
             Restore
           </Button>
         ) : open ? (
           <a className="btn primary" href={reviewHref(application.id)}>
-            {application.status === "draft"
-              ? "Continue the application"
-              : "Open the application"}
+            Open the application
           </a>
-        ) : job.triage === "saved" ? (
+        ) : job.triage === "shortlisted" ? (
           <Button variant="primary" disabled={pending} onClick={start}>
-            {application ? "Start a new application" : "Start application"}
+            Start a new application
           </Button>
         ) : (
           <Button
             variant="primary"
             disabled={pending}
-            onClick={() => triage("saved", "Shortlisted.")}
+            onClick={() =>
+              triage("shortlisted", "Shortlisted. Its application is started.")
+            }
           >
             Shortlist
           </Button>
         )}
-        {job.triage === "saved" && !job.application_count && (
+        {job.triage === "shortlisted" && (
           <Button
             disabled={pending}
-            onClick={() => triage("inbox", "Returned to the jobs to review.")}
+            onClick={() => triage("new", "Back to New.")}
           >
-            Return to review
-          </Button>
-        )}
-        {job.triage === "inbox" && !job.application_count && (
-          <Button disabled={pending} onClick={start}>
-            Start application
+            Back to New
           </Button>
         )}
         {job.triage !== "dismissed" && (
@@ -178,15 +209,19 @@ function Actions({
             Dismiss…
           </Button>
         )}
-        <Button variant="quiet" className="only-desktop" onClick={onNote}>
-          Add a note
-        </Button>
+        {!fresh && (
+          <Button variant="quiet" className="only-desktop" onClick={onNote}>
+            Add a note
+          </Button>
+        )}
       </ActionBar>
-      <div className="only-mobile">
-        <Button variant="quiet" onClick={onNote}>
-          Add a note
-        </Button>
-      </div>
+      {!fresh && (
+        <div className="only-mobile">
+          <Button variant="quiet" onClick={onNote}>
+            Add a note
+          </Button>
+        </div>
+      )}
       {dismissing && (
         <DismissDialog
           what={job.title || "this job"}

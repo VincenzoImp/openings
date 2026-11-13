@@ -73,8 +73,8 @@ export function Insights() {
     <div className="stack insight">
       <div className="spread wrap">
         <p className="muted measure">
-          Only employer answers count. Drafts you never sent and jobs your agent
-          dismissed are left out. A rate is shown from{" "}
+          Only employer answers count. Applications you never sent and jobs your
+          agent dismissed are left out. A rate is shown from{" "}
           {plural(data?.min_sample ?? 5, "sent application")}.
         </p>
         <SegmentedControl
@@ -96,12 +96,13 @@ export function Insights() {
           <div className="tiles">
             <Overall data={data.overall} min={data.min_sample} />
           </div>
-          {(data.excluded.preparing > 0 || data.excluded.closed_unsent > 0) && (
+          {(data.excluded.shortlisted > 0 ||
+            data.excluded.closed_unsent > 0) && (
             <p className="caption">
-              Not counted: {plural(data.excluded.preparing, "Draft")} still in
-              preparation and{" "}
-              {plural(data.excluded.closed_unsent, "application")} closed
-              without being sent.
+              Not counted:{" "}
+              {plural(data.excluded.shortlisted, "shortlisted application")} not
+              sent yet and {plural(data.excluded.closed_unsent, "application")}{" "}
+              closed without being sent.
             </p>
           )}
           <div className="insight-grid">
@@ -143,7 +144,7 @@ export function Insights() {
 function TimeToAnswer({ data }: { data: Report }) {
   const answered = data.overall.timed;
   const waiting = data.overall.waiting;
-  const due = data.no_reply.due ?? 0;
+  const due = data.no_reply.overdue ?? 0;
   return (
     <Card
       title="Time to an answer"

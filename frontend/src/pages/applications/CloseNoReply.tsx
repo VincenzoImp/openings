@@ -39,7 +39,7 @@ export function CloseNoReply({
 function Confirm({ days, onClose }: { days: number; onClose: () => void }) {
   const { mutate, pending, notify } = useWorkspace();
   const list = useFresh<ListResult<Application>>(
-    "/applications?no_reply_due=true&sort=applied&limit=200",
+    "/applications?needs=reply_overdue&sort=applied&limit=200",
     { items: [], total: 0 },
     ["applications"],
   );

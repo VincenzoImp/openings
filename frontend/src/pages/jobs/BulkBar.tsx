@@ -6,27 +6,27 @@ import { useWorkspace } from "../../state";
 import { DismissDialog } from "./DismissDialog";
 import type { Section } from "./model";
 
-type Action = "saved" | "dismissed" | "inbox" | "forget";
+type Action = "shortlisted" | "dismissed" | "new" | "forget";
 const LABELS: Record<Section, [Action, string][]> = {
-  review: [
-    ["saved", "Shortlist"],
+  new: [
+    ["shortlisted", "Shortlist"],
     ["dismissed", "Dismiss…"],
   ],
-  shortlist: [
-    ["inbox", "Return to review"],
+  shortlisted: [
+    ["new", "Back to New"],
     ["dismissed", "Dismiss…"],
   ],
-  dismissed: [["inbox", "Restore"]],
+  dismissed: [["new", "Restore"]],
   all: [
-    ["saved", "Shortlist"],
-    ["inbox", "Return to review"],
+    ["shortlisted", "Shortlist"],
+    ["new", "Back to New"],
     ["dismissed", "Dismiss…"],
   ],
 };
 
 /**
  * The actions on the selected jobs: shortlist, dismiss with an optional
- * reason, return to review or restore, and forget for good after asking.
+ * reason, back to New or restore, and forget for good after asking.
  * Each job is changed on its own; the ones that fail are reported.
  */
 export function BulkBar({

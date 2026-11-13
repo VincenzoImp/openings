@@ -61,7 +61,7 @@ new job when its signal arrives, and only on a job nobody has reviewed yet:
 - **dismiss** moves the job to **Dismissed**. The dismissal names the rule
   ("Dismissed by the rule “Languages I work in”"), and **Restore** brings the
   job back to review; the rule does not dismiss it again;
-- **flag** keeps the job in **To review** and lists the rule among its signals.
+- **flag** keeps the job in **New** and lists the rule among its signals.
 
 A rule never acts on jobs already waiting for review, on jobs you added
 yourself in the dashboard, on shortlisted jobs or on jobs with an application.

@@ -19,15 +19,16 @@ export function NextStep({ applications }: { applications: number }) {
             once, and can be restored.
           </li>
           <li>
-            <strong>Your agent reviews them</strong> against your policy,
-            shortlists the credible ones and writes a CV and a letter for each.
+            <strong>You shortlist the ones you want</strong>; shortlisting
+            starts the application. You or your agent add its CV and letter as
+            PDFs.
           </li>
           <li>
             <strong>You read what is ready</strong>, with the posting beside the
             documents, send the application yourself and mark it applied.
           </li>
           <li>
-            <strong>You record the employer's answer.</strong> After a few weeks
+            <strong>You record the employer's reply.</strong> After a few weeks
             Insights shows which roles and sources answer.
           </li>
         </ol>

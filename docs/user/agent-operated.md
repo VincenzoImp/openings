@@ -3,7 +3,7 @@
 Openings is built to be run by your own AI agent. You install the workspace and
 connect an agent; the agent then runs the search and keeps improving it. Your
 part stays small: tell it facts and preferences, answer its focused questions,
-apply to the Drafts it prepares, and mark each one Applied or close it.
+apply to the applications it makes Ready, and mark each one Applied or close it.
 
 ## What the agent does
 
@@ -14,18 +14,18 @@ an agent can, without waiting for each request:
 | Area | Skill |
 |---|---|
 | Install, connect and onboard: career record, Profile, policy, templates, searches | [setup-openings](../../skills/setup-openings/SKILL.md) |
-| Review the Inbox and shortlist credible jobs under your policy | [review-inbox](../../skills/review-inbox/SKILL.md) |
-| Prepare a CV and letter Draft for every shortlisted job, with PDF checks | [prepare-shortlist](../../skills/prepare-shortlist/SKILL.md) |
+| Review new jobs and shortlist credible ones under your policy | [review-inbox](../../skills/review-inbox/SKILL.md) |
+| Prepare the CV and letter of every Shortlisted application until it is Ready, with PDF checks | [prepare-shortlist](../../skills/prepare-shortlist/SKILL.md) |
 | Keep searches and monitored companies effective; reduce noise | [manage-sources](../../skills/manage-sources/SKILL.md) |
 | Improve your Career record, claims, CV MASTER and letter template | [maintain-career](../../skills/maintain-career/SKILL.md) |
-| Prioritize ready Drafts, find stale or expired ones, record what you report | [track-applications](../../skills/track-applications/SKILL.md) |
+| Prioritize Ready applications, find stale or expired ones, record what you report | [track-applications](../../skills/track-applications/SKILL.md) |
 | Prepare you for interviews from the documents the employer received | [prepare-interview](../../skills/prepare-interview/SKILL.md) |
 | Write factual, evidence-based wording | [career-claims](../../skills/career-claims/SKILL.md) |
 | Connection, versions, transfers, shared references | [openings-workspace](../../skills/openings-workspace/SKILL.md) |
 
 The agent never submits an application, contacts an employer or records Applied
 on its own, and never invents career facts. Your preferences live in the
-[Policy](policy.md) and the Career record; Drafts you close are not read as
+[Policy](policy.md) and the Career record; applications you close are not read as
 preferences. The agent proposes policy items, for example from an answer you
 gave, and you confirm them under **Library → Policy**; it does not rely on an
 item you have not confirmed.
@@ -129,7 +129,7 @@ what you see next to each change.
 Ask for anything in plain language: "what should I apply to today?", "add these
 companies", "I got an interview at X", "make the CV stronger for data roles".
 Between requests, a scheduled or recurring agent session can review new jobs and
-prepare Drafts. Each run ends with a short report of what changed, what is left
+prepare applications. Each run ends with a short report of what changed, what is left
 and which facts the agent needs from you.
 
 Changes stay reversible: records keep versions, contexts and document revisions
