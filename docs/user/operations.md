@@ -69,6 +69,7 @@ docker compose down
 all uploaded documents; use it only when intentionally discarding the installation.
 To change installation environment settings, use `docker compose up -d` so the
 container is recreated. Editing `OPENINGS_PASSWORD` does not reset an existing owner.
+[Configuration](configuration.md) lists every setting with its default.
 
 Tasks show collection failures, cancellation and explicit retry. Source failures
 do not discard acquired jobs. The global scheduled collection
