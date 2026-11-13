@@ -189,7 +189,10 @@ export function SourceYieldView() {
             ))}
             <GridRow className="total">
               <Cell kind="primary">
-                <strong>All {plural(data.total.sources, "source")}</strong>
+                <strong>Total</strong>
+                <div className="meta">
+                  {plural(data.total.sources, "source")} and jobs added by hand
+                </div>
               </Cell>
               <Counts row={data.total} />
             </GridRow>
