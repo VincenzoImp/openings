@@ -13,8 +13,8 @@ an agent can, without waiting for each request:
 
 | Area | Skill |
 |---|---|
-| Install, connect and onboard: career record, Profile, policy, templates, searches | [setup-openings](../../skills/setup-openings/SKILL.md) |
-| Review the Inbox and shortlist credible jobs under your policy | [review-inbox](../../skills/review-inbox/SKILL.md) |
+| Install, connect and onboard: career record, Profile, Preferences, templates, searches | [setup-openings](../../skills/setup-openings/SKILL.md) |
+| Review the Inbox and shortlist credible jobs under your Preferences | [review-inbox](../../skills/review-inbox/SKILL.md) |
 | Prepare a CV and letter Draft for every shortlisted job, with PDF checks | [prepare-shortlist](../../skills/prepare-shortlist/SKILL.md) |
 | Keep searches and monitored companies effective; reduce noise | [manage-sources](../../skills/manage-sources/SKILL.md) |
 | Improve your Career record, claims, CV MASTER and letter template | [maintain-career](../../skills/maintain-career/SKILL.md) |
@@ -24,11 +24,11 @@ an agent can, without waiting for each request:
 | Connection, versions, transfers, shared references | [openings-workspace](../../skills/openings-workspace/SKILL.md) |
 
 The agent never submits an application, contacts an employer or records Applied
-on its own, and never invents career facts. Your preferences live in the
-[Policy](policy.md) and the Career record; Drafts you close are not read as
-preferences. The agent proposes policy items, for example from an answer you
-gave, and you confirm them under **Library → Policy**; it does not rely on an
-item you have not confirmed.
+on its own, and never invents career facts. Your preferences live in
+[Preferences](preferences.md) and the Career record; Drafts you close are not
+read as preferences. The agent records what you tell it, for example an answer
+you gave, in your words under **Library → Preferences**, where you can edit or
+delete it.
 
 ## Set it up
 
@@ -58,8 +58,8 @@ password and create the API token yourself.
    personal data out of Git. The agent's machine needs `pdflatex` to compile PDFs.
 5. Start by asking the agent to set up your workspace, or to try it first with
    the synthetic example career. Then tell it about your career. It records facts in the Career
-   record and proposes your rules and preferences as policy items for you to
-   confirm, asks what is missing, and then runs the workflows above.
+   record and your rules and preferences in Preferences, in your words, asks
+   what is missing, and then runs the workflows above.
 
 ## See what the agent did
 

@@ -13,7 +13,8 @@ effect of triage or preparation; record each change and its reason.
 
 Read [Openings workspace](../openings-workspace/SKILL.md) for transport, source
 schemas, provider limits and optimistic versions. Read the current Profile and
-the policy's decision items (`policy_get`): they define what a useful job is. Keep no personal search
+the owner's Preferences (`preferences_get`), above all What I'm looking for and
+What I rule out: they define what a useful job is. Keep no personal search
 criteria in this skill.
 
 ## Run and questions
@@ -36,8 +37,7 @@ For each source, read its configuration, schedule, last runs and errors. Measure
 yield with `sources_yield` (REST `GET /collection/yield`) over a stated
 period (`since`, `until`): per source and per search, the jobs it collected
 first, still to review, shortlisted, applied to, answered by an employer
-(responses, interviews, offers), dismissed by a policy rule, an agent or the
-owner, likely duplicates and postings no longer listed; searches are also
+(responses, interviews, offers), dismissed by an agent, the owner or other, likely duplicates and postings no longer listed; searches are also
 split by job board (`providers`). Each job counts once, for the source that
 found it first, so a search whose jobs are mostly `likely_duplicates` of other
 sources adds little. `kept_rate` is withheld below `min_sample` collected jobs:
@@ -45,16 +45,16 @@ do not judge a small source on it. Separate history from the current filters:
 jobs collected before a filter change do not describe it, so set `since` to the
 change when you re-measure.
 
-Dismissals were made by agents applying the policy, so a high dismissal
-rate measures collected text outside that policy, not the owner's taste.
-Dismissals by a rule (`dismissed_by.rule`, `dismissed_by_rule`) already cost
-the agent nothing; a source whose jobs a language rule dismisses in bulk is
-better narrowed by place or language, so that collection stops paying for them. Drafts
+Dismissals were made by agents applying the Preferences, so a high dismissal
+rate measures collected text outside them, not the owner's taste. A source
+whose jobs mostly require languages the owner does not speak (`jobs_list` with
+`hide_unspoken_required` reports the count) is better narrowed by place or
+language, so that collection stops paying for them. Drafts
 the owner closed without applying are not preference evidence either: postings
-close or become unfeasible. Derive every filter from the policy and Career
+close or become unfeasible. Derive every filter from the Preferences and Career
 records, and use dismissed titles only to find recurring clear mismatches
-(unrelated domains, sales, roles the policy excludes). Check each candidate term
-against saved jobs so a filter never removes work the policy includes.
+(unrelated domains, sales, roles the owner rules out). Check each candidate term
+against saved jobs so a filter never removes work the owner is looking for.
 
 ## Tune
 

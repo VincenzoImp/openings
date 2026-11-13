@@ -51,8 +51,8 @@ Classify:
 - **incomplete**: a document, file or review step is missing;
 - **blocked**: an employer requirement or open question needs the owner;
 - **stale**: the frozen context predates a change to a part its documents use:
-  the Profile header or summary, a confirmed policy item, guidance, a template or
-  Career (`staleness_list` names each changed part), or the
+  the Profile header or summary, a Facts about me or Writing rules statement, a
+  template or Career (`staleness_list` names each changed part), or the
   posting changed after preparation;
 - **expired**: the posting is closed or past its deadline.
 
@@ -67,8 +67,8 @@ note first, it is the owner's standing guidance for that application.
 
 ## Prioritize Drafts
 
-Order ready Drafts for the owner: live deadlines first, then fit with the
-policy's decision items, then posting age. `sort: "deadline"` and `sort: "priority"` list
+Order ready Drafts for the owner: live deadlines first, then fit with
+What I'm looking for in the owner's Preferences, then posting age. `sort: "deadline"` and `sort: "priority"` list
 dated or prioritized attempts first, combined with `readiness: "ready"`. Give one line per Draft with the reason.
 Do not invent deadlines; mark unknown ones as unknown. Record a deadline the
 posting or owner states, and an owner-agreed `priority`, on the application.
@@ -99,12 +99,12 @@ to continue, never for an employer rejection.
 
 `applications_list` with `no_reply_due: true` lists Applied applications sent
 longer ago than the no-reply period; the result's `no_reply` gives the period's
-`days`, its `source` (`policy` or `default`, 30 days) and whether the owner
-`confirmed` the Policy item. Report them with their sent dates and propose
+`days` and its `source` (`settings`, the owner's `no_reply_days`, or
+`default`, 30 days). Report them with their sent dates and propose
 closing them as no reply. Close them (`applications_update` or
 `applications_bulk` with `outcome: "no_response"` and `concluded_on`, today
-when omitted) only when the owner asks or a confirmed "No reply" decision item
-says to; otherwise ask with one `questions_ask` that lists them. Never close an
+when omitted) only when the owner asks or Working with me in the owner's
+Preferences says to; otherwise ask with one `questions_ask` that lists them. Never close an
 Interview or Offer as no reply.
 
 ## Patterns
@@ -117,6 +117,6 @@ computed from them, and do not lower `min_sample` to make a point. Drafts never
 sent are counted apart in `excluded`; dismissed jobs never had an application.
 Do not read Drafts the owner closed without applying as preferences: the owner
 applies to every feasible prepared Draft, and closures record feasibility.
-Present patterns as observations for the owner to weigh, not as changes to the
-policy. Report using the shared
+Present patterns as observations for the owner to weigh, not as changes to
+the Preferences. Report using the shared
 [run report](../openings-workspace/references/run-report.md).

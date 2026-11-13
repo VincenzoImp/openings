@@ -24,10 +24,7 @@ An agent token is refused, with `403 forbidden` on REST and MCP, when it tries t
 - restore a backup;
 - answer a question for the owner (it can ask and withdraw questions);
 - write or withdraw a request for the agent (it takes, completes and declines
-  the requests you write);
-- confirm a [policy](policy.md) item or switch on a rule (it adds, edits, moves
-  and removes items, and what it adds or changes is a proposal until you
-  confirm it).
+  the requests you write).
 
 An agent token can still download a backup and a records export, because the
 operating mandate has the agent back up before broad changes. A backup taken
@@ -73,7 +70,7 @@ the method sections of its recent runs as suggestions. An agent token may
 write notes too: record a lasting gap in how a workflow fits this workspace,
 for example a step it always needs here. Each save is an attributed version the
 owner can read and restore. Personal criteria (what to apply to, eligibility,
-writing rules) belong to the policy, never to skill notes.
+writing rules) belong to [Preferences](preferences.md), never to skill notes.
 
 ![Settings → Skills: a skill's local notes with who wrote them, a suggestion from a recent run, the read-only skill text and its reference files](../images/skills.png)
 
@@ -90,7 +87,7 @@ skills: discover the tools/resources and their typed input schemas.
    will handle with `requests_take` and report with `requests_complete` or
    `requests_decline`. See [Ask your agent](agent-operated.md#ask-your-agent).
 1. Call `workspace_info`, `profile_get`, `knowledge_list`, `claims_list`,
-   `templates_list` and `instructions_get` as needed. Detailed narratives explain
+   `templates_list` and `preferences_get` as needed. Detailed narratives explain
    the facts; approved claims are reusable wording, not the only allowed wording.
    [Career entries](career.md) separate titles, organizations, partial dates and
    skill tags from optional descriptions and ordered claims. Empty descriptions
@@ -103,12 +100,14 @@ skills: discover the tools/resources and their typed input schemas.
    Each job carries `signals` computed without a model when it was collected:
    the posting's `language`, `required` language groups and `welcome`
    languages, a likely `duplicate` of an earlier job with its confidence,
-   `no_longer_listed` for a company-board posting the board stopped listing,
-   and the Policy `rules` that matched. `jobs_list` filters on them (`signal`,
-   `posting_language`, `posting_language_not`, `requires`, `dismissed_by`,
-   `rule_id`). `jobs_distinct` records that a flagged job is a different vacancy;
-   the flag does not return. Signals are evidence to confirm in the posting,
-   not verdicts.
+   and `no_longer_listed` for a company-board posting the board stopped listing.
+   `jobs_list` filters on them (`signal`, `posting_language`,
+   `posting_language_not`, `requires`, `dismissed_by`), and
+   `hide_unspoken_required: true` leaves out jobs whose required languages are
+   outside the owner's `spoken_languages`. `jobs_distinct` records that a likely
+   duplicate is a different vacancy; the mark does not return. Signals are
+   labels and evidence to confirm in the posting, not verdicts: nothing is
+   dismissed automatically.
 3. Inspect `job.application` or use `applications_list` with `value.job_id` to find
    its attempts. Continue the open application, or use `applications_create` to
    start Preparing (`draft`) with questions and an idempotency key. Read the
@@ -117,8 +116,9 @@ skills: discover the tools/resources and their typed input schemas.
    `application_id` for one application). Starting removes it from the pending Shortlist queue. A later attempt is possible after the previous one closes.
 4. Call `contexts_create` with the application, selected templates,
    optional evidence/claim filters and an idempotency key. Read the returned
-   payload or its `openings://contexts/{id}` resource. Follow stored general,
-   template and application instructions. Snapshot assets retain their exact bytes.
+   payload or its `openings://contexts/{id}` resource. Follow the frozen
+   Preferences (writing rules and facts), template guidance and application
+   instructions. Snapshot assets retain their exact bytes.
 5. Write the CV, cover letter and answers externally. Compile LaTeX on the agent's
    computer with its own tools; Openings does not execute TeX or provide a model.
 6. Call `documents_create` with the claim and Career entry ids the revision
@@ -132,12 +132,12 @@ skills: discover the tools/resources and their typed input schemas.
 7. Approve a document review only after the agent's own content and PDF checks;
    it records an agent check, not human or employer approval. A CV or letter is
    approved only with its source and its PDF.
-8. After a Profile, policy, guidance, template or Career change,
+8. After a Profile, Preferences, template or Career change,
    `staleness_list` lists Draft applications whose current revisions were
    built on older inputs and `staleness_get` explains one, naming each
-   changed part (for example the Profile `summary` or the policy item "Work
-   authorization"). Profile metadata, decision items and
-   unconfirmed proposals never make a Draft stale. Contexts stay frozen: refresh by
+   changed part (for example the Profile `summary` or a Facts about me
+   statement added or removed). Profile metadata and the sections other than
+   facts and writing never make a Draft stale. Contexts stay frozen: refresh by
    preparing a new context and new revisions. The owner submits
    applications and records Applied. Portals and sending are outside Openings.
 
@@ -155,7 +155,7 @@ Every create takes an `idempotency_key` for retries. `jobs_triage`, `jobs_update
 `applications_update` return the compact job summary (`posting_preview`, no
 full posting); read `jobs_get` for the text. Tool errors include `details`; a
 version conflict reports `details.current_version`, including for Profile,
-instructions and collection settings.
+Preferences, settings and collection settings.
 A write wraps its body in `value`. For example:
 
 ```json
@@ -216,7 +216,7 @@ cooldowns apply to agent operations as they do to the dashboard. Use
 interval. Description retrieval is automatic; incomplete candidates stay in the
 run checkpoint until usable text is available. `sources_yield` measures each
 source over a period: the jobs it collected first, kept, applied to, answered
-and dismissed (by a rule, an agent or the owner); the
+and dismissed (by an agent, the owner or other); the
 [manage-sources skill](../../skills/manage-sources/SKILL.md) uses it.
 
 Prefer a compatible bulk patch when applying the same schedule or acquisition
@@ -241,11 +241,11 @@ only outcomes the owner reported, never ones you infer from mail or a portal.
   `response_date` (today when omitted), with an optional `response_note`.
   Closing with `outcome: "no_response"` concludes it on `concluded_on`.
 - `applications_list` with `no_reply_due: true` lists Applied applications sent
-  longer ago than the no-reply period: the days of the Policy decision labelled
-  "No reply", or 30. Its result's `no_reply` names the period and whether the
-  owner confirmed it. Close them as `no_response` (one by one or with
-  `applications_bulk`) only under a confirmed rule; otherwise propose the list
-  and ask the owner with `questions_ask`.
+  longer ago than the no-reply period: the setting `no_reply_days`, or 30. Its
+  result's `no_reply` names the period and its `source` (`settings` or
+  `default`). Close them as `no_response` (one by one or with
+  `applications_bulk`) only when the owner asks or Working with me says to;
+  otherwise propose the list and ask the owner with `questions_ask`.
 - `insights_get` returns response, interview and offer rates for sent
   applications, the median days to a first answer and groups by role family,
   seniority, location, source kind, named source and month. A group below
@@ -256,11 +256,8 @@ only outcomes the owner reported, never ones you infer from mail or a portal.
 
 - Job triage uses `inbox` (unreviewed interest), `saved` (saved interest) and `dismissed`.
   Dismissed is reversible and remembered. Give a dismissal a short `reason`
-  (`jobs_triage`, `jobs_bulk`): the owner reads it beside the job. A Policy rule
-  the owner enabled and confirmed dismisses or flags new jobs on their signals
-  by itself; its dismissals name the rule in `dismissal.rule`. Measure a rule
-  you want to propose with `policy_rule_preview`; only the owner enables one.
-  `jobs_delete` permanently removes
+  (`jobs_triage`, `jobs_bulk`): the owner reads it beside the job. Nothing
+  dismisses a job automatically. `jobs_delete` permanently removes
   job-owned history/files and permits rediscovery; include `job_id` and the
   job's current `expected_version`.
 - Each job has at most one non-Closed application. A creation/reopening conflict

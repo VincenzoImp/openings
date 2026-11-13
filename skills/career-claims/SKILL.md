@@ -5,9 +5,9 @@ description: Write and review factual career claims, CV bullets, supporting cont
 
 # Career claims
 
-Read the owner request, current Openings Profile, the `writing` items of the
-owner's policy, relevant Career descriptions, reusable claims and selected
-template rules. Use Globish: clear international
+Read the owner request, current Openings Profile, the Writing rules of the
+owner's Preferences, relevant Career descriptions, reusable claims and selected
+template guidance and limits. Use Globish: clear international
 English with precise technical terms. Clarity, factual accuracy and reader value
 come before a controlled vocabulary.
 
@@ -68,9 +68,8 @@ one continuing project as separate achievements in multiple CV sections.
 ## Apply the document contract
 
 The Openings rules define fixed fields, permitted changes, slot counts and
-Skills selection: the confirmed `writing` items of the policy (scope `all`, or
-`cv` or `letter` for that document) and the template's limits and rule
-statements (`rules.statements`). Claim selection is typed: start a CV from the
+Skills selection: the Writing rules of Preferences (`writing`, scope `all`, or
+`cv` or `letter` for that document) and the template's guidance and limits. Claim selection is typed: start a CV from the
 claims with `default_in_cv`, prefer `role: core` over `supporting`, take a
 `bench` claim only when the job calls for it, and avoid two claims of one
 `group` saying the same thing. Use approved claims when they make the case well. When the
