@@ -16,16 +16,14 @@ from openings.operations import restore_database
 from openings.workspace import Workspace
 from outcome_fixtures import make_schema_ten
 from schema_fixtures import columns, index_names, table_names
-from timeline_fixtures import SCHEMA_THIRTEEN_NOTE_COLUMNS as NEW_NOTES
+from timeline_fixtures import SCHEMA_THIRTEEN_NOTE_COLUMNS as NEW_NOTES, guided_application
 
 CHILDREN = ("events", "notes", "documents", "contexts", "questions", "requests")
 
 
 def make(workspace, title, *moves):
     job = workspace.ingest_job({"title": title, "company": "Example", "posting": "Build APIs."})
-    application = workspace.create_application(
-        {"job_id": job["id"], "note": f"Guidance for {title}", "priority": 2}
-    )
+    application = guided_application(workspace, job["id"], f"Guidance for {title}", priority=2)
     for move in moves:
         current = workspace.get_application(application["id"])
         application = workspace.update_application(
@@ -168,7 +166,7 @@ def test_upgrade_keeps_every_row_and_backfills_exactly(tmp_path):
     workspace = Workspace(path)
     fresh = Database(tmp_path / "fresh.sqlite")
     with closing(sqlite3.connect(path)) as conn, closing(sqlite3.connect(fresh.path)) as reference:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 13
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 14
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert not conn.execute("PRAGMA foreign_key_check").fetchall()
         assert table_names(conn) == table_names(reference)

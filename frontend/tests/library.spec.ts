@@ -311,6 +311,8 @@ test("a policy conflict reloads the section and keeps the unsaved text", async (
     section.locator("li").filter({ hasText: "My unsaved statement." }),
   ).toBeVisible();
   // A button pressed on a stale section says so and shows the latest state.
+  // The save above may still be finishing, so read the version once it has.
+  await page.waitForLoadState("networkidle");
   const current = await call(page, "/policy/facts");
   await call(
     page,
@@ -336,10 +338,9 @@ test("the profile is saved with typed fields and free-form details edited as row
   await go(page, "career");
   const profile = page.getByRole("form", { name: "Profile" });
   await profile.getByLabel("Headline").fill(headline);
-  await profile
-    .getByText("Target roles and preferences, kept from earlier versions")
-    .click();
-  await profile.getByLabel("Target roles").fill("Data engineer");
+  // Target roles and preferences are policy items since 0.23, not Profile fields.
+  await expect(profile.getByLabel("Target roles")).toHaveCount(0);
+  await expect(profile.getByLabel("Preferences")).toHaveCount(0);
   const details = profile.getByRole("group", {
     name: "Other profile details as keys and values",
   });
@@ -367,7 +368,8 @@ test("the profile is saved with typed fields and free-form details edited as row
   await saved(page, "Profile saved.");
   const stored = await call(page, "/career/profile");
   expect(stored.headline).toBe(headline);
-  expect(stored.roles).toBe("Data engineer");
+  expect(stored).not.toHaveProperty("roles");
+  expect(stored).not.toHaveProperty("preferences");
   expect(stored.metadata[key]).toBe(42);
   expect(stored.metadata.interview_availability).toEqual({
     days: ["Tue", "Thu"],

@@ -507,9 +507,6 @@ img.frame {
 .link-row {
   grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr) auto;
 }
-.sub-fields {
-  margin-top: var(--s3);
-}
 .screen summary {
   color: var(--ink-2);
   cursor: pointer;

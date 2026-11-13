@@ -160,7 +160,7 @@ links and summary; the confirmed items of the policy sections for eligibility,
 writing and other facts; the text of general guidance; the source, guidance and
 rules of the selected templates; the text, dates and skills of the selected
 Career entries and the wording of their claims. Editing Profile metadata,
-preferences or target roles, a rule for shortlisting jobs, an agent's
+a Decision item (target roles, preferences, a rule for shortlisting jobs), an agent's
 unconfirmed proposal, a template's name, the order of entries or claims, a
 claim's selection fields or any free-form metadata leaves every Draft current,
 and so does changing spacing or changing a part back. A frozen copy made before the policy

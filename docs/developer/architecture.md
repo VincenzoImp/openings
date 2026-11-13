@@ -65,11 +65,11 @@ belongs to the module of its concern.
 
 | Package | Modules |
 |---|---|
-| `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage, rule dismissals and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py` notes, their author, run and pin, and the deprecated application note; `timeline.py` the timeline of a job or an application; `timeline_upgrade.py` the timeline part of the schema 12 to 13 step; `applications.py` derived readiness, preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, responses, Ready and deletion; `bulk.py` per-item bulk results; `overview.py` the funnel |
+| `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage, rule dismissals and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py` notes, their author, run and pin; `timeline.py` the timeline of a job or an application; `timeline_upgrade.py` the timeline part of the schema 12 to 13 step; `availability_upgrade.py` the jobs part of the schema 13 to 14 step; `applications.py` derived readiness, preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, responses, Ready and deletion; `bulk.py` per-item bulk results; `overview.py` the funnel |
 | `discovery/` | `service.py` the provider gate (`http_budget`, `fetch_bytes`); `models.py` typed inputs; `network.py` the public-address policy and the bounded fetch; `resolution.py` board detection and source configuration; `feeds.py` posting readers (Lever, Ashby, RSS) and adapter dispatch; `sources.py` source schemas, preview and writes; `runs.py` the global switch, provider policies, queueing, scheduling and run records; `tasks.py` leases, retry and running one collection |
 | `documents/` | `contexts.py` frozen contexts and their staleness reports; `revisions.py` creation, cited evidence, review, comparison and deletion; `sources.py` the source and PDF of a CV or letter and its derived text; `text.py` readable text of a TeX source; `latex.py` what CV and letter class commands print; `files.py` owned files and scoped transfer grants; `models.py` inputs; `upgrade.py` the schema 12 to 13 step |
 | `career/` | `profile.py` Profile and instructions; `entries.py` Career entries; `claims.py`; `templates.py`; `imports.py`; `models.py` inputs and defaults; `records.py` row helpers shared with documents |
-| `policy/` | `service.py` item writes, confirmation and rule preview; `models.py` sections, the signal registry `SIGNALS` and inputs; `records.py` records as read and the frozen policy; `upgrade.py` the schema 9 to 10 step |
+| `policy/` | `service.py` item writes, confirmation and rule preview; `models.py` sections, the signal registry `SIGNALS` and inputs; `records.py` records as read and the frozen policy; `upgrade.py` the schema 9 to 10 step; `profile_upgrade.py` the Profile part of the schema 13 to 14 step |
 | `interfaces/` | One module per area declaring its operations and binding them to its service: `core.py` (workspace, jobs, notes, applications, overview), `career.py`, `documents.py`, `discovery.py`, `activity.py`, `agent_requests.py`, `policy.py`, `outcomes.py`, `insights.py`, `source_yield.py`, `skills.py` and `system.py` (sign-in, tokens, inventory, backup, restore, examples, export); `registry.py` the declaration and its binding |
 
 Services never import FastAPI routing or MCP registration; `interfaces/` binds
@@ -121,20 +121,17 @@ create accepts `idempotency_key`. Records without a key column keep their key
 in `idempotency_keys` (`idempotency.py`: the table, the key, a SHA-256 of the
 request and the record's id; a key whose record is gone is free again).
 
-The names and shapes before 0.22 stay until 0.23. `aliases` lists a tool's
-earlier names: `bind_mcp` registers each as the same tool, its description
-starting "Deprecated alias of <name>; removed in 0.23.", and the inventory lists
-it after the tool's name. An `Alias` with `params` keeps the arguments the
-earlier tool took, where the new tool takes them differently.
-`Tool.legacy` names the `value` fields a tool still accepts as deprecated flat
-arguments, for the lists that took flat filters before. `scripts/inventory.py`
-writes the tables of both into the [upgrade guide](../user/upgrading-0.22.md).
+A tool has that one name and that one shape. The earlier names and the flat
+list arguments, kept as deprecated aliases in 0.22, were removed in 0.23 (the
+[upgrade guide](../user/upgrading-0.23.md) maps each to its tool), and
+`OpeningsMCP.call_tool` refuses an argument a tool does not take with
+`422 validation` instead of ignoring it, so a filter passed beside `value` is
+never dropped silently.
 
 `scripts/inventory.py` writes `operation-inventory.json` from the declarations
 and `interfaces/inventory-notes.json`, which holds the inventory's order,
-dashboard locations and remarks. `pytest` fails while the file or the upgrade
-guide's tables are out of date, or when a declared route, tool or surface is not
-registered.
+dashboard locations and remarks. `pytest` fails while the file is out of date,
+or when a declared route, tool or surface is not registered.
 
 ## Data and workflow rules
 
@@ -275,9 +272,8 @@ registered.
   first and then by time, with counts by kind. An application's timeline holds
   its rows and its job's rows without an application. `note_added` and
   `note_edited` are not entries: the note is. The application's pinned note is
-  what the deprecated `application.note` reads and writes until 0.23, and what
-  a new context freezes as `application.note` and
-  `instructions.application_note`.
+  its standing guidance, which a new context freezes as `application.note` and
+  `instructions.application_note`; an application has no note field of its own.
 - **Runs and questions:** a token has one open run (a partial unique index); its
   writes attach to it. A run without activity is reported as interrupted but
   only an explicit supersede closes it. A finished run stores its report and
@@ -317,8 +313,7 @@ registered.
 - **Concurrency:** typed inputs, optimistic versions, idempotency keys, foreign
   keys and short transactions protect shared state. Run one application process
   per workspace; database connections do not cross threads. Every deletion
-  names the current version; a note, revision or file deleted without one is
-  accepted until 0.23.
+  names the current version.
 
 SQLite uses WAL and stores SHA-256-deduplicated BLOBs for attachments. Lists return
 compact paginated summaries; full postings, narratives, contexts and file bytes
@@ -333,7 +328,27 @@ memory and releasing SQLite readers before cancellation or thread changes.
 Backups use SQLite's online backup API. A restore preserves
 installation authentication, recent provider request history and later cooldowns.
 
-Workspaces and backups use schema 13 (0.22), the breaking group. The timeline
+Workspaces and backups use schema 14 (0.23), which removes what 0.19 to 0.22
+deprecated and keeps every value it held, in one transaction
+(`_migrate_13_to_14`). The jobs part (`workspace/availability_upgrade.py`)
+turns each `jobs.availability` other than `unknown` or empty into one unpinned
+note on its job (`origin='upgrade'`, the text of `note_body` naming the value
+exactly), attributed to the actor and run of the last `job_edited` event naming
+`availability` and dated by it, else by the job's `updated_at`; it compares
+every note with the text it expects byte for byte, then drops the column. The
+Profile part (`policy/profile_upgrade.py`) requires each non-empty Profile
+`preferences` and `roles` value to be held by a policy item (its statement, or
+its text value, equal with runs of whitespace collapsed, in any section); a
+value no item holds is copied whole into a new unconfirmed `decision` item at
+the end of the section (`origin` `profile_preferences_removed` or
+`profile_roles_removed`, a value that is not text as a `structured` value) and
+the section's version moves on by one. After checking every value again, it
+removes both keys from the stored Profile (`json_remove`), keeping its version
+and time. No event is written; frozen contexts, whose Profile part still holds
+both texts, and every other row are not touched. Restore accepts schema 14 and
+upgrades a copy of a schema 5 to 13 backup.
+
+Schema 13 (0.22) was the breaking group. The timeline
 part of `_migrate_12_to_13` (`workspace/timeline_upgrade.py`) adds `run_id`,
 `pinned_at` and `origin` to `notes`, copies each non-empty `applications.note`
 into one pinned note of its application (`origin='upgrade'`) attributed to the
@@ -341,8 +356,7 @@ actor and run of the last event that set it (the last `application_updated`
 naming `note`, else `application_created`) and dated by it, else by the
 application's `updated_at`, compares every copy with its source byte for byte,
 then drops `applications.note`. It writes no event and changes no other value;
-frozen contexts are not touched. Restore accepts schema 13 and upgrades a copy
-of a schema 5 to 12 backup.
+frozen contexts are not touched.
 
 The documents part (`documents/upgrade.py`, `migrate_to_13`, run after the
 timeline part in the same transaction): documents gain `text`, `legacy_content`,
@@ -437,8 +451,8 @@ applications gain `ready_at` with who set it, API tokens gain a kind, and the
 owner tokens with unchanged access. Schema 6 is upgraded through schema 7 in the same
 transaction (application priority, deadline and requirements), and schema 5
 through schema 6 (removing obsolete derived data and preserving owned records and
-immutable snapshots). Restore accepts schema 13 and upgrades a copy of a schema 5,
-6, 7, 8, 9, 10, 11 or 12 backup. Other historical formats require the matching release.
+immutable snapshots). Restore accepts schema 14 and upgrades a copy of a schema 5,
+6, 7, 8, 9, 10, 11, 12 or 13 backup. Other historical formats require the matching release.
 
 ## Acquisition
 

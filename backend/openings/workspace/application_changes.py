@@ -87,10 +87,6 @@ class ApplicationChanges:
                 (stamp, value.job_id),
             )
             self.event("application_created", value.job_id, record_id, {"status": "draft"}, c)
-            # The deprecated note field (until 0.23) starts the pinned note.
-            note = value.model_dump(include={"note"})["note"]
-            if note:
-                self.insert_note(c, value.job_id, record_id, note, pinned=True)
         return self.get_application(record_id)
 
     @staticmethod
@@ -114,13 +110,9 @@ class ApplicationChanges:
         changes = value.model_dump(
             exclude_unset=True, exclude={"expected_version", "response_date", "response_note"}
         )
-        # The deprecated note field (until 0.23) writes the pinned note, not the application.
-        note = changes.pop("note", None)
         with self.db.transaction() as c:
             row = c.execute("SELECT * FROM applications WHERE id=?", (application_id,)).fetchone()
             check_version(row, value.expected_version)
-            if note is not None:
-                self.write_application_note(c, row["job_id"], application_id, note)
             status = changes.get("status") or row["status"]
             if row["status"] == "closed" and status != "closed":
                 self._check_active_application(c, row["job_id"], excluding=application_id)

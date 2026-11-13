@@ -34,7 +34,6 @@ from ..models import (
 from ..operations import storage_status
 from .registry import (
     REQUIRED,
-    Alias,
     Operation,
     Param,
     Route,
@@ -99,7 +98,6 @@ OPERATIONS = (
         params=(query_model(JobQuery),),
         call=lambda s, value: s.list_jobs(**(value or JobQuery()).model_dump()),
         rest=(Route("GET", "/jobs", "jobs"),),
-        aliases=("jobs_search",),
         tool=Tool(
             READ_ONLY,
             "Search compact paginated job summaries with location/source/remote/date/queue filters; include_facets=true adds filter value lists and include_counts=true the size of each queue. Each job has its ingest signals (posting language, languages the posting requires or welcomes, the earlier job it likely duplicates with a confidence, whether the source no longer lists it, policy rules that matched) and, when dismissed, its dismissal (who, why, which rule). Filter by signal, posting_language, posting_language_not, requires, dismissed_by or rule_id. Read jobs_get for full content.",
@@ -156,7 +154,6 @@ OPERATIONS = (
         params=(Param("value", JobInput),),
         call=ingest,
         rest=(Route("POST", "/jobs", "ingest"),),
-        aliases=("job_ingest",),
         tool=Tool(
             FETCH,
             "Add a URL, pasted text or structured job. Duplicate identities preserve history. A new job gets its ingest signals, and an enabled rule the owner confirmed may dismiss it at once (dismissal.rule names the rule; restore it with jobs_triage).",
@@ -171,7 +168,6 @@ OPERATIONS = (
         params=(Param("job_id", str),),
         call=lambda s, job_id: s.get_job(job_id),
         rest=(Route("GET", "/jobs/{job_id}", "get_job"),),
-        aliases=("job_get",),
         tool=Tool(
             READ_ONLY,
             "Read full job text, metadata, versions, observations (with unlisted_at when a board stopped listing one), signals and dismissal.",
@@ -186,7 +182,6 @@ OPERATIONS = (
         params=(Param("job_id", str), Param("value", JobPatch)),
         call=lambda s, job_id, value: s.update_job(job_id, value),
         rest=(Route("PATCH", "/jobs/{job_id}", "edit_job"),),
-        aliases=("job_update",),
         tool=Tool(
             WRITE,
             "Correct job fields using the version returned by jobs_get. Returns the compact job summary; read jobs_get for full text.",
@@ -203,7 +198,6 @@ OPERATIONS = (
             job_id, value.triage, value.expected_version, value.reason
         ),
         rest=(Route("POST", "/jobs/{job_id}/triage", "triage"),),
-        aliases=("job_triage",),
         tool=Tool(
             WRITE,
             "Set inbox/saved/dismissed and return the compact job summary. Use queue=inbox/shortlist/applications for actionable queues; saved is retained interest. When dismissing, give a short reason (shown to the owner beside the dismissal); the dismissal records who made it and can be restored.",
@@ -218,7 +212,6 @@ OPERATIONS = (
         params=(Param("job_id", str), Param("value", DistinctInput)),
         call=lambda s, job_id, value: s.mark_distinct(job_id, value.other_id),
         rest=(Route("POST", "/jobs/{job_id}/distinct", "distinct"),),
-        aliases=("job_distinct",),
         tool=Tool(
             WRITE,
             "Record that a job flagged as a likely duplicate (signals.duplicate) is a different vacancy from other_id: the flag is cleared and does not return. Merge verified duplicates with jobs_merge instead.",
@@ -235,7 +228,6 @@ OPERATIONS = (
             job_id, value.target_id, value.expected_version, value.target_version
         ),
         rest=(Route("POST", "/jobs/{job_id}/merge", "merge"),),
-        aliases=("job_merge",),
         tool=Tool(
             REMOVE,
             "Explicitly merge verified duplicate jobs, preserving postings, applications and notes.",
@@ -253,7 +245,6 @@ OPERATIONS = (
         ),
         call=lambda s, job_id, expected_version: s.forget_job(job_id, expected_version),
         rest=(Route("DELETE", "/jobs/{job_id}", "forget"),),
-        aliases=("job_forget",),
         tool=Tool(
             REMOVE,
             "Permanently delete the current version of a job and its application/file history. Future acquisition is new.",
@@ -317,7 +308,6 @@ OPERATIONS = (
         params=(Param("job_id", str), Param("value", NoteInput)),
         call=lambda s, job_id, value: s.add_note(job_id, value),
         rest=(Route("POST", "/jobs/{job_id}/notes", "note"),),
-        aliases=("note_add",),
         tool=Tool(
             WRITE,
             "Write a note on a job, or on one of its applications with application_id. The note records you as its author and your open run. pinned=true pins it: it is listed first, and a job and an application each have one pinned note (pinning unpins the previous one). The application's pinned note is its standing guidance, included in new frozen contexts.",
@@ -345,18 +335,10 @@ OPERATIONS = (
         "Delete one note",
         params=(
             Param("note_id", str),
-            # Required on MCP; REST accepts a delete without it until 0.23 (#167).
-            Param("expected_version", int, rest=(Annotated[int | None, Query(ge=1)], None)),
+            Param("expected_version", int, rest=(Annotated[int, Query(ge=1)], REQUIRED)),
         ),
         call=lambda s, note_id, expected_version: s.delete_note(note_id, expected_version),
         rest=(Route("DELETE", "/notes/{note_id}", "remove_note"),),
-        aliases=(
-            Alias(
-                "note_delete",
-                params=(Param("note_id", str),),
-                call=lambda s, note_id: s.delete_note(note_id),
-            ),
-        ),
         tool=Tool(
             REMOVE,
             "Delete a note for good with its current version; a note_deleted change records it.",
@@ -385,7 +367,6 @@ OPERATIONS = (
         params=(Param("note_id", str),),
         call=lambda s, note_id: s.get_note(note_id),
         rest=(Route("GET", "/notes/{note_id}", "get_note"),),
-        aliases=("note_get",),
         tool=Tool(READ_ONLY, "Read one editable note with its optimistic version."),
     ),
     Operation(
@@ -397,7 +378,6 @@ OPERATIONS = (
         params=(Param("note_id", str), Param("value", NotePatch)),
         call=lambda s, note_id, value: s.update_note(note_id, value),
         rest=(Route("PATCH", "/notes/{note_id}", "edit_note"),),
-        aliases=("note_update",),
         tool=Tool(
             WRITE,
             "Edit a retained note without deleting/recreating it, using its current version.",
@@ -417,7 +397,6 @@ OPERATIONS = (
             application_id, expected_version
         ),
         rest=(Route("DELETE", "/applications/{application_id}", "delete_application"),),
-        aliases=("application_delete",),
         tool=Tool(
             REMOVE,
             "Delete one attempt and its owned documents/history, retaining the archived job and other attempts.",
@@ -446,10 +425,9 @@ OPERATIONS = (
         params=(Param("value", ApplicationInput),),
         call=lambda s, value: s.create_application(value),
         rest=(Route("POST", "/applications", "create_application"),),
-        aliases=("application_create",),
         tool=Tool(
             WRITE,
-            "Create a draft attempt, optionally with priority, deadline and employer requirements. This never sends an application or generates documents. Write standing guidance as the application's pinned note (notes_create with application_id and pinned=true); the note field is deprecated and creates that pinned note until 0.23.",
+            "Create a draft attempt, optionally with priority, deadline and employer requirements. This never sends an application or generates documents. Write standing guidance as the application's pinned note (notes_create with application_id and pinned=true).",
         ),
     ),
     Operation(
@@ -461,10 +439,9 @@ OPERATIONS = (
         params=(Param("application_id", str),),
         call=lambda s, application_id: s.get_application(application_id),
         rest=(Route("GET", "/applications/{application_id}", "get_application"),),
-        aliases=("application_get",),
         tool=Tool(
             READ_ONLY,
-            "Read a single application, its job, employer requirements, derived readiness, the stored Ready step (ready_at, ready_by), its employer responses and its pinned note (pinned_note; note is its text, deprecated and removed in 0.23). timeline_get lists its notes and changes.",
+            "Read a single application, its job, employer requirements, derived readiness, the stored Ready step (ready_at, ready_by), its employer responses and its pinned note (pinned_note), the owner's standing guidance. timeline_get lists its notes and changes.",
         ),
     ),
     Operation(
@@ -476,10 +453,9 @@ OPERATIONS = (
         params=(Param("application_id", str), Param("value", ApplicationPatch)),
         call=lambda s, application_id, value: s.update_application(application_id, value),
         rest=(Route("PATCH", "/applications/{application_id}", "edit_application"),),
-        aliases=("application_update",),
         tool=Tool(
             WRITE,
-            "Record progress, priority, deadline, employer requirements and questions/answers explicitly; editing documents never marks sent. Moving to Interview or Offer, or closing as rejected (or accepted without an offer on record), records the matching employer response dated response_date (today by default) with response_note. Close as no_response (with concluded_on, today by default) only a sent application whose employer did not answer within the no-reply period. Record only what the owner reported. The returned job is the compact summary. The note field is deprecated (removed in 0.23): it edits the pinned note, adds it when there is none, or unpins it when empty; use notes_update and notes_pin.",
+            "Record progress, priority, deadline, employer requirements and questions/answers explicitly; editing documents never marks sent. Moving to Interview or Offer, or closing as rejected (or accepted without an offer on record), records the matching employer response dated response_date (today by default) with response_note. Close as no_response (with concluded_on, today by default) only a sent application whose employer did not answer within the no-reply period. Record only what the owner reported. The returned job is the compact summary. Standing guidance is the pinned note: edit it with notes_update and notes_pin.",
         ),
     ),
     Operation(
@@ -491,7 +467,6 @@ OPERATIONS = (
         params=(Param("application_id", str), Param("value", ApplicationReady)),
         call=lambda s, application_id, value: s.set_ready(application_id, value),
         rest=(Route("POST", "/applications/{application_id}/ready", "ready_application"),),
-        aliases=("application_ready",),
         tool=Tool(
             WRITE,
             "Mark a Preparing application ready to apply (ready=true) or clear the mark (ready=false), using its current version. Refused with application_not_ready naming the failed check (stage, blocked, none, missing_pdf, unreviewed). The mark is cleared automatically when a revision, context, file or blocking requirement changes. This never submits anything.",
@@ -506,7 +481,6 @@ OPERATIONS = (
         params=(Param("application_id", str),),
         call=lambda s, application_id: s.application_events(application_id),
         rest=(Route("GET", "/applications/{application_id}/events", "events"),),
-        aliases=("application_history",),
         tool=Tool(
             READ_ONLY,
             "Read the recorded lifecycle events of an attempt. timeline_get lists them with its notes and its job's entries.",

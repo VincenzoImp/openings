@@ -666,7 +666,7 @@ test("requirements, the plan and a concurrent change in the details", async ({
   await expect
     .poll(async () => {
       const value = await call(page, `/applications/${application.id}`);
-      return [value.note, value.pinned_note?.version];
+      return [value.pinned_note?.body, value.pinned_note?.version];
     })
     .toEqual(["Lead with the API work.", 2]);
   await pinned.getByRole("button", { name: "Unpin" }).click();

@@ -27,6 +27,7 @@ from large_fixtures import seed_large, seed_signals
 from openings.app import create_app
 from openings.career import ClaimCreate, KnowledgeCreate, TemplateCreate
 from openings.documents import ContextCreate
+from timeline_fixtures import guided_application
 
 pytestmark = pytest.mark.performance
 
@@ -117,7 +118,7 @@ def test_a_busy_timeline_stays_within_its_budget(client):
     """The first page of the timelines of a job with 1,200 events and 300 notes, with counts."""
     workspace = client.app.state.workspace
     job = workspace.ingest_job({"title": "Busy", "company": "Synthetic", "posting": "Busy."})
-    application = workspace.create_application({"job_id": job["id"], "note": "Pinned."})
+    application = guided_application(workspace, job["id"], "Pinned.")
     with workspace.db.transaction() as conn:
         for index in range(1_200):
             stamp = f"2026-{1 + index % 12:02d}-{1 + index % 28:02d}T10:{index % 60:02d}:00+00:00"

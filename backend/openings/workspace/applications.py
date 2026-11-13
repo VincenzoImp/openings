@@ -73,8 +73,6 @@ class ApplicationReads:
             row["last_response"] = last_responses(connection, [application_id])[application_id]
             pinned = self.pinned_application_notes(connection, [application_id])[application_id]
         row["pinned_note"] = pinned
-        # Deprecated since 0.22, removed in 0.23: the pinned note's text.
-        row["note"] = pinned["body"] if pinned else ""
         return row
 
     @staticmethod

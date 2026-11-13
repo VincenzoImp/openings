@@ -367,8 +367,8 @@ class FileOperations:
         _, payload = self._grant(request.headers.get("X-Transfer-Token", ""), "GET")
         return self.file_response(payload["file_id"], inline=False)
 
-    def delete_file(self, file_id: str, expected_version: int | None = None) -> dict:
-        """Permanently delete a live Career entry, template or job asset, with its expected_version (a file's version is always 1; required from 0.23). Context and revision files are immutable: delete the revision instead."""
+    def delete_file(self, file_id: str, expected_version: int) -> dict:
+        """Permanently delete a live Career entry, template or job asset, with its expected_version (a file's version is always 1). Context and revision files are immutable: delete the revision instead."""
         with self.db.transaction() as conn:
             row = _get(conn, "all_files", file_id, "File")
             descriptor = self._file_record(row)

@@ -15,7 +15,7 @@ from outcome_fixtures import make_schema_ten
 from policy_fixtures import make_schema_nine
 from schema_fixtures import columns, index_names, make_schema_seven, table_names
 from signal_fixtures import make_schema_eleven
-from timeline_fixtures import make_schema_twelve, older_rows
+from timeline_fixtures import guided_application, make_schema_twelve, older_rows
 
 AGENT = token_actor("agent-token", "Synthetic agent", "agent")
 # Awkward but valid texts: they must come back exactly.
@@ -107,7 +107,7 @@ def test_upgrade_copies_each_application_note_exactly_and_changes_nothing_else(t
     workspace = Workspace(path)
     fresh = Database(tmp_path / "fresh.sqlite")
     with closing(sqlite3.connect(path)) as conn, closing(sqlite3.connect(fresh.path)) as reference:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 13
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 14
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert not conn.execute("PRAGMA foreign_key_check").fetchall()
         assert table_names(conn) == table_names(reference)
@@ -143,10 +143,10 @@ def test_upgrade_copies_each_application_note_exactly_and_changes_nothing_else(t
     # Never changed after creation: the creation's actor (the system) and time.
     assert created[:5] == ("system", None, None, None, "2026-09-01T08:00:00.000000+00:00")
     assert unknown[:5] == (None, None, None, None, "2026-01-05T09:00:00.000000+00:00")
-    # Reads: the pinned note, the deprecated field and the timeline.
+    # Reads: the pinned note and the timeline.
     for name, text in TEXTS.items():
         application = workspace.get_application(ids[name])
-        assert application["note"] == text == application["pinned_note"]["body"]
+        assert application["pinned_note"]["body"] == text and "note" not in application
         assert application["pinned_note"]["origin"] == "upgrade"
         first = workspace.timeline(application_id=ids[name])["items"][0]
         assert first["note"]["pinned"] and first["note"]["body"] == text
@@ -204,7 +204,7 @@ def test_every_supported_schema_upgrades_and_restores_with_the_notes_pinned(tmp_
     ids = {}
     for name, text in TEXTS.items():
         job = workspace.ingest_job({"title": name, "company": "Example", "posting": "Build."})
-        ids[name] = workspace.create_application({"job_id": job["id"], "note": text})["id"]
+        ids[name] = guided_application(workspace, job["id"], text)["id"]
     downgrade(path, version)
     with closing(sqlite3.connect(path)) as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == version
@@ -225,4 +225,4 @@ def test_every_supported_schema_upgrades_and_restores_with_the_notes_pinned(tmp_
                 )
             } == texts
         for name, text in TEXTS.items():
-            assert opened.get_application(ids[name])["note"] == text
+            assert opened.get_application(ids[name])["pinned_note"]["body"] == text

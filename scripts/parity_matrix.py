@@ -384,7 +384,6 @@ def analyse(evidence):
             rest_names |= names
             in_path |= parameters
             free |= loose
-        # The tool's own inputs; the names after it are deprecated aliases (#167).
         # A tool the app does not register fails test_interfaces.py instead.
         mcp_names = mcp_inputs(tools.get(entry["mcp"][0], {})) if entry["mcp"] else set()
         code = own_code(files)
@@ -508,7 +507,7 @@ def build(inventory, rows, gaps, references):
         "  called the route without an error response (Chromium desktop; setup calls made",
         "  by the test helpers are excluded).",
         "- **Editor** is `raw JSON` when a free-form JSON input is edited as JSON text.",
-        "- **MCP** names the tool; the inventory also lists its deprecated aliases.",
+        "- **MCP** names the tool, `<resource>_<verb>`.",
         "- Input comparisons use names from OpenAPI and the MCP tool schemas. An input",
         "  counts as offered when its name occurs in the files that call the route or in",
         "  the page and library modules they import; a mentioned name may still lack a",

@@ -69,8 +69,7 @@
         }
       ],
       "mcp": [
-        "skills_get",
-        "skill_get"
+        "skills_get"
       ],
       "dashboard": "Settings: Skills",
       "notes": "SKILL.md ends with the workspace's local notes under \"Local notes for this workspace\" (version, day and author); local_notes=false returns the shipped text alone. Reference files are served as shipped."
@@ -134,8 +133,7 @@
         }
       ],
       "mcp": [
-        "jobs_list",
-        "jobs_search"
+        "jobs_list"
       ],
       "dashboard": "Jobs: tabs To review, Shortlist, Dismissed and All, search, signal filter, more filters, pages",
       "notes": "q, triage (including active), company, location, source, remote, job_type, complete, queue (inbox/shortlist/applications/dismissed), created_since/until, sort, limit, offset; include_facets=true adds facets (default false). Items include compact active-or-latest application and application_count."
@@ -151,8 +149,7 @@
         }
       ],
       "mcp": [
-        "jobs_get",
-        "job_get"
+        "jobs_get"
       ],
       "dashboard": "Jobs: the selected job",
       "notes": "Includes compact active-or-latest application and application_count, alongside full posting, versions and provenance."
@@ -168,8 +165,7 @@
         }
       ],
       "mcp": [
-        "jobs_create",
-        "job_ingest"
+        "jobs_create"
       ],
       "dashboard": "Jobs: Add a job",
       "notes": "One deduplicated ingestion service; URL fetch is bounded and may contact an external site."
@@ -185,8 +181,7 @@
         }
       ],
       "mcp": [
-        "jobs_update",
-        "job_update"
+        "jobs_update"
       ],
       "dashboard": "Jobs: job details, Correct the job",
       "notes": "expected_version prevents lost updates. Returns the compact job summary (posting_preview, no full posting); read the job for full text."
@@ -202,8 +197,7 @@
         }
       ],
       "mcp": [
-        "jobs_triage",
-        "job_triage"
+        "jobs_triage"
       ],
       "dashboard": "Jobs: Shortlist, Dismiss (with a reason), Return to review, Restore",
       "notes": "saved retains interest. queue=shortlist contains saved jobs without any application attempts; starting preparation removes them from that queue. Returns the compact job summary (posting_preview, no full posting)."
@@ -267,8 +261,7 @@
         }
       ],
       "mcp": [
-        "jobs_merge",
-        "job_merge"
+        "jobs_merge"
       ],
       "dashboard": "Jobs: Same vacancy: merge; Merge with another job",
       "notes": "Both record versions are required. Resolve an open-application conflict before merging jobs that each have an open attempt."
@@ -284,8 +277,7 @@
         }
       ],
       "mcp": [
-        "jobs_distinct",
-        "job_distinct"
+        "jobs_distinct"
       ],
       "dashboard": "Jobs: job detail, Is this the same vacancy? Different",
       "notes": "Clears the likely_duplicate signal of either job against the other and remembers the pair, so signals computed again do not flag it. Never merges."
@@ -301,8 +293,7 @@
         }
       ],
       "mcp": [
-        "jobs_delete",
-        "job_forget"
+        "jobs_delete"
       ],
       "dashboard": "Jobs: job details, Forget this job permanently; selection bar, Forget",
       "notes": "expected_version is required. Future acquisition is new; deletion includes attempts, snapshots and owned files."
@@ -354,8 +345,7 @@
         }
       ],
       "mcp": [
-        "notes_get",
-        "note_get"
+        "notes_get"
       ],
       "dashboard": "Jobs: job timeline, Edit this note; Application review: Timeline, Edit this note"
     },
@@ -370,8 +360,7 @@
         }
       ],
       "mcp": [
-        "notes_create",
-        "note_add"
+        "notes_create"
       ],
       "dashboard": "Jobs: job timeline, Add the note; Application review: Timeline, Add the note; Details, Pinned note",
       "notes": "application_id writes the note on that application of the job; pinned=true pins it. The note records its author and the author's open run."
@@ -387,8 +376,7 @@
         }
       ],
       "mcp": [
-        "notes_update",
-        "note_update"
+        "notes_update"
       ],
       "dashboard": "Jobs: job timeline, Edit this note; Application review: Timeline, Edit this note; Details, Pinned note"
     },
@@ -419,8 +407,7 @@
         }
       ],
       "mcp": [
-        "notes_delete",
-        "note_delete"
+        "notes_delete"
       ],
       "dashboard": "Jobs: job timeline; Application review: Timeline"
     },
@@ -684,15 +671,14 @@
         }
       ],
       "mcp": [
-        "profile_get",
-        "career_get_profile"
+        "profile_get"
       ],
       "dashboard": "Career: profile"
     },
     {
       "id": "profile.update",
       "group": "Career and templates",
-      "operation": "Edit profile/preferences/contact",
+      "operation": "Edit profile/contact",
       "rest": [
         {
           "method": "PATCH",
@@ -700,11 +686,10 @@
         }
       ],
       "mcp": [
-        "profile_update",
-        "career_update_profile"
+        "profile_update"
       ],
       "dashboard": "Career: profile and Other details",
-      "notes": "links is a list of string-valued objects; metadata is an arbitrary finite JSON object of extension values. preferences and roles are deprecated in favour of decision items of the policy and stay readable and writable until the breaking release. expected_version required. A stale version returns 409 with details.current_version."
+      "notes": "links is a list of string-valued objects; metadata is an arbitrary finite JSON object of extension values. Preferences and target roles are decision items of the policy. expected_version required. A stale version returns 409 with details.current_version."
     },
     {
       "id": "knowledge.list",
@@ -1168,11 +1153,10 @@
         }
       ],
       "mcp": [
-        "applications_get",
-        "application_get"
+        "applications_get"
       ],
       "dashboard": "Applications: attempt detail",
-      "notes": "readiness is derived from current revision leaves and unresolved blocking requirements; ready is reported only for an application marked ready (ready_at, ready_by) whose checks still pass. pinned_note is the application's pinned note; note, its text, is deprecated since 0.22 and removed in 0.23."
+      "notes": "readiness is derived from current revision leaves and unresolved blocking requirements; ready is reported only for an application marked ready (ready_at, ready_by) whose checks still pass. pinned_note is the application's pinned note, its standing guidance."
     },
     {
       "id": "applications.create",
@@ -1185,11 +1169,10 @@
         }
       ],
       "mcp": [
-        "applications_create",
-        "application_create"
+        "applications_create"
       ],
       "dashboard": "Jobs: Start application (the selected job or a Shortlist row)",
-      "notes": "At most one non-Closed attempt per job. A conflicting new request reports the active application ID; idempotency keys support retries. Starting retains saved interest and leaves the pending Shortlist queue; it never submits or generates documents. Optional priority (1 highest to 5), deadline (YYYY-MM-DD) and structured employer requirements. note is deprecated since 0.22 (removed in 0.23): non-empty, it creates the application's pinned note."
+      "notes": "At most one non-Closed attempt per job. A conflicting new request reports the active application ID; idempotency keys support retries. Starting retains saved interest and leaves the pending Shortlist queue; it never submits or generates documents. Optional priority (1 highest to 5), deadline (YYYY-MM-DD) and structured employer requirements. Standing guidance is the application's pinned note (notes.create with application_id and pinned)."
     },
     {
       "id": "applications.update",
@@ -1202,11 +1185,10 @@
         }
       ],
       "mcp": [
-        "applications_update",
-        "application_update"
+        "applications_update"
       ],
       "dashboard": "Applications: progress, planning, requirements and questions/answers",
-      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history. Entering Closed requires an explicit outcome: accepted, rejected, not_pursued or no_response (no answer within the no-reply period; only for a sent application, with concluded_on, today by default). Moving to Interview or Offer, or closing as rejected (or accepted without an offer on record) records the matching employer response, dated response_date (today by default) with response_note; a response of that kind on that day is never repeated, and its date stays correctable with responses.update. Reopening enforces one open attempt per job. applied_at, priority or deadline null clears the value. requirements replaces the whole list; keep existing ids. The returned job is the compact job summary. Leaving Preparing or adding/unresolving a blocking requirement clears the stored Ready step. note is deprecated since 0.22 (removed in 0.23): it edits the pinned note, adds it pinned when there is none, or unpins it when empty, without changing the application version."
+      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history. Entering Closed requires an explicit outcome: accepted, rejected, not_pursued or no_response (no answer within the no-reply period; only for a sent application, with concluded_on, today by default). Moving to Interview or Offer, or closing as rejected (or accepted without an offer on record) records the matching employer response, dated response_date (today by default) with response_note; a response of that kind on that day is never repeated, and its date stays correctable with responses.update. Reopening enforces one open attempt per job. applied_at, priority or deadline null clears the value. requirements replaces the whole list; keep existing ids. The returned job is the compact job summary. Leaving Preparing or adding/unresolving a blocking requirement clears the stored Ready step."
     },
     {
       "id": "applications.ready",
@@ -1219,8 +1201,7 @@
         }
       ],
       "mcp": [
-        "applications_ready",
-        "application_ready"
+        "applications_ready"
       ],
       "dashboard": "Applications: Mark ready / Not ready in the attempt; Ready badge, filter and queue",
       "notes": "expected_version; ready (default true). Refused with 409 application_not_ready and details.check (stage, blocked, none, missing_pdf, unreviewed) while a check fails. Cleared automatically, with an attributed application_ready_cleared event and its reason, by a new revision or context, a deleted revision, a file added to a current revision, a blocking requirement, or leaving Preparing. Never submits anything."
@@ -1236,8 +1217,7 @@
         }
       ],
       "mcp": [
-        "applications_delete",
-        "application_delete"
+        "applications_delete"
       ],
       "dashboard": "Applications: delete attempt",
       "notes": "expected_version is required. Keeps the archived job and other attempts; removes owned contexts/documents and their transfers."
@@ -1269,8 +1249,7 @@
         }
       ],
       "mcp": [
-        "applications_history",
-        "application_history"
+        "applications_history"
       ],
       "dashboard": "Application review: Timeline (through the timeline)",
       "notes": "The application's events only; timeline.read lists them with its notes and its job's entries."
@@ -1302,8 +1281,7 @@
         }
       ],
       "mcp": [
-        "responses_create",
-        "responses_add"
+        "responses_create"
       ],
       "dashboard": "Applications: Record response on an Applied, Interview or Offer row; Application review: Timeline, Record a response",
       "notes": "kind, date (YYYY-MM-DD, not in the future), note and an optional idempotency_key. Only a sent application (applied_at, or Applied/Interview/Offer) accepts one: 409 application_not_sent otherwise. One response of a kind per day (409 response_exists with details.response_id); other may repeat. Never moves the stage: applications.update with response_date records the response together with the stage. An agent records only a response the owner reported."
@@ -1335,8 +1313,7 @@
         }
       ],
       "mcp": [
-        "responses_delete",
-        "responses_remove"
+        "responses_delete"
       ],
       "dashboard": "Application review: Timeline, Remove on a response",
       "notes": "expected_version is required. The application's stage and outcome do not change."
@@ -1400,8 +1377,7 @@
         }
       ],
       "mcp": [
-        "contexts_create",
-        "application_prepare_context"
+        "contexts_create"
       ],
       "dashboard": "Applications: prepare context",
       "notes": "Select template_ids/knowledge_ids/claim_ids and note; optional idempotency_key. Unapproved/out-of-scope claims cannot enter context."
@@ -1417,8 +1393,7 @@
         }
       ],
       "mcp": [
-        "staleness_get",
-        "application_staleness"
+        "staleness_get"
       ],
       "dashboard": "Applications: Inputs changed indicator and the review page Inputs tab",
       "notes": "Compares what each current leaf's context froze with the current records, only for what documents use: Profile parts (name, headline, contact, links, summary) by hash, confirmed eligibility/writing/facts policy items by content (a scoped writing item concerns its document kind only), and the content documents use of the instructions and the selected templates, Career entries and claims (names, positions, default flags, claim selection fields, metadata and spacing are ignored). Each change names its part (input, id, label, state, section for policy); each document carries comparison {profile: parts|whole, policy: items|not_frozen}. Read-only; refreshing means preparing a new context and new revisions."
@@ -1434,8 +1409,7 @@
         }
       ],
       "mcp": [
-        "staleness_list",
-        "applications_staleness"
+        "staleness_list"
       ],
       "dashboard": "Applications: Inputs changed tag and first change on rows",
       "notes": "status (default draft, or all), stale_only (default true), limit, offset. Application list/read summaries also include stale_inputs, stale_changes (the first three changes) and stale_changes_total."
@@ -1670,8 +1644,7 @@
         }
       ],
       "mcp": [
-        "workspace_restore",
-        "workspace_restore_upload"
+        "workspace_restore"
       ],
       "dashboard": "Settings: Backup and restore, Restore (owner only)",
       "notes": "MCP obtains a scoped raw HTTP upload grant. Validated restore preserves installation authentication; no arbitrary SQL endpoint. Recent destination provider HTTP usage and later cooldowns survive older-backup restore; saved policy settings are restored.",
@@ -1990,8 +1963,7 @@
         }
       ],
       "mcp": [
-        "tokens_create",
-        "token_create"
+        "tokens_create"
       ],
       "dashboard": "Settings: Agent access, Create a token (owner or agent)",
       "notes": "kind is owner (default, full access) or agent (scoped). The secret is returned once. The dashboard form defaults to agent.",
@@ -2008,8 +1980,7 @@
         }
       ],
       "mcp": [
-        "tokens_revoke",
-        "token_revoke"
+        "tokens_revoke"
       ],
       "dashboard": "Settings: Agent access, Revoke a token",
       "notes": "May revoke the caller token; subsequent requests require another valid credential.",
@@ -2105,8 +2076,7 @@
         }
       ],
       "mcp": [
-        "sources_yield",
-        "collection_yield"
+        "sources_yield"
       ],
       "dashboard": "Collection: Yield",
       "notes": "Each job counts once, for the source that first collected it; searches are split by job board. kept_rate is withheld below min_sample collected jobs."

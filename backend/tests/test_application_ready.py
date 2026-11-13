@@ -201,7 +201,7 @@ def test_a_new_revision_or_context_clears_ready(app):
     assert len(workspace.application_events(application["id"])["items"]) == count
     # Removing the new revision makes the approved one current again: checks pass,
     # but the judgement has to be made again.
-    documents.delete_document(revision["id"])
+    documents.delete_document(revision["id"], revision["version"])
     assert workspace.get_application(application["id"])["readiness"] == "reviewed"
 
     second, _ = ready(app, "Second synthetic engineer")
@@ -216,7 +216,7 @@ def test_deleting_a_current_revision_clears_ready(app):
     workspace, documents = app.state.workspace, app.state.documents
     application, cv = ready(app)
     with acting_as(OWNER):
-        documents.delete_document(cv["id"])
+        documents.delete_document(cv["id"], cv["version"])
     current = cleared(workspace, application, "document_deleted")
     assert [item["kind"] for item in current["preparation"]] == ["cover_letter"]
 
