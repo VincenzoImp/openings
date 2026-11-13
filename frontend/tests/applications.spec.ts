@@ -272,7 +272,7 @@ test("keyboard only: an employer response is recorded from an Applied row", asyn
   await expect(
     form.getByRole("button", { name: "Interview", exact: true }),
   ).toBeFocused();
-  await page.keyboard.press("Tab");
+  await page.keyboard.press(tabKey(page));
   await expect(
     form.getByRole("button", { name: "Rejection", exact: true }),
   ).toBeFocused();
@@ -282,7 +282,7 @@ test("keyboard only: an employer response is recorded from an Applied row", asyn
   ).toHaveAttribute("aria-pressed", "true");
   await form.getByLabel("Note").focus();
   await page.keyboard.type("Position filled internally.");
-  await page.keyboard.press("Tab");
+  await page.keyboard.press(tabKey(page));
   await expect(
     form.getByRole("button", { name: "Save and close as rejected" }),
   ).toBeFocused();

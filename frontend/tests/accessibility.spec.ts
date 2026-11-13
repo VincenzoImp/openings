@@ -73,6 +73,11 @@ async function findings(page: Page, key: string) {
           .first()
           .evaluate((el, within) => !!el.closest(within), item.within)
           .catch(() => false);
+      // On a phone the fixed bottom bar covers whatever row reaches the edge
+      // of the viewport, which axe reads as a small target. Scroll the target
+      // to the middle and check its size and spacing there again.
+      if (!skip && violation.id === "target-size")
+        skip = await visibleTargetFits(page, target);
       if (!skip)
         found.push(
           `${violation.id}: ${target}\n    ${node.failureSummary?.replaceAll("\n", "\n    ")}`,
@@ -80,6 +85,33 @@ async function findings(page: Page, key: string) {
     }
   }
   return found;
+}
+
+/** The target passes the target-size rule once nothing fixed covers it. */
+async function visibleTargetFits(page: Page, target: string) {
+  const element = page.locator(target).first();
+  const covered = await element
+    .evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      const bars = [...document.querySelectorAll(".tabbar, .sticky-actions")];
+      const edge = Math.min(
+        window.innerHeight,
+        ...bars
+          .map((bar) => bar.getBoundingClientRect())
+          .filter((rect) => rect.height > 0)
+          .map((rect) => rect.top),
+      );
+      return box.bottom > edge && !el.closest(".tabbar, .sticky-actions");
+    })
+    .catch(() => false);
+  if (!covered) return false;
+  await element.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  const { violations } = await new AxeBuilder({ page })
+    .include(target)
+    .withRules(["target-size"])
+    .analyze();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  return violations.length === 0;
 }
 
 async function useTheme(page: Page, theme: string) {
