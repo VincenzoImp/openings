@@ -129,7 +129,10 @@ CREATE TABLE IF NOT EXISTS context_inputs (
  created_at TEXT NOT NULL, profile_version INTEGER, instructions_version INTEGER,
  templates TEXT NOT NULL DEFAULT '[]', knowledge TEXT NOT NULL DEFAULT '[]', claims TEXT NOT NULL DEFAULT '[]',
  -- Policy section versions, {"decision":3,...}; NULL for a context frozen before schema 10.
- policy TEXT
+ policy TEXT,
+ -- Short hashes of the parts it froze (schema 11): Profile parts, policy items and
+ -- template contents, compared by staleness.py. Derived from the payload.
+ parts TEXT
 );
 CREATE TABLE IF NOT EXISTS documents (
  id TEXT PRIMARY KEY, application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
