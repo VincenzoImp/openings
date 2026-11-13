@@ -435,7 +435,7 @@ def register_system(router, mcp, workspace, auth, public_url):
                 "claims": ["metadata"],
                 "policy_items": ["value", "rule"],
                 "templates": ["rules"],
-                "documents": ["content"],
+                "documents": ["content", "legacy_content", "claim_ids", "knowledge_ids"],
                 "sources": ["config", "schedule"],
                 "providers": ["policy", "runtime"],
             }

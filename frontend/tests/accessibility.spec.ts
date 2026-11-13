@@ -1,6 +1,14 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Page } from "@playwright/test";
-import { go, isNarrow, ownerSession, type Cookies } from "./session";
+import {
+  call,
+  go,
+  isNarrow,
+  ownerSession,
+  syntheticTex,
+  upload,
+  type Cookies,
+} from "./session";
 
 // Automated accessibility checks (axe) on every screen, in both themes; the
 // Playwright projects supply the desktop and the narrow width. The budget in
@@ -296,6 +304,47 @@ for (const theme of ["light", "dark"]) {
         .click();
       await settled(page);
       expect(await findings(page, "review-revision")).toEqual([]);
+      // A CV revision compared with the one it replaces.
+      const job = await call(page, "/jobs", "POST", {
+        title: `Compared CV ${test.info().project.name} ${Date.now()}`,
+        company: "Example Labs",
+        posting: "Build reliable services with a small team.",
+      });
+      const application = await call(page, "/applications", "POST", {
+        job_id: job.id,
+      });
+      let previous = null;
+      for (const wording of ["First wording.", "Second wording."]) {
+        previous = await call(page, "/documents", "POST", {
+          application_id: application.id,
+          kind: "resume",
+          title: "CV",
+          previous_id: previous?.id ?? null,
+        });
+        // Sources only: Chromium's PDF viewer would keep the network busy.
+        await upload(
+          page,
+          "document",
+          previous.id,
+          "cv.tex",
+          syntheticTex(`${wording}\n\nA kept line.`),
+          "application/x-tex",
+        );
+      }
+      await go(page, `review?application=${application.id}&tab=documents`);
+      await settled(page);
+      await page
+        .getByRole("list", { name: "Document revisions" })
+        .getByRole("button", { name: /^Open/ })
+        .first()
+        .click();
+      await page
+        .getByRole("button", { name: "Compare with revision 1" })
+        .click();
+      await expect(
+        page.getByRole("list", { name: "Changes since revision 1" }),
+      ).toBeVisible();
+      expect(await findings(page, "review-comparison")).toEqual([]);
       // The form that records an employer response, under its row.
       await go(page, "applications?stage=interview");
       await settled(page);

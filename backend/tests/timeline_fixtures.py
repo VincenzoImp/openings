@@ -3,6 +3,7 @@
 import sqlite3
 from contextlib import closing
 
+from document_fixtures import undo_documents
 from openings.db import APPLICATIONS
 
 # What schema 13 added to the notes of a schema 12 file (the timeline part).
@@ -90,9 +91,14 @@ def older_rows(conn, table, added=()):
     return conn.execute(f"SELECT {names} FROM {table}{copied} ORDER BY 1").fetchall()
 
 
-def make_schema_twelve(path):
-    """Remove what schema 13 added from a current workspace file, keeping every other value."""
+def make_schema_twelve(path, content=None):
+    """Remove what schema 13 added from a current workspace file, keeping every other value.
+
+    ``content`` maps CV and letter revision ids to the structured content they
+    stored in schema 12 (see ``document_fixtures.undo_documents``).
+    """
     with closing(sqlite3.connect(path)) as conn:
+        undo_documents(conn, content)
         undo_timeline(conn)
         conn.execute("PRAGMA user_version=12")
         conn.commit()

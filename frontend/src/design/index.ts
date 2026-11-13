@@ -25,6 +25,8 @@ export { Chips, FilterBar, type ChipOption } from "./Chips";
 export { GridTable, GridRow, Cell } from "./Grid";
 export { RateBar, percent } from "./Rate";
 export { Panes, type PaneItem } from "./Panes";
+export { TextDiff } from "./Diff";
+export { foldDiff, type DiffLine } from "./lines";
 export { ResponseForm } from "./ResponseForm";
 export {
   ReportSection,

@@ -193,20 +193,35 @@ def test_context_freezes_stored_instructions_evidence_and_file_bytes(workspace):
 def test_document_revisions_validate_evidence_and_never_inherit_old_pdf(workspace, tmp_path):
     ws, _, documents, client, evidence, claim, _, application = workspace
     context = documents.prepare_context(ContextCreate(application_id=application["id"]))
-    content = {
-        "bullets": [
-            {
-                "text": "Reduced latency by 20%.",
-                "evidence_ids": [evidence["id"]],
-                "claim_ids": [claim["id"]],
-            }
-        ]
-    }
     first = documents.create_document(
-        DocumentCreate(application_id=application["id"], context_id=context["id"], content=content)
+        DocumentCreate(
+            application_id=application["id"],
+            context_id=context["id"],
+            claim_ids=[claim["id"], claim["id"]],
+            knowledge_ids=[evidence["id"]],
+            note="Leads with the latency work.",
+        )
     )
+    assert (first["claim_ids"], first["knowledge_ids"]) == ([claim["id"]], [evidence["id"]])
+    assert "content" not in first and first["text"] is None
+    source = b"\\begin{document}\nReduced latency by 20\\%.\n\\end{document}\n"
+    upload(documents, client, "document", first["id"], "cv.tex", source, "application/x-tex")
+    assert documents.get_document(first["id"])["text"] == "Reduced latency by 20%."
     data = b"%PDF-1.4\nSynthetic storage fixture"
-    pdf, _ = upload(documents, client, "document", first["id"], "cv.pdf", data, "application/pdf")
+    grant = documents.reserve_upload(
+        UploadReservation(
+            owner_type="document",
+            owner_id=first["id"],
+            name="cv.pdf",
+            media_type="application/pdf",
+            size=len(data),
+            source_sha256=hashlib.sha256(source).hexdigest(),
+        )
+    )
+    response = client.put(grant["url"], headers=grant["headers"], content=data)
+    assert response.status_code == 200, response.text
+    pdf = response.json()
+    assert pdf["source_sha256"] == hashlib.sha256(source).hexdigest()
     documents.review_document(
         first["id"], ReviewUpdate(expected_version=documents.get_document(first["id"])["version"])
     )
@@ -221,23 +236,33 @@ def test_document_revisions_validate_evidence_and_never_inherit_old_pdf(workspac
             )
         )
     second = documents.create_document(
-        DocumentCreate(
-            application_id=application["id"],
-            previous_id=first["id"],
-            content={"text": "Revised wording."},
-        )
+        DocumentCreate(application_id=application["id"], previous_id=first["id"])
     )
     assert second["revision_number"] == 2
-    assert second["files"] == []
+    assert second["files"] == [] and second["context_id"] == context["id"]
     assert client.get(pdf["url"]).content == data
-    with pytest.raises(DomainError):
+    for invented, code in (
+        ({"claim_ids": ["unknown"]}, "unapproved_claim"),
+        ({"knowledge_ids": ["unknown"]}, "unknown_evidence"),
+        ({"content": {"text": "Free-form wording."}}, "content_not_accepted"),
+    ):
+        with pytest.raises(DomainError) as error:
+            documents.create_document(
+                DocumentCreate(
+                    application_id=application["id"], context_id=context["id"], **invented
+                )
+            )
+        assert error.value.code == code
+    with pytest.raises(DomainError) as error:
         documents.create_document(
             DocumentCreate(
                 application_id=application["id"],
                 context_id=context["id"],
+                kind="answers",
                 content={"bullets": [{"text": "Invented", "evidence_ids": ["unknown"]}]},
             )
         )
+    assert error.value.code == "unknown_evidence"
     ws.db.backup(tmp_path / "portable.sqlite")
     with sqlite3.connect(tmp_path / "portable.sqlite") as restored:
         assert restored.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
@@ -251,9 +276,7 @@ def test_document_revisions_validate_evidence_and_never_inherit_old_pdf(workspac
 
 def test_transfer_scope_integrity_and_forget_prevent_late_resurrection(workspace):
     ws, _, documents, client, _, _, _, application = workspace
-    document = documents.create_document(
-        DocumentCreate(application_id=application["id"], content={"text": "Draft"})
-    )
+    document = documents.create_document(DocumentCreate(application_id=application["id"]))
     data = b"filled source"
     grant = documents.reserve_upload(
         UploadReservation(
@@ -277,7 +300,7 @@ def test_transfer_scope_integrity_and_forget_prevent_late_resurrection(workspace
     download = documents.reserve_download(response.json()["id"])
     assert client.get(download["url"], headers=download["headers"]).content == data
     late = documents.reserve_upload(
-        UploadReservation(owner_type="document", owner_id=document["id"], name="late.tex", size=4)
+        UploadReservation(owner_type="document", owner_id=document["id"], name="late.txt", size=4)
     )
     ws.forget_job(application["job_id"], ws.get_job(application["job_id"])["version"])
     assert client.put(late["url"], headers=late["headers"], content=b"late").status_code == 401
@@ -317,12 +340,22 @@ def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_
             application_id=application["id"],
             context_id=context["id"],
             title="Candidate CV",
-            content={"text": "document " * 10000},
         )
     )
-    asset, _ = upload(
-        documents, client, "document", first["id"], "candidate.tex", b"document " * 10000
+    source = b"document " * 10000
+    asset, _ = upload(documents, client, "document", first["id"], "candidate.tex", source)
+    pdf = b"%PDF-1.4\nSynthetic candidate"
+    grant = documents.reserve_upload(
+        UploadReservation(
+            owner_type="document",
+            owner_id=first["id"],
+            name="candidate.pdf",
+            media_type="application/pdf",
+            size=len(pdf),
+            source_sha256=asset["sha256"],
+        )
     )
+    assert client.put(grant["url"], headers=grant["headers"], content=pdf).status_code == 200
     documents.review_document(
         first["id"], ReviewUpdate(expected_version=documents.get_document(first["id"])["version"])
     )
@@ -333,7 +366,6 @@ def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_
                 application_id=application["id"],
                 previous_id=previous["id"],
                 title=f"Candidate CV {number}",
-                content={"text": "draft " * 1000},
             )
         )
     with (
@@ -352,15 +384,21 @@ def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_
     assert result["total"] == 26
     assert reads.call_count == 3 and singles.call_count == 1
     assert {row["revision_number"] for row in result["items"]} == set(range(1, 27))
-    assert sum(row["file_count"] for row in result["items"]) == 1
-    assert all("content" not in row and "files" not in row for row in result["items"])
+    assert sum(row["file_count"] for row in result["items"]) == 2
+    assert all(
+        not {"content", "files", "text", "legacy_content"} & row.keys() for row in result["items"]
+    )
+    # The text derived from the source is searched too.
+    found = client.get("/api/v1/documents", params={"q": "document document"}).json()
+    assert [row["id"] for row in found["items"]] == [first["id"]]
     assert (
         client.get(
             "/api/v1/documents", params={"summary": "true", "review_state": "approved"}
         ).json()["total"]
         == 1
     )
-    assert client.get(f"/api/v1/documents/{first['id']}").json()["content"] == first["content"]
+    detail = client.get(f"/api/v1/documents/{first['id']}").json()
+    assert detail["text"] == " ".join(["document"] * 10000) and "content" not in detail
     compact = client.get(
         "/api/v1/career/knowledge", params={"summary": "true", "q": "evidence", "limit": 1}
     ).json()

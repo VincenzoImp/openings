@@ -12,6 +12,7 @@ import {
   ErrorBanner,
   Loading,
   Panes,
+  SegmentedControl,
   Tag,
 } from "../../design";
 import { FileDialog } from "../../library/Assets";
@@ -73,7 +74,10 @@ function PdfFrame({ file, title }: { file: WorkspaceFile; title: string }) {
   );
 }
 
-/** One current revision: its PDF, or its text when it has none yet. */
+/**
+ * One current revision: its PDF beside the text read from its source, one at
+ * a time, or the text alone while it has no PDF.
+ */
 function RevisionPane({
   kind,
   revision,
@@ -84,12 +88,13 @@ function RevisionPane({
   loading: boolean;
 }) {
   const [opened, setOpened] = useState<WorkspaceFile | null>(null);
+  const [view, setView] = useState("pdf");
   const name = kindLabels[kind];
   const pdf = revision?.files?.find(isPdf);
   const source = revision?.files?.find(isSource);
-  const text =
-    typeof revision?.content?.text === "string" ? revision.content.text : "";
+  const text = revision?.text || "";
   const approved = revision?.review_state === "approved";
+  const shown = pdf && text ? view : pdf ? "pdf" : "text";
   return (
     <Card
       title={name}
@@ -112,6 +117,17 @@ function RevisionPane({
         )
       }
     >
+      {!loading && pdf && text && (
+        <SegmentedControl
+          label={`Show the ${name} as`}
+          options={[
+            { id: "pdf", label: "PDF" },
+            { id: "text", label: "Text" },
+          ]}
+          value={view}
+          onChange={setView}
+        />
+      )}
       <div className="scroll">
         {loading ? (
           <Loading label={`Loading the ${name}…`} />
@@ -120,7 +136,7 @@ function RevisionPane({
             Your agent writes it from a frozen copy of your record. It appears
             here with its PDF.
           </EmptyState>
-        ) : pdf ? (
+        ) : pdf && shown === "pdf" ? (
           <PdfFrame file={pdf} title={`Preview of the ${name}, ${pdf.name}`} />
         ) : text ? (
           <div
@@ -132,7 +148,8 @@ function RevisionPane({
           </div>
         ) : (
           <EmptyState title="No PDF yet">
-            This revision has no PDF. Its files are in the Documents tab.
+            This revision has no PDF and no source yet. Its files are in the
+            Documents tab.
           </EmptyState>
         )}
       </div>

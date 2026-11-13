@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { expect, type BrowserContext, type Page } from "@playwright/test";
 
 export type Cookies = Parameters<BrowserContext["addCookies"]>[0];
@@ -100,9 +101,10 @@ export async function upload(
   name: string,
   bytes: Buffer,
   mediaType = "application/pdf",
+  sourceSha256?: string,
 ) {
   return page.evaluate(
-    async ({ ownerType, ownerId, name, data, mediaType }) => {
+    async ({ ownerType, ownerId, name, data, mediaType, sourceSha256 }) => {
       const setup = { "X-Openings-E2E-Setup": "1" };
       const session = await fetch("/api/v1/auth/session", {
         headers: setup,
@@ -121,16 +123,66 @@ export async function upload(
           name,
           size: body.length,
           media_type: mediaType,
+          ...(sourceSha256 ? { source_sha256: sourceSha256 } : {}),
         }),
-      }).then((response) => response.json());
+      }).then(async (response) => {
+        if (!response.ok) throw Error(await response.text());
+        return response.json();
+      });
       const response = await fetch(ticket.url, {
         method: ticket.method || "PUT",
         headers: { ...setup, ...ticket.headers },
         body,
       });
-      if (!response.ok) throw Error(await response.text());
+      // Read the answer: an unread body keeps the request open for the page.
+      const answer = await response.text();
+      if (!response.ok) throw Error(answer);
     },
-    { ownerType, ownerId, name, data: bytes.toString("base64"), mediaType },
+    {
+      ownerType,
+      ownerId,
+      name,
+      data: bytes.toString("base64"),
+      mediaType,
+      sourceSha256,
+    },
+  );
+}
+
+/** A small LaTeX source whose text, as the server reads it, is `text`. */
+export function syntheticTex(text = "Synthetic application CV") {
+  return Buffer.from(
+    `\\documentclass{article}\n\\begin{document}\n${text}\n\\end{document}\n`,
+  );
+}
+
+/**
+ * Give a CV or letter revision its source and the PDF built from it, as the
+ * test's own setup: the PDF names the source's SHA-256.
+ */
+export async function attachSource(
+  page: Page,
+  documentId: string,
+  text = "Synthetic application CV",
+  name = "document",
+) {
+  const source = syntheticTex(text);
+  await upload(
+    page,
+    "document",
+    documentId,
+    `${name}.tex`,
+    source,
+    "application/x-tex",
+  );
+  await upload(
+    page,
+    "document",
+    documentId,
+    `${name}.pdf`,
+    syntheticPdf(text.replace(/\s+/g, " ")),
+    "application/pdf",
+    createHash("sha256").update(source).digest("hex"),
   );
 }
 

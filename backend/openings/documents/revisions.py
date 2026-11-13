@@ -1,19 +1,57 @@
-"""Document revisions: validated content, review, consistency and deletion."""
+"""Document revisions: creation, evidence, review, comparison and deletion.
+
+A CV or letter revision (``SOURCE_KINDS``) is its uploaded .tex source and PDF,
+the evidence it cites and an optional note; its text is derived from the source
+(``sources.py``). Form answers and other documents keep structured content.
+Content stored on a CV or letter before 0.22 is kept read-only as
+``legacy_content``.
+"""
 
 from __future__ import annotations
 
+import difflib
 import json
 from typing import Literal
 
 from ..career.records import _get, _page
-from ..common import decode_record, encode, new_id, now
-from ..consistency import compare as compare_content, is_tex_source
+from ..common import encode, new_id, now
 from ..errors import DomainError, conflict, missing
-from .models import DocumentCreate, ReviewUpdate
+from .models import SOURCE_KINDS, DocumentCreate, ReviewUpdate
+from .sources import approval_problem
+from .text import is_tex_source
+
+# Columns of a revision summary; the full record adds content, text and evidence.
+SUMMARY_COLUMNS = (
+    "id,application_id,context_id,kind,title,previous_id,review_state,version,created_at"
+)
+
+
+def readable_lines(row) -> list[str]:
+    """The lines a comparison reads: the derived text, else structured content as text."""
+    if row.get("text") is not None:
+        # Blank lines only separate paragraphs; they are not compared.
+        return [line for line in row["text"].splitlines() if line.strip()]
+    if row["kind"] in SOURCE_KINDS:
+        return []
+    lines = []
+
+    def walk(value, path):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                walk(child, f"{path}.{key}" if path else str(key))
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                walk(child, f"{path}[{index}]")
+        elif value is not None and value != "":
+            text = value if isinstance(value, str) else json.dumps(value)
+            lines.extend(f"{path}: {line}" if path else line for line in text.splitlines())
+
+    walk(json.loads(row["content"] or "{}"), "")
+    return lines
 
 
 class RevisionOperations:
-    """Creating, reading, reviewing and deleting document revisions."""
+    """Creating, reading, reviewing, comparing and deleting document revisions."""
 
     def _validate_content(self, content, context, kind):
         if not context:
@@ -115,9 +153,54 @@ class RevisionOperations:
                             422, "answer_choice", "An answer is not one of the permitted choices."
                         )
 
+    @staticmethod
+    def _validate_evidence(conn, context, claim_ids, knowledge_ids):
+        """Cited claims and Career entries come from the frozen context, else exist now."""
+        if context:
+            claims = {row["id"] for row in context["payload"]["claims"]}
+            entries = {row["id"] for row in context["payload"]["knowledge"]}
+        else:
+
+            def existing(table, ids, extra=""):
+                if not ids:
+                    return set()
+                marks = ",".join("?" for _ in ids)
+                return {
+                    row[0]
+                    for row in conn.execute(
+                        f"SELECT id FROM {table} WHERE id IN ({marks}){extra}", ids
+                    )
+                }
+
+            claims = existing("claims", claim_ids, " AND approved=1")
+            entries = existing("knowledge", knowledge_ids)
+        if not set(claim_ids) <= claims:
+            raise DomainError(
+                422,
+                "unapproved_claim",
+                "The revision cites unapproved claims or claims outside its frozen context.",
+                {"claim_ids": sorted(set(claim_ids) - claims)},
+            )
+        if not set(knowledge_ids) <= entries:
+            raise DomainError(
+                422,
+                "unknown_evidence",
+                "The revision cites Career entries outside its frozen context.",
+                {"knowledge_ids": sorted(set(knowledge_ids) - entries)},
+            )
+
     def create_document(self, value: DocumentCreate) -> dict:
-        """Store draft structured content as a new immutable revision; previous_id links an earlier version. Never marks the application sent."""
-        content = encode(value.content)
+        """Create a new immutable draft revision; previous_id links the revision it replaces. A CV or letter (resume, cover_letter) takes no content: then upload its .tex source and the PDF built from it (files_reserve_upload with source_sha256). Form answers and other kinds keep structured content. Never marks the application sent."""
+        source_kind = value.kind in SOURCE_KINDS
+        if source_kind and value.content is not None:
+            raise DomainError(
+                422,
+                "content_not_accepted",
+                "A CV or letter revision is its .tex source and PDF: create the revision without "
+                "content, then upload the source and the PDF built from it.",
+            )
+        content = encode({} if source_kind else value.content or {})
+        claim_ids, knowledge_ids = encode(value.claim_ids), encode(value.knowledge_ids)
         with self.db.transaction() as conn:
             application = _get(conn, "applications", value.application_id, "Application")
             previous = (
@@ -143,9 +226,21 @@ class RevisionOperations:
                     raise DomainError(
                         422, "context_application", "The context belongs to another application."
                     )
-            self._validate_content(value.content, context, value.kind)
+            if not source_kind:
+                self._validate_content(value.content or {}, context, value.kind)
+            self._validate_evidence(conn, context, value.claim_ids, value.knowledge_ids)
+            # A retry returns the revision it created: for a CV or letter, only while
+            # that revision is still an empty draft.
             old = conn.execute(
-                "SELECT id FROM documents WHERE application_id=? AND context_id IS ? AND kind=? AND title=? AND content=? AND previous_id IS ? ORDER BY created_at LIMIT 1",
+                "SELECT id FROM documents d WHERE application_id=? AND context_id IS ? AND kind=? "
+                "AND title=? AND content=? AND previous_id IS ? AND note=? AND claim_ids=? "
+                "AND knowledge_ids=?"
+                + (
+                    " AND review_state='draft' AND NOT EXISTS(SELECT 1 FROM files f WHERE f.document_id=d.id)"
+                    if source_kind
+                    else ""
+                )
+                + " ORDER BY created_at LIMIT 1",
                 (
                     value.application_id,
                     context_id,
@@ -153,6 +248,9 @@ class RevisionOperations:
                     value.title,
                     content,
                     value.previous_id,
+                    value.note,
+                    claim_ids,
+                    knowledge_ids,
                 ),
             ).fetchone()
             if old:
@@ -160,7 +258,8 @@ class RevisionOperations:
             else:
                 document_id = new_id()
                 conn.execute(
-                    "INSERT INTO documents(id,application_id,context_id,kind,title,content,previous_id,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                    "INSERT INTO documents(id,application_id,context_id,kind,title,content,previous_id,"
+                    "note,claim_ids,knowledge_ids,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                     (
                         document_id,
                         value.application_id,
@@ -169,6 +268,9 @@ class RevisionOperations:
                         value.title,
                         content,
                         value.previous_id,
+                        value.note,
+                        claim_ids,
+                        knowledge_ids,
                         now(),
                     ),
                 )
@@ -222,17 +324,28 @@ class RevisionOperations:
                 files[row["document_id"]].append(self._file_record(row))
         items = []
         for row in rows:
-            result = dict(row) if summary else decode_record(row, ["content"])
-            result.update(revision_number=revisions[result["id"]])
+            result = dict(row)
+            result["revision_number"] = revisions[result["id"]]
             if summary:
                 result["file_count"] = counts.get(result["id"], 0)
-            else:
-                result["files"] = files[result["id"]]
+                items.append(result)
+                continue
+            content = result.pop("content")
+            if result["kind"] not in SOURCE_KINDS:
+                result["content"] = json.loads(content)
+            for key in ("claim_ids", "knowledge_ids", "legacy_content"):
+                if result[key] is not None:
+                    result[key] = json.loads(result[key])
+            result["files"] = files[result["id"]]
+            sources = [
+                file for file in result["files"] if is_tex_source(file["name"], file["media_type"])
+            ]
+            result["source_sha256"] = sources[0]["sha256"] if len(sources) == 1 else None
             items.append(result)
         return items
 
     def get_document(self, document_id: str) -> dict:
-        """Read a document revision, review state and attached file metadata."""
+        """Read a revision: for a CV or letter its text derived from the .tex source, the evidence it cites, its note, review state and files (the PDF names its source_sha256); for other kinds its structured content."""
         row = self.db.one("SELECT * FROM documents WHERE id=?", (document_id,))
         if not row:
             missing("Document revision")
@@ -248,7 +361,7 @@ class RevisionOperations:
         q: str = "",
         review_state: Literal["draft", "approved"] | None = None,
     ) -> dict:
-        """List revisions by application/kind/review state/title. summary=true (default) omits structured content and file entries; summary=false includes them; retrieve a revision for exact content/files."""
+        """List revisions by application/kind/review state; q searches titles, notes and the text derived from sources. summary=true (default) omits text, content and file entries; summary=false includes them."""
         _page(limit, offset)
         where, params = [], []
         if application_id:
@@ -263,14 +376,10 @@ class RevisionOperations:
             where.append("review_state=?")
             params.append(review_state)
         if q:
-            where.append("title LIKE ?")
-            params.append(f"%{q}%")
+            where.append("(title LIKE ? OR note LIKE ? OR text LIKE ?)")
+            params.extend([f"%{q}%"] * 3)
         clause = " WHERE " + " AND ".join(where) if where else ""
-        columns = (
-            "id,application_id,context_id,kind,title,previous_id,review_state,version,created_at"
-            if summary
-            else "*"
-        )
+        columns = SUMMARY_COLUMNS if summary else "*"
         rows = self.db.all(
             f"SELECT {columns} FROM documents{clause} ORDER BY created_at DESC,id LIMIT ? OFFSET ?",
             (*params, limit, offset),
@@ -280,34 +389,53 @@ class RevisionOperations:
             "total": self.db.one(f"SELECT COUNT(*) AS n FROM documents{clause}", params)["n"],
         }
 
-    @staticmethod
-    def _consistency(conn, row) -> dict:
-        sources, names = [], []
-        for file in conn.execute(
-            "SELECT id,name,media_type,sha256 FROM files WHERE document_id=? ORDER BY name,id",
-            (row["id"],),
-        ).fetchall():
-            if not is_tex_source(file["name"], file["media_type"]):
-                continue
-            blob = conn.execute(
-                "SELECT content FROM blobs WHERE sha256=?", (file["sha256"],)
-            ).fetchone()
-            text = bytes(blob["content"]).decode("utf-8", "replace") if blob else ""
-            sources.append((file["name"], text))
-            names.append({"id": file["id"], "name": file["name"]})
-        report = compare_content(json.loads(row["content"]), sources)
-        return {"document_id": row["id"], "version": row["version"], "sources": names, **report}
-
-    def check_consistency(self, document_id: str) -> dict:
-        """Compare a revision's structured content text with its attached .tex source, ignoring case, whitespace, punctuation and LaTeX markup. Read-only; documents_review applies the same check."""
+    def compare_documents(self, document_id: str, other_id: str = "") -> dict:
+        """Compare a revision's text with another revision's (by default the one it replaces), line by line. CV and letter revisions compare the text derived from their sources; form answers compare their content as text."""
         with self.db.connect() as conn:
             row = conn.execute("SELECT * FROM documents WHERE id=?", (document_id,)).fetchone()
             if not row:
                 missing("Document revision")
-            return self._consistency(conn, dict(row))
+            row = dict(row)
+            other_id = other_id or row["previous_id"] or ""
+            if not other_id:
+                raise DomainError(
+                    422,
+                    "comparison_target",
+                    "This revision replaces no earlier revision; name the revision to compare with.",
+                )
+            other = conn.execute("SELECT * FROM documents WHERE id=?", (other_id,)).fetchone()
+            if not other:
+                missing("Document revision")
+            other = dict(other)
+        if other["application_id"] != row["application_id"]:
+            raise DomainError(
+                422, "comparison_target", "Compare revisions of the same application."
+            )
+        before, after = readable_lines(other), readable_lines(row)
+        lines, added, removed = [], 0, 0
+        matcher = difflib.SequenceMatcher(None, before, after, autojunk=False)
+        for tag, first, last, start, end in matcher.get_opcodes():
+            if tag == "equal":
+                lines.extend({"change": "same", "text": line} for line in after[start:end])
+                continue
+            lines.extend({"change": "removed", "text": line} for line in before[first:last])
+            lines.extend({"change": "added", "text": line} for line in after[start:end])
+            removed += last - first
+            added += end - start
+        return {
+            "document_id": document_id,
+            "other_id": other_id,
+            "text": {
+                "document": row["text"] is not None or row["kind"] not in SOURCE_KINDS,
+                "other": other["text"] is not None or other["kind"] not in SOURCE_KINDS,
+            },
+            "added": added,
+            "removed": removed,
+            "lines": lines,
+        }
 
     def review_document(self, document_id: str, value: ReviewUpdate) -> dict:
-        """Approve exact document content/files; future changes require a new revision. Refuses with 409 content_mismatch when the attached .tex source disagrees with the structured content, unless allow_content_mismatch=true."""
+        """Approve the exact revision and its files; future changes require a new revision. A CV or letter needs its .tex source and the PDF built from it (409 source_required, pdf_required)."""
         with self.db.transaction() as conn:
             row = _get(conn, "documents", document_id, "Document revision")
             if row["version"] != value.expected_version:
@@ -315,20 +443,10 @@ class RevisionOperations:
                     "The document or its files changed. Reload it before approving.",
                     details={"current_version": row["version"]},
                 )
-            if row["review_state"] != "approved" and not value.allow_content_mismatch:
-                report = self._consistency(conn, row)
-                if report["status"] == "mismatch":
-                    first = report["mismatches"][0]
-                    raise DomainError(
-                        409,
-                        "content_mismatch",
-                        f"{report['reason']} First difference at {first['path']}: "
-                        f'"{first["text"][:120]}". Save the matching content as a new revision '
-                        "or upload the matching source; set allow_content_mismatch only for an "
-                        "intentional difference.",
-                        report,
-                    )
             if row["review_state"] != "approved":
+                problem = approval_problem(conn, row)
+                if problem:
+                    raise problem
                 conn.execute(
                     "UPDATE documents SET review_state='approved',version=version+1 WHERE id=?",
                     (document_id,),

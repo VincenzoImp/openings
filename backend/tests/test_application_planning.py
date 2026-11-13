@@ -6,9 +6,10 @@ import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
+from document_fixtures import attach, attach_pdf
 from openings.app import create_app
 from openings.db import SCHEMA_VERSION, Database
-from openings.documents import DocumentCreate, ReviewUpdate, UploadReservation
+from openings.documents import DocumentCreate, ReviewUpdate
 from openings.errors import DomainError
 from openings.operations import restore_database
 from openings.workspace import Workspace
@@ -223,7 +224,7 @@ def test_readiness_follows_current_revisions_and_sorts_by_plan(tmp_path):
     assert ids(sort="priority") == [urgent["id"], late["id"], soon["id"], loose["id"]]
 
     cv = documents.create_document(
-        DocumentCreate(application_id=soon["id"], kind="resume", title="CV", content={"text": "A"})
+        DocumentCreate(application_id=soon["id"], kind="resume", title="CV")
     )
     answers = documents.create_document(
         DocumentCreate(
@@ -231,18 +232,10 @@ def test_readiness_follows_current_revisions_and_sorts_by_plan(tmp_path):
         )
     )
     assert readiness(soon) == "missing_pdf"
-    pdf = b"%PDF-1.4\nSynthetic test PDF"
-    grant = documents.reserve_upload(
-        UploadReservation(
-            owner_type="document",
-            owner_id=cv["id"],
-            name="cv.pdf",
-            size=len(pdf),
-            media_type="application/pdf",
-        )
-    )
     with TestClient(app) as client:
-        assert client.put(grant["url"], headers=grant["headers"], content=pdf).status_code == 200
+        attach(documents, client.put, cv["id"], "A", pdf=False)
+        assert readiness(soon) == "missing_pdf"
+        attach_pdf(documents, client.put, cv["id"], "A")
     assert readiness(soon) == "unreviewed"
     for document in (cv, answers):
         current = documents.get_document(document["id"])
@@ -257,7 +250,6 @@ def test_readiness_follows_current_revisions_and_sorts_by_plan(tmp_path):
             kind="resume",
             title="CV v2",
             previous_id=cv["id"],
-            content={"text": "Changed"},
         )
     )
     assert readiness(soon) == "missing_pdf"

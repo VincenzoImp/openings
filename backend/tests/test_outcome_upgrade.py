@@ -181,7 +181,11 @@ def test_upgrade_keeps_every_row_and_backfills_exactly(tmp_path):
             assert tuple(new)[: len(old)] == tuple(old)
             assert new[-1] is None
         for table in CHILDREN:
-            assert after[table] == before[table], table
+            # Later schemas only append columns (documents gain those of schema 13).
+            assert [tuple(row)[: len(old)] for row, old in zip(after[table], before[table])] == [
+                tuple(old) for old in before[table]
+            ], table
+            assert len(after[table]) == len(before[table]), table
         assert after["indexes"] == before["indexes"]
         assert after["references"] == before["references"]
         # The table holds the new definition and accepts the new outcome.
