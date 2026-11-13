@@ -84,6 +84,35 @@ def counts(path):
         }
 
 
+# Tables the upgrade renames: schema-15 name -> schema-14 name.
+RENAMED = {"replies": "responses"}  # #214
+
+
+def created_by_upgrade(pre_upgrade):
+    """Rows the upgrade's folds add, per schema-15 table, counted on the original."""
+    created = {}
+    # #214: an application (and its event) per shortlisted job without an open one,
+    # and an event per stored Ready mark.
+    started = query(
+        pre_upgrade,
+        "SELECT count(*) FROM jobs j WHERE triage='saved' AND NOT EXISTS(SELECT 1 FROM "
+        "applications a WHERE a.job_id=j.id AND a.status<>'closed')",
+    )[0][0]
+    marks = query(pre_upgrade, "SELECT count(*) FROM applications WHERE ready_at IS NOT NULL")[0][0]
+    created["applications"] = created.get("applications", 0) + started
+    created["events"] = created.get("events", 0) + started + marks
+    return created
+
+
+def expected_counts(original, pre_upgrade):
+    """The row counts of the upgraded file: the original's, renamed, plus folded rows."""
+    renamed = {old: new for new, old in RENAMED.items()}
+    expected = {renamed.get(name, name): number for name, number in original.items()}
+    for name, number in created_by_upgrade(pre_upgrade).items():
+        expected[name] += number
+    return expected
+
+
 @pytest.fixture
 def upgraded(tmp_path):
     """The fixture upgraded at startup: (database, pre-upgrade copy, archive, input digest)."""
@@ -106,7 +135,7 @@ def test_the_original_is_kept_byte_for_byte_and_every_row_is_copied(upgraded):
     path, pre_upgrade, archive, before, original = upgraded
     assert digest(pre_upgrade) == before
     assert query(pre_upgrade, "PRAGMA user_version") == [(14,)]
-    assert counts(path) == original
+    assert counts(path) == expected_counts(original, pre_upgrade)
     assert query(path, "SELECT count(*) FROM jobs_fts WHERE jobs_fts MATCH 'engineer'")[0][0] > 0
     assert sorted(p.name for p in path.parent.iterdir()) == sorted(
         [path.name, pre_upgrade.name, archive.name]
@@ -119,23 +148,24 @@ def test_the_original_is_kept_byte_for_byte_and_every_row_is_copied(upgraded):
 def test_generic_changes_keep_every_value(upgraded):
     path, pre_upgrade = upgraded[:2]
     # Ids, versions and every kept value are copied unchanged.
+    # Rows an upgrade fold adds (#214) are not in the original.
     for table, columns in (
-        ("jobs", "id,title,company,posting,triage,version,created_at,dismissed_reason"),
-        ("applications", "id,job_id,status,outcome,version,questions,answers,requirements"),
+        ("jobs", "id,title,company,posting,version,created_at,dismissed_reason"),
+        ("applications", "id,job_id,outcome,version,questions,answers,requirements"),
         ("events", "id,job_id,application_id,kind,payload,actor_kind,actor_name,run_id"),
-        ("documents", "id,kind,previous_id,review_state,text,legacy_content,claim_ids"),
+        ("documents", "id,previous_id,text,legacy_content,claim_ids"),
         ("blobs", "sha256,content,size"),
     ):
         sql = f"SELECT rowid,{columns} FROM {table} ORDER BY rowid"
         if table == "blobs":
             sql = f"SELECT {columns} FROM {table} ORDER BY sha256"
-        assert query(path, sql) == query(pre_upgrade, sql)
+        assert query(path, sql)[: len(old := query(pre_upgrade, sql))] == old
     # An estimated response day becomes text on the response.
     old = query(pre_upgrade, "SELECT id,note FROM responses WHERE estimated=1")
     assert old
     for response_id, note in old:
         expected = (note + " " if note else "") + "(day estimated during the 0.20 upgrade)"
-        assert query(path, "SELECT note FROM responses WHERE id=?", (response_id,)) == [(expected,)]
+        assert query(path, "SELECT note FROM replies WHERE id=?", (response_id,)) == [(expected,)]
     assert query(path, "SELECT count(*) FROM pragma_table_info('notes') WHERE name='origin'") == [
         (0,)
     ]
@@ -185,7 +215,7 @@ def test_the_archive_holds_every_dropped_value_with_the_counts_of_its_source(upg
         assert archive["counts"]["dropped_columns." + key] == len(rows)
     assert set(archive["counts"]) == {
         f"{top}.{sub}" for top in ("dropped_columns",) for sub in dropped
-    }
+    } | {section.name for section in m15.SECTIONS}
 
 
 def test_a_backup_of_the_previous_schema_is_restored_upgraded(tmp_path):
@@ -195,7 +225,7 @@ def test_a_backup_of_the_previous_schema_is_restored_upgraded(tmp_path):
     assert restore_database(workspace, backup)["restored"]
     assert digest(backup) == before
     # Restore keeps the destination's tokens and drops transfer grants.
-    restored, uploaded = counts(workspace.db.path), counts(backup)
+    restored, uploaded = counts(workspace.db.path), expected_counts(counts(backup), backup)
     for name in ("api_tokens", "transfer_grants"):
         restored.pop(name), uploaded.pop(name)
     assert restored == uploaded
@@ -224,7 +254,8 @@ def test_a_stop_between_the_two_renames_is_finished_at_the_next_start(tmp_path, 
     assert not path.exists() and files.next.exists() and files.pre_upgrade.exists()
     monkeypatch.undo()
     Database(path)
-    assert counts(path) == original and digest(files.pre_upgrade) == before
+    assert counts(path) == expected_counts(original, files.pre_upgrade)
+    assert digest(files.pre_upgrade) == before
     assert not files.next.exists()
 
 
@@ -242,7 +273,8 @@ def test_a_stop_before_the_swap_leaves_the_original_and_runs_again(tmp_path, mon
     assert digest(path) == before and files.next.exists()
     monkeypatch.undo()
     Database(path)
-    assert counts(path) == original and digest(files.pre_upgrade) == before
+    assert counts(path) == expected_counts(original, files.pre_upgrade)
+    assert digest(files.pre_upgrade) == before
     assert not files.next.exists()
 
 

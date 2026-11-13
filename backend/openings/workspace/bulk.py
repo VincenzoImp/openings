@@ -2,7 +2,7 @@
 
 from ..common import check_version
 from ..errors import DomainError, missing
-from ..models import ApplicationBulk, ApplicationPatch, ApplicationReady, JobBulk
+from ..models import ApplicationBulk, ApplicationPatch, JobBulk
 
 
 class BulkChanges:
@@ -61,7 +61,7 @@ class BulkChanges:
         return self._bulk(value.items, apply, value.action == "forget")
 
     def bulk_applications(self, value):
-        """Close with an outcome, reopen to a stage, mark or unmark ready, or delete versioned attempts."""
+        """Close with an outcome, reopen to a stage, or delete versioned attempts."""
         value = (
             value if isinstance(value, ApplicationBulk) else ApplicationBulk.model_validate(value)
         )
@@ -74,19 +74,6 @@ class BulkChanges:
             if value.action == "delete":
                 self.delete_application(item.id, item.expected_version, collect=False)
                 return {"deleted": True}
-            if value.action in {"mark_ready", "unmark_ready"}:
-                updated = self.set_ready(
-                    item.id,
-                    ApplicationReady(
-                        expected_version=item.expected_version, ready=value.action == "mark_ready"
-                    ),
-                )
-                return {
-                    "job_id": updated["job_id"],
-                    "readiness": updated["readiness"],
-                    "ready_at": updated["ready_at"],
-                    "version": updated["version"],
-                }
             if value.action == "reopen" and row["status"] != "closed":
                 raise DomainError(
                     409,

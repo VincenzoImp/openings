@@ -1,6 +1,7 @@
 """The overview: funnel counts and activity from recorded application history."""
 
 from ..posting import posting_complete_sql
+from .readiness import READY_SQL
 
 
 class Overview:
@@ -16,9 +17,8 @@ class Overview:
             " WHERE " + " AND ".join(conditions) if conditions else ""
         )
         apps = self.db.all(
-            "SELECT id,status,outcome,applied_at,ready_at FROM applications WHERE id IN ("
-            + cohort
-            + ")",
+            "SELECT id,status,outcome,applied_at," + READY_SQL + " AS ready FROM applications app "
+            "WHERE id IN (" + cohort + ")",
             bounds,
         )
         stages = ["applied", "interview", "offer"]
@@ -62,7 +62,7 @@ class Overview:
             outcome = (app["outcome"] or "not_pursued") if app["status"] == "closed" else "waiting"
             funnel[highest]["outcomes"][outcome] += 1
         counts = self.db.one(
-            "SELECT count(*) n,coalesce(sum(triage='inbox' AND NOT EXISTS (SELECT 1 FROM applications WHERE job_id=j.id)),0) inbox,coalesce(sum(NOT "
+            "SELECT count(*) n,coalesce(sum(triage='new'),0) new,coalesce(sum(NOT "
             + posting_complete_sql()
             + "),0) incomplete FROM jobs j WHERE triage!='dismissed'"
         )
@@ -70,10 +70,10 @@ class Overview:
             "sent": sent,
             "interviews": funnel[1]["count"],
             "offers": funnel[2]["count"],
-            "active": sum(a["status"] not in {"draft", "closed"} for a in apps),
-            "drafts": sum(a["status"] == "draft" for a in apps),
-            "ready": sum(a["status"] == "draft" and a["ready_at"] is not None for a in apps),
-            "inbox": counts["inbox"],
+            "active": sum(a["status"] not in {"shortlisted", "closed"} for a in apps),
+            "shortlisted": sum(a["status"] == "shortlisted" for a in apps),
+            "ready": sum(bool(a["ready"]) for a in apps),
+            "new": counts["new"],
             "incomplete": counts["incomplete"],
             "funnel": funnel,
             "activity": [

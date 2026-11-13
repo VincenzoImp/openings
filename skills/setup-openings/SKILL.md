@@ -71,7 +71,7 @@ stored [run report](../openings-workspace/references/run-report.md).
 
 To try the workflow before sharing personal data, import the repository's
 synthetic `examples/career.json`, add the items of `examples/policy.json` and use
-`examples/resume.tex` and `examples/cover-letter.tex`; replace them with the
+`examples/cv.tex` and `examples/letter.tex`; replace them with the
 owner's records afterwards.
 
 Work in this order; each step uses records the next ones need.
@@ -92,8 +92,8 @@ Work in this order; each step uses records the next ones need.
    not rely on an unconfirmed item. In a workspace upgraded from an earlier
    version, sort the copied items first as
    [Maintain Career](../maintain-career/SKILL.md) describes.
-3. **Templates.** Start from the repository `examples/resume.tex` and
-   `examples/cover-letter.tex` or the owner's own documents. Build a one-page CV
+3. **Templates.** Start from the repository `examples/cv.tex` and
+   `examples/letter.tex` or the owner's own documents. Build a one-page CV
    MASTER from the Career record, compile it, check the PDF, and store source,
    guidance and rules in the resume template. Do the same for the letter template.
 4. **Instructions.** Store general writing guidance with `instructions_update`:

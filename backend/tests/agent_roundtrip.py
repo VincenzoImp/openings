@@ -104,7 +104,7 @@ async def exercise(base, token, folder, tectonic):
                         },
                     )
                 )
-                tex = (Path(__file__).resolve().parents[2] / "examples/resume.tex").read_text()
+                tex = (Path(__file__).resolve().parents[2] / "examples/cv.tex").read_text()
                 template = unpack(
                     await session.call_tool(
                         "templates_create",
