@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.21.0 — 2026-11-13
+
+Jobs that explain themselves, rules that act on them, and the System screens on the new design.
+
+- **Signals on every job**, computed without a model: posting language, required and welcome languages, a likely duplicate of an earlier job (decide Same vacancy or Different inside the job; `POST /jobs/{id}/distinct`), and "no longer listed" for company-board postings. The job field `availability` is deprecated and no longer shown.
+- **Policy rules act:** once enabled and confirmed by you, a decision rule on a signal dismisses or flags new jobs nobody has touched, when their signal arrives. Each dismissal names its rule and can be restored; duplicates are never merged. Each rule shows how many jobs waiting for review it would match (`POST /policy/rules/preview`, MCP `policy_rule_preview`).
+- **Yield:** Collection → Yield shows, per source and search, what was collected, kept, applied to, answered and dismissed, and by whom (`GET /collection/yield`, MCP `collection_yield`).
+- **Jobs** is rebuilt: To review, Shortlist, Dismissed and All, each beside the selected job; dismiss with a reason and restore; bulk actions; Add a job looks the address up first. `GET /jobs` filters by signal, language, dismissal and rule; dismissals take a `reason`.
+- **Skill local notes:** up to 2,000 characters per skill, versioned and attributed, added after the shipped text whenever an agent reads the skill (REST, `skill_get`, MCP prompts); the shipped text is never changed. `skills.notes.read` and `skills.notes.update` on REST and MCP; agent tokens may write them. The dashboard shows each skill's text, reference files and notes, and a run report's Method section can be added to the notes.
+- **Collection** is rebuilt with Sources (a typed form instead of JSON), Runs and tasks, Providers and Yield. **Settings** is rebuilt with Agent access, Skills, Backup and restore, and Workspace; owner-only parts are marked. Old links keep working.
+- The runs list includes each run's method section; `/workspace` and `workspace_info` report the schema version.
+- Fixed: reading the workspace's storage size could fail while the write-ahead log was being checkpointed.
+
+**After upgrading:** open Policy to enable the rules you want; none acts until you do. The signals of existing jobs are computed in the background in the first minutes after start; until then a job shows no signals.
+
+**Database schema 12 (additive).** A schema 5–11 workspace is upgraded automatically at start in one transaction: skill notes, job signals, dismissal records (filled from each job's last dismissal event) and listing observations. Restore accepts schema 12 and upgrades a copy of an older backup. A schema 12 workspace cannot be opened by 0.20 or earlier: back up before upgrading.
+
 ## 0.20.0 — 2026-11-13
 
 What employers answered, what it tells you, and one page to review and send an application.
