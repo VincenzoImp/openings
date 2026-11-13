@@ -106,7 +106,7 @@ access, storage and upgrades.
 
 [Agents and MCP](docs/user/agents.md) explains the tools, transfers and state rules.
 
-![Settings → Agent access with client configuration and the served skills](docs/images/agent-access.png)
+![Settings → Agent access with the API tokens and the client configuration](docs/images/agent-access.png)
 
 ## Documentation
 

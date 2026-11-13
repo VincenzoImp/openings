@@ -326,6 +326,79 @@ when that issue lands; the table says which parts those are.
 - A rebuilt screen renders in `.screen` instead of `.legacy`
   (`shell/routes.ts`, `REBUILT`).
 
+**Stage 6, System.**
+
+- **Collection** (`pages/Collection.tsx`, `pages/collection/`) has the switch of
+  scheduled collection above three tabs, one file each so a later tab (the yield
+  of each source, #166) is one more entry and one more file: **Sources**
+  (`Sources.tsx`, `SourceRow.tsx`: saved searches and company boards in one table
+  filtered by kind and text, on/off, providers, schedule, last run with its
+  problems, Run once or Stop run, Edit, Run with options, Remove; a selection kept
+  across pages for switch on, pause, run, run with options, configure and remove,
+  with the failures listed and "Use current versions"), **Runs and tasks**
+  (`Runs.tsx`, `RunRow.tsx`, `TaskRow.tsx`: runs filtered by state and source;
+  **Tasks** opens a run's provider tasks, its timing and the settings it froze as
+  a read-only tree; **All tasks** filters by kind and job; stop and retry) and
+  **Providers** (`Providers.tsx`: the request gate of each provider, on/off and
+  spacing saved per provider, its state, request counts, last answer and error).
+  **Add a search** and **Add a company board** open the source form under the
+  list (`SourceEditor.tsx`, `SourceFields.tsx`, `Schedule.tsx`): every setting
+  has its own control, so `config` is no longer edited as JSON; configuration
+  the form has no control for is kept as it is. Preview, run-only limits and
+  bulk configuration keep their behaviour. The prototype's Yield tab waits for
+  #166.
+- **Settings** (`pages/Settings.tsx`, `pages/settings/`) has the tabs **Agent
+  access** (tokens with their kinds and the open run of each, revoke after
+  asking, the token form with the kind as a switch and the secret shown once,
+  the client configuration for Claude Code, Codex or JSON with the MCP and REST
+  addresses), **Skills** (below), **Backup and restore** (sizes and the restore
+  limit, backup download, records export, the restore form that needs a file and
+  the typed word RESTORE) and **Workspace** (version, schema, public address,
+  data size, retention, sign out, password). Parts that need owner authority are
+  marked **Owner only** (`OwnerOnly.tsx`): tokens, restore and the password.
+- **Skills** (`Skills.tsx`, `SkillDetail.tsx`, `SkillNotes.tsx`) lists the
+  served skills beside the opened one: its local notes (#168) with the version
+  and who wrote it, a counter of the 2,000 characters, earlier versions to use
+  again, and the method sections of the workflow's recent runs to add; the
+  shipped text read-only; its reference files and the shared ones its text links
+  to, each read in a dialog. A run report's Method section links to the notes
+  of its workflow with `from_run=`, which offers that method as a note.
+- Old addresses are rewritten by the shell (`canonicalHash`): `#settings?section=collection`
+  opens Collection, Providers; `#settings?section=activity` (with
+  `activity_view=tasks`) opens Runs and tasks; `#collection?section=searches`
+  and `companies` open Sources filtered by kind; `#skills` opens Settings,
+  Skills. Where each capability of the old pages went:
+
+  | Old place | Now |
+  |---|---|
+  | Collection: Saved searches and Companies tabs, cards | Collection, Sources (one table, filtered by kind) |
+  | Collection: source dialog with the raw JSON of `config` | The source form under the list, one control per setting |
+  | Collection: Run with options, Configure, bulk actions, batch errors | The same, from the row or the selection bar |
+  | Collection: View progress | "Runs of this search" in the row's last run |
+  | Settings, Collection: provider request settings | Collection, Providers |
+  | Settings, Activity: collection runs, all tasks, run details with raw JSON | Collection, Runs and tasks; a run's frozen settings as a tree |
+  | Settings, Agent access: endpoint, client configuration, guide, API links | Settings, Agent access, Connect an agent |
+  | Settings, Agent access: skills by name | Settings, Skills, with text, files and local notes |
+  | Settings, Agent access: tokens | Settings, Agent access, Tokens (revoke asks first) |
+  | Settings, Workspace: backup, export, restore, storage | Settings, Backup and restore |
+  | Settings, Workspace: version, retention, sign out, password | Settings, Workspace |
+  | Settings, Workspace: Appearance | The theme and density switches of the top bar |
+
+- `design/system.css` holds what these screens add: the collection switch,
+  selected and nested table rows, wrapping source text, the local notes panel
+  and the provider and token forms. The old Collection and Settings pages
+  (`Companies.tsx`, `CollectionForms.tsx`, `Settings.tsx`) and their rules in
+  `legacy.css` are deleted.
+- Checks: `frontend/tests/system.spec.ts` (a search added, switched on, run once,
+  stopped, its runs and tasks, removed; bulk configuration and run-only limits;
+  the source and provider editors' conflict recovery; the Collection tabs and
+  the collection switch by keyboard; tokens and their refusal of owner
+  operations; backup, export and the guarded restore) and
+  `frontend/tests/skills.spec.ts` (a local note saved in the dashboard appears in the
+  skill an agent reads over MCP and REST; versions and a conflict; a reference
+  file; a run's method added as a note; the notes saved by keyboard). The axe
+  and overflow checks cover every new tab.
+
 ## Not decided here
 
 - Charts beyond simple rate bars. Insights starts with tables and bars.

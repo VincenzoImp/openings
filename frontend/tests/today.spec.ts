@@ -371,9 +371,14 @@ test("since your last visit counts from the end of the previous visit", async ({
   await expect(
     since.getByRole("link", { name: "maintain-career", exact: true }),
   ).toHaveCount(0);
-  // Collection since then: the newest run, which failed.
+  // Collection since then: the newest run of the fixtures, which failed, and
+  // the runs the Collection tests started and stopped (read from the API).
+  const runs = (await call(page, "/collection/runs?limit=100")).items.filter(
+    (run: { created_at: string; finished_at?: string }) =>
+      Date.parse(run.finished_at || run.created_at) >= Date.parse(seen),
+  ).length;
   await expect(since).toContainText(
-    "No new jobs in 1 collection run; 1 source failed: Fjord Analytics board",
+    `No new jobs in ${runs} collection run${runs === 1 ? "" : "s"}; 1 source failed: Fjord Analytics board`,
   );
   const stored = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("openings-today-visit") || "null"),

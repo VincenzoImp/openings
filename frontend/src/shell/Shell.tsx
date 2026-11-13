@@ -255,7 +255,7 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
             ref={main}
             inert={more}
           >
-            {/* The old pages bring their own stylesheet, scoped to .legacy. */}
+            {/* Every screen is built with the design system (stage 4 removed the last old page). */}
             <div className={REBUILT.includes(route) ? "screen" : "legacy"}>
               <Screen route={route}>
                 {route === "today" ? (
@@ -282,8 +282,6 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
                   <TemplatesPage />
                 ) : (
                   <SettingsPage
-                    theme={theme}
-                    onTheme={toggleTheme}
                     onLogout={() =>
                       onLogout().catch((e) =>
                         notify(
