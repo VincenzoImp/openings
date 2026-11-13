@@ -10,8 +10,8 @@
 
 <!-- Commands you ran and their results; see CONTRIBUTING.md → Verify a change. -->
 
-- [ ] `uv run ruff check backend` and `uv run ruff format --check backend`
-- [ ] `uv run pytest`
+- [ ] `uv run ruff check backend scripts` and `uv run ruff format --check backend scripts`
+- [ ] `uv run pytest -n auto` (and `-m performance` for hot paths or migrations)
 - [ ] `npm --prefix frontend run build`, `npm --prefix frontend run format:check` and `npm --prefix frontend test`
 - [ ] Browser workflows (`npm run test:e2e` in `frontend`) for dashboard changes
 - [ ] `python3 scripts/bump_version.py --check` (releases only change versions with `scripts/bump_version.py`)
