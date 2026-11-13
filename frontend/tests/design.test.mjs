@@ -91,11 +91,15 @@ test("every shipped hash route still opens its screen, and design names are alia
   assert.equal(routes.routeOf("#jobs?q=python"), "inbox");
   assert.equal(routes.canonicalHash("#jobs?q=python"), "#inbox?q=python");
   assert.equal(routes.canonicalHash("#overview"), "#today");
+  // Overview's period is the Progress of Applications, Insights.
   assert.equal(
     routes.canonicalHash("#overview?since=2026-01-01"),
-    "#today?since=2026-01-01",
+    "#applications?since=2026-01-01&section=insights",
   );
   assert.equal(routes.canonicalHash("#career?section=knowledge"), null);
+  // The review page belongs to Applications.
+  assert.equal(routes.routeOf("#review?application=x1"), "review");
+  assert.equal(routes.destinationOf("review").item.label, "Applications");
 });
 
 test("navigation has three groups, and both job queues belong to Jobs", () => {
@@ -119,16 +123,30 @@ test("navigation has three groups, and both job queues belong to Jobs", () => {
     assert.ok(routes.destinationOf(route), route);
 });
 
-test("deep links to a job or an application are read from the hash", () => {
+test("a job opens over a screen; an application opens its review page", () => {
   assert.deepEqual(routes.overlayOf("#inbox?job=abc"), {
     kind: "job",
     id: "abc",
   });
-  assert.deepEqual(
-    routes.overlayOf("#applications?application=x1&detail=requirements"),
-    { kind: "application", id: "x1" },
-  );
+  assert.equal(routes.overlayOf("#applications?application=x1"), null);
   assert.equal(routes.overlayOf("#applications?view=list"), null);
+  // The old drawer's address, with its tab, from any screen.
+  assert.equal(
+    routes.canonicalHash("#applications?application=x1&detail=requirements"),
+    "#review?application=x1&tab=requirements",
+  );
+  assert.equal(
+    routes.canonicalHash("#today?application=x1&detail=posting"),
+    "#review?application=x1&pane=posting",
+  );
+  assert.equal(
+    routes.canonicalHash("#activity?application=x1"),
+    "#review?application=x1",
+  );
+  assert.equal(
+    routes.canonicalHash("#review?application=x1&tab=answers"),
+    null,
+  );
 });
 
 test("the stored theme and density win; otherwise the system theme and comfortable rows", () => {

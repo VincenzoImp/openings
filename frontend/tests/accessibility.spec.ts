@@ -23,7 +23,9 @@ const EXCLUSIONS: Record<string, Exclusion[]> = {};
 const SCREENS = [
   "today",
   "applications",
-  "applications?view=list",
+  "applications?view=board",
+  "applications?stage=applied",
+  "applications?section=insights",
   "inbox",
   "shortlist",
   "inbox?queue=dismissed",
@@ -155,7 +157,7 @@ for (const theme of ["light", "dark"]) {
         expect(await findings(page, screen)).toEqual([]);
       });
 
-    test("an open job, an open application and the add-job dialog have no serious accessibility finding", async ({
+    test("an open job and the add-job dialog have no serious accessibility finding", async ({
       page,
     }) => {
       await page.context().addCookies(cookies);
@@ -168,13 +170,64 @@ for (const theme of ["light", "dark"]) {
       await page.getByRole("button", { name: "Add job" }).click();
       await expect(page.locator("dialog[open] input[name=url]")).toBeVisible();
       expect(await findings(page, "add-job")).toEqual([]);
-      await page.keyboard.press("Escape");
-      await go(page, "applications?view=list");
+    });
+
+    test("the review page, each of its tabs and the response form have no serious accessibility finding", async ({
+      page,
+    }) => {
+      test.setTimeout(90000);
+      await page.context().addCookies(cookies);
+      await go(page, "today");
+      const api = (path: string) =>
+        page.evaluate(
+          (path) =>
+            fetch("/api/v1" + path, {
+              headers: { "X-Openings-E2E-Setup": "1" },
+            }).then((response) => response.json()),
+          path,
+        );
+      const ready = (
+        await api("/applications?status=draft&ready=true&sort=deadline&limit=1")
+      ).items[0];
+      const sent = (await api("/applications?status=interview&limit=1"))
+        .items[0];
+      for (const [id, tab] of [
+        [ready.id, "answers"],
+        [ready.id, "requirements"],
+        [ready.id, "inputs"],
+        [ready.id, "documents"],
+        [ready.id, "details"],
+        [sent.id, "timeline"],
+      ]) {
+        await go(page, `review?application=${id}&tab=${tab}`);
+        await settled(page);
+        expect(await findings(page, `review-${tab}`)).toEqual([]);
+      }
+      // The pane switch on a phone, and the documents in a revision.
+      await go(page, `review?application=${ready.id}&tab=documents`);
       await settled(page);
-      await page.locator(".application-list .table-link").first().click();
-      await expect(page.locator("dialog[open] [role=tablist]")).toBeVisible();
+      await page
+        .getByRole("list", { name: "Document revisions" })
+        .getByRole("button", { name: /^Open/ })
+        .first()
+        .click();
       await settled(page);
-      expect(await findings(page, "application")).toEqual([]);
+      expect(await findings(page, "review-revision")).toEqual([]);
+      // The form that records an employer response, under its row.
+      await go(page, "applications?stage=interview");
+      await settled(page);
+      await page
+        .getByRole("button", { name: /^Record response/ })
+        .first()
+        .click();
+      await expect(page.locator("form.respond")).toBeVisible();
+      expect(await findings(page, "respond")).toEqual([]);
+      // Selected rows with the bulk actions.
+      await page.locator(".grid-row input[type=checkbox]").nth(1).check();
+      await expect(
+        page.getByRole("group", { name: "Selected applications" }),
+      ).toBeVisible();
+      expect(await findings(page, "bulk")).toEqual([]);
     });
 
     test("the More sheet has no serious accessibility finding", async ({

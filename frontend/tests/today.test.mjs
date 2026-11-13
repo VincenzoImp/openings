@@ -2,8 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 // Node strips the types of these modules; none of them uses React.
 const visit = await import("../src/pages/today/visit.ts");
-const { todaySummary, replyDays, DEFAULT_REPLY_DAYS } =
-  await import("../src/pages/today/summary.ts");
+const { todaySummary } = await import("../src/pages/today/summary.ts");
 const { collectedSince, collectedLine } =
   await import("../src/pages/today/collected.ts");
 const time = await import("../src/library/time.ts");
@@ -123,18 +122,6 @@ test("the summary leads with ready applications and counts in words", () => {
       quiet: true,
     },
   );
-});
-
-test("the no-reply period comes from the policy's No reply decision", () => {
-  const item = (label, value) => ({ label, value });
-  assert.equal(replyDays([item("No reply", "45 days")]), 45);
-  assert.equal(replyDays([item("No response after", 21)]), 21);
-  assert.equal(replyDays([item("no-reply period", "60")]), 60);
-  // Anything else falls back to the default.
-  assert.equal(replyDays([]), DEFAULT_REPLY_DAYS);
-  assert.equal(replyDays([item("No reply", "six weeks")]), 30);
-  assert.equal(replyDays([item("No reply", 0)]), 30);
-  assert.equal(replyDays([item("Salary", "45 days")]), 30);
 });
 
 test("collection since the last visit: new jobs, their sources and failing sources", () => {
