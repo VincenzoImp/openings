@@ -34,23 +34,56 @@ def structured_error(error: BaseException) -> DomainError | None:
     return None
 
 
+def error_text(domain: DomainError) -> str:
+    body = {
+        "code": domain.code,
+        "status": domain.status,
+        "message": domain.message,
+        "details": domain.details,
+    }
+    return json.dumps({"error": body}, default=str)
+
+
 class OpeningsMCP(MCPServer):
     """Return REST-shaped error bodies; the SDK runs sync tools in worker threads."""
 
     async def call_tool(self, name, arguments, context=None):
         try:
+            self._refuse_unknown_arguments(name, arguments)
             return await super().call_tool(name, arguments, context)
+        except DomainError as error:
+            raise ToolError(error_text(error)) from error
         except ToolError as error:
             domain = structured_error(error.__cause__)
             if domain is None:
                 raise
-            body = {
-                "code": domain.code,
-                "status": domain.status,
-                "message": domain.message,
-                "details": domain.details,
-            }
-            raise ToolError(json.dumps({"error": body}, default=str)) from error.__cause__
+            raise ToolError(error_text(domain)) from error.__cause__
+
+    def _refuse_unknown_arguments(self, name, arguments):
+        """An argument the tool does not take is refused, never ignored.
+
+        Lists take their filters inside ``value``; a filter passed beside it would
+        otherwise be dropped silently and the list returned unfiltered.
+        """
+        tool = self._tool_manager.get_tool(name)
+        if tool is None or not arguments:
+            return
+        unknown = sorted(set(arguments) - set(tool.parameters.get("properties", {})))
+        if unknown:
+            raise DomainError(
+                422,
+                "validation",
+                "Some fields need attention.",
+                [
+                    {
+                        "field": [field],
+                        "message": "This tool takes no such argument; pass filters, "
+                        "options and a write's fields inside value.",
+                        "type": "extra_forbidden",
+                    }
+                    for field in unknown
+                ],
+            )
 
     async def read_resource(self, uri, context=None):
         try:

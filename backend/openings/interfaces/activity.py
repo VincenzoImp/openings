@@ -75,7 +75,6 @@ OPERATIONS = (
         tool=Tool(
             READ,
             "Read one agent run: status, stored report, questions asked and a page of the changes it made (changes_limit, changes_offset).",
-            legacy=tuple(RunRead.model_fields),
         ),
     ),
     Operation(

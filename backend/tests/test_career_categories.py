@@ -24,7 +24,7 @@ def test_awards_and_publications_survive_import_filtering_and_frozen_context(tmp
                 response = client.request(
                     method,
                     "/api/v1" + path,
-                    params=arguments if method == "GET" else None,
+                    params=arguments.get("value", arguments) if method == "GET" else None,
                     json=arguments.get("value") if method != "GET" else None,
                 )
                 response.raise_for_status()
@@ -77,7 +77,7 @@ def test_awards_and_publications_survive_import_filtering_and_frozen_context(tmp
                 "knowledge_list",
                 "GET",
                 "/career/knowledge",
-                {"kind": entry["kind"], "summary": True},
+                {"value": {"kind": entry["kind"], "summary": True}},
             )
             assert listed["total"] == 2
             assert {row["kind"] for row in listed["items"]} == {entry["kind"]}

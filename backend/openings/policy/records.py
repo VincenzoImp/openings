@@ -13,6 +13,8 @@ ORIGIN_NOTES = {
     "profile_metadata": "Copied from Profile metadata in 0.19",
     "profile_preferences": "Copied from Profile preferences in 0.19",
     "profile_roles": "Copied from Profile roles in 0.19",
+    "profile_preferences_removed": "Copied from Profile preferences when 0.23 removed the field",
+    "profile_roles_removed": "Copied from Profile roles when 0.23 removed the field",
 }
 
 

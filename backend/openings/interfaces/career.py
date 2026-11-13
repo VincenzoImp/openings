@@ -41,7 +41,6 @@ OPERATIONS = (
         params=(),
         call=lambda s: s.get_profile(),
         rest=(Route("GET", "/career/profile", "get_profile"),),
-        aliases=("career_get_profile",),
         tool=Tool(LOOKUP, method="get_profile"),
     ),
     Operation(
@@ -49,11 +48,10 @@ OPERATIONS = (
         "profile",
         "update",
         "Career and templates",
-        "Edit profile/preferences/contact",
+        "Edit profile/contact",
         params=(Param("value", ProfileUpdate),),
         call=lambda s, value: s.update_profile(value),
         rest=(Route("PATCH", "/career/profile", "update_profile"),),
-        aliases=("career_update_profile",),
         tool=Tool(REPLACE, method="update_profile"),
     ),
     Operation(
@@ -68,7 +66,6 @@ OPERATIONS = (
         tool=Tool(
             LOOKUP,
             CareerService.list_knowledge.__doc__,
-            legacy=tuple(KnowledgeQuery.model_fields),
         ),
     ),
     Operation(
@@ -126,7 +123,7 @@ OPERATIONS = (
         params=(query_model(ClaimQuery),),
         call=lambda s, value: s.list_claims(**(value or ClaimQuery()).model_dump()),
         rest=(Route("GET", "/career/claims", "list_claims"),),
-        tool=Tool(LOOKUP, CareerService.list_claims.__doc__, legacy=tuple(ClaimQuery.model_fields)),
+        tool=Tool(LOOKUP, CareerService.list_claims.__doc__),
     ),
     Operation(
         "claims.create",
@@ -184,7 +181,6 @@ OPERATIONS = (
         tool=Tool(
             LOOKUP,
             CareerService.list_templates.__doc__,
-            legacy=tuple(TemplateQuery.model_fields),
         ),
     ),
     Operation(

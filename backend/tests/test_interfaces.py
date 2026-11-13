@@ -84,12 +84,7 @@ async def test_every_declared_route_tool_and_surface_is_registered(tmp_path):
             if not route.absolute:
                 assert route.method.lower() in paths["/api/v1" + route.path], exemption.id
     tools = {tool.name for tool in await app.state.mcp.list_tools()}
-    declared = {
-        name
-        for operation in operations
-        if operation.tool
-        for name in (operation.canonical_name, *(alias.name for alias in operation.alias_entries))
-    }
+    declared = {operation.canonical_name for operation in operations if operation.tool}
     assert tools == declared
     templates = {item.uri_template for item in await app.state.mcp.list_resource_templates()}
     prompts = await app.state.mcp.list_prompts()
@@ -209,8 +204,8 @@ class Greeter:
 
 
 @pytest.mark.asyncio
-async def test_one_declaration_gives_a_route_a_tool_its_aliases_and_an_inventory_entry():
-    """A synthetic operation, declared once, binds to REST and MCP under every name."""
+async def test_one_declaration_gives_a_route_a_tool_and_an_inventory_entry():
+    """A synthetic operation, declared once, binds to REST and MCP under one name."""
     operation = Operation(
         "greetings.read",
         "greetings",
@@ -221,7 +216,6 @@ async def test_one_declaration_gives_a_route_a_tool_its_aliases_and_an_inventory
         call=lambda s, name, loud: s.greet(name, loud),
         rest=(Route("GET", "/greetings/{name}", "greeting_get"),),
         tool=Tool(ToolAnnotations(readOnlyHint=True), "Greet someone."),
-        aliases=("greeting_get",),
     )
     assert operation.canonical_name == "greetings_get"
     router, mcp = APIRouter(prefix="/api/v1"), OpeningsMCP("Synthetic")
@@ -233,13 +227,11 @@ async def test_one_declaration_gives_a_route_a_tool_its_aliases_and_an_inventory
         assert client.get("/api/v1/greetings/Ada?loud=true").json() == {"greeting": "HELLO Ada"}
     assert app.openapi()["paths"]["/api/v1/greetings/{name}"]["get"]["summary"] == "Greeting Get"
     tools = {tool.name: tool for tool in await mcp.list_tools()}
-    assert set(tools) == {"greetings_get", "greeting_get"}
-    alias, tool = tools["greeting_get"], tools["greetings_get"]
-    assert alias.description == "Deprecated alias of greetings_get; removed in 0.23. Greet someone."
-    assert alias.input_schema["properties"] == tool.input_schema["properties"]
-    result = await mcp.call_tool("greeting_get", {"name": "Ada"})
+    assert set(tools) == {"greetings_get"}
+    assert tools["greetings_get"].description == "Greet someone."
+    result = await mcp.call_tool("greetings_get", {"name": "Ada"})
     assert "Hello Ada" in result.content[0].text
     notes = {"operations": [{"id": "greetings.read", "dashboard": "None"}], "exceptions": []}
     entry = inventory((operation,), (), notes)["operations"][0]
     assert entry["rest"] == [{"method": "GET", "path": "/api/v1/greetings/{name}"}]
-    assert entry["mcp"] == ["greetings_get", "greeting_get"]
+    assert entry["mcp"] == ["greetings_get"]

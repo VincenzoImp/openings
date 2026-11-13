@@ -41,7 +41,6 @@ OPERATIONS = (
                 status_code=201,
             ),
         ),
-        aliases=("responses_add",),
         tool=Tool(
             WRITE,
             "Record an employer response the owner reported, with the day it arrived. Only for a sent application (409 application_not_sent otherwise); one response of a kind per day (409 response_exists). Never moves the stage: to record an interview, offer or rejection together with the stage, use applications_update with response_date. Never invent a response.",
@@ -72,7 +71,6 @@ OPERATIONS = (
             response_id, expected_version
         ),
         rest=(Route("DELETE", "/responses/{response_id}", "responses_remove"),),
-        aliases=("responses_remove",),
         tool=Tool(
             REMOVE,
             "Delete a response recorded by mistake, with its current version. The application's stage does not change.",

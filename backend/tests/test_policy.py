@@ -674,16 +674,19 @@ def test_a_context_freezes_the_sections_as_shared_parts(tmp_path):
         ] == before
 
 
+# The Profile texts 0.19 copied into decision items (removed from the Profile in 0.23).
+PROFILE_TEXTS = {
+    "preferences": "Remote first.\nNo consultancies — “synthetic”.",
+    "roles": "Backend engineer",
+}
+
+
 def schema_nine_workspace(path):
     """A schema 9 file with a free-form Profile, claim metadata and released contexts."""
     workspace, knowledge, claims, _, applications = seed(path)
     career = CareerService(workspace)
     career.update_profile(
-        ProfileUpdate(
-            expected_version=career.get_profile()["version"],
-            preferences="Remote first.\nNo consultancies — “synthetic”.",
-            metadata=METADATA,
-        )
+        ProfileUpdate(expected_version=career.get_profile()["version"], metadata=METADATA)
     )
     exact = {
         claims[0]: {"default_in_cv": True, "role": "core", "group": "Data pipelines", "x": 1},
@@ -698,6 +701,14 @@ def schema_nine_workspace(path):
             )
     del workspace, career
     make_schema_eight(path)
+    with closing(sqlite3.connect(path)) as conn:
+        # As a Profile saved before 0.23 stored them.
+        conn.execute(
+            "UPDATE settings SET data=json_set(data,'$.preferences',?,'$.roles',?) "
+            "WHERE key='profile'",
+            (PROFILE_TEXTS["preferences"], PROFILE_TEXTS["roles"]),
+        )
+        conn.commit()
     legacy_prepare_context(path, applications[0], key="first-key")
     legacy_prepare_context(path, applications[1], knowledge_ids=knowledge[:2])
     legacy_prepare_context(path, applications[2], note="Synthetic note ✓")
@@ -717,7 +728,17 @@ PRESERVED = ("settings", "knowledge", "claims", "templates", "contexts", "contex
 def rows_of(conn, table):
     added = SCHEMA_TEN_COLUMNS.get(table, ())
     names = [f'"{row[0]}"' for row in columns(conn, table) if row[0] not in added]
-    return conn.execute(f"SELECT {','.join(names)} FROM {table} ORDER BY 1,2").fetchall()
+    rows = conn.execute(f"SELECT {','.join(names)} FROM {table} ORDER BY 1,2").fetchall()
+    if table != "settings":
+        return rows
+    # Schema 14 removed the Profile's preferences and roles, held by the policy since 0.19.
+    kept = []
+    for row in rows:
+        data = json.loads(row[1])
+        if row[0] == "profile":
+            data = {k: v for k, v in data.items() if k not in PROFILE_TEXTS}
+        kept.append((row[0], data, *row[2:]))
+    return kept
 
 
 def test_schema_nine_upgrade_copies_the_profile_and_touches_no_existing_row(tmp_path):
@@ -771,9 +792,9 @@ def test_schema_nine_upgrade_copies_the_profile_and_touches_no_existing_row(tmp_
 
     career, policy = CareerService(workspace), PolicyService(workspace)
     profile = career.get_profile()
-    # Nothing left the Profile.
-    assert profile["metadata"] == METADATA and profile["roles"] == "Backend engineer"
-    assert profile["preferences"].startswith("Remote first.")
+    # Metadata stays in the Profile; preferences and roles live in the policy only.
+    assert profile["metadata"] == METADATA
+    assert not set(PROFILE_TEXTS) & set(profile)
     sections = {section["section"]: section for section in policy.get_policy()["sections"]}
     assert {name: section["version"] for name, section in sections.items()} == {
         "decision": 1,
@@ -799,8 +820,8 @@ def test_schema_nine_upgrade_copies_the_profile_and_touches_no_existing_row(tmp_
     }
     decision = sections["decision"]["items"]
     assert [(item["label"], item["statement"]) for item in decision] == [
-        ("Preferences", profile["preferences"]),
-        ("Target roles", profile["roles"]),
+        ("Preferences", PROFILE_TEXTS["preferences"]),
+        ("Target roles", PROFILE_TEXTS["roles"]),
     ]
     assert [item["origin"]["source"] for item in decision] == [
         "profile_preferences",

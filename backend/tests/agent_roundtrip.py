@@ -74,7 +74,7 @@ async def exercise(base, token, folder, tectonic):
                             "value": {
                                 "expected_version": profile["version"],
                                 "name": "Alex Example",
-                                "roles": "Backend engineer",
+                                "headline": "Backend engineer",
                                 "summary": "Built Python APIs and reduced latency by 20%.",
                             }
                         },
@@ -146,10 +146,36 @@ async def exercise(base, token, folder, tectonic):
                     == 1
                 )
                 application = unpack(
+                    await session.call_tool("applications_create", {"value": {"job_id": job["id"]}})
+                )
+                # Standing guidance is the application's pinned note (the note field is gone).
+                pinned = unpack(
                     await session.call_tool(
-                        "applications_create",
-                        {"value": {"job_id": job["id"], "note": "Prefer technical detail."}},
+                        "notes_create",
+                        {
+                            "job_id": job["id"],
+                            "value": {
+                                "body": "Prefer technical detail.",
+                                "application_id": application["id"],
+                                "pinned": True,
+                            },
+                        },
                     )
+                )
+                removed = await session.call_tool(
+                    "applications_update",
+                    {
+                        "application_id": application["id"],
+                        "value": {"expected_version": application["version"], "note": "Gone"},
+                    },
+                )
+                flat = await session.call_tool("knowledge_list", {"q": "Example API"})
+                unversioned = await session.call_tool("notes_delete", {"note_id": pinned["id"]})
+                checks["removed_fields_refused"] = (
+                    removed.is_error
+                    and flat.is_error
+                    and unversioned.is_error
+                    and "expected_version" in unversioned.content[0].text
                 )
                 checks["preparation_leaves_shortlist"] = (
                     unpack(await session.call_tool("jobs_list", {"value": {"queue": "shortlist"}}))[
@@ -172,6 +198,10 @@ async def exercise(base, token, folder, tectonic):
                 resource = await session.read_resource(context["resource_uri"])
                 checks["context_resource"] = (
                     json.loads(resource.contents[0].text)["signature"] == context["signature"]
+                )
+                checks["pinned_note_in_context"] = (
+                    context["payload"]["application"]["note"] == "Prefer technical detail."
+                    and "roles" not in context["payload"]["profile"]
                 )
                 checks["stored_instructions_in_context"] = (
                     bool(context["payload"]["instructions"]["general"])
