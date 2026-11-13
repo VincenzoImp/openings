@@ -17,6 +17,8 @@ from ..common import encode, new_id, now
 from ..errors import DomainError, conflict, missing
 from ..transfers import SnapshotResponse
 from .models import OWNER_COLUMNS, OWNER_TABLES, OwnerType, UploadReservation
+from .sources import check_source_bytes, check_upload, refresh_text
+from .text import is_tex_source
 
 
 class FileOperations:
@@ -47,6 +49,8 @@ class FileOperations:
             if row.get(column) is not None:
                 result.update(owner_type=owner, owner_id=row[column])
                 break
+        # A revision's PDF names the SHA-256 of the source it was built from.
+        result["source_sha256"] = row.get("source_sha256")
         result["url"] = f"/api/v1/files/{row['id']}/content"
         return result
 
@@ -124,10 +128,24 @@ class FileOperations:
             raise DomainError(
                 413, "file_size", f"Files must be at most {self.max_file_bytes} bytes."
             )
+        if value.source_sha256 is not None and value.owner_type != "document":
+            raise DomainError(
+                422, "source_sha256", "Only a document revision's PDF names its source."
+            )
         with self.db.transaction() as conn:
-            _, job_id = self._owner(conn, value.owner_type, value.owner_id, writable=True)
+            owner, job_id = self._owner(conn, value.owner_type, value.owner_id, writable=True)
             payload = value.model_dump()
             payload["sha256"] = value.sha256.lower() if value.sha256 else None
+            payload["source_sha256"] = value.source_sha256.lower() if value.source_sha256 else None
+            if value.owner_type == "document":
+                check_upload(
+                    conn,
+                    owner,
+                    value.name,
+                    value.media_type,
+                    payload["sha256"],
+                    payload["source_sha256"],
+                )
             payload["job_id"] = job_id
             # The raw upload carries only the grant, so the grant remembers who reserved it.
             payload["actor"] = list(current_actor().columns())
@@ -189,6 +207,11 @@ class FileOperations:
             b"%PDF-"
         ):
             raise DomainError(422, "pdf_header", "The uploaded file is not a PDF.")
+        source = scope["owner_type"] == "document" and is_tex_source(
+            scope["name"], scope["media_type"]
+        )
+        if source:
+            check_source_bytes(bytes(data))
         with self.db.transaction() as conn:
             grant, current = self._grant(token, "PUT", conn)
             self._owner(conn, current["owner_type"], current["owner_id"], writable=False)
@@ -198,7 +221,7 @@ class FileOperations:
                 if existing and existing["sha256"] == actual_sha:
                     return self._file_record(existing)
                 conflict("This upload grant was already used.")
-            self._owner(conn, current["owner_type"], current["owner_id"], writable=True)
+            owner, _ = self._owner(conn, current["owner_type"], current["owner_id"], writable=True)
             column = OWNER_COLUMNS[current["owner_type"]]
             old = conn.execute(
                 f"SELECT * FROM files WHERE {column}=? AND name=?",
@@ -211,13 +234,23 @@ class FileOperations:
             if old:
                 file_id = old["id"]
             else:
+                if current["owner_type"] == "document":
+                    check_upload(
+                        conn,
+                        owner,
+                        current["name"],
+                        current["media_type"],
+                        actual_sha,
+                        current.get("source_sha256"),
+                    )
                 file_id = new_id()
                 conn.execute(
                     "INSERT OR IGNORE INTO blobs(sha256,content,size) VALUES(?,?,?)",
                     (actual_sha, bytes(data), len(data)),
                 )
                 conn.execute(
-                    f"INSERT INTO files(id,sha256,name,media_type,size,{column},created_at) VALUES(?,?,?,?,?,?,?)",
+                    f"INSERT INTO files(id,sha256,name,media_type,size,{column},created_at,source_sha256) "
+                    "VALUES(?,?,?,?,?,?,?,?)",
                     (
                         file_id,
                         actual_sha,
@@ -226,6 +259,7 @@ class FileOperations:
                         len(data),
                         current["owner_id"],
                         now(),
+                        current.get("source_sha256"),
                     ),
                 )
                 if current["owner_type"] in {"template", "knowledge"}:
@@ -237,6 +271,8 @@ class FileOperations:
                     conn.execute(
                         "UPDATE documents SET version=version+1 WHERE id=?", (current["owner_id"],)
                     )
+                    if source:
+                        refresh_text(conn, current["owner_id"])
                 uploader = from_columns(*(current.get("actor") or ()))
                 self._file_event(
                     conn,

@@ -3,8 +3,9 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from document_fixtures import attach
 from openings.app import create_app
-from openings.documents import DocumentCreate, ReviewUpdate, UploadReservation
+from openings.documents import DocumentCreate, ReviewUpdate
 from openings.errors import DomainError
 
 
@@ -18,7 +19,6 @@ def test_preparation_uses_current_revision_files_and_review(tmp_path):
             application_id=application["id"],
             kind="resume",
             title="CV",
-            content={"text": "Synthetic content."},
         )
     )
     with TestClient(app) as client:
@@ -31,17 +31,7 @@ def test_preparation_uses_current_revision_files_and_review(tmp_path):
             return detail
 
         assert current() == [{"kind": "resume", "revisions": 1, "pdf": 0, "approved": 0}]
-        pdf = b"%PDF-1.4\nSynthetic test PDF"
-        grant = documents.reserve_upload(
-            UploadReservation(
-                owner_type="document",
-                owner_id=first["id"],
-                name="cv.pdf",
-                size=len(pdf),
-                media_type="application/pdf",
-            )
-        )
-        assert client.put(grant["url"], headers=grant["headers"], content=pdf).status_code == 200
+        attach(documents, client.put, first["id"])
         assert current()[0]["pdf"] == 1
         first = documents.get_document(first["id"])
         documents.review_document(first["id"], ReviewUpdate(expected_version=first["version"]))
@@ -52,7 +42,6 @@ def test_preparation_uses_current_revision_files_and_review(tmp_path):
                 kind="resume",
                 title="Revised CV",
                 previous_id=first["id"],
-                content={"text": "Changed content."},
             )
         )
         assert current() == [{"kind": "resume", "revisions": 1, "pdf": 0, "approved": 0}]

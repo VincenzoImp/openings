@@ -9,11 +9,10 @@ few collection runs. Everything is fictional.
 import json
 from datetime import UTC, datetime, timedelta
 
+from document_fixtures import source_revision
 from openings.actors import OWNER, acting_as, token_actor
 from openings.common import new_id
-from openings.documents import DocumentCreate, ReviewUpdate, UploadReservation
 
-PDF = b"%PDF-1.4\nSynthetic test PDF"
 POSTING = "Build reliable data services.\n\nResponsibilities\nDesign pipelines with a small team."
 
 
@@ -37,29 +36,14 @@ def seed_today(app, client, before_open_run):
 
     def make_ready(application):
         for kind, title in (("resume", "CV"), ("cover_letter", "Letter")):
-            document = documents.create_document(
-                DocumentCreate(
-                    application_id=application["id"],
-                    kind=kind,
-                    title=title,
-                    content={"text": "Synthetic."},
-                )
-            )
-            grant = documents.reserve_upload(
-                UploadReservation(
-                    owner_type="document",
-                    owner_id=document["id"],
-                    name=f"{kind}.pdf",
-                    size=len(PDF),
-                    media_type="application/pdf",
-                )
-            )
-            assert (
-                client.put(grant["url"], headers=grant["headers"], content=PDF).status_code == 200
-            )
-            current = documents.get_document(document["id"])
-            documents.review_document(
-                document["id"], ReviewUpdate(expected_version=current["version"])
+            source_revision(
+                documents,
+                client.put,
+                application["id"],
+                kind,
+                "Synthetic.",
+                title=title,
+                approve=True,
             )
         current = workspace.get_application(application["id"])
         workspace.set_ready(application["id"], {"expected_version": current["version"]})

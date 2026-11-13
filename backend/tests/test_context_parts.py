@@ -239,6 +239,7 @@ def assert_reproduced(workspace, before):
             "created_at": row["created_at"],
             "owner_type": "context",
             "owner_id": row["context_id"],
+            "source_sha256": None,
             "url": f"/api/v1/files/{row['id']}/content",
         }
 
@@ -497,6 +498,7 @@ def test_new_contexts_store_the_released_serialisation(tmp_path):
         DocumentCreate(
             application_id=applications[2],
             context_id=documents.list_contexts(applications[2])["items"][0]["id"],
+            kind="answers",
             content={"sections": [{"evidence_ids": knowledge[:1]}]},
         )
     )
@@ -562,6 +564,8 @@ def test_context_files_keep_their_ids_through_rest_and_stay_immutable(tmp_path):
             "created_at",
         ]
         exported = [item for item in archive["files"] if item["context_id"]]
+        # Only a revision's PDF names a source.
+        assert all(item.pop("source_sha256") is None for item in exported)
         assert sorted(exported, key=lambda item: item["id"]) == before["files"]
 
 

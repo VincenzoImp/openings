@@ -1428,12 +1428,12 @@
         "documents_list"
       ],
       "dashboard": "Applications: documents/history",
-      "notes": "application_id, kind, q (title), review_state, summary, limit, offset. summary defaults to true and returns file counts without content/files; summary=false includes them."
+      "notes": "application_id, kind, q (title, note and the text derived from sources), review_state, summary, limit, offset. summary defaults to true and returns file counts without text/content/files; summary=false includes them."
     },
     {
       "id": "documents.read",
       "group": "Applications and documents",
-      "operation": "Read exact revision content, chain number and files",
+      "operation": "Read a revision: derived text or form content, evidence, chain number and files",
       "rest": [
         {
           "method": "GET",
@@ -1443,12 +1443,13 @@
       "mcp": [
         "documents_get"
       ],
-      "dashboard": "Applications: revision detail and preview"
+      "dashboard": "Applications: revision detail and preview",
+      "notes": "A CV or letter (resume, cover_letter) returns text, derived from its .tex source without a TeX runtime (null without a source), source_sha256, claim_ids, knowledge_ids, note, legacy_content (content saved before 0.22, read-only, else null) and files; it has no content. Form answers and other kinds also return their structured content."
     },
     {
       "id": "documents.create",
       "group": "Applications and documents",
-      "operation": "Save content as a new immutable revision",
+      "operation": "Create a new immutable revision (CV/letter: then upload source and PDF)",
       "rest": [
         {
           "method": "POST",
@@ -1458,13 +1459,13 @@
       "mcp": [
         "documents_create"
       ],
-      "dashboard": "Applications: add/edit content as a new revision",
-      "notes": "previous_id links earlier content and inherits its context only; files are never inherited. Evidence provenance and template limits remain validated."
+      "dashboard": "Applications: Add a document / New revision (source and PDF upload)",
+      "notes": "previous_id links an earlier revision and inherits its context only; files are never inherited. A CV or letter takes no content (422 content_not_accepted): create the revision, upload its one .tex source, then its PDF naming the source's SHA-256. claim_ids and knowledge_ids must come from the frozen context (else exist; claims approved). Form answers and other kinds keep structured content with evidence and template limits validated. A retry with the same fields returns the same revision (a CV or letter only while it is an empty draft)."
     },
     {
       "id": "documents.review",
       "group": "Applications and documents",
-      "operation": "Approve the exact revision content/files",
+      "operation": "Approve the exact revision and its files",
       "rest": [
         {
           "method": "POST",
@@ -1475,23 +1476,23 @@
         "documents_review"
       ],
       "dashboard": "Applications: Approve revision",
-      "notes": "Required expected_version detects concurrent file/review changes. Approval blocks all further file uploads. Refuses with 409 content_mismatch when the attached .tex text and structured content disagree; allow_content_mismatch=true approves an intentional difference."
+      "notes": "Required expected_version detects concurrent file/review changes. A CV or letter needs its .tex source (409 source_required) and its PDF (409 pdf_required). Approval blocks all further file uploads."
     },
     {
-      "id": "documents.consistency",
+      "id": "documents.compare",
       "group": "Applications and documents",
-      "operation": "Compare structured content text with the attached .tex source",
+      "operation": "Compare the text of two revisions line by line",
       "rest": [
         {
           "method": "GET",
-          "path": "/api/v1/documents/{document_id}/consistency"
+          "path": "/api/v1/documents/{document_id}/comparison"
         }
       ],
       "mcp": [
-        "documents_consistency"
+        "documents_compare"
       ],
-      "dashboard": "Applications: approval reports content/source differences",
-      "notes": "Ignores case, whitespace, punctuation, accents and LaTeX markup; no TeX runtime. Status consistent, mismatch or not_checked (no .tex file or no text)."
+      "dashboard": "Applications: review page Documents tab, Compare with the previous revision",
+      "notes": "other_id defaults to the revision this one replaces (previous_id). Line by line: CV and letter revisions compare the text derived from their .tex sources, form answers and other kinds their structured content as path: value lines; blank lines are not compared. Each line is same, added or removed; text.document/text.other say whether each side has text (a CV or letter without a source has none). Same application only."
     },
     {
       "id": "documents.delete",
@@ -1558,7 +1559,7 @@
         "files_reserve_upload"
       ],
       "dashboard": "Career/Templates/Applications/Inbox: upload file",
-      "notes": "MCP reserves a scoped HTTP PUT grant, then the caller sends raw bytes; UI performs the same transfer. Size/SHA-256/PDF checks apply; no base64 tool input."
+      "notes": "MCP reserves a scoped HTTP PUT grant, then the caller sends raw bytes; UI performs the same transfer. Size/SHA-256/PDF checks apply; no base64 tool input. A CV or letter revision has one .tex source (UTF-8; 409 source_exists for another) and one PDF (409 pdf_exists): the PDF reservation names source_sha256, the SHA-256 of the revision's source (422 source_required without it, 409 source_required before the source, 409 source_mismatch for another source); the file record returns it."
     },
     {
       "id": "files.download",

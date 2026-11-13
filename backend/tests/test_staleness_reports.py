@@ -1,4 +1,4 @@
-"""Stale-context reports and content/source consistency across REST, MCP and review."""
+"""Stale-context reports across REST, MCP and the application reads."""
 
 import json
 
@@ -15,9 +15,7 @@ from openings.career import (
     TemplateCreate,
     TemplateUpdate,
 )
-from openings.consistency import compare, tokens
-from openings.documents import ContextCreate, DocumentCreate, ReviewUpdate, UploadReservation
-from openings.errors import DomainError
+from openings.documents import ContextCreate, DocumentCreate
 
 SOURCE = r"""\documentclass{article}
 \usepackage{hyperref}
@@ -34,124 +32,6 @@ SOURCE = r"""\documentclass{article}
 \vspace{4pt}{\small Skills: Python, SQL.}
 \end{document}
 """
-
-
-def content(**changes):
-    value = {
-        "kind": "resume",
-        "name": "Alex Example",
-        "website": "https://example.test",
-        "experience": [
-            {
-                "title": "Backend Engineer",
-                "organization": "Example Cloud",
-                "dates": "2021 – present",
-                "bullets": [
-                    {"text": "Reduced API p95 latency by 20% through tracing.", "claim_ids": []},
-                    "Built Python services for Café Example.",
-                ],
-            }
-        ],
-        "skills": ["Python", "SQL"],
-    }
-    value.update(changes)
-    return value
-
-
-def test_comparison_ignores_markup_spacing_and_reports_changed_words():
-    assert compare(content(), [("cv.tex", SOURCE)])["status"] == "consistent"
-    changed = content(skills=["Python", "Rust"])
-    report = compare(changed, [("cv.tex", SOURCE)])
-    assert report["status"] == "mismatch"
-    assert report["mismatches"] == [{"path": "skills[1]", "text": "Rust"}]
-    commented = content(
-        experience=[{"bullets": ["Reduced API p95 latency by 20% through tracing measured"]}]
-    )
-    assert compare(commented, [("cv.tex", SOURCE)])["status"] == "mismatch"
-    assert compare(content(), [])["status"] == "not_checked"
-    assert compare({"claim_ids": ["a"]}, [("cv.tex", SOURCE)])["status"] == "not_checked"
-    assert tokens(r"Stra\ss e \v{S}koda na\"{\i}ve") == ["strasse", "skoda", "naive"]
-
-
-def upload(documents, client, document_id, name, data, media="application/octet-stream"):
-    grant = documents.reserve_upload(
-        UploadReservation(
-            owner_type="document", owner_id=document_id, name=name, size=len(data), media_type=media
-        )
-    )
-    response = client.put(grant["url"], headers=grant["headers"], content=data)
-    assert response.status_code == 200, response.text
-
-
-@pytest.mark.asyncio
-async def test_review_refuses_source_mismatch_unless_explicitly_allowed(tmp_path):
-    app = create_app(tmp_path / "consistency.sqlite", start_worker=False)
-    workspace, documents = app.state.workspace, app.state.documents
-    job = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build services."})
-    application = workspace.create_application({"job_id": job["id"]})
-    stale_text = documents.create_document(
-        DocumentCreate(
-            application_id=application["id"], kind="resume", content=content(skills=["Rust"])
-        )
-    )
-    with TestClient(app) as client:
-        session = client.post("/api/v1/auth/setup", json={"password": "synthetic-password"}).json()
-        client.headers["X-CSRF-Token"] = session["csrf_token"]
-        upload(documents, client, stale_text["id"], "cv.tex", SOURCE.encode())
-        version = documents.get_document(stale_text["id"])["version"]
-
-        report = client.get(f"/api/v1/documents/{stale_text['id']}/consistency").json()
-        assert report["status"] == "mismatch" and report["sources"][0]["name"] == "cv.tex"
-        mcp = await app.state.mcp.call_tool(
-            "documents_consistency", {"document_id": stale_text["id"]}
-        )
-        assert json.loads(mcp.content[0].text) == report
-
-        refused = client.post(
-            f"/api/v1/documents/{stale_text['id']}/review",
-            json={"review_state": "approved", "expected_version": version},
-        )
-        assert refused.status_code == 409
-        error = refused.json()["error"]
-        assert error["code"] == "content_mismatch"
-        assert error["details"]["mismatches"] == [{"path": "skills[0]", "text": "Rust"}]
-        assert documents.get_document(stale_text["id"])["review_state"] == "draft"
-
-        allowed = client.post(
-            f"/api/v1/documents/{stale_text['id']}/review",
-            json={"expected_version": version, "allow_content_mismatch": True},
-        )
-        assert allowed.status_code == 200 and allowed.json()["review_state"] == "approved"
-
-        matching = documents.create_document(
-            DocumentCreate(
-                application_id=application["id"],
-                kind="resume",
-                previous_id=stale_text["id"],
-                content=content(),
-            )
-        )
-        upload(documents, client, matching["id"], "cv.tex", SOURCE.encode())
-        upload(
-            documents, client, matching["id"], "cv.pdf", b"%PDF-1.4\nsynthetic", "application/pdf"
-        )
-        matching = documents.get_document(matching["id"])
-        approved = documents.review_document(
-            matching["id"], ReviewUpdate(expected_version=matching["version"])
-        )
-        assert approved["review_state"] == "approved"
-        assert (
-            client.get(f"/api/v1/documents/{matching['id']}/consistency").json()["status"]
-            == "consistent"
-        )
-
-        without_source = documents.create_document(
-            DocumentCreate(
-                application_id=application["id"], kind="cover_letter", content={"body": "x"}
-            )
-        )
-        assert documents.check_consistency(without_source["id"])["status"] == "not_checked"
-        documents.review_document(without_source["id"], ReviewUpdate(expected_version=1))
 
 
 @pytest.mark.asyncio
@@ -186,7 +66,6 @@ async def test_staleness_reports_changed_inputs_without_rewriting_contexts(tmp_p
                 application_id=application["id"],
                 context_id=context["id"],
                 kind="resume",
-                content=content(),
             )
         )
     signature = contexts[0]["signature"]
@@ -262,7 +141,6 @@ async def test_staleness_reports_changed_inputs_without_rewriting_contexts(tmp_p
             context_id=refreshed["id"],
             previous_id=leaf["document_id"],
             kind="resume",
-            content=content(),
         )
     )
     assert documents.application_staleness(applications[0]["id"])["stale"] is False
@@ -287,19 +165,6 @@ def _knowledge_patch(entry):
     from openings.career import KnowledgeUpdate
 
     return KnowledgeUpdate(expected_version=entry["version"], narrative="Changed.")
-
-
-def test_review_conflict_reports_version_before_content(tmp_path):
-    app = create_app(tmp_path / "version.sqlite", start_worker=False)
-    workspace, documents = app.state.workspace, app.state.documents
-    job = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build services."})
-    application = workspace.create_application({"job_id": job["id"]})
-    document = documents.create_document(
-        DocumentCreate(application_id=application["id"], content={"text": "Synthetic."})
-    )
-    with pytest.raises(DomainError) as error:
-        documents.review_document(document["id"], ReviewUpdate(expected_version=2))
-    assert error.value.code == "conflict"
 
 
 def test_context_input_summaries_are_stored_and_rebuilt(tmp_path):
@@ -328,7 +193,6 @@ def test_context_input_summaries_are_stored_and_rebuilt(tmp_path):
             application_id=application["id"],
             context_id=context["id"],
             kind="resume",
-            content=content(),
         )
     )
     with sqlite3.connect(path) as conn:

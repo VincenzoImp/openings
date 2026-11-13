@@ -121,15 +121,17 @@ skills: discover the tools/resources and their typed input schemas.
    template and application instructions. Snapshot assets retain their exact bytes.
 5. Write the CV, cover letter and answers externally. Compile LaTeX on the agent's
    computer with its own tools; Openings does not execute TeX or provide a model.
-6. Call `documents_create`, then `files_reserve_upload` for each PDF/source file.
-   Use the returned raw HTTP transfer URL/method/headers. MCP transports metadata,
-   not base64 file bodies. Verify results with `documents_get` and scoped downloads.
+6. Call `documents_create` with the claim and Career entry ids the revision
+   uses and an optional note; a CV or letter takes no `content`. Then
+   `files_reserve_upload` for its `.tex` source, and for its PDF with
+   `source_sha256`, the source's SHA-256: a PDF built from another source is
+   refused. Use the returned raw HTTP transfer URL/method/headers. MCP
+   transports metadata, not base64 file bodies. Verify results with
+   `documents_get`, whose `text` the server derives from the source, and scoped
+   downloads; `documents_compare` shows what changed since the previous revision.
 7. Approve a document review only after the agent's own content and PDF checks;
-   it records an agent check, not human or employer approval. `documents_review`
-   refuses with `content_mismatch` when the structured content's text differs
-   from the attached `.tex` source; `documents_consistency` runs the same
-   read-only check. Fix the content or source, or pass
-   `value.allow_content_mismatch=true` only for an intentional difference.
+   it records an agent check, not human or employer approval. A CV or letter is
+   approved only with its source and its PDF.
 8. After a Profile, policy, guidance, template or Career change,
    `applications_staleness` lists Draft applications whose current revisions were
    built on older inputs and `application_staleness` explains one, naming each

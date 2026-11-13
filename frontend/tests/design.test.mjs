@@ -298,3 +298,20 @@ test("free-form values become typed rows and come back unchanged", async () => {
     'In "references": Give every row a key.',
   );
 });
+
+test("a comparison keeps two unchanged lines around each change and folds the rest", async () => {
+  const { foldDiff } = await import("../src/design/lines.ts");
+  const same = (text) => ({ change: "same", text });
+  const lines = [
+    ...["a", "b", "c", "d", "e", "f"].map(same),
+    { change: "removed", text: "g" },
+    { change: "added", text: "G" },
+    ...["h", "i", "j"].map(same),
+  ];
+  assert.deepEqual(
+    foldDiff(lines).map((row) => row.text ?? `(${row.count})`),
+    ["(4)", "e", "f", "g", "G", "h", "i", "(1)"],
+  );
+  assert.deepEqual(foldDiff([same("a")]), [{ change: "folded", count: 1 }]);
+  assert.deepEqual(foldDiff([]), []);
+});

@@ -35,7 +35,9 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   rules. Your agent proposes items; they count after you confirm them.
 - **Prepare:** store your Profile, Career entries, approved claims with typed
   selection fields, LaTeX templates with typed rules and writing instructions. Each application freezes the exact context its CV,
-  cover letter and form answers were written from, with PDF/source revisions and review.
+  cover letter and form answers were written from. A CV or letter revision is its
+  `.tex` source and the PDF built from it; Openings reads its text from the source
+  for review, search and comparison between revisions, without running TeX.
 - **Plan:** give applications a priority, a deadline and the employer's requirements
   (authorship rules, attachments, references, language, eligibility). Filter by
   readiness (blocked, no documents, missing PDF, needs review, reviewed, ready) and
@@ -46,8 +48,8 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   site and **Mark applied**. A later change to the documents clears the mark.
 - **Stay consistent:** applications built on older inputs are flagged after a
   change to a part their documents use (Profile header and summary, confirmed
-  policy items, templates, Career), naming the part, and review checks a document's content against its
-  `.tex` source.
+  policy items, templates, Career), naming the part, and a PDF built from another
+  source than its revision's is refused.
 - **Track:** follow applications through Preparing, Ready, Applied, Interview,
   Offer and Closed as a list or a board. Record the employer's rejection,
   interview or offer with its date, and close the ones that never answered as

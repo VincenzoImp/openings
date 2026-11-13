@@ -32,6 +32,9 @@
     "contexts.create": {
       "note": "The context dialog sends `template_ids`; `template_id` is the single-template form of the same input."
     },
+    "documents.create": {
+      "note": "Add a document and New revision send the title, frozen copy, note, the CV or letter's source and PDF, or form content; the agent cites `claim_ids` and `knowledge_ids`, which an open revision shows as counts."
+    },
     "profile.update": {
       "note": "`metadata` is edited as rows under Other details; the owner's rules and facts are items of the Policy. The deprecated `preferences` and `roles` stay editable under a collapsed heading."
     },

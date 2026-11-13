@@ -440,7 +440,7 @@
       "the Ready mark is removed and set again under Details",
       "the review page, each of its tabs and the response form have no serious accessibility finding"
     ],
-    "GET /api/v1/documents/{}/consistency": [
+    "GET /api/v1/documents/{}/comparison": [
       "documents, revisions, frozen copies and their files are managed in the review page",
       "the review page, each of its tabs and the response form have no serious accessibility finding"
     ],
