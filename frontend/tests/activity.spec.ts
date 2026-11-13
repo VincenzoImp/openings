@@ -409,10 +409,28 @@ test("the owner writes requests, follows the agent's result and withdraws one", 
   ).toBeVisible();
   await fitsViewport(page);
 
-  // The job's own "Ask your agent" lists the request about it.
+  // The job's own "Ask your agent" lists the request about it and writes
+  // another one about the job.
   await go(page, `inbox?job=${job.id}`);
   await expect(dialog(page).locator(".ask-agent")).toContainText(
     "1 request waiting",
+  );
+  await dialog(page)
+    .getByRole("button", { name: "Ask your agent", exact: true })
+    .click();
+  const later = unique("Check the salary range");
+  await dialog(page).getByLabel("Request for your agent").fill(later);
+  await dialog(page)
+    .getByRole("button", { name: "Send request", exact: true })
+    .click();
+  await expect(
+    dialog(page).getByRole("article", { name: later }),
+  ).toContainText("Waiting for the agent");
+  await dialog(page)
+    .getByRole("button", { name: "Close dialog", exact: true })
+    .click();
+  await expect(dialog(page).locator(".ask-agent")).toContainText(
+    "2 requests waiting",
   );
   await page.keyboard.press("Escape");
 
@@ -420,9 +438,9 @@ test("the owner writes requests, follows the agent's result and withdraws one", 
   const run = await as("/runs", "POST", {
     workflow: unique("prepare-shortlist"),
   });
-  const [open] = (
+  const open = (
     await as(`/requests?state=open&subject_type=job&subject_id=${job.id}`)
-  ).items;
+  ).items.find((item: any) => item.text === about);
   const taken = await as(`/requests/${open.id}/take`, "POST", {
     expected_version: open.version,
   });
