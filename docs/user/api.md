@@ -442,7 +442,8 @@ unchanged and have no `policy`.
 
 Contexts record the inputs they froze: the instructions version, each selected
 template, Career entry and claim with its version, and a short hash of each
-Profile part, each policy item and each template's content.
+Profile part, each policy item, the general instructions and the content of each
+template, entry and claim.
 `GET /applications/{id}/staleness` compares them with the current records for
 each current revision leaf and returns `stale`, `inputs`, `changes` and
 per-document status (`current`, `stale` or `no_context`) with that document's
@@ -458,9 +459,16 @@ Only what documents use is compared:
   proposals and the order of items are not compared. A writing item scoped to
   `cv` concerns the CV (`resume`) only, one scoped to `letter` the letter
   (`cover_letter`) only.
-- **Instructions, templates, entries and claims:** as before by version; a
-  template whose version moved only because of its name or default flag stays
-  current. Entries and claims that were not selected for the context are ignored.
+- **Instructions, templates, entries and claims:** by the content documents
+  use: the guidance text; a template's kind, source, guidance and rules; an
+  entry's kind, title, organization, dates, skills and narrative; a claim's text
+  and entry. A new version that only changes a name, a position, the default
+  flag, a claim's selection fields (`default_in_cv`, `role`, `group`) or
+  free-form `metadata` keeps documents current, and so does a change undone. A
+  claim that is no longer approved still counts. Entries and claims the context
+  did not freeze are ignored.
+- Text is compared with its runs of whitespace made single spaces, except a
+  template's source.
 
 A change has `input` (`profile`, `policy`, `instructions`, `template`,
 `knowledge` or `claim`), `id` (the Profile part, the policy item or the record),
