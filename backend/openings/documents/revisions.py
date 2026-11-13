@@ -193,6 +193,8 @@ class RevisionOperations:
 
     def create_document(self, value: DocumentCreate) -> dict:
         """Create a new revision; previous_id links the revision it replaces. A CV or letter (cv, letter) takes no content: give pdf (name, size, optional sha256) and, optionally, its TeX source inline (source) or as a file (source_file). The result's uploads holds one-shot grants (pdf, and source for source_file): PUT the exact bytes to each url with its headers, the source first. The revision is incomplete until its PDF is stored, then complete and immutable; Ready counts only complete revisions. Text comes from the source, else from the PDF. Form answers and other kinds keep structured content. Never marks the application sent."""
+        if not isinstance(value, DocumentCreate):
+            value = DocumentCreate.model_validate(value)
         source_kind = value.kind in SOURCE_KINDS
         if source_kind and value.content is not None:
             raise DomainError(
@@ -342,9 +344,8 @@ class RevisionOperations:
                 ),
             )
         if value.pdf is not None:
-            source = source_hash(conn, document_id) or (
-                value.source_file.sha256 if value.source_file else None
-            )
+            pending = value.source_file.sha256 if uploads["source"] else None
+            source = source_hash(conn, document_id) or pending
             uploads["pdf"] = self.upload_grant(
                 conn,
                 UploadReservation(
@@ -354,6 +355,7 @@ class RevisionOperations:
                     source_sha256=source,
                     **value.pdf.model_dump(),
                 ),
+                pending_source=pending,
             )
         return uploads
 
@@ -376,28 +378,25 @@ class RevisionOperations:
             )
         }
         files = {record_id: [] for record_id in ids}
+        complete = set()
         if summary:
-            counts = {
-                row["document_id"]: row["n"]
-                for row in self.db.all(
-                    f"SELECT document_id,COUNT(*) AS n FROM files WHERE document_id IN ({placeholders}) GROUP BY document_id",
-                    ids,
-                )
-            }
+            counts = {}
+            for row in self.db.all(
+                "SELECT document_id,COUNT(*) AS n,SUM(media_type=?) AS pdf FROM files "
+                f"WHERE document_id IN ({placeholders}) GROUP BY document_id",
+                (PDF, *ids),
+            ):
+                counts[row["document_id"]] = row["n"]
+                if row["pdf"]:
+                    complete.add(row["document_id"])
         else:
             for row in self.db.all(
                 f"SELECT * FROM files WHERE document_id IN ({placeholders}) ORDER BY created_at,name,id",
                 ids,
             ):
                 files[row["document_id"]].append(self._file_record(row))
-        complete = {
-            row["document_id"]
-            for row in self.db.all(
-                f"SELECT DISTINCT document_id FROM files WHERE document_id IN ({placeholders}) "
-                "AND media_type=?",
-                (*ids, PDF),
-            )
-        }
+                if row["media_type"] == PDF:
+                    complete.add(row["document_id"])
         items = []
         for row in rows:
             result = dict(row)

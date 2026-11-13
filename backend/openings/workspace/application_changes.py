@@ -183,6 +183,7 @@ class ApplicationChanges:
                     status in {"applied", "interview", "offer"}
                     or (status == "closed" and changes["outcome"] == "accepted")
                 )
+                and status != row["status"]
                 and not row["applied_at"]
                 and "applied_at" not in changes
             ):

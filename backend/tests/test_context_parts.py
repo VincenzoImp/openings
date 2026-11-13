@@ -105,7 +105,7 @@ def seed(path, *, entries=6, claims=4, applications=3, narrative=60, seed=3):
                 name=name, kind=kind, tex=words(rng, 150), guidance=words(rng, 60), is_default=True
             )
         )["id"]
-        for name, kind in (("MASTER CV", "resume"), ("MASTER letter", "cover_letter"))
+        for name, kind in (("MASTER CV", "cv"), ("MASTER letter", "letter"))
     ]
     add_asset(workspace, "template_id", templates[0], "assets/logo.png", b"synthetic logo")
     add_asset(workspace, "template_id", templates[0], "fonts/Ünï cödé.ttf", b"synthetic font")
@@ -363,7 +363,7 @@ def test_questions_and_requests_do_not_keep_deleted_contexts_alive(tmp_path):
     workspace, documents = app.state.workspace, app.state.documents
     career = app.state.career
     entry = career.create_knowledge(KnowledgeCreate(title="Backend engineer", narrative="Built."))
-    career.create_template(TemplateCreate(name="CV", kind="resume", tex="x", is_default=True))
+    career.create_template(TemplateCreate(name="CV", kind="cv", tex="x", is_default=True))
     add_asset(workspace, "knowledge_id", entry["id"], "proof.pdf", b"%PDF-1.4 proof")
     applications = []
     for index in range(2):

@@ -5,11 +5,11 @@ from fastapi.testclient import TestClient
 
 from document_fixtures import attach
 from openings.app import create_app
-from openings.documents import DocumentCreate, ReviewUpdate
+from openings.documents import DocumentCreate
 from openings.errors import DomainError
 
 
-def test_preparation_uses_current_revision_files_and_review(tmp_path):
+def test_preparation_counts_current_revisions_and_complete_ones(tmp_path):
     app = create_app(tmp_path / "preparation.sqlite", start_worker=False)
     workspace, documents = app.state.workspace, app.state.documents
     job = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build services."})
@@ -17,7 +17,7 @@ def test_preparation_uses_current_revision_files_and_review(tmp_path):
     first = documents.create_document(
         DocumentCreate(
             application_id=application["id"],
-            kind="resume",
+            kind="cv",
             title="CV",
         )
     )
@@ -30,24 +30,23 @@ def test_preparation_uses_current_revision_files_and_review(tmp_path):
             assert client.get("/api/v1/applications").json()["items"][0]["preparation"] == detail
             return detail
 
-        assert current() == [{"kind": "resume", "revisions": 1, "pdf": 0, "approved": 0}]
+        assert current() == [{"kind": "cv", "revisions": 1, "complete": 0}]
         attach(documents, client.put, first["id"])
-        assert current()[0]["pdf"] == 1
+        assert current()[0]["complete"] == 1
         first = documents.get_document(first["id"])
-        documents.review_document(first["id"], ReviewUpdate(expected_version=first["version"]))
-        assert current()[0]["approved"] == 1
         second = documents.create_document(
             DocumentCreate(
                 application_id=application["id"],
-                kind="resume",
+                kind="cv",
                 title="Revised CV",
                 previous_id=first["id"],
             )
         )
-        assert current() == [{"kind": "resume", "revisions": 1, "pdf": 0, "approved": 0}]
-        assert workspace.get_application(application["id"])["status"] == "draft"
+        # The new revision is current and incomplete; its parent's PDF does not count.
+        assert current() == [{"kind": "cv", "revisions": 1, "complete": 0}]
+        assert workspace.get_application(application["id"])["status"] == "shortlisted"
         documents.delete_document(second["id"], second["version"])
-        assert current()[0]["approved"] == 1
+        assert current()[0]["complete"] == 1
 
 
 def test_question_edits_retain_compatible_answers_and_reject_invalid_changes_atomically(tmp_path):

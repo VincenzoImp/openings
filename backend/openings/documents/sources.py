@@ -65,12 +65,13 @@ def source_hash(conn, document_id) -> str | None:
     return hashes[0] if len(hashes) == 1 else None
 
 
-def check_upload(conn, document, name, media_type, sha256, source_sha256):
+def check_upload(conn, document, name, media_type, sha256, source_sha256, pending_source=None):
     """Refuse a file that would give a revision a second source or an unpaired PDF.
 
     Called when the upload is reserved (``sha256`` may be unknown) and again with
     the received bytes' hash. Re-sending a file under its own name is left to the
-    caller's idempotent path.
+    caller's idempotent path. ``pending_source`` is the hash of a source the same
+    create is granting: its PDF grant may name it before the source arrives.
     """
     files = [file for file in _files(conn, document["id"]) if file["name"] != name]
     sources = [file for file in files if is_tex_source(file["name"], file["media_type"])]
@@ -122,6 +123,8 @@ def check_upload(conn, document, name, media_type, sha256, source_sha256):
     if source_sha256 is None:
         return
     hashes = {file["sha256"] for file in sources}
+    if not hashes and pending_source and source_sha256.lower() == pending_source.lower():
+        return
     if not hashes:
         raise DomainError(
             409,

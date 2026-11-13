@@ -38,11 +38,11 @@ def test_resolve_matches_identities_without_ingesting(workspace):
     assert [item["id"] for item in by_url["items"]] == [job["id"]]
     match = by_url["items"][0]
     assert "lever:example:abc-123" in match["matched_by"] and "job_url" in match["matched_by"]
-    assert match["triage"] == "saved" and match["application"]["id"] == attempt["id"]
+    assert match["triage"] == "shortlisted" and match["application"]["id"] == attempt["id"]
     assert match["applications"] == [
         {
             "id": attempt["id"],
-            "status": "draft",
+            "status": "shortlisted",
             "outcome": None,
             "version": attempt["version"],
             "applied_at": None,
@@ -132,7 +132,7 @@ def test_duplicate_groups_are_annotated_filtered_and_read_only(workspace):
         "conflicts": [],
     }
     assert by_id[other_city["id"]]["similarity"] is None
-    assert by_id[ats["id"]]["applications"][0]["status"] == "draft"
+    assert by_id[ats["id"]]["applications"][0]["status"] == "shortlisted"
     assert by_id[linkedin["id"]]["source"] == "linkedin"
 
     by_location = workspace.duplicate_jobs({"match_location": True, "min_confidence": 0})
@@ -140,8 +140,8 @@ def test_duplicate_groups_are_annotated_filtered_and_read_only(workspace):
     assert workspace.duplicate_jobs({"job_id": unrelated["id"]})["total"] == 0
     assert workspace.duplicate_jobs({"job_id": indeed["id"]})["total"] == 1
     assert workspace.duplicate_jobs({"job_id": other_city["id"]})["total"] == 0
-    assert workspace.duplicate_jobs({"queue": "inbox"})["total"] == 1
-    assert workspace.duplicate_jobs({"queue": "dismissed"})["total"] == 0
+    assert workspace.duplicate_jobs({"triage": "new"})["total"] == 1
+    assert workspace.duplicate_jobs({"triage": "dismissed"})["total"] == 0
     assert workspace.duplicate_jobs({"offset": 1})["items"] == []
     assert workspace.duplicate_jobs({"min_confidence": 0.85})["total"] == 0
     assert (count(workspace, "jobs"), count(workspace, "events")) == before
@@ -226,7 +226,7 @@ def test_bulk_applications_close_reopen_delete(workspace):
         {"action": "delete", "outcome": "rejected", "items": [{"id": "a", "expected_version": 1}]},
         {
             "action": "close",
-            "status": "draft",
+            "status": "shortlisted",
             "outcome": "rejected",
             "items": [{"id": "a", "expected_version": 1}],
         },
@@ -353,7 +353,7 @@ def test_rest_and_mcp_parity(tmp_path):
             {
                 "value": {
                     "action": "reopen",
-                    "status": "draft",
+                    "status": "shortlisted",
                     "items": [
                         {
                             "id": attempt["id"],
@@ -364,4 +364,4 @@ def test_rest_and_mcp_parity(tmp_path):
             },
         )
     )
-    assert reopened["items"][0]["result"]["status"] == "draft"
+    assert reopened["items"][0]["result"]["status"] == "shortlisted"

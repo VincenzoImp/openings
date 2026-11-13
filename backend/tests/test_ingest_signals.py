@@ -232,15 +232,15 @@ def test_a_rule_dismisses_only_matching_new_jobs_names_the_rule_and_can_be_rever
         rule("language_required", "not_in", ["English", "Italian"]),
     )
     # Rules act only on new jobs: the job already waiting stays in the Inbox.
-    assert workspace.get_job(waiting["id"])["triage"] == "inbox"
+    assert workspace.get_job(waiting["id"])["triage"] == "new"
     preview = policy.preview_rule({"rule": languages["rule"]})
     assert (preview["matches"], preview["inbox"], preview["pending"]) == (1, 1, 0)
     assert preview["examples"][0]["id"] == waiting["id"]
-    assert workspace.get_job(waiting["id"])["triage"] == "inbox"
+    assert workspace.get_job(waiting["id"])["triage"] == "new"
 
     dismissed = job(workspace, "Backend Entwickler", GERMAN, 2)
     kept = job(workspace, "Data Engineer", ENGLISH, 3)
-    assert kept["triage"] == "inbox" and kept["dismissal"] is None
+    assert kept["triage"] == "new" and kept["dismissal"] is None
     assert dismissed["triage"] == "dismissed"
     assert dismissed["dismissal"]["rule"] == {
         "item_id": languages["id"],
@@ -256,21 +256,21 @@ def test_a_rule_dismisses_only_matching_new_jobs_names_the_rule_and_can_be_rever
         (dismissed["id"],),
     )
     assert json.loads(event["payload"]) == {
-        "from": "inbox",
+        "from": "new",
         "to": "dismissed",
         "rule": {"item_id": languages["id"]},
     }
     assert event["actor_kind"] == "system"
-    by_rule = workspace.list_jobs(queue="dismissed", dismissed_by="rule", include_counts=True)
+    by_rule = workspace.list_jobs(triage="dismissed", dismissed_by="rule", include_counts=True)
     assert [item["id"] for item in by_rule["items"]] == [dismissed["id"]]
     assert by_rule["counts"]["dismissed_by"] == {"rule": 1, "agent": 0, "owner": 0, "other": 0}
     assert workspace.list_jobs(rule_id=languages["id"])["total"] == 1
 
     # Restoring is an ordinary triage change, and the job stays restored.
-    restored = workspace.set_triage(dismissed["id"], "inbox", dismissed["version"])
-    assert restored["triage"] == "inbox" and restored["dismissal"] is None
+    restored = workspace.set_triage(dismissed["id"], "new", dismissed["version"])
+    assert restored["triage"] == "new" and restored["dismissal"] is None
     again = workspace.ingest_job({"url": "https://example.test/jobs/2", "posting": GERMAN + " "})
-    assert again["triage"] == "inbox" and not again["created"]
+    assert again["triage"] == "new" and not again["created"]
 
 
 def test_rules_act_only_when_enabled_and_confirmed(services):
@@ -284,7 +284,7 @@ def test_rules_act_only_when_enabled_and_confirmed(services):
     )
     assert disabled["confirmed"] and not disabled["enabled"]
     first = job(workspace, "Softwareentwickler", GERMAN, 1)
-    assert first["triage"] == "inbox" and first["signals"]["rules"] == []
+    assert first["triage"] == "new" and first["signals"]["rules"] == []
     # An agent edit switches an enabled rule off and makes it a proposal again.
     enabled = add_rule(policy, "German postings", rule("posting_language", "in", ["de"]))
     with acting_as(AGENT):
@@ -296,7 +296,7 @@ def test_rules_act_only_when_enabled_and_confirmed(services):
             },
         )
     second = job(workspace, "Entwickler", GERMAN, 2)
-    assert second["triage"] == "inbox"
+    assert second["triage"] == "new"
 
 
 def test_flag_rules_record_a_match_and_the_owner_adds_jobs_freely(services):
@@ -307,7 +307,7 @@ def test_flag_rules_record_a_match_and_the_owner_adds_jobs_freely(services):
     dismiss = add_rule(policy, "German postings", rule("posting_language", "in", ["de"]))
     first = job(workspace, "Data Engineer", ENGLISH, 1, company="Northstar Labs")
     copy = job(workspace, "Data Engineer", ENGLISH, 2, company="Northstar Labs")
-    assert copy["triage"] == "inbox"
+    assert copy["triage"] == "new"
     assert copy["signals"]["rules"] == [
         {"item_id": flag["id"], "label": flag["label"], "action": "flag"}
     ]
@@ -316,7 +316,7 @@ def test_flag_rules_record_a_match_and_the_owner_adds_jobs_freely(services):
     # A job the owner adds in the dashboard is never dismissed by a rule.
     with acting_as(OWNER):
         added = job(workspace, "Softwareentwickler", GERMAN, 3)
-    assert added["triage"] == "inbox" and added["signals"]["language"] == "de"
+    assert added["triage"] == "new" and added["signals"]["language"] == "de"
     # An agent's ingest is collection like any other.
     with acting_as(AGENT):
         collected = job(workspace, "Entwickler", GERMAN, 4)
@@ -342,10 +342,10 @@ def test_triage_reasons_and_who_dismissed(services):
         owner = workspace.set_triage(second["id"], "dismissed", second["version"], "Too far.")
     assert owner["dismissal"]["category"] == "owner" and owner["dismissal"]["reason"] == "Too far."
     counts = workspace.list_jobs(include_counts=True)["counts"]
-    assert counts["dismissed"] == 2 and counts["inbox"] == 1
+    assert counts["dismissed"] == 2 and counts["new"] == 1
     assert counts["dismissed_by"] == {"rule": 0, "agent": 1, "owner": 1, "other": 0}
     with pytest.raises(Exception, match="reason"):
-        workspace.set_triage(third["id"], "saved", third["version"], "Nice")
+        workspace.set_triage(third["id"], "shortlisted", third["version"], "Nice")
 
 
 def test_a_board_that_stops_listing_a_posting_marks_it_and_its_rule_acts(tmp_path, monkeypatch):
@@ -385,7 +385,7 @@ def test_a_board_that_stops_listing_a_posting_marks_it_and_its_rule_acts(tmp_pat
     assert run()["state"] == "succeeded"
     jobs = {item["title"]: item for item in workspace.list_jobs()["items"]}
     assert not any(item["signals"]["no_longer_listed"] for item in jobs.values())
-    workspace.set_triage(jobs["Engineer 3"]["id"], "saved", jobs["Engineer 3"]["version"])
+    workspace.set_triage(jobs["Engineer 3"]["id"], "shortlisted", jobs["Engineer 3"]["version"])
     add_rule(policy, "Postings no longer listed", rule("no_longer_listed", "is", True))
     listed["value"] = ["1"]
     second = run()
@@ -395,7 +395,7 @@ def test_a_board_that_stops_listing_a_posting_marks_it_and_its_rule_acts(tmp_pat
     # Untouched jobs to review are dismissed by the rule; a shortlisted job is not.
     assert after["Engineer 2"]["triage"] == "dismissed"
     assert (
-        after["Engineer 3"]["triage"] == "saved"
+        after["Engineer 3"]["triage"] == "shortlisted"
         and after["Engineer 3"]["signals"]["no_longer_listed"]
     )
     assert not after["Engineer 1"]["signals"]["no_longer_listed"]

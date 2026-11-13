@@ -105,7 +105,7 @@ def test_changes_record_the_owner_session_the_named_token_and_the_system(app):
         ).json()
         saved = anonymous.post(
             f"/api/v1/jobs/{job['id']}/triage",
-            json={"triage": "saved", "expected_version": job["version"]},
+            json={"triage": "dismissed", "expected_version": job["version"]},
             headers=bearer(token),
         ).json()
         edited, error = tool(
@@ -312,29 +312,29 @@ def test_writes_join_the_open_run_of_their_own_token_only(services):
     workspace, activity = services
     first, second = add_job(workspace, "First"), add_job(workspace, "Second")
     with acting_as(AGENT):
-        workspace.set_triage(first["id"], "saved", first["version"])
+        workspace.set_triage(first["id"], "dismissed", first["version"])
         run = activity.start_run({"workflow": "review-inbox", "scope": "Two synthetic jobs"})
     with acting_as(OTHER):
         other = activity.start_run({"workflow": "track-applications"})
         workspace.set_triage(second["id"], "dismissed", second["version"])
     with acting_as(AGENT):
-        workspace.set_triage(first["id"], "dismissed", 2)
+        workspace.set_triage(first["id"], "new", 2)
     with acting_as(OWNER):
-        workspace.set_triage(first["id"], "saved", 3)
+        workspace.set_triage(first["id"], "dismissed", 3)
     add_job(workspace, "Collected while both runs are open")
     with acting_as(AGENT):
         finished = activity.finish_run(run["id"], {"expected_version": 1, **REPORT})
-        workspace.set_triage(first["id"], "inbox", 4)
+        workspace.set_triage(first["id"], "shortlisted", 4)
     changes = {
         (item["payload"].get("to"), item["actor"]["label"]): item["run_id"]
         for item in events(workspace, kind="triage_changed")
     }
     assert changes == {
-        ("saved", "Synthetic agent"): None,  # before the run
+        ("dismissed", "Synthetic agent"): None,  # before the run
         ("dismissed", "Second synthetic agent"): other["id"],
-        ("dismissed", "Synthetic agent"): run["id"],
-        ("saved", "Owner (dashboard)"): None,
-        ("inbox", "Synthetic agent"): None,  # after the run
+        ("new", "Synthetic agent"): run["id"],
+        ("dismissed", "Owner (dashboard)"): None,
+        ("shortlisted", "Synthetic agent"): None,  # after the run
     }
     assert all(item["run_id"] is None for item in events(workspace, kind="job_added"))
     assert finished["report"]["changes"] == {
@@ -357,7 +357,7 @@ def test_one_open_run_per_token_and_explicit_supersede(services):
             activity.start_run({"workflow": "review-inbox", "idempotency_key": "run-1"})["id"]
             == (first["id"])
         )
-        workspace.set_triage(job["id"], "saved", job["version"])
+        workspace.set_triage(job["id"], "dismissed", job["version"])
         with pytest.raises(DomainError) as refused:
             activity.start_run({"workflow": "prepare-shortlist"})
         assert (refused.value.status, refused.value.code) == (409, "run_open")
@@ -419,7 +419,7 @@ def test_a_run_without_activity_is_reported_interrupted_but_never_closed(service
     job = add_job(workspace)
     with acting_as(AGENT):
         run = activity.start_run({"workflow": "review-inbox"})
-        workspace.set_triage(job["id"], "saved", job["version"])
+        workspace.set_triage(job["id"], "dismissed", job["version"])
     assert activity.list_runs({"status": "open"})["total"] == 1
     workspace.db.execute("UPDATE runs SET last_activity_at='2026-01-01T00:00:00.000000+00:00'")
     stale = activity.get_run(run["id"])
@@ -436,7 +436,7 @@ def test_a_run_without_activity_is_reported_interrupted_but_never_closed(service
         with pytest.raises(DomainError) as refused:
             activity.start_run({"workflow": "review-inbox"})
         assert refused.value.details["run"]["status"] == "interrupted"
-        workspace.set_triage(job["id"], "dismissed", 2)
+        workspace.set_triage(job["id"], "new", 2)
         assert activity.get_run(run["id"])["status"] == "open"
         assert activity.finish_run(run["id"], {"expected_version": 1, **REPORT})["status"] == (
             "finished"
@@ -473,7 +473,7 @@ def test_runs_list_finds_runs_active_since_a_time(services):
         "last_activity_at='2026-01-01T00:10:00.000000+00:00'"
     )
     with acting_as(OTHER):
-        workspace.set_triage(job["id"], "saved", job["version"])
+        workspace.set_triage(job["id"], "dismissed", job["version"])
     since = "2026-01-02T00:00:00Z"
     assert [item["id"] for item in activity.list_runs({"active_since": since})["items"]] == [
         long["id"]
@@ -492,7 +492,7 @@ def test_changes_filter_by_several_kinds_of_record_and_name_their_run(services):
         workspace.add_note(job["id"], {"body": "Synthetic note."})
         asked = activity.ask_question({"question": "Synthetic question?"})
     with acting_as(OWNER):
-        workspace.set_triage(job["id"], "saved", job["version"])
+        workspace.set_triage(job["id"], "dismissed", job["version"])
     kinds = lambda **filters: sorted(item["kind"] for item in events(workspace, **filters))
     assert kinds(subject_types=["note", "question"]) == ["note_added", "question_asked"]
     assert kinds(subject_types=["job"]) == ["job_added", "triage_changed"]
@@ -674,7 +674,7 @@ def test_rest_and_mcp_expose_the_same_runs_questions_and_changes(app):
         assert mcp_conflict["details"]["run"]["id"] == run["id"]
         saved = rest.post(
             f"/api/v1/jobs/{job['id']}/triage",
-            json={"triage": "saved", "expected_version": job["version"]},
+            json={"triage": "dismissed", "expected_version": job["version"]},
             headers=headers,
         )
         assert saved.status_code == 200
