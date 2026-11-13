@@ -233,9 +233,13 @@ export function SectionCard({
         <StatementList label={`${section.title} statements`}>
           {items.map((item, index) => {
             const label = itemName(item.text);
+            // Keyed by its text, so a moved statement keeps its focus.
+            const repeat = items
+              .slice(0, index)
+              .filter((other) => other.text === item.text).length;
             return (
               <Statement
-                key={`${index}-${item.text}`}
+                key={`${repeat}-${item.text}`}
                 name={label}
                 editing={shown === index}
                 disabled={!!editing}
