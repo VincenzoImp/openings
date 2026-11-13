@@ -261,7 +261,11 @@ function Detail({
           onConfirm={async () => {
             if (
               await mutate(
-                () => api(`/documents/${document.id}`, "DELETE"),
+                () =>
+                  api(
+                    `/documents/${document.id}?expected_version=${document.version}`,
+                    "DELETE",
+                  ),
                 "Revision deleted.",
               )
             )

@@ -222,10 +222,10 @@ class ContextOperations:
         application_id: str = "",
         limit: int = 100,
         offset: int = 0,
-        summary: bool = False,
+        summary: bool = True,
         q: str = "",
     ) -> dict:
-        """List frozen contexts without payloads. Search the associated job's title/company; summary=true includes file/document counts."""
+        """List frozen contexts without payloads, by application_id; q searches the job's title and company. summary=true (the default) adds labels and file, document and evidence counts."""
         _page(limit, offset)
         where, params = [], []
         if application_id:
@@ -250,6 +250,8 @@ class ContextOperations:
         return {
             "items": rows,
             "total": self.db.one(f"SELECT COUNT(*) AS n FROM contexts{clause}", params)["n"],
+            "limit": limit,
+            "offset": offset,
         }
 
     def application_staleness(self, application_id: str) -> dict:
@@ -270,7 +272,7 @@ class ContextOperations:
         limit: int = 50,
         offset: int = 0,
     ) -> dict:
-        """List applications in one stage (default draft; "all" for every stage) whose current revisions were built on older inputs, with each changed part (as application_staleness). stale_only=false also lists current ones. Read-only."""
+        """List applications in one stage (default draft; "all" for every stage) whose current revisions were built on older inputs, with each changed part (as staleness_get). stale_only=false also lists current ones. Read-only."""
         _page(limit, offset)
         where, params = ("AND a.status=?", [status]) if status != "all" else ("", [])
         with self.db.connect() as conn:
@@ -299,4 +301,9 @@ class ContextOperations:
                     **report,
                 }
             )
-        return {"items": items[offset : offset + limit], "total": len(items)}
+        return {
+            "items": items[offset : offset + limit],
+            "total": len(items),
+            "limit": limit,
+            "offset": offset,
+        }

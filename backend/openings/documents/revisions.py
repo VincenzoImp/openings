@@ -14,8 +14,9 @@ import json
 from typing import Literal
 
 from ..career.records import _get, _page
-from ..common import encode, new_id, now
+from ..common import check_version, encode, new_id, now
 from ..errors import DomainError, conflict, missing
+from ..idempotency import fingerprint, remember, replay
 from .models import SOURCE_KINDS, DocumentCreate, ReviewUpdate
 from .sources import approval_problem
 from .text import is_tex_source
@@ -201,67 +202,53 @@ class RevisionOperations:
             )
         content = encode({} if source_kind else value.content or {})
         claim_ids, knowledge_ids = encode(value.claim_ids), encode(value.knowledge_ids)
+        digest = fingerprint(value)
         with self.db.transaction() as conn:
-            application = _get(conn, "applications", value.application_id, "Application")
-            previous = (
-                _get(conn, "documents", value.previous_id, "Document revision")
-                if value.previous_id
-                else None
-            )
-            if previous and (
-                previous["application_id"] != value.application_id or previous["kind"] != value.kind
-            ):
-                raise DomainError(
-                    422,
-                    "revision_parent",
-                    "A previous revision must belong to the same application and document kind.",
+            document_id = replay(conn, "documents", value.idempotency_key, digest)
+            if document_id is None:
+                application = _get(conn, "applications", value.application_id, "Application")
+                previous = (
+                    _get(conn, "documents", value.previous_id, "Document revision")
+                    if value.previous_id
+                    else None
                 )
-            context_id = value.context_id or (previous["context_id"] if previous else None)
-            context = None
-            if context_id:
-                context = self.context_record(
-                    conn, _get(conn, "contexts", context_id, "Application context")
-                )
-                if context["application_id"] != application["id"]:
+                if previous and (
+                    previous["application_id"] != value.application_id
+                    or previous["kind"] != value.kind
+                ):
                     raise DomainError(
-                        422, "context_application", "The context belongs to another application."
+                        422,
+                        "revision_parent",
+                        "A previous revision must belong to the same application and document kind.",
                     )
-            if not source_kind:
-                self._validate_content(value.content or {}, context, value.kind)
-            self._validate_evidence(conn, context, value.claim_ids, value.knowledge_ids)
-            # A retry returns the revision it created: for a CV or letter, only while
-            # that revision is still an empty draft.
-            old = conn.execute(
-                "SELECT id FROM documents d WHERE application_id=? AND context_id IS ? AND kind=? "
-                "AND title=? AND content=? AND previous_id IS ? AND note=? AND claim_ids=? "
-                "AND knowledge_ids=?"
-                + (
-                    " AND review_state='draft' AND NOT EXISTS(SELECT 1 FROM files f WHERE f.document_id=d.id)"
-                    if source_kind
-                    else ""
-                )
-                + " ORDER BY created_at LIMIT 1",
-                (
-                    value.application_id,
-                    context_id,
-                    value.kind,
-                    value.title,
-                    content,
-                    value.previous_id,
-                    value.note,
-                    claim_ids,
-                    knowledge_ids,
-                ),
-            ).fetchone()
-            if old:
-                document_id = old["id"]
-            else:
-                document_id = new_id()
-                conn.execute(
-                    "INSERT INTO documents(id,application_id,context_id,kind,title,content,previous_id,"
-                    "note,claim_ids,knowledge_ids,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                context_id = value.context_id or (previous["context_id"] if previous else None)
+                context = None
+                if context_id:
+                    context = self.context_record(
+                        conn, _get(conn, "contexts", context_id, "Application context")
+                    )
+                    if context["application_id"] != application["id"]:
+                        raise DomainError(
+                            422,
+                            "context_application",
+                            "The context belongs to another application.",
+                        )
+                if not source_kind:
+                    self._validate_content(value.content or {}, context, value.kind)
+                self._validate_evidence(conn, context, value.claim_ids, value.knowledge_ids)
+                # A retry returns the revision it created: for a CV or letter, only while
+                # that revision is still an empty draft.
+                old = conn.execute(
+                    "SELECT id FROM documents d WHERE application_id=? AND context_id IS ? AND kind=? "
+                    "AND title=? AND content=? AND previous_id IS ? AND note=? AND claim_ids=? "
+                    "AND knowledge_ids=?"
+                    + (
+                        " AND review_state='draft' AND NOT EXISTS(SELECT 1 FROM files f WHERE f.document_id=d.id)"
+                        if source_kind
+                        else ""
+                    )
+                    + " ORDER BY created_at LIMIT 1",
                     (
-                        document_id,
                         value.application_id,
                         context_id,
                         value.kind,
@@ -271,22 +258,43 @@ class RevisionOperations:
                         value.note,
                         claim_ids,
                         knowledge_ids,
-                        now(),
                     ),
-                )
-                self.workspace.event(
-                    "document_created",
-                    application["job_id"],
-                    value.application_id,
-                    {
-                        "document_id": document_id,
-                        "kind": value.kind,
-                        "previous_id": value.previous_id,
-                    },
-                    conn,
-                    subject=("document", document_id),
-                )
-                self.workspace.clear_ready(conn, value.application_id, "document_created")
+                ).fetchone()
+                if old:
+                    document_id = old["id"]
+                else:
+                    document_id = new_id()
+                    conn.execute(
+                        "INSERT INTO documents(id,application_id,context_id,kind,title,content,previous_id,"
+                        "note,claim_ids,knowledge_ids,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                        (
+                            document_id,
+                            value.application_id,
+                            context_id,
+                            value.kind,
+                            value.title,
+                            content,
+                            value.previous_id,
+                            value.note,
+                            claim_ids,
+                            knowledge_ids,
+                            now(),
+                        ),
+                    )
+                    self.workspace.event(
+                        "document_created",
+                        application["job_id"],
+                        value.application_id,
+                        {
+                            "document_id": document_id,
+                            "kind": value.kind,
+                            "previous_id": value.previous_id,
+                        },
+                        conn,
+                        subject=("document", document_id),
+                    )
+                    self.workspace.clear_ready(conn, value.application_id, "document_created")
+                remember(conn, "documents", value.idempotency_key, digest, document_id)
         return self.get_document(document_id)
 
     def _document_records(self, rows, *, summary=False):
@@ -387,6 +395,8 @@ class RevisionOperations:
         return {
             "items": self._document_records(rows, summary=summary),
             "total": self.db.one(f"SELECT COUNT(*) AS n FROM documents{clause}", params)["n"],
+            "limit": limit,
+            "offset": offset,
         }
 
     def compare_documents(self, document_id: str, other_id: str = "") -> dict:
@@ -467,10 +477,11 @@ class RevisionOperations:
                 )
         return self.get_document(document_id)
 
-    def delete_document(self, document_id: str) -> dict:
-        """Permanently remove one document revision and its attached files; other versions remain."""
+    def delete_document(self, document_id: str, expected_version: int | None = None) -> dict:
+        """Permanently remove one document revision and its attached files, with its current expected_version (required from 0.23); other revisions remain."""
         with self.db.transaction() as conn:
             document = _get(conn, "documents", document_id, "Document revision")
+            check_version(document, expected_version)
             application = conn.execute(
                 "SELECT applications.job_id FROM applications JOIN documents ON documents.application_id=applications.id WHERE documents.id=?",
                 (document_id,),

@@ -96,16 +96,16 @@ def test_awards_and_publications_survive_import_filtering_and_frozen_context(tmp
             {"value": {"name": "Example CV", "tex": "Synthetic template", "is_default": True}},
         )
         job = call(
-            "job_ingest",
+            "jobs_create",
             "POST",
             "/jobs",
             {"value": {"title": "Engineer", "company": "Example", "posting": "Build APIs."}},
         )
         application = call(
-            "application_create", "POST", "/applications", {"value": {"job_id": job["id"]}}
+            "applications_create", "POST", "/applications", {"value": {"job_id": job["id"]}}
         )
         context = call(
-            "application_prepare_context",
+            "contexts_create",
             "POST",
             "/contexts",
             {"value": {"application_id": application["id"], "template_id": template["id"]}},

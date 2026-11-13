@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..common import check_version, decode_record, encode, new_id, now
 from ..errors import missing
+from ..idempotency import fingerprint, remember, replay
 from .models import TemplateCreate, TemplateUpdate
 from .records import _get, _page, values
 
@@ -16,10 +17,10 @@ class TemplateOperations:
         kind: str = "",
         limit: int = 100,
         offset: int = 0,
-        summary: bool = False,
+        summary: bool = True,
         q: str = "",
     ) -> dict:
-        """List template packages/defaults. summary=true omits TeX, guidance and rules; get the template before editing or compiling externally."""
+        """List template packages and defaults by kind or q. summary=true (the default) omits TeX, guidance and rules; summary=false includes them. Read the template before editing or compiling externally."""
         _page(limit, offset)
         where, params = [], []
         if kind:
@@ -47,6 +48,8 @@ class TemplateOperations:
         return {
             "items": items,
             "total": self.db.one(f"SELECT COUNT(*) AS n FROM templates{clause}", params)["n"],
+            "limit": limit,
+            "offset": offset,
         }
 
     def get_template(self, template_id: str) -> dict:
@@ -60,35 +63,43 @@ class TemplateOperations:
 
     def create_template(self, value: TemplateCreate) -> dict:
         """Store a user template and optional rules. The first template of a kind becomes its default."""
-        record_id, timestamp = new_id(), now()
+        digest = fingerprint(value)
         with self.db.transaction() as conn:
-            is_default = (
-                value.is_default
-                or not conn.execute(
-                    "SELECT 1 FROM templates WHERE kind=? AND is_default=1", (value.kind,)
-                ).fetchone()
-            )
-            if is_default:
-                conn.execute(
-                    "UPDATE templates SET is_default=0,version=version+1,updated_at=? WHERE kind=? AND is_default=1",
-                    (timestamp, value.kind),
-                )
-            conn.execute(
-                "INSERT INTO templates(id,name,kind,tex,guidance,rules,is_default,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
-                (
-                    record_id,
-                    value.name,
-                    value.kind,
-                    value.tex,
-                    value.guidance,
-                    encode(value.rules),
-                    int(is_default),
-                    timestamp,
-                    timestamp,
-                ),
-            )
-            self._record(conn, "template_created", "template", record_id, kind=value.kind)
+            record_id = replay(conn, "templates", value.idempotency_key, digest)
+            if record_id is None:
+                record_id = self._insert_template(conn, value, now())
+                remember(conn, "templates", value.idempotency_key, digest, record_id)
         return self.get_template(record_id)
+
+    def _insert_template(self, conn, value, timestamp):
+        record_id = new_id()
+        is_default = (
+            value.is_default
+            or not conn.execute(
+                "SELECT 1 FROM templates WHERE kind=? AND is_default=1", (value.kind,)
+            ).fetchone()
+        )
+        if is_default:
+            conn.execute(
+                "UPDATE templates SET is_default=0,version=version+1,updated_at=? WHERE kind=? AND is_default=1",
+                (timestamp, value.kind),
+            )
+        conn.execute(
+            "INSERT INTO templates(id,name,kind,tex,guidance,rules,is_default,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+            (
+                record_id,
+                value.name,
+                value.kind,
+                value.tex,
+                value.guidance,
+                encode(value.rules),
+                int(is_default),
+                timestamp,
+                timestamp,
+            ),
+        )
+        self._record(conn, "template_created", "template", record_id, kind=value.kind)
+        return record_id
 
     def update_template(self, template_id: str, value: TemplateUpdate) -> dict:
         """Revise template source/default/guidance with optimistic version checking; old contexts stay frozen."""

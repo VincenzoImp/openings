@@ -6,7 +6,7 @@ import json
 
 from pydantic import ValidationError
 
-from ..common import new_id, now
+from ..common import now
 from ..errors import DomainError
 from .models import DEFAULT_PROFILE, CareerImport, ImportPreview, KnowledgeCreate, ProfileUpdate
 from .records import values
@@ -105,9 +105,7 @@ class ImportOperations:
             if profile_data is not None:
                 self._apply_profile(conn, profile_data, value.expected_profile_version)
             for item in value.knowledge:
-                record_id = new_id()
-                self._insert_knowledge(conn, item, record_id, timestamp)
-                identifiers.append(record_id)
+                identifiers.append(self._insert_knowledge(conn, item, timestamp))
         return {
             "profile": self.get_profile(),
             "items": [self.get_knowledge(record_id) for record_id in identifiers],

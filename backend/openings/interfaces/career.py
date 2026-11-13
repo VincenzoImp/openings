@@ -15,7 +15,8 @@ from ..career import (
     TemplateCreate,
     TemplateUpdate,
 )
-from .registry import Operation, Param, Route, Tool, bind_mcp, bind_rest
+from ..career.models import ClaimQuery, KnowledgeQuery, TemplateQuery
+from .registry import Operation, Param, Route, Tool, bind_mcp, bind_rest, query_model
 
 LOOKUP = ToolAnnotations(
     readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
@@ -40,7 +41,8 @@ OPERATIONS = (
         params=(),
         call=lambda s: s.get_profile(),
         rest=(Route("GET", "/career/profile", "get_profile"),),
-        tool=Tool("career_get_profile", LOOKUP, method="get_profile"),
+        aliases=("career_get_profile",),
+        tool=Tool(LOOKUP, method="get_profile"),
     ),
     Operation(
         "profile.update",
@@ -51,7 +53,8 @@ OPERATIONS = (
         params=(Param("value", ProfileUpdate),),
         call=lambda s, value: s.update_profile(value),
         rest=(Route("PATCH", "/career/profile", "update_profile"),),
-        tool=Tool("career_update_profile", REPLACE, method="update_profile"),
+        aliases=("career_update_profile",),
+        tool=Tool(REPLACE, method="update_profile"),
     ),
     Operation(
         "knowledge.list",
@@ -59,18 +62,14 @@ OPERATIONS = (
         "list",
         "Career and templates",
         "Search/filter paginated career entries summaries",
-        params=(
-            Param("q", str, ""),
-            Param("kind", str, ""),
-            Param("limit", int, 100),
-            Param("offset", int, 0),
-            Param("summary", bool, False),
-        ),
-        call=lambda s, q, kind, limit, offset, summary: s.list_knowledge(
-            q, kind, limit, offset, summary
-        ),
+        params=(query_model(KnowledgeQuery),),
+        call=lambda s, value: s.list_knowledge(**(value or KnowledgeQuery()).model_dump()),
         rest=(Route("GET", "/career/knowledge", "list_knowledge"),),
-        tool=Tool("knowledge_list", LOOKUP, method="list_knowledge"),
+        tool=Tool(
+            LOOKUP,
+            CareerService.list_knowledge.__doc__,
+            legacy=tuple(KnowledgeQuery.model_fields),
+        ),
     ),
     Operation(
         "knowledge.create",
@@ -81,7 +80,7 @@ OPERATIONS = (
         params=(Param("value", KnowledgeCreate),),
         call=lambda s, value: s.create_knowledge(value),
         rest=(Route("POST", "/career/knowledge", "create_knowledge", status_code=201),),
-        tool=Tool("knowledge_create", ADD, method="create_knowledge"),
+        tool=Tool(ADD, method="create_knowledge"),
     ),
     Operation(
         "knowledge.read",
@@ -92,7 +91,7 @@ OPERATIONS = (
         params=(Param("knowledge_id", str),),
         call=lambda s, knowledge_id: s.get_knowledge(knowledge_id),
         rest=(Route("GET", "/career/knowledge/{knowledge_id}", "get_knowledge"),),
-        tool=Tool("knowledge_get", LOOKUP, method="get_knowledge"),
+        tool=Tool(LOOKUP, method="get_knowledge"),
     ),
     Operation(
         "knowledge.update",
@@ -103,7 +102,7 @@ OPERATIONS = (
         params=(Param("knowledge_id", str), Param("value", KnowledgeUpdate)),
         call=lambda s, knowledge_id, value: s.update_knowledge(knowledge_id, value),
         rest=(Route("PATCH", "/career/knowledge/{knowledge_id}", "update_knowledge"),),
-        tool=Tool("knowledge_update", REPLACE, method="update_knowledge"),
+        tool=Tool(REPLACE, method="update_knowledge"),
     ),
     Operation(
         "knowledge.delete",
@@ -116,7 +115,7 @@ OPERATIONS = (
             knowledge_id, expected_version
         ),
         rest=(Route("DELETE", "/career/knowledge/{knowledge_id}", "delete_knowledge"),),
-        tool=Tool("knowledge_delete", DELETE, method="delete_knowledge"),
+        tool=Tool(DELETE, method="delete_knowledge"),
     ),
     Operation(
         "claims.list",
@@ -124,19 +123,10 @@ OPERATIONS = (
         "list",
         "Career and templates",
         "Search/filter paginated claims summaries",
-        params=(
-            Param("knowledge_id", str, ""),
-            Param("approved", bool | None, None),
-            Param("limit", int, 100),
-            Param("offset", int, 0),
-            Param("summary", bool, False),
-            Param("q", str, ""),
-        ),
-        call=lambda s, knowledge_id, approved, limit, offset, summary, q: s.list_claims(
-            knowledge_id, approved, limit, offset, summary, q
-        ),
+        params=(query_model(ClaimQuery),),
+        call=lambda s, value: s.list_claims(**(value or ClaimQuery()).model_dump()),
         rest=(Route("GET", "/career/claims", "list_claims"),),
-        tool=Tool("claims_list", LOOKUP, method="list_claims"),
+        tool=Tool(LOOKUP, CareerService.list_claims.__doc__, legacy=tuple(ClaimQuery.model_fields)),
     ),
     Operation(
         "claims.create",
@@ -147,7 +137,7 @@ OPERATIONS = (
         params=(Param("value", ClaimCreate),),
         call=lambda s, value: s.create_claim(value),
         rest=(Route("POST", "/career/claims", "create_claim", status_code=201),),
-        tool=Tool("claims_create", ADD, method="create_claim"),
+        tool=Tool(ADD, method="create_claim"),
     ),
     Operation(
         "claims.read",
@@ -158,7 +148,7 @@ OPERATIONS = (
         params=(Param("claim_id", str),),
         call=lambda s, claim_id: s.get_claim(claim_id),
         rest=(Route("GET", "/career/claims/{claim_id}", "get_claim"),),
-        tool=Tool("claims_get", LOOKUP, method="get_claim"),
+        tool=Tool(LOOKUP, method="get_claim"),
     ),
     Operation(
         "claims.update",
@@ -169,7 +159,7 @@ OPERATIONS = (
         params=(Param("claim_id", str), Param("value", ClaimUpdate)),
         call=lambda s, claim_id, value: s.update_claim(claim_id, value),
         rest=(Route("PATCH", "/career/claims/{claim_id}", "update_claim"),),
-        tool=Tool("claims_update", REPLACE, method="update_claim"),
+        tool=Tool(REPLACE, method="update_claim"),
     ),
     Operation(
         "claims.delete",
@@ -180,7 +170,7 @@ OPERATIONS = (
         params=(Param("claim_id", str), Param("expected_version", int)),
         call=lambda s, claim_id, expected_version: s.delete_claim(claim_id, expected_version),
         rest=(Route("DELETE", "/career/claims/{claim_id}", "delete_claim"),),
-        tool=Tool("claims_delete", DELETE, method="delete_claim"),
+        tool=Tool(DELETE, method="delete_claim"),
     ),
     Operation(
         "templates.list",
@@ -188,18 +178,14 @@ OPERATIONS = (
         "list",
         "Career and templates",
         "Search/filter paginated templates summaries",
-        params=(
-            Param("kind", str, ""),
-            Param("limit", int, 100),
-            Param("offset", int, 0),
-            Param("summary", bool, False),
-            Param("q", str, ""),
-        ),
-        call=lambda s, kind, limit, offset, summary, q: s.list_templates(
-            kind, limit, offset, summary, q
-        ),
+        params=(query_model(TemplateQuery),),
+        call=lambda s, value: s.list_templates(**(value or TemplateQuery()).model_dump()),
         rest=(Route("GET", "/templates", "list_templates"),),
-        tool=Tool("templates_list", LOOKUP, method="list_templates"),
+        tool=Tool(
+            LOOKUP,
+            CareerService.list_templates.__doc__,
+            legacy=tuple(TemplateQuery.model_fields),
+        ),
     ),
     Operation(
         "templates.create",
@@ -210,7 +196,7 @@ OPERATIONS = (
         params=(Param("value", TemplateCreate),),
         call=lambda s, value: s.create_template(value),
         rest=(Route("POST", "/templates", "create_template", status_code=201),),
-        tool=Tool("templates_create", ADD, method="create_template"),
+        tool=Tool(ADD, method="create_template"),
     ),
     Operation(
         "templates.read",
@@ -221,7 +207,7 @@ OPERATIONS = (
         params=(Param("template_id", str),),
         call=lambda s, template_id: s.get_template(template_id),
         rest=(Route("GET", "/templates/{template_id}", "get_template"),),
-        tool=Tool("templates_get", LOOKUP, method="get_template"),
+        tool=Tool(LOOKUP, method="get_template"),
     ),
     Operation(
         "templates.update",
@@ -232,7 +218,7 @@ OPERATIONS = (
         params=(Param("template_id", str), Param("value", TemplateUpdate)),
         call=lambda s, template_id, value: s.update_template(template_id, value),
         rest=(Route("PATCH", "/templates/{template_id}", "update_template"),),
-        tool=Tool("templates_update", REPLACE, method="update_template"),
+        tool=Tool(REPLACE, method="update_template"),
     ),
     Operation(
         "templates.delete",
@@ -245,7 +231,7 @@ OPERATIONS = (
             template_id, expected_version
         ),
         rest=(Route("DELETE", "/templates/{template_id}", "delete_template"),),
-        tool=Tool("templates_delete", DELETE, method="delete_template"),
+        tool=Tool(DELETE, method="delete_template"),
     ),
     Operation(
         "instructions.read",
@@ -256,7 +242,7 @@ OPERATIONS = (
         params=(),
         call=lambda s: s.get_instructions(),
         rest=(Route("GET", "/instructions", "get_instructions"),),
-        tool=Tool("instructions_get", LOOKUP, method="get_instructions"),
+        tool=Tool(LOOKUP, method="get_instructions"),
     ),
     Operation(
         "instructions.update",
@@ -267,7 +253,7 @@ OPERATIONS = (
         params=(Param("value", InstructionsUpdate),),
         call=lambda s, value: s.update_instructions(value),
         rest=(Route("PATCH", "/instructions", "update_instructions"),),
-        tool=Tool("instructions_update", REPLACE, method="update_instructions"),
+        tool=Tool(REPLACE, method="update_instructions"),
     ),
     Operation(
         "career.preview_import",
@@ -278,7 +264,7 @@ OPERATIONS = (
         params=(Param("value", ImportPreview),),
         call=lambda s, value: s.preview_import(value),
         rest=(Route("POST", "/career/import/preview", "preview_import"),),
-        tool=Tool("career_preview_import", LOOKUP, method="preview_import"),
+        tool=Tool(LOOKUP, method="preview_import"),
     ),
     Operation(
         "career.import",
@@ -289,7 +275,7 @@ OPERATIONS = (
         params=(Param("value", CareerImport),),
         call=lambda s, value: s.import_knowledge(value),
         rest=(Route("POST", "/career/import", "import_knowledge", status_code=201),),
-        tool=Tool("career_import", ADD, method="import_knowledge"),
+        tool=Tool(ADD, method="import_knowledge"),
     ),
 )
 

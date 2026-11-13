@@ -69,6 +69,7 @@
         }
       ],
       "mcp": [
+        "skills_get",
         "skill_get"
       ],
       "dashboard": "Settings: Skills",
@@ -133,6 +134,7 @@
         }
       ],
       "mcp": [
+        "jobs_list",
         "jobs_search"
       ],
       "dashboard": "Jobs: tabs To review, Shortlist, Dismissed and All, search, signal filter, more filters, pages",
@@ -149,6 +151,7 @@
         }
       ],
       "mcp": [
+        "jobs_get",
         "job_get"
       ],
       "dashboard": "Jobs: the selected job",
@@ -165,6 +168,7 @@
         }
       ],
       "mcp": [
+        "jobs_create",
         "job_ingest"
       ],
       "dashboard": "Jobs: Add a job",
@@ -181,6 +185,7 @@
         }
       ],
       "mcp": [
+        "jobs_update",
         "job_update"
       ],
       "dashboard": "Jobs: job details, Correct the job",
@@ -197,6 +202,7 @@
         }
       ],
       "mcp": [
+        "jobs_triage",
         "job_triage"
       ],
       "dashboard": "Jobs: Shortlist, Dismiss (with a reason), Return to review, Restore",
@@ -261,6 +267,7 @@
         }
       ],
       "mcp": [
+        "jobs_merge",
         "job_merge"
       ],
       "dashboard": "Jobs: Same vacancy: merge; Merge with another job",
@@ -277,6 +284,7 @@
         }
       ],
       "mcp": [
+        "jobs_distinct",
         "job_distinct"
       ],
       "dashboard": "Jobs: job detail, Is this the same vacancy? Different",
@@ -293,6 +301,7 @@
         }
       ],
       "mcp": [
+        "jobs_delete",
         "job_forget"
       ],
       "dashboard": "Jobs: job details, Forget this job permanently; selection bar, Forget",
@@ -345,6 +354,7 @@
         }
       ],
       "mcp": [
+        "notes_get",
         "note_get"
       ],
       "dashboard": "Jobs: job timeline, Edit this note; Application review: Timeline, Edit this note"
@@ -360,6 +370,7 @@
         }
       ],
       "mcp": [
+        "notes_create",
         "note_add"
       ],
       "dashboard": "Jobs: job timeline, Add the note; Application review: Timeline, Add the note; Details, Pinned note",
@@ -376,6 +387,7 @@
         }
       ],
       "mcp": [
+        "notes_update",
         "note_update"
       ],
       "dashboard": "Jobs: job timeline, Edit this note; Application review: Timeline, Edit this note; Details, Pinned note"
@@ -391,7 +403,7 @@
         }
       ],
       "mcp": [
-        "note_pin"
+        "notes_pin"
       ],
       "dashboard": "Jobs: job timeline, Pin/Unpin; Application review: Timeline, Pin/Unpin; Details, Pinned note, Unpin",
       "notes": "expected_version; pinned (default true). At most one pinned note per job and per application: pinning unpins the note pinned in the same scope, with a note_unpinned event naming the replacement. Unpinning keeps the note."
@@ -407,6 +419,7 @@
         }
       ],
       "mcp": [
+        "notes_delete",
         "note_delete"
       ],
       "dashboard": "Jobs: job timeline; Application review: Timeline"
@@ -671,6 +684,7 @@
         }
       ],
       "mcp": [
+        "profile_get",
         "career_get_profile"
       ],
       "dashboard": "Career: profile"
@@ -686,6 +700,7 @@
         }
       ],
       "mcp": [
+        "profile_update",
         "career_update_profile"
       ],
       "dashboard": "Career: profile and Other details",
@@ -1153,6 +1168,7 @@
         }
       ],
       "mcp": [
+        "applications_get",
         "application_get"
       ],
       "dashboard": "Applications: attempt detail",
@@ -1169,6 +1185,7 @@
         }
       ],
       "mcp": [
+        "applications_create",
         "application_create"
       ],
       "dashboard": "Jobs: Start application (the selected job or a Shortlist row)",
@@ -1185,6 +1202,7 @@
         }
       ],
       "mcp": [
+        "applications_update",
         "application_update"
       ],
       "dashboard": "Applications: progress, planning, requirements and questions/answers",
@@ -1201,6 +1219,7 @@
         }
       ],
       "mcp": [
+        "applications_ready",
         "application_ready"
       ],
       "dashboard": "Applications: Mark ready / Not ready in the attempt; Ready badge, filter and queue",
@@ -1217,6 +1236,7 @@
         }
       ],
       "mcp": [
+        "applications_delete",
         "application_delete"
       ],
       "dashboard": "Applications: delete attempt",
@@ -1249,6 +1269,7 @@
         }
       ],
       "mcp": [
+        "applications_history",
         "application_history"
       ],
       "dashboard": "Application review: Timeline (through the timeline)",
@@ -1281,6 +1302,7 @@
         }
       ],
       "mcp": [
+        "responses_create",
         "responses_add"
       ],
       "dashboard": "Applications: Record response on an Applied, Interview or Offer row; Application review: Timeline, Record a response",
@@ -1313,6 +1335,7 @@
         }
       ],
       "mcp": [
+        "responses_delete",
         "responses_remove"
       ],
       "dashboard": "Application review: Timeline, Remove on a response",
@@ -1377,6 +1400,7 @@
         }
       ],
       "mcp": [
+        "contexts_create",
         "application_prepare_context"
       ],
       "dashboard": "Applications: prepare context",
@@ -1393,6 +1417,7 @@
         }
       ],
       "mcp": [
+        "staleness_get",
         "application_staleness"
       ],
       "dashboard": "Applications: Inputs changed indicator and the review page Inputs tab",
@@ -1409,6 +1434,7 @@
         }
       ],
       "mcp": [
+        "staleness_list",
         "applications_staleness"
       ],
       "dashboard": "Applications: Inputs changed tag and first change on rows",
@@ -1644,6 +1670,7 @@
         }
       ],
       "mcp": [
+        "workspace_restore",
         "workspace_restore_upload"
       ],
       "dashboard": "Settings: Backup and restore, Restore (owner only)",
@@ -1963,6 +1990,7 @@
         }
       ],
       "mcp": [
+        "tokens_create",
         "token_create"
       ],
       "dashboard": "Settings: Agent access, Create a token (owner or agent)",
@@ -1980,6 +2008,7 @@
         }
       ],
       "mcp": [
+        "tokens_revoke",
         "token_revoke"
       ],
       "dashboard": "Settings: Agent access, Revoke a token",
@@ -2076,6 +2105,7 @@
         }
       ],
       "mcp": [
+        "sources_yield",
         "collection_yield"
       ],
       "dashboard": "Collection: Yield",

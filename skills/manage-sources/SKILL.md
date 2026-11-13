@@ -33,7 +33,7 @@ stored [run report](../openings-workspace/references/run-report.md).
 ## Measure before changing
 
 For each source, read its configuration, schedule, last runs and errors. Measure
-yield with `collection_yield` (REST `GET /collection/yield`) over a stated
+yield with `sources_yield` (REST `GET /collection/yield`) over a stated
 period (`since`, `until`): per source and per search, the jobs it collected
 first, still to review, shortlisted, applied to, answered by an employer
 (responses, interviews, offers), dismissed by a policy rule, an agent or the

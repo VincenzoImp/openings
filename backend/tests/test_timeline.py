@@ -350,7 +350,7 @@ def test_rest_and_mcp_return_identical_timelines(tmp_path):
         unpinned = tool(
             client,
             headers,
-            "note_pin",
+            "notes_pin",
             {"note_id": note["id"], "value": {"expected_version": 2, "pinned": False}},
         )
         assert (unpinned["pinned"], unpinned["version"]) == (False, 3)

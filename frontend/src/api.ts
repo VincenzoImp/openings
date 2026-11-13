@@ -579,6 +579,8 @@ export interface WorkspaceFile {
   created_at?: string;
   download_url?: string;
   url?: string;
+  /** Always 1: a file never changes. A delete names it. */
+  version?: number;
 }
 export interface Source extends Versioned {
   name: string;

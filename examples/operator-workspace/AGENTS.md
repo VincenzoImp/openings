@@ -28,7 +28,7 @@ When the owner asks only to inspect or report, keep that run read-only.
 ## Skills
 
 The Openings server serves its workflow skills, matching its version: use the
-`skills_list` and `skill_get` MCP tools or the per-skill MCP prompts. For
+`skills_list` and `skills_get` MCP tools or the per-skill MCP prompts. For
 clients that load skills from disk, `python3 .agents/scripts/fetch_skills.py`
 copies them into `.agents/skills/`.
 

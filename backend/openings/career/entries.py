@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..common import check_version, decode_record, encode, new_id, now
 from ..errors import missing
+from ..idempotency import fingerprint, remember, replay
 from .models import KnowledgeCreate, KnowledgeUpdate
 from .records import _get, _page, values
 
@@ -17,9 +18,9 @@ class EntryOperations:
         kind: str = "",
         limit: int = 100,
         offset: int = 0,
-        summary: bool = False,
+        summary: bool = True,
     ) -> dict:
-        """Search career evidence. summary=true returns bounded previews/counts; get a record for its full narrative and metadata."""
+        """Search Career entries by q (title, organization, narrative) and kind. summary=true (the default) returns bounded previews and counts; summary=false returns full records. Read knowledge_get for one entry's full narrative and metadata."""
         _page(limit, offset)
         where, params = [], []
         if q:
@@ -48,6 +49,8 @@ class EntryOperations:
                 for row in rows
             ],
             "total": total,
+            "limit": limit,
+            "offset": offset,
         }
 
     def get_knowledge(self, knowledge_id: str) -> dict:
@@ -59,9 +62,8 @@ class EntryOperations:
 
     def create_knowledge(self, value: KnowledgeCreate) -> dict:
         """Add detailed career evidence. Facts should come from the user, not a job posting."""
-        record_id, timestamp = new_id(), now()
         with self.db.transaction() as conn:
-            self._insert_knowledge(conn, value, record_id, timestamp)
+            record_id = self._insert_knowledge(conn, value, now())
         return self.get_knowledge(record_id)
 
     @staticmethod
@@ -74,7 +76,13 @@ class EntryOperations:
             row = conn.execute("SELECT MAX(position) FROM knowledge").fetchone()
         return (row[0] + 1) if row[0] is not None else 0
 
-    def _insert_knowledge(self, conn, value, record_id, timestamp):
+    def _insert_knowledge(self, conn, value, timestamp):
+        """Add one entry and return its id, or the id an earlier request with its key created."""
+        digest = fingerprint(value)
+        replayed = replay(conn, "knowledge", value.idempotency_key, digest)
+        if replayed:
+            return replayed
+        record_id = new_id()
         position = (
             value.position if value.position is not None else self._next_position(conn, "knowledge")
         )
@@ -95,6 +103,8 @@ class EntryOperations:
             ),
         )
         self._record(conn, "knowledge_created", "knowledge", record_id, kind=value.kind)
+        remember(conn, "knowledge", value.idempotency_key, digest, record_id)
+        return record_id
 
     def update_knowledge(self, knowledge_id: str, value: KnowledgeUpdate) -> dict:
         """Revise entry fields with version protection; dates=null clears dates, frozen contexts remain unchanged."""

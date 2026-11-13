@@ -90,7 +90,7 @@ async def test_rest_mcp_queues_filter_before_totals_facets_and_pagination(tmp_pa
         result = client.get("/api/v1/jobs?queue=shortlist&sort=title&limit=1&offset=1").json()
         assert result["total"] == 2 and result["items"][0]["title"] == "C role"
         mcp = await app.state.mcp.call_tool(
-            "jobs_search",
+            "jobs_list",
             {
                 "value": {
                     "queue": "shortlist",

@@ -47,6 +47,12 @@ SHA256 = r"^[a-fA-F0-9]{64}$"
 
 class DocumentCreate(Input):
     application_id: str
+    idempotency_key: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description="Retrying with the same key and request returns the record the first request created.",
+    )
     context_id: str | None = None
     kind: DocumentKind = "resume"
     title: str = Field(default="", max_length=300)
@@ -92,6 +98,43 @@ class ReviewUpdate(Input):
 
 
 StalenessStage = Literal["draft", "applied", "interview", "offer", "closed", "all"]
+
+
+# The filters, page and detail of each list: MCP's value, REST's query string.
+class ContextQuery(Input):
+    application_id: str = ""
+    limit: int = 100
+    offset: int = 0
+    summary: bool = True
+    q: str = ""
+
+
+class DocumentQuery(Input):
+    application_id: str = ""
+    kind: str = ""
+    limit: int = 100
+    offset: int = 0
+    summary: bool = True
+    q: str = ""
+    review_state: Literal["draft", "approved"] | None = None
+
+
+class FileQuery(Input):
+    owner_type: OwnerType | None = None
+    owner_id: str = ""
+    limit: int = 100
+    offset: int = 0
+    summary: bool = True
+    q: str = ""
+    media_type: str = ""
+    application_id: str = ""
+
+
+class StalenessQuery(Input):
+    status: StalenessStage = "draft"
+    stale_only: bool = True
+    limit: int = 50
+    offset: int = 0
 
 
 class UploadReservation(Input):

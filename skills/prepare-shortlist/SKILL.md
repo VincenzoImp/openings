@@ -110,7 +110,7 @@ uses its evidence links; it does not create an official bank claim.
 Write a letter for the actual role and company, with supported reasons and
 relevant examples. Present the strongest truthful case and never volunteer gaps
 (see [Career claims](../career-claims/SKILL.md)); record gaps for the owner in
-a note on the application instead (`note_add` with `application_id`, not
+a note on the application instead (`notes_create` with `application_id`, not
 pinned: the pinned note is the owner's standing guidance). Check the CV and letter together for consistent positioning,
 attribution and personal details. Resolve every placeholder. Do not use the
 general letter MASTER unchanged as if it addressed a specific employer.
@@ -124,7 +124,7 @@ geometry, links, factual scope and employer requirements. Use the template's
 checker where supplied; it does not replace factual or visual review.
 
 Find the intended current document leaf for each kind. When resuming, check
-`application_staleness`: a leaf built on older inputs is refreshed with a new
+`staleness_get`: a leaf built on older inputs is refreshed with a new
 context and new revisions when the change matters. Reuse matching work;
 complete missing steps on a compatible incomplete revision. Save changed output
 as the appropriate new revision. An approved parent does not supply files or
@@ -148,7 +148,7 @@ Do not attribute this review to a human.
 
 Re-read the intended CV and CL leaves and their files. Both must match the chosen
 context, have their exact source and a valid checked PDF built from it, and have
-approved review states. Only then mark the Draft ready: `application_ready` with the
+approved review states. Only then mark the Draft ready: `applications_ready` with the
 application's current `expected_version`. Openings refuses with
 `application_not_ready` and names the failed check (`blocked`, `none`,
 `missing_pdf`, `unreviewed`) when the stored records disagree; fix that step

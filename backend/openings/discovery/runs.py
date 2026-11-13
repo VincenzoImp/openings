@@ -204,13 +204,14 @@ class RunOperations:
             params.append(state)
         where = " WHERE " + " AND ".join(clauses) if clauses else ""
         query = "SELECT r.*," + states_sql + " AS state FROM collection_runs r"
+        limit, offset = min(max(limit, 1), 200), max(offset, 0)
         rows = self.db.all(
             "SELECT * FROM ("
             + query
             + ")"
             + where
             + " ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?",
-            (*params, min(max(limit, 1), 200), max(offset, 0)),
+            (*params, limit, offset),
         )
         ids = [row["id"] for row in rows]
         tasks = (
@@ -230,6 +231,8 @@ class RunOperations:
         return {
             "items": [self._run_summary(record) for record in records] if summary else records,
             "total": self.db.one("SELECT COUNT(*) AS n FROM (" + query + ")" + where, params)["n"],
+            "limit": limit,
+            "offset": offset,
         }
 
     def get_run(self, run_id):

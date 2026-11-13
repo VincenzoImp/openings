@@ -71,7 +71,7 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
 
 Openings works best when your own AI agent runs it. The server ships
 [workflow skills](skills/) and serves them to any connected agent (`skills_list`,
-`skill_get` and one MCP prompt per skill). With them, an agent reviews new jobs
+`skills_get` and one MCP prompt per skill). With them, an agent reviews new jobs
 against your policy, prepares a CV and letter for every shortlisted job, records
 employer requirements, tunes searches and keeps your Career record current. You
 answer its questions, apply to the prepared Drafts and mark them Applied.
