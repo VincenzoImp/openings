@@ -36,6 +36,12 @@ class JobInput(Input):
     source_key: str | None = Field(default=None, max_length=1000)
     source_id: str | None = None
     raw: dict[str, Any] = Field(default_factory=dict)
+    idempotency_key: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description="Retrying with the same key and request returns the record the first request created.",
+    )
 
     @field_validator("url")
     @classmethod
@@ -94,6 +100,12 @@ class MergeInput(Versioned):
 
 class NoteInput(Input):
     body: str = Field(min_length=1, max_length=30_000)
+    idempotency_key: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description="Retrying with the same key and request returns the record the first request created.",
+    )
     application_id: str | None = Field(
         default=None,
         description="Write the note on this application of the job; omit for a note on the job itself.",
@@ -115,7 +127,7 @@ class NotePin(Versioned):
 DEPRECATED_NOTE = (
     "Deprecated since 0.22, removed in 0.23: the application's pinned note "
     "(pinned_note). Writing it edits that note, creates it pinned when there is none, "
-    "or unpins it when empty. Use note_add with pinned=true, note_update and note_pin."
+    "or unpins it when empty. Use notes_create with pinned=true, notes_update and notes_pin."
 )
 
 

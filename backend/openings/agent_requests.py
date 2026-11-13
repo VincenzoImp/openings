@@ -189,7 +189,12 @@ class RequestService:
                 (*params, value.limit, value.offset),
             ).fetchall()
             total = conn.execute("SELECT count(*) FROM requests r" + clause, params).fetchone()[0]
-        return {"items": [request_record(row) for row in rows], "total": total}
+        return {
+            "items": [request_record(row) for row in rows],
+            "total": total,
+            "limit": value.limit,
+            "offset": value.offset,
+        }
 
     def create_request(self, value: RequestCreate) -> dict:
         """Write a request for the agent about a job, an application, a Career entry or nothing.

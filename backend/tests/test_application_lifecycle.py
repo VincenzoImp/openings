@@ -130,7 +130,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             return result.get("structuredContent") or json.loads(result["content"][0]["text"])
 
         job = call(
-            "job_ingest",
+            "jobs_create",
             "POST",
             "/jobs",
             {
@@ -142,7 +142,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             },
         )
         attempt = call(
-            "application_create",
+            "applications_create",
             "POST",
             "/applications",
             {
@@ -154,7 +154,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             },
         )
         retry = call(
-            "application_create",
+            "applications_create",
             "POST",
             "/applications",
             {
@@ -167,7 +167,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
         )
         assert retry["id"] == attempt["id"]
         call(
-            "application_create",
+            "applications_create",
             "POST",
             "/applications",
             {
@@ -195,7 +195,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
 
         path = f"/applications/{attempt['id']}"
         attempt = call(
-            "application_update",
+            "applications_update",
             "PATCH",
             path,
             {
@@ -208,7 +208,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
         )
         assert attempt["applied_at"]
         attempt = call(
-            "application_update",
+            "applications_update",
             "PATCH",
             path,
             {
@@ -221,7 +221,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
         )
         assert attempt["applied_at"] is None
         call(
-            "application_update",
+            "applications_update",
             "PATCH",
             path,
             {
@@ -234,7 +234,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             error=422,
         )
         attempt = call(
-            "application_update",
+            "applications_update",
             "PATCH",
             path,
             {
@@ -247,7 +247,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             },
         )
         attempt = call(
-            "application_update",
+            "applications_update",
             "PATCH",
             path,
             {
@@ -260,7 +260,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
         )
         assert attempt["outcome"] == "rejected"
         call(
-            "application_delete",
+            "applications_delete",
             "DELETE",
             path,
             {
@@ -271,7 +271,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             error=422,
         )
         call(
-            "application_delete",
+            "applications_delete",
             "DELETE",
             path,
             {
@@ -281,7 +281,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             error=409,
         )
         call(
-            "application_delete",
+            "applications_delete",
             "DELETE",
             path,
             {
@@ -292,7 +292,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
         retained = client.get(f"/api/v1/jobs/{job['id']}").json()
         assert retained["triage"] == "saved" and retained["application_count"] == 0
         call(
-            "job_forget",
+            "jobs_delete",
             "DELETE",
             f"/jobs/{job['id']}",
             {
@@ -303,7 +303,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             error=422,
         )
         call(
-            "job_forget",
+            "jobs_delete",
             "DELETE",
             f"/jobs/{job['id']}",
             {
@@ -313,7 +313,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             error=409,
         )
         call(
-            "job_forget",
+            "jobs_delete",
             "DELETE",
             f"/jobs/{job['id']}",
             {

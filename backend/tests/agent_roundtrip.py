@@ -54,9 +54,9 @@ async def exercise(base, token, folder, tectonic):
                 names = {tool.name for tool in tools.tools}
                 by_name = {tool.name: tool for tool in tools.tools}
                 checks["typed_module_discovery"] = {
-                    "career_get_profile",
+                    "profile_get",
                     "templates_create",
-                    "application_prepare_context",
+                    "contexts_create",
                     "files_reserve_upload",
                 } <= names
                 checks["career_file_tool_annotations"] = (
@@ -66,10 +66,10 @@ async def exercise(base, token, folder, tectonic):
                     and not by_name["files_reserve_upload"].annotations.read_only_hint
                     and not by_name["files_reserve_upload"].annotations.open_world_hint
                 )
-                profile = unpack(await session.call_tool("career_get_profile", {}))
+                profile = unpack(await session.call_tool("profile_get", {}))
                 unpack(
                     await session.call_tool(
-                        "career_update_profile",
+                        "profile_update",
                         {
                             "value": {
                                 "expected_version": profile["version"],
@@ -120,7 +120,7 @@ async def exercise(base, token, folder, tectonic):
                 )
                 job = unpack(
                     await session.call_tool(
-                        "job_ingest",
+                        "jobs_create",
                         {
                             "value": {
                                 "title": "Backend engineer",
@@ -132,7 +132,7 @@ async def exercise(base, token, folder, tectonic):
                 )
                 unpack(
                     await session.call_tool(
-                        "job_triage",
+                        "jobs_triage",
                         {
                             "job_id": job["id"],
                             "value": {"triage": "saved", "expected_version": job["version"]},
@@ -140,26 +140,26 @@ async def exercise(base, token, folder, tectonic):
                     )
                 )
                 checks["shortlist_before_preparation"] = (
-                    unpack(
-                        await session.call_tool("jobs_search", {"value": {"queue": "shortlist"}})
-                    )["total"]
+                    unpack(await session.call_tool("jobs_list", {"value": {"queue": "shortlist"}}))[
+                        "total"
+                    ]
                     == 1
                 )
                 application = unpack(
                     await session.call_tool(
-                        "application_create",
+                        "applications_create",
                         {"value": {"job_id": job["id"], "note": "Prefer technical detail."}},
                     )
                 )
                 checks["preparation_leaves_shortlist"] = (
-                    unpack(
-                        await session.call_tool("jobs_search", {"value": {"queue": "shortlist"}})
-                    )["total"]
+                    unpack(await session.call_tool("jobs_list", {"value": {"queue": "shortlist"}}))[
+                        "total"
+                    ]
                     == 0
                 )
                 context = unpack(
                     await session.call_tool(
-                        "application_prepare_context",
+                        "contexts_create",
                         {
                             "value": {
                                 "application_id": application["id"],
@@ -320,9 +320,11 @@ async def exercise(base, token, folder, tectonic):
                     await session.call_tool(
                         "documents_list",
                         {
-                            "application_id": application["id"],
-                            "summary": True,
-                            "limit": 1,
+                            "value": {
+                                "application_id": application["id"],
+                                "summary": True,
+                                "limit": 1,
+                            }
                         },
                     )
                 )
@@ -347,10 +349,7 @@ async def exercise(base, token, folder, tectonic):
                     unpack(
                         await session.call_tool(
                             "knowledge_list",
-                            {
-                                "summary": True,
-                                "q": "Example API",
-                            },
+                            {"value": {"summary": True, "q": "Example API"}},
                         )
                     )["items"][0]["id"]
                     == evidence["id"]
@@ -366,10 +365,7 @@ async def exercise(base, token, folder, tectonic):
                     and unpack(
                         await session.call_tool(
                             "contexts_list",
-                            {
-                                "application_id": application["id"],
-                                "summary": True,
-                            },
+                            {"value": {"application_id": application["id"], "summary": True}},
                         )
                     )["items"][0]["document_count"]
                     == 2
@@ -377,20 +373,20 @@ async def exercise(base, token, folder, tectonic):
                 checks["files_do_not_mark_application_sent"] = (
                     unpack(
                         await session.call_tool(
-                            "application_get", {"application_id": application["id"]}
+                            "applications_get", {"application_id": application["id"]}
                         )
                     )["status"]
                     == "draft"
                 )
                 current = unpack(
                     await session.call_tool(
-                        "application_get", {"application_id": application["id"]}
+                        "applications_get", {"application_id": application["id"]}
                     )
                 )
                 for status in ("applied", "closed"):
                     current = unpack(
                         await session.call_tool(
-                            "application_update",
+                            "applications_update",
                             {
                                 "application_id": application["id"],
                                 "value": {
@@ -402,13 +398,13 @@ async def exercise(base, token, folder, tectonic):
                         )
                     )
                 checks["closed_stays_out_of_pending_queues"] = (
-                    unpack(
-                        await session.call_tool("jobs_search", {"value": {"queue": "shortlist"}})
-                    )["total"]
+                    unpack(await session.call_tool("jobs_list", {"value": {"queue": "shortlist"}}))[
+                        "total"
+                    ]
                     == 0
-                    and unpack(
-                        await session.call_tool("jobs_search", {"value": {"queue": "inbox"}})
-                    )["total"]
+                    and unpack(await session.call_tool("jobs_list", {"value": {"queue": "inbox"}}))[
+                        "total"
+                    ]
                     == 0
                 )
                 response = await http.get(base + "/api/v1/backup")

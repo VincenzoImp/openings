@@ -211,7 +211,7 @@ export function ClaimGroups({ claims }: { claims: Claim[] }) {
 /** The claims of one entry, inside its editor. */
 export function EntryClaims({ entry }: { entry: Knowledge }) {
   const { data, setData, loading, error, reload } = useFresh(
-    `/career/claims?knowledge_id=${entry.id}&limit=200`,
+    `/career/claims?knowledge_id=${entry.id}&limit=200&summary=false`,
     NONE,
     ["career"],
   );

@@ -55,7 +55,7 @@ Use public company information only from sources the owner can verify; cite them
 
 ## Save and report
 
-Save the preparation as a note on the application (`note_add` with
+Save the preparation as a note on the application (`notes_create` with
 `application_id`), so it stays with that attempt. Do not pin it: the pinned note
 is the owner's standing guidance.
 Report the note ID and any open questions for the owner, using the shared

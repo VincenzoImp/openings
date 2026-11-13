@@ -63,7 +63,7 @@ def test_skills_over_rest_and_mcp(tmp_path, monkeypatch):
         assert client.get("/api/v1/skills/nope", headers=rest).status_code == 404
 
         result = rpc(
-            "tools/call", {"name": "skill_get", "arguments": {"name": "setup-openings"}}, 1
+            "tools/call", {"name": "skills_get", "arguments": {"name": "setup-openings"}}, 1
         )
         body = result.get("structuredContent") or json.loads(result["content"][0]["text"])
         assert "# Set up Openings" in body["content"]

@@ -406,7 +406,12 @@ def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_
     assert len(compact["items"][0]["narrative_preview"]) == 240
     assert compact["items"][0]["claim_count"] == 1
     assert "metadata" not in compact["items"][0] and "narrative" not in compact["items"][0]
-    assert career.list_knowledge()["items"][0]["narrative"] == evidence["narrative"]
+    # Lists return summaries by default; summary=false gives the full records.
+    assert "narrative" not in career.list_knowledge()["items"][0]
+    assert career.list_knowledge(summary=False)["items"][0]["narrative"] == evidence["narrative"]
+    full = client.get("/api/v1/career/knowledge", params={"summary": "false"}).json()
+    assert full["items"][0]["narrative"] == evidence["narrative"]
+    assert (full["limit"], full["offset"]) == (100, 0)
     claim_summary = client.get(
         "/api/v1/career/claims", params={"summary": "true", "q": "Example API", "approved": "true"}
     ).json()

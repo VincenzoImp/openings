@@ -109,7 +109,7 @@ test("a local note added in the dashboard appears in the skill an agent reads ov
   // over MCP (tool and prompt) and REST; the shipped text is unchanged.
   const agent = await agentToken(page);
   const tool = await mcp(page, agent.token, "tools/call", {
-    name: "skill_get",
+    name: "skills_get",
     arguments: { name: skill },
   });
   const served = (tool.structuredContent || JSON.parse(tool.content[0].text))

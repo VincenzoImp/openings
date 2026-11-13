@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..common import check_version, encode, new_id, now
 from ..errors import missing
+from ..idempotency import fingerprint, remember, replay
 from .models import CLAIM_FIELDS, ClaimCreate, ClaimUpdate
 from .records import _claim, _get, _page, values
 
@@ -17,10 +18,10 @@ class ClaimOperations:
         approved: bool | None = None,
         limit: int = 100,
         offset: int = 0,
-        summary: bool = False,
+        summary: bool = True,
         q: str = "",
     ) -> dict:
-        """List reusable claims by evidence, approval or text. summary=true omits metadata and bounds wording previews; the typed selection fields (default_in_cv, role, group) are always returned."""
+        """List reusable claims by evidence (knowledge_id), approval or text (q). summary=true (the default) omits metadata and bounds wording previews; summary=false returns full claims. The typed selection fields (default_in_cv, role, group) are always returned."""
         _page(limit, offset)
         where, params = [], []
         if knowledge_id:
@@ -49,6 +50,8 @@ class ClaimOperations:
         return {
             "items": [_claim(row, full=not summary) for row in rows],
             "total": self.db.one(f"SELECT COUNT(*) AS n FROM claims{clause}", params)["n"],
+            "limit": limit,
+            "offset": offset,
         }
 
     def get_claim(self, claim_id: str) -> dict:
@@ -60,36 +63,44 @@ class ClaimOperations:
 
     def create_claim(self, value: ClaimCreate) -> dict:
         """Create reusable claim wording tied to evidence. Approval defaults to false. Selection is typed: default_in_cv, role (core, supporting, bench) and group."""
-        record_id, timestamp = new_id(), now()
+        record_id, timestamp, digest = new_id(), now(), fingerprint(value)
         with self.db.transaction() as conn:
-            _get(conn, "knowledge", value.knowledge_id, "Career knowledge")
-            conn.execute(
-                'INSERT INTO claims(id,knowledge_id,text,approved,position,default_in_cv,role,"group",metadata,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
-                (
-                    record_id,
-                    value.knowledge_id,
-                    value.text,
-                    int(value.approved),
-                    value.position
-                    if value.position is not None
-                    else self._next_position(conn, "claims", value.knowledge_id),
-                    int(value.default_in_cv),
-                    value.role,
-                    value.group,
-                    encode(value.metadata),
-                    timestamp,
-                    timestamp,
-                ),
-            )
-            self._record(
-                conn,
-                "claim_created",
-                "claim",
-                record_id,
-                knowledge_id=value.knowledge_id,
-                approved=value.approved,
-            )
+            replayed = replay(conn, "claims", value.idempotency_key, digest)
+            if replayed:
+                record_id = replayed
+            else:
+                self._insert_claim(conn, value, record_id, timestamp)
+                remember(conn, "claims", value.idempotency_key, digest, record_id)
         return self.get_claim(record_id)
+
+    def _insert_claim(self, conn, value, record_id, timestamp):
+        _get(conn, "knowledge", value.knowledge_id, "Career knowledge")
+        conn.execute(
+            'INSERT INTO claims(id,knowledge_id,text,approved,position,default_in_cv,role,"group",metadata,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+            (
+                record_id,
+                value.knowledge_id,
+                value.text,
+                int(value.approved),
+                value.position
+                if value.position is not None
+                else self._next_position(conn, "claims", value.knowledge_id),
+                int(value.default_in_cv),
+                value.role,
+                value.group,
+                encode(value.metadata),
+                timestamp,
+                timestamp,
+            ),
+        )
+        self._record(
+            conn,
+            "claim_created",
+            "claim",
+            record_id,
+            knowledge_id=value.knowledge_id,
+            approved=value.approved,
+        )
 
     def update_claim(self, claim_id: str, value: ClaimUpdate) -> dict:
         """Revise or approve a claim with version checking; document generation does not silently approve new facts."""

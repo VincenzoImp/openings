@@ -377,7 +377,7 @@ def test_requests_exist_after_a_schema_seven_upgrade(tmp_path):
         assert "requests" not in table_names(conn)
     upgraded = Workspace(path)
     requests = RequestService(upgraded)
-    assert requests.list_requests() == {"items": [], "total": 0}
+    assert requests.list_requests() == {"items": [], "total": 0, "limit": 50, "offset": 0}
     with acting_as(OWNER):
         created = requests.create_request(
             {"text": "Prepare this one.", "subject_type": "job", "subject_id": job["id"]}

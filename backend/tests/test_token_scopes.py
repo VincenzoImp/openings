@@ -95,11 +95,13 @@ def test_an_agent_token_is_refused_owner_operations_on_rest_and_mcp(app, client)
             client.post(
                 "/api/v1/tokens", json={"name": "Escalation", "kind": "owner"}, headers=headers
             ),
-            tool(client, agent, "token_create", {"value": {"name": "Escalation", "kind": "owner"}}),
+            tool(
+                client, agent, "tokens_create", {"value": {"name": "Escalation", "kind": "owner"}}
+            ),
         ),
         (
             client.delete(f"/api/v1/tokens/{other['id']}", headers=headers),
-            tool(client, agent, "token_revoke", {"token_id": other["id"]}),
+            tool(client, agent, "tokens_revoke", {"token_id": other["id"]}),
         ),
         (
             client.post(
@@ -107,7 +109,7 @@ def test_an_agent_token_is_refused_owner_operations_on_rest_and_mcp(app, client)
                 content=b"SQLite format 3\x00",
                 headers={**headers, "Content-Type": "application/vnd.sqlite3"},
             ),
-            tool(client, agent, "workspace_restore_upload"),
+            tool(client, agent, "workspace_restore"),
         ),
         (
             client.post(f"/api/v1/questions/{asked['id']}/answer", json=answer, headers=headers),
@@ -180,7 +182,7 @@ def test_an_agent_token_keeps_the_workflow_operations(app, client):
     assert error is None and export["headers"]["X-Operational-Token"]
     current = client.get(f"/api/v1/jobs/{job['id']}", headers=headers).json()
     forgotten, error = tool(
-        client, agent, "job_forget", {"job_id": job["id"], "expected_version": current["version"]}
+        client, agent, "jobs_delete", {"job_id": job["id"], "expected_version": current["version"]}
     )
     assert error is None and forgotten["deleted"] is True
     # The recorded kind outlives the token.
@@ -241,7 +243,7 @@ def test_an_owner_token_keeps_full_access_and_chooses_the_kind(app, client):
     # The kind defaults to owner on both interfaces, so existing scripts keep working.
     default = client.post("/api/v1/tokens", json={"name": "Script"}, headers=headers).json()
     scoped, error = tool(
-        client, owner, "token_create", {"value": {"name": "Agent on laptop", "kind": "agent"}}
+        client, owner, "tokens_create", {"value": {"name": "Agent on laptop", "kind": "agent"}}
     )
     assert error is None and (default["kind"], scoped["kind"]) == ("owner", "agent")
     assert scoped["token"].startswith("op_")
@@ -259,7 +261,7 @@ def test_an_owner_token_keeps_full_access_and_chooses_the_kind(app, client):
     assert created["actor"]["token_kind"] == "owner"
     for body in ({"name": "Invalid", "kind": "admin"}, {"name": "Invalid", "kind": None}):
         invalid = client.post("/api/v1/tokens", json=body, headers=headers)
-        _, error = tool(client, owner, "token_create", {"value": body})
+        _, error = tool(client, owner, "tokens_create", {"value": body})
         assert invalid.status_code == 422
         assert invalid.json()["error"]["code"] == error["code"] == "validation"
     # The owner can run everything from an external session: answer, revoke, change the password.
@@ -286,7 +288,7 @@ def test_an_owner_token_keeps_full_access_and_chooses_the_kind(app, client):
         headers={**headers, "Content-Type": "application/vnd.sqlite3"},
     )
     assert restored.status_code == 200, restored.text
-    upload, error = tool(client, owner, "workspace_restore_upload")
+    upload, error = tool(client, owner, "workspace_restore")
     assert error is None and upload["url"] == "/api/v1/backup/restore"
 
 
@@ -341,7 +343,7 @@ def test_tokens_from_schema_seven_keep_full_access(tmp_path):
         assert [(item["name"], item["kind"]) for item in listed.json()["items"]] == [
             ("Token from 0.16", "owner")
         ]
-        created, error = tool(client, token, "token_create", {"value": {"name": "New agent"}})
+        created, error = tool(client, token, "tokens_create", {"value": {"name": "New agent"}})
         assert error is None and created["kind"] == "owner"
         assert client.delete(f"/api/v1/tokens/{created['id']}", headers=headers).status_code == 200
         backup = client.get("/api/v1/backup", headers=headers)

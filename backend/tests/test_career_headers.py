@@ -189,7 +189,7 @@ def test_complete_entry_workflow_headers_order_and_frozen_context(tmp_path, tran
         )
         application = app.state.workspace.create_application({"job_id": job["id"]})
         frozen = call(
-            "application_prepare_context",
+            "contexts_create",
             "POST",
             "/contexts",
             {

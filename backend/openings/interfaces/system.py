@@ -39,6 +39,12 @@ class TokenInput(Input):
         default="owner",
         description="owner has full access; agent cannot change the owner password, manage tokens, restore a backup, answer questions for the owner or write requests for the agent.",
     )
+    idempotency_key: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description="Retrying with the same key and request returns the token without its secret, which is shown only once.",
+    )
 
 
 def redact_secrets(value):
@@ -118,7 +124,7 @@ GROUP = "Workspace access and portability"
 OPERATIONS = (
     Operation(
         "password.update",
-        "password",
+        "owner_password",
         "update",
         GROUP,
         "Change owner password and rotate owner sessions",
@@ -127,7 +133,6 @@ OPERATIONS = (
         call=lambda s, value: s.change_password(value.password),
         rest=(Route("POST", "/auth/password", "change_password", custom=True),),
         tool=Tool(
-            "owner_password_update",
             REMOVE,
             "Change the owner password and invalidate all browser sessions; API/MCP tokens remain valid. Owner only: an agent token is refused with forbidden.",
         ),
@@ -139,7 +144,7 @@ OPERATIONS = (
         "Archive",
         "Read supported logical operations and transport exceptions",
         rest=(Route("GET", "/capabilities", "capabilities", custom=True),),
-        tool=Tool("capabilities_get", READ, custom=True),
+        tool=Tool(READ, custom=True),
     ),
     Operation(
         "tokens.list",
@@ -151,7 +156,6 @@ OPERATIONS = (
         call=lambda s: s.list_tokens(),
         rest=(Route("GET", "/tokens", "tokens"),),
         tool=Tool(
-            "tokens_list",
             READ,
             "List installation API/MCP token metadata with each token's kind; stored token secrets are never returned. Owner only: an agent token is refused with forbidden.",
         ),
@@ -164,10 +168,10 @@ OPERATIONS = (
         "Create a named owner or agent API token",
         access="owner",
         params=(Param("value", TokenInput),),
-        call=lambda s, value: s.create_token(value.name, value.kind),
+        call=lambda s, value: s.create_token(value.name, value.kind, value.idempotency_key),
         rest=(Route("POST", "/tokens", "token"),),
+        aliases=("token_create",),
         tool=Tool(
-            "token_create",
             WRITE,
             "Create a named API/MCP token of kind owner (full access, the default) or agent (scoped). Save its secret; it is returned only once. Owner only: an agent token is refused with forbidden.",
         ),
@@ -175,58 +179,56 @@ OPERATIONS = (
     Operation(
         "tokens.revoke",
         "tokens",
-        "delete",
+        "revoke",
         GROUP,
         "Revoke an API token",
         access="owner",
         params=(Param("token_id", str),),
         call=lambda s, token_id: s.revoke_token(token_id),
         rest=(Route("DELETE", "/tokens/{token_id}", "revoke"),),
+        aliases=("token_revoke",),
         tool=Tool(
-            "token_revoke",
             REMOVE,
             "Revoke an API/MCP token, including the current token if selected. Owner only: an agent token is refused with forbidden.",
         ),
     ),
     Operation(
         "backup.download",
-        "backups",
-        "create",
+        "workspace",
+        "backup",
         GROUP,
         "Download a consistent SQLite backup including bytes",
         call=backup_grant,
         rest=(Route("GET", "/backup", "backup", custom=True),),
         tool=Tool(
-            "workspace_backup",
             READ,
             "Reserve a scoped HTTP download of a consistent SQLite backup, including file bytes. A backup taken with an agent token omits the owner password hash, session secret and API tokens; it still restores completely.",
         ),
     ),
     Operation(
         "backup.restore",
-        "backups",
+        "workspace",
         "restore",
         GROUP,
         "Replace workspace data from a SQLite backup",
         access="owner",
         call=restore_grant,
         rest=(Route("POST", "/backup/restore", "restore", custom=True),),
+        aliases=("workspace_restore_upload",),
         tool=Tool(
-            "workspace_restore_upload",
             REMOVE,
             "Reserve a scoped raw SQLite upload that replaces workspace data; installation authentication stays unchanged. Owner only: an agent token is refused with forbidden.",
         ),
     ),
     Operation(
         "export.records",
-        "records",
+        "workspace",
         "export",
         GROUP,
         "Download portable JSON records without file bytes",
         call=export_grant,
         rest=(Route("GET", "/export", "export", custom=True),),
         tool=Tool(
-            "workspace_export",
             READ,
             "Reserve a redacted JSON records export. File bytes and installation authentication are excluded; use backup for a full snapshot.",
         ),

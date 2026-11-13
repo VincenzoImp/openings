@@ -22,6 +22,7 @@ from .actors import (
 )
 from .common import new_id, now
 from .errors import DomainError
+from .idempotency import fingerprint, remember, replay
 
 COOKIE = "openings_session"
 MAX_AGE = 7 * 24 * 3600
@@ -159,13 +160,25 @@ class Auth:
         )
         return {"items": rows, "total": len(rows)}
 
-    def create_token(self, name, kind="owner"):
-        """Create an ``owner`` token (full access) or a scoped ``agent`` token."""
+    def create_token(self, name, kind="owner", idempotency_key=None):
+        """Create an ``owner`` token (full access) or a scoped ``agent`` token.
+
+        A retry with the same idempotency key returns the token without its secret,
+        which is shown only once.
+        """
         require_owner("create API tokens")
         if kind not in TOKEN_KINDS:
             raise DomainError(422, "token_kind", "Choose an owner or an agent token.")
         token, record_id, stamp = "op_" + secrets.token_urlsafe(32), new_id(), now()
+        digest = fingerprint({"name": name, "kind": kind})
         with self.workspace.db.transaction() as conn:
+            replayed = replay(conn, "api_tokens", idempotency_key, digest)
+            if replayed:
+                row = conn.execute(
+                    "SELECT id,name,kind,created_at FROM api_tokens WHERE id=?", (replayed,)
+                ).fetchone()
+                return {**dict(row), "token": None}
+            remember(conn, "api_tokens", idempotency_key, digest, record_id)
             conn.execute(
                 "INSERT INTO api_tokens(id,name,kind,token_hash,created_at) VALUES(?,?,?,?,?)",
                 (record_id, name, kind, hashlib.sha256(token.encode()).hexdigest(), stamp),

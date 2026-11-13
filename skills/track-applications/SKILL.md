@@ -46,19 +46,19 @@ Classify:
 - **ready**: marked ready, and both current leaves still have checked PDFs, exact
   sources and approved review;
 - **reviewed, not marked**: the checks pass but nobody judged the Draft complete;
-  report it, and mark it ready (`application_ready`) only after the full
+  report it, and mark it ready (`applications_ready`) only after the full
   [Prepare Shortlist](../prepare-shortlist/SKILL.md) readiness checks;
 - **incomplete**: a document, file or review step is missing;
 - **blocked**: an employer requirement or open question needs the owner;
 - **stale**: the frozen context predates a change to a part its documents use:
   the Profile header or summary, a confirmed policy item, guidance, a template or
-  Career (`applications_staleness` names each changed part), or the
+  Career (`staleness_list` names each changed part), or the
   posting changed after preparation;
 - **expired**: the posting is closed or past its deadline.
 
 Check stale and expired cases against current records before reporting them.
 A ready Draft that is stale or expired stays in the owner's queue until someone
-acts: report it first, and clear the mark (`application_ready` with
+acts: report it first, and clear the mark (`applications_ready` with
 `ready: false`) when the owner should not apply with the current documents.
 An `application_ready_cleared` event in the application's timeline
 (`timeline_get` with `application_id`) gives the reason a Draft left the queue.
@@ -83,13 +83,13 @@ Record only outcomes the owner reported: never infer one from silence, mail or a
 portal. When the owner reports a submission, record Applied with `applied_at`.
 When the owner reports an employer's answer, record it with the day it arrived:
 
-- an interview, offer or rejection: `application_update` with the stage
+- an interview, offer or rejection: `applications_update` with the stage
   (`interview`, `offer`, or `closed` with `outcome: "rejected"`), the current
   `expected_version` and `response_date`; the matching response is recorded
   with it. A second interview while already in Interview, or another answer
-  such as a request for references, is `responses_add` with `kind`
+  such as a request for references, is `responses_create` with `kind`
   (`interview` or `other`), `date`, a short `note` and an `idempotency_key`;
-- a mistaken record: `responses_update` or `responses_remove` with the
+- a mistaken record: `responses_update` or `responses_delete` with the
   response's `expected_version`. A response marked `estimated` got its date
   from the upgrade; correct it when the owner knows the day.
 
@@ -102,7 +102,7 @@ to continue, never for an employer rejection.
 longer ago than the no-reply period; the result's `no_reply` gives the period's
 `days`, its `source` (`policy` or `default`, 30 days) and whether the owner
 `confirmed` the Policy item. Report them with their sent dates and propose
-closing them as no reply. Close them (`application_update` or
+closing them as no reply. Close them (`applications_update` or
 `applications_bulk` with `outcome: "no_response"` and `concluded_on`, today
 when omitted) only when the owner asks or a confirmed "No reply" decision item
 says to; otherwise ask with one `questions_ask` that lists them. Never close an

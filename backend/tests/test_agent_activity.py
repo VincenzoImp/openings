@@ -123,7 +123,7 @@ def test_changes_record_the_owner_session_the_named_token_and_the_system(app):
         edited, error = tool(
             anonymous,
             token,
-            "job_update",
+            "jobs_update",
             {
                 "job_id": job["id"],
                 "value": {"expected_version": saved["version"], "location": "Zurich"},
@@ -133,7 +133,7 @@ def test_changes_record_the_owner_session_the_named_token_and_the_system(app):
         ingested, error = tool(
             anonymous,
             token,
-            "job_ingest",
+            "jobs_create",
             {"value": {"title": "Agent job", "company": "Example", "posting": "Run services."}},
         )
         assert error is None
@@ -890,7 +890,7 @@ def test_rest_and_mcp_expose_the_same_runs_questions_and_changes(app):
             ),
             (
                 f"/api/v1/applications/{'missing'}/events",
-                "application_history",
+                "applications_history",
                 {"application_id": "missing"},
             ),
         ):

@@ -95,9 +95,8 @@ class SkillLibrary:
 def list_skills(library: SkillLibrary, notes: SkillNotesService) -> dict:
     """Every shipped skill with its reference files and the version of its local notes."""
     summaries = notes.summaries()
-    return {
-        "items": [{**item, "local_notes": summaries.get(item["name"])} for item in library.list()]
-    }
+    items = [{**item, "local_notes": summaries.get(item["name"])} for item in library.list()]
+    return {"items": items, "total": len(items)}
 
 
 def read_skill(

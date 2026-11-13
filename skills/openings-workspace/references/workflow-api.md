@@ -4,18 +4,30 @@ Use the current MCP schemas or REST OpenAPI for exact inputs. REST paths below
 are relative to the configured `/api/v1` origin. This reference contains shared
 mechanics, not personal selection or writing policy.
 
+## Names and arguments
+
+- Every tool is named `<resource>_<verb>` (`jobs_get`, `applications_update`,
+  `profile_get`). Its arguments are the record ids a REST path names, flat;
+  `expected_version` of a delete, flat; and one `value`: the REST body of a
+  write, or the filters, `limit`, `offset` and options of a read.
+- Lists return summaries with `items`, `total`, `limit` and `offset`; pass
+  `value.summary: false` or read the single record for full content.
+- Every delete names the record's `expected_version`. Every create accepts an
+  `idempotency_key`: a retry with the same key and request returns the record
+  the first request created; the key with another request is `409 conflict`.
+
 ## Queues and applications
 
-- `GET /jobs?queue=inbox&limit=200&offset=0` and `jobs_search(value)` list a
-  compact preview. `job_get` / `GET /jobs/{id}` supplies the full posting.
+- `GET /jobs?queue=inbox&limit=200&offset=0` and `jobs_list(value)` list a
+  compact preview. `jobs_get` / `GET /jobs/{id}` supplies the full posting.
   Filter value lists (`facets`) appear only with `include_facets: true`.
-- `job_triage(job_id, value)` / `POST /jobs/{id}/triage` takes `triage` and
+- `jobs_triage(job_id, value)` / `POST /jobs/{id}/triage` takes `triage` and
   `expected_version`, and with `dismissed` an optional `reason` (at most 500
   characters) the owner reads beside the dismissal; `jobs_bulk` takes the same
   `reason` for its `dismissed` action. Values are `inbox`, `saved` and
   `dismissed`, not `draft`. Restoring a dismissed job clears its dismissal.
   It returns the compact job summary with the new `version`, not the posting.
-  `job_update` and `application_update` also return compact jobs.
+  `jobs_update` and `applications_update` also return compact jobs.
 - A 409 version conflict carries `details.current_version`; read the record
   again before retrying so concurrent edits are preserved.
 - Actionable `queue=shortlist` means saved with no application attempt. Raw
@@ -23,7 +35,7 @@ mechanics, not personal selection or writing policy.
 - Snapshot the queue's IDs before mutating it, or repeatedly process offset zero.
   Advancing offsets over a shrinking queue can skip jobs.
 - `applications_list` / `GET /applications?job_id={id}` resolves attempts.
-  `application_create` / `POST /applications` creates Draft and retains saved
+  `applications_create` / `POST /applications` creates Draft and retains saved
   job interest. Application existence removes the job from actionable Shortlist.
 - Application creation supports an `idempotency_key`. A repeat key for the same
   job returns the existing attempt without changing its fields. A conflicting open attempt returns409 with its ID;
@@ -32,7 +44,7 @@ mechanics, not personal selection or writing policy.
 
 ## Contexts and documents
 
-- `application_prepare_context` / `POST /contexts` takes `application_id`,
+- `contexts_create` / `POST /contexts` takes `application_id`,
   explicit `template_ids`, optional `knowledge_ids`, `claim_ids`, `note` and
   `idempotency_key`. It freezes job, Profile, the policy sections with their
   versions, guidance, evidence, claims, templates and selected source-file bytes,
@@ -46,8 +58,9 @@ mechanics, not personal selection or writing policy.
   `claim_ids`, `knowledge_ids` and `previous_id`. A CV or letter (`resume`,
   `cover_letter`) takes no `content` (`422 content_not_accepted`): it is the
   `.tex` source and PDF uploaded next. Form answers keep structured `content`.
-  A retry with the same fields returns the same revision (a CV or letter only
-  while it is still an empty draft). Changed output needs the proper parent.
+  A retry with the same fields, or the same `idempotency_key`, returns the same
+  revision (without a key, a CV or letter only while it is still an empty
+  draft). Changed output needs the proper parent.
   Child revisions inherit neither files nor approval.
 - Cite the evidence a revision uses: `claim_ids` of reused approved claims,
   `knowledge_ids` of the Career entries behind new wording. Include them in the
@@ -78,9 +91,10 @@ mechanics, not personal selection or writing policy.
   or establish human approval.
 - `documents_list` / `GET /documents` returns compact rows by default (file
   counts, no text, content or files); `q` searches titles, notes and the text
-  derived from sources. Pass `summary: false`, or read `documents_get`, for text,
-  content and file entries.
-- Ready is a stored step of a Draft, set with `application_ready(application_id,
+  derived from sources. Pass `value.summary: false`, or read `documents_get`, for
+  text, content and file entries. `documents_delete(document_id,
+  expected_version)` removes a draft revision and its files for good.
+- Ready is a stored step of a Draft, set with `applications_ready(application_id,
   value)` / `POST /applications/{id}/ready` (`expected_version`, `ready`). The
   agent's assessment comes first: the intended current CV and CL leaf revisions,
   valid final PDFs and sources, complete content/layout checks and approved
@@ -100,13 +114,13 @@ mechanics, not personal selection or writing policy.
 
 ## Employer responses
 
-- `responses_add(application_id, value)` / `POST /applications/{id}/responses`
+- `responses_create(application_id, value)` / `POST /applications/{id}/responses`
   records an owner-reported answer (`kind`, `date`, `note`,
   `idempotency_key`) without moving the stage. `responses_update` /
-  `PATCH /responses/{id}` and `responses_remove` / `DELETE /responses/{id}` take
+  `PATCH /responses/{id}` and `responses_delete` / `DELETE /responses/{id}` take
   the response's `expected_version`; `responses_list` /
   `GET /applications/{id}/responses` reads them.
-- `application_update` moving a sent application to Interview or Offer, or
+- `applications_update` moving a sent application to Interview or Offer, or
   closing it as `rejected`, records the response itself (`response_date`,
   `response_note`); `outcome: "no_response"` with `concluded_on` closes a sent
   application that never got an answer.

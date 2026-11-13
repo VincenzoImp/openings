@@ -94,7 +94,7 @@ def test_a_note_is_served_identically_over_rest_and_mcp(client, owner, agent):
 
     rest = client.get(f"/api/v1/skills/{SKILL}", headers=auth(agent)).json()
     via_file = client.get(f"/api/v1/skills/{SKILL}/files/SKILL.md", headers=auth(agent)).json()
-    mcp, error = tool(client, agent, "skill_get", {"name": SKILL})
+    mcp, error = tool(client, agent, "skills_get", {"name": SKILL})
     assert error is None
     assert rest["content"] == via_file["content"] == mcp["content"]
     assert rest["local_notes"] == mcp["local_notes"]
@@ -114,7 +114,9 @@ def test_a_note_is_served_identically_over_rest_and_mcp(client, owner, agent):
     assert hashlib.sha256((ROOT / SKILL / "SKILL.md").read_bytes()).hexdigest() == digest
     plain = client.get(f"/api/v1/skills/{SKILL}?local_notes=false", headers=auth(agent)).json()
     assert plain["content"] == text
-    plain_mcp, _ = tool(client, agent, "skill_get", {"name": SKILL, "local_notes": False})
+    plain_mcp, _ = tool(
+        client, agent, "skills_get", {"name": SKILL, "value": {"local_notes": False}}
+    )
     assert plain_mcp["content"] == text
 
     # Reference files are served as shipped, without notes.

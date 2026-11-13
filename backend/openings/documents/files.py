@@ -13,12 +13,14 @@ from fastapi import Request
 
 from ..actors import acting_as, current_actor, from_columns
 from ..career.records import _get, _page
-from ..common import encode, new_id, now
+from ..common import check_version, encode, new_id, now
 from ..errors import DomainError, conflict, missing
 from ..transfers import SnapshotResponse
 from .models import OWNER_COLUMNS, OWNER_TABLES, OwnerType, UploadReservation
 from .sources import check_source_bytes, check_upload, refresh_text
 from .text import is_tex_source
+
+FILE_VERSION = 1
 
 
 class FileOperations:
@@ -52,6 +54,8 @@ class FileOperations:
         # A revision's PDF names the SHA-256 of the source it was built from.
         result["source_sha256"] = row.get("source_sha256")
         result["url"] = f"/api/v1/files/{row['id']}/content"
+        # A file never changes, so its version is always 1; a delete names it.
+        result["version"] = FILE_VERSION
         return result
 
     def get_file(self, file_id: str) -> dict:
@@ -67,7 +71,7 @@ class FileOperations:
         owner_id: str = "",
         limit: int = 100,
         offset: int = 0,
-        summary: bool = False,
+        summary: bool = True,
         q: str = "",
         media_type: str = "",
         application_id: str = "",
@@ -104,6 +108,8 @@ class FileOperations:
         return {
             "items": [self._file_record(row) for row in rows],
             "total": self.db.one(f"SELECT COUNT(*) AS n FROM all_files{clause}", params)["n"],
+            "limit": limit,
+            "offset": offset,
         }
 
     def _new_grant(self, conn, payload, method):
@@ -361,11 +367,12 @@ class FileOperations:
         _, payload = self._grant(request.headers.get("X-Transfer-Token", ""), "GET")
         return self.file_response(payload["file_id"], inline=False)
 
-    def delete_file(self, file_id: str) -> dict:
-        """Delete a live knowledge/template/job asset. Immutable context/document files require deleting the owning document instead."""
+    def delete_file(self, file_id: str, expected_version: int | None = None) -> dict:
+        """Permanently delete a live Career entry, template or job asset, with its expected_version (a file's version is always 1; required from 0.23). Context and revision files are immutable: delete the revision instead."""
         with self.db.transaction() as conn:
             row = _get(conn, "all_files", file_id, "File")
             descriptor = self._file_record(row)
+            check_version(descriptor, expected_version)
             if descriptor["owner_type"] in {"document", "context"}:
                 conflict(
                     "Revision/context files are immutable. Delete the entire document or create a new revision."
