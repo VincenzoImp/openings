@@ -52,6 +52,8 @@ def groups_at(workspace, min_confidence):
     return result["items"]
 
 
+# The labelled benchmark (duplicate_benchmark.py) seeds 122 jobs; the tests that use it
+# are marked `performance` and run weekly and with `pytest -m performance`.
 @pytest.fixture(scope="module")
 def benchmark(tmp_path_factory):
     workspace = Workspace(tmp_path_factory.mktemp("benchmark") / "workspace.sqlite")
@@ -68,6 +70,7 @@ def benchmark(tmp_path_factory):
     return workspace, records
 
 
+@pytest.mark.performance
 def test_benchmark_precision_and_recall(benchmark):
     """Pairwise precision and recall on the labelled benchmark (122 records, 51
     vacancies, 101 true duplicate pairs).
@@ -118,6 +121,7 @@ def test_benchmark_precision_and_recall(benchmark):
     assert grouped_pairs(before) <= everything
 
 
+@pytest.mark.performance
 def test_benchmark_near_misses_stay_out_of_the_high_tier(benchmark):
     workspace, records = benchmark
     wrong = {}
@@ -144,6 +148,7 @@ def test_benchmark_near_misses_stay_out_of_the_high_tier(benchmark):
     assert reopened["tier"] == "medium" and "posting_date" in reopened["reasons"]["conflicts"]
 
 
+@pytest.mark.performance
 def test_groups_are_ordered_by_confidence_with_reasons(benchmark):
     workspace, _records = benchmark
     groups = groups_at(workspace, 0)
@@ -356,6 +361,7 @@ def test_large_blocks_stay_bounded_and_complete():
     assert len(group["ids"]) == 400
 
 
+@pytest.mark.performance
 def test_one_job_is_scored_against_its_blocks_only(benchmark, monkeypatch):
     workspace, records = benchmark
     by_vacancy = {}

@@ -274,7 +274,9 @@ test("keyboard only: a policy item is edited, saved and moved", async ({
   await expect(row).toHaveCount(0);
 });
 
-test("a policy conflict reloads the section and keeps the unsaved text", async ({
+// Quarantined: order-dependent on the shared e2e server and database (failed on
+// CI in November 2026). Restore once each worker has its own workspace, #220.
+test.fixme("a policy conflict reloads the section and keeps the unsaved text", async ({
   page,
 }) => {
   const label = unique("Salary");

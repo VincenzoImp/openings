@@ -767,6 +767,7 @@ def context_storage(path, tmp_path):
     )
 
 
+@pytest.mark.performance
 def test_five_hundred_contexts_sharing_one_career_record_shrink_by_seventy_percent(tmp_path):
     """Issue #143 acceptance: the full 500 contexts over a Career record of reduced size.
 
