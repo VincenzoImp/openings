@@ -3,14 +3,15 @@ import assert from "node:assert/strict";
 // Node strips the types of these modules; none of them uses React.
 const { isNewWorkspace } = await import("../src/shell/setup.ts");
 const model = await import("../src/pages/setup/model.ts");
+const preferences = await import("../src/pages/preferences/model.ts");
 
 const blank = {
   profile: { name: "", headline: "", location: "", email: "" },
   sections: [
-    { section: "decision", total: 0 },
-    { section: "eligibility", total: 0 },
+    { section: "looking_for", items: [] },
+    { section: "ruled_out", items: [] },
   ],
-  noReply: { days: 30, source: "default", item_id: null, confirmed: false },
+  noReply: { days: 30, source: "default" },
   sources: 0,
   tokens: [],
   entries: 0,
@@ -70,10 +71,10 @@ test("the record counts each part from the workspace", () => {
     ...blank,
     profile: { ...blank.profile, name: "Alex Morgan", headline: "Engineer" },
     sections: [
-      { section: "decision", total: 1 },
-      { section: "eligibility", total: 2 },
+      { section: "looking_for", items: [{ text: "a" }, { text: "b" }] },
+      { section: "ruled_out", items: [{ text: "c" }] },
     ],
-    noReply: { days: 45, source: "policy", item_id: "i", confirmed: true },
+    noReply: { days: 45, source: "settings" },
     sources: 1,
     entries: 9,
     claims: 1,
@@ -84,10 +85,10 @@ test("the record counts each part from the workspace", () => {
   );
   assert.equal(items.profile.state, "done");
   assert.equal(items.profile.meta, "Alex Morgan · Engineer");
-  assert.equal(items.policy.state, "done");
+  assert.equal(items.preferences.state, "done");
   assert.equal(
-    items.policy.meta,
-    "2 facts employers ask about · no reply after 45 days",
+    items.preferences.meta,
+    "2 statements on what you look for · 1 you rule out · no reply after 45 days",
   );
   assert.equal(items.searches.meta, "1 saved search or company board");
   assert.equal(items.entries.meta.startsWith("9 entries"), true);
@@ -109,28 +110,67 @@ test("the record counts each part from the workspace", () => {
   assert.equal(model.steps(complete).next.line, "3 applications");
 });
 
-test("a policy is in progress until it has a fact and the no-reply period", () => {
-  const withFact = {
+test("preferences are in progress until they say what you look for and the no-reply period", () => {
+  const withStatement = {
     ...blank,
     sections: [
-      { section: "decision", total: 0 },
-      { section: "eligibility", total: 1 },
+      { section: "looking_for", items: [{ text: "Backend roles" }] },
+      { section: "ruled_out", items: [] },
     ],
   };
   const item = (facts) =>
-    model.recordItems(facts).find((entry) => entry.id === "policy");
-  assert.equal(item(withFact).state, "progress");
-  assert.match(item(withFact).meta, /no reply period not set/);
+    model.recordItems(facts).find((entry) => entry.id === "preferences");
+  assert.equal(item(withStatement).state, "progress");
+  assert.match(item(withStatement).meta, /no reply period not set/);
   const withPeriod = {
     ...blank,
-    sections: [{ section: "decision", total: 1 }],
-    noReply: { days: 30, source: "policy", item_id: "i", confirmed: true },
+    sections: [{ section: "ruled_out", items: [{ text: "Agencies" }] }],
+    noReply: { days: 30, source: "settings" },
   };
   assert.equal(item(withPeriod).state, "progress");
+  assert.equal(
+    item({ ...withStatement, noReply: withPeriod.noReply }).state,
+    "done",
+  );
 });
 
-test("a no-reply period is a whole number of days from 1 to 3650", () => {
-  assert.equal(model.replyDays(" 45 "), 45);
-  for (const text of ["0", "3651", "4.5", "", "forty"])
-    assert.equal(model.replyDays(text), null);
+test("a no-reply period is a whole number of days from 1 to 365", () => {
+  assert.equal(preferences.replyDays(" 45 "), 45);
+  assert.equal(preferences.replyDays("365"), 365);
+  for (const text of ["0", "366", "4.5", "", "forty"])
+    assert.equal(preferences.replyDays(text), null);
+});
+
+test("a Preferences section is saved whole: in place, moved or added", () => {
+  const items = [{ text: "a" }, { text: "b" }, { text: "c" }];
+  assert.deepEqual(
+    preferences.moved(items, 0, 1).map((item) => item.text),
+    ["b", "a", "c"],
+  );
+  assert.deepEqual(preferences.moved(items, 0, -1), items);
+  // An edit replaces the statement where it now is, found by its text.
+  assert.deepEqual(
+    preferences
+      .saved([{ text: "z" }, ...items], { text: "B" }, 1, "b")
+      .map((item) => item.text),
+    ["z", "a", "B", "c"],
+  );
+  // A statement removed elsewhere, or a new one, is added at the end.
+  assert.deepEqual(
+    preferences.saved(items, { text: "x" }, 1, "gone").map((item) => item.text),
+    ["a", "b", "c", "x"],
+  );
+  assert.deepEqual(
+    preferences.saved(items, { text: "d" }, -1, null).map((item) => item.text),
+    ["a", "b", "c", "d"],
+  );
+  // Only a writing rule carries a scope; it defaults to every document.
+  assert.deepEqual(preferences.itemsBody("writing", [{ text: "a" }]), [
+    { text: "a", scope: "all" },
+  ]);
+  assert.deepEqual(
+    preferences.itemsBody("facts", [{ text: "a", scope: "cv" }]),
+    [{ text: "a" }],
+  );
+  assert.equal(preferences.itemName("x".repeat(50), 10), "xxxxxxxxx…");
 });

@@ -66,7 +66,7 @@ export function megabytes(bytes: number) {
 
 export const tokenAccess: Record<TokenKind, string> = {
   agent:
-    "Runs the job search. Cannot change your password, manage tokens, restore a backup, confirm policy items, answer its own questions or write requests for itself.",
+    "Runs the job search. Cannot change your password, manage tokens, restore a backup, answer its own questions or write requests for itself.",
   owner: "Full access, the same as your dashboard session.",
 };
 

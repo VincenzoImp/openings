@@ -17,7 +17,7 @@ import { CloseNoReply } from "./CloseNoReply";
 import { InsightTable } from "./InsightTable";
 import { Progress } from "./Progress";
 
-const SCOPES = ["applications", "responses", "jobs", "policy"];
+const SCOPES = ["applications", "responses", "jobs", "settings"];
 
 /** "34%"; a dash when the sample is too small for a rate. */
 const rateOf = (rate: number | null) => (rate === null ? "–" : percent(rate));

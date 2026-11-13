@@ -89,12 +89,12 @@ export default function TodayPage(links: Links) {
     NONE,
     ["questions"],
   );
-  // Applied applications past the no-reply period: the number of days of the
-  // owner's "No reply" decision in the policy, or 30, as the server reads it.
+  // Applied applications past the no-reply period: the owner's setting
+  // (Preferences, Facts about me), or 30, as the server reads it.
   const waiting = useFresh<ListResult<Application>>(
     "/applications?no_reply_due=true&limit=1",
     NONE,
-    [...APPLICATIONS, "policy"],
+    [...APPLICATIONS, "settings"],
   );
   const days = waiting.data.no_reply?.days ?? 30;
   const runs = useFresh<ListResult<Run>>(

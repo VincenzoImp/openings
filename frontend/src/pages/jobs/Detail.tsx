@@ -351,12 +351,6 @@ export function Detail({
             {[dayTime(job.dismissal.at), job.dismissal.reason]
               .filter(Boolean)
               .join(" · ") || "No reason was given."}
-            {job.dismissal.rule && (
-              <>
-                {" "}
-                <a href="#policy">See the rule in Policy</a>.
-              </>
-            )}
           </Banner>
         )}
         <Actions
