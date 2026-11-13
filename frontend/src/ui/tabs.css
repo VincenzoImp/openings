@@ -1,0 +1,215 @@
+@layer ui {
+  .ui-tabs {
+    display: flex;
+    align-self: stretch;
+    gap: var(--s-5);
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .ui-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .ui-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1-5);
+    flex: none;
+    height: var(--detail-bar-h);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-2);
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+    letter-spacing: 0;
+    transition: color var(--d-fast) var(--ease);
+  }
+  .ui-tab:hover,
+  .ui-tab[aria-selected="true"] {
+    color: var(--text);
+  }
+  .ui-tab::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    border-radius: 2px;
+    background: transparent;
+    transition: background-color var(--d-fast) var(--ease);
+  }
+  .ui-tab[aria-selected="true"]::after {
+    background: var(--text);
+  }
+  .ui-tab:focus-visible {
+    border-radius: var(--r-sm);
+    box-shadow: var(--focus-inset);
+  }
+
+  .ui-segmented {
+    display: inline-flex;
+    flex: none;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--r-lg);
+    background: var(--hover);
+  }
+  .ui-segment {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1-5);
+    height: 26px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--r-md);
+    background: transparent;
+    color: var(--text-2);
+    font: 500 12.5px/1 var(--font);
+    letter-spacing: 0;
+    white-space: nowrap;
+    transition:
+      background-color var(--d-fast) var(--ease),
+      color var(--d-fast) var(--ease);
+  }
+  .ui-segment:hover {
+    color: var(--text);
+  }
+  .ui-segment[aria-checked="true"] {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+  }
+  .ui-segment[aria-label] {
+    padding: 0 8px;
+  }
+
+  .ui-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-width: 0;
+    min-height: var(--detail-bar-h);
+    padding: 0 var(--s-5) 0 var(--pane-pad);
+    border-bottom: 1px solid var(--border);
+  }
+  .ui-toolbar-spacer {
+    flex: 1;
+  }
+  .ui-toolbar-tools {
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
+    flex: none;
+  }
+  .ui-toolbar-tools .ui-search {
+    width: 220px;
+    margin-right: var(--s-1);
+  }
+
+  .ui-chips {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--s-1-5);
+    padding: var(--s-2) var(--s-5) var(--s-2) var(--pane-pad);
+    border-bottom: 1px solid var(--border);
+  }
+  .ui-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1-5);
+    flex: none;
+    height: 26px;
+    padding: 0 4px 0 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-full);
+    background: var(--bg);
+    color: var(--text);
+    font: 500 12.5px/1 var(--font);
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+  .ui-chip-field {
+    color: var(--text-3);
+    font-weight: var(--w-regular);
+  }
+  .ui-chip-remove {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-3);
+  }
+  .ui-chip-remove:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .ui-chips-clear {
+    height: 26px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: var(--r-md);
+    background: transparent;
+    color: var(--text-3);
+    font: 500 12.5px/1 var(--font);
+  }
+  .ui-chips-clear:hover {
+    color: var(--text);
+    background: var(--hover);
+  }
+
+  @container app (max-width: 719px) {
+    .ui-toolbar {
+      padding: 0 var(--s-4);
+    }
+    .ui-toolbar-tools {
+      display: none;
+    }
+    .ui-tabs {
+      gap: var(--s-1-5);
+      padding: 10px 0;
+    }
+    .ui-tab {
+      height: 30px;
+      padding: 0 var(--s-3);
+      border-radius: var(--r-full);
+      background: var(--hover);
+      color: var(--text-2);
+      font-size: 13px;
+    }
+    .ui-tab::after {
+      display: none;
+    }
+    /* A 44 px touch target around the 30 px pill */
+    .ui-tab::before {
+      content: "";
+      position: absolute;
+      inset: -7px -3px;
+    }
+    .ui-tab[aria-selected="true"] {
+      background: var(--primary);
+      color: var(--on-primary);
+    }
+    .ui-tab[aria-selected="true"] .ui-count {
+      color: inherit;
+      opacity: 0.75;
+    }
+    .ui-tab:focus-visible {
+      border-radius: var(--r-full);
+      box-shadow: var(--focus-ring);
+    }
+    .ui-chips {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding: var(--s-2) var(--s-4);
+      scrollbar-width: none;
+    }
+  }
+}
