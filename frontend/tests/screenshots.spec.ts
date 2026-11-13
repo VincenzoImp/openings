@@ -118,5 +118,27 @@ for (const [size, viewport] of Object.entries(VIEWPORTS))
           await capture(page, screen, path);
         });
       }
+      // The design system gallery (ui.html), which the dashboard never serves.
+      if (!DOCS)
+        test("ui-gallery", async ({ page }) => {
+          await page.route("**/ui.html", (route) =>
+            route.fulfill({
+              path: join(ROOT, "frontend/dist/ui.html"),
+              contentType: "text/html",
+            }),
+          );
+          await page.goto("/ui.html");
+          await page.waitForLoadState("networkidle");
+          await page.screenshot({
+            path: join(
+              ROOT,
+              "frontend/screenshots",
+              `${size}-${theme}`,
+              "ui-gallery.png",
+            ),
+            fullPage: true,
+            animations: "disabled",
+          });
+        });
     });
   }

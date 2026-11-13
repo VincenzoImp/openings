@@ -1,0 +1,155 @@
+@layer ui {
+  .ui-modal {
+    max-width: calc(100vw - 32px);
+    max-height: calc(100dvh - 32px);
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-xl);
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    opacity: 1;
+    scale: 1;
+    transition:
+      opacity var(--d-base) var(--ease),
+      scale var(--d-base) var(--ease),
+      translate var(--d-slow) var(--ease),
+      overlay var(--d-base) allow-discrete,
+      display var(--d-base) allow-discrete;
+  }
+  .ui-modal::backdrop {
+    background: var(--backdrop);
+    opacity: 1;
+    transition:
+      opacity var(--d-base) var(--ease),
+      overlay var(--d-base) allow-discrete,
+      display var(--d-base) allow-discrete;
+  }
+  .ui-modal:not([open]) {
+    opacity: 0;
+    scale: 0.98;
+    transition-duration: var(--d-exit);
+  }
+  .ui-modal:not([open])::backdrop {
+    opacity: 0;
+  }
+  @starting-style {
+    .ui-modal[open] {
+      opacity: 0;
+      scale: 0.98;
+    }
+    .ui-modal[open]::backdrop {
+      opacity: 0;
+    }
+  }
+  .ui-modal[data-kind="dialog"] {
+    width: 440px;
+  }
+  .ui-modal-frame {
+    display: flex;
+    flex-direction: column;
+    max-height: inherit;
+  }
+  .ui-modal-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-5) var(--s-6) 0;
+  }
+  .ui-modal-head h2 {
+    flex: 1;
+    min-width: 0;
+    font: 600 15px/22px var(--font);
+    letter-spacing: -0.01em;
+  }
+  .ui-modal-body {
+    padding: var(--s-1-5) var(--s-6) 0;
+    overflow: auto;
+  }
+  .ui-modal-desc {
+    font: var(--t-sm);
+    color: var(--text-2);
+    letter-spacing: 0;
+  }
+  .ui-modal-body > * + * {
+    margin-top: var(--s-4);
+  }
+  .ui-modal-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--s-2);
+    padding: var(--s-5) var(--s-6);
+  }
+
+  /* Drawer */
+  .ui-modal[data-kind="drawer"] {
+    width: min(560px, 100vw);
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0 0 0 auto;
+    border-radius: var(--r-xl) 0 0 var(--r-xl);
+    translate: 0 0;
+  }
+  .ui-modal[data-kind="drawer"]:not([open]) {
+    translate: 24px 0;
+    scale: 1;
+  }
+  @starting-style {
+    .ui-modal[data-kind="drawer"][open] {
+      translate: 24px 0;
+      scale: 1;
+    }
+  }
+  .ui-modal[data-kind="drawer"] .ui-modal-frame {
+    height: 100%;
+  }
+  .ui-modal[data-kind="drawer"] .ui-modal-head {
+    position: sticky;
+    top: 0;
+    min-height: var(--detail-bar-h);
+    padding: var(--s-2) var(--s-3) var(--s-2) var(--s-6);
+    border-bottom: 1px solid var(--border);
+  }
+  .ui-modal[data-kind="drawer"] .ui-modal-body {
+    flex: 1;
+    padding: var(--s-5) var(--s-6);
+  }
+  .ui-modal[data-kind="drawer"] .ui-modal-foot {
+    padding: var(--s-3) var(--s-6);
+    border-top: 1px solid var(--border);
+    background: var(--bg-subtle);
+  }
+
+  .ui-dialog-preview {
+    display: grid;
+    place-items: center;
+    padding: var(--s-8) var(--s-5);
+    border-radius: var(--r-lg);
+    background: var(--backdrop);
+  }
+  .ui-dialog-preview .ui-modal-frame {
+    width: 100%;
+    max-width: 380px;
+    border-radius: var(--r-xl);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+  }
+
+  @media (max-width: 719px) {
+    .ui-modal[data-kind="dialog"] {
+      width: calc(100vw - 24px);
+    }
+    .ui-modal[data-kind="drawer"] {
+      width: 100vw;
+      border-radius: 0;
+    }
+    .ui-modal-head,
+    .ui-modal-body,
+    .ui-modal-foot {
+      padding-left: var(--s-5);
+      padding-right: var(--s-5);
+    }
+  }
+}

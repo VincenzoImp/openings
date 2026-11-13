@@ -1,0 +1,214 @@
+/* Design tokens of the dashboard ("quiet neutral", design direction 21).
+   Neutral greys, one blue accent, three meanings. This is the only file of
+   src/ui with colour literals; tests/contrast.test.mjs holds every text and
+   boundary pair to WCAG AA in both themes. */
+@layer tokens {
+  :root {
+    color-scheme: light;
+
+    /* Surfaces */
+    --bg: #ffffff;
+    --bg-subtle: #f7f7f8;
+    --surface: #ffffff;
+    --hover: #f1f1f3;
+    --selected: #ebebee;
+    --border: #e4e4e7;
+    --border-strong: #d4d4d8;
+    --control: #84848d;
+
+    /* Text */
+    --text: #18181b;
+    --text-2: #52525b;
+    --text-3: #66666f;
+    --text-disabled: #a1a1aa;
+
+    /* Action */
+    --primary: #18181b;
+    --on-primary: #ffffff;
+    --primary-hover: #2e2e33;
+    --accent: #2b59d9;
+    --on-accent: #ffffff;
+    --accent-text: #2148b8;
+    --accent-soft: #eef3ff;
+
+    /* Meaning */
+    --success: #15803d;
+    --success-soft: #ebf8ef;
+    --warning: #a65308;
+    --warning-soft: #fdf4e7;
+    --danger: #c9262b;
+    --danger-soft: #fdeeee;
+    --on-danger: #ffffff;
+
+    --backdrop: rgb(16 16 20 / 0.36);
+    --ring-floating: rgb(16 16 20 / 0.06);
+
+    /* Elevation: only things that float */
+    --shadow-xs: 0 1px 2px rgb(16 16 20 / 0.06);
+    --shadow-sm:
+      0 1px 2px rgb(16 16 20 / 0.06), 0 2px 6px -2px rgb(16 16 20 / 0.06);
+    --shadow-md:
+      0 0 0 1px rgb(16 16 20 / 0.06), 0 8px 20px -6px rgb(16 16 20 / 0.16);
+    --shadow-lg:
+      0 0 0 1px rgb(16 16 20 / 0.06), 0 24px 48px -12px rgb(16 16 20 / 0.24);
+
+    /* Focus */
+    --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+    --focus-inset: inset 0 0 0 2px var(--accent);
+    --focus-input: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+
+    /* Type: Inter (variable, opsz 14-32, wght 400-600). Never 700. */
+    --font:
+      "Inter Variable", "Inter", ui-sans-serif, -apple-system,
+      BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --t-3xl: 28px/34px var(--font);
+    --t-2xl: 22px/28px var(--font);
+    --t-xl: 18px/26px var(--font);
+    --t-lg: 16px/24px var(--font);
+    --t-md: 14px/20px var(--font);
+    --t-sm: 13px/18px var(--font);
+    --t-xs: 12px/16px var(--font);
+    --tr-3xl: -0.022em;
+    --tr-2xl: -0.018em;
+    --tr-xl: -0.012em;
+    --tr-md: -0.006em;
+    --w-regular: 400;
+    --w-medium: 500;
+    --w-semibold: 600;
+    --measure: 66ch;
+
+    /* Space: a 4px grid */
+    --s-0-5: 2px;
+    --s-1: 4px;
+    --s-1-5: 6px;
+    --s-2: 8px;
+    --s-3: 12px;
+    --s-4: 16px;
+    --s-5: 20px;
+    --s-6: 24px;
+    --s-8: 32px;
+    --s-10: 40px;
+    --s-12: 48px;
+    --s-16: 64px;
+    --pane-pad: 24px;
+
+    /* Sizes */
+    --control-h: 32px;
+    --control-h-sm: 28px;
+    --input-h: 34px;
+    --row: 52px;
+    --row-sm: 40px;
+    --row-touch: 60px;
+    --group-h: 32px;
+    --detail-bar-h: 44px;
+    --sidebar-w: 240px;
+    --bar-top: 52px;
+    --bar-bottom: 60px;
+    --touch: 44px;
+
+    /* Radius */
+    --r-sm: 4px;
+    --r-md: 6px;
+    --r-lg: 8px;
+    --r-xl: 12px;
+    --r-full: 999px;
+
+    /* Motion */
+    --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-in: cubic-bezier(0.4, 0, 1, 1);
+    --d-fast: 100ms;
+    --d-base: 150ms;
+    --d-slow: 220ms;
+    --d-exit: 120ms;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #111113;
+      --bg-subtle: #0c0c0e;
+      --surface: #19191c;
+      --hover: #212125;
+      --selected: #28282d;
+      --border: #26262b;
+      --border-strong: #34343a;
+      --control: #75757f;
+      --text: #ececef;
+      --text-2: #a5a5ae;
+      --text-3: #90909a;
+      --text-disabled: #5c5c66;
+      --primary: #ececef;
+      --on-primary: #111113;
+      --primary-hover: #ffffff;
+      --accent: #6f97ff;
+      --on-accent: #0b1020;
+      --accent-text: #8eadff;
+      --accent-soft: #1a2340;
+      --success: #4ccb7a;
+      --success-soft: #11281a;
+      --warning: #f0a54a;
+      --warning-soft: #2d2012;
+      --danger: #ff7b78;
+      --danger-soft: #341617;
+      --on-danger: #1a0909;
+      --backdrop: rgb(0 0 0 / 0.6);
+      --ring-floating: rgb(255 255 255 / 0.07);
+      --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
+      --shadow-sm:
+        0 1px 2px rgb(0 0 0 / 0.4), inset 0 1px 0 rgb(255 255 255 / 0.04);
+      --shadow-md:
+        0 0 0 1px rgb(255 255 255 / 0.07), 0 8px 24px -4px rgb(0 0 0 / 0.6);
+      --shadow-lg:
+        0 0 0 1px rgb(255 255 255 / 0.08), 0 24px 56px -8px rgb(0 0 0 / 0.7);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #111113;
+    --bg-subtle: #0c0c0e;
+    --surface: #19191c;
+    --hover: #212125;
+    --selected: #28282d;
+    --border: #26262b;
+    --border-strong: #34343a;
+    --control: #75757f;
+    --text: #ececef;
+    --text-2: #a5a5ae;
+    --text-3: #90909a;
+    --text-disabled: #5c5c66;
+    --primary: #ececef;
+    --on-primary: #111113;
+    --primary-hover: #ffffff;
+    --accent: #6f97ff;
+    --on-accent: #0b1020;
+    --accent-text: #8eadff;
+    --accent-soft: #1a2340;
+    --success: #4ccb7a;
+    --success-soft: #11281a;
+    --warning: #f0a54a;
+    --warning-soft: #2d2012;
+    --danger: #ff7b78;
+    --danger-soft: #341617;
+    --on-danger: #1a0909;
+    --backdrop: rgb(0 0 0 / 0.6);
+    --ring-floating: rgb(255 255 255 / 0.07);
+    --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-sm:
+      0 1px 2px rgb(0 0 0 / 0.4), inset 0 1px 0 rgb(255 255 255 / 0.04);
+    --shadow-md:
+      0 0 0 1px rgb(255 255 255 / 0.07), 0 8px 24px -4px rgb(0 0 0 / 0.6);
+    --shadow-lg:
+      0 0 0 1px rgb(255 255 255 / 0.08), 0 24px 56px -8px rgb(0 0 0 / 0.7);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --d-fast: 0ms;
+      --d-base: 0ms;
+      --d-slow: 0ms;
+      --d-exit: 0ms;
+    }
+  }
+}

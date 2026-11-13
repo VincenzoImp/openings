@@ -1,0 +1,87 @@
+@layer ui {
+  .ui-count {
+    font: var(--t-xs);
+    font-weight: var(--w-medium);
+    color: var(--text-3);
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .ui-needs {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: var(--r-full);
+    background: var(--accent);
+    color: var(--on-accent);
+    font: 600 11px/1 var(--font);
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .ui-tags {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--s-1-5);
+  }
+  .ui-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    height: 22px;
+    padding: 0 var(--s-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--bg-subtle);
+    color: var(--text-2);
+    font: var(--t-xs);
+    font-weight: var(--w-medium);
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+  .ui-status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1-5);
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+    color: var(--text-2);
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+  .ui-tone-warning {
+    color: var(--warning);
+  }
+  .ui-tone-danger {
+    color: var(--danger);
+  }
+  .ui-tone-success {
+    color: var(--success);
+  }
+  .ui-tone-accent {
+    color: var(--accent-text);
+  }
+  .ui-dot {
+    display: inline-block;
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .ui-dot[data-off] {
+    background: transparent;
+  }
+  .ui-avatar {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    border-radius: 50%;
+    background: var(--selected);
+    color: var(--text-2);
+    font-weight: var(--w-semibold);
+    line-height: 1;
+    letter-spacing: 0;
+  }
+}
