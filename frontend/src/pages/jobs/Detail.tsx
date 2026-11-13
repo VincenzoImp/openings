@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, api, newId, type Application, type Job } from "../../api";
-import { Banner, Button, Card, ErrorBanner, Loading, Tag } from "../../design";
+import {
+  ActionBar,
+  Banner,
+  Button,
+  Card,
+  ErrorBanner,
+  Loading,
+  Tag,
+} from "../../design";
 import { dayTime } from "../../library/time";
 import { useFresh } from "../../library/useFresh";
 import { useWorkspace } from "../../state";
@@ -61,21 +69,28 @@ function Signals({ job, own }: { job: Job; own: Set<string> | null }) {
   );
 }
 
-/** Shortlist, dismiss, restore and start or open an application. */
+/**
+ * Shortlist, dismiss, restore and start or open an application. On a narrow
+ * screen they stay in a bar above the bottom navigation.
+ */
 function Actions({
   job,
   onOpenApplication,
   onNote,
+  leaving,
 }: {
   job: Job;
   onOpenApplication: (id: string) => void;
   onNote: () => void;
+  leaving: (id: string) => (() => void) | null;
 }) {
   const { mutate, pending } = useWorkspace();
   const [dismissing, setDismissing] = useState(false);
   const key = useRef<string | null>(null);
-  const triage = (value: string, message: string, reason?: string) =>
-    mutate(
+  async function triage(value: string, message: string, reason?: string) {
+    // In To review and the Shortlist the job leaves the list: show the next.
+    const next = leaving(job.id);
+    const ok = await mutate(
       () =>
         api(`/jobs/${job.id}/triage`, "POST", {
           triage: value,
@@ -84,6 +99,9 @@ function Actions({
         }),
       message,
     );
+    if (ok) next?.();
+    return ok;
+  }
   async function start() {
     let created: Application | undefined;
     key.current ||= newId();
@@ -111,57 +129,64 @@ function Actions({
   const application = job.application;
   const open = application && application.status !== "closed";
   return (
-    <div className="row" role="group" aria-label="Actions on this job">
-      {job.triage === "dismissed" ? (
-        <Button
-          variant="primary"
-          disabled={pending}
-          onClick={() =>
-            triage(job.application_count ? "saved" : "inbox", "Restored.")
-          }
-        >
-          Restore
+    <>
+      <ActionBar sticky label="Actions on this job">
+        {job.triage === "dismissed" ? (
+          <Button
+            variant="primary"
+            disabled={pending}
+            onClick={() =>
+              triage(job.application_count ? "saved" : "inbox", "Restored.")
+            }
+          >
+            Restore
+          </Button>
+        ) : open ? (
+          <a className="btn primary" href={reviewHref(application.id)}>
+            {application.status === "draft"
+              ? "Continue the application"
+              : "Open the application"}
+          </a>
+        ) : job.triage === "saved" ? (
+          <Button variant="primary" disabled={pending} onClick={start}>
+            {application ? "Start a new application" : "Start application"}
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            disabled={pending}
+            onClick={() => triage("saved", "Shortlisted.")}
+          >
+            Shortlist
+          </Button>
+        )}
+        {job.triage === "saved" && !job.application_count && (
+          <Button
+            disabled={pending}
+            onClick={() => triage("inbox", "Returned to the jobs to review.")}
+          >
+            Return to review
+          </Button>
+        )}
+        {job.triage === "inbox" && !job.application_count && (
+          <Button disabled={pending} onClick={start}>
+            Start application
+          </Button>
+        )}
+        {job.triage !== "dismissed" && (
+          <Button disabled={pending} onClick={() => setDismissing(true)}>
+            Dismiss…
+          </Button>
+        )}
+        <Button variant="quiet" className="only-desktop" onClick={onNote}>
+          Add a note
         </Button>
-      ) : open ? (
-        <a className="btn primary" href={reviewHref(application.id)}>
-          {application.status === "draft"
-            ? "Continue the application"
-            : "Open the application"}
-        </a>
-      ) : job.triage === "saved" ? (
-        <Button variant="primary" disabled={pending} onClick={start}>
-          {application ? "Start a new application" : "Start application"}
+      </ActionBar>
+      <div className="only-mobile">
+        <Button variant="quiet" onClick={onNote}>
+          Add a note
         </Button>
-      ) : (
-        <Button
-          variant="primary"
-          disabled={pending}
-          onClick={() => triage("saved", "Shortlisted.")}
-        >
-          Shortlist
-        </Button>
-      )}
-      {job.triage === "saved" && !job.application_count && (
-        <Button
-          disabled={pending}
-          onClick={() => triage("inbox", "Returned to the jobs to review.")}
-        >
-          Return to review
-        </Button>
-      )}
-      {job.triage === "inbox" && !job.application_count && (
-        <Button disabled={pending} onClick={start}>
-          Start application
-        </Button>
-      )}
-      {job.triage !== "dismissed" && (
-        <Button disabled={pending} onClick={() => setDismissing(true)}>
-          Dismiss…
-        </Button>
-      )}
-      <Button variant="quiet" onClick={onNote}>
-        Add a note
-      </Button>
+      </div>
       {dismissing && (
         <DismissDialog
           what={job.title || "this job"}
@@ -178,7 +203,7 @@ function Actions({
           }}
         />
       )}
-    </div>
+    </>
   );
 }
 
@@ -248,8 +273,15 @@ export function Detail({
   id,
   onGone,
   own,
+  leaving,
   ...links
-}: Links & { id: string; onGone: () => void; own: Set<string> | null }) {
+}: Links & {
+  id: string;
+  onGone: () => void;
+  own: Set<string> | null;
+  /** Before a triage: what shows the next job once this one left the list. */
+  leaving: (id: string) => (() => void) | null;
+}) {
   const record = useFresh<Job | null>(
     `/jobs/${encodeURIComponent(id)}`,
     null,
@@ -331,6 +363,7 @@ export function Detail({
           job={job}
           onOpenApplication={links.onOpenApplication}
           onNote={note}
+          leaving={leaving}
         />
       </div>
       {job.signals.duplicate && (

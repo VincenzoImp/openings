@@ -119,13 +119,20 @@ def register_mcp(mcp, library: SkillLibrary, notes: SkillNotesService):
 
     # One prompt per shipped skill: the skill's instructions with its local notes.
     for item in library.list():
-        name = item["name"]
+        mcp.prompt(name=item["name"], description=item["description"][:1024])(
+            _prompt(library, notes, item["name"])
+        )
 
-        def instructions(name=name) -> str:
-            skill = read_skill(library, notes, name)["content"]
-            return (
-                f"Follow the Openings `{name}` skill below. Read referenced files with "
-                f"skills_get(name, path); `../<skill>/...` links name another skill.\n\n{skill}"
-            )
 
-        mcp.prompt(name=name, description=item["description"][:1024])(instructions)
+def _prompt(library: SkillLibrary, notes: SkillNotesService, name: str):
+    """The prompt of one skill: a function without parameters, so it declares no arguments."""
+
+    def instructions() -> str:
+        skill = read_skill(library, notes, name)["content"]
+        return (
+            f"Follow the Openings `{name}` skill below. Read referenced files with "
+            f"skills_get(name, path); `../<skill>/...` links name another skill.\n\n{skill}"
+        )
+
+    instructions.__name__ = instructions.__qualname__ = name.replace("-", "_")
+    return instructions

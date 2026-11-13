@@ -212,6 +212,7 @@ test("the setup guide reads the workspace and fills in the basics", async ({
   await editor.getByLabel("Name", { exact: true }).fill(name);
   await editor.getByLabel("Keywords").fill("synthetic engineer");
   await editor.getByLabel("Location", { exact: true }).fill("Zurich");
+  await editor.getByLabel("Country").fill("switzerland");
   await editor.getByRole("button", { name: "Save the search" }).click();
   await toast(page, "Search saved.");
   await expect(editor).toHaveCount(0);
@@ -243,7 +244,9 @@ test("the setup guide reads the workspace and fills in the basics", async ({
   await create.getByRole("button", { name: "Create", exact: true }).click();
   await expect(create.locator("pre.secret")).toHaveText(/^op_/);
   await expect(
-    card(page, "Connect an agent").getByLabel("MCP configuration"),
+    card(page, "Connect an agent").getByLabel("MCP configuration", {
+      exact: true,
+    }),
   ).toContainText("/mcp");
   const token = (await call(page, "/tokens")).items.find(
     (item: { name: string }) => item.name === tokenName,

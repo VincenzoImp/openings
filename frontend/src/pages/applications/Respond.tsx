@@ -13,8 +13,11 @@ export function Respond({
   application,
   reload,
   onDone,
+  stacked = false,
 }: {
   application: Application;
+  /** Laid out for a dialog: one field under the other. */
+  stacked?: boolean;
   /** Read the application again after a conflict. */
   reload: () => void;
   onDone: () => void;
@@ -66,6 +69,7 @@ export function Respond({
       submit={plan.submit}
       caption={plan.caption}
       busy={busy}
+      stacked={stacked}
       onSubmit={save}
       onCancel={onDone}
     />

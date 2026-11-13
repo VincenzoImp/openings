@@ -2,6 +2,7 @@ import type { Source } from "../../api";
 import { Field } from "../../design";
 import {
   LIMITS,
+  NATIONAL,
   PORTALS,
   type ConfigProperties,
   type SourceSchema,
@@ -51,12 +52,17 @@ export function SearchFields({
       </Field>
       <Field
         label="Country"
-        hint="The portal's market, such as switzerland, uk or usa."
+        hint="The portal's market, such as switzerland, uk or usa. Indeed and Glassdoor search one country's site and need it; LinkedIn uses the location alone."
       >
         <input
           name="country"
-          required
+          required={providers.some((id) => NATIONAL.includes(id))}
           defaultValue={String(config.country || country)}
+          placeholder={
+            providers.some((id) => NATIONAL.includes(id))
+              ? "switzerland"
+              : "None"
+          }
         />
       </Field>
       <fieldset className="field">

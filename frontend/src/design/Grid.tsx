@@ -4,8 +4,8 @@ import { cx } from "./classes";
 /**
  * A table built from rows of a CSS grid, with the ARIA roles of a table. The
  * roles keep its meaning for screen readers when narrow screens stack each row
- * into a block, and each row is skipped by layout and paint while it is off
- * screen (`content-visibility`), so a list of hundreds of rows stays fast.
+ * into a block. Every row is laid out (a page holds at most 200), so the
+ * table is as tall as its rows and nothing below it is an empty placeholder.
  * `columns` are the grid columns of every row on wide screens.
  */
 export function GridTable({

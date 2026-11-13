@@ -557,7 +557,7 @@ def test_old_finished_runs_go_and_the_recent_ones_of_each_source_stay(collected)
     summary = workspace.discovery.get_source(source)["last_run"]
 
     removed = prune(workspace.db, days=90)
-    assert removed == {"runs": 7, "tasks": 8, "events": 14, "more": False}
+    assert removed == {"runs": 7, "tasks": 8, "events": 14, "keys": 0, "more": False}
     left = {row["id"] for row in workspace.db.all("SELECT id FROM collection_runs")}
     # The newest finished run and the next 19 stay; the five oldest finished ones go.
     assert left == {fresh, *old[: KEPT_RUNS_PER_SOURCE - 1], queued, running, orphan_recent}
@@ -578,7 +578,13 @@ def test_old_finished_runs_go_and_the_recent_ones_of_each_source_stay(collected)
     assert orphans["n"] == 0
     assert workspace.discovery.get_source(source)["last_run"] == summary
     assert workspace.discovery.list_runs(source_id=source)["total"] == KEPT_RUNS_PER_SOURCE + 2
-    assert prune(workspace.db, days=90) == {"runs": 0, "tasks": 0, "events": 0, "more": False}
+    assert prune(workspace.db, days=90) == {
+        "runs": 0,
+        "tasks": 0,
+        "events": 0,
+        "keys": 0,
+        "more": False,
+    }
 
 
 def test_pruning_is_bounded_and_keeps_records_of_agent_runs(collected, monkeypatch):
@@ -644,6 +650,24 @@ def test_the_worker_prunes_at_start_and_then_at_a_slow_pace(collected, monkeypat
     worker.prune_backlog_seconds = 0
     worker._schedule_loop(Lane(3))
     assert calls[1:] == ["again"] * 3
+
+
+def test_idempotency_keys_older_than_thirty_days_are_pruned(tmp_path, monkeypatch):
+    workspace = open_workspace(tmp_path / "keys.sqlite")
+    job = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build APIs."})
+    for key, age in (("old", 31), ("recent", 29)):
+        workspace.db.execute(
+            "INSERT INTO idempotency_keys(scope,key,fingerprint,record_id,created_at) "
+            "VALUES(?,?,?,?,?)",
+            ("jobs", key, "digest", job["id"], stamp(age)),
+        )
+    # Collection retention switched off does not keep the keys.
+    monkeypatch.setenv("OPENINGS_RETENTION_DAYS", "0")
+    assert prune(workspace.db)["keys"] == 1
+    left = workspace.db.all("SELECT key FROM idempotency_keys ORDER BY key")
+    assert left == [{"key": "recent"}]
+    assert workspace.get_job(job["id"])["id"] == job["id"]
+    assert prune(workspace.db)["keys"] == 0
 
 
 # Restore room

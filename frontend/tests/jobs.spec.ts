@@ -419,6 +419,10 @@ test("a note is edited, an application started and a job forgotten from its page
   // Shortlisted, then started: the review page of the new application opens.
   await actions(page).getByRole("button", { name: "Shortlist" }).click();
   await expect(toast(page)).toContainText("Shortlisted");
+  // The job left To review; the Shortlist shows it.
+  await expect(page).not.toHaveURL(new RegExp(`job=${kept.id}`));
+  await go(page, `jobs?section=shortlist&job=${kept.id}`);
+  await settled(page);
   await actions(page)
     .getByRole("button", { name: "Start application", exact: true })
     .click();
@@ -436,4 +440,113 @@ test("a note is edited, an application started and a job forgotten from its page
   await expect(page).not.toHaveURL(/job=/);
   const left = await call(page, `/jobs?q=${encodeURIComponent(tag)}`);
   expect(left.items.map((item: { id: string }) => item.id)).toEqual([kept.id]);
+});
+
+test("after a triage the next job of the list is shown, or the previous one at the end", async ({
+  page,
+}) => {
+  const tag = unique("Next after triage");
+  for (const name of ["A", "B", "C"]) await job(page, `${tag} ${name}`);
+  await go(page, "jobs?section=review");
+  await settled(page);
+  await page.getByRole("searchbox", { name: "Search jobs" }).fill(tag);
+  const links = page.locator(".job-list > li .title");
+  await expect(links).toHaveCount(3);
+  const order = await links.allTextContents();
+  const id = async (title: string) =>
+    (await call(page, `/jobs?q=${encodeURIComponent(tag)}`)).items.find(
+      (item: { title: string }) => item.title === title,
+    ).id;
+  // From the pane: the first job is shortlisted, the second one shows.
+  await row(page, order[0]).getByRole("link", { name: order[0] }).click();
+  await expect(page.locator("#job-title")).toHaveText(order[0]);
+  await actions(page).getByRole("button", { name: "Shortlist" }).click();
+  await expect(toast(page)).toContainText("Shortlisted");
+  await expect(page).toHaveURL(new RegExp(`job=${await id(order[1])}`));
+  await expect(page.locator("#job-title")).toHaveText(order[1]);
+  await expect(links).toHaveCount(2);
+  // From the last row: it is dismissed, the one before it shows.
+  if (isNarrow(page))
+    await page.getByRole("button", { name: "List", exact: true }).click();
+  await row(page, order[2]).getByRole("link", { name: order[2] }).click();
+  await expect(page.locator("#job-title")).toHaveText(order[2]);
+  if (isNarrow(page))
+    await page.getByRole("button", { name: "List", exact: true }).click();
+  await row(page, order[2])
+    .getByRole("button", { name: /^Dismiss/ })
+    .click();
+  await expect(toast(page)).toContainText("Dismissed");
+  await expect(page).toHaveURL(new RegExp(`job=${await id(order[1])}`));
+  await expect(page.locator("#job-title")).toHaveText(order[1]);
+  // The last one left: dismissed from the pane, nothing is selected.
+  if (isNarrow(page))
+    await page
+      .getByRole("button", { name: "Selected job", exact: true })
+      .click();
+  await actions(page).getByRole("button", { name: "Dismiss…" }).click();
+  await dialog(page)
+    .getByRole("button", { name: "Dismiss", exact: true })
+    .click();
+  await expect(toast(page)).toContainText("Dismissed");
+  await expect(page).not.toHaveURL(/job=/);
+  await expect(links).toHaveCount(0);
+});
+
+test("on a phone the job's actions stay above the bottom bar and the toast", async ({
+  page,
+}) => {
+  test.skip(!isNarrow(page), "The fixed action bar is for narrow screens.");
+  const tag = unique("Phone actions");
+  await job(page, `${tag} A`);
+  await job(page, `${tag} B`);
+  await go(page, "jobs?section=review");
+  await settled(page);
+  await page.getByRole("searchbox", { name: "Search jobs" }).fill(tag);
+  await expect(page.locator(".job-list > li")).toHaveCount(2);
+  await page.locator(".job-list > li .title").first().click();
+  await expect(page.locator("#job-title")).toBeVisible();
+  const nav = (await page
+    .getByRole("navigation", { name: "Main" })
+    .boundingBox())!;
+  const bar = actions(page);
+  const inReach = async () => {
+    const box = (await bar.boundingBox())!;
+    expect(box.y + box.height).toBeLessThanOrEqual(nav.y + 1);
+    expect(box.y).toBeGreaterThan(0);
+    for (const name of ["Shortlist", "Dismiss…"]) {
+      const button = (await bar
+        .getByRole("button", { name, exact: true })
+        .boundingBox())!;
+      expect(button.y + button.height).toBeLessThanOrEqual(nav.y + 1);
+    }
+    return box;
+  };
+  await inReach();
+  await bar.getByRole("button", { name: "Shortlist", exact: true }).click();
+  await expect(toast(page)).toContainText("Shortlisted");
+  // The next job shows; the toast sits above its action bar, covering nothing.
+  const box = await inReach();
+  const message = (await toast(page).boundingBox())!;
+  expect(message.y + message.height).toBeLessThanOrEqual(box.y + 1);
+  await expect(page.getByRole("button", { name: "Add a note" })).toBeVisible();
+  await fitsViewport(page);
+});
+
+test("the tab strip scrolls on a phone and keeps the selected tab in view", async ({
+  page,
+}) => {
+  await go(page, "jobs");
+  await settled(page);
+  const strip = page.getByRole("tablist", { name: "Jobs by triage state" });
+  const all = strip.getByRole("tab", { name: /^All/ });
+  await all.click();
+  await expect(all).toHaveAttribute("aria-selected", "true");
+  const width = page.viewportSize()!.width;
+  await expect
+    .poll(async () => {
+      const box = (await all.boundingBox())!;
+      return box.x >= 0 && box.x + box.width <= width;
+    })
+    .toBe(true);
+  await fitsViewport(page);
 });

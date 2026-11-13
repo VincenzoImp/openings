@@ -160,8 +160,8 @@ class Auth:
         )
         return {"items": rows, "total": len(rows)}
 
-    def create_token(self, name, kind="owner", idempotency_key=None):
-        """Create an ``owner`` token (full access) or a scoped ``agent`` token.
+    def create_token(self, name, kind="agent", idempotency_key=None):
+        """Create a scoped ``agent`` token (the default) or an ``owner`` token (full access).
 
         A retry with the same idempotency key returns the token without its secret,
         which is shown only once.

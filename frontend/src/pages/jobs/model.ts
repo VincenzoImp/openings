@@ -303,3 +303,16 @@ export function placeTag(job: Pick<Job, "application" | "triage">): Label {
   if (job.triage === "dismissed") return { text: "Dismissed" };
   return { text: "To review" };
 }
+
+/** The tabs a triaged job leaves: To review and the Shortlist. */
+export const QUEUE_SECTIONS: Section[] = ["review", "shortlist"];
+
+/**
+ * The job to show once `id` leaves the list: the next row, or the previous
+ * one at the end; "" when it was the only one.
+ */
+export function neighbour(ids: string[], id: string) {
+  const index = ids.indexOf(id);
+  if (index < 0) return ids[0] || "";
+  return ids[index + 1] || ids[index - 1] || "";
+}
