@@ -666,7 +666,7 @@ test("a template's source, typed rules, assets and sample are managed end to end
       .getByRole("region", { name: "Templates by kind" })
       .getByRole("button", { name: name + " renamed" }),
   ).toHaveCount(0);
-  expect(await read()).toBeUndefined();
+  await expect.poll(read).toBeUndefined();
 });
 
 test("links of earlier versions open the rebuilt screens", async ({ page }) => {
