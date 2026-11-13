@@ -5,6 +5,7 @@ import {
   card,
   fitsViewport,
   go,
+  isNarrow,
   ownerSession,
   type Cookies,
 } from "./session";
@@ -167,6 +168,14 @@ test("a preview through paused providers asks no job board and saves nothing", a
     await editor.getByLabel("Name", { exact: true }).fill(unique("Preview"));
     await editor.getByLabel("Keywords").fill("synthetic engineer");
     await editor.getByLabel("Location", { exact: true }).fill("Zurich");
+    // No country by default; Indeed searches one country's site and needs it.
+    const country = editor.getByLabel("Country");
+    await expect(country).toHaveValue("");
+    await expect(country).toHaveAttribute("required", "");
+    await editor.getByRole("checkbox", { name: "Indeed" }).uncheck();
+    await expect(country).not.toHaveAttribute("required", "");
+    await editor.getByRole("checkbox", { name: "Indeed" }).check();
+    await country.fill("switzerland");
     await editor.getByRole("button", { name: "Preview results" }).click();
     await toast(page, "Preview complete. No job was saved.");
     const result = editor.getByRole("region", { name: /^Preview:/ });
@@ -195,6 +204,7 @@ test("sources filter by kind and act in bulk, with run-only limits", async ({
         config: {
           query: "synthetic analyst",
           location: city,
+          country: "switzerland",
           providers: ["indeed"],
         },
       }),
@@ -574,4 +584,50 @@ test("the password form and the list of operations", async ({ page }) => {
   const operations = await list;
   await expect(operations.locator("body")).toContainText('"operations"');
   await operations.close();
+});
+
+test("the connection snippet wraps inside its block with a copy button, and the tabs scroll", async ({
+  page,
+}) => {
+  await go(page, "settings?section=agents");
+  const block = page.locator(".code-block").filter({
+    has: page.getByLabel("MCP configuration", { exact: true }),
+  });
+  const code = block.getByLabel("MCP configuration", { exact: true });
+  await expect(code).toContainText("claude mcp add");
+  // Nothing hides past the right edge: the lines wrap.
+  const fits = await code.evaluate(
+    (element) => element.scrollWidth <= element.clientWidth + 1,
+  );
+  expect(fits).toBe(true);
+  const copy = block.getByRole("button", {
+    name: "Copy the MCP configuration",
+  });
+  const inner = (await copy.boundingBox())!;
+  const outer = (await block.boundingBox())!;
+  expect(inner.x).toBeGreaterThanOrEqual(outer.x);
+  expect(inner.x + inner.width).toBeLessThanOrEqual(outer.x + outer.width + 1);
+  await expect(
+    page.getByRole("button", { name: "Copy the MCP address" }),
+  ).toBeVisible();
+  // The last tab of Settings is reached and shown whole.
+  const strip = page.getByRole("tablist", { name: /Settings/ });
+  const last = strip.getByRole("tab").last();
+  await last.click();
+  await expect(last).toHaveAttribute("aria-selected", "true");
+  const width = page.viewportSize()!.width;
+  await expect
+    .poll(async () => {
+      const box = (await last.boundingBox())!;
+      return box.x >= 0 && box.x + box.width <= width;
+    })
+    .toBe(true);
+  if (isNarrow(page)) {
+    const scrolls = await strip.evaluate(
+      (element) => element.scrollWidth > element.clientWidth,
+    );
+    expect(scrolls).toBe(true);
+    await expect(strip).toHaveAttribute("data-hidden", /start|both/);
+  }
+  await fitsViewport(page);
 });

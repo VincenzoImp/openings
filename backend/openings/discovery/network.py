@@ -18,6 +18,9 @@ MAX_FEED_BYTES = 8 * 1024 * 1024
 
 
 HTTP_BUDGET: ContextVar[ProviderBudget | None] = ContextVar("collection_http_budget", default=None)
+# Passed as ``budget`` by a caller that deliberately fetches outside the provider
+# gate (tests of the address policy). A public fetch without any budget is refused.
+UNGUARDED = object()
 
 
 def public_url(value: str) -> str:
@@ -97,7 +100,17 @@ def fetch_bytes(
     method="GET",
     body=None,
 ) -> bytes:
-    budget = budget or HTTP_BUDGET.get()
+    """Fetch ``url`` through the provider gate: ``budget``, else the context's budget.
+
+    A public fetch with neither fails closed; only an explicit ``UNGUARDED`` skips
+    the gate.
+    """
+    if budget is UNGUARDED:
+        budget = None
+    else:
+        budget = budget or HTTP_BUDGET.get()
+        if budget is None and public:
+            raise RuntimeError("no provider budget")
     current = url
     try:
         with httpx.Client(

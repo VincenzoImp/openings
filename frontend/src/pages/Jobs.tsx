@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { JobList, PolicySection } from "../api";
 import { Button, Card, EmptyState, Split, Tabs } from "../design";
 import { PageHead } from "../library/common";
@@ -11,7 +11,9 @@ import { Detail } from "./jobs/Detail";
 import {
   DEFAULTS,
   JOB_SCOPES,
+  neighbour,
   ownLanguages,
+  QUEUE_SECTIONS,
   SECTIONS,
   sectionCount,
   sectionOf,
@@ -51,6 +53,21 @@ export default function JobsPage({ onOpenApplication }: Links) {
   const select = (job: string) => {
     setValues({ job });
     setPane(1);
+  };
+  // The rows of the list, to move on from a job that leaves it.
+  const rows = useRef<string[]>([]);
+  /**
+   * Before a triage of `id`: in To review and the Shortlist, where the job
+   * leaves the list, returns what shows the next row (or the previous one at
+   * the end) once the change is saved.
+   */
+  const leaving = (id: string) => {
+    if (!QUEUE_SECTIONS.includes(section) || id !== filters.job) return null;
+    const next = neighbour(rows.current, id);
+    return () => {
+      setValues({ job: next });
+      if (!next) setPane(0);
+    };
   };
   return (
     <>
@@ -99,6 +116,10 @@ export default function JobsPage({ onOpenApplication }: Links) {
               own={own}
               selected={filters.job}
               onSelect={select}
+              onRows={(ids) => {
+                rows.current = ids;
+              }}
+              leaving={leaving}
               onAdd={() => setAdding(true)}
             />
             {filters.job ? (
@@ -108,6 +129,7 @@ export default function JobsPage({ onOpenApplication }: Links) {
                 own={own}
                 onOpenApplication={onOpenApplication}
                 onOpenJob={select}
+                leaving={leaving}
                 onGone={() => {
                   setValues({ job: "" });
                   setPane(0);

@@ -8,23 +8,24 @@ import {
   type ListResult,
   type WorkspaceFile,
 } from "../../api";
-import { ActionBar, Button, Dialog, Tag } from "../../design";
+import { ActionBar, Banner, Button, Dialog, Tag } from "../../design";
 import { useFresh } from "../../library/useFresh";
 import { useWorkspace } from "../../state";
 import { reviewHref } from "../applications/links";
 import { planTags, stageOf, stageTag } from "../applications/model";
 import { Respond } from "../applications/Respond";
-import { queuePlace } from "./model";
+import { nextReady, queuePlace } from "./model";
 
 const NONE = { items: [], total: 0 };
+/** The Ready applications in Today's order. */
+const READY_QUEUE =
+  "/applications?status=draft&ready=true&sort=deadline&limit=200";
 
 /** "1 of 6 ready · Next: Data Platform Engineer", in Today's order. */
 function QueuePlace({ id }: { id: string }) {
-  const queue = useFresh<ListResult<Application>>(
-    "/applications?status=draft&ready=true&sort=deadline&limit=200",
-    NONE,
-    ["applications"],
-  );
+  const queue = useFresh<ListResult<Application>>(READY_QUEUE, NONE, [
+    "applications",
+  ]);
   const place = queuePlace(queue.data.items, id);
   if (!place) return null;
   return (
@@ -59,6 +60,8 @@ export function Head({
 }) {
   const { mutate, pending, notify } = useWorkspace();
   const [dialog, setDialog] = useState<"stop" | "respond" | null>(null);
+  // The last Ready application was just marked applied.
+  const [allSent, setAllSent] = useState(false);
   const stage = stageOf(application);
   const tag = stageTag(application);
   const job = application.job;
@@ -67,8 +70,17 @@ export function Head({
     void Promise.all(pdfs.map((file) => downloadWorkspaceFile(file))).catch(
       (cause) => notify(String(cause), true),
     );
+  /**
+   * Mark it applied, then go on to the next Ready application in Today's
+   * order, with Undo in the toast. After the last one, say so here.
+   */
   async function markApplied() {
-    await mutate(async () => {
+    const done: {
+      next?: Application | null;
+      before?: Application;
+      after?: Application;
+    } = {};
+    const ok = await mutate(async () => {
       // Read it again: the Ready mark may have been cleared since the page loaded.
       const fresh = await api<Application>(`/applications/${application.id}`);
       if (fresh.readiness !== "ready")
@@ -77,12 +89,49 @@ export function Head({
           409,
           "application_not_ready",
         );
-      await api(`/applications/${application.id}`, "PATCH", {
-        expected_version: fresh.version,
-        status: "applied",
-      });
-    }, "Marked applied. Record the employer's answer here when it comes.");
-    reload();
+      const queue = await api<ListResult<Application>>(READY_QUEUE);
+      done.next = nextReady(queue.items, application.id);
+      done.before = fresh;
+      done.after = await api<Application>(
+        `/applications/${application.id}`,
+        "PATCH",
+        { expected_version: fresh.version, status: "applied" },
+      );
+    }, "Marked applied.");
+    const { next, before, after } = done;
+    if (!ok || !after || !before) return;
+    notify("Marked applied.", false, {
+      label: "Undo",
+      run: () => void undo(after, before),
+    });
+    if (next) location.hash = reviewHref(next.id);
+    else {
+      setAllSent(true);
+      reload();
+    }
+  }
+  /** Back to Preparing without a sent day, Ready again as it was. */
+  async function undo(sent: Application, previous: Application) {
+    const ok = await mutate(async () => {
+      const draft = await api<Application>(
+        `/applications/${sent.id}`,
+        "PATCH",
+        {
+          expected_version: sent.version,
+          status: previous.status,
+          applied_at: previous.applied_at ?? null,
+        },
+      );
+      if (previous.ready_at)
+        await api(`/applications/${sent.id}/ready`, "POST", {
+          expected_version: draft.version,
+          ready: true,
+        });
+    }, "Back to Ready. It was not marked applied.");
+    if (!ok) return;
+    setAllSent(false);
+    if (location.hash === reviewHref(sent.id)) reload();
+    else location.hash = reviewHref(sent.id);
   }
   async function stop() {
     if (
@@ -134,6 +183,21 @@ export function Head({
   );
   return (
     <header className="review-head spread">
+      {allSent && (
+        <Banner
+          tone="info"
+          role="status"
+          className="all-sent"
+          title="All sent."
+          action={
+            <a className="btn sm" href="#today">
+              Back to Today
+            </a>
+          }
+        >
+          No other application is ready to apply.
+        </Banner>
+      )}
       <div className="grow">
         <div className="row">
           <Tag tone={tag.tone}>{tag.text}</Tag>
@@ -181,10 +245,10 @@ export function Head({
       {dialog === "respond" && (
         <Dialog
           title="Record the employer's answer"
-          className="wide"
           onClose={() => setDialog(null)}
         >
           <Respond
+            stacked
             application={application}
             reload={reload}
             onDone={() => setDialog(null)}

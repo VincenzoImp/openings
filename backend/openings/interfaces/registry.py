@@ -153,6 +153,29 @@ def _function(name, params, call, service, *, offload=False, returns=REQUIRED, d
     return function
 
 
+def renamed(method, name):
+    """``method`` under the tool's name, so its argument schema is titled after the tool."""
+    if inspect.iscoroutinefunction(method):
+
+        async def function(*args, **kwargs):
+            return await method(*args, **kwargs)
+
+    else:
+
+        def function(*args, **kwargs):
+            return method(*args, **kwargs)
+
+    function.__name__ = function.__qualname__ = name
+    function.__doc__ = method.__doc__
+    function.__signature__ = inspect.signature(method, eval_str=True)
+    function.__annotations__ = {
+        key: value
+        for key, value in inspect.get_annotations(method, eval_str=True).items()
+        if key != "self"
+    }
+    return function
+
+
 def _rest_params(params):
     return [(p.name, *(p.rest or (p.annotation, p.default))) for p in params]
 
@@ -185,7 +208,7 @@ def bind_mcp(mcp, operations, service):
             continue
         name = operation.canonical_name
         if tool.method:
-            function = getattr(service, tool.method)
+            function = renamed(getattr(service, tool.method), name)
         else:
             params = tool.params if tool.params is not None else operation.params
             function = _function(
