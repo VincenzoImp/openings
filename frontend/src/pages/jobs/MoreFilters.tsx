@@ -1,5 +1,10 @@
 import { Button, Field } from "../../design";
-import type { Filters } from "./model";
+import {
+  LANGUAGES,
+  POSTING_LANGUAGES,
+  languageName,
+  type Filters,
+} from "./model";
 
 const TEXT: [keyof Filters, string, string][] = [
   ["company", "Company", "companies"],
@@ -15,6 +20,16 @@ const KEYS: (keyof Filters)[] = [
   "remote",
   "created_since",
   "created_until",
+  "posting_language",
+  "posting_language_not",
+  "requires",
+];
+// The posting's own language is recognised in four languages; a requirement
+// can name any of them.
+const LANGUAGE_FILTERS: [keyof Filters, string, string[]][] = [
+  ["posting_language", "Written in", POSTING_LANGUAGES],
+  ["posting_language_not", "Not written in", POSTING_LANGUAGES],
+  ["requires", "Requires", Object.keys(LANGUAGES)],
 ];
 
 /** The archive's other filters, with the values the jobs found have. */
@@ -36,7 +51,7 @@ export function MoreFilters({
         More filters{active ? ` (${active} on)` : ""}
         <span className="muted">
           {" "}
-          · company, place, source, work style, dates
+          · company, place, source, work style, languages, dates
         </span>
       </summary>
       <div className="form-grid">
@@ -60,6 +75,21 @@ export function MoreFilters({
             <option value="false">On site or hybrid</option>
           </select>
         </Field>
+        {LANGUAGE_FILTERS.map(([key, label, codes]) => (
+          <Field key={key} label={label}>
+            <select
+              value={filters[key]}
+              onChange={(event) => change(key, event.target.value)}
+            >
+              <option value="">Any language</option>
+              {codes.map((code) => (
+                <option key={code} value={code}>
+                  {languageName(code)}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ))}
         <Field label="Added from">
           <input
             type="date"

@@ -1,4 +1,4 @@
-"""Generate the dashboard/REST/MCP parity matrix (docs/developer/parity.md).
+"""Generate and enforce the dashboard/REST/MCP parity matrix (docs/developer/parity.md).
 
 The matrix joins four sources:
 
@@ -7,13 +7,23 @@ The matrix joins four sources:
 - the dashboard source (REST paths it really calls, raw-JSON editors);
 - recorded browser evidence (REST calls the dashboard made during the e2e suite).
 
+Every difference between the three interfaces is a gap unless
+docs/developer/parity-notes.json documents it with a reason (an exemption). The
+rule, enforced by ``--check`` in pytest and by ``--gate`` after the browser
+tests in CI: no operation lacks REST or MCP, every operation has a dashboard
+path that a browser test exercised (or a documented exemption), and the
+dashboard calls no REST route outside the inventory.
+
 Usage, from the repository root:
 
-    uv run python scripts/parity_matrix.py           # regenerate the matrix
-    uv run python scripts/parity_matrix.py --check   # fail when it is out of date
-    uv run python scripts/parity_matrix.py --e2e     # re-record browser evidence first
+    uv run python scripts/parity_matrix.py              # regenerate the matrix
+    uv run python scripts/parity_matrix.py --check      # fail when stale or on a gap
+    uv run python scripts/parity_matrix.py --e2e        # re-record browser evidence first
+    uv run python scripts/parity_matrix.py --gate DIR   # check a fresh e2e recording
 
 ``--e2e`` needs the built dashboard and Playwright Chromium (see CONTRIBUTING).
+``--gate DIR`` reads what the browser tests recorded in DIR when they ran with
+``OPENINGS_PARITY_EVIDENCE=DIR`` (frontend/tests/fixtures.ts).
 """
 
 import argparse
@@ -24,10 +34,8 @@ import re
 import subprocess
 import sys
 import tempfile
-import zipfile
 from collections import defaultdict
 from pathlib import Path
-from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 INVENTORY = ROOT / "backend/openings/operation-inventory.json"
@@ -36,17 +44,56 @@ SOURCES = FRONTEND / "src"
 MATRIX = ROOT / "docs/developer/parity.md"
 EVIDENCE = ROOT / "docs/developer/parity-e2e.json"
 NOTES = ROOT / "docs/developer/parity-notes.json"
-# The e2e helper marks its own setup requests with this header; they are not
-# evidence of a dashboard path.
-SETUP_HEADER = "x-openings-e2e-setup"
+# The browser tests write what the dashboard requested into this directory
+# (frontend/tests/fixtures.ts); requests the e2e helpers make for their own
+# setup carry a header and are left out there.
+EVIDENCE_ENV = "OPENINGS_PARITY_EVIDENCE"
+EVIDENCE_PROJECT = "chromium"
+API = "/api/v1"
 METHODS = ("GET", "POST", "PATCH", "PUT", "DELETE")
+# Route templates whose last parameter is a path of several segments.
+PATHS = set()
 SUFFIX = re.compile(r"[^{}`]*\}((?:/(?:[\w-]+|\$\{[^}]*\}))+)")
 LITERAL = re.compile(r"""(["'`])(/(?:\\.|(?!\1).)*)\1""", re.DOTALL)
+IMPORT = re.compile(r"""from\s+["'](\.{1,2}/[^"']+)["']""")
+# Files whose words count for the inputs of the routes a page calls: the page's
+# own modules and the shared library, not the design system or the shell.
+OWN_CODE = ("pages/", "library/")
 
 
 def route_key(path):
     """A route path with anonymous parameters: /jobs/{job_id} -> /jobs/{}."""
     return re.sub(r"\{[^}]+\}", "{}", path).rstrip("/") or "/"
+
+
+def inventory_routes(inventory):
+    """Every REST route of the inventory, operations and exceptions: key -> methods."""
+    routes = defaultdict(set)
+    for entry in inventory["operations"] + inventory["exceptions"]:
+        for route in entry["rest"]:
+            routes[route_key(route["path"])].add(route["method"])
+            # A last parameter named path takes several segments (a skill's file).
+            if route["path"].endswith("/{path}"):
+                PATHS.add(route_key(route["path"]))
+    return routes
+
+
+def template_of(key, routes, method=None):
+    """The route template a concrete path key belongs to, or None."""
+    if key in routes and (method is None or method in routes[key]):
+        return key
+    candidates = [
+        template for template, methods in routes.items() if method is None or method in methods
+    ]
+    for template in candidates:
+        if re.fullmatch(re.escape(template).replace(r"\{\}", "[^/]+"), key):
+            return template
+    for template in candidates:
+        if template in PATHS:
+            prefix = re.escape(template.removesuffix("{}")).replace(r"\{\}", "[^/]+")
+            if re.fullmatch(prefix + ".+", key):
+                return template
+    return None
 
 
 def contract():
@@ -116,6 +163,17 @@ def mcp_inputs(schema):
     return names
 
 
+def api_literals():
+    """String literals of the dashboard source that name a REST path: (file, path, text, end)."""
+    for file in sorted(SOURCES.rglob("*.ts*")):
+        text = file.read_text()
+        for match in LITERAL.finditer(text):
+            path = re.sub(r"\$\{[^}]*\}", "{}", match.group(2)).split("?")[0]
+            if not path.startswith("/api/") and path != "/health":
+                path = API + path
+            yield file, path, text, match.end()
+
+
 def dashboard_references(routes):
     """REST routes named by string literals in the dashboard source.
 
@@ -124,39 +182,66 @@ def dashboard_references(routes):
     dropped, so conditional paths and methods do not invent references.
     """
     references = defaultdict(set)
-    for file in sorted(SOURCES.rglob("*.ts*")):
-        text = file.read_text()
-        for match in LITERAL.finditer(text):
-            path = re.sub(r"\$\{[^}]*\}", "{}", match.group(2)).split("?")[0]
-            if not path.startswith("/api/") and path != "/health":
-                path = "/api/v1" + path
-            # A literal chosen inside a template continues after the expression:
-            # `${run ? "/collection/runs" : "/tasks"}/${id}` names /tasks/{} too.
-            suffix = SUFFIX.match(text, match.end())
-            keys = {route_key(path)}
-            if suffix:
-                keys.add(route_key(path + re.sub(r"\$\{[^}]*\}", "{}", suffix.group(1))))
-            keys &= set(routes)
-            if not keys:
-                continue
-            depth, index, limit = 0, match.end(), min(len(text), match.end() + 800)
-            while index < limit:
-                character = text[index]
-                if character in "([{":
-                    depth += 1
-                elif character in ")]}":
-                    if depth == 0:
-                        break
-                    depth -= 1
-                index += 1
-            methods = set(
-                re.findall(r'"({})"'.format("|".join(METHODS)), text[match.end() : index])
-            )
-            for key in keys:
-                for method in methods or {"GET"}:
-                    if method in routes[key]:
-                        references[(method, key)].add(file.relative_to(SOURCES).as_posix())
+    for file, path, text, end in api_literals():
+        # A literal chosen inside a template continues after the expression:
+        # `${run ? "/collection/runs" : "/tasks"}/${id}` names /tasks/{} too.
+        suffix = SUFFIX.match(text, end)
+        keys = {route_key(path)}
+        if suffix:
+            keys.add(route_key(path + re.sub(r"\$\{[^}]*\}", "{}", suffix.group(1))))
+        keys &= set(routes)
+        if not keys:
+            continue
+        depth, index, limit = 0, end, min(len(text), end + 800)
+        while index < limit:
+            character = text[index]
+            if character in "([{":
+                depth += 1
+            elif character in ")]}":
+                if depth == 0:
+                    break
+                depth -= 1
+            index += 1
+        methods = set(re.findall(r'"({})"'.format("|".join(METHODS)), text[end:index]))
+        for key in keys:
+            for method in methods or {"GET"}:
+                if method in routes[key]:
+                    references[(method, key)].add(file.relative_to(SOURCES).as_posix())
     return references
+
+
+def unknown_literals(routes):
+    """Dashboard literals naming an /api/v1 path that no inventory route matches."""
+    found = []
+    for file, path, _, _ in api_literals():
+        key = route_key(path)
+        if not key.startswith(API + "/"):
+            continue
+        if template_of(key, routes) is None:
+            found.append(f"{file.relative_to(SOURCES).as_posix()}: {path}")
+    return sorted(set(found))
+
+
+def imports_of(file):
+    """Relative modules one dashboard file imports, as paths under SOURCES."""
+    found = set()
+    for target in IMPORT.findall((SOURCES / file).read_text()):
+        base = (SOURCES / file).parent / target
+        for candidate in (base.with_name(base.name + ".tsx"), base.with_name(base.name + ".ts")):
+            if candidate.is_file():
+                found.add(candidate.resolve().relative_to(SOURCES.resolve()).as_posix())
+    return found
+
+
+def own_code(files):
+    """The files and the page and library modules they import, transitively."""
+    seen, queue = set(files), list(files)
+    while queue:
+        for name in imports_of(queue.pop()):
+            if name not in seen and name.startswith(OWN_CODE):
+                seen.add(name)
+                queue.append(name)
+    return sorted(seen)
 
 
 def source_mentions(files, name):
@@ -169,97 +254,105 @@ def raw_json_editor(files, name):
     return any(pattern.search((SOURCES / file).read_text()) for file in files)
 
 
+def recorded_requests(directory):
+    """What the browser tests recorded, per request: test title, method, path,
+    status, and whether the test gave the answer itself."""
+    for file in sorted(Path(directory).glob("*.json")):
+        record = json.loads(file.read_text())
+        for request in record["requests"]:
+            yield (
+                record["title"],
+                request["method"],
+                request["path"],
+                request["status"],
+                request.get("answered", False),
+            )
+
+
+def evidence_document(directory, routes):
+    """Exercised routes and unknown /api/v1 requests from one recorded e2e run.
+
+    Routes the server answered are in ``routes``; routes a test answered itself
+    (page.route) are in ``answered``, which counts only for an operation whose
+    notes say why (``answered_by_test``).
+    """
+    evidence, answered, unknown = defaultdict(set), defaultdict(set), defaultdict(set)
+    for title, method, path, status, by_test in recorded_requests(directory):
+        key = route_key(path)
+        template = template_of(key, routes, method)
+        if template is None:
+            if key.startswith(API + "/"):
+                unknown[f"{method} {key}"].add(title)
+            continue
+        # A request cut short by navigation has status -1. It still shows that
+        # the dashboard sent it, and counting it keeps recordings repeatable.
+        if status == -1 or 200 <= status < 400:
+            (answered if by_test else evidence)[(method, template)].add(title)
+
+    def listed(found):
+        return {
+            f"{method} {path}": sorted(titles) for (method, path), titles in sorted(found.items())
+        }
+
+    return {
+        "format": "openings-parity-e2e-v2",
+        "project": EVIDENCE_PROJECT,
+        "routes": listed(evidence),
+        "answered": listed(answered),
+        "unknown": {route: sorted(titles) for route, titles in sorted(unknown.items())},
+    }
+
+
 def record_e2e(routes):
-    """Run the Chromium desktop e2e project with traces and keep dashboard requests."""
+    """Run the Chromium desktop e2e project and keep the requests the dashboard made."""
     with tempfile.TemporaryDirectory(prefix="openings-parity-e2e-") as directory:
-        report = Path(directory) / "report.json"
         result = subprocess.run(
             [
                 "npx",
                 "playwright",
                 "test",
-                "--project=chromium",
-                "--trace=on",
-                "--reporter=json",
+                f"--project={EVIDENCE_PROJECT}",
+                "--reporter=dot",
                 "--output",
                 str(Path(directory) / "results"),
             ],
             cwd=FRONTEND,
-            env={**os.environ, "PLAYWRIGHT_JSON_OUTPUT_NAME": str(report)},
+            env={**os.environ, EVIDENCE_ENV: str(Path(directory) / "evidence")},
             stdout=subprocess.DEVNULL,
             check=False,
         )
         if result.returncode:
             raise SystemExit("The e2e suite failed; evidence was not recorded.")
-        evidence = defaultdict(set)
-
-        def visit(suite):
-            for child in suite.get("suites", []):
-                visit(child)
-            for spec in suite.get("specs", []):
-                for test in spec["tests"]:
-                    for attempt in test["results"]:
-                        for attachment in attempt.get("attachments", []):
-                            if attachment["name"] == "trace":
-                                for route in trace_routes(Path(attachment["path"]), routes):
-                                    evidence[route].add(spec["title"])
-
-        visit(json.loads(report.read_text()))
-    document = {
-        "format": "openings-parity-e2e-v1",
-        "project": "chromium",
-        "routes": {
-            f"{method} {path}": sorted(titles)
-            for (method, path), titles in sorted(evidence.items())
-        },
-    }
+        document = evidence_document(Path(directory) / "evidence", routes)
     EVIDENCE.write_text(json.dumps(document, indent=2) + "\n")
-
-
-def trace_routes(trace, routes):
-    """REST requests the dashboard itself sent in one recorded test, unless refused."""
-    found = set()
-    with zipfile.ZipFile(trace) as archive:
-        for name in archive.namelist():
-            if not name.endswith(".network"):
-                continue
-            for line in archive.read(name).decode().splitlines():
-                snapshot = json.loads(line).get("snapshot", {})
-                request, response = snapshot.get("request", {}), snapshot.get("response", {})
-                headers = {header["name"].lower() for header in request.get("headers", [])}
-                # A request cut short by navigation has status -1. It still shows that
-                # the dashboard sent it, and counting it keeps recordings repeatable.
-                status = response.get("status", -1)
-                if SETUP_HEADER in headers or not (status == -1 or 200 <= status < 400):
-                    continue
-                key = route_key(urlsplit(request["url"]).path)
-                # Concrete identifiers are matched against the route templates.
-                for template, methods in routes.items():
-                    if request["method"] in methods and (
-                        key == template
-                        or re.fullmatch(re.escape(template).replace(r"\{\}", "[^/]+"), key)
-                    ):
-                        found.add((request["method"], template))
-    return found
 
 
 def cell(values):
     return "<br>".join(values) if values else "—"
 
 
-def build():
+def reasons(mapping, where):
+    """A map of names to reasons from parity-notes.json; every reason is required."""
+    for name, reason in mapping.items():
+        if not isinstance(reason, str) or not reason.strip():
+            raise SystemExit(f"parity-notes.json: {where} '{name}' needs a reason")
+    return mapping
+
+
+def analyse(evidence):
+    """Rows of the matrix, the gaps and the documented exemptions, for one evidence document."""
     inventory = json.loads(INVENTORY.read_text())
     notes = json.loads(NOTES.read_text())
-    evidence = json.loads(EVIDENCE.read_text())
     openapi, tools = contract()
     templates = {route_key(path): path for path in openapi["paths"]}
-    routes = defaultdict(set)
-    for entry in inventory["operations"] + inventory["exceptions"]:
-        for route in entry["rest"]:
-            routes[route_key(route["path"])].add(route["method"])
+    routes = inventory_routes(inventory)
     references = dashboard_references(routes)
     exercised = {tuple(route.split(" ", 1)): titles for route, titles in evidence["routes"].items()}
-    unknown_notes = set(notes["operations"]) - {entry["id"] for entry in inventory["operations"]}
+    by_tests = {
+        tuple(route.split(" ", 1)): titles for route, titles in evidence.get("answered", {}).items()
+    }
+    known = {entry["id"] for entry in inventory["operations"]}
+    unknown_notes = set(notes["operations"]) - known
     if unknown_notes:
         raise SystemExit(f"parity-notes.json names unknown operations: {sorted(unknown_notes)}")
     unknown_access = {
@@ -269,12 +362,22 @@ def build():
     }
     if unknown_access:
         raise SystemExit(f"The inventory has unknown access levels: {sorted(unknown_access)}")
+    shared_inputs = reasons(notes.get("inputs", {}), "input")
+    stale = []
 
     rows = []
     for entry in inventory["operations"]:
+        note = notes["operations"].get(entry["id"], {})
+        reasons(
+            {key: note[key] for key in ("exempt", "note", "answered_by_test") if key in note},
+            f"remark of {entry['id']}:",
+        )
         keys = [(route["method"], route_key(route["path"])) for route in entry["rest"]]
         files = sorted({file for key in keys for file in references.get(key, ())})
-        tests = sorted({title for key in keys for title in exercised.get(key, ())})
+        tests = {title for key in keys for title in exercised.get(key, ())}
+        if note.get("answered_by_test"):
+            tests |= {title for key in keys for title in by_tests.get(key, ())}
+        tests = sorted(tests)
         rest_names, in_path, free = set(), set(), set()
         for method, key in keys:
             names, parameters, loose = rest_inputs(openapi, method, templates.get(key, key))
@@ -282,56 +385,134 @@ def build():
             in_path |= parameters
             free |= loose
         # The tool's own inputs; the names after it are deprecated aliases (#167).
-        mcp_names = mcp_inputs(tools[entry["mcp"][0]]) if entry["mcp"] else set()
+        # A tool the app does not register fails test_interfaces.py instead.
+        mcp_names = mcp_inputs(tools.get(entry["mcp"][0], {})) if entry["mcp"] else set()
+        code = own_code(files)
+        unmentioned = sorted(
+            name for name in rest_names - in_path if files and not source_mentions(code, name)
+        )
+        input_reasons = reasons(note.get("inputs", {}), f"input of {entry['id']}")
+        interface_reasons = reasons(note.get("interfaces", {}), f"interface input of {entry['id']}")
+        rest_only = sorted(rest_names - mcp_names) if entry["mcp"] else []
+        mcp_only = sorted(mcp_names - rest_names) if entry["rest"] else []
+        stale += [
+            f"{entry['id']}: input '{name}' has a control or no longer exists"
+            for name in sorted(set(input_reasons) - set(unmentioned))
+        ]
+        stale += [
+            f"{entry['id']}: interface input '{name}' is on both interfaces or gone"
+            for name in sorted(set(interface_reasons) - set(rest_only) - set(mcp_only))
+        ]
         rows.append(
             {
                 "entry": entry,
                 "files": files,
                 "tests": tests,
                 "direct": bool(files or tests),
-                "raw": sorted(name for name in free if raw_json_editor(files, name)),
-                "unmentioned": sorted(
-                    name
-                    for name in rest_names - in_path
-                    if files and not source_mentions(files, name)
-                ),
-                "rest_only": sorted(rest_names - mcp_names) if entry["mcp"] else [],
-                "mcp_only": sorted(mcp_names - rest_names) if entry["rest"] else [],
-                "via": notes["operations"].get(entry["id"], {}).get("via", []),
-                "note": notes["operations"].get(entry["id"], {}).get("note", ""),
+                "raw": sorted(name for name in free if raw_json_editor(code, name)),
+                "unmentioned": unmentioned,
+                "input_reasons": {
+                    name: input_reasons.get(name) or shared_inputs.get(name) for name in unmentioned
+                },
+                "rest_only": rest_only,
+                "mcp_only": mcp_only,
+                "interface_reasons": interface_reasons,
+                "via": note.get("via", []),
+                "exempt": note.get("exempt", ""),
+                "answered": note.get("answered_by_test", ""),
+                "note": note.get("note", ""),
             }
         )
-    direct = {row["entry"]["id"] for row in rows if row["direct"]}
+    by_id = {row["entry"]["id"]: row for row in rows}
     for row in rows:
-        missing = set(row["via"]) - direct
-        if missing or (row["via"] and row["direct"]):
-            raise SystemExit(f"parity-notes.json: check 'via' of {row['entry']['id']}")
-        row["reachable"] = row["direct"] or bool(row["via"])
+        identifier = row["entry"]["id"]
+        if any(name not in by_id for name in row["via"]):
+            raise SystemExit(f"parity-notes.json: 'via' of {identifier} names an unknown operation")
+        if row["via"] and not row["note"]:
+            raise SystemExit(
+                f"parity-notes.json: {identifier} is reached via another operation; say why in 'note'"
+            )
+        if row["direct"] and (row["via"] or row["exempt"]):
+            stale.append(f"{identifier}: has its own dashboard path; remove 'via' or 'exempt'")
+        if row["via"] and row["exempt"]:
+            stale.append(f"{identifier}: 'via' and 'exempt' exclude each other")
+        if row["answered"] and not row["tests"]:
+            stale.append(f"{identifier}: 'answered_by_test' but no browser test calls it")
+    if stale:
+        raise SystemExit("parity-notes.json has stale exemptions:\n- " + "\n- ".join(stale))
 
+    gaps = defaultdict(list)
+    for row in rows:
+        entry, identifier = row["entry"], row["entry"]["id"]
+        if not entry["rest"] or not entry["mcp"]:
+            gaps["one_sided"].append(identifier)
+        if not row["direct"] and not row["via"] and not row["exempt"]:
+            gaps["no_dashboard"].append(identifier)
+        if row["direct"] and not row["tests"]:
+            gaps["no_e2e"].append(identifier)
+        untested = [name for name in row["via"] if not by_id[name]["tests"]]
+        if untested:
+            gaps["via_without_e2e"].append(f"{identifier} (via {', '.join(untested)})")
+        missing = [name for name, reason in row["input_reasons"].items() if not reason]
+        if missing:
+            gaps["inputs"].append(f"{identifier}: {', '.join(missing)}")
+        differing = [
+            name
+            for name in row["rest_only"] + row["mcp_only"]
+            if name not in row["interface_reasons"]
+        ]
+        if differing:
+            gaps["interfaces"].append(f"{identifier}: {', '.join(differing)}")
+        if row["raw"]:
+            gaps["raw_json"].append(f"{identifier}: {', '.join(row['raw'])}")
+    for path in unknown_literals(routes):
+        gaps["unknown_routes"].append(f"dashboard source {path}")
+    for route, titles in evidence.get("unknown", {}).items():
+        gaps["unknown_routes"].append(f"called in e2e: {route} ({titles[0]})")
+    return inventory, rows, gaps, references
+
+
+GAP_TITLES = {
+    "one_sided": "Operations without REST or without MCP",
+    "no_dashboard": "Operations without a dashboard path and without an exemption",
+    "no_e2e": "Dashboard paths no browser test exercised",
+    "via_without_e2e": "Operations reached through an operation no browser test exercised",
+    "inputs": "Inputs without a dashboard control and without a reason",
+    "interfaces": "Inputs on one interface only, without a reason",
+    "raw_json": "Free-form JSON edited as raw JSON",
+    "unknown_routes": "Dashboard requests outside the inventory",
+}
+
+
+def gap_lines(gaps):
+    return [f"{GAP_TITLES[kind]}: {item}" for kind in GAP_TITLES for item in gaps.get(kind, [])]
+
+
+def build(inventory, rows, gaps, references):
     out = [
         "# Parity matrix",
         "",
         "Generated by `scripts/parity_matrix.py`; do not edit by hand. Run",
         "`uv run python scripts/parity_matrix.py` after changing the operation inventory,",
         "a REST route, an MCP tool or the dashboard, and add `--e2e` after changing the",
-        "browser tests. Remarks come from `parity-notes.json`.",
+        "browser tests. Exemptions and remarks come from `parity-notes.json`.",
         "",
         "Design rule: every capability is manageable from the dashboard, REST and MCP",
-        "alike. This page shows where that holds in the current code and lists every gap.",
+        "alike. Every difference is a gap unless it is documented here with its reason;",
+        "`pytest` and the browser tests in CI fail on a gap (see CONTRIBUTING, Parity).",
         "",
         "How to read the evidence:",
         "",
         "- **Dashboard code** lists the dashboard source files that name the operation's",
         "  REST route. **E2E** counts the browser tests in which the dashboard itself",
         "  called the route without an error response (Chromium desktop; setup calls made",
-        "  by the test helper are excluded). An operation with neither has no working",
-        "  dashboard path.",
+        "  by the test helpers are excluded).",
         "- **Editor** is `raw JSON` when a free-form JSON input is edited as JSON text.",
-        "- **MCP** names the tool; the inventory also lists its deprecated aliases, which",
-        "  are removed in 0.23.",
-        "- Input comparisons use names from OpenAPI and the MCP tool schemas. A name the",
-        "  dashboard files never mention cannot be set there; a mentioned name may still",
-        "  lack a control, so those lists are lower bounds.",
+        "- **MCP** names the tool; the inventory also lists its deprecated aliases.",
+        "- Input comparisons use names from OpenAPI and the MCP tool schemas. An input",
+        "  counts as offered when its name occurs in the files that call the route or in",
+        "  the page and library modules they import; a mentioned name may still lack a",
+        "  control, so the lists of inputs without a control are lower bounds.",
         "- **Access** is `owner` for an operation that needs owner authority (the",
         "  dashboard session or an API token of kind `owner`) and refuses an API token",
         "  of kind `agent` with `403 forbidden`; `any` accepts both kinds.",
@@ -340,38 +521,33 @@ def build():
         "",
     ]
     total = len(rows)
-    unreachable = [row for row in rows if not row["reachable"]]
+    exempt = [row for row in rows if row["exempt"]]
     indirect = [row for row in rows if row["via"]]
-    untested = [row for row in rows if row["direct"] and not row["tests"]]
-    raw = [row for row in rows if row["raw"]]
     unmentioned = [row for row in rows if row["unmentioned"]]
     different = [row for row in rows if row["rest_only"] or row["mcp_only"]]
-    one_sided = [row for row in rows if not row["entry"]["rest"] or not row["entry"]["mcp"]]
     owner_only = [row for row in rows if row["entry"].get("access") == "owner"]
+    open_gaps = sum(len(items) for items in gaps.values())
     out += [
         "| Measure | Operations |",
         "|---|---|",
         f"| Logical operations in the inventory | {total} |",
-        f"| Without REST or without MCP | {len(one_sided)} |",
+        f"| With REST and MCP | {sum(bool(r['entry']['rest'] and r['entry']['mcp']) for r in rows)} |",
         f"| Owner only (refused for an agent token) | {len(owner_only)} |",
-        f"| Without a working dashboard path | {len(unreachable)} |",
-        f"| Reached only through another operation | {len(indirect)} |",
-        f"| With inputs the dashboard never mentions | {len(unmentioned)} |",
-        f"| With free-form JSON edited as raw JSON | {len(raw)} |",
-        f"| With different REST and MCP input names | {len(different)} |",
         f"| With a dashboard path exercised by e2e | {sum(bool(row['tests']) for row in rows)} |",
-        f"| With a dashboard path but no e2e evidence | {len(untested)} |",
+        f"| Reached through another operation (documented) | {len(indirect)} |",
+        f"| Without a dashboard path: agent only (documented) | {len(exempt)} |",
+        f"| With inputs only agents and scripts set (documented) | {len(unmentioned)} |",
+        f"| With inputs on one interface only (documented) | {len(different)} |",
+        f"| **Gaps** | **{open_gaps}** |",
         "",
         "## Gaps",
         "",
-        "### Operations without a working dashboard path",
-        "",
-        "The inventory names a dashboard location for each of these, but no dashboard",
-        "code calls the route and no browser test reached it.",
-        "",
-        "| Operation | REST | MCP | Inventory says | Remark |",
-        "|---|---|---|---|---|",
     ]
+    if open_gaps:
+        out += ["Each line is a gap: close it, or document it with a reason.", ""]
+        out += [f"- {line}" for line in gap_lines(gaps)]
+    else:
+        out.append("None. Every difference below is documented with its reason.")
 
     def rest_cell(entry):
         return cell(
@@ -384,72 +560,78 @@ def build():
     def mcp_cell(entry):
         return cell([f"`{tool}`" for tool in entry["mcp"][:1]])
 
-    for row in unreachable:
+    out += [
+        "",
+        "## Documented exemptions",
+        "",
+        "### Operations without a dashboard path",
+        "",
+        "Operations only an API token performs. The dashboard shows what they did.",
+        "",
+        "| Operation | REST | MCP | Dashboard shows | Reason |",
+        "|---|---|---|---|---|",
+    ]
+    for row in exempt:
         entry = row["entry"]
         out.append(
-            f"| `{entry['id']}` | {rest_cell(entry)} | {mcp_cell(entry)} | {entry['dashboard']} | {row['note'] or '—'} |"
+            f"| `{entry['id']}` | {rest_cell(entry)} | {mcp_cell(entry)} | {entry['dashboard']} | {row['exempt']} |"
         )
     out += [
         "",
-        "### Operations reached only through another operation",
+        "### Operations reached through another operation",
         "",
-        "The dashboard offers the capability, but calls a different operation for it.",
-        "The route itself is never called from the dashboard.",
+        "The dashboard offers the capability through a different operation, which a",
+        "browser test exercises; the route itself is not called from the dashboard.",
         "",
-        "| Operation | Dashboard uses | Remark |",
+        "| Operation | Dashboard uses | Reason |",
         "|---|---|---|",
     ]
     for row in indirect:
         via = ", ".join(f"`{name}`" for name in row["via"])
-        out.append(f"| `{row['entry']['id']}` | {via} | {row['note'] or '—'} |")
+        out.append(f"| `{row['entry']['id']}` | {via} | {row['note']} |")
     out += [
         "",
-        "### Inputs the dashboard never mentions",
+        "### Inputs only agents and scripts set",
         "",
-        "REST inputs whose names do not occur in the dashboard files that call the",
-        "operation. They can be set over REST or MCP only.",
+        "REST inputs whose names do not occur in the dashboard code of the operation.",
         "",
-        "| Operation | Inputs | Remark |",
+        "| Operation | Input | Reason |",
         "|---|---|---|",
     ]
     for row in unmentioned:
-        names = ", ".join(f"`{name}`" for name in row["unmentioned"])
-        out.append(f"| `{row['entry']['id']}` | {names} | {row['note'] or '—'} |")
+        for name in row["unmentioned"]:
+            reason = row["input_reasons"][name] or "**no reason: a gap**"
+            out.append(f"| `{row['entry']['id']}` | `{name}` | {reason} |")
     out += [
         "",
-        "### Free-form JSON edited as raw JSON",
+        "### Inputs on one interface only",
         "",
-        "Structured data the owner can change only by editing JSON text.",
+        "Input names present on REST or MCP only.",
         "",
-        "| Operation | Fields | Dashboard code | Remark |",
+        "| Operation | Input | Interface | Reason |",
         "|---|---|---|---|",
     ]
-    for row in raw:
-        names = ", ".join(f"`{name}`" for name in row["raw"])
-        out.append(
-            f"| `{row['entry']['id']}` | {names} | {cell(row['files'])} | {row['note'] or '—'} |"
-        )
-    out += [
-        "",
-        "### REST and MCP input differences",
-        "",
-        "Input names present on one interface only. Path parameters, transport details",
-        "and renamed arguments appear here; each needs a decision: align or document.",
-        "",
-        "| Operation | REST only | MCP only |",
-        "|---|---|---|",
-    ]
     for row in different:
-        out.append(
-            "| `{}` | {} | {} |".format(
-                row["entry"]["id"],
-                ", ".join(f"`{name}`" for name in row["rest_only"]) or "—",
-                ", ".join(f"`{name}`" for name in row["mcp_only"]) or "—",
-            )
-        )
+        for name, side in [(n, "REST") for n in row["rest_only"]] + [
+            (n, "MCP") for n in row["mcp_only"]
+        ]:
+            reason = row["interface_reasons"].get(name) or "**no reason: a gap**"
+            out.append(f"| `{row['entry']['id']}` | `{name}` | {side} | {reason} |")
+    answered = [row for row in rows if row["answered"]]
     out += [
         "",
-        "### Owner-only operations",
+        "### Browser tests that answer for the server",
+        "",
+        "The dashboard sends the request and handles the answer; the test gives the",
+        "answer the server gives, because the real one would disturb the other tests.",
+        "",
+        "| Operation | Reason |",
+        "|---|---|",
+    ]
+    out += [f"| `{row['entry']['id']}` | {row['answered']} |" for row in answered]
+    out += [
+        "",
+        "## Owner-only operations",
         "",
         "Operations that need owner authority. An API token of kind `agent` is refused",
         "with `403 forbidden` on REST and MCP; `test_interfaces.py` checks each one.",
@@ -464,11 +646,11 @@ def build():
         )
     out += [
         "",
-        "### Dashboard actions outside the logical operations",
+        "## Dashboard actions outside the logical operations",
         "",
         "REST routes the dashboard calls that the inventory records as transport",
         "exceptions, with the documented reason. Any other dashboard call maps to an",
-        "operation above, and `test_interfaces.py` fails for a REST route or MCP tool",
+        "operation, and `test_interfaces.py` fails for a REST route or MCP tool",
         "missing from the inventory.",
         "",
         "| Exception | Dashboard code | MCP | Reason |",
@@ -481,14 +663,7 @@ def build():
             out.append(
                 f"| `{entry['id']}` | {cell(files)} | {mcp_cell(entry)} | {entry['reason']} |"
             )
-    out += [
-        "",
-        "### Dashboard paths without e2e evidence",
-        "",
-        cell([f"`{row['entry']['id']}`" for row in untested]).replace("<br>", ", "),
-        "",
-        "## Matrix",
-    ]
+    out += ["", "## Matrix"]
     groups = defaultdict(list)
     for row in rows:
         groups[row["entry"]["group"]].append(row)
@@ -508,6 +683,8 @@ def build():
             code = cell(row["files"]) if row["direct"] else "**none**"
             if row["via"]:
                 code = "via " + ", ".join(f"`{name}`" for name in row["via"])
+            elif row["exempt"]:
+                code = "agent only"
             out.append(
                 "| `{}`<br>{} | {} | {} | {} | {} | {} | {} | {} |".format(
                     entry["id"],
@@ -524,26 +701,62 @@ def build():
     return "\n".join(out) + "\n"
 
 
+def fail_on(gaps, what):
+    lines = gap_lines(gaps)
+    if lines:
+        raise SystemExit(
+            f"Parity gaps ({what}). Close each one, or document it with a reason in "
+            "docs/developer/parity-notes.json (see CONTRIBUTING, Parity):\n- " + "\n- ".join(lines)
+        )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--check", action="store_true", help="fail when parity.md is out of date")
+    parser.add_argument(
+        "--check", action="store_true", help="fail when parity.md is stale or a gap is open"
+    )
     parser.add_argument("--e2e", action="store_true", help="re-record browser evidence first")
+    parser.add_argument(
+        "--gate",
+        metavar="DIR",
+        help=f"check the requests the browser tests recorded in DIR ({EVIDENCE_ENV})",
+    )
     arguments = parser.parse_args()
+    inventory = json.loads(INVENTORY.read_text())
+    if arguments.gate:
+        directory = Path(arguments.gate)
+        if not any(directory.glob("*.json")):
+            raise SystemExit(
+                f"No browser evidence in {directory}; run the e2e tests with {EVIDENCE_ENV}."
+            )
+        fresh = evidence_document(directory, inventory_routes(inventory))
+        _, rows, gaps, _ = analyse(fresh)
+        fail_on(gaps, "this browser test run")
+        committed = json.loads(EVIDENCE.read_text())
+        stale = set(fresh["routes"]) ^ set(committed["routes"])
+        if stale:
+            print(
+                "Note: docs/developer/parity-e2e.json differs from this run for "
+                + ", ".join(sorted(stale))
+                + "; record it again with --e2e."
+            )
+        print(f"Parity: {len(rows)} operations, no gap in this browser test run.")
+        return
     if arguments.e2e:
-        inventory = json.loads(INVENTORY.read_text())
-        routes = defaultdict(set)
-        for entry in inventory["operations"] + inventory["exceptions"]:
-            for route in entry["rest"]:
-                routes[route_key(route["path"])].add(route["method"])
-        record_e2e(routes)
-    matrix = build()
+        record_e2e(inventory_routes(inventory))
+    analysis = analyse(json.loads(EVIDENCE.read_text()))
+    matrix = build(*analysis)
     if arguments.check:
         if MATRIX.read_text() != matrix:
             raise SystemExit(
                 "docs/developer/parity.md is out of date; run scripts/parity_matrix.py."
             )
+        fail_on(analysis[2], "the committed evidence")
         return
     MATRIX.write_text(matrix)
+    gaps = gap_lines(analysis[2])
+    if gaps:
+        print(f"{len(gaps)} parity gaps; see docs/developer/parity.md.")
 
 
 if __name__ == "__main__":

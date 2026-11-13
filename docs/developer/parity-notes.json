@@ -1,147 +1,152 @@
 {
-  "format": "openings-parity-notes-v1",
+  "format": "openings-parity-notes-v2",
+  "about": "Exemptions of the parity matrix, each with its reason (scripts/parity_matrix.py). 'exempt': an operation without a dashboard path. 'via': the dashboard reaches the capability through other operations, 'note' says why. 'inputs': REST inputs the dashboard does not set. 'interfaces': inputs on REST or MCP only. 'answered_by_test': the browser test answers the request itself, and why. 'inputs' at the top level applies to every operation.",
+  "inputs": {
+    "idempotency_key": "A retry key for agents and scripts that may send a create again after a lost answer. The dashboard sends each create once: its form is locked until the answer arrives."
+  },
   "operations": {
-    "jobs.resolve": {
-      "note": "Add a job looks the address up when it is typed and offers to open the job already in the workspace; `source_key` serves collectors and scripts."
-    },
-    "sources.run": {
-      "via": [
-        "sources.bulk"
-      ],
-      "note": "Run once, also for one source, sends a bulk action."
-    },
-    "sources.delete": {
-      "via": [
-        "sources.bulk"
-      ],
-      "note": "Remove, also for one source, sends a bulk action."
-    },
-    "applications.staleness_list": {
-      "via": [
-        "applications.list",
-        "applications.staleness"
-      ],
-      "note": "Rows use `stale_inputs`, `stale_changes` and `stale_changes_total` in the application list; details use the per-application report. There is no workspace-wide staleness view."
-    },
     "jobs.create": {
-      "note": "Add a job sends the address, role, company, location and pasted text; other details are corrected afterwards as keys and values (`jobs.update`). `raw`, `source_key` and `source_id` are collector fields for scripted imports."
-    },
-    "applications.create": {
-      "note": "Starting an application sends the job only; plan fields and questions are edited afterwards (`applications.update`)."
-    },
-    "contexts.create": {
-      "note": "The context dialog sends `template_ids`; `template_id` is the single-template form of the same input."
-    },
-    "documents.create": {
-      "note": "Add a document and New revision send the title, frozen copy, note, the CV or letter's source and PDF, or form content; the agent cites `claim_ids` and `knowledge_ids`, which an open revision shows as counts."
-    },
-    "profile.update": {
-      "note": "`metadata` is edited as rows under Other details; the owner's rules and facts are items of the Policy. The deprecated `preferences` and `roles` stay editable under a collapsed heading."
-    },
-    "templates.update": {
-      "note": "The Rules tab edits the typed limits, the rule statements and the free-form rest of `rules` as rows."
-    },
-    "applications.update": {
-      "note": "Answers have one control per question on the review page. The response form moves the stage with `response_date` and `response_note` (Other uses `responses.add`), and closes as no reply with `concluded_on`."
-    },
-    "applications.list": {
-      "note": "The Preparing and Ready chips filter Draft by `ready=false` and `ready=true`; the Ready to apply queue filters by `readiness=ready` with `sort=ready`; Waiting for a reply and Close as no reply use `no_reply_due`. The other time ranges serve agents and scripts."
-    },
-    "responses.add": {
-      "note": "The response form builds its body in `pages/applications/recording.ts`, which sends `kind`, `date` and `note`; the Timeline's Record a response opens the same form."
-    },
-    "contexts.list": {
-      "note": "Inputs lists the application's frozen copies 20 at a time; `q` serves agents and scripts."
-    },
-    "templates.list": {
-      "note": "Templates and the frozen-copy dialog read the templates as one page of summaries; `offset` serves agents and scripts."
-    },
-    "insights.read": {
-      "note": "Insights uses the default minimum sample of 5 and `applied_since` for the last 90 days; `min_sample` and `applied_until` serve agents and scripts."
-    },
-    "runs.start": {
-      "note": "Runs belong to API tokens: a dashboard session has no runs. Activity shows runs, their reports and their changes read-only."
-    },
-    "runs.update": {
-      "note": "Runs belong to API tokens: a dashboard session has no runs."
-    },
-    "runs.finish": {
-      "note": "Runs belong to API tokens: a dashboard session has no runs."
-    },
-    "events.list": {
-      "note": "The Activity timeline filters changes by who made them (owner, API tokens or one token, system, not recorded), by kind of record (`subject_types`), by period and by run; the job, application and subject filters serve agents and scripts; the job and application timelines read `timeline.read`."
-    },
-    "runs.list": {
-      "note": "Activity filters runs by status; Today lists the runs active since the last visit (`active_since`). The workflow, token and start-time filters serve agents and scripts."
-    },
-    "questions.list": {
-      "note": "Today and Activity filter questions by state; `answered_since` and the subject filters serve the agent's next run."
-    },
-    "questions.ask": {
-      "note": "Agents ask questions for the owner; the dashboard answers and withdraws them."
-    },
-    "requests.take": {
-      "note": "Agents take, complete and decline requests with an API token; the dashboard writes and withdraws them."
-    },
-    "requests.complete": {
-      "note": "Agents take, complete and decline requests with an API token; the dashboard writes and withdraws them."
-    },
-    "requests.decline": {
-      "note": "Agents take, complete and decline requests with an API token; the dashboard writes and withdraws them."
-    },
-    "requests.list": {
-      "note": "Activity filters requests by state and the Ask your agent dialog by subject; `run_id` and `updated_since` serve agents."
-    },
-    "notes.list": {
-      "via": [
-        "timeline.read"
-      ],
-      "note": "The job and application timelines list every note with its scope, author, run and pin."
-    },
-    "applications.history": {
-      "via": [
-        "timeline.read"
-      ],
-      "note": "The application's Timeline lists its events with its notes and its job's entries."
-    },
-    "timeline.read": {
-      "note": "The timelines filter by kind (notes, changes, responses), who, scope (on an application) and period, and page by 30; `limit` up to 200 serves agents and scripts."
-    },
-    "requests.read": {
-      "via": [
-        "requests.list"
-      ],
-      "note": "Activity renders requests from the list, which returns complete records."
-    },
-    "questions.read": {
-      "via": [
-        "questions.list"
-      ],
-      "note": "Activity renders questions from the list, which returns complete records."
-    },
-    "policy.add": {
-      "note": "The form sends the fields it shows; `position` and `idempotency_key` serve agents and scripts (a new item goes to the end, then the arrows move it)."
-    },
-    "policy.read": {
-      "note": "The screen reads the whole policy; `GET /policy/{section}` serves agents that need one section."
-    },
-    "runs.read": {
-      "note": "The report counts all changes of a run and names the records of the first 100 (`changes_limit`); its link opens the timeline filtered by the run, which pages through every change. `changes_offset` serves agents and scripts."
-    },
-    "jobs.list": {
-      "note": "Jobs filters by tab (queue), search, signal, text completeness, who dismissed and rule, and the All tab by company, place, source, work style and added from; `posting_language`, `posting_language_not`, `requires`, `job_type`, `remote` and `created_until` also serve agents and scripts."
+      "inputs": {
+        "metadata": "Add a job sends the address, role, company, place and pasted text; other details are added afterwards as keys and values in Correct the job (`jobs.update`).",
+        "raw": "The provider payload of a collector; in the dashboard the owner pastes the posting text.",
+        "source_id": "The collection source of a collected posting; a job added in the dashboard has none.",
+        "source_key": "A collector's identity of a posting at its source; a job added in the dashboard is identified by its address."
+      }
     },
     "jobs.update": {
-      "note": "Correct the job edits role, company, place, address, text and the other details as keys and values. `availability` is deprecated since 0.21: whether the source still lists the posting is the no_longer_listed signal."
+      "inputs": {
+        "availability": "Deprecated since 0.21: whether the source still lists the posting is the No longer listed signal, shown on the job."
+      }
+    },
+    "jobs.resolve": {
+      "inputs": {
+        "source_key": "A collector's identity of a posting; Add a job looks the address up."
+      }
     },
     "jobs.duplicates": {
-      "note": "A job's Possible copies lists its group at the default confidence; `queue`, `match_location` and `offset` page the workspace-wide list for agents and scripts."
+      "inputs": {
+        "match_location": "The selected job's Possible copies lists its group at the default matching; requiring the same place tunes the workspace-wide list for agents and scripts."
+      }
+    },
+    "policy.add": {
+      "inputs": {
+        "position": "A new item goes to the end of its section; Move up and Move down place it (`policy.reorder`)."
+      }
+    },
+    "applications.list": {
+      "inputs": {
+        "ready_since": "The Ready to apply queue lists every Ready application by deadline; when an application became Ready serves agents and scripts that report a period.",
+        "ready_until": "The Ready to apply queue lists every Ready application by deadline; when an application became Ready serves agents and scripts that report a period."
+      }
+    },
+    "applications.staleness_list": {
+      "via": ["applications.list", "applications.staleness"],
+      "note": "Each row of Applications carries its changed inputs (`stale_inputs`, `stale_changes`) and the review page's Inputs tab reads the full report of one application; the workspace-wide list serves an agent that refreshes documents."
+    },
+    "insights.read": {
+      "inputs": {
+        "applied_until": "Insights compares the last 90 days and all time (`applied_since`); a period that ends earlier serves agents and scripts."
+      }
+    },
+    "contexts.list": {
+      "inputs": {
+        "q": "Inputs lists the frozen copies of the open application; searching every copy serves agents and scripts."
+      }
+    },
+    "contexts.create": {
+      "inputs": {
+        "template_id": "The single-template form of `template_ids`, which the frozen-copy dialog sends."
+      }
+    },
+    "documents.create": {
+      "inputs": {
+        "claim_ids": "The claims a revision cites are recorded by the agent that wrote it; the revision shows them. A revision the owner adds is its files.",
+        "knowledge_ids": "The Career entries a revision cites are recorded by the agent that wrote it; the revision shows them. A revision the owner adds is its files."
+      }
     },
     "files.list": {
-      "note": "A job's Files lists all of its files; `q` serves agents and scripts."
+      "inputs": {
+        "q": "A job's Files and the assets of Career and Templates list every file of their record; searching file names across the workspace serves agents and scripts."
+      }
+    },
+    "events.list": {
+      "inputs": {
+        "subject_id": "The Activity timeline filters by kind of record (`subject_types`), who, period and run; the changes of one record are its own timeline (`timeline.read`).",
+        "subject_type": "The Activity timeline filters by several kinds of record at once (`subject_types`); the single kind serves agents and scripts."
+      }
+    },
+    "runs.list": {
+      "inputs": {
+        "started_since": "Activity filters runs by status, and Today by activity since the last visit (`active_since`); the start time serves agents and scripts.",
+        "started_until": "Activity filters runs by status, and Today by activity since the last visit (`active_since`); the start time serves agents and scripts.",
+        "token_id": "Settings shows each token's open run beside it; listing one token's runs serves agents and scripts."
+      }
+    },
+    "runs.start": {
+      "exempt": "A run belongs to the API token that opens it, and the token's writes are attributed to it. The dashboard session is the owner and has no runs; Activity shows every run, its report and its changes."
+    },
+    "runs.update": {
+      "exempt": "Only the token whose run is open records its progress; Activity shows the notes in the run's report."
+    },
+    "runs.finish": {
+      "exempt": "Only the token whose run it is closes it with its report; Activity shows the report."
+    },
+    "runs.read": {
+      "inputs": {
+        "changes_offset": "A report names the first 100 changed records and links to the timeline filtered by the run, which pages through all of them."
+      }
+    },
+    "questions.list": {
+      "inputs": {
+        "answered_since": "Today and Activity filter questions by state; what was answered since a time serves the agent's next run.",
+        "subject_id": "Today and Activity filter questions by state; the questions of one record serve the agent."
+      }
+    },
+    "questions.read": {
+      "via": ["questions.list"],
+      "note": "Activity and Today render each question from the list, which returns complete records; one question by id serves an agent following a link."
+    },
+    "questions.ask": {
+      "exempt": "Questions are what the agent asks the owner. The owner answers or withdraws them on Today and in Activity, and writes to the agent with a request."
+    },
+    "requests.list": {
+      "inputs": {
+        "updated_since": "Activity filters requests by state and Ask your agent by subject; changes since a time serve the agent's next run."
+      }
+    },
+    "requests.read": {
+      "via": ["requests.list"],
+      "note": "Activity renders each request from the list, which returns complete records; one request by id serves an agent following a link."
+    },
+    "requests.take": {
+      "exempt": "Requests are what the owner asks the agent. The agent takes, completes or declines them with its token; the owner writes and withdraws them in Activity and with Ask your agent, and sees their state and result there."
+    },
+    "requests.complete": {
+      "exempt": "Requests are what the owner asks the agent. The agent completes them with its token and its result; Activity shows the result."
+    },
+    "requests.decline": {
+      "exempt": "Requests are what the owner asks the agent. The agent declines them with its token and a reason; Activity shows the reason."
+    },
+    "notes.list": {
+      "via": ["timeline.read"],
+      "note": "The job and application timelines list every note with its scope, author, run and pin through the one timeline read; the notes alone serve agents."
+    },
+    "applications.history": {
+      "via": ["timeline.read"],
+      "note": "The application's Timeline lists its lifecycle events with its notes and its job's entries through the one timeline read."
     },
     "collection.yield": {
-      "note": "Yield offers the last 30 or 90 days and all time (`since`); `until` and `min_sample` serve agents and scripts."
+      "inputs": {
+        "until": "Yield shows the last 30 or 90 days and all time (`since`); a period that ends earlier serves agents and scripts."
+      }
+    },
+    "files.download": {
+      "interfaces": {
+        "inline": "REST only: whether a browser shows the bytes or saves them is HTTP transport (Content-Disposition). MCP reserves a download address instead (`binary.transfers`)."
+      }
+    },
+    "password.update": {
+      "answered_by_test": "A real change signs out every browser session, the shared one of the browser tests too, so the test answers the request as the server does; test_archive.py changes the password over HTTP."
     }
   }
 }

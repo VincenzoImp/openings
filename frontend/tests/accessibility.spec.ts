@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./fixtures";
 import {
   call,
   go,
@@ -15,18 +15,6 @@ import {
 // docs/developer/dashboard-design.md: no serious or critical finding against
 // WCAG 2.2 AA.
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
-
-// Findings inside pages that a later stage of issue #135 rebuilds. Each entry
-// names one rule inside one part of one screen and the stage that removes it.
-// Never widen an entry to a whole screen or add one for the shell or a design
-// component: fix those.
-interface Exclusion {
-  rule: string;
-  within: string;
-  stage: number;
-  reason: string;
-}
-const EXCLUSIONS: Record<string, Exclusion[]> = {};
 
 const SCREENS = [
   "today",
@@ -61,6 +49,9 @@ const SCREENS = [
   "settings?section=skills&skill=prepare-shortlist",
   "settings?section=backup",
   "settings?section=workspace",
+  "setup",
+  "setup?step=record",
+  "setup?step=next",
 ];
 
 const cookies: Cookies = ownerSession();
@@ -73,24 +64,15 @@ async function findings(page: Page, key: string) {
   for (const violation of violations) {
     if (violation.impact !== "serious" && violation.impact !== "critical")
       continue;
-    const excluded = (EXCLUSIONS[key] || []).filter(
-      (item) => item.rule === violation.id,
-    );
     for (const node of violation.nodes) {
       const target = node.target.join(" ");
-      let skip = false;
-      for (const item of excluded)
-        skip ||= await page
-          .locator(target)
-          .first()
-          .evaluate((el, within) => !!el.closest(within), item.within)
-          .catch(() => false);
-      // On a phone the fixed bottom bar covers whatever row reaches the edge
-      // of the viewport, which axe reads as a small target. Scroll the target
-      // to the middle and check its size and spacing there again.
-      if (!skip && violation.id === "target-size")
-        skip = await visibleTargetFits(page, target);
-      if (!skip)
+      // On a phone the fixed bottom bar, and the sticky top bar, cover whatever
+      // reaches the edge of the viewport, which axe reads as a small target.
+      // Scroll the target to the middle and check its size and spacing again.
+      const covered =
+        violation.id === "target-size" &&
+        (await visibleTargetFits(page, target));
+      if (!covered)
         found.push(
           `${violation.id}: ${target}\n    ${node.failureSummary?.replaceAll("\n", "\n    ")}`,
         );
@@ -105,15 +87,18 @@ async function visibleTargetFits(page: Page, target: string) {
   const covered = await element
     .evaluate((el) => {
       const box = el.getBoundingClientRect();
-      const bars = [...document.querySelectorAll(".tabbar, .sticky-actions")];
-      const edge = Math.min(
-        window.innerHeight,
-        ...bars
+      const fixed = ".tabbar, .sticky-actions, .topbar";
+      const rects = (selector: string) =>
+        [...document.querySelectorAll(selector)]
           .map((bar) => bar.getBoundingClientRect())
-          .filter((rect) => rect.height > 0)
-          .map((rect) => rect.top),
+          .filter((rect) => rect.height > 0);
+      const bottom = Math.min(
+        window.innerHeight,
+        ...rects(".tabbar, .sticky-actions").map((rect) => rect.top),
       );
-      return box.bottom > edge && !el.closest(".tabbar, .sticky-actions");
+      // The sticky top bar covers whatever scrolled under it.
+      const top = Math.max(0, ...rects(".topbar").map((rect) => rect.bottom));
+      return (box.bottom > bottom || box.top < top) && !el.closest(fixed);
     })
     .catch(() => false);
   if (!covered) return false;
@@ -200,6 +185,28 @@ for (const theme of ["light", "dark"]) {
         await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
         expect(await findings(page, screen)).toEqual([]);
       });
+
+    test("the setup guide with its forms open has no serious accessibility finding", async ({
+      page,
+    }) => {
+      await page.context().addCookies(cookies);
+      await go(page, "setup?step=record");
+      await settled(page);
+      const record = page.getByRole("list", { name: "Your record" });
+      for (const [button, key] of [
+        [/the profile$/, "setup-profile"],
+        [/the policy$/, "setup-policy"],
+        [/^Add a search$/, "setup-search"],
+      ] as const) {
+        await record.getByRole("button", { name: button }).click();
+        await expect(record.locator(".inline-form")).toBeVisible();
+        await settled(page);
+        expect(await findings(page, key)).toEqual([]);
+        await record
+          .getByRole("button", { name: /^Close/, expanded: true })
+          .click();
+      }
+    });
 
     test("a job with its details, the dismissed job, the dialogs and the selection have no serious accessibility finding", async ({
       page,
