@@ -64,9 +64,7 @@ def seed_large(workspace, jobs, applications):
                 )
             )
             identities.append(("url:" + url, job_id))
-            postings.append(
-                (new_id(), job_id, "url:" + url, url, "{}", sha, created, created)
-            )
+            postings.append((new_id(), job_id, "url:" + url, url, "{}", sha, created, created))
         conn.executemany(
             "INSERT INTO jobs(id,title,company,location,url,posting,triage,metadata,created_at,updated_at) "
             "VALUES(?,?,?,?,?,?,?,?,?,?)",
@@ -85,7 +83,11 @@ def seed_large(workspace, jobs, applications):
             created = now - timedelta(days=60, minutes=index)
             applied = now - timedelta(days=5 + index % 55) if status != "draft" else None
             ready = status == "draft" and index % 2 == 0
-            outcome = ("rejected", "no_response", "not_pursued")[index % 3] if status == "closed" else None
+            outcome = (
+                ("rejected", "no_response", "not_pursued")[index % 3]
+                if status == "closed"
+                else None
+            )
             if outcome == "not_pursued":
                 applied = None
             conn.execute(
@@ -100,7 +102,9 @@ def seed_large(workspace, jobs, applications):
                     stamp(created),
                     stamp(now - timedelta(minutes=index)),
                     1 + index % 5 if status == "draft" else None,
-                    (now + timedelta(days=index % 30)).date().isoformat() if status == "draft" else None,
+                    (now + timedelta(days=index % 30)).date().isoformat()
+                    if status == "draft"
+                    else None,
                     stamp(now - timedelta(hours=index)) if ready else None,
                     "owner" if ready else None,
                     now.date().isoformat() if outcome == "no_response" else None,
@@ -141,7 +145,15 @@ def seed_large(workspace, jobs, applications):
                 conn.execute(
                     "INSERT INTO files(id,sha256,name,media_type,size,document_id,created_at) "
                     "VALUES(?,?,?,?,?,?,?)",
-                    (new_id(), sha, f"{kind}.pdf", "application/pdf", len(PDF), document_id, stamp(created)),
+                    (
+                        new_id(),
+                        sha,
+                        f"{kind}.pdf",
+                        "application/pdf",
+                        len(PDF),
+                        document_id,
+                        stamp(created),
+                    ),
                 )
             kind = {"interview": "interview", "offer": "offer", "closed": "rejection"}.get(status)
             if kind and applied and outcome != "no_response":
