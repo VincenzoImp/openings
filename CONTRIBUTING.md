@@ -26,7 +26,10 @@ uv run openings --database data/development.sqlite
 
 Open `http://127.0.0.1:8080`. For frontend hot reload, run
 `npm --prefix frontend run dev` separately; Vite proxies `/api` and `/mcp` to the
-backend. Never commit development databases or credentials.
+backend. The design system of the new dashboard (`frontend/src/ui`) has a
+gallery of every primitive at `http://127.0.0.1:5173/ui.html` on that server; the
+dashboard does not link or serve it. Never commit development databases or
+credentials.
 
 To build Docker images locally, give them local names:
 

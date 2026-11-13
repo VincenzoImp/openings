@@ -139,30 +139,31 @@ type Toggle = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
 };
 
 /** A checkbox with its label on the right. */
-export const Checkbox = forwardRef<HTMLInputElement, Toggle>(
-  function Checkbox({ label, hint, className, ...rest }, ref) {
-    const id = useId();
-    return (
-      <label className={cx("ui-toggle", className)}>
-        <input
-          ref={ref}
-          type="checkbox"
-          className="ui-checkbox"
-          aria-describedby={hint ? `${id}-hint` : undefined}
-          {...rest}
-        />
-        <span className="ui-toggle-text">
-          <span>{label}</span>
-          {hint && (
-            <span className="ui-field-hint" id={`${id}-hint`}>
-              {hint}
-            </span>
-          )}
-        </span>
-      </label>
-    );
-  },
-);
+export const Checkbox = forwardRef<HTMLInputElement, Toggle>(function Checkbox(
+  { label, hint, className, ...rest },
+  ref,
+) {
+  const id = useId();
+  return (
+    <label className={cx("ui-toggle", className)}>
+      <input
+        ref={ref}
+        type="checkbox"
+        className="ui-checkbox"
+        aria-describedby={hint ? `${id}-hint` : undefined}
+        {...rest}
+      />
+      <span className="ui-toggle-text">
+        <span>{label}</span>
+        {hint && (
+          <span className="ui-field-hint" id={`${id}-hint`}>
+            {hint}
+          </span>
+        )}
+      </span>
+    </label>
+  );
+});
 
 /** An on/off setting that applies at once, as a switch. */
 export const Switch = forwardRef<HTMLInputElement, Toggle>(function Switch(

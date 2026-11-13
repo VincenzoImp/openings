@@ -76,6 +76,18 @@
     text-decoration: underline;
     text-underline-offset: 2px;
   }
+  /* A link inside running text is underlined at rest (WCAG 1.4.1); links
+     that stand alone (navigation, rows, buttons) are not. */
+  p a,
+  .ui-prose a {
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+    text-underline-offset: 2px;
+  }
+  p a:hover,
+  .ui-prose a:hover {
+    text-decoration-color: currentColor;
+  }
   code,
   kbd,
   pre,

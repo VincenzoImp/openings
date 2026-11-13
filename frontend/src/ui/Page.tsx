@@ -141,9 +141,7 @@ export function Properties({
 }: {
   items: { label: string; value: ReactNode }[];
 }) {
-  const shown = items.filter(
-    (item) => item.value != null && item.value !== "",
-  );
+  const shown = items.filter((item) => item.value != null && item.value !== "");
   return (
     <dl className="ui-props">
       {shown.map((item) => (

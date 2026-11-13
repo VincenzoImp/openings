@@ -188,4 +188,9 @@
       display: none;
     }
   }
+
+  /* Focus wins over every variant's resting shadow. */
+  .ui-btn[data-variant]:focus-visible {
+    box-shadow: var(--focus-ring);
+  }
 }

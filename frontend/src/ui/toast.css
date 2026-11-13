@@ -97,7 +97,9 @@
     .ui-toast-region {
       left: var(--s-3);
       right: var(--s-3);
-      bottom: calc(var(--bar-bottom) + var(--s-3) + env(safe-area-inset-bottom));
+      bottom: calc(
+        var(--bar-bottom) + var(--s-3) + env(safe-area-inset-bottom)
+      );
       max-width: none;
     }
     .ui-toast .ui-kbd {

@@ -88,8 +88,8 @@
       padding: var(--s-2) var(--s-4) var(--s-4);
     }
     .ui-savebar {
-      padding: var(--s-2) var(--s-3) calc(var(--s-2) + env(safe-area-inset-bottom))
-        var(--s-4);
+      padding: var(--s-2) var(--s-3)
+        calc(var(--s-2) + env(safe-area-inset-bottom)) var(--s-4);
     }
     .ui-savebar .ui-btn {
       height: var(--touch);

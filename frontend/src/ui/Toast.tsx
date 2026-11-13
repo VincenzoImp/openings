@@ -149,6 +149,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({ show, close }), [show, close]);
   const error = toast?.tone === "error";
+  const { key, ...options } = toast ?? { key: 0, message: "" };
   return (
     <ToastContext.Provider value={value}>
       {children}
@@ -156,8 +157,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         <div role="status" aria-live="polite">
           {toast && !error && (
             <ToastView
-              key={toast.key}
-              {...toast}
+              key={key}
+              {...options}
               onClose={close}
               onHold={setHeld}
             />
@@ -165,7 +166,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         </div>
         <div role="alert" aria-live="assertive">
           {toast && error && (
-            <ToastView key={toast.key} {...toast} onClose={close} />
+            <ToastView key={key} {...options} onClose={close} />
           )}
         </div>
       </div>
