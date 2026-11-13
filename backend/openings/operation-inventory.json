@@ -135,7 +135,7 @@
       "mcp": [
         "jobs_search"
       ],
-      "dashboard": "Inbox: search, filters, pagination",
+      "dashboard": "Jobs: tabs To review, Shortlist, Dismissed and All, search, signal filter, more filters, pages",
       "notes": "q, triage (including active), company, location, source, remote, job_type, complete, queue (inbox/shortlist/applications/dismissed), created_since/until, sort, limit, offset; include_facets=true adds facets (default false). Items include compact active-or-latest application and application_count."
     },
     {
@@ -151,7 +151,7 @@
       "mcp": [
         "job_get"
       ],
-      "dashboard": "Inbox: job detail",
+      "dashboard": "Jobs: the selected job",
       "notes": "Includes compact active-or-latest application and application_count, alongside full posting, versions and provenance."
     },
     {
@@ -167,7 +167,7 @@
       "mcp": [
         "job_ingest"
       ],
-      "dashboard": "Inbox: Add job",
+      "dashboard": "Jobs: Add a job",
       "notes": "One deduplicated ingestion service; URL fetch is bounded and may contact an external site."
     },
     {
@@ -183,7 +183,7 @@
       "mcp": [
         "job_update"
       ],
-      "dashboard": "Inbox: edit job",
+      "dashboard": "Jobs: job details, Correct the job",
       "notes": "expected_version prevents lost updates. Returns the compact job summary (posting_preview, no full posting); read the job for full text."
     },
     {
@@ -199,7 +199,7 @@
       "mcp": [
         "job_triage"
       ],
-      "dashboard": "Inbox: Add/remove shortlist, Dismiss, Restore",
+      "dashboard": "Jobs: Shortlist, Dismiss (with a reason), Return to review, Restore",
       "notes": "saved retains interest. queue=shortlist contains saved jobs without any application attempts; starting preparation removes them from that queue. Returns the compact job summary (posting_preview, no full posting)."
     },
     {
@@ -215,7 +215,7 @@
       "mcp": [
         "jobs_bulk"
       ],
-      "dashboard": "Inbox: selection toolbar",
+      "dashboard": "Jobs: selection bar",
       "notes": "At most 200 versioned items, with per-item results/errors. Error results include details such as current_version."
     },
     {
@@ -231,7 +231,7 @@
       "mcp": [
         "jobs_resolve"
       ],
-      "dashboard": "Job details: Possible duplicates (identity matches are merged on ingestion)",
+      "dashboard": "Jobs: Add a job (the address already in the workspace)",
       "notes": "Read-only. Matches retained identities and normalized job/posting URLs; returns triage and every attempt per job. More than one match is an identity conflict to merge."
     },
     {
@@ -247,7 +247,7 @@
       "mcp": [
         "jobs_duplicates"
       ],
-      "dashboard": "Jobs: Possible duplicates tab; Job details: Possible duplicates",
+      "dashboard": "Jobs: job details, Possible copies and merging; Is this the same vacancy?",
       "notes": "Read-only and paginated by group, most confident first. Each group has a confidence in [0,1], a tier and the matched or conflicting signals (requisition id, apply target, posting text, company and title, location); min_confidence defaults to 0.5. Never merges."
     },
     {
@@ -263,7 +263,7 @@
       "mcp": [
         "job_merge"
       ],
-      "dashboard": "Inbox: merge duplicate",
+      "dashboard": "Jobs: Same vacancy: merge; Merge with another job",
       "notes": "Both record versions are required. Resolve an open-application conflict before merging jobs that each have an open attempt."
     },
     {
@@ -295,7 +295,7 @@
       "mcp": [
         "job_forget"
       ],
-      "dashboard": "Inbox: Forget",
+      "dashboard": "Jobs: job details, Forget this job permanently; selection bar, Forget",
       "notes": "expected_version is required. Future acquisition is new; deletion includes attempts, snapshots and owned files."
     },
     {
@@ -311,7 +311,7 @@
       "mcp": [
         "notes_list"
       ],
-      "dashboard": "Inbox: notes"
+      "dashboard": "Jobs: job timeline; Application review: Timeline"
     },
     {
       "id": "notes.read",
@@ -326,7 +326,7 @@
       "mcp": [
         "note_get"
       ],
-      "dashboard": "Inbox: note editor"
+      "dashboard": "Jobs: job timeline, Edit this note"
     },
     {
       "id": "notes.create",
@@ -341,7 +341,7 @@
       "mcp": [
         "note_add"
       ],
-      "dashboard": "Inbox/Applications: add note"
+      "dashboard": "Jobs: job timeline, Add the note; Application review: Timeline"
     },
     {
       "id": "notes.update",
@@ -356,7 +356,7 @@
       "mcp": [
         "note_update"
       ],
-      "dashboard": "Inbox/Applications: edit note"
+      "dashboard": "Jobs: job timeline, Edit this note"
     },
     {
       "id": "notes.delete",
@@ -371,7 +371,7 @@
       "mcp": [
         "note_delete"
       ],
-      "dashboard": "Inbox/Applications: remove note"
+      "dashboard": "Jobs: job timeline; Application review: Timeline"
     },
     {
       "id": "collection.read",
@@ -1133,7 +1133,7 @@
       "mcp": [
         "application_create"
       ],
-      "dashboard": "Inbox: Start application",
+      "dashboard": "Jobs: Start application (the selected job or a Shortlist row)",
       "notes": "At most one non-Closed attempt per job. A conflicting new request reports the active application ID; idempotency keys support retries. Starting retains saved interest and leaves the pending Shortlist queue; it never submits or generates documents. Optional priority (1 highest to 5), deadline (YYYY-MM-DD) and structured employer requirements."
     },
     {

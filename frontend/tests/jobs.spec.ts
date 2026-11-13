@@ -222,7 +222,9 @@ test("a likely duplicate is decided inside the job: different, then merged", asy
   expect(copy.signals.duplicate.job_id).toBe(earlier.id);
   await go(page, `jobs?signal=likely_duplicate&job=${copy.id}`);
   await settled(page);
-  await expect(row(page, copy.title)).toContainText("Likely duplicate");
+  // On a phone the selected job replaces the list.
+  if (!isNarrow(page))
+    await expect(row(page, copy.title)).toContainText("Likely duplicate");
   const box = detail(page).locator(".duplicate");
   await expect(box).toContainText(earlier.title);
   await expect(box).toContainText("identical posting text");
@@ -354,11 +356,16 @@ test("signals filter the list and Collection shows what each source yielded", as
   );
   await page.getByRole("button", { name: "All time" }).click();
   await settled(page);
-  await page
+  await expect(table).toBeVisible();
+  const dismissedByRule = page
     .getByRole("list", { name: "Jobs each rule dismissed" })
     .getByRole("link")
-    .first()
-    .click();
+    .first();
+  // Clear of the bottom bar of a phone before the click.
+  await dismissedByRule.evaluate((link) =>
+    link.scrollIntoView({ block: "center" }),
+  );
+  await dismissedByRule.click();
   await expect(page).toHaveURL(/#jobs\?section=dismissed&rule_id=/);
   await expect(page.locator(".job-list > li").first()).toContainText(
     "Dismissed by the rule",
@@ -382,4 +389,45 @@ test("on a phone the selected job replaces the list until the switch shows it", 
   await expect(page.locator(".job-list")).toBeVisible();
   await expect(page.locator(".job-detail")).toBeHidden();
   await fitsViewport(page);
+});
+
+test("a note is edited, an application started and a job forgotten from its page", async ({
+  page,
+}) => {
+  const tag = unique("Own page");
+  const kept = await job(page, `${tag} kept`);
+  const gone = await job(page, `${tag} gone`);
+  await go(page, `jobs?job=${kept.id}`);
+  await settled(page);
+  await detail(page).getByLabel("A note on this job").fill("First thought.");
+  await detail(page)
+    .getByRole("button", { name: "Add the note", exact: true })
+    .click();
+  const timeline = detail(page).getByRole("list", {
+    name: "Timeline of this job",
+  });
+  await timeline.getByRole("button", { name: "Edit this note" }).click();
+  await dialog(page).getByLabel("Note").fill("Second thought.");
+  await dialog(page).getByRole("button", { name: "Save the note" }).click();
+  await expect(timeline).toContainText("Second thought.");
+  // Shortlisted, then started: the review page of the new application opens.
+  await actions(page).getByRole("button", { name: "Shortlist" }).click();
+  await expect(toast(page)).toContainText("Shortlisted");
+  await actions(page)
+    .getByRole("button", { name: "Start application", exact: true })
+    .click();
+  await expect(page).toHaveURL(/#review\?application=/);
+  await expect(page.locator(".main h1")).toHaveText(kept.title);
+  // Forgetting asks first and removes the job for good.
+  await go(page, `jobs?section=all&job=${gone.id}`);
+  await settled(page);
+  await detail(page)
+    .getByRole("button", { name: "Forget this job permanently" })
+    .click();
+  await expect(dialog(page)).toContainText("removed for good");
+  await dialog(page).getByRole("button", { name: "Forget the job" }).click();
+  await expect(toast(page)).toContainText("removed");
+  await expect(page).not.toHaveURL(/job=/);
+  const left = await call(page, `/jobs?q=${encodeURIComponent(tag)}`);
+  expect(left.items.map((item: { id: string }) => item.id)).toEqual([kept.id]);
 });

@@ -414,7 +414,7 @@ test("the owner writes requests, follows the agent's result and withdraws one", 
   // another one about the job.
   await go(page, `jobs?section=all&job=${job.id}`);
   const detail = page.locator(".job-detail");
-  await detail.getByText("Ask your agent", { exact: true }).click();
+  await detail.locator("summary", { hasText: "Ask your agent" }).click();
   await expect(detail.getByRole("article", { name: about })).toBeVisible();
   const later = unique("Check the salary range");
   await detail.getByLabel("A request about this job").fill(later);

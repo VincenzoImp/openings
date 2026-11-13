@@ -221,6 +221,8 @@ def main():
         # A large workspace (the performance budget) is written in one transaction.
         if jobs > LARGE:
             seed_large(workspace, jobs, applications)
+            # Its signals, as a started workspace computes them in the background.
+            workspace.signals.backfill()
         for index in range(0 if jobs > LARGE else jobs):
             job = workspace.ingest_job(
                 {
