@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.23.0 — 2026-11-14
+## 0.23.0 — 2026-11-13
 
 The end of the redesign: a setup guide for new workspaces, parity enforced in CI, and the deprecated names and fields removed. **Read [Upgrading to 0.23](docs/user/upgrading-0.23.md) before upgrading scripts or agents.**
 
