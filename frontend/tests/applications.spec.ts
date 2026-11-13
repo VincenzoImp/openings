@@ -622,22 +622,20 @@ test("requirements, the plan and a concurrent change in the details", async ({
   const current = await call(page, `/applications/${application.id}`);
   await call(page, `/applications/${application.id}`, "PATCH", {
     expected_version: current.version,
-    note: "Changed in another session",
+    deadline: "2027-03-03",
   });
   await details.getByRole("button", { name: "Save details" }).click();
   await details.getByRole("button", { name: "Review latest values" }).click();
   await expect(details.locator(".conflict-recovery")).toContainText(
-    "Changed in another session",
+    "2027-03-03",
   );
   await details
     .getByRole("button", { name: "Reload editor and discard draft" })
     .click();
   // The editor now holds the latest record.
   await expect(
-    page
-      .getByRole("form", { name: "Stage and plan" })
-      .getByLabel("Application note and writing guidance"),
-  ).toHaveValue("Changed in another session");
+    page.getByRole("form", { name: "Stage and plan" }).getByLabel("Deadline"),
+  ).toHaveValue("2027-03-03");
   await page
     .getByRole("form", { name: "Stage and plan" })
     .getByLabel("Priority")
@@ -653,9 +651,40 @@ test("requirements, the plan and a concurrent change in the details", async ({
   await expect
     .poll(async () => {
       const value = await call(page, `/applications/${application.id}`);
-      return [value.priority, value.deadline, value.note];
+      return [value.priority, value.deadline];
     })
-    .toEqual([3, "2027-01-15", "Changed in another session"]);
+    .toEqual([3, "2027-01-15"]);
+
+  // The pinned note: pinned, edited, then unpinned into the timeline.
+  const pinned = page.getByRole("form", { name: "Pinned note" });
+  await pinned.getByLabel("Pinned note").fill("Lead with the platform work.");
+  await pinned.getByRole("button", { name: "Pin this note" }).click();
+  await expect
+    .poll(
+      async () =>
+        (await call(page, `/applications/${application.id}`)).pinned_note?.body,
+    )
+    .toBe("Lead with the platform work.");
+  await expect(
+    pinned.getByRole("button", { name: "Save the pinned note" }),
+  ).toBeVisible();
+  await pinned.getByLabel("Pinned note").fill("Lead with the API work.");
+  await pinned.getByRole("button", { name: "Save the pinned note" }).click();
+  await expect
+    .poll(async () => {
+      const value = await call(page, `/applications/${application.id}`);
+      return [value.note, value.pinned_note?.version];
+    })
+    .toEqual(["Lead with the API work.", 2]);
+  await pinned.getByRole("button", { name: "Unpin" }).click();
+  await expect(
+    pinned.getByRole("button", { name: "Pin this note" }),
+  ).toBeVisible();
+  await expect(pinned.getByLabel("Pinned note")).toHaveValue("");
+  await page.getByRole("tab", { name: "Timeline" }).click();
+  await expect(
+    page.getByRole("list", { name: "Timeline of this application" }),
+  ).toContainText("Lead with the API work.");
 });
 
 test("documents, revisions, frozen copies and their files are managed in the review page", async ({
@@ -878,7 +907,9 @@ test("the timeline records responses, notes and who made each change", async ({
   await call(page, "/tokens/" + agent.id, "DELETE");
   await go(page, `review?application=${application.id}&tab=timeline`);
   await settled(page);
-  const history = page.getByRole("list", { name: "History and notes" });
+  const history = page.getByRole("list", {
+    name: "Timeline of this application",
+  });
   await expect(history.getByRole("listitem").first()).toContainText(
     `Synthetic agent ${stamp}`,
   );
@@ -922,6 +953,21 @@ test("the timeline records responses, notes and who made each change", async ({
     .fill("Synthetic note on the application.");
   await page.getByRole("button", { name: "Add the note" }).click();
   await expect(history).toContainText("Synthetic note on the application.");
+  // Pinned, it leads the timeline.
+  await history.getByRole("button", { name: "Pin this note" }).click();
+  await expect(history.getByRole("listitem").first()).toContainText(
+    "Pinned note",
+  );
+  // Notes only, then the job's own entries, marked as such.
+  const filters = page.getByRole("group", { name: "Timeline filters" });
+  await filters.getByRole("button", { name: /^Notes/ }).click();
+  await expect(history.getByRole("listitem")).toHaveCount(1);
+  await filters.getByRole("button", { name: /^Everything/ }).click();
+  await filters.getByLabel("Scope").selectOption("job");
+  await expect(history).toContainText("Collected");
+  await expect(history.getByRole("listitem").first()).toContainText("Job");
+  await expect(history).not.toContainText("Synthetic note on the application.");
+  await filters.getByLabel("Scope").selectOption("");
   await history.getByRole("button", { name: "Delete this note" }).click();
   await dialog(page).getByRole("button", { name: "Delete the note" }).click();
   await expect(history).not.toContainText("Synthetic note on the application.");

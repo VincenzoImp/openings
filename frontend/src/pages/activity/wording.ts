@@ -59,6 +59,8 @@ const counted: Record<string, [string, string]> = {
   file_uploaded: ["file uploaded", "files uploaded"],
   job_added: ["job added", "jobs added"],
   note_added: ["note", "notes"],
+  note_pinned: ["note pinned", "notes pinned"],
+  note_unpinned: ["note unpinned", "notes unpinned"],
   question_asked: ["question asked", "questions asked"],
   request_completed: ["request completed", "requests completed"],
   request_declined: ["request declined", "requests declined"],
