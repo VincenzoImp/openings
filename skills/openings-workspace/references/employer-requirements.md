@@ -21,7 +21,7 @@ Store each requirement found in the application's `requirements` list with
 is replaced as a whole: read the application first and keep existing `id` values.
 Record a known closing date in the application `deadline` (YYYY-MM-DD). Do not
 store requirements in job metadata: an explicit metadata edit can stop later
-source refreshes of that job. Do not duplicate them in the application note.
+source refreshes of that job. Do not duplicate them in the application's notes.
 
 An unresolved blocking requirement makes the application's derived `readiness`
 `blocked`. It stays Draft and is reported as not ready, with the requirement and

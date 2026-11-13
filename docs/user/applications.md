@@ -96,10 +96,10 @@ Below, six tabs hold the rest:
 |---|---|
 | **Answers** | One control per form question, with the live answers; **Copy all**; add, edit and remove questions. |
 | **Requirements** | The employer's conditions, each blocking or not and resolved or not, with your note. |
-| **Timeline** | The employer's responses, every change with who made it, and the notes on the application. |
+| **Timeline** | The employer's responses, then one list of the notes and changes of the application and of its job, the pinned notes first, with filters. |
 | **Inputs** | The frozen copies of your record the documents were written from, their files, and what changed since. |
 | **Documents** | Every document revision: open, approve, revise, add files, delete. |
-| **Details** | Stage and outcome, priority, deadline, the time sent, the application note, the Ready step, requests for your agent, the job and deletion. |
+| **Details** | Stage and outcome, priority, deadline, the time sent, the Ready step, the pinned note, requests for your agent, the job and deletion. |
 
 Old links to an application (`#applications?application=…&detail=…`) open this
 page on the matching tab.
@@ -172,7 +172,7 @@ every current revision has its PDF and is approved and no blocking requirement i
 unresolved; otherwise it names what is missing. It shows who marked the
 application and when, and **Not ready** removes the mark.
 
-![Details of an application marked ready by the agent, with its plan, the request that led to it and the job](../images/application-ready.png)
+![Details of an application marked ready by the agent, with its plan, its pinned note, the request that led to it and the job](../images/application-ready.png)
 
 The mark describes exactly what was judged, so Openings clears it when that
 changes: a new document revision or frozen copy, a deleted revision, a file added
@@ -299,11 +299,23 @@ the job with its notes, files and maintenance actions.
 | Forget job | Permanently remove the job, identities and owned application history/files. Future collection can find it again. |
 
 Closing an application keeps it in Applications, including its history and
-files. The **Timeline** lists each recorded change with who made it: you in the
-dashboard, a named API token or the system. Entries from before version 0.17
-show "unknown (before 0.17)".
+files. The **Timeline** lists the notes and recorded changes of the application
+and of its job in one list, newest first, each with who made it: you in the
+dashboard, a named API token (with the workflow of its run) or the system.
+Entries from before version 0.17 show "unknown (before 0.17)". The job's own
+entries carry a **Job** tag. Filter by kind (notes, changes, employer
+responses), by who, by scope (this application or the job) and by period. Add a
+note on the application at the top; each note can be pinned, edited or deleted.
+The job's page shows the same timeline for the job and every application to it.
 
-![The Timeline tab: an employer response, the changes with who made each and a note](../images/application-history.png)
+**Pinned notes.** A job and an application each have at most one pinned note,
+listed first in its timeline; pinning another note unpins the previous one, and
+unpinning keeps the note. The application's pinned note is its standing
+guidance: edit it under **Details**, where it replaced the application note of
+earlier versions. Your agent reads it first, and each new frozen copy of your
+record includes it; copies made earlier keep the text they froze.
+
+![The Timeline tab: an employer response, then the pinned note, a note on the job and the changes, each with who made it](../images/application-history.png)
 
 Closing never returns the job to To review or Shortlist. To cancel preparation
 without losing documents, close it as **Not pursued**. Deleting the final attempt

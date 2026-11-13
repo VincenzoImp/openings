@@ -111,7 +111,10 @@ skills: discover the tools/resources and their typed input schemas.
    not verdicts.
 3. Inspect `job.application` or use `applications_list` with `value.job_id` to find
    its attempts. Continue the open application, or use `application_create` to
-   start Preparing (`draft`) with questions, notes and an idempotency key. Starting removes it from the pending Shortlist queue. A later attempt is possible after the previous one closes.
+   start Preparing (`draft`) with questions and an idempotency key. Read the
+   job's notes and changes with `timeline_get`; the pinned notes come first and
+   hold the owner's standing guidance. Write findings as notes (`note_add`, with
+   `application_id` for one application). Starting removes it from the pending Shortlist queue. A later attempt is possible after the previous one closes.
 4. Call `application_prepare_context` with the application, selected templates,
    optional evidence/claim filters and an idempotency key. Read the returned
    payload or its `openings://contexts/{id}` resource. Follow stored general,
@@ -185,7 +188,8 @@ its name at the time) or the system. Use one token per agent.
 `runs_get` returns a run with its report, questions and a page of its changes;
 `runs_list` filters by status, workflow, token and start time; `events_list`
 reads the change log by run, record, actor or time. `application_history` and
-notes carry the same `actor`. An open run without a write for two hours is
+notes carry the same `actor`; a note also names the run it was written in.
+`timeline_get` lists one job's or application's notes and changes together. An open run without a write for two hours is
 reported as `interrupted` but stays open; a later write with the same token
 attaches to it again. Changes made before version 0.17 show the actor
 `unknown (before 0.17)`. The skills' [run report reference](../../skills/openings-workspace/references/run-report.md)
