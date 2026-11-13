@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.19.0 — 2026-11-13
+
+Your decisions in your own words, and a first screen that tells you what to do next.
+
+- **Today** replaces Overview as the first screen: a one-line summary of what waits for you; the applications ready to apply, by deadline and priority; the agent's questions, answered in place, and applications blocked by a requirement; the pipeline; what the agent and collection did since your last visit; and applications waiting longer than your policy's no-reply period (30 days without one). The former Overview numbers are under Progress. `#overview` links open Today.
+- **Policy**, a new Library screen with `policy_*` operations on REST and MCP: your decision rules, eligibility facts, writing rules and other confirmed facts as short statements in four sections, each with its own version. Items an agent writes are proposals until you confirm them; only you confirm an item or switch on a rule.
+- A decision item can carry a rule on a collection signal (`language_required`, `posting_language`, `likely_duplicate`, `no_longer_listed`). Rules are stored and validated; they are not applied at collection yet.
+- A prepared context freezes the policy sections with their versions (`payload.policy`); earlier contexts are unchanged.
+- **Claims** have typed selection fields: `default_in_cv`, `role` (`core`, `supporting`, `bench`) and `group`. Template `rules` gain `statements`, a typed list of rule statements beside the limits.
+- **Career and Templates** are rebuilt on the new design. Free-form metadata and the rest of template rules are edited as key/value rows instead of JSON text. Earlier links keep working.
+- **Activity** is rebuilt with Questions, Requests, Runs and a Timeline that filters changes by who, kind of record, period and run; run reports count changes by kind with links to the records.
+- The application list filters by applied time (`applied_since`, `applied_until`), the run list by last activity (`active_since`) and the change list by several kinds of record (`subject_types`); changes, questions and requests name their run's workflow (`run_workflow`).
+- Skills read and maintain the policy and the typed claim fields. `examples/policy.json` is a synthetic policy.
+- Profile `preferences` and `roles` are deprecated in favour of Decision items; they are still stored, returned and writable.
+
+**After upgrading:** open Policy. Each top-level Profile metadata key has been copied into an unconfirmed Facts item, and `preferences` and `roles` into unconfirmed Decision items. Confirm, edit or move them (or let your agent sort them and ask you); nothing was removed from the Profile.
+
+**Database schema 10 (additive).** A schema 5–9 workspace is upgraded automatically at start in one transaction; the Profile, every Career entry, claim, template and frozen context keep every value. A claim metadata key `default_in_cv`, `role` or `group` with a valid value is copied to the typed field. Restore accepts schema 10 and upgrades a copy of an older backup. A schema 10 workspace cannot be opened by 0.18 or earlier: back up before upgrading.
+
 ## 0.18.0 — 2026-11-11
 
 A much smaller database and the first stage of the new dashboard.
