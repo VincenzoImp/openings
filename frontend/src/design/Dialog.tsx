@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
-import { Notification, confirmLeave } from "../state";
+import { Notification, confirmLeave, useWorkspace } from "../state";
 import { IconButton } from "./Button";
 import { cx } from "./classes";
 
@@ -39,11 +39,14 @@ export function Dialog({
 }) {
   const ref = useRef<HTMLDialogElement>(null),
     id = useId();
+  const { dismiss } = useWorkspace();
   const close = () => {
     if (!ref.current || confirmLeave(ref.current)) onClose();
   };
   useEffect(() => {
     const last = document.activeElement as HTMLElement | null;
+    // A notification from before the dialog is not about it.
+    dismiss();
     ref.current?.showModal();
     const unlock = lockPageScroll();
     return () => {

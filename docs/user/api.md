@@ -9,7 +9,7 @@ an **owner** token (full access) or an **agent** token, which is refused with
 `403 forbidden` for the owner password, token management, restore, answering
 a question and writing or withdrawing a request (see
 [token kinds](agents.md#token-kinds)). `POST /tokens` takes
-`{"name": "...", "kind": "agent"}`; `kind` defaults to `owner`. Tokens can be
+`{"name": "...", "kind": "agent"}`; `kind` defaults to `agent`. Tokens can be
 revoked independently. Browser session writes also need
 the `X-CSRF-Token` returned by `/auth/session`; scripts use bearer auth instead.
 `POST /auth/logout` revokes every browser session (all signed-in browsers must

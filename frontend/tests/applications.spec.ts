@@ -38,6 +38,15 @@ const localDay = (offset = 0) => {
   ].join("-");
 };
 const toast = (page: Page) => page.locator(".app-toast").last();
+/** The Ready applications in Today's order, as the review page reads them. */
+const READY_QUEUE =
+  "/applications?status=draft&ready=true&sort=deadline&limit=200";
+/** The one opened after `id` is marked applied. */
+const nextOf = (queue: { id: string }[], id: string) => {
+  const index = queue.findIndex((item) => item.id === id);
+  const others = queue.filter((item) => item.id !== id);
+  return index < 0 ? others[0] : queue[index + 1] || others[0];
+};
 const dialog = (page: Page) => page.locator("dialog[open]").last();
 // Safari moves through links with Option+Tab; the other browsers with Tab.
 const tabKey = (page: Page) =>
@@ -168,6 +177,9 @@ test("keyboard only: a ready application is reviewed from Today and marked appli
   await expect(page.locator("iframe.frame")).toHaveCount(2);
   await settled(page);
   expect(await reached(/^Mark applied$/)).toBe(true);
+  // The next Ready application in Today's order is opened next.
+  const queue = await call(page, READY_QUEUE);
+  const next = nextOf(queue.items, application.id);
   await page.keyboard.press("Enter");
   await expect(toast(page)).toContainText("Marked applied");
   await expect
@@ -175,6 +187,11 @@ test("keyboard only: a ready application is reviewed from Today and marked appli
       async () => (await call(page, `/applications/${application.id}`)).status,
     )
     .toBe("applied");
+  if (next)
+    await expect(page).toHaveURL(
+      new RegExp(`#review\\?application=${next.id}$`),
+    );
+  else await expect(page.getByText("All sent.")).toBeVisible();
   const sent = await call(page, `/applications/${application.id}`);
   expect(sent.applied_at).toBeTruthy();
   // The Ready history stays in the timeline.
@@ -182,10 +199,181 @@ test("keyboard only: a ready application is reviewed from Today and marked appli
   expect(history.items.map((event: any) => event.kind)).toContain(
     "application_marked_ready",
   );
+  await go(page, `review?application=${application.id}`);
   await expect(
     page.getByRole("button", { name: "Record response" }).first(),
   ).toBeVisible();
   await fitsViewport(page);
+});
+
+test("after Mark applied the next Ready application opens, with Undo", async ({
+  page,
+}) => {
+  const prefix = unique("Send next");
+  // A deadline before every other Ready application: these two lead the queue.
+  const first = await make(page, `${prefix} first`, {
+    ready: true,
+    deadline: "2000-01-01",
+  });
+  const second = await make(page, `${prefix} second`, {
+    ready: true,
+    deadline: "2000-01-02",
+  });
+  await go(page, `review?application=${first.id}`);
+  await settled(page);
+  await page.getByRole("button", { name: "Mark applied" }).first().click();
+  await expect(page).toHaveURL(
+    new RegExp(`#review\\?application=${second.id}$`),
+  );
+  await expect(page.locator(".main h1")).toHaveText(`${prefix} second`);
+  await expect(toast(page)).toContainText("Marked applied.");
+  const sent = await call(page, `/applications/${first.id}`);
+  expect([sent.status, !!sent.applied_at]).toEqual(["applied", true]);
+  // Undo: back to the first one, Preparing and Ready again, never sent.
+  await toast(page).getByRole("button", { name: "Undo" }).click();
+  await expect(page).toHaveURL(
+    new RegExp(`#review\\?application=${first.id}$`),
+  );
+  await expect
+    .poll(async () => {
+      const back = await call(page, `/applications/${first.id}`);
+      return [back.status, back.applied_at, back.readiness];
+    })
+    .toEqual(["draft", null, "ready"]);
+  await expect(
+    page.getByRole("button", { name: "Mark applied" }).first(),
+  ).toBeVisible();
+  // The last one: no other application is ready, so the page says so.
+  await page.route(
+    /\/api\/v1\/applications\?status=draft&ready=true/,
+    (route) => route.fulfill({ json: { items: [first], total: 1 } }),
+  );
+  await page.getByRole("button", { name: "Mark applied" }).first().click();
+  await expect(page.getByText("All sent.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Back to Today" })).toBeVisible();
+  await expect(page).toHaveURL(
+    new RegExp(`#review\\?application=${first.id}$`),
+  );
+  await expect(
+    page.getByRole("button", { name: "Record response" }).first(),
+  ).toBeVisible();
+  await page.unroute(/\/api\/v1\/applications\?status=draft&ready=true/);
+  // The second one leaves the queue, so the next project starts from its own.
+  const left = await call(page, `/applications/${second.id}`);
+  await call(page, `/applications/${second.id}`, "PATCH", {
+    expected_version: left.version,
+    status: "closed",
+    outcome: "not_pursued",
+  });
+  // A confirmation goes by itself; an error stays until it is closed.
+  await page.mouse.move(0, 0);
+  await expect(toast(page)).toHaveCount(0, { timeout: 9000 });
+  await fitsViewport(page);
+});
+
+test("the response dialog lays its fields out one under the other, without an earlier toast", async ({
+  page,
+}) => {
+  const application = await make(page, unique("Dialog layout"), {
+    ready: true,
+  });
+  // Stay on this page after Mark applied: it is the only Ready one here.
+  await page.route(
+    /\/api\/v1\/applications\?status=draft&ready=true/,
+    (route) => route.fulfill({ json: { items: [application], total: 1 } }),
+  );
+  await go(page, `review?application=${application.id}`);
+  await settled(page);
+  await page.getByRole("button", { name: "Mark applied" }).first().click();
+  await expect(toast(page)).toContainText("Marked applied.");
+  await page.unroute(/\/api\/v1\/applications\?status=draft&ready=true/);
+  await page.getByRole("button", { name: "Record response" }).first().click();
+  const box = dialog(page);
+  await expect(box).toBeVisible();
+  // The confirmation from before the dialog is gone, inside it and outside.
+  await expect(page.locator(".app-toast")).toHaveCount(0);
+  const form = box.getByRole("form", {
+    name: /Record the employer's response/,
+  });
+  const body = (await box.locator(".dialog-body").boundingBox())!;
+  const note = (await form.getByLabel("Note").boundingBox())!;
+  const date = (await form.getByLabel("Date of the answer").boundingBox())!;
+  const choice = (await form.getByRole("group").first().boundingBox())!;
+  // Choice, date, note: one under the other, the note as wide as the form.
+  expect(date.y).toBeGreaterThan(choice.y + choice.height - 1);
+  expect(note.y).toBeGreaterThan(date.y + date.height - 1);
+  expect(note.width).toBeGreaterThan(body.width * 0.75);
+  const cancel = (await form
+    .getByRole("button", { name: "Cancel" })
+    .boundingBox())!;
+  const save = (await form
+    .getByRole("button", { name: "Save and move to Interview" })
+    .boundingBox())!;
+  // The buttons come after the note, Cancel before the main one, at the end.
+  expect(cancel.y).toBeGreaterThan(note.y + note.height - 1);
+  expect(save.x).toBeGreaterThan(cancel.x);
+  expect(body.x + body.width - (save.x + save.width)).toBeLessThan(40);
+  await form.getByLabel("Note").fill("Call with the team lead.");
+  await form
+    .getByRole("button", { name: "Save and move to Interview" })
+    .click();
+  await expect(box).toHaveCount(0);
+  await expect(toast(page)).toContainText("Response saved.");
+  await expect
+    .poll(
+      async () => (await call(page, `/applications/${application.id}`)).status,
+    )
+    .toBe("interview");
+});
+
+test("an inline response form closes when the stage changes", async ({
+  page,
+}) => {
+  const title = unique("Inline form");
+  await make(page, title, { status: "applied" });
+  await go(page, `applications?stage=applied&q=${encodeURIComponent(title)}`);
+  await settled(page);
+  await row(page, title)
+    .getByRole("button", { name: /^Record response/ })
+    .click();
+  const form = page.getByRole("form", {
+    name: /Record the employer's response/,
+  });
+  await expect(form).toBeVisible();
+  await page
+    .getByRole("group", { name: "Stage" })
+    .getByRole("button", { name: /^All/ })
+    .click();
+  await expect(page).toHaveURL(/stage=all|#applications\?q=/);
+  await expect(row(page, title)).toBeVisible();
+  await expect(form).toHaveCount(0);
+});
+
+test("the list is as tall as its rows: no empty rows below them", async ({
+  page,
+}) => {
+  await go(page, "applications?stage=all");
+  await settled(page);
+  const rows = page.locator(
+    ".grid-table [role=rowgroup]:not(.grid-head) > [role=row]",
+  );
+  expect(await rows.count()).toBeGreaterThan(20);
+  const height = () =>
+    page.evaluate(() => document.documentElement.scrollHeight);
+  const before = await height();
+  // Scroll through the whole list: no row changes size once it is drawn.
+  for (let y = 0; y < before; y += 400) {
+    await page.evaluate((top) => window.scrollTo(0, top), y);
+    await page.waitForTimeout(30);
+  }
+  expect(await height()).toBe(before);
+  const last = rows.last();
+  await last.scrollIntoViewIfNeeded();
+  const table = (await page.locator(".grid-table").boundingBox())!;
+  const end = (await last.boundingBox())!;
+  // The last row ends the table.
+  expect(table.y + table.height - (end.y + end.height)).toBeLessThan(2);
+  await expect(last.getByRole("link").first()).toBeVisible();
 });
 
 test("marking applied is refused cleanly once the application is no longer ready", async ({
@@ -250,8 +438,9 @@ test("keyboard only: an employer response is recorded from an Applied row", asyn
   });
   await go(page, `applications?stage=applied&q=${encodeURIComponent(prefix)}`);
   await settled(page);
+  // 50 days in UTC; the local day can be one off near midnight.
   await expect(row(page, `${prefix} silent`)).toContainText(
-    "No reply for 50 days",
+    /No reply for (49|50|51) days/,
   );
 
   // Rejection, with the keyboard: the form takes focus on its first choice.
@@ -347,19 +536,27 @@ test("selected applications are closed as no reply, reopened and deleted togethe
     .check();
   const bar = page.getByRole("group", { name: "Selected applications" });
   await expect(bar).toContainText("3 selected");
+  // Only the actions valid for every selected application are offered: the
+  // Draft was never sent and is not Ready, the others are not Preparing.
+  await expect(bar.getByRole("button")).toHaveText([
+    "Close…",
+    "Delete…",
+    "Clear",
+  ]);
+  await row(page, `${prefix} draft`).getByRole("checkbox").uncheck();
+  await expect(bar).toContainText("2 selected");
+  await expect(bar.getByRole("button")).toHaveText([
+    "Close as no reply",
+    "Close…",
+    "Delete…",
+    "Clear",
+  ]);
   await bar.getByRole("button", { name: "Close as no reply" }).click();
-  // The Draft was never sent: it is refused and named, the others are closed.
-  const failure = page
-    .getByRole("alert")
-    .filter({ hasText: "could not be changed" });
-  await expect(failure).toContainText(`${prefix} draft`);
   for (const item of items)
-    expect((await call(page, `/applications/${item.id}`)).outcome).toBe(
-      "no_response",
-    );
-  await expect(bar).toContainText("1 selected");
-  await bar.getByRole("button", { name: "Clear" }).click();
-  await failure.getByRole("button", { name: "Dismiss" }).click();
+    await expect
+      .poll(async () => (await call(page, `/applications/${item.id}`)).outcome)
+      .toBe("no_response");
+  await expect(bar).toHaveCount(0);
 
   await page
     .getByRole("group", { name: "Stage" })

@@ -96,7 +96,7 @@ def events(workspace, **filters):
 
 def test_changes_record_the_owner_session_the_named_token_and_the_system(app):
     workspace = app.state.workspace
-    token = app.state.auth.create_token("Synthetic agent")
+    token = app.state.auth.create_token("Synthetic agent", "owner")
     owner = owner_client(app)
     with TestClient(app, base_url="http://localhost:8080") as anonymous:
         # Async REST handler, sync REST handler in a worker thread, sync and async MCP tools.
@@ -656,7 +656,7 @@ def test_questions_outlive_their_subject_with_a_label(tmp_path):
 
 def test_rest_and_mcp_expose_the_same_runs_questions_and_changes(app):
     workspace = app.state.workspace
-    token = app.state.auth.create_token("Synthetic agent")
+    token = app.state.auth.create_token("Synthetic agent", "owner")
     job = add_job(workspace)
     owner = owner_client(app)
     with TestClient(app, base_url="http://localhost:8080") as rest:

@@ -271,7 +271,7 @@ def test_a_dashboard_request_reaches_the_agent_and_its_result_comes_back(tmp_pat
     app = create_app(tmp_path / "exchange.sqlite", start_worker=False)
     app.state.auth.setup("synthetic-password")
     agent = app.state.auth.create_token("Synthetic agent", "agent")
-    owner_token = app.state.auth.create_token("Synthetic owner token")
+    owner_token = app.state.auth.create_token("Synthetic owner token", "owner")
     job = add_job(app.state.workspace)
     owner = TestClient(app)
     session = owner.post("/api/v1/auth/login", json={"password": "synthetic-password"})

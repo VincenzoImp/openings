@@ -58,6 +58,24 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* A command or configuration with its copy button inside, top right. */
+.code-block {
+  position: relative;
+  min-width: 0;
+}
+.code-block .code {
+  padding-right: 52px;
+}
+.code-block .icon-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--surface);
+}
+.code-block.inline .code {
+  padding-top: var(--s2);
+  padding-bottom: var(--s2);
+}
 .skill-text {
   max-height: 420px;
 }

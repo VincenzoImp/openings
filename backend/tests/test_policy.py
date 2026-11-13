@@ -459,7 +459,7 @@ def test_rest_mcp_and_the_dashboard_session_manage_the_same_items(tmp_path):
     app = create_app(tmp_path / "interfaces.sqlite", start_worker=False)
     app.state.auth.setup("synthetic-password")
     agent = app.state.auth.create_token("Synthetic agent", "agent")
-    owner_token = app.state.auth.create_token("Synthetic owner token")
+    owner_token = app.state.auth.create_token("Synthetic owner token", "owner")
     owner = TestClient(app)
     session = owner.post("/api/v1/auth/login", json={"password": "synthetic-password"})
     owner.headers["X-CSRF-Token"] = session.json()["csrf_token"]
