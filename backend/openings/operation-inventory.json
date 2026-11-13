@@ -2140,6 +2140,26 @@
       "reason": "MCP initialization/discovery/session/resource transport is protocol infrastructure; no simulated dashboard button or MCP wrapper is required."
     },
     {
+      "id": "backups.owner_files",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/backups"
+        },
+        {
+          "method": "GET",
+          "path": "/api/v1/backups/{name}"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/v1/backups/{name}"
+        }
+      ],
+      "mcp": [],
+      "dashboard": "Settings: Backup and restore, Automatic backups (owner only)",
+      "reason": "Scheduled backups and pre-upgrade copies hold the whole workspace, including the password hash, session secret and token hashes: listing, downloading and deleting them is owner-only REST and never an MCP tool."
+    },
+    {
       "id": "reference.examples",
       "rest": [
         {

@@ -30,6 +30,7 @@ flowchart LR
 | `backend/openings/snapshots.py`, `compaction.py` | Content-addressed storage of frozen contexts; giving freed pages back to the data volume |
 | `backend/openings/retention.py` | Refresh events, what an observation stores, pruning of finished collection runs and tasks |
 | `backend/openings/operations.py` | Backup credentials, restore, the room a restore needs and storage status |
+| `backend/openings/backups.py` | Scheduled local backups run by the worker, their rotation and status, and the owner's access to them and to the pre-upgrade copies `db.py` keeps |
 | `backend/openings/idempotency.py` | Idempotency keys of the creates whose records have no key column |
 | `backend/openings/activity.py`, `actors.py` | Actor of each change, agent runs with reports, questions for the owner, change log |
 | `backend/openings/agent_requests.py`, `subjects.py` | Requests for the agent; the subject reference shared with questions |

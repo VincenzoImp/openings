@@ -158,6 +158,7 @@ missing from the inventory.
 | Exception | Dashboard code | MCP | Reason |
 |---|---|---|---|
 | `auth.bootstrap_session` | App.tsx<br>api.ts<br>shell/Auth.tsx | — | Credential bootstrap and browser session transport precede authenticated domain tools; MCP uses bearer authentication. Logout revokes every browser session; API/MCP tokens remain valid. |
+| `backups.owner_files` | pages/settings/AutomaticBackups.tsx | — | Scheduled backups and pre-upgrade copies hold the whole workspace, including the password hash, session secret and token hashes: listing, downloading and deleting them is owner-only REST and never an MCP tool. |
 | `reference.examples` | pages/career/ImportDialog.tsx<br>pages/templates/Dialogs.tsx | — | Shipped static reference files are convenience downloads, not private workspace records; agents may use REST or repository examples. |
 
 ## Matrix

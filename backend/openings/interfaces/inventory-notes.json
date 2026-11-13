@@ -644,6 +644,10 @@
       "dashboard": null
     },
     {
+      "id": "backups.owner_files",
+      "dashboard": "Settings: Backup and restore, Automatic backups (owner only)"
+    },
+    {
       "id": "reference.examples",
       "dashboard": "Career/Templates: download synthetic examples"
     },
