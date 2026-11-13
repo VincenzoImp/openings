@@ -436,3 +436,21 @@ def test_schema_seven_applications_upgrade_without_a_ready_mark(tmp_path):
     assert (after["version"], after["updated_at"]) == (before["version"], before["updated_at"])
     marked = upgraded.set_ready(application["id"], {"expected_version": after["version"]})
     assert marked["readiness"] == "ready"
+
+
+def test_undoing_mark_applied_restores_the_ready_draft(app):
+    workspace = app.state.workspace
+    marked, _ = ready(app)
+    applied = workspace.update_application(
+        marked["id"], {"expected_version": marked["version"], "status": "applied"}
+    )
+    assert applied["applied_at"] and applied["ready_at"] is None
+    # Undo, as the dashboard does: back to Preparing without a sent day, then Ready again.
+    draft = workspace.update_application(
+        marked["id"],
+        {"expected_version": applied["version"], "status": "draft", "applied_at": None},
+    )
+    assert (draft["status"], draft["applied_at"]) == ("draft", None)
+    assert not draft.get("responses")
+    again = workspace.set_ready(marked["id"], {"expected_version": draft["version"]})
+    assert again["readiness"] == "ready" and again["status"] == "draft"

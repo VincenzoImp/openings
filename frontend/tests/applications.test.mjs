@@ -389,3 +389,57 @@ test("the review page: current revisions, before you send, the queue and old tab
   assert.equal(review.tabOf("details"), "details");
   assert.equal(review.tabOf("nonsense"), "answers");
 });
+
+test("bulk actions are offered only when valid for every selected application", () => {
+  const draft = {
+    status: "draft",
+    applied_at: null,
+    ready_at: null,
+    readiness: "reviewed",
+  };
+  const ready = {
+    ...draft,
+    ready_at: "2026-11-12T10:00:00Z",
+    readiness: "ready",
+  };
+  const applied = {
+    status: "applied",
+    applied_at: "2026-11-01T10:00:00Z",
+    ready_at: null,
+    readiness: "ready",
+  };
+  const interview = { ...applied, status: "interview" };
+  const closed = { ...applied, status: "closed" };
+  assert.deepEqual(model.bulkActions([]), []);
+  assert.deepEqual(model.bulkActions([applied, interview, draft]), [
+    "close",
+    "delete",
+  ]);
+  assert.deepEqual(model.bulkActions([applied, interview]), [
+    "no_reply",
+    "close",
+    "delete",
+  ]);
+  assert.deepEqual(model.bulkActions([draft]), [
+    "close",
+    "mark_ready",
+    "delete",
+  ]);
+  assert.deepEqual(model.bulkActions([ready]), [
+    "close",
+    "unmark_ready",
+    "delete",
+  ]);
+  assert.deepEqual(model.bulkActions([draft, ready]), ["close", "delete"]);
+  assert.deepEqual(model.bulkActions([closed]), ["reopen", "delete"]);
+  assert.deepEqual(model.bulkActions([closed, applied]), ["delete"]);
+});
+
+test("after Mark applied the next Ready application follows in Today's order", () => {
+  const queue = [{ id: "a" }, { id: "b" }, { id: "c" }];
+  assert.equal(review.nextReady(queue, "a").id, "b");
+  assert.equal(review.nextReady(queue, "c").id, "a");
+  assert.equal(review.nextReady(queue, "x").id, "a");
+  assert.equal(review.nextReady([{ id: "a" }], "a"), null);
+  assert.equal(review.nextReady([], "a"), null);
+});

@@ -200,7 +200,7 @@ class ApplicationInput(Input):
     priority: Priority | None = None
     deadline: str | None = Field(default=None, description="Closing date as YYYY-MM-DD.")
     requirements: list[Requirement] = Field(default_factory=list, max_length=100)
-    idempotency_key: str | None = Field(default=None, max_length=100)
+    idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
 
     @field_validator("deadline")
     @classmethod

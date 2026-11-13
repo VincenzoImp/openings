@@ -3,23 +3,27 @@ import { api, type BulkResult } from "../../api";
 import { Button, Dialog, Field } from "../../design";
 import { plural } from "../../library/common";
 import { useWorkspace } from "../../state";
-import { outcomeLabels, stageLabels } from "./model";
+import { outcomeLabels, stageLabels, type BulkAction } from "./model";
 
 type Action = "close" | "reopen" | "delete";
 
 /**
  * The actions on the selected applications: close with an outcome (no reply
- * among them), reopen, mark or unmark ready, delete. Each application is
- * changed on its own; the ones that fail are reported, the rest go through.
+ * among them), reopen, mark or unmark ready, delete; only those valid for
+ * every selected application are offered. Each application is changed on its
+ * own; the ones that fail are reported, the rest go through.
  */
 export function BulkBar({
   selection,
+  actions,
   hint,
   onClear,
   onResult,
 }: {
   /** Selected application ids with the version they were selected at. */
   selection: Record<string, number>;
+  /** The actions valid for the whole selection (`bulkActions`). */
+  actions: BulkAction[];
   hint?: string;
   onClear: () => void;
   onResult: (result: BulkResult) => void;
@@ -49,33 +53,53 @@ export function BulkBar({
     <div className="bulkbar" role="group" aria-label="Selected applications">
       <strong className="num">{ids.length} selected</strong>
       {hint && <span className="muted grow only-desktop">{hint}</span>}
-      <Button
-        size="sm"
-        disabled={pending}
-        onClick={() => run("close", { outcome: "no_response" })}
-      >
-        Close as no reply
-      </Button>
-      <Button size="sm" disabled={pending} onClick={() => setDialog("close")}>
-        Close…
-      </Button>
-      <Button size="sm" disabled={pending} onClick={() => setDialog("reopen")}>
-        Reopen…
-      </Button>
-      <Button size="sm" disabled={pending} onClick={() => run("mark_ready")}>
-        Mark ready
-      </Button>
-      <Button size="sm" disabled={pending} onClick={() => run("unmark_ready")}>
-        Not ready
-      </Button>
-      <Button
-        size="sm"
-        variant="danger"
-        disabled={pending}
-        onClick={() => setDialog("delete")}
-      >
-        Delete…
-      </Button>
+      {actions.includes("no_reply") && (
+        <Button
+          size="sm"
+          disabled={pending}
+          onClick={() => run("close", { outcome: "no_response" })}
+        >
+          Close as no reply
+        </Button>
+      )}
+      {actions.includes("close") && (
+        <Button size="sm" disabled={pending} onClick={() => setDialog("close")}>
+          Close…
+        </Button>
+      )}
+      {actions.includes("reopen") && (
+        <Button
+          size="sm"
+          disabled={pending}
+          onClick={() => setDialog("reopen")}
+        >
+          Reopen…
+        </Button>
+      )}
+      {actions.includes("mark_ready") && (
+        <Button size="sm" disabled={pending} onClick={() => run("mark_ready")}>
+          Mark ready
+        </Button>
+      )}
+      {actions.includes("unmark_ready") && (
+        <Button
+          size="sm"
+          disabled={pending}
+          onClick={() => run("unmark_ready")}
+        >
+          Not ready
+        </Button>
+      )}
+      {actions.includes("delete") && (
+        <Button
+          size="sm"
+          variant="danger"
+          disabled={pending}
+          onClick={() => setDialog("delete")}
+        >
+          Delete…
+        </Button>
+      )}
       <Button size="sm" variant="quiet" onClick={onClear}>
         Clear
       </Button>

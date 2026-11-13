@@ -18,8 +18,11 @@ def test_the_product_application_has_no_test_routes(app):
 
 
 def test_reset_restores_the_snapshot_and_keeps_its_sessions(tmp_path, owned_database):
-    snapshot = tmp_path / "snapshot.sqlite"
+    snapshot = tmp_path / "seed" / "workspace.sqlite"
+    snapshot.parent.mkdir()
     shutil.copyfile(owned_database, snapshot)
+    (snapshot.parent / "backups").mkdir()
+    (snapshot.parent / "backups" / "daily.sqlite").write_bytes(b"seeded backup")
     live = tmp_path / "live" / "workspace.sqlite"
     live.parent.mkdir()
     shutil.copyfile(snapshot, live)
@@ -35,10 +38,14 @@ def test_reset_restores_the_snapshot_and_keeps_its_sessions(tmp_path, owned_data
         assert job.status_code == 200, job.text
         assert client.get("/api/v1/jobs").json()["total"] == 1
 
+        (live.parent / "extra.sqlite").write_bytes(b"made by a test")
         assert client.get(RESET_PATH).status_code == 405
         assert client.post(RESET_PATH).status_code == 204
         # The session was signed with the snapshot's secret, so it survives the reset.
         assert client.get("/api/v1/jobs").json()["total"] == 0
         assert client.get(f"/api/v1/jobs/{job.json()['id']}").status_code == 404
+        # The backup files beside the database are the snapshot's again.
+        assert (live.parent / "backups" / "daily.sqlite").read_bytes() == b"seeded backup"
+        assert not (live.parent / "extra.sqlite").exists()
         # The snapshot itself never changes.
         assert snapshot.read_bytes() == owned_database.read_bytes()

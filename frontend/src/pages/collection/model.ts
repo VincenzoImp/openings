@@ -44,6 +44,8 @@ export const PORTALS: [string, string][] = [
   ["indeed", "Indeed"],
   ["glassdoor", "Glassdoor"],
 ];
+/** The portals that search one country's site, and so need a country. */
+export const NATIONAL = ["indeed", "glassdoor"];
 const portalName = (id: string) =>
   PORTALS.find(([key]) => key === id)?.[1] || id;
 
@@ -61,7 +63,8 @@ export function sourceLine(source: Source) {
     const where = String(
       source.config.location || source.config.country || "All locations",
     );
-    return `Search · "${String(source.config.query || "")}" · ${where}`;
+    const query = String(source.config.query || "").trim();
+    return ["Search", query && `"${query}"`, where].filter(Boolean).join(" · ");
   }
   return `Company board · ${String(source.url || source.config.board || source.kind)}`;
 }

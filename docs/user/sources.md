@@ -38,7 +38,7 @@ JobSpy searches **LinkedIn**, **Indeed** and **Glassdoor** through the attribute
 |---|---|
 | Query | Required search text; one saved search per query/location combination. |
 | Location | Portal search location; empty by default. Use a location the selected portal recognizes. |
-| Country | JobSpy country selection; default `usa`. Available locations and capabilities vary by portal. |
+| Country | The portal market, such as `switzerland`, `uk` or `usa`; empty by default. Indeed and Glassdoor search one country's site, so a search that includes them needs a country; LinkedIn uses the location alone. Available locations and capabilities vary by portal. |
 | Portals | LinkedIn, Indeed and Glassdoor selected by default; select the ones you want. |
 | Result limit | Up to **20 returned jobs per portal per run** by default; allowed range 1–50. Known jobs count toward it. |
 | Age window | **72 hours** by default; allowed range 1–8760 hours. Applied through the portal's supported age filter. |

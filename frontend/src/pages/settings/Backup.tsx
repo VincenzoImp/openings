@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from "react";
 import { binary } from "../../api";
 import { Banner, Button, Field, Stat, Stats } from "../../design";
 import { useWorkspace } from "../../state";
+import { AutomaticBackups } from "./AutomaticBackups";
 import { TWO_UP, megabytes, type Storage } from "./model";
 import { OwnerOnly } from "./OwnerOnly";
 
@@ -174,6 +175,7 @@ export function Backup({ storage }: { storage?: Storage }) {
           </form>
         </section>
       </div>
+      <AutomaticBackups />
     </div>
   );
 }

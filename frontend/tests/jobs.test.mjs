@@ -213,3 +213,13 @@ test("where a job came from and where it is now", () => {
     { text: "Applied", tone: "info" },
   );
 });
+
+test("a job that leaves its list gives way to the next row, or the previous one", () => {
+  const ids = ["a", "b", "c"];
+  assert.equal(model.neighbour(ids, "a"), "b");
+  assert.equal(model.neighbour(ids, "b"), "c");
+  assert.equal(model.neighbour(ids, "c"), "b");
+  assert.equal(model.neighbour(["a"], "a"), "");
+  assert.equal(model.neighbour(ids, "gone"), "a");
+  assert.deepEqual(model.QUEUE_SECTIONS, ["review", "shortlist"]);
+});

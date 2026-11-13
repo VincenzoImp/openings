@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .._vendor.jobspy.model import Country, DescriptionFormat, JobType, ScraperInput, Site
 from ..errors import DomainError
@@ -17,7 +17,11 @@ class JobSpyConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     query: str = Field(min_length=1, max_length=300)
     location: str = Field(default="", max_length=300)
-    country: str = Field(default="usa", max_length=100)
+    country: str = Field(
+        default="",
+        max_length=100,
+        description="The portal market, such as switzerland, uk or usa. Indeed and Glassdoor search one country's site and need it; LinkedIn searches by location alone. Empty: no country.",
+    )
     providers: list[Literal["linkedin", "indeed", "glassdoor"]] = Field(
         default_factory=lambda: list(SEARCH_PROVIDERS), min_length=1, max_length=3
     )
@@ -48,7 +52,17 @@ class JobSpyConfig(BaseModel):
     @field_validator("country")
     @classmethod
     def valid_country(cls, value):
-        return Country(value).value
+        return Country(value).value if value.strip() else ""
+
+    @model_validator(mode="after")
+    def country_for_national_sites(self):
+        national = [name for name in ("indeed", "glassdoor") if name in self.providers]
+        if national and not self.country:
+            raise ValueError(
+                f"{' and '.join(item.title() for item in national)} search one country's site: "
+                "enter the country, such as switzerland, uk or usa, or search LinkedIn only."
+            )
+        return self
 
     @field_validator("providers")
     @classmethod
@@ -106,7 +120,8 @@ def collect(config, provider, budget, *, preview=False, source=None):
         site_name=[Site(provider)],
         search_term=cfg.query,
         location=cfg.location or None,
-        country_indeed=Country(cfg.country),
+        # Only Indeed and Glassdoor read the country, and they always have one.
+        **({"country_indeed": Country(cfg.country)} if cfg.country else {}),
         is_remote=cfg.is_remote,
         job_type=JobType(cfg.job_type) if cfg.job_type else None,
         results_wanted=min(cfg.results_wanted, 3) if preview else cfg.results_wanted,

@@ -247,7 +247,7 @@ def test_rebinding_after_the_url_check_is_refused_before_connecting(monkeypatch,
     port = local_server.server_address[1]
     calls = synthetic_resolver(monkeypatch, {"rebind.test": ["93.184.216.34", "127.0.0.1"]})
     with pytest.raises(DomainError) as refused:
-        network.fetch_bytes(f"http://rebind.test:{port}/secret")
+        network.fetch_bytes(f"http://rebind.test:{port}/secret", budget=network.UNGUARDED)
     assert refused.value.code == "private_url"
     assert calls == ["rebind.test", "rebind.test"]
     assert local_server.seen == []
@@ -258,7 +258,10 @@ def test_connections_use_the_checked_address(monkeypatch, local_server):
     # Treat the synthetic server as public; the name itself is unresolvable by the system.
     patch_discovery(monkeypatch, "is_public_address", lambda address: address == "127.0.0.1")
     synthetic_resolver(monkeypatch, {"pinned.test": ["127.0.0.1", "127.0.0.1"]})
-    assert network.fetch_bytes(f"http://pinned.test:{port}/page") == b"internal"
+    assert (
+        network.fetch_bytes(f"http://pinned.test:{port}/page", budget=network.UNGUARDED)
+        == b"internal"
+    )
     assert local_server.seen == ["/page"]
 
 
@@ -271,6 +274,6 @@ def test_every_redirect_hop_is_pinned(monkeypatch, local_server):
         {"start.test": ["127.0.0.1", "127.0.0.1"], "rebind.test": ["127.0.0.1", "10.0.0.8"]},
     )
     with pytest.raises(DomainError) as refused:
-        network.fetch_bytes(f"http://start.test:{port}/start")
+        network.fetch_bytes(f"http://start.test:{port}/start", budget=network.UNGUARDED)
     assert refused.value.code == "private_url"
     assert local_server.seen == ["/start"]

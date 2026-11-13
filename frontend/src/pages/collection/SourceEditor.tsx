@@ -102,7 +102,10 @@ function SourceForm({
       Object.assign(config, {
         query: String(f.get("query")),
         location: String(f.get("location") || ""),
-        country: String(f.get("country")),
+        // An empty country is left out: the search then has none.
+        ...(String(f.get("country") || "").trim()
+          ? { country: String(f.get("country")).trim() }
+          : {}),
         providers: f.getAll("providers"),
         results_wanted: Number(f.get("results_wanted")),
         hours_old: Number(f.get("hours_old")),
@@ -211,7 +214,7 @@ function SourceForm({
             {searching ? (
               <SearchFields
                 source={source}
-                country={String(defaults("country", "usa"))}
+                country={String(defaults("country", ""))}
                 providers={providers}
                 onProviders={setProviders}
               />
