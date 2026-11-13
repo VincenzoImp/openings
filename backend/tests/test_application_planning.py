@@ -15,6 +15,7 @@ from openings.workspace import Workspace
 from outcome_fixtures import SCHEMA_ELEVEN_COLUMNS
 from schema_fixtures import SCHEMA_EIGHT_COLUMNS, columns, make_schema_seven
 from signal_fixtures import SCHEMA_TWELVE_COLUMNS
+from timeline_fixtures import older_rows
 
 SCHEMA_SEVEN_COLUMNS = ("requirements", "deadline", "priority")
 
@@ -56,8 +57,7 @@ def test_schema_six_upgrade_preserves_records_and_matches_a_new_workspace(tmp_pa
     with sqlite3.connect(path) as conn:
         assert "priority" not in {row[0] for row in columns(conn, "applications")}
         before = {
-            table: conn.execute(f"SELECT * FROM {table} ORDER BY 1").fetchall()
-            for table in ("jobs", "applications", "events", "notes")
+            table: older_rows(conn, table) for table in ("jobs", "applications", "events", "notes")
         }
 
     upgraded = Workspace(path)
@@ -85,10 +85,8 @@ def test_schema_six_upgrade_preserves_records_and_matches_a_new_workspace(tmp_pa
                 *SCHEMA_ELEVEN_COLUMNS.get(table, ()),
                 *SCHEMA_TWELVE_COLUMNS.get(table, ()),
             )
-            names = [row[0] for row in columns(conn, table) if row[0] not in added]
-            assert (
-                conn.execute(f"SELECT {','.join(names)} FROM {table} ORDER BY 1").fetchall() == rows
-            )
+            assert older_rows(conn, table, added) == rows, table
+    assert current["note"] == current["pinned_note"]["body"] == "Synthetic guidance"
     # The new fields are usable straight away.
     updated = upgraded.update_application(
         application["id"], {"expected_version": current["version"], "priority": 2}

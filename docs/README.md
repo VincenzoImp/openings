@@ -18,6 +18,7 @@ three work with the same jobs, career knowledge, documents and collection settin
 | Read the workflow skills agents follow | [Skills](../skills/) |
 | Write scripts | [REST API](user/api.md) |
 | Move, restore, upgrade or operate a workspace | [Operations](user/operations.md) |
+| Upgrade to 0.22, which changes stored data, REST and MCP | [Upgrading to 0.22](user/upgrading-0.22.md) |
 | Set the server's environment variables | [Configuration](user/configuration.md) |
 | Run from source or contribute | [Contributing](../CONTRIBUTING.md) and [Architecture](developer/architecture.md) |
 | Report a vulnerability | [Security policy](../SECURITY.md) |

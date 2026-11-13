@@ -60,8 +60,10 @@ Check stale and expired cases against current records before reporting them.
 A ready Draft that is stale or expired stays in the owner's queue until someone
 acts: report it first, and clear the mark (`application_ready` with
 `ready: false`) when the owner should not apply with the current documents.
-An `application_ready_cleared` event in `application_history` gives the reason a
-Draft left the queue.
+An `application_ready_cleared` event in the application's timeline
+(`timeline_get` with `application_id`) gives the reason a Draft left the queue.
+The timeline also holds the application's notes and its job's; read the pinned
+note first, it is the owner's standing guidance for that application.
 
 ## Prioritize Drafts
 
