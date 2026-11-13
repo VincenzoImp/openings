@@ -39,7 +39,7 @@ async def test_staleness_reports_changed_inputs_without_rewriting_contexts(tmp_p
     app = create_app(tmp_path / "staleness.sqlite", start_worker=False)
     workspace, career, documents = app.state.workspace, app.state.career, app.state.documents
     template = career.create_template(
-        TemplateCreate(name="MASTER CV", kind="resume", tex=SOURCE, is_default=True)
+        TemplateCreate(name="MASTER CV", kind="cv", tex=SOURCE, is_default=True)
     )
     entry = career.create_knowledge(KnowledgeCreate(title="Backend Engineer"))
     other = career.create_knowledge(KnowledgeCreate(title="Unselected entry"))
@@ -65,7 +65,7 @@ async def test_staleness_reports_changed_inputs_without_rewriting_contexts(tmp_p
             DocumentCreate(
                 application_id=application["id"],
                 context_id=context["id"],
-                kind="resume",
+                kind="cv",
             )
         )
     signature = contexts[0]["signature"]
@@ -140,7 +140,7 @@ async def test_staleness_reports_changed_inputs_without_rewriting_contexts(tmp_p
             application_id=applications[0]["id"],
             context_id=refreshed["id"],
             previous_id=leaf["document_id"],
-            kind="resume",
+            kind="cv",
         )
     )
     assert documents.application_staleness(applications[0]["id"])["stale"] is False
@@ -174,7 +174,7 @@ def test_context_input_summaries_are_stored_and_rebuilt(tmp_path):
     app = create_app(path, start_worker=False)
     workspace, career, documents = app.state.workspace, app.state.career, app.state.documents
     template = career.create_template(
-        TemplateCreate(name="MASTER CV", kind="resume", tex=SOURCE, is_default=True)
+        TemplateCreate(name="MASTER CV", kind="cv", tex=SOURCE, is_default=True)
     )
     entry = career.create_knowledge(KnowledgeCreate(title="Backend Engineer"))
     job = workspace.ingest_job({"title": "Synthetic role", "posting": "Build services."})
@@ -190,7 +190,7 @@ def test_context_input_summaries_are_stored_and_rebuilt(tmp_path):
         DocumentCreate(
             application_id=application["id"],
             context_id=context["id"],
-            kind="resume",
+            kind="cv",
         )
     )
     with sqlite3.connect(path) as conn:

@@ -130,23 +130,35 @@ async def exercise(base, token, folder, tectonic):
                         },
                     )
                 )
-                unpack(
+                job = unpack(
                     await session.call_tool(
                         "jobs_triage",
                         {
                             "job_id": job["id"],
-                            "value": {"triage": "saved", "expected_version": job["version"]},
+                            "value": {"triage": "shortlisted", "expected_version": job["version"]},
                         },
                     )
                 )
-                checks["shortlist_before_preparation"] = (
-                    unpack(await session.call_tool("jobs_list", {"value": {"queue": "shortlist"}}))[
-                        "total"
-                    ]
+                checks["shortlist_starts_the_application"] = (
+                    unpack(
+                        await session.call_tool("jobs_list", {"value": {"triage": "shortlisted"}})
+                    )["total"]
                     == 1
+                    and job["application"]["status"] == "shortlisted"
                 )
+                second_start = await session.call_tool(
+                    "applications_create", {"value": {"job_id": job["id"]}}
+                )
+                checks["one_open_application_per_job"] = second_start.is_error
                 application = unpack(
-                    await session.call_tool("applications_create", {"value": {"job_id": job["id"]}})
+                    await session.call_tool(
+                        "applications_get", {"application_id": job["application"]["id"]}
+                    )
+                )
+                checks["cv_and_letter_required_by_default"] = (
+                    application["required_documents"] == ["cv", "letter"]
+                    and application["missing"] == ["cv", "letter"]
+                    and application["ready"] is False
                 )
                 # Standing guidance is the application's pinned note (the note field is gone).
                 pinned = unpack(
@@ -171,17 +183,17 @@ async def exercise(base, token, folder, tectonic):
                 )
                 flat = await session.call_tool("knowledge_list", {"q": "Example API"})
                 unversioned = await session.call_tool("notes_delete", {"note_id": pinned["id"]})
-                checks["removed_fields_refused"] = (
+                gone = [
+                    name
+                    for name in ("documents_review", "applications_ready", "responses_create")
+                    if name in names
+                ]
+                checks["removed_fields_and_tools_refused"] = (
                     removed.is_error
                     and flat.is_error
                     and unversioned.is_error
                     and "expected_version" in unversioned.content[0].text
-                )
-                checks["preparation_leaves_shortlist"] = (
-                    unpack(await session.call_tool("jobs_list", {"value": {"queue": "shortlist"}}))[
-                        "total"
-                    ]
-                    == 0
+                    and gone == []
                 )
                 context = unpack(
                     await session.call_tool(
@@ -224,15 +236,33 @@ async def exercise(base, token, folder, tectonic):
                     {
                         "value": {
                             "application_id": application["id"],
-                            "kind": "resume",
+                            "kind": "cv",
                             "content": {"text": "Free-form wording."},
                         }
                     },
                 )
                 checks["cv_content_refused"] = refused.is_error and (
                     "content_not_accepted" in refused.content[0].text
-                    or "source and PDF" in refused.content[0].text
+                    or "optional TeX source" in refused.content[0].text
                 )
+                tex_bytes = source.read_bytes()
+                tex_sha = hashlib.sha256(tex_bytes).hexdigest()
+
+                def spec(name, data):
+                    return {
+                        "name": name,
+                        "size": len(data),
+                        "sha256": hashlib.sha256(data).hexdigest(),
+                    }
+
+                async def put(grant, data):
+                    response = await http.put(
+                        urljoin(base, grant["url"]), headers=grant["headers"], content=data
+                    )
+                    if response.status_code >= 400:
+                        return None, response.text
+                    return response.json(), None
+
                 document = unpack(
                     await session.call_tool(
                         "documents_create",
@@ -240,52 +270,28 @@ async def exercise(base, token, folder, tectonic):
                             "value": {
                                 "application_id": application["id"],
                                 "context_id": context["id"],
-                                "kind": "resume",
+                                "kind": "cv",
                                 "title": "CV",
                                 "claim_ids": [claim["id"]],
                                 "knowledge_ids": [evidence["id"]],
                                 "note": "Built from the synthetic template.",
+                                "source_file": spec("application.tex", tex_bytes),
+                                "pdf": spec("application.pdf", pdf),
                             }
                         },
                     )
                 )
                 checks["cv_has_no_content"] = "content" not in document
-
-                async def send(document_id, name, data, media, source_sha256=None):
-                    value = {
-                        "owner_type": "document",
-                        "owner_id": document_id,
-                        "name": name,
-                        "media_type": media,
-                        "size": len(data),
-                        "sha256": hashlib.sha256(data).hexdigest(),
-                    }
-                    if source_sha256:
-                        value["source_sha256"] = source_sha256
-                    result = await session.call_tool("files_reserve_upload", {"value": value})
-                    if result.is_error:
-                        return None, result.content[0].text
-                    reservation = unpack(result)
-                    response = await http.put(
-                        urljoin(base, reservation["url"]),
-                        headers=reservation["headers"],
-                        content=data,
-                    )
-                    response.raise_for_status()
-                    return response.json(), None
-
-                tex_bytes = source.read_bytes()
-                tex_sha = hashlib.sha256(tex_bytes).hexdigest()
-                _, early = await send(
-                    document["id"], "application.pdf", pdf, "application/pdf", tex_sha
+                checks["create_returns_grants"] = (
+                    document["complete"] is False
+                    and document["uploads"]["source"] is not None
+                    and document["uploads"]["pdf"] is not None
                 )
+                _, early = await put(document["uploads"]["pdf"], pdf)
                 checks["pdf_waits_for_its_source"] = bool(early) and "source" in early
                 uploaded = []
-                for name, data, media, built in [
-                    ("application.tex", tex_bytes, "application/x-tex", None),
-                    ("application.pdf", pdf, "application/pdf", tex_sha),
-                ]:
-                    stored, error = await send(document["id"], name, data, media, built)
+                for kind, data in (("source", tex_bytes), ("pdf", pdf)):
+                    stored, error = await put(document["uploads"][kind], data)
                     if error:
                         raise RuntimeError(error)
                     uploaded.append(stored)
@@ -295,27 +301,63 @@ async def exercise(base, token, folder, tectonic):
                     fetched = await http.get(
                         urljoin(base, download["url"]), headers=download["headers"]
                     )
-                    checks["exact_" + name] = fetched.content == data
+                    checks["exact_" + stored["name"]] = fetched.content == data
                 checks["pdf_names_its_source"] = uploaded[1]["source_sha256"] == tex_sha
                 current = unpack(
                     await session.call_tool("documents_get", {"document_id": document["id"]})
                 )
                 checks["text_derived_from_source"] = (
                     current["source_sha256"] == tex_sha
+                    and current["complete"] is True
+                    and current["text_from"] == "tex"
                     and "Reduced API p95 latency by 20%" in (current["text"] or "")
                     and "\\" not in current["text"]
                     and current["claim_ids"] == [claim["id"]]
                 )
-                reviewed = unpack(
+                checks["complete_revision_is_immutable"] = (
                     await session.call_tool(
-                        "documents_review",
+                        "files_reserve_upload",
                         {
-                            "document_id": document["id"],
-                            "value": {"expected_version": current["version"]},
+                            "value": {
+                                "owner_type": "document",
+                                "owner_id": document["id"],
+                                "name": "late.pdf",
+                                "media_type": "application/pdf",
+                                "size": len(pdf),
+                            }
+                        },
+                    )
+                ).is_error
+                # A letter without TeX: the PDF alone, its text read from the PDF.
+                letter = unpack(
+                    await session.call_tool(
+                        "documents_create",
+                        {
+                            "value": {
+                                "application_id": application["id"],
+                                "kind": "letter",
+                                "pdf": spec("letter.pdf", pdf),
+                            }
                         },
                     )
                 )
-                checks["source_and_pdf_approved"] = reviewed["review_state"] == "approved"
+                checks["letter_needs_no_source"] = letter["uploads"]["source"] is None
+                _, error = await put(letter["uploads"]["pdf"], pdf)
+                letter = unpack(
+                    await session.call_tool("documents_get", {"document_id": letter["id"]})
+                )
+                checks["pdf_only_text_from_pdf"] = (
+                    error is None
+                    and letter["complete"]
+                    and letter["text_from"] == "pdf"
+                    and "Example" in (letter["text"] or "")
+                )
+                ready = unpack(
+                    await session.call_tool("applications_list", {"value": {"stage": "ready"}})
+                )
+                checks["ready_is_computed"] = [item["id"] for item in ready["items"]] == [
+                    application["id"]
+                ] and ready["items"][0]["missing"] == []
                 revised = unpack(
                     await session.call_tool(
                         "documents_create",
@@ -323,29 +365,35 @@ async def exercise(base, token, folder, tectonic):
                             "value": {
                                 "application_id": application["id"],
                                 "previous_id": document["id"],
-                                "kind": "resume",
+                                "kind": "cv",
                                 "note": "Edited source awaiting a newly compiled PDF.",
+                                "source": tex_bytes.decode().replace(
+                                    "Linux.", "Linux, Kubernetes."
+                                ),
+                                "pdf": spec("application.pdf", pdf),
                             }
                         },
                     )
                 )
-                checks["revision_has_no_inherited_pdf"] = revised["files"] == []
-                edited = tex_bytes.replace(b"Linux.", b"Linux, Kubernetes.")
-                _, error = await send(revised["id"], "application.tex", edited, "application/x-tex")
-                _, mismatch = await send(
-                    revised["id"], "application.pdf", pdf, "application/pdf", tex_sha
-                )
+                checks["revision_has_no_inherited_pdf"] = [
+                    file["name"] for file in revised["files"]
+                ] == ["cv.tex"] and not revised["complete"]
+                checks["incomplete_revision_clears_ready"] = unpack(
+                    await session.call_tool(
+                        "applications_get", {"application_id": application["id"]}
+                    )
+                )["missing"] == ["cv"]
+                _, mismatch = await put(revised["uploads"]["pdf"], pdf + b"\n")
                 comparison = unpack(
                     await session.call_tool("documents_compare", {"document_id": revised["id"]})
                 )
                 checks["changed_source_compared"] = (
-                    error is None
-                    and comparison["other_id"] == document["id"]
+                    comparison["other_id"] == document["id"]
                     and (comparison["added"], comparison["removed"]) == (1, 1)
                     and [line["change"] for line in comparison["lines"] if line["change"] != "same"]
                     == ["removed", "added"]
                 )
-                checks["pdf_of_another_source_refused"] = bool(mismatch) and "source" in mismatch
+                checks["pdf_grant_bound_to_its_bytes"] = bool(mismatch)
                 summaries = unpack(
                     await session.call_tool(
                         "documents_list",
@@ -370,7 +418,7 @@ async def exercise(base, token, folder, tectonic):
                 ).json()
                 checks["rest_mcp_compact_document_page"] = (
                     summaries == rest_summaries
-                    and summaries["total"] == 2
+                    and summaries["total"] == 3
                     and "content" not in summaries["items"][0]
                     and "files" not in summaries["items"][0]
                     and summaries["items"][0]["revision_number"] == 2
@@ -400,39 +448,47 @@ async def exercise(base, token, folder, tectonic):
                     )["items"][0]["document_count"]
                     == 2
                 )
-                checks["files_do_not_mark_application_sent"] = (
-                    unpack(
-                        await session.call_tool(
-                            "applications_get", {"application_id": application["id"]}
-                        )
-                    )["status"]
-                    == "draft"
-                )
                 current = unpack(
                     await session.call_tool(
                         "applications_get", {"application_id": application["id"]}
                     )
                 )
-                for status in ("applied", "closed"):
+                checks["files_do_not_mark_application_sent"] = (
+                    current["status"] == "shortlisted" and current["applied_at"] is None
+                )
+                # The owner reports sending it and an interview invitation.
+                for value in ({"status": "applied"}, {"reply": {"kind": "interview"}}):
                     current = unpack(
                         await session.call_tool(
                             "applications_update",
                             {
                                 "application_id": application["id"],
-                                "value": {
-                                    "expected_version": current["version"],
-                                    "status": status,
-                                    **({"outcome": "rejected"} if status == "closed" else {}),
-                                },
+                                "value": {"expected_version": current["version"], **value},
                             },
                         )
                     )
-                checks["closed_stays_out_of_pending_queues"] = (
-                    unpack(await session.call_tool("jobs_list", {"value": {"queue": "shortlist"}}))[
-                        "total"
-                    ]
-                    == 0
-                    and unpack(await session.call_tool("jobs_list", {"value": {"queue": "inbox"}}))[
+                checks["reply_moves_the_stage"] = current["status"] == "interview" and [
+                    reply["kind"] for reply in current["replies"]
+                ] == ["interview"]
+                current = unpack(
+                    await session.call_tool(
+                        "applications_update",
+                        {
+                            "application_id": application["id"],
+                            "value": {
+                                "expected_version": current["version"],
+                                "reply": {"kind": "rejection"},
+                            },
+                        },
+                    )
+                )
+                checks["closing_keeps_the_shortlist"] = (
+                    (current["status"], current["outcome"]) == ("closed", "rejected")
+                    and unpack(
+                        await session.call_tool("jobs_list", {"value": {"triage": "shortlisted"}})
+                    )["total"]
+                    == 1
+                    and unpack(await session.call_tool("jobs_list", {"value": {"triage": "new"}}))[
                         "total"
                     ]
                     == 0
@@ -456,7 +512,7 @@ async def exercise(base, token, folder, tectonic):
                     )
                     checks["backup_context_and_revisions"] = (
                         restored.execute("SELECT COUNT(*) FROM contexts").fetchone()[0] == 1
-                        and restored.execute("SELECT COUNT(*) FROM documents").fetchone()[0] == 2
+                        and restored.execute("SELECT COUNT(*) FROM documents").fetchone()[0] == 3
                     )
     return {
         "purpose": "new production-module MCP/REST/external-compilation/file/backup round trip",

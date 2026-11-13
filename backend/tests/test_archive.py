@@ -107,15 +107,15 @@ async def test_completeness_filter_matches_overview_and_page_totals_on_rest_and_
 async def test_active_job_filter_matches_attention_counts_without_dismissed_jobs(tmp_path):
     app = create_app(tmp_path / "active.sqlite", start_worker=False)
     workspace = app.state.workspace
-    for state in ("inbox", "saved", "dismissed"):
+    for state in ("new", "shortlisted", "dismissed"):
         item = job(workspace, url=f"https://example.test/{state}", posting="")
-        if state != "inbox":
+        if state != "new":
             workspace.set_triage(item["id"], state, item["version"])
     with TestClient(app) as client:
         client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
         result = client.get("/api/v1/jobs?triage=active&complete=false").json()
         assert result["total"] == client.get("/api/v1/overview").json()["incomplete"] == 2
-        assert {row["triage"] for row in result["items"]} == {"inbox", "saved"}
+        assert {row["triage"] for row in result["items"]} == {"new", "shortlisted"}
         assert client.get("/api/v1/jobs?triage=dismissed&complete=false").json()["total"] == 1
     result = await app.state.mcp.call_tool(
         "jobs_list", {"value": {"triage": "active", "complete": False}}
@@ -254,7 +254,7 @@ def test_compact_filters_bulk_conflicts_and_attempt_delete(workspace):
     assert "posting" not in page["items"][0] and len(page["items"][0]["posting_preview"]) == 240
     result = workspace.bulk_jobs(
         {
-            "action": "saved",
+            "action": "shortlisted",
             "items": [
                 {"id": first["id"], "expected_version": 1},
                 {"id": other["id"], "expected_version": 1},
@@ -263,7 +263,8 @@ def test_compact_filters_bulk_conflicts_and_attempt_delete(workspace):
     )
     assert result["succeeded"] == result["failed"] == 1
     assert result["items"][1]["error"]["status"] == 409
-    attempt = workspace.create_application({"job_id": first["id"]})
+    # The shortlist started the application.
+    attempt = workspace.get_application(workspace.get_job(first["id"])["application"]["id"])
     attempt = workspace.update_application(
         attempt["id"],
         {"expected_version": attempt["version"], "status": "closed", "outcome": "not_pursued"},
@@ -275,7 +276,7 @@ def test_compact_filters_bulk_conflicts_and_attempt_delete(workspace):
     assert workspace.get_application(retained["id"])
     assert workspace.get_note(note["id"])["body"] == "Edited"
     summary = workspace.list_applications(limit=1)
-    assert summary["stage_counts"]["draft"] == 1 and "questions" not in summary["items"][0]
+    assert summary["stage_counts"]["shortlisted"] == 1 and "questions" not in summary["items"][0]
 
 
 def test_http_validates_answers_dates_and_rotation_preserves_tokens(tmp_path):

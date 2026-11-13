@@ -8,6 +8,7 @@ import gzip
 import hashlib
 import json
 import re
+import runpy
 import sqlite3
 import stat
 from contextlib import closing
@@ -186,6 +187,114 @@ def test_text_that_is_not_json_is_repaired_and_archived(tmp_path):
     archive = json.loads(m15.files(path).archive.read_text())
     assert archive["repaired_json"]["jobs.overrides"] == [{"id": job_id, "value": "not json"}]
     assert archive["counts"]["repaired_json.jobs.overrides"] == 1
+
+
+# #214 Applications and documents.
+
+
+def test_applications_and_documents_take_the_words_of_0_24(upgraded):
+    path, pre_upgrade, archive_path = upgraded[:3]
+    archive = json.loads(archive_path.read_text())
+    # Triage, stage and kinds.
+    triage = {"inbox": "new", "saved": "shortlisted", "dismissed": "dismissed"}
+    old_jobs = dict(query(pre_upgrade, "SELECT id,triage FROM jobs"))
+    assert dict(query(path, "SELECT id,triage FROM jobs")) == {
+        key: triage[value] for key, value in old_jobs.items()
+    }
+    old_status = dict(query(pre_upgrade, "SELECT id,status FROM applications"))
+    new_status = dict(query(path, "SELECT id,status FROM applications"))
+    assert {key: new_status[key] for key in old_status} == {
+        key: "shortlisted" if value == "draft" else value for key, value in old_status.items()
+    }
+    assert query(path, "SELECT DISTINCT required_documents FROM applications") == [
+        ('["cv","letter"]',)
+    ]
+    kinds = {"resume": "cv", "cover_letter": "letter"}
+    for table in ("documents", "templates"):
+        old_kinds = dict(query(pre_upgrade, f"SELECT id,kind FROM {table}"))
+        assert dict(query(path, f"SELECT id,kind FROM {table}")) == {
+            key: kinds.get(value, value) for key, value in old_kinds.items()
+        }
+    # Text derived from TeX is kept and says so; review states go to the archive.
+    assert query(path, "SELECT count(*) FROM documents WHERE text IS NOT NULL") == query(
+        path, "SELECT count(*) FROM documents WHERE text_from='tex'"
+    )
+    assert archive["document_review_states"] == dict(
+        query(pre_upgrade, "SELECT id,review_state FROM documents")
+    )
+    # Replies are the responses, copied with their ids.
+    assert query(path, "SELECT id,application_id,kind,date,version FROM replies ORDER BY id") == (
+        query(pre_upgrade, "SELECT id,application_id,kind,date,version FROM responses ORDER BY id")
+    )
+
+
+def test_every_shortlisted_job_has_an_open_application_after_the_upgrade(upgraded):
+    path, pre_upgrade = upgraded[:2]
+    waiting = {
+        row[0]
+        for row in query(
+            pre_upgrade,
+            "SELECT id FROM jobs j WHERE triage='saved' AND NOT EXISTS(SELECT 1 FROM "
+            "applications a WHERE a.job_id=j.id AND a.status<>'closed')",
+        )
+    }
+    assert waiting
+    old_ids = {row[0] for row in query(pre_upgrade, "SELECT id FROM applications")}
+    started = [
+        row[1:]
+        for row in query(
+            path,
+            "SELECT a.id,a.job_id,a.status,a.from_shortlist,e.actor_kind,"
+            "json_extract(e.payload,'$.by') FROM applications a JOIN events e "
+            "ON e.application_id=a.id AND e.kind='application_created'",
+        )
+        if row[0] not in old_ids
+    ]
+    assert {row[0] for row in started} == waiting and len(started) == len(waiting)
+    assert {row[1:] for row in started} == {("shortlisted", 1, "system", "upgrade")}
+    assert query(
+        path,
+        "SELECT count(*) FROM jobs j WHERE triage='shortlisted' AND NOT EXISTS(SELECT 1 FROM "
+        "applications a WHERE a.job_id=j.id AND a.status<>'closed')",
+    ) == [(0,)]
+
+
+def test_stored_ready_marks_are_archived_with_an_event_and_ready_is_computed(upgraded):
+    path, pre_upgrade, archive_path = upgraded[:3]
+    archive = json.loads(archive_path.read_text())
+    marks = query(
+        pre_upgrade,
+        "SELECT id,ready_at,ready_by_kind,ready_by_name FROM applications WHERE ready_at IS NOT NULL",
+    )
+    assert marks
+    assert {
+        key: (value["ready_at"], value["ready_by_kind"], value["ready_by_name"])
+        for key, value in archive["applications_ready"].items()
+    } == {row[0]: row[1:] for row in marks}
+    events = query(
+        path,
+        "SELECT application_id,created_at,actor_kind,actor_name FROM events "
+        "WHERE kind='application_ready_mark_archived'",
+    )
+    assert sorted(events) == sorted(marks)
+    # Ready is computed: the upgraded workspace lists what the rehearsal's rule
+    # computes on the original, and the rehearsal counts where the stored marks differ.
+    verify = runpy.run_path(str(Path(__file__).parents[2] / "scripts" / "verify_m15.py"))
+    computed = {
+        row[0]
+        for row in query(
+            pre_upgrade, "SELECT id FROM applications a WHERE " + verify["COMPUTED_READY"]
+        )
+    }
+    listed = Workspace(path).list_applications(stage="ready", limit=200)
+    assert {item["id"] for item in listed["items"]} == computed
+    assert listed["stage_counts"]["ready"] == len(computed)
+    stored = {row[0] for row in marks}
+    assert verify["aggregates"](pre_upgrade)["ready"] == {
+        "stored and computed": len(stored & computed),
+        "stored, not computed": len(stored - computed),
+        "computed, not stored": len(computed - stored),
+    }
 
 
 # Archive.

@@ -159,7 +159,7 @@ class FileOperations:
         with self.db.transaction() as conn:
             return self.upload_grant(conn, value)
 
-    def upload_grant(self, conn, value: UploadReservation) -> dict:
+    def upload_grant(self, conn, value: UploadReservation, pending_source=None) -> dict:
         """A one-shot PUT grant for one file of an owner, checked in the caller's transaction."""
         owner, job_id = self._owner(conn, value.owner_type, value.owner_id, writable=True)
         payload = value.model_dump()
@@ -173,6 +173,7 @@ class FileOperations:
                 value.media_type,
                 payload["sha256"],
                 payload["source_sha256"],
+                pending_source,
             )
         payload["job_id"] = job_id
         # The raw upload carries only the grant, so the grant remembers who reserved it.
