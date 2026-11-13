@@ -24,6 +24,7 @@ if (!Number.isInteger(port) || port < 1 || port > 65535)
   );
 process.env.OPENINGS_E2E_TOKEN ||= randomUUID();
 const baseURL = `http://127.0.0.1:${port}`;
+const PERFORMANCE = "performance.spec.ts";
 
 export default defineConfig({
   testDir: "./tests",
@@ -43,19 +44,30 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      testIgnore: PERFORMANCE,
       use: { browserName: "chromium", viewport: { width: 1440, height: 1000 } },
     },
     {
       name: "chromium-mobile",
+      testIgnore: PERFORMANCE,
       use: { browserName: "chromium", viewport: { width: 390, height: 844 } },
     },
     {
       name: "webkit",
+      testIgnore: PERFORMANCE,
       use: { browserName: "webkit", viewport: { width: 1440, height: 1000 } },
     },
     {
       name: "webkit-mobile",
+      testIgnore: PERFORMANCE,
       use: { browserName: "webkit", viewport: { width: 390, height: 844 } },
+    },
+    // The performance budget starts its own large workspace (5,000 jobs).
+    {
+      name: "chromium-performance",
+      testMatch: PERFORMANCE,
+      timeout: 240000,
+      use: { browserName: "chromium", viewport: { width: 1440, height: 1000 } },
     },
   ],
 });
