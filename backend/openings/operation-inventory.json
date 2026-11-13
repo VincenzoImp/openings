@@ -233,6 +233,22 @@
       "notes": "Both record versions are required. Resolve an open-application conflict before merging jobs that each have an open attempt."
     },
     {
+      "id": "jobs.distinct",
+      "group": "Archive",
+      "operation": "Mark a job flagged as a likely duplicate as a different vacancy",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/jobs/{job_id}/distinct"
+        }
+      ],
+      "mcp": [
+        "job_distinct"
+      ],
+      "dashboard": "Jobs: job detail, Is this the same vacancy? Different",
+      "notes": "Clears the likely_duplicate signal of either job against the other and remembers the pair, so signals computed again do not flag it. Never merges."
+    },
+    {
       "id": "jobs.delete",
       "group": "Archive",
       "operation": "Permanently forget job-owned data and identities",
@@ -1021,6 +1037,22 @@
       ],
       "dashboard": "Policy: Remove",
       "notes": "expected_version is the section's version; a stale one returns 409 with details.current_version. Frozen contexts retain their exact copies."
+    },
+    {
+      "id": "policy.rule_preview",
+      "group": "Career and templates",
+      "operation": "Count the jobs to review a decision rule matches now, without acting",
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/api/v1/policy/rules/preview"
+        }
+      ],
+      "mcp": [
+        "policy_rule_preview"
+      ],
+      "dashboard": "Policy: a rule's matches in the Inbox",
+      "notes": "A dry run on the Inbox; rules themselves act only on new jobs while enabled and confirmed. pending counts jobs whose signals are not computed yet."
     },
     {
       "id": "applications.list",
@@ -1958,6 +1990,22 @@
         "collection_runs_cancel"
       ],
       "dashboard": "Collection: Stop current run"
+    },
+    {
+      "id": "collection.yield",
+      "group": "Collection",
+      "operation": "Read what each source and search yielded: collected, shortlisted, applied, responses, dismissed",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/collection/yield"
+        }
+      ],
+      "mcp": [
+        "collection_yield"
+      ],
+      "dashboard": "Collection: Yield",
+      "notes": "Each job counts once, for the source that first collected it; searches are split by job board. kept_rate is withheld below min_sample collected jobs."
     }
   ],
   "exceptions": [

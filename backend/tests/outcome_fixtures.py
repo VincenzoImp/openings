@@ -3,6 +3,8 @@
 import sqlite3
 from contextlib import closing
 
+from signal_fixtures import make_schema_eleven
+
 # Columns schema 11 added to existing tables.
 SCHEMA_ELEVEN_COLUMNS = {"applications": ("concluded_on",), "context_inputs": ("parts",)}
 # The applications table and its indexes as released with schema 10 (0.19).
@@ -37,6 +39,7 @@ def make_schema_ten(path):
     The applications table is built again with the released definition, so the
     file is what 0.19 wrote: an upgrade test then sees the table it rebuilds.
     """
+    make_schema_eleven(path)  # first undo schema 12
     with closing(sqlite3.connect(path)) as conn:
         if conn.execute("SELECT count(*) FROM applications WHERE outcome='no_response'").fetchone()[
             0

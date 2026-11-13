@@ -182,15 +182,28 @@ class DuplicateIndex:
         self.blocks = {}
         self._evidence = {}
         self._links = None
-        self._linking = threading.Lock()
+        self._positions = ({}, -1)
+        # Jobs collected after the index was built are added in place (ingest
+        # signals) while another thread may be reading it.
+        self._lock = threading.RLock()
         for item in features:
             self.add(item)
 
     def add(self, features):
-        self.jobs[features.id] = features
-        self._links = None
-        for key in _block_keys(features):
-            self.blocks.setdefault(key, []).append(features.id)
+        with self._lock:
+            self.jobs[features.id] = features
+            # Block sizes decide which keys are generic, so scores computed before change.
+            self._links = None
+            if self._evidence:
+                self._evidence = {}
+            for key in _block_keys(features):
+                self.blocks.setdefault(key, []).append(features.id)
+
+    def _position(self, job_id):
+        """Insertion order of an indexed job, for stable ties; rebuilt when jobs are added."""
+        if self._positions[1] != len(self.jobs):
+            self._positions = ({job: i for i, job in enumerate(self.jobs)}, len(self.jobs))
+        return self._positions[0][job_id]
 
     def _generic(self, features):
         """Reference and target keys of this job shared by too many jobs."""
@@ -205,8 +218,9 @@ class DuplicateIndex:
         key = (first, second) if first < second else (second, first)
         found = self._evidence.get(key)
         if found is None:
-            a, b = self.jobs[first], self.jobs[second]
-            found = self._evidence[key] = score_pair(a, b, self._generic(a))
+            with self._lock:
+                a, b = self.jobs[first], self.jobs[second]
+                found = self._evidence[key] = score_pair(a, b, self._generic(a))
         return found
 
     def _rivalled(self, scores):
@@ -229,6 +243,10 @@ class DuplicateIndex:
         The job may be new or already indexed. Only jobs sharing a blocking key are
         scored, so the cost follows the size of those blocks, not of the archive.
         """
+        with self._lock:
+            return self._matches(features, min_confidence, limit)
+
+    def _matches(self, features, min_confidence, limit):
         candidates = set()
         for key in _block_keys(features):
             members = self.blocks.get(key, ())
@@ -248,8 +266,7 @@ class DuplicateIndex:
         }
         for job_id in self._rivalled(likely):
             found[job_id] = _ambiguous(found[job_id])
-        position = {job_id: index for index, job_id in enumerate(self.jobs)}
-        ranked = sorted(found.items(), key=lambda item: (-item[1].score, position[item[0]]))
+        ranked = sorted(found.items(), key=lambda item: (-item[1].score, self._position(item[0])))
         return [item for item in ranked if item[1].score >= min_confidence][:limit]
 
     def _pairs(self):
@@ -272,7 +289,7 @@ class DuplicateIndex:
 
     def links(self):
         """Every candidate pair with its evidence, computed once per index."""
-        with self._linking:
+        with self._lock:
             return self._all_links()
 
     def _all_links(self):
@@ -303,6 +320,10 @@ class DuplicateIndex:
         pull two cities into one group. A group's confidence is its weakest link, or
         its weakest conflicting pair when every candidate is requested.
         """
+        with self._lock:
+            return self._groups(min_confidence, match_location)
+
+    def _groups(self, min_confidence, match_location):
         position = {job_id: index for index, job_id in enumerate(self.jobs)}
         links = []
         for (a, b), evidence in self.links().items():

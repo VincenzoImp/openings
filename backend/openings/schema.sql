@@ -14,7 +14,12 @@ CREATE TABLE IF NOT EXISTS jobs (
  CHECK(triage IN ('inbox','saved','dismissed')), availability TEXT NOT NULL DEFAULT 'unknown',
  metadata TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(metadata)), overrides TEXT NOT NULL DEFAULT '{}',
  content_version INTEGER NOT NULL DEFAULT 1, version INTEGER NOT NULL DEFAULT 1,
- created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ -- The current dismissal (schema 12): when, by whom, through which policy rule
+ -- (its item id and label, kept if the item is removed) and why. Cleared on restore.
+ dismissed_at TEXT, dismissed_by_kind TEXT, dismissed_by_id TEXT, dismissed_by_name TEXT,
+ dismissed_by_token_kind TEXT, dismissed_rule_id TEXT, dismissed_rule_label TEXT,
+ dismissed_reason TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS jobs_url ON jobs(url);
 CREATE INDEX IF NOT EXISTS jobs_triage ON jobs(triage,created_at);
@@ -35,7 +40,10 @@ CREATE TABLE IF NOT EXISTS postings (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
  source_id TEXT REFERENCES sources(id) ON DELETE SET NULL, identity TEXT NOT NULL UNIQUE,
  url TEXT NOT NULL DEFAULT '', payload TEXT NOT NULL DEFAULT '{}', content_hash TEXT NOT NULL,
- first_seen_at TEXT NOT NULL, last_seen_at TEXT NOT NULL
+ first_seen_at TEXT NOT NULL, last_seen_at TEXT NOT NULL,
+ -- Set when a complete run of a company board no longer listed this posting
+ -- (schema 12); cleared when it is seen again.
+ unlisted_at TEXT
 );
 CREATE INDEX IF NOT EXISTS postings_job ON postings(job_id);
 CREATE TABLE IF NOT EXISTS job_identities (
@@ -336,4 +344,23 @@ CREATE TABLE IF NOT EXISTS responses (
 );
 CREATE INDEX IF NOT EXISTS responses_application ON responses(application_id,date);
 CREATE UNIQUE INDEX IF NOT EXISTS responses_once ON responses(application_id,kind,date) WHERE kind<>'other';
-PRAGMA user_version=11;
+-- Ingest signals of each job (job_signals.py, schema 12). Derived from the job and
+-- rebuildable, except distinct_from (pairs the owner judged different vacancies) and
+-- rules (the policy rules that matched when the job was collected).
+CREATE TABLE IF NOT EXISTS job_signals (
+ job_id TEXT PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
+ format INTEGER NOT NULL, content_version INTEGER NOT NULL,
+ language TEXT, language_confidence REAL,
+ required TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(required)),
+ welcome TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(welcome)),
+ duplicate_checked INTEGER NOT NULL DEFAULT 0 CHECK(duplicate_checked IN (0,1)),
+ duplicate_of TEXT REFERENCES jobs(id) ON DELETE SET NULL, duplicate_confidence REAL,
+ distinct_from TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(distinct_from)),
+ rules TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(rules)),
+ computed_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS job_signals_duplicate ON job_signals(duplicate_of);
+CREATE INDEX IF NOT EXISTS job_signals_language ON job_signals(language);
+CREATE INDEX IF NOT EXISTS postings_unlisted ON postings(job_id) WHERE unlisted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS jobs_dismissed_rule ON jobs(dismissed_rule_id) WHERE dismissed_rule_id IS NOT NULL;
+PRAGMA user_version=12;
