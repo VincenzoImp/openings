@@ -19,7 +19,8 @@ behavior. The running OpenAPI schema and MCP `tools/list` are the contract.
 - Ship English code/UI/docs and synthetic public fixtures. Keep databases,
   credentials, personal documents and machine-specific deployment files out of Git.
 - Use focused invariant tests and practical complete workflows after meaningful
-  changes. Check populated desktop/mobile views for dashboard changes.
+  changes. Attach the screenshots project's images of every changed screen to
+  the PR (`npm --prefix frontend run screenshots`).
 - Prefer small, clear services and coherent commits. Parallel work should use
   isolated worktrees and explicit file ownership; remove temporary work afterward.
 

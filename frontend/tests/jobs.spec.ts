@@ -11,8 +11,7 @@ import {
 // Jobs (stage 4 of #135): the tabs To review, Shortlist, Dismissed and All
 // beside the selected job, its signals, the duplicate decision inside the job,
 // rule dismissals that name their rule, and the yield of each source in
-// Collection. The four projects share one server, so every test makes its own
-// jobs, named after the project.
+// Collection. Each test starts from the seeded workspace (fixtures.ts).
 const cookies: Cookies = ownerSession();
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {

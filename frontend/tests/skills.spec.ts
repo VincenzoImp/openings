@@ -10,8 +10,7 @@ import {
 
 // Settings, Skills: the text and reference files of each served skill, and
 // its local notes, which are added after the shipped text whenever an agent
-// reads the skill. The four projects share one server, so each test reads the
-// current version of the notes it changes and writes text of its own.
+// reads the skill. Each test starts from the seeded workspace (fixtures.ts).
 const cookies: Cookies = ownerSession();
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {

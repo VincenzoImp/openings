@@ -12,7 +12,7 @@ import {
 // Activity: the agent's questions, the owner's requests, runs with their
 // reports, and the timeline of every change. Each dashboard path of the
 // questions.*, requests.*, runs.* and events.* operations is exercised here.
-// The four projects share one server, so each test makes its own records.
+// Each test starts from the seeded workspace (fixtures.ts).
 const cookies: Cookies = ownerSession();
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {

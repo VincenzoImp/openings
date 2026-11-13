@@ -8,7 +8,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openings.actors import OWNER, acting_as, current_actor, token_actor
-from openings.app import create_app
 from openings.errors import DomainError
 
 PASSWORD = "synthetic-password"
@@ -16,13 +15,7 @@ MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 FORBIDDEN = {"token_kind": "agent", "required": "owner"}
 
 
-@pytest.fixture
-def app(tmp_path):
-    app = create_app(tmp_path / "scopes.sqlite", start_worker=False)
-    app.state.auth.setup(PASSWORD)
-    return app
-
-
+# Unlike the shared `client`, no owner session: every request names its token.
 @pytest.fixture
 def client(app):
     with TestClient(app, base_url="http://localhost:8080") as client:
