@@ -336,4 +336,14 @@ CREATE TABLE IF NOT EXISTS responses (
 );
 CREATE INDEX IF NOT EXISTS responses_application ON responses(application_id,date);
 CREATE UNIQUE INDEX IF NOT EXISTS responses_once ON responses(application_id,kind,date) WHERE kind<>'other';
-PRAGMA user_version=11;
+-- Local notes for a shipped skill (skill_notes.py, schema 12): one immutable row per
+-- version; the highest version is current. Appended when the skill is served.
+CREATE TABLE IF NOT EXISTS skill_notes (
+ skill TEXT NOT NULL CHECK(length(skill) BETWEEN 1 AND 100),
+ version INTEGER NOT NULL CHECK(version>=1),
+ text TEXT NOT NULL DEFAULT '' CHECK(length(text)<=2000),
+ created_by_kind TEXT, created_by_id TEXT, created_by_name TEXT, created_by_token_kind TEXT,
+ created_at TEXT NOT NULL,
+ PRIMARY KEY(skill,version)
+);
+PRAGMA user_version=12;

@@ -1,0 +1,131 @@
+/* The System screens: Collection and Settings with its Skills. */
+.danger-text {
+  color: var(--danger);
+}
+/* The switch of scheduled collection, above the tabs */
+.master {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s3) var(--s4);
+  margin-bottom: var(--s4);
+}
+.master label {
+  cursor: pointer;
+}
+/* Rows of the System tables: a selected or opened row, tasks under their run */
+.datatable tr.is-selected > td {
+  background: var(--accent-soft);
+}
+.datatable tr.is-selected .meta {
+  color: var(--ink-2);
+}
+.datatable tr.nested > td:first-child {
+  padding-left: var(--s6);
+}
+.datatable tr.nested > td.full {
+  padding-left: var(--s6);
+}
+.datatable .actions > .btn + .btn {
+  margin-left: var(--s1);
+}
+.datatable .title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+/* The actions of a source: two short lines on wide screens */
+.cell-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--s1);
+  width: 210px;
+  margin-left: auto;
+}
+/* A skill's description in the list: two lines; the panel shows it all */
+.skills .meta {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.time {
+  gap: var(--s1);
+}
+/* Source text that wraps: a token, a skill and its files */
+.code.wrap {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.skill-text {
+  max-height: 420px;
+}
+.dialog .skill-text {
+  max-height: none;
+}
+.local-notes {
+  background: var(--accent-soft);
+}
+.local-notes .caption,
+.local-notes .hint,
+.local-notes .meta {
+  color: var(--ink-2);
+}
+.local-notes .list > li {
+  border-color: var(--line-strong);
+}
+/* A provider of the request gate: its state, on/off, spacing and Save */
+.provider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: var(--s4);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.spacing {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--ink-2);
+  font-size: var(--t-sm);
+}
+.spacing .input {
+  width: 80px;
+}
+.new-token {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--s3) var(--s4);
+}
+.new-token > .field:first-child {
+  flex: 1 1 200px;
+}
+@media (max-width: 860px) {
+  .master {
+    align-items: flex-start;
+  }
+  .provider {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+  .provider > .grow {
+    grid-column: 1 / -1;
+  }
+  .provider > .btn {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+  .cell-actions {
+    width: auto;
+  }
+  .datatable tr.nested > td:first-child,
+  .datatable tr.nested > td.full {
+    padding-left: 0;
+  }
+  .datatable.stack tr.nested {
+    padding-left: var(--s6);
+  }
+}

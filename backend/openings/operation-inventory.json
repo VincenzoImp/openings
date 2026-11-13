@@ -20,7 +20,7 @@
       "mcp": [
         "workspace_info"
       ],
-      "dashboard": "Settings: workspace information",
+      "dashboard": "Settings: Workspace; Backup and restore (storage)",
       "notes": "actor describes the caller; for an API token, token_kind is owner or agent. open_requests counts owner requests no agent has taken."
     },
     {
@@ -36,7 +36,7 @@
       "mcp": [
         "capabilities_get"
       ],
-      "dashboard": "Settings: capabilities/help"
+      "dashboard": "Settings: Agent access, Available operations; Workspace"
     },
     {
       "id": "skills.list",
@@ -51,7 +51,8 @@
       "mcp": [
         "skills_list"
       ],
-      "dashboard": "Settings: Connect an agent"
+      "dashboard": "Settings: Skills",
+      "notes": "Each skill lists its reference files (file_details: path, bytes, first heading) and local_notes: the version, author and length of its current notes, or null."
     },
     {
       "id": "skills.read",
@@ -70,7 +71,40 @@
       "mcp": [
         "skill_get"
       ],
-      "dashboard": "Settings: Connect an agent"
+      "dashboard": "Settings: Skills",
+      "notes": "SKILL.md ends with the workspace's local notes under \"Local notes for this workspace\" (version, day and author); local_notes=false returns the shipped text alone. Reference files are served as shipped."
+    },
+    {
+      "id": "skills.notes.read",
+      "group": "Archive",
+      "operation": "Read a skill's local notes for this workspace with earlier versions",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/skills/{name}/notes"
+        }
+      ],
+      "mcp": [
+        "skill_notes_get"
+      ],
+      "dashboard": "Settings: Skills: local notes",
+      "notes": "Text, version (0 when none), who wrote it and up to 50 earlier versions, newest first."
+    },
+    {
+      "id": "skills.notes.update",
+      "group": "Archive",
+      "operation": "Replace a skill's local notes",
+      "rest": [
+        {
+          "method": "PUT",
+          "path": "/api/v1/skills/{name}/notes"
+        }
+      ],
+      "mcp": [
+        "skill_notes_update"
+      ],
+      "dashboard": "Settings: Skills: local notes",
+      "notes": "At most 2000 characters; empty clears the notes. expected_version is the current version (0 for the first notes); a stale one returns 409 with details.current_version. Each save is a new attributed version with a skill_notes_updated event; the same text again is no change. The owner session, owner tokens and agent tokens may write. The shipped skill text never changes: the notes are appended when the skill is served."
     },
     {
       "id": "overview.read",
@@ -336,7 +370,7 @@
       "mcp": [
         "collection_get"
       ],
-      "dashboard": "Settings/Collection: automatic collection"
+      "dashboard": "Collection: scheduled collection switch"
     },
     {
       "id": "collection.update",
@@ -351,7 +385,7 @@
       "mcp": [
         "collection_update"
       ],
-      "dashboard": "Settings/Collection: scheduled collection",
+      "dashboard": "Collection: scheduled collection switch",
       "notes": "Preserves per-source settings. Pausing prevents future scheduled runs; queued/current runs continue until explicitly stopped. Manual runs remain available. A stale version returns 409 with details.current_version."
     },
     {
@@ -367,7 +401,7 @@
       "mcp": [
         "providers_list"
       ],
-      "dashboard": "Settings: provider pacing",
+      "dashboard": "Collection: Providers",
       "notes": "Recent request counts, actual cooldowns, capabilities and runtime are read-only; counts do not impose hourly/daily quotas."
     },
     {
@@ -383,7 +417,7 @@
       "mcp": [
         "providers_update"
       ],
-      "dashboard": "Settings: provider pacing",
+      "dashboard": "Collection: Providers (on/off and spacing per provider)",
       "notes": "Editable policy fields: enabled and min_interval_seconds. expected_version is required. An existing server cooldown remains in effect."
     },
     {
@@ -399,7 +433,7 @@
       "mcp": [
         "sources_list"
       ],
-      "dashboard": "Collection: Saved searches and Companies tabs",
+      "dashboard": "Collection: Sources",
       "notes": "limit, offset, summary (default true: compact last_run tasks and last_diagnostic_count; summary=false adds last_diagnostics and full task records)."
     },
     {
@@ -415,7 +449,7 @@
       "mcp": [
         "sources_get"
       ],
-      "dashboard": "Collection: source editor"
+      "dashboard": "Collection: source form (latest values after a conflict)"
     },
     {
       "id": "sources.preview",
@@ -430,7 +464,7 @@
       "mcp": [
         "sources_preview"
       ],
-      "dashboard": "Collection: source preview",
+      "dashboard": "Collection: source form, Preview results",
       "notes": "Uses the same shared HTTP spacing/cooldowns as scheduled and manual collection; bounded diagnostic/estimate response. Preview capability does not imply support for automatic full-text collection."
     },
     {
@@ -446,7 +480,7 @@
       "mcp": [
         "sources_create"
       ],
-      "dashboard": "Collection: add saved search/company",
+      "dashboard": "Collection: Add a search, Add a company board",
       "notes": "New sources start paused; one query/location per JobSpy source. Automatic collection requires an adapter that supplies descriptions."
     },
     {
@@ -462,7 +496,7 @@
       "mcp": [
         "sources_update"
       ],
-      "dashboard": "Collection: edit/pause source"
+      "dashboard": "Collection: source form; on/off switch of a source"
     },
     {
       "id": "sources.delete",
@@ -477,7 +511,7 @@
       "mcp": [
         "sources_delete"
       ],
-      "dashboard": "Collection: remove source"
+      "dashboard": "Collection: Remove a source"
     },
     {
       "id": "sources.run",
@@ -508,7 +542,7 @@
       "mcp": [
         "sources_bulk"
       ],
-      "dashboard": "Collection: selection toolbar",
+      "dashboard": "Collection: Sources selection bar",
       "notes": "Versioned items and per-item outcomes. Error results include details such as current_version."
     },
     {
@@ -524,7 +558,7 @@
       "mcp": [
         "tasks_list"
       ],
-      "dashboard": "Settings: tasks/activity",
+      "dashboard": "Collection: Runs and tasks, All tasks",
       "notes": "state, kind, source_id, job_id, limit, offset; source/job labels accompany IDs."
     },
     {
@@ -540,7 +574,7 @@
       "mcp": [
         "tasks_get"
       ],
-      "dashboard": "Settings: task detail"
+      "dashboard": "Collection: Runs and tasks, task Details"
     },
     {
       "id": "tasks.cancel",
@@ -555,7 +589,7 @@
       "mcp": [
         "tasks_cancel"
       ],
-      "dashboard": "Settings: cancel task"
+      "dashboard": "Collection: Runs and tasks, Stop task"
     },
     {
       "id": "tasks.retry",
@@ -570,7 +604,7 @@
       "mcp": [
         "tasks_retry"
       ],
-      "dashboard": "Settings: retry task"
+      "dashboard": "Collection: Runs and tasks, Retry"
     },
     {
       "id": "profile.read",
@@ -1508,7 +1542,7 @@
       "mcp": [
         "workspace_export"
       ],
-      "dashboard": "Settings: export records",
+      "dashboard": "Settings: Backup and restore, Export records",
       "notes": "MCP obtains scoped HTTP download. Secrets are omitted; use SQLite backup for exact documents/assets."
     },
     {
@@ -1524,7 +1558,7 @@
       "mcp": [
         "workspace_backup"
       ],
-      "dashboard": "Settings: download backup",
+      "dashboard": "Settings: Backup and restore, Download a backup",
       "notes": "MCP obtains a short-lived scoped HTTP grant; bytes stay outside the tool response. A backup taken with an agent token omits the owner password hash, the session secret and API tokens; it restores completely because restore keeps the destination's authentication."
     },
     {
@@ -1540,7 +1574,7 @@
       "mcp": [
         "workspace_restore_upload"
       ],
-      "dashboard": "Settings: restore backup",
+      "dashboard": "Settings: Backup and restore, Restore (owner only)",
       "notes": "MCP obtains a scoped raw HTTP upload grant. Validated restore preserves installation authentication; no arbitrary SQL endpoint. Recent destination provider HTTP usage and later cooldowns survive older-backup restore; saved policy settings are restored.",
       "access": "owner"
     },
@@ -1842,7 +1876,7 @@
       "mcp": [
         "tokens_list"
       ],
-      "dashboard": "Settings: access tokens with their kind",
+      "dashboard": "Settings: Agent access, Tokens with their kind (owner only)",
       "notes": "Token secrets are not returned after creation. Each token has a kind: owner (full access) or agent.",
       "access": "owner"
     },
@@ -1859,7 +1893,7 @@
       "mcp": [
         "token_create"
       ],
-      "dashboard": "Settings: create access token (owner or agent)",
+      "dashboard": "Settings: Agent access, Create a token (owner or agent)",
       "notes": "kind is owner (default, full access) or agent (scoped). The secret is returned once. The dashboard form defaults to agent.",
       "access": "owner"
     },
@@ -1876,7 +1910,7 @@
       "mcp": [
         "token_revoke"
       ],
-      "dashboard": "Settings: revoke access token",
+      "dashboard": "Settings: Agent access, Revoke a token",
       "notes": "May revoke the caller token; subsequent requests require another valid credential.",
       "access": "owner"
     },
@@ -1893,7 +1927,7 @@
       "mcp": [
         "owner_password_update"
       ],
-      "dashboard": "Settings: change password",
+      "dashboard": "Settings: Workspace, Change the password (owner only)",
       "notes": "Retains API tokens; cookie caller must log in again.",
       "access": "owner"
     },
@@ -1910,7 +1944,7 @@
       "mcp": [
         "sources_schemas"
       ],
-      "dashboard": "Collection: source fields and defaults",
+      "dashboard": "Collection: source form fields and limits",
       "notes": "Typed settings and computed capabilities include automatic_collection. Description retrieval is automatic; internal batch sizing is not user configuration."
     },
     {
@@ -1926,7 +1960,7 @@
       "mcp": [
         "collection_runs_list"
       ],
-      "dashboard": "Collection: run history",
+      "dashboard": "Collection: Runs and tasks",
       "notes": "limit, offset, source_id, state, summary (default true: omits source_snapshot and task payload/result bodies; summary=false includes them)."
     },
     {
@@ -1942,7 +1976,7 @@
       "mcp": [
         "collection_runs_get"
       ],
-      "dashboard": "Collection: source run details"
+      "dashboard": "Collection: Runs and tasks, a run's Tasks"
     },
     {
       "id": "collection.runs.cancel",
@@ -1957,7 +1991,7 @@
       "mcp": [
         "collection_runs_cancel"
       ],
-      "dashboard": "Collection: Stop current run"
+      "dashboard": "Collection: Stop run (source row or run)"
     }
   ],
   "exceptions": [

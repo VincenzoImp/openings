@@ -70,6 +70,10 @@ const counted: Record<string, [string, string]> = {
   knowledge_updated: ["Career entry edited", "Career entries edited"],
   policy_item_added: ["policy item proposed", "policy items proposed"],
   source_updated: ["source changed", "sources changed"],
+  skill_notes_updated: [
+    "skill's local notes saved",
+    "skills' local notes saved",
+  ],
 };
 /** What `count` changes of one kind are: "document revisions". */
 export function countedAs(kind: string, count: number) {
