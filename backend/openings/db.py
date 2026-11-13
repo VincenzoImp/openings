@@ -245,7 +245,7 @@ def _migrate_9_to_10(conn):
     # Additive: the typed policy, typed claim selection fields and the policy versions
     # a context froze. Profile metadata, preferences and roles are copied into
     # unconfirmed policy items and stay where they are; no existing value changes.
-    from .policy import migrate_profile
+    from .policy.upgrade import migrate_profile
 
     for column in (
         "default_in_cv INTEGER NOT NULL DEFAULT 0 CHECK(default_in_cv IN (0,1))",
