@@ -1,19 +1,86 @@
 """Small connection-per-operation SQLite store; no connections cross worker threads."""
 
 import json
+import logging
+import math
 import os
+import re
 import sqlite3
 import tempfile
 import threading
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 
+from . import compaction
 from .errors import DomainError
 from .posting import posting_complete
 
+LOG = logging.getLogger(__name__)
 SCHEMA_VERSION = 14
 SCHEMA_SQL = Path(__file__).with_name("schema.sql")
 TEMP_PREFIX = ".openings-temp-"
+# A copy of the workspace taken before an in-place upgrade: the copy itself, the
+# write-ahead log of the upgrade and some slack must fit on the data volume.
+PRE_UPGRADE_ROOM = 2.2
+PRE_UPGRADE_KEEP = 2
+MIB = 1024**2
+
+
+def utc_stamp():
+    """A UTC timestamp for file names: ``20260302T080000Z``."""
+    return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+
+
+def file_bytes(path):
+    """Bytes of a SQLite file and its write-ahead log; a missing file counts as zero."""
+    total = 0
+    for name in (Path(path), Path(str(path) + "-wal")):
+        try:
+            total += name.stat().st_size
+        except FileNotFoundError:
+            pass
+    return total
+
+
+def pre_upgrade_copies(path):
+    """The copies ``copy_before_upgrade`` kept beside the workspace ``path``, newest first."""
+    path = Path(path)
+    pattern = re.compile(re.escape(path.stem) + r"\.pre-schema\d+-(\d{8}T\d{6}Z)\.sqlite")
+    found = [
+        (match.group(1), item.name, item)
+        for item in path.parent.iterdir()
+        if (match := pattern.fullmatch(item.name)) and item.is_file()
+    ]
+    return [item for _, _, item in sorted(found, reverse=True)]
+
+
+def write_verified_copy(conn, temp, target, check=None):
+    """``VACUUM INTO`` a temporary name, check it, make it private and rename it into place.
+
+    ``temp`` must not exist. The copy must pass ``quick_check`` (and ``check`` on
+    its connection, when given) before it takes its final name; the rename and the
+    file are flushed to disk. On failure the temporary copy is removed and the
+    error is raised.
+    """
+    try:
+        conn.execute("VACUUM INTO ?", (str(temp),))
+        with closing(sqlite3.connect(temp)) as copy:
+            if copy.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+                raise sqlite3.DatabaseError("The copy failed its integrity check.")
+            if check:
+                check(copy)
+        os.chmod(temp, 0o600)
+        handle = os.open(temp, os.O_RDONLY)
+        try:
+            os.fsync(handle)
+        finally:
+            os.close(handle)
+        os.replace(temp, target)
+        compaction.fsync_directory(Path(target).parent)
+    except BaseException:
+        Database.remove_temp(temp)
+        raise
 
 
 class Database:
@@ -37,6 +104,9 @@ class Database:
                 )
             if version not in (0, *MIGRATIONS, SCHEMA_VERSION):
                 raise DomainError(400, "schema_version", "Unsupported workspace database version.")
+            if version in MIGRATIONS and existing_tables:
+                # Before anything is written: a verified copy at the old version.
+                self.copy_before_upgrade(conn, version)
             conn.execute("PRAGMA journal_mode=WAL")
             if version in MIGRATIONS:
                 upgrade(conn)
@@ -45,6 +115,57 @@ class Database:
 
         compact(self)  # an upgrade or large deletions may have left most of the file free
         self.path.chmod(0o600)
+
+    def copy_before_upgrade(self, conn, version):
+        """Keep a verified copy of the workspace at ``version`` before upgrading it in place.
+
+        The copy is ``<name>.pre-schema<version>-<UTC timestamp>.sqlite`` beside the
+        workspace, mode 0600. Without room for it (``PRE_UPGRADE_ROOM`` times the
+        file), or when it fails its check, the start is refused and the workspace
+        file is left as it was. The two most recent copies are kept; older ones are
+        removed only after the new one is verified.
+        """
+        size = file_bytes(self.path)
+        needed = math.ceil(PRE_UPGRADE_ROOM * size)
+        room, free = compaction.has_room(self.path.parent, needed)
+        if not room:
+            raise DomainError(
+                507,
+                "upgrade_room",
+                f"Openings keeps a copy of the workspace before upgrading it from schema "
+                f"{version} and needs {math.ceil(needed / MIB)} MiB of free space on the data "
+                f"volume ({self.path.parent}); {free // MIB} MiB are free. Free some space and "
+                "start again. The workspace file was not changed.",
+                {"needed_bytes": needed, "free_bytes": free, "database_bytes": size},
+            )
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        target = self.path.parent / f"{self.path.stem}.pre-schema{version}-{utc_stamp()}.sqlite"
+        temp = self.temp_file("pre-upgrade")
+        os.unlink(temp)
+
+        def same_version(copy):
+            if copy.execute("PRAGMA user_version").fetchone()[0] != version:
+                raise sqlite3.DatabaseError("The copy does not have the workspace's version.")
+
+        try:
+            write_verified_copy(conn, temp, target, same_version)
+        except (sqlite3.Error, OSError) as error:
+            raise DomainError(
+                500,
+                "upgrade_copy",
+                f"Openings could not keep a verified copy of the workspace before upgrading it "
+                f"from schema {version} ({error}). The workspace file was not changed.",
+            ) from error
+        for old in pre_upgrade_copies(self.path)[PRE_UPGRADE_KEEP:]:
+            old.unlink(missing_ok=True)
+        compaction.fsync_directory(self.path.parent)
+        LOG.warning(
+            "Copied the schema %d workspace to %s before upgrading it to schema %d.",
+            version,
+            target,
+            SCHEMA_VERSION,
+        )
+        return target
 
     @contextmanager
     def connect(self):
