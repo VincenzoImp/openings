@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Literal
 
-from ..career import _get, _page
+from ..career.records import _get, _page
 from ..common import decode_record, encode, new_id, now
 from ..consistency import compare as compare_content, is_tex_source
 from ..errors import DomainError, conflict, missing
