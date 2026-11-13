@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./fixtures";
 import { go, isNarrow, ownerSession, type Cookies } from "./session";
 
 // The shell: navigation groups, route aliases, theme and density, screens

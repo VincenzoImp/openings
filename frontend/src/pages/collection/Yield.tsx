@@ -137,7 +137,7 @@ export function SourceYieldView() {
     )
     .sort((a, b) => b.collected - a.collected)[0];
   return (
-    <div className="stack yield">
+    <div className="stack">
       <div className="spread wrap">
         <p className="muted measure">
           What each source brought, from collected jobs to employer answers. A

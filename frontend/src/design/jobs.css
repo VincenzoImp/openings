@@ -119,12 +119,7 @@
   align-items: flex-start;
   margin-top: var(--s2);
 }
-/* Yield of each source (Collection). Until stage 6 rebuilds Collection it
-   renders inside the older page, whose element rules it overrides here. */
-.yield .card > header h2 {
-  font: 600 var(--t-lg) / 1.4 var(--sans);
-  letter-spacing: 0;
-}
+/* Yield of each source (Collection). */
 .yield-table .grid-row.total {
   background: var(--surface);
 }

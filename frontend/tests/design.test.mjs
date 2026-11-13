@@ -28,17 +28,15 @@ test("Tab stays inside a container that keeps focus", () => {
   assert.equal(trappedIndex(0, 0, false), -1);
 });
 
-test("older button and tag names map to the design system's classes", () => {
+test("buttons and tags get the design system's classes", () => {
   assert.equal(buttonClass(), "btn");
   assert.equal(buttonClass("primary"), "btn primary");
-  assert.equal(buttonClass("danger small"), "btn danger sm");
-  assert.equal(buttonClass("danger-fill"), "btn danger");
-  assert.equal(buttonClass("", "sm", "small extra"), "btn sm extra");
-  assert.equal(buttonClass("subtle"), "btn quiet");
+  assert.equal(buttonClass("quiet danger", "sm"), "btn quiet danger sm");
+  assert.equal(buttonClass("", "md", "extra"), "btn extra");
   assert.equal(buttonClass("", "", "close", true), "icon-btn close");
   assert.equal(tagClass(), "tag");
-  assert.equal(tagClass("green", "ready-tag"), "tag ready ready-tag");
-  assert.equal(tagClass("amber"), "tag attention");
+  assert.equal(tagClass("ready", "ready-tag"), "tag ready ready-tag");
+  assert.equal(tagClass("neutral"), "tag");
   assert.equal(tagClass("agent"), "tag agent");
   assert.equal(cx("a", false, "b a", undefined), "a b");
 });
@@ -141,9 +139,11 @@ test("navigation has three groups, and the old job queues belong to Jobs", () =>
   assert.equal(routes.destinationOf("jobs").group, "Work");
   assert.equal(routes.destinationOf("settings").group, "System");
   assert.equal(routes.TAB_BAR.length, 4);
-  // Every screen is reachable from the navigation.
+  // Every screen is reachable from the navigation, except the setup guide:
+  // a new workspace opens on it, and Settings, Workspace links to it.
   for (const route of Object.keys(routes.SCREENS))
-    assert.ok(routes.destinationOf(route), route);
+    if (route !== "setup") assert.ok(routes.destinationOf(route), route);
+  assert.equal(routes.destinationOf("setup"), null);
 });
 
 test("a job opens in Jobs; an application opens its review page", () => {

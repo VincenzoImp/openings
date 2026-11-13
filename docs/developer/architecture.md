@@ -48,7 +48,9 @@ generated from the operation declarations (see below), packaged with the app and
 served by authenticated `GET /api/v1/capabilities` and `capabilities_get`. OpenAPI at `/api/openapi.json` and discovered MCP schemas are
 authoritative for individual input fields. The generated
 [parity matrix](parity.md) shows each operation's REST route, MCP tool and real
-dashboard path, and lists every gap. Read [REST](../user/api.md) and
+dashboard path with the browser tests that used it, and the documented
+exemptions; `pytest` and the browser tests in CI fail on any other difference
+(see [Contributing](../../CONTRIBUTING.md#parity)). Read [REST](../user/api.md) and
 [agent](../user/agents.md) guides for usable examples.
 
 ## Module map
@@ -497,7 +499,9 @@ Add behavior in the shared service before exposing it through REST, MCP and the
 dashboard: the method goes in the module of its concern (see the module map),
 and one `Operation` declaration in the area's `interfaces/` module gives its
 route and tool. Add its dashboard location to `interfaces/inventory-notes.json`
-and run `uv run python scripts/inventory.py`. Keep
+and run `uv run python scripts/inventory.py`; build its dashboard path with a
+browser test that uses it and record the evidence with
+`uv run python scripts/parity_matrix.py --e2e`. Keep
 operator/bootstrap and raw-byte transport differences explicit.
 
 Provider adapters emit bounded structured postings and use the shared HTTP gate.

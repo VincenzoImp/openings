@@ -135,7 +135,9 @@ export function TabBar({
         type="button"
         aria-expanded={moreOpen}
         aria-controls="more-sheet"
-        aria-current={TAB_BAR.includes(current) ? undefined : "page"}
+        aria-current={
+          !current || TAB_BAR.includes(current) ? undefined : "page"
+        }
         onClick={() => onMore(!moreOpen)}
       >
         More

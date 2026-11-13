@@ -597,9 +597,6 @@ export interface Source extends Versioned {
   last_run?: CollectionRun;
   last_diagnostics?: { warnings?: string[] }[];
 }
-export type CollectionSchedule =
-  | { kind: "daily"; times: string[]; timezone: string }
-  | { kind: "interval"; minutes: number };
 export interface BackgroundTask {
   id: string;
   kind: "collect";
@@ -921,40 +918,6 @@ export function version<T extends { version: number }>(
 export function text(value: unknown): string {
   return value == null ? "" : String(value);
 }
-export function formatSalary(value: unknown): string {
-  if (typeof value === "string") return value.trim();
-  const amount = (entry: unknown) =>
-    typeof entry === "number" && Number.isFinite(entry) ? entry : null;
-  if (typeof value === "number")
-    return amount(value)?.toLocaleString("en") ?? "";
-  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
-  const salary = value as Json,
-    minimum = amount(salary.min_amount),
-    maximum = amount(salary.max_amount);
-  if (minimum === null && maximum === null) return "";
-  const currency =
-    typeof salary.currency === "string" ? salary.currency.trim() : "";
-  const money = (entry: number) =>
-    [currency, entry.toLocaleString("en")].filter(Boolean).join(" ");
-  const range =
-    minimum !== null && maximum !== null
-      ? minimum === maximum
-        ? money(minimum)
-        : `${money(minimum)}–${maximum.toLocaleString("en")}`
-      : minimum !== null
-        ? `From ${money(minimum)}`
-        : `Up to ${money(maximum!)}`;
-  const periods: Record<string, string> = {
-    hourly: "hour",
-    daily: "day",
-    weekly: "week",
-    monthly: "month",
-    yearly: "year",
-  };
-  const interval =
-    typeof salary.interval === "string" ? salary.interval.trim() : "";
-  return interval ? `${range} / ${periods[interval] || interval}` : range;
-}
 export function date(value?: string) {
   if (!value) return "Not yet";
   const d = new Date(value);
@@ -1103,14 +1066,6 @@ export async function copyText(value: string) {
   if (!copied) throw new Error("Select and copy the displayed text manually.");
 }
 
-export function jsonValue(
-  form: FormData,
-  name: string,
-  fallback: unknown = {},
-) {
-  const raw = String(form.get(name) || "").trim();
-  return raw ? JSON.parse(raw) : fallback;
-}
 export function formatTime(value?: string) {
   if (!value) return "Not scheduled";
   const parsed = new Date(value);

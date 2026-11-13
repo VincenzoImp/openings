@@ -36,8 +36,10 @@ test("links of the old Settings and Collection open where their parts moved", ()
   // Current addresses stay as they are.
   assert.equal(hash("#settings?section=agents"), null);
   assert.equal(hash("#collection?section=runs"), null);
-  assert.ok(routes.REBUILT.includes("collection"));
-  assert.ok(routes.REBUILT.includes("settings"));
+  // The design's name of the setup guide.
+  assert.equal(hash("#onboarding"), "#setup");
+  assert.equal(routes.routeOf("#setup?step=record"), "setup");
+  assert.equal(hash("#setup"), null);
 });
 
 test("a run or task is described by its counts, state and schedule", () => {

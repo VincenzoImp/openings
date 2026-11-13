@@ -222,6 +222,17 @@ await shot("policy");
 await open("templates?section=rules");
 await shot("templates");
 
+// The setup guide on this workspace: the record, with the Policy basics open.
+await open("setup?step=record");
+await page
+  .getByRole("list", { name: "Your record" })
+  .getByRole("button", { name: /the policy$/ })
+  .click();
+await page
+  .getByRole("form", { name: "Add a fact employers ask about" })
+  .waitFor();
+await shot("setup");
+
 await open("settings?section=agents");
 await shot("agent-access");
 // A new token is shown once; the screenshot shows an example in its place.
