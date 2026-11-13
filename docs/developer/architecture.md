@@ -64,7 +64,7 @@ belongs to the module of its concern.
 |---|---|
 | `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage, rule dismissals and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py`; `applications.py` derived readiness, preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, responses, Ready and deletion; `bulk.py` per-item bulk results; `overview.py` the funnel |
 | `discovery/` | `service.py` the provider gate (`http_budget`, `fetch_bytes`); `models.py` typed inputs; `network.py` the public-address policy and the bounded fetch; `resolution.py` board detection and source configuration; `feeds.py` posting readers (Lever, Ashby, RSS) and adapter dispatch; `sources.py` source schemas, preview and writes; `runs.py` the global switch, provider policies, queueing, scheduling and run records; `tasks.py` leases, retry and running one collection |
-| `documents/` | `contexts.py` frozen contexts and their staleness reports; `revisions.py` content validation, review, consistency and deletion; `files.py` owned files and scoped transfer grants; `models.py` inputs |
+| `documents/` | `contexts.py` frozen contexts and their staleness reports; `revisions.py` creation, cited evidence, review, comparison and deletion; `sources.py` the source and PDF of a CV or letter and its derived text; `text.py` readable text of a TeX source; `files.py` owned files and scoped transfer grants; `models.py` inputs; `upgrade.py` the schema 12 to 13 step |
 | `career/` | `profile.py` Profile and instructions; `entries.py` Career entries; `claims.py`; `templates.py`; `imports.py`; `models.py` inputs and defaults; `records.py` row helpers shared with documents |
 | `policy/` | `service.py` item writes, confirmation and rule preview; `models.py` sections, the signal registry `SIGNALS` and inputs; `records.py` records as read and the frozen policy; `upgrade.py` the schema 9 to 10 step |
 | `interfaces/` | One module per area declaring its operations and binding them to its service: `core.py` (workspace, jobs, notes, applications, overview), `career.py`, `documents.py`, `discovery.py`, `activity.py`, `agent_requests.py`, `policy.py`, `outcomes.py`, `insights.py`, `source_yield.py`, `skills.py` and `system.py` (sign-in, tokens, inventory, backup, restore, examples, export); `registry.py` the declaration and its binding |
@@ -144,11 +144,25 @@ or when a declared route, tool or surface is not registered.
   explicit outcome. Forget permanently removes job-owned records.
 - **Snapshots:** preparing a context freezes the job, career evidence, instructions,
   questions, selected templates and exact assets. Later profile edits affect new
-  contexts. Changed document content creates a revision with its own uploaded files.
+  contexts. A changed document is a new revision with its own uploaded files.
   Attachment changes increment the document version; approval checks that version
-  so concurrent uploads cannot be approved unseen. Approval also compares the
-  structured content's text with the attached `.tex` source (`consistency.py`,
-  no TeX runtime) unless an explicit override is sent.
+  so concurrent uploads cannot be approved unseen.
+- **Documents:** a CV or letter revision (`SOURCE_KINDS`) is its files: one
+  `.tex` source and one PDF, whose upload names the source's SHA-256
+  (`files.source_sha256`); a PDF of another source is refused before its bytes
+  are stored (`documents/sources.py`). It stores no content (`content` stays
+  `{}`), only the claim and Career entry ids it cites, an optional note and the
+  text derived from its source when the source arrives (`documents.text`).
+  `documents/text.py` derives it without a TeX runtime: the body after
+  `\begin{document}`, comments and layout settings removed, the source's own
+  `\newcommand`/`\def` macros expanded a bounded number of times, accents
+  composed, and the breaks TeX makes kept as lines. The same source always gives
+  the same text, so the stored text can be checked against it; a parser change
+  needs a schema step that derives it again. Approval of a CV or letter requires
+  its source and PDF. `compare_documents` diffs two revisions' text by line with
+  `difflib`; form answers keep structured content and compare it as
+  `path: value` lines. Content a CV or letter stored before schema 13 is kept
+  read-only in `legacy_content`.
 - **Snapshot storage:** a context's payload is one canonical JSON text, and its
   signature is the SHA-256 of that text. `snapshots.py` stores the text as a frame
   of literals with one part between each pair: every Career entry, claim and
@@ -277,7 +291,19 @@ memory and releasing SQLite readers before cancellation or thread changes.
 Backups use SQLite's online backup API. A restore preserves
 installation authentication, recent provider request history and later cooldowns.
 
-Workspaces and backups use schema 12 (0.21). Opening schema 11 is an additive
+Workspaces and backups use schema 13 (0.22). Opening schema 12 runs
+`_migrate_12_to_13`, which calls `documents.upgrade.migrate_to_13`: documents gain
+`text`, `legacy_content`, `note`, `claim_ids` and `knowledge_ids`, files gain
+`source_sha256` (NULL for every existing file) and the `all_files` and
+`context_files` views are built again with it. A CV or letter revision's
+content moves byte for byte to `legacy_content` (`{}` to NULL) and `content`
+becomes `{}`; the ids any revision's content cited are copied to `claim_ids` and
+`knowledge_ids`; the text of every revision with a `.tex` source is derived and
+stored (several sources: each in file-name order). Ids, files, hashes, review
+states and versions do not change. Measured on a synthetic workspace of 4,000
+CV and letter revisions with 8,000 files on a laptop: 0.8 s.
+
+Schema 12 (0.21) was additive. Opening schema 11 is an additive
 change in one transaction (`_migrate_11_to_12`): it adds the `skill_notes` table
 (`skill_notes.migrate`) and, through `job_signals.migrate`, the `job_signals`
 table, the dismissal record columns of `jobs` (`dismissed_at`, `dismissed_by_*`,
@@ -358,8 +384,8 @@ applications gain `ready_at` with who set it, API tokens gain a kind, and the
 owner tokens with unchanged access. Schema 6 is upgraded through schema 7 in the same
 transaction (application priority, deadline and requirements), and schema 5
 through schema 6 (removing obsolete derived data and preserving owned records and
-immutable snapshots). Restore accepts schema 12 and upgrades a copy of a schema 5,
-6, 7, 8, 9, 10 or 11 backup. Other historical formats require the matching release.
+immutable snapshots). Restore accepts schema 13 and upgrades a copy of a schema 5,
+6, 7, 8, 9, 10, 11 or 12 backup. Other historical formats require the matching release.
 
 ## Acquisition
 

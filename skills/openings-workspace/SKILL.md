@@ -90,11 +90,12 @@ Prepare an application context with the intended job, templates, Career entries
 and claims. Read its returned frozen payload and assets before generation.
 Use the document permissions in those frozen instructions.
 
-When new application wording is allowed, `content.bullets` can contain `text`
-and `evidence_ids` naming the frozen source entries. `claim_ids` can be omitted
-for that wording. Do not invent a claim ID or cite a different sentence as an
-exact reused claim. The service checks cited IDs, not whether the prose follows
-from the evidence; factual and editorial checks remain the agent's work.
+A revision names the evidence it uses: `claim_ids` for approved claims it reuses
+and `knowledge_ids` for the frozen Career entries behind new wording, which
+needs no claim ID. Do not invent a claim ID or cite a different sentence as an
+exact reused claim. The service checks cited IDs against the frozen context,
+not whether the prose follows from the evidence; factual and editorial checks
+remain the agent's work.
 
 Save changed output as a document revision linked with `previous_id` when needed.
 A child revision has its own files and review state. Read the actual current
@@ -113,11 +114,14 @@ prove a valid document. For a suitable unchanged PDF, verify its source/context
 compatibility and quality before reuse. If compilation or validation is not
 available, keep the task incomplete and report the missing capability.
 
-Keep the structured `content` and the uploaded source identical in wording: every
-text value in `content` must appear in the `.tex` file. `documents_consistency`
-reports differences, and `documents_review` refuses a mismatch with
-`content_mismatch`. Correct the content or source; use
-`allow_content_mismatch=true` only for an intentional, documented difference.
+A CV or letter revision is its source and PDF; it takes no `content`
+(`content_not_accepted`). Upload the `.tex` source first, then the PDF with
+`source_sha256` set to the source's SHA-256: a PDF naming another source is
+refused with `source_mismatch`, a second source or PDF with `source_exists` or
+`pdf_exists`. The server derives the revision's `text` from the source, without
+a TeX runtime; read it to check what the owner reviews. Content saved on a CV or
+letter before 0.22 is kept read-only as `legacy_content`. Form answers keep
+structured `content`.
 
 Uploads change document versions. Read the new version before setting document
 review to approved. Approval records the completed agent check, not human or

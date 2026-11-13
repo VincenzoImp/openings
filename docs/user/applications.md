@@ -72,7 +72,8 @@ without stopping the others.
 An application opens on its own page, from Today's **Review**, a row of the
 list or any link to it. The posting, the current CV and the current letter stand
 side by side with their PDFs; on a phone a switch shows one at a time and the
-main actions stay in a bar at the bottom.
+main actions stay in a bar at the bottom. A switch above the CV or the letter
+shows, instead of its PDF, the text read from its source.
 
 ![The review page: tags, its place in the Ready queue, the posting, the CV and the letter with their PDFs, and Mark applied](../images/review.png)
 
@@ -117,25 +118,32 @@ prepared copies; existing documents keep the material used to write them.
 
 Connect an [external agent through MCP](agents.md), or work manually. Ask it to
 read the prepared context, write the CV, cover letter and answers, compile LaTeX
-on its computer, and upload PDF and source files to the appropriate document
-revision. It uses its own model access and tools.
+on its computer, and upload the source and the PDF built from it to the
+appropriate document revision. It uses its own model access and tools.
 
-For manual work, choose **Add a document** under **Documents**, with its text,
-the frozen copy it was written from and its PDF or source. Keep each PDF with
-the source revision that produced it. Form answers have both an archived
-document revision and live application answers; update the live answers under
-**Answers** when you want to reuse them in the application form.
+A CV or letter revision is its `.tex` source and the PDF built from it, with an
+optional note and the claims and Career entries it uses. Openings reads the text
+from the source, without running TeX: that text is what you review, search and
+compare between revisions; the PDF shows the layout. The PDF upload names the
+source it was built from, and a PDF built from another source is refused. Form
+answers keep their fields.
 
-![The Documents tab with a revision open: its text, its source and PDF, the source check and its actions](../images/documents.png)
+For manual work, choose **Add a document** under **Documents**: for a CV or a
+letter, its title, the frozen copy it was written from, its `.tex` source and
+its PDF; for form answers or another document, its text. Form answers have both
+an archived document revision and live application answers; update the live
+answers under **Answers** when you want to reuse them in the application form.
+
+![The Documents tab with a revision open: the text read from its source, its source and PDF, the changes since the previous revision and its actions](../images/documents.png)
 
 Open the PDF and check wording, dates, layout and page count. Approve the
-reviewed revision when ready. An open revision with a `.tex` source shows
-whether its saved content appears in that source. When they differ, the
-differing values are listed and approval becomes **Approve with differences**,
-for intentional cases only; otherwise save a corrected revision or upload the
-matching source. For changed content, choose **New revision** and upload its
-new files. Approved revisions keep their content and attachments fixed. Click a
-file name to preview a supported PDF, image or text file with its size and hash.
+reviewed revision when ready; a CV or letter needs its source and its PDF first.
+**Compare with revision 1** (for the revision before the open one) lists the
+lines removed and added since then, with the unchanged lines around them. For a
+changed CV or letter, choose **New revision** and upload its new source and PDF.
+Approved revisions keep their files fixed. A CV or letter saved before 0.22
+also shows the content stored with it then, read-only. Click a file name to
+preview a supported PDF, image or text file with its size and hash.
 
 The list shows the state of the CV and letter from the current revisions:
 **None**, **Written, without PDF**, **Written, not approved**, **CV approved,

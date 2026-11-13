@@ -43,7 +43,7 @@ Paste the posting when extraction cannot obtain the complete text.
 | Templates/guidance | CRUD `/templates`, `GET/PATCH /instructions` |
 | Collection | `GET/PATCH /collection`, `GET /providers`, `PATCH /providers/{id}`, CRUD `/sources`, `/sources/schemas`, preview/run, `/sources/bulk`, `/collection/runs` and `GET /collection/yield` |
 | Tasks | `GET /tasks`, `GET /tasks/{id}`, `POST /tasks/{id}/cancel` or `/retry` |
-| Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `GET /documents/{id}/consistency`, `POST /documents/{id}/review` |
+| Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `GET /documents/{id}/comparison`, `POST /documents/{id}/review` |
 | Files | `GET /files`, `GET/DELETE /files/{id}`, `GET /files/{id}/content`, `POST /files/uploads`, `POST /files/{id}/download` |
 | Agent activity | `GET /events`; `GET/POST /runs`, `GET/PATCH /runs/{id}`, `POST /runs/{id}/finish`; `GET/POST /questions`, `GET /questions/{id}`, `POST /questions/{id}/answer`, `POST /questions/{id}/withdraw`; `GET/POST /requests`, `GET /requests/{id}`, `POST /requests/{id}/take`, `/complete`, `/decline`, `/withdraw` |
 | Skills | `GET /skills`, `GET /skills/{name}`, `GET /skills/{name}/files/{path}`, `GET/PUT /skills/{name}/notes` |
@@ -63,7 +63,7 @@ for full records:
 
 | List | Default `summary=true` | Added by `summary=false` |
 |---|---|---|
-| `GET /documents` | Revision metadata, `revision_number`, `file_count` | Structured `content` and `files` |
+| `GET /documents` | Revision metadata, `revision_number`, `file_count` | Derived `text`, form `content`, evidence ids and `files` |
 | `GET /sources` | Source settings, outcome/counts, `last_diagnostic_count`, compact `last_run` | `last_diagnostics`, full `last_run` with `source_snapshot` and task payloads/results |
 | `GET /collection/runs` | Run state, counts, timing, compact `tasks` (`id`, `kind`, `provider`, `state`, `attempts`, `error`, `next_run_at`, `updated_at`) | `source_snapshot` and full task payloads/results |
 
@@ -500,12 +500,18 @@ settings, defaults, run counters and request pacing.
 1. `POST /contexts` with `application_id` and optional `template_id`/`template_ids`,
    evidence/claim IDs, note and `idempotency_key`. The context freezes the selected
    profile, evidence, instructions, questions and template assets.
-2. `POST /documents` with `application_id`, `context_id`, `kind`, `title` and
-   structured `content`. Kinds: `resume`, `cover_letter`, `answers`, `other`.
-   Use `previous_id` for a new revision. New revisions inherit no old PDF/files.
+2. `POST /documents` with `application_id`, `context_id`, `kind`, `title`, the
+   evidence it uses (`claim_ids`, `knowledge_ids`) and an optional `note`. Kinds:
+   `resume`, `cover_letter`, `answers`, `other`. A CV or letter (`resume`,
+   `cover_letter`) is its `.tex` source and PDF and takes no `content`
+   (`422 content_not_accepted`); form answers and `other` keep structured
+   `content`. Use `previous_id` for a new revision. New revisions inherit no old
+   PDF/files.
 3. Reserve `POST /files/uploads` with `owner_type`, `owner_id`, relative `name`,
    `media_type`, exact `size` in bytes and optional hex `sha256`. File owners are
    `knowledge`, `template`, `document` or `job`; frozen context assets are read-only.
+   For a CV or letter, upload the `.tex` source (UTF-8) first, then the PDF with
+   `source_sha256`, the source's SHA-256 (see below).
 4. Resolve the returned relative `url` against the workspace origin and send raw
    bytes with its returned `method` and `headers`. This scoped transfer needs no
    owner bearer token. SHA-256 is always computed server-side. Files are limited
@@ -514,24 +520,46 @@ settings, defaults, run counters and request pacing.
    `{"review_state":"approved","expected_version":3}`, using the version just read.
    An attachment change invalidates that version. Reload and review the current
    files before retrying a conflict. Approved revisions reject added files.
-   Changed content belongs in a new revision.
+   A changed source belongs in a new revision. A CV or letter is approved only
+   with its source (`409 source_required`) and its PDF (`409 pdf_required`).
 
-### Content and source consistency
+### Source, PDF and derived text
 
-`GET /documents/{id}/consistency` compares the structured `content` with the text
-of the revision's attached `.tex` files (or a TeX media type). Every text value in
-`content` must appear as a contiguous word sequence in the source; case,
-whitespace, punctuation, accents and common LaTeX markup are ignored, and keys for
-identifiers or settings (`id`, `*_id`, `*_ids`, `kind`, `type`, `format`, `style`
-and similar) are skipped. No TeX runtime or PDF text extraction is used. The
-result has `status` (`consistent`, `mismatch` or `not_checked` when no source or
-text exists), `checked`, `mismatch_count` and up to 50 `mismatches` with JSON
-paths.
+A CV or letter revision has one `.tex` source and one PDF (a file is a source by
+a `.tex`/`.ltx` name or a TeX media type). The PDF reservation names the source
+it was built from:
 
-Review applies the same check. A mismatch refuses approval with HTTP 409
-`content_mismatch`; `details` holds the full report. Save the matching content as
-a new revision or upload the matching source. For an intentional, reviewed
-difference, send `"allow_content_mismatch": true` with the review.
+```json
+{"owner_type": "document", "owner_id": "DOCUMENT_ID", "name": "cv.pdf",
+ "media_type": "application/pdf", "size": 48213, "source_sha256": "SHA256_OF_CV_TEX"}
+```
+
+| Refusal | When |
+|---|---|
+| `422 source_required` | A CV or letter PDF without `source_sha256` |
+| `409 source_required` | The revision has no source yet |
+| `409 source_mismatch` | `source_sha256` is not the revision's source |
+| `409 source_exists`, `409 pdf_exists` | A second source or PDF; create a new revision |
+| `422 source_encoding` | A source that is not UTF-8 |
+| `422 pdf_media_type` | A `.pdf` sent with another media type |
+
+The file record returns `source_sha256` (null for every other file and for PDFs
+uploaded before 0.22). When the source arrives the server derives the revision's
+`text`: the document body with comments, layout settings and markup removed,
+macros the source defines expanded, accents composed and the breaks TeX makes
+(paragraphs, `\\`, items, headings) kept as lines. No TeX runtime is used, so
+the text is for review, search and comparison; the PDF shows the layout.
+`GET /documents/{id}` returns `text`, `source_sha256`, `claim_ids`,
+`knowledge_ids`, `note`, `files` and `legacy_content` (the content a CV or
+letter stored before 0.22, read-only, else null); form answers also return
+`content`. `GET /documents?q=` searches titles, notes and the derived text.
+
+`GET /documents/{id}/comparison` (MCP `documents_compare`) compares a revision's
+text with the revision it replaces, or with `other_id` of the same application,
+line by line: `lines` of `{"change": "same" | "added" | "removed", "text"}`,
+the `added` and `removed` counts, and `text.document`/`text.other`, false for a
+side without text (a CV or letter without a source). Form answers compare their
+content as `path: value` lines.
 
 ### Stale contexts
 

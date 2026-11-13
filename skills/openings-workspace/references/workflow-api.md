@@ -40,14 +40,23 @@ mechanics, not personal selection or writing policy.
 - A context is a fixed input snapshot. Compare versions and relevant content
   before reusing it. Prepare a new context when different inputs are needed.
 - `documents_create` / `POST /documents` takes application/context IDs,
-  `kind: resume | cover_letter`, `title`, `content` and optional `previous_id`.
-  Exact repeated content with the same context, title and parent reuses the
-  revision. Changed output needs the proper parent. Child revisions inherit
-  neither PDF files nor approval.
-- Example of allowed new evidence-linked wording:
-  `content: {bullets: [{text: "A supported sentence", evidence_ids: [entryID]}]}`.
-  Include that entry in the context. Omit `claim_ids` for a new formulation.
-  Unknown frozen evidence/claim IDs are rejected; entailment is not checked.
+  `kind: resume | cover_letter | answers | other`, `title`, optional `note`,
+  `claim_ids`, `knowledge_ids` and `previous_id`. A CV or letter (`resume`,
+  `cover_letter`) takes no `content` (`422 content_not_accepted`): it is the
+  `.tex` source and PDF uploaded next. Form answers keep structured `content`.
+  A retry with the same fields returns the same revision (a CV or letter only
+  while it is still an empty draft). Changed output needs the proper parent.
+  Child revisions inherit neither files nor approval.
+- Cite the evidence a revision uses: `claim_ids` of reused approved claims,
+  `knowledge_ids` of the Career entries behind new wording. Include them in the
+  context. Unknown frozen evidence/claim IDs are rejected; entailment is not
+  checked.
+- `documents_get` returns a CV or letter's `text`, derived from its source
+  without a TeX runtime, `source_sha256`, the cited ids, `note`, its files and,
+  for revisions saved before 0.22, the read-only `legacy_content`.
+  `documents_compare(document_id, other_id?)` /
+  `GET /documents/{id}/comparison` compares the text with the revision it
+  replaces (or `other_id`) line by line: `lines` of `same`, `added`, `removed`.
 
 ## Transfers and completed Drafts
 
@@ -55,12 +64,20 @@ mechanics, not personal selection or writing policy.
   media type, size and optional SHA-256. Transfer bytes through the returned
   upload instruction, then verify the stored file. The server checks size,
   digest and a PDF header, not full PDF validity or layout.
+- A CV or letter revision has one `.tex` source (UTF-8) and one PDF. Upload the
+  source first; the PDF reservation names `source_sha256`, the source's
+  SHA-256. Without it: `422 source_required`; before the source:
+  `409 source_required`; another source: `409 source_mismatch`; a second source
+  or PDF: `409 source_exists` / `pdf_exists`.
 - `documents_review` / `POST /documents/{id}/review` takes `expected_version`
-  and `review_state: approved`. Uploads change the document version; read it again
-  before review. Approval does not parse the PDF or establish human approval.
+  and `review_state: approved`. A CV or letter needs its source
+  (`409 source_required`) and its PDF (`409 pdf_required`). Uploads change the
+  document version; read it again before review. Approval does not parse the PDF
+  or establish human approval.
 - `documents_list` / `GET /documents` returns compact rows by default (file
-  counts, no content or files). Pass `summary: false`, or read `documents_get`,
-  for structured content and file entries.
+  counts, no text, content or files); `q` searches titles, notes and the text
+  derived from sources. Pass `summary: false`, or read `documents_get`, for text,
+  content and file entries.
 - Ready is a stored step of a Draft, set with `application_ready(application_id,
   value)` / `POST /applications/{id}/ready` (`expected_version`, `ready`). The
   agent's assessment comes first: the intended current CV and CL leaf revisions,
