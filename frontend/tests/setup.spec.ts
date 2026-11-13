@@ -100,6 +100,9 @@ test("a new workspace opens on the setup guide, which is skipped, continued and 
   const banner = page.locator(".banner", {
     hasText: "Your workspace is not set up yet.",
   });
+  // Let Today finish its reads first: WebKit can drop a click on a link that
+  // a late render replaces.
+  await page.waitForLoadState("networkidle");
   await banner.getByRole("link", { name: "Continue setting up" }).click();
   await expect(page).toHaveURL(/#setup$/);
   // Skipping goes to Today, and the guide no longer opens by itself.
