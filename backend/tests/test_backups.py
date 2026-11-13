@@ -12,7 +12,6 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from compat_fixtures import make_schema_thirteen
 from openings import backups, compaction, db as db_module
 from openings.app import create_app
 from openings.db import SCHEMA_VERSION, Database
@@ -23,11 +22,15 @@ from openings.workspace import Workspace
 PASSWORD = "synthetic-password"
 
 
-def schema_thirteen(path):
+def older(path, version=13):
+    """A workspace file marked with an earlier schema: what an in-place upgrade copies first."""
     workspace = Workspace(path)
     workspace.ingest_job({"title": "Synthetic engineer", "company": "Example", "posting": "APIs."})
     del workspace
-    make_schema_thirteen(path)
+    with closing(sqlite3.connect(path)) as conn:
+        conn.execute(f"PRAGMA user_version={version}")
+        conn.commit()
+        conn.execute("PRAGMA journal_mode=DELETE")
     return path
 
 
@@ -50,31 +53,16 @@ def mode(path):
 # Pre-upgrade copies
 
 
-def test_an_upgrade_keeps_one_verified_copy_before_any_ddl(tmp_path, monkeypatch):
-    path = schema_thirteen(tmp_path / "openings.sqlite")
-    seen = []
-    real_upgrade = db_module.upgrade
-
-    def upgrade(conn):
-        # The copy is complete, verified and at the old version before the first step.
-        seen.extend(db_module.pre_upgrade_copies(path))
-        assert not list(tmp_path.glob(".openings-temp-*"))
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 13
-        real_upgrade(conn)
-
-    monkeypatch.setattr(db_module, "upgrade", upgrade)
-    Database(path)
-    copies = db_module.pre_upgrade_copies(path)
-    assert copies == seen and len(copies) == 1
-    copy = copies[0]
+def test_a_verified_private_copy_is_kept_at_the_old_version(tmp_path):
+    path = older(tmp_path / "openings.sqlite")
+    before = path.read_bytes()
+    copy = db_module.copy_before_upgrade(path, 13)
+    assert db_module.pre_upgrade_copies(path) == [copy]
     assert copy.name.startswith("openings.pre-schema13-") and copy.suffix == ".sqlite"
     assert opened_version(copy) == 13
-    assert opened_version(path) == SCHEMA_VERSION
     assert mode(copy) == 0o600
-    # A current workspace opens without another copy.
-    Database(path)
-    assert db_module.pre_upgrade_copies(path) == copies
-    # The copy restores to the same workspace through the guarded restore.
+    assert path.read_bytes() == before
+    assert not list(tmp_path.glob(".openings-temp-*"))
     with closing(sqlite3.connect(copy)) as conn:
         assert conn.execute("SELECT count(*) FROM jobs").fetchone()[0] == 1
 
@@ -84,12 +72,22 @@ def test_a_fresh_workspace_takes_no_copy(tmp_path):
     assert not list(tmp_path.glob("*.pre-*"))
 
 
-def test_without_room_the_start_is_refused_and_the_file_is_unchanged(tmp_path, monkeypatch):
-    path = schema_thirteen(tmp_path / "openings.sqlite")
+def test_an_unsupported_older_workspace_is_refused_without_a_copy(tmp_path):
+    path = older(tmp_path / "openings.sqlite")
+    before = path.read_bytes()
+    with pytest.raises(DomainError) as refused:
+        Database(path)
+    assert refused.value.code == "schema_version"
+    assert path.read_bytes() == before
+    assert sorted(item.name for item in tmp_path.iterdir()) == ["openings.sqlite"]
+
+
+def test_without_room_the_copy_is_refused_and_the_file_is_unchanged(tmp_path, monkeypatch):
+    path = older(tmp_path / "openings.sqlite")
     before = path.read_bytes()
     no_room(monkeypatch, free=1024)
     with pytest.raises(DomainError) as refused:
-        Database(path)
+        db_module.copy_before_upgrade(path, 13)
     assert refused.value.code == "upgrade_room"
     assert "MiB of free space" in refused.value.message
     assert refused.value.details["needed_bytes"] >= 2.2 * len(before)
@@ -97,8 +95,8 @@ def test_without_room_the_start_is_refused_and_the_file_is_unchanged(tmp_path, m
     assert sorted(item.name for item in tmp_path.iterdir()) == ["openings.sqlite"]
 
 
-def test_a_copy_that_cannot_be_kept_refuses_the_start(tmp_path, monkeypatch):
-    path = schema_thirteen(tmp_path / "openings.sqlite")
+def test_a_copy_that_cannot_be_kept_is_refused(tmp_path, monkeypatch):
+    path = older(tmp_path / "openings.sqlite")
     before = path.read_bytes()
 
     def broken_rename(source, target):
@@ -106,19 +104,19 @@ def test_a_copy_that_cannot_be_kept_refuses_the_start(tmp_path, monkeypatch):
 
     monkeypatch.setattr(db_module.os, "replace", broken_rename)
     with pytest.raises(DomainError) as refused:
-        Database(path)
+        db_module.copy_before_upgrade(path, 13)
     assert refused.value.code == "upgrade_copy"
     assert path.read_bytes() == before
     assert sorted(item.name for item in tmp_path.iterdir()) == ["openings.sqlite"]
 
 
 def test_the_two_most_recent_pre_upgrade_copies_are_kept(tmp_path):
-    path = schema_thirteen(tmp_path / "openings.sqlite")
+    path = older(tmp_path / "openings.sqlite")
     for stamp in ("20250101T000000Z", "20250201T000000Z", "20250301T000000Z"):
         shutil.copyfile(path, tmp_path / f"openings.pre-schema12-{stamp}.sqlite")
     # Another kind of kept copy (0.24's renamed original) is never rotated here.
     shutil.copyfile(path, tmp_path / "openings.pre-0.24.sqlite")
-    Database(path)
+    db_module.copy_before_upgrade(path, 13)
     kept = [item.name for item in db_module.pre_upgrade_copies(path)]
     assert len(kept) == 2
     assert kept[0].startswith("openings.pre-schema13-")
@@ -288,6 +286,17 @@ def test_the_owner_lists_downloads_and_deletes_kept_copies(app, tmp_path):
         assert [item["kind"] for item in client.get("/api/v1/backups").json()["items"]] == [
             "scheduled"
         ]
+
+
+def test_the_renamed_original_of_the_0_24_upgrade_is_a_kept_copy(app, tmp_path):
+    db = app.state.workspace.db
+    shutil.copyfile(db.path, tmp_path / "openings.pre-0.24.sqlite")
+    listed = {item["name"]: item["kind"] for item in backups.listing(db)}
+    assert listed["openings.pre-0.24.sqlite"] == "pre_upgrade"
+    assert listed["openings.pre-schema13-20260101T080000Z.sqlite"] == "pre_upgrade"
+    # The archive beside it is not a database copy.
+    (tmp_path / "openings.pre-0.24-archive.json").write_text("{}")
+    assert "openings.pre-0.24-archive.json" not in {item["name"] for item in backups.listing(db)}
 
 
 def test_names_outside_the_listing_are_not_found(app, tmp_path):

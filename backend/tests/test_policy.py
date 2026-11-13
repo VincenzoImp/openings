@@ -1,15 +1,12 @@
-"""The owner's policy: sections with their own version, owner confirmation, frozen copies and the upgrade."""
+"""The owner's policy: sections with their own version, owner confirmation and frozen copies."""
 
 import hashlib
 import json
-import sqlite3
-from contextlib import closing
 
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from context_fixtures import legacy_prepare_context, make_schema_eight
 from openings.actors import OWNER, acting_as, token_actor
 from openings.app import create_app
 from openings.career import (
@@ -17,34 +14,21 @@ from openings.career import (
     ClaimCreate,
     ClaimUpdate,
     KnowledgeCreate,
-    ProfileUpdate,
     TemplateCreate,
     TemplateUpdate,
 )
-from openings.db import MIGRATIONS, SCHEMA_VERSION, Database
 from openings.documents import ContextCreate, DocumentService
 from openings.errors import DomainError
 from openings.operations import restore_database
 from openings.policy import SECTIONS, PolicyItemCreate, PolicyItemUpdate, PolicyService
 from openings.snapshots import payload_text
+from openings.staleness import backfill_context_inputs
 from openings.workspace import Workspace
-from policy_fixtures import SCHEMA_TEN_COLUMNS, make_schema_nine
-from schema_fixtures import columns, index_names, table_names
 from test_context_parts import seed
 
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 AGENT = token_actor("token-agent", "Synthetic agent", "agent")
 OWNER_TOKEN = token_actor("token-owner", "Synthetic owner token", "owner")
-METADATA = {
-    "decision_policy": {"include": ["backend"], "exclude": ["sales"], "stretch": {"max": 2}},
-    "work_authorization": "EU citizen — “synthetic” ✓",
-    "notice_period_days": 30,
-    "open_to_relocation": False,
-    "salary": 95000.5,
-    "languages": ["English", "Italian"],
-    "unset": None,
-    "Interview-availability": {"days": ["Tue", "Thu"], "from": "16:00"},
-}
 RULE = {
     "signal": "language_required",
     "condition": {"operator": "not_in", "value": ["English", "Italian"]},
@@ -112,10 +96,17 @@ def test_sections_have_their_own_version_and_items_keep_a_dense_order(services):
                 "idempotency_key": "letter-length",
             },
         )
-        # A retry with the same key returns the item, even with the version it had before.
+        # A retry of the same request returns the item, though the section has moved on.
         again = policy.add_item(
             "writing",
-            {"expected_version": 1, "label": "Letter length", "idempotency_key": "letter-length"},
+            {
+                "expected_version": 1,
+                "label": "Letter length",
+                "statement": "Three paragraphs.",
+                "value": 200,
+                "scope": "letter",
+                "idempotency_key": "letter-length",
+            },
         )
         assert again["item"]["id"] == second["item"]["id"] and again["section"]["version"] == 2
         refused(
@@ -667,233 +658,11 @@ def test_a_context_freezes_the_sections_as_shared_parts(tmp_path):
             tuple(row) for row in conn.execute("SELECT * FROM context_inputs ORDER BY context_id")
         ]
         conn.execute("DELETE FROM context_inputs")
-    Workspace(workspace.db.path)
+        backfill_context_inputs(conn)
     with workspace.db.connect() as conn:
         assert [
             tuple(row) for row in conn.execute("SELECT * FROM context_inputs ORDER BY context_id")
         ] == before
-
-
-# The Profile texts 0.19 copied into decision items (removed from the Profile in 0.23).
-PROFILE_TEXTS = {
-    "preferences": "Remote first.\nNo consultancies — “synthetic”.",
-    "roles": "Backend engineer",
-}
-
-
-def schema_nine_workspace(path):
-    """A schema 9 file with a free-form Profile, claim metadata and released contexts."""
-    workspace, knowledge, claims, _, applications = seed(path)
-    career = CareerService(workspace)
-    career.update_profile(
-        ProfileUpdate(expected_version=career.get_profile()["version"], metadata=METADATA)
-    )
-    exact = {
-        claims[0]: {"default_in_cv": True, "role": "core", "group": "Data pipelines", "x": 1},
-        claims[1]: {"default_in_cv": "yes", "role": "primary", "group": ["a"]},
-        claims[2]: {"role": "bench", "selection": {"role": "core"}},
-        claims[3]: {"default_in_cv": 1, "group": "g" * 101},
-    }
-    with workspace.db.transaction() as conn:
-        for claim_id, metadata in exact.items():
-            conn.execute(
-                "UPDATE claims SET metadata=? WHERE id=?", (json.dumps(metadata), claim_id)
-            )
-    del workspace, career
-    make_schema_eight(path)
-    with closing(sqlite3.connect(path)) as conn:
-        # As a Profile saved before 0.23 stored them.
-        conn.execute(
-            "UPDATE settings SET data=json_set(data,'$.preferences',?,'$.roles',?) "
-            "WHERE key='profile'",
-            (PROFILE_TEXTS["preferences"], PROFILE_TEXTS["roles"]),
-        )
-        conn.commit()
-    legacy_prepare_context(path, applications[0], key="first-key")
-    legacy_prepare_context(path, applications[1], knowledge_ids=knowledge[:2])
-    legacy_prepare_context(path, applications[2], note="Synthetic note ✓")
-    # The released 8 -> 9 step alone, as 0.18 ran it.
-    with closing(sqlite3.connect(path)) as conn:
-        conn.execute("BEGIN IMMEDIATE")
-        MIGRATIONS[8](conn)
-        conn.execute("PRAGMA user_version=9")
-        conn.commit()
-        conn.execute("PRAGMA journal_mode=DELETE")
-    return claims, applications
-
-
-PRESERVED = ("settings", "knowledge", "claims", "templates", "contexts", "context_parts", "events")
-
-
-def rows_of(conn, table):
-    added = SCHEMA_TEN_COLUMNS.get(table, ())
-    names = [f'"{row[0]}"' for row in columns(conn, table) if row[0] not in added]
-    rows = conn.execute(f"SELECT {','.join(names)} FROM {table} ORDER BY 1,2").fetchall()
-    if table != "settings":
-        return rows
-    # Schema 14 removed the Profile's preferences and roles, held by the policy since 0.19.
-    kept = []
-    for row in rows:
-        data = json.loads(row[1])
-        if row[0] == "profile":
-            data = {k: v for k, v in data.items() if k not in PROFILE_TEXTS}
-        kept.append((row[0], data, *row[2:]))
-    return kept
-
-
-def test_schema_nine_upgrade_copies_the_profile_and_touches_no_existing_row(tmp_path):
-    path = tmp_path / "schema9.sqlite"
-    claims, applications = schema_nine_workspace(path)
-    with closing(sqlite3.connect(path)) as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 9
-        assert not {"policy_items", "policy_sections"} & table_names(conn)
-        assert "role" not in {row[0] for row in columns(conn, "claims")}
-        before = {table: rows_of(conn, table) for table in PRESERVED}
-        payloads = {
-            row[0]: (payload_text(conn, row[0]), row[1])
-            for row in conn.execute("SELECT id,signature FROM contexts")
-        }
-        parts = conn.execute("SELECT * FROM snapshot_parts ORDER BY id").fetchall()
-    assert len(payloads) == 3 and len(before["claims"]) == 24
-
-    workspace = Workspace(path)
-    fresh = Database(tmp_path / "fresh.sqlite")
-    with sqlite3.connect(path) as conn, sqlite3.connect(fresh.path) as reference:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
-        assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
-        assert not conn.execute("PRAGMA foreign_key_check").fetchall()
-        assert table_names(conn) == table_names(reference)
-        assert index_names(conn) == index_names(reference)
-        for table in table_names(reference):
-            if not table.startswith("jobs_fts"):
-                assert sorted(columns(conn, table)) == sorted(columns(reference, table)), table
-        # Every existing row, and every frozen context, is what it was.
-        for table in PRESERVED:
-            assert rows_of(conn, table) == before[table], table
-        assert conn.execute("SELECT * FROM snapshot_parts ORDER BY id").fetchall() == parts
-        for context_id, (text, signature) in payloads.items():
-            assert payload_text(conn, context_id) == text
-            assert hashlib.sha256(text.encode()).hexdigest() == signature
-            assert "policy" not in json.loads(text)
-        # A context from before the policy has no section versions.
-        assert conn.execute("SELECT policy FROM context_inputs").fetchall() == [(None,)] * 3
-        typed = {
-            row[0]: row[1:]
-            for row in conn.execute('SELECT id,default_in_cv,role,"group" FROM claims')
-        }
-    # Only a key with the field's name and a valid value of the field is copied.
-    assert typed[claims[0]] == (1, "core", "Data pipelines")
-    assert typed[claims[1]] == (0, "supporting", "")
-    assert typed[claims[2]] == (0, "bench", "")
-    assert typed[claims[3]] == (0, "supporting", "")
-    assert all(
-        value == (0, "supporting", "") for key, value in typed.items() if key not in claims[:4]
-    )
-
-    career, policy = CareerService(workspace), PolicyService(workspace)
-    profile = career.get_profile()
-    # Metadata stays in the Profile; preferences and roles live in the policy only.
-    assert profile["metadata"] == METADATA
-    assert not set(PROFILE_TEXTS) & set(profile)
-    sections = {section["section"]: section for section in policy.get_policy()["sections"]}
-    assert {name: section["version"] for name, section in sections.items()} == {
-        "decision": 1,
-        "eligibility": 0,
-        "writing": 0,
-        "facts": 1,
-    }
-    facts = sections["facts"]["items"]
-    # One item per key, in the order the Profile stores them.
-    assert [item["origin"]["key"] for item in facts] == sorted(METADATA)
-    assert [item["position"] for item in facts] == list(range(len(METADATA)))
-    assert {item["origin"]["key"]: item["value"] for item in facts} == METADATA
-    assert [item["label"] for item in facts][:2] == ["Interview availability", "Decision policy"]
-    assert {item["origin"]["key"]: item["value_type"] for item in facts} == {
-        "decision_policy": "structured",
-        "work_authorization": "text",
-        "notice_period_days": "number",
-        "open_to_relocation": "boolean",
-        "salary": "number",
-        "languages": "structured",
-        "unset": "structured",
-        "Interview-availability": "structured",
-    }
-    decision = sections["decision"]["items"]
-    assert [(item["label"], item["statement"]) for item in decision] == [
-        ("Preferences", PROFILE_TEXTS["preferences"]),
-        ("Target roles", PROFILE_TEXTS["roles"]),
-    ]
-    assert [item["origin"]["source"] for item in decision] == [
-        "profile_preferences",
-        "profile_roles",
-    ]
-    for item in facts + decision:
-        assert item["confirmed"] is False and item["confirmed_by"] is None
-        assert item["created_by"]["kind"] == "system"
-        assert item["origin"]["note"].startswith("Copied from Profile ")
-        assert item["origin"]["note"].endswith(" in 0.19")
-    assert sections["facts"]["unconfirmed"] == len(METADATA)
-
-    # A structured value is kept until someone sorts it: other fields change around it,
-    # a typed value replaces it, and it cannot be written again.
-    structured = facts[1]
-    with acting_as(AGENT):
-        labelled = policy.update_item(
-            structured["id"], {"expected_version": 1, "label": "Decision policy (old)"}
-        )["item"]
-        assert labelled["value"] == METADATA["decision_policy"]
-        assert labelled["value_type"] == "structured"
-        with pytest.raises(ValidationError):
-            policy.update_item(
-                structured["id"],
-                {"expected_version": 2, "value": {"a": 1}, "value_type": "structured"},
-            )
-    with acting_as(OWNER):
-        sorted_item = policy.update_item(
-            structured["id"], {"expected_version": 2, "value": ["backend"], "value_type": "list"}
-        )["item"]
-        assert sorted_item["confirmed"] and sorted_item["value_type"] == "list"
-        assert sorted_item["origin"]["key"] == "decision_policy"
-    # A new context freezes the copied items as unconfirmed.
-    context = prepared(workspace, applications[0])
-    frozen = context["payload"]["policy"]["facts"]["items"]
-    assert [item["confirmed"] for item in frozen] == [False, True] + [False] * (len(METADATA) - 2)
-    assert frozen[0]["origin"]["source"] == "profile_metadata"
-    assert frozen[0]["value"] == METADATA["Interview-availability"]
-    # Opening again copies nothing twice.
-    again = PolicyService(Workspace(path)).get_policy()
-    assert [section["total"] for section in again["sections"]] == [2, 0, 0, len(METADATA)]
-
-
-def test_an_older_backup_restores_through_the_same_step(tmp_path):
-    source = tmp_path / "schema9.sqlite"
-    schema_nine_workspace(source)
-    original = source.read_bytes()
-    target = Workspace(tmp_path / "live" / "workspace.sqlite")
-    with acting_as(OWNER):
-        PolicyService(target).add_item("facts", {"expected_version": 0, "label": "Replaced"})
-    restore_database(target, source)
-    assert source.read_bytes() == original
-    restored = PolicyService(target).get_policy()
-    assert [section["total"] for section in restored["sections"]] == [2, 0, 0, len(METADATA)]
-    assert CareerService(target).get_profile()["metadata"] == METADATA
-    # A current backup carries the policy as it is.
-    with acting_as(OWNER):
-        PolicyService(target).add_item("eligibility", {"expected_version": 0, "label": "Permit"})
-    backup = tmp_path / "current.sqlite"
-    target.db.backup(backup)
-    other = Workspace(tmp_path / "other" / "workspace.sqlite")
-    restore_database(other, backup)
-    assert PolicyService(other).get_policy() == PolicyService(target).get_policy()
-
-
-def test_a_profile_without_free_form_values_gets_an_empty_policy(tmp_path):
-    path = tmp_path / "plain.sqlite"
-    Workspace(path)
-    CareerService(Workspace(path))
-    make_schema_nine(path)
-    policy = PolicyService(Workspace(path)).get_policy()
-    assert all(section["version"] == 0 and not section["items"] for section in policy["sections"])
 
 
 def test_claims_carry_typed_selection_fields(tmp_path):
@@ -992,3 +761,14 @@ def test_template_rules_hold_typed_statements_beside_limits_and_free_keys(tmp_pa
     ):
         with pytest.raises(ValidationError):
             TemplateCreate(name="CV", rules={"statements": bad})
+
+
+def test_a_backup_carries_the_policy_as_it_is(tmp_path):
+    target = Workspace(tmp_path / "live" / "workspace.sqlite")
+    with acting_as(OWNER):
+        PolicyService(target).add_item("eligibility", {"expected_version": 0, "label": "Permit"})
+    backup = tmp_path / "current.sqlite"
+    target.db.backup(backup)
+    other = Workspace(tmp_path / "other" / "workspace.sqlite")
+    restore_database(other, backup)
+    assert PolicyService(other).get_policy() == PolicyService(target).get_policy()

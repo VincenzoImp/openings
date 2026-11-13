@@ -39,7 +39,8 @@ flowchart LR
 | `backend/openings/worker.py` | Independent scheduling and acquisition lanes |
 | `backend/openings/interfaces/` | REST routes and MCP tools of each area, bound to the shared services |
 | `backend/openings/app.py`, `auth.py` | HTTP host: authentication, middleware, error bodies, the MCP mount and dashboard hosting |
-| `backend/openings/schema.sql` | Relational ownership, SQLite indexes and JSON payloads |
+| `backend/openings/schema.sql` | The whole schema of a new workspace: relational ownership, SQLite indexes and JSON payloads |
+| `backend/openings/migrations/` | The one supported upgrade, from the previous schema (`m15.py`: a new file with the data copied in, the archive and the pre-upgrade copy) |
 | `frontend/src` | Dashboard using REST; no duplicated domain decisions |
 | `backend/openings/skills.py`, `skill_notes.py` | Shipped skills served read-only; per-workspace local notes appended when a skill is served |
 | `skills/` | Agent workflow skills (Agent Skills format) and their shared references |
@@ -65,11 +66,11 @@ belongs to the module of its concern.
 
 | Package | Modules |
 |---|---|
-| `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage, rule dismissals and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py` notes, their author, run and pin; `timeline.py` the timeline of a job or an application; `timeline_upgrade.py` the timeline part of the schema 12 to 13 step; `availability_upgrade.py` the jobs part of the schema 13 to 14 step; `applications.py` derived readiness, preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, responses, Ready and deletion; `bulk.py` per-item bulk results; `overview.py` the funnel |
+| `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage, rule dismissals and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py` notes, their author, run and pin; `timeline.py` the timeline of a job or an application; `applications.py` derived readiness, preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, responses, Ready and deletion; `bulk.py` per-item bulk results; `overview.py` the funnel |
 | `discovery/` | `service.py` the provider gate (`http_budget`, `fetch_bytes`); `models.py` typed inputs; `network.py` the public-address policy and the bounded fetch; `resolution.py` board detection and source configuration; `feeds.py` posting readers (Lever, Ashby, RSS) and adapter dispatch; `sources.py` source schemas, preview and writes; `runs.py` the global switch, provider policies, queueing, scheduling and run records; `tasks.py` leases, retry and running one collection |
-| `documents/` | `contexts.py` frozen contexts and their staleness reports; `revisions.py` creation, cited evidence, review, comparison and deletion; `sources.py` the source and PDF of a CV or letter and its derived text; `text.py` readable text of a TeX source; `latex.py` what CV and letter class commands print; `files.py` owned files and scoped transfer grants; `models.py` inputs; `upgrade.py` the schema 12 to 13 step |
+| `documents/` | `contexts.py` frozen contexts and their staleness reports; `revisions.py` creation, cited evidence, review, comparison and deletion; `sources.py` the source and PDF of a CV or letter and its derived text; `text.py` readable text of a TeX source; `latex.py` what CV and letter class commands print; `files.py` owned files and scoped transfer grants; `models.py` inputs |
 | `career/` | `profile.py` Profile and instructions; `entries.py` Career entries; `claims.py`; `templates.py`; `imports.py`; `models.py` inputs and defaults; `records.py` row helpers shared with documents |
-| `policy/` | `service.py` item writes, confirmation and rule preview; `models.py` sections, the signal registry `SIGNALS` and inputs; `records.py` records as read and the frozen policy; `upgrade.py` the schema 9 to 10 step; `profile_upgrade.py` the Profile part of the schema 13 to 14 step |
+| `policy/` | `service.py` item writes, confirmation and rule preview; `models.py` sections, the signal registry `SIGNALS` and inputs; `records.py` records as read and the frozen policy |
 | `interfaces/` | One module per area declaring its operations and binding them to its service: `core.py` (workspace, jobs, notes, applications, overview), `career.py`, `documents.py`, `discovery.py`, `activity.py`, `agent_requests.py`, `policy.py`, `outcomes.py`, `insights.py`, `source_yield.py`, `skills.py` and `system.py` (sign-in, tokens, capabilities, backup, restore, examples, export); `registry.py` the declaration and its binding |
 
 Services never import FastAPI routing or MCP registration; `interfaces/` binds
@@ -118,9 +119,10 @@ A tool's arguments have one shape: the record ids a REST path names, flat;
 or the query string of a read (`query_model`). Every paged list returns `items`,
 `total`, `limit` and `offset` and summaries by default; every delete names
 `expected_version` (a file's version is always 1: files never change); every
-create accepts `idempotency_key`. Records without a key column keep their key
-in `idempotency_keys` (`idempotency.py`: the table, the key, a SHA-256 of the
-request and the record's id; a key whose record is gone is free again).
+create accepts `idempotency_key`, kept in `idempotency_keys` (`idempotency.py`:
+the table, the key, a SHA-256 of the request and the record's id). A retry of the
+same request returns the same record, the key with another request is a 409 and
+a key whose record is gone is free again.
 
 A tool has that one name and that one shape. The earlier names and the flat
 list arguments, kept as deprecated aliases in 0.22, were removed in 0.23 (see
@@ -329,102 +331,47 @@ memory and releasing SQLite readers before cancellation or thread changes.
 Backups use SQLite's online backup API. A restore preserves
 installation authentication, recent provider request history and later cooldowns.
 
-Workspaces and backups use schema 14 (0.23), which removes what 0.19 to 0.22
-deprecated and keeps every value it held, in one transaction
-(`_migrate_13_to_14`). The jobs part (`workspace/availability_upgrade.py`)
-turns each `jobs.availability` other than `unknown` or empty into one unpinned
-note on its job (`origin='upgrade'`, the text of `note_body` naming the value
-exactly), attributed to the actor and run of the last `job_edited` event naming
-`availability` and dated by it, else by the job's `updated_at`; it compares
-every note with the text it expects byte for byte, then drops the column. The
-Profile part (`policy/profile_upgrade.py`) requires each non-empty Profile
-`preferences` and `roles` value to be held by a policy item (its statement, or
-its text value, equal with runs of whitespace collapsed, in any section); a
-value no item holds is copied whole into a new unconfirmed `decision` item at
-the end of the section (`origin` `profile_preferences_removed` or
-`profile_roles_removed`, a value that is not text as a `structured` value) and
-the section's version moves on by one. After checking every value again, it
-removes both keys from the stored Profile (`json_remove`), keeping its version
-and time. No event is written; frozen contexts, whose Profile part still holds
-both texts, and every other row are not touched. Restore accepts schema 14 and
-upgrades a copy of a schema 5 to 13 backup.
+Workspaces and backups use schema 15 (0.24). `schema.sql` is the whole layout
+and runs once, on a new file (`db.create`, one transaction); nothing is created or
+backfilled on a later start. `db.prepare` opens schema 15, creates a new
+workspace, upgrades the previous schema through its migration and refuses any
+other version with what to do: a workspace older than 0.23 opens once with the
+0.23 image first, a newer one needs a newer Openings.
 
-Schema 13 (0.22) was the breaking group. The timeline
-part of `_migrate_12_to_13` (`workspace/timeline_upgrade.py`) adds `run_id`,
-`pinned_at` and `origin` to `notes`, copies each non-empty `applications.note`
-into one pinned note of its application (`origin='upgrade'`) attributed to the
-actor and run of the last event that set it (the last `application_updated`
-naming `note`, else `application_created`) and dated by it, else by the
-application's `updated_at`, compares every copy with its source byte for byte,
-then drops `applications.note`. It writes no event and changes no other value;
-frozen contexts are not touched.
+`backend/openings/migrations/` holds exactly one migration, from the previous
+schema (`MIGRATIONS = {14: m15.upgrade}`). `m15.py` is frozen with its release
+and imports only the standard library. It does not change the workspace in
+place: it creates `<db>.next` from `schema.sql`, attaches the schema-14 file
+read-only and copies every kept table with one `INSERT ... SELECT` in one
+transaction (`TABLES`: per-table column expressions and row filters; `FOLDS`:
+rows the upgrade creates), then rebuilds the search index. Values that leave the
+schema go to `<stem>.pre-0.24-archive.json` beside the database (mode 0600,
+written through a temporary name): `SECTIONS` of removed records, every
+non-default value of a dropped column (`dropped_columns`), stored texts that were
+not JSON (`repaired_json`) and any table nothing copies (`dropped_tables`).
+Before the swap it checks the new file's integrity, that no reference broke that
+was not broken before, the row count of every table (copied plus created), the
+`INVARIANTS` (applications not Closed, bytes of stored files) and the archive
+read back against its sources; any failure removes the new file and the archive
+and refuses the start. The swap renames the original to
+`<stem>.pre-0.24.sqlite` (the pre-upgrade copy, byte for byte the schema-14 file,
+listed by `backups.py` and never deleted automatically) and the new file to the
+database's name. `m15.recover` finishes a swap interrupted between its two
+renames or removes an unfinished new file at the next start. A room check (2.2
+times the database plus the estimated archive) runs before anything is written.
+Restore converts a copy of a schema-14 backup the same way (`CONVERSIONS`),
+reading the upload only and keeping its archive beside the database.
+`db.copy_before_upgrade` (a verified `VACUUM INTO` copy, the two newest kept) is
+kept for a later migration that changes a file in place; 0.24 does not need it.
 
-The documents part (`documents/upgrade.py`, `migrate_to_13`, run after the
-timeline part in the same transaction): documents gain `text`, `legacy_content`,
-`note`, `claim_ids` and `knowledge_ids`, files gain `source_sha256` (NULL for
-every existing file) and the `all_files` and `context_files` views are built
-again with it. A CV or letter revision's content moves byte for byte to
-`legacy_content` (`{}` to NULL) and `content` becomes `{}`; the ids any
-revision's content cited are copied to `claim_ids` and `knowledge_ids`; the text
-of every revision with a `.tex` source is derived and stored (several sources:
-each in file-name order). Ids, files, hashes, review states and versions do not
-change. Measured on a synthetic workspace of 4,000 CV and letter revisions with
-8,000 files on a laptop: 0.8 s.
-
-Schema 12 (0.21) was an additive change. Opening schema 11 is an additive
-change in one transaction (`_migrate_11_to_12`): it adds the `skill_notes` table
-(`skill_notes.migrate`) and, through `job_signals.migrate`, the `job_signals`
-table, the dismissal record columns of `jobs` (`dismissed_at`, `dismissed_by_*`,
-`dismissed_rule_id`, `dismissed_rule_label`, `dismissed_reason`),
-`postings.unlisted_at` and their indexes. Dismissed jobs get the time and actor
-of their last dismissal event (none when no event exists: they count as
-"other"), and the postings each company board's last complete run did not list
-are marked. No other value changes. The text and duplicate signals of existing
-jobs are computed after the upgrade by `SignalService.backfill` on the warm-up
-thread, in batches of 200 jobs, without applying rules; jobs read
-`computed: false` until then. Measured on a synthetic workspace of 25,000 jobs
-with postings of about 3,000 characters on a laptop: the migration takes 0.3 s,
-the text signals 7 s, the duplicate index 3 s and the duplicate signals 0.5 s;
-a small host takes several times longer, in the background.
-
-Schema 11 (0.20) was an additive change with one table rebuild. Opening schema 10 adds the
-`responses` table (an employer's answer to a sent application: kind, date, note,
-whether the date is estimated, how it was recorded, attribution, version and
-idempotency key; one per application, kind and day except `other`) and rebuilds
-`applications` to allow the `no_response` outcome and add `concluded_on`. The
-rebuild copies every row with its rowid, recreates the table's indexes and
-triggers from their saved SQL and runs with foreign keys off; the upgrade fails
-unless `foreign_key_check` reports nothing it did not report before. It then
-records one response, by the system and without an event, for each application
-in Interview or Offer and each rejected one with a sent date: dated by the last
-event that moved it to that stage, else its last change with `estimated` set.
-Nothing else changes. `outcomes.no_reply_period` is the only definition of the
-no-reply period (the days of the Policy decision item labelled "No reply",
-confirmed items first, else 30); `insights.py` maps titles to role family and
-seniority with fixed keyword tables and no model.
-
-Schema 10 (0.19) was an additive change. Opening schema 9
-creates the policy tables, adds `default_in_cv`, `role` and `group` to `claims`
-and `policy` to `context_inputs`, and copies the Profile's free-form values:
-one unconfirmed `facts` item per top-level `metadata` key, holding the original
-value (`origin`, `origin_key`), and one unconfirmed `decision` item each for the
-`preferences` and `roles` text. The Profile row, every Career entry, claim and
-template and every frozen context are left as they were. A claim field is
-filled from `metadata` only when a key has the field's name and a valid value
-of the field (`db.CLAIM_FIELDS_FROM_METADATA`).
-
-Schema 9 (0.18) was a storage-only change: opening schema 8
-moves every frozen context into content-addressed parts and its asset files out of
-`files`, compares each rebuilt payload with the stored text, and then drops the
-old column, all in the upgrade transaction; contexts gain summary columns for
-lists. When at least a quarter of the file (and `OPENINGS_COMPACT_MIN_MB`, default
-32) is free afterwards, or after large deletions, `compaction.py` rewrites the file
-at start: a compact copy beside the database is copied back in one transaction, so
-an interruption leaves the previous file valid and the next start tries again.
-The same upgrade step (`retention.trim_history`) deletes `posting_updated` events
-that recorded a re-sighting, turns the others into `job_refreshed`, and reduces
-stored provider payloads to the two values above; the compaction returns the
-freed pages. A database already at the unreleased schema 9 does not get this.
+When at least a quarter of the file (and `OPENINGS_COMPACT_MIN_MB`, default 32)
+is free after large deletions, `compaction.py` rewrites the file at start: a
+compact copy beside the database is copied back in one transaction, so an
+interruption leaves the previous file valid and the next start tries again.
+`outcomes.no_reply_period` is the only definition of the no-reply period (the
+days of the Policy decision item labelled "No reply", confirmed items first,
+else 30); `insights.py` maps titles to role family and seniority with fixed
+keyword tables and no model.
 
 Retention is one environment setting, `OPENINGS_RETENTION_DAYS` (default 90, 0
 off). The scheduler thread calls `retention.prune` at start and every six hours;
@@ -444,16 +391,6 @@ upload before writing it and the service checks the replacement's room again
 with the real sizes. `storage_status` feeds `GET /workspace` and
 `workspace_info`.
 
-Schema 8 shipped with 0.17.0. Opening schema 7 upgrades it in the same
-transaction: events gain a subject, an actor and a run, notes gain an author,
-applications gain `ready_at` with who set it, API tokens gain a kind, and the
-`runs`, `questions` and `requests` tables are added; existing rows keep every value, read as
-"unknown (before 0.17)" and are not marked ready, and existing tokens become
-owner tokens with unchanged access. Schema 6 is upgraded through schema 7 in the same
-transaction (application priority, deadline and requirements), and schema 5
-through schema 6 (removing obsolete derived data and preserving owned records and
-immutable snapshots). Restore accepts schema 14 and upgrades a copy of a schema 5,
-6, 7, 8, 9, 10, 11, 12 or 13 backup. Other historical formats require the matching release.
 
 ## Acquisition
 

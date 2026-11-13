@@ -1,8 +1,6 @@
 """Requests for the agent: owner instructions an agent takes, completes or declines."""
 
 import json
-import sqlite3
-from contextlib import closing
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,7 +12,6 @@ from openings.app import create_app
 from openings.career import CareerService, KnowledgeCreate
 from openings.errors import DomainError
 from openings.workspace import Workspace
-from schema_fixtures import make_schema_seven, table_names
 
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 AGENT = token_actor("token-agent", "Synthetic agent", "agent")
@@ -52,7 +49,12 @@ def test_request_lifecycle_versions_and_attribution(services):
             }
         )
         again = requests.create_request(
-            {"text": "Prepare this one too.", "idempotency_key": "prepare"}
+            {
+                "text": "  Prepare this one too.  ",
+                "subject_type": "job",
+                "subject_id": job["id"],
+                "idempotency_key": "prepare",
+            }
         )
         general = requests.create_request({"text": "Stop applying to consultancies."})
         refused(
@@ -366,21 +368,3 @@ def test_a_dashboard_request_reaches_the_agent_and_its_result_comes_back(tmp_pat
         assert invalid.status_code == 422
         exported = owner.get("/api/v1/export").json()
         assert {item["id"] for item in exported["requests"]} == {request["id"], second["id"]}
-
-
-def test_requests_exist_after_a_schema_seven_upgrade(tmp_path):
-    path = tmp_path / "schema7.sqlite"
-    workspace = Workspace(path)
-    job = add_job(workspace)
-    make_schema_seven(path)
-    with closing(sqlite3.connect(path)) as conn:
-        assert "requests" not in table_names(conn)
-    upgraded = Workspace(path)
-    requests = RequestService(upgraded)
-    assert requests.list_requests() == {"items": [], "total": 0, "limit": 50, "offset": 0}
-    with acting_as(OWNER):
-        created = requests.create_request(
-            {"text": "Prepare this one.", "subject_type": "job", "subject_id": job["id"]}
-        )
-    assert created["subject"]["label"] == "Synthetic engineer · Example"
-    assert ActivityService(upgraded).list_runs()["total"] == 0

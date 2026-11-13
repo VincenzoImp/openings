@@ -28,12 +28,12 @@ _ENTRIES = (
     "SELECT 'event' AS type,CASE WHEN e.subject_type='response' THEN 'response' ELSE 'event' END AS kind,"
     "e.id,e.created_at,e.job_id,e.application_id,e.actor_kind,e.actor_id,e.actor_name,"
     "e.actor_token_kind,e.run_id,NULL AS pinned_at,e.kind AS event_kind,e.payload,"
-    "e.subject_type,e.subject_id,NULL AS body,NULL AS version,NULL AS updated_at,NULL AS origin "
+    "e.subject_type,e.subject_id,NULL AS body,NULL AS version,NULL AS updated_at "
     "FROM events e WHERE {events} AND e.kind NOT IN ('note_added','note_edited') "
     "UNION ALL "
     "SELECT 'note','note',n.id,n.created_at,n.job_id,n.application_id,n.author_kind,n.author_id,"
     "n.author_name,n.author_token_kind,n.run_id,n.pinned_at,NULL,NULL,NULL,NULL,n.body,n.version,"
-    "n.updated_at,n.origin FROM notes n WHERE {notes}"
+    "n.updated_at FROM notes n WHERE {notes}"
 )
 
 
@@ -65,7 +65,6 @@ def _entry(row):
             "updated_at": row["updated_at"],
             "pinned": row["pinned_at"] is not None,
             "pinned_at": row["pinned_at"],
-            "origin": row["origin"],
         }
     else:
         event = decode_record(row, ("payload",))

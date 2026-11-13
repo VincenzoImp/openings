@@ -7,7 +7,6 @@ from contextlib import closing
 import pytest
 from fastapi.testclient import TestClient
 
-from context_fixtures import insert_legacy_context, legacy_prepare_context, make_schema_eight
 from openings.actors import OWNER, acting_as, token_actor
 from openings.app import create_app
 from openings.career import (
@@ -21,13 +20,8 @@ from openings.career import (
     TemplateCreate,
     TemplateUpdate,
 )
-from openings.db import MIGRATIONS, SCHEMA_VERSION
 from openings.documents import ContextCreate, DocumentCreate, DocumentService
 from openings.policy import PolicyService
-from openings.snapshots import payload_text
-from openings.staleness import PARTS_FORMAT, frozen_parts
-from openings.workspace import Workspace
-from outcome_fixtures import make_schema_ten
 from test_context_parts import seed
 
 AGENT = token_actor("token-agent", "Synthetic agent", "agent")
@@ -264,106 +258,6 @@ def _parts(path):
             context_id: json.loads(parts) if parts else None
             for context_id, parts in conn.execute("SELECT context_id,parts FROM context_inputs")
         }
-
-
-def test_a_schema_ten_workspace_is_backfilled_from_its_frozen_payloads(tmp_path):
-    path = tmp_path / "schema10.sqlite"
-    workspace, *_, applications = seed(path, applications=2)
-    services = Services(workspace)
-    services.profile(metadata={"notes": "Synthetic"})
-    services.add("eligibility", "Work authorization", statement="EU citizen.")
-    services.add("writing", "One page", statement="Keep it short.", scope="cv")
-    contexts = [services.draft(application_id)["id"] for application_id in applications]
-    services.profile(summary="Changed after the first contexts.")
-    expected = {application_id: services.report(application_id) for application_id in applications}
-    del workspace, services
-    make_schema_ten(path)
-    with closing(sqlite3.connect(path)) as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 10
-        assert "parts" not in {row[1] for row in conn.execute("PRAGMA table_info(context_inputs)")}
-        derived = {
-            context_id: frozen_parts(payload_text(conn, context_id)) for context_id in contexts
-        }
-
-    upgraded = Services(Workspace(path))
-    with closing(sqlite3.connect(path)) as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
-    assert _parts(path) == derived
-    assert all(parts["profile"] and parts["policy"] for parts in derived.values())
-    for application_id in applications:
-        assert upgraded.report(application_id) == expected[application_id]
-        assert changed(expected[application_id]) == [("profile", "Summary", "changed")]
-    # Deriving again gives the same rows: the backfill is deterministic.
-    with upgraded.workspace.db.transaction() as conn:
-        conn.execute("UPDATE context_inputs SET parts=NULL")
-    assert upgraded.report(applications[0]) == expected[applications[0]]
-    Workspace(path)
-    assert _parts(path) == derived
-    # A schema 11 file written before part hashes existed gains the column and them.
-    with upgraded.workspace.db.transaction() as conn:
-        conn.execute("ALTER TABLE context_inputs DROP COLUMN parts")
-    Workspace(path)
-    assert _parts(path) == derived
-
-
-def test_older_contexts_compare_what_they_froze_and_say_what_they_cannot(tmp_path):
-    path = tmp_path / "legacy.sqlite"
-    workspace, knowledge, _, _, applications = seed(path, applications=3)
-    services = Services(workspace)
-    services.profile(metadata={"rules": "Synthetic rules"})
-    del workspace, services
-    make_schema_eight(path)
-    legacy = legacy_prepare_context(path, applications[0], knowledge_ids=knowledge[:1])["id"]
-    with closing(sqlite3.connect(path)) as conn:
-        unreadable = insert_legacy_context(conn, applications[1], "not a JSON payload")
-        profile_version = conn.execute(
-            "SELECT version FROM settings WHERE key='profile'"
-        ).fetchone()[0]
-        for number, (application_id, context_id) in enumerate(
-            ((applications[0], legacy), (applications[1], unreadable))
-        ):
-            conn.execute(
-                "INSERT INTO documents(id,application_id,context_id,kind,title,content,created_at) "
-                "VALUES(?,?,?,'resume','CV','{}','2026-01-01T00:00:00+00:00')",
-                (f"document-{number}", application_id, context_id),
-            )
-        conn.commit()
-    # The released 8 -> 9 step, then the current chain from schema 9.
-    with closing(sqlite3.connect(path)) as conn:
-        conn.execute("BEGIN IMMEDIATE")
-        MIGRATIONS[8](conn)
-        conn.execute("PRAGMA user_version=9")
-        conn.commit()
-    services = Services(Workspace(path))
-    parts = _parts(path)
-    assert parts[legacy]["policy"] is None and parts[legacy]["profile"]
-    assert parts[unreadable] == {
-        "format": PARTS_FORMAT,
-        "profile": None,
-        "policy": None,
-        "instructions": None,
-        "templates": {},
-        "knowledge": {},
-        "claims": {},
-    }
-    first, second = (services.report(application_id) for application_id in applications[:2])
-    assert first["stale"] is False
-    assert first["documents"][0]["comparison"] == {"profile": "parts", "policy": "not_frozen"}
-    # The unreadable payload records no version: compared as a whole, it differs.
-    assert second["documents"][0]["comparison"] == {"profile": "whole", "policy": "not_frozen"}
-    assert changed(second) == [
-        ("profile", "Profile", "changed"),
-        ("instructions", "Instructions", "changed"),
-    ]
-    assert second["changes"][0]["id"] is None
-    assert second["changes"][0]["current_version"] == profile_version
-
-    # The Profile's own rules and later policy changes are not compared for these.
-    services.profile(metadata={})
-    services.add("eligibility", "Work authorization", statement="EU citizen.")
-    assert services.report(applications[0])["stale"] is False
-    services.profile(summary="Changed summary.")
-    assert changed(services.report(applications[0])) == [("profile", "Summary", "changed")]
 
 
 def test_records_are_compared_by_the_content_documents_use(tmp_path):

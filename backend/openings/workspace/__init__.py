@@ -4,7 +4,6 @@
 of the job services (jobs.py, job_changes.py, identity.py, notes.py), the
 application services (applications.py, application_changes.py), the timeline
 of a job or application (timeline.py), bulk.py and overview.py.
-timeline_upgrade.py is the timeline part of the schema 12 to 13 upgrade.
 """
 
 from .service import Workspace

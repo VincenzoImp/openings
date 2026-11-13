@@ -13,8 +13,6 @@ from openings.app import create_app
 from openings.career import TemplateCreate
 from openings.documents import ContextCreate, DocumentCreate, ReviewUpdate, UploadReservation
 from openings.errors import DomainError
-from openings.workspace import Workspace
-from schema_fixtures import columns, make_schema_seven
 
 AGENT = token_actor("token-agent", "Synthetic agent")
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
@@ -419,23 +417,6 @@ def test_rest_and_mcp_mark_ready_with_the_same_inputs_and_errors(app):
             "/api/v1/applications", params={"ready_since": "soon"}, headers=headers
         )
         assert invalid.status_code == 422
-
-
-def test_schema_seven_applications_upgrade_without_a_ready_mark(tmp_path):
-    path = tmp_path / "schema7.sqlite"
-    app = create_app(path, start_worker=False)
-    application = start(app)
-    approved(app, application)
-    before = app.state.workspace.get_application(application["id"])
-    make_schema_seven(path)
-    with sqlite3.connect(path) as conn:
-        assert "ready_at" not in {row[0] for row in columns(conn, "applications")}
-    upgraded = Workspace(path)
-    after = upgraded.get_application(application["id"])
-    assert (after["readiness"], after["ready_at"], after["ready_by"]) == ("reviewed", None, None)
-    assert (after["version"], after["updated_at"]) == (before["version"], before["updated_at"])
-    marked = upgraded.set_ready(application["id"], {"expected_version": after["version"]})
-    assert marked["readiness"] == "ready"
 
 
 def test_undoing_mark_applied_restores_the_ready_draft(app):
