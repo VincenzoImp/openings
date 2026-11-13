@@ -4,6 +4,18 @@
 store their settings in SQLite. New sources start paused; preview one, review its
 results and enable the schedule when ready. You can run a paused source manually.
 
+The screen has a switch for scheduled collection and three tabs:
+
+- **Sources:** saved searches and company boards in one table, filtered by kind
+  and searchable. Each row has its on/off switch, providers, schedule and last
+  run, with Run once, Edit, Run with options and Remove. **Add a search** and
+  **Add a company board** open the form below the table; every setting has its
+  own control.
+- **Runs and tasks:** collection runs with their results and state, filtered by
+  state and source. **Tasks** opens a run's provider tasks and the settings the
+  run froze; **All tasks** lists tasks with their own filters (kind, job).
+- **Providers:** the shared request gate of each provider (see Request pacing).
+
 ![Collection with saved searches, schedule summaries and acquisition results](../images/collection.png)
 
 ## Choose what to collect
@@ -141,16 +153,19 @@ from stored progress, including after a provider cooldown. Counts are cumulative
 
 Provider status distinguishes active work, a wait with a resume time,
 failed work and cancellation. Processing time measures active attempts; waiting
-time and total elapsed time explain longer runs. Raw task diagnostics remain
-available for investigation. A **Partial** run reports bounded coverage or
+time and total elapsed time explain longer runs. Under **Runs and tasks**, a
+run's **Tasks** show each provider task with its error and next attempt, and the
+source settings and run-only limits the run froze. A **Partial** run reports bounded coverage or
 unavailable descriptions; completion does not imply every matching job was fetched.
 
 ![Saved search form with query, portal selection, role filters and excluded role terms](../images/collection-settings.png)
 
 ## Request pacing
 
-**Settings → Collection** stores two provider-wide controls for previews, URL
-imports, scheduled/manual runs, redirects and detail fetches:
+**Collection → Providers** stores two provider-wide controls for previews, URL
+imports, scheduled/manual runs, redirects and detail fetches, and shows where the
+gate stands for each provider (ready, spacing requests, paused by the provider
+until a time, off):
 
 | Setting | Default | Scope |
 |---|---|---|

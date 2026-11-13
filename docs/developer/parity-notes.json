@@ -1,9 +1,6 @@
 {
   "format": "openings-parity-notes-v1",
   "operations": {
-    "skills.read": {
-      "note": "Settings lists the served skills by name and description; their text and reference files cannot be opened."
-    },
     "jobs.resolve": {
       "note": "No lookup of a job by URL, external key or title and company. Job details open Possible duplicates (`jobs.duplicates`) instead."
     },
