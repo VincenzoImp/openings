@@ -301,8 +301,10 @@ when that issue lands; the table says which parts those are.
   asking, confirm, move to a section, the switch of a rule on a signal, the
   version of each section and the sections panel. A version conflict reads the
   section again and keeps the unsaved text in the open form. The banner
-  "changed since N Drafts" of the prototype waits for staleness by section
-  (#144), and a rule shows that signals arrive later (#166) instead of counts.
+  "changed since N Drafts" of the prototype is not built: staleness by part
+  (#144) names each changed policy item in an application's Inputs tab and under
+  its **Inputs changed** tag in the list. A rule shows that signals arrive later
+  (#166) instead of counts.
 - **Career** (`pages/Career.tsx`, `pages/career/`) and **Templates**
   (`pages/Templates.tsx`, `pages/templates/`) are rebuilt and the old pages and
   their rules in `legacy.css` are deleted. Career has the Profile with typed

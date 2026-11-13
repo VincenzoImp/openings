@@ -79,9 +79,11 @@ Application list/detail records include `preparation`: per-kind counts of curren
 revision leaves (`revisions`), leaves with their own PDF (`pdf`) and leaves with
 an approved PDF (`approved`). A new revision inherits neither files nor approval.
 These counts do not certify content quality, required document completeness or
-submission. `stale_inputs` lists the input kinds (`profile`, `instructions`,
-`template`, `knowledge`, `claim`) that changed after the contexts of the current
-leaves were frozen; it is empty when they are current. Context lists with `summary=true` include frozen job/template labels,
+submission. `stale_inputs` lists the input kinds (`profile`, `policy`,
+`instructions`, `template`, `knowledge`, `claim`) that changed after the contexts
+of the current leaves were frozen; it is empty when they are current.
+`stale_changes` holds the first three changes of the staleness report and
+`stale_changes_total` their number. Context lists with `summary=true` include frozen job/template labels,
 evidence/claim counts and a bounded `note_preview`, alongside file/document counts.
 A version conflict returns HTTP 409 with the stored version, for example
 `{"error":{"code":"conflict","message":"…","details":{"current_version":4}}}`;
@@ -438,13 +440,41 @@ A context prepared since 0.19 contains `policy`: the four sections with their
 versions and items, each item marked `confirmed` or not. Earlier contexts are
 unchanged and have no `policy`.
 
-Contexts record the Profile, instructions, template, Career entry and claim
-versions they froze, and since 0.19 the policy section versions (not compared
-by the report yet). `GET /applications/{id}/staleness` compares them with the
-current records for each current revision leaf and returns `stale`, `inputs`,
-`changes` (input, ID, label, `changed`/`deleted`/`unapproved`, frozen and current
-version) and per-document status (`current`, `stale` or `no_context`). Entries and
-claims that were not selected for the context are ignored.
+Contexts record the inputs they froze: the instructions version, each selected
+template, Career entry and claim with its version, and a short hash of each
+Profile part, each policy item and each template's content.
+`GET /applications/{id}/staleness` compares them with the current records for
+each current revision leaf and returns `stale`, `inputs`, `changes` and
+per-document status (`current`, `stale` or `no_context`) with that document's
+`changes` and `comparison`.
+
+Only what documents use is compared:
+
+- **Profile:** the parts `name`, `headline`, `contact` (email, phone, location),
+  `links` and `summary`. `metadata`, `preferences` and `roles` are frozen too but
+  never make a document stale: rules and facts belong in the policy.
+- **Policy:** the confirmed items of `eligibility`, `writing` and `facts`, by
+  content (label, statement, value, scope, rule). Decision items, unconfirmed
+  proposals and the order of items are not compared. A writing item scoped to
+  `cv` concerns the CV (`resume`) only, one scoped to `letter` the letter
+  (`cover_letter`) only.
+- **Instructions, templates, entries and claims:** as before by version; a
+  template whose version moved only because of its name or default flag stays
+  current. Entries and claims that were not selected for the context are ignored.
+
+A change has `input` (`profile`, `policy`, `instructions`, `template`,
+`knowledge` or `claim`), `id` (the Profile part, the policy item or the record),
+`label`, `state`, `frozen_version` and `current_version`; a policy change also
+has its `section`, and its versions are the section's. States: `changed`,
+`deleted` and `unapproved` for records; `changed`, `added`, `removed` (deleted
+or moved to `decision`), `unconfirmed` and `confirmed` (confirmed since the
+context froze it as a proposal) for policy items.
+
+`comparison` says what a document's context allowed: `profile` is `parts`, or
+`whole` when the frozen payload could not be read part by part (`id` is then
+null and the Profile version is compared); `policy` is `items`, or `not_frozen`
+for a context prepared before 0.19, which holds no policy and is not compared
+for it.
 
 `GET /staleness` lists such reports across applications: `status` defaults to
 `draft` (`all` for every stage), `stale_only` defaults to `true`,
