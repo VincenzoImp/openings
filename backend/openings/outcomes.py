@@ -34,23 +34,6 @@ DEFAULT_REPLY_DAYS = 30
 _NO_REPLY_LABEL = re.compile(r"\bno[\s-]?(reply|response)\b", re.IGNORECASE)
 _DAYS = re.compile(r"^\s*(\d{1,4})(\s*days?)?\s*$", re.IGNORECASE)
 
-# Mirrored in schema.sql; the 10 -> 11 migration creates the same objects.
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS responses (
- id TEXT PRIMARY KEY, application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
- kind TEXT NOT NULL CHECK(kind IN ('rejection','interview','offer','other')),
- date TEXT NOT NULL CHECK(length(date)=10 AND date(date)=date),
- note TEXT NOT NULL DEFAULT '',
- estimated INTEGER NOT NULL DEFAULT 0 CHECK(estimated IN (0,1)),
- origin TEXT NOT NULL DEFAULT 'manual' CHECK(origin IN ('manual','stage','upgrade')),
- created_by_kind TEXT, created_by_id TEXT, created_by_name TEXT, created_by_token_kind TEXT,
- updated_by_kind TEXT, updated_by_id TEXT, updated_by_name TEXT, updated_by_token_kind TEXT,
- idempotency_key TEXT UNIQUE, version INTEGER NOT NULL DEFAULT 1,
- created_at TEXT NOT NULL, updated_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS responses_application ON responses(application_id,date);
-CREATE UNIQUE INDEX IF NOT EXISTS responses_once ON responses(application_id,kind,date) WHERE kind<>'other';
-"""
 SENT_SQL = "(app.applied_at IS NOT NULL OR app.status IN ('applied','interview','offer'))"
 
 
@@ -369,48 +352,3 @@ class ResponseService:
             )
         return {"deleted": True, "id": response_id}
 
-
-def backfill_responses(conn):
-    """Schema 10 to 11: one response for each application whose stage implies an employer answer.
-
-    An application in Interview or Offer gets an ``interview`` or ``offer``
-    response, and one closed as rejected with ``applied_at`` a ``rejection``. Its
-    day is that of the latest stage-change event that moved the application there
-    (for a rejection: the latest one that closed it or set its outcome); without
-    such an event it is the day of ``updated_at``, marked ``estimated``. The
-    responses are recorded by the system and add no event; nothing else changes.
-    """
-    stamp = now()
-    targets = (
-        ("interview", "interview", "status='interview'", "'interview'", None),
-        ("offer", "offer", "status='offer'", "'offer'", None),
-        (
-            "rejection",
-            "closed",
-            "status='closed' AND outcome='rejected' AND applied_at IS NOT NULL",
-            "'closed'",
-            "OR EXISTS(SELECT 1 FROM json_each(e.payload,'$.fields') f WHERE f.value='outcome')",
-        ),
-    )
-    counts = {}
-    for kind, stage, condition, target, also in targets:
-        moved = (
-            "json_extract(e.payload,'$.to')=" + target + " AND (coalesce(json_extract(e.payload,"
-            "'$.from'),'')<>" + target + (" " + also if also else "") + ")"
-        )
-        rows = conn.execute(
-            "SELECT a.id,a.updated_at,(SELECT substr(e.created_at,1,10) FROM events e "
-            "WHERE e.application_id=a.id AND e.kind='application_updated' AND json_valid(e.payload) "
-            f"AND {moved} ORDER BY e.created_at DESC,e.rowid DESC LIMIT 1) "
-            f"FROM applications a WHERE {condition} ORDER BY a.rowid"
-        ).fetchall()
-        for application_id, updated_at, moved_on in rows:
-            day = moved_on or updated_at[:10]
-            conn.execute(
-                "INSERT INTO responses(id,application_id,kind,date,estimated,origin,"
-                "created_by_kind,updated_by_kind,created_at,updated_at) "
-                "VALUES(?,?,?,?,?,'upgrade','system','system',?,?)",
-                (new_id(), application_id, kind, day, int(moved_on is None), stamp, stamp),
-            )
-        counts[kind] = len(rows)
-    return counts
