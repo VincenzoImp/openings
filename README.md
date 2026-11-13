@@ -24,17 +24,17 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   dismiss them with a reason; dismissed jobs stay remembered and can be restored.
   Each job arrives with signals computed without a model: the posting's language,
   the languages it requires, a likely duplicate of an earlier job (merged only
-  when you confirm) and a company-board posting no longer listed. Rules you enable
-  in your Policy dismiss or flag new jobs on those signals; bulk actions work on
-  up to 200 jobs.
+  when you confirm) and a company-board posting no longer listed. Signals label
+  and filter jobs, for example hiding jobs that require languages you don't
+  speak; nothing is dismissed automatically. Bulk actions work on up to 200 jobs.
 - **Measure sources:** **Yield** counts, per source and search, the jobs it found
   first and how many were shortlisted, applied to, answered by an employer or
   dismissed, and by whom.
-- **Decide once:** a **Policy** of short statements holds your rules for
-  shortlisting and dismissing, the facts employers ask about and your writing
-  rules. Your agent proposes items; they count after you confirm them.
+- **Decide once:** **Preferences** hold, in your own words, what you are looking
+  for, what you rule out, the facts employers ask about, your writing rules and
+  how the agent should work with you. Your agent reads and applies them.
 - **Prepare:** store your Profile, Career entries, approved claims with typed
-  selection fields, LaTeX templates with typed rules and writing instructions. Each application freezes the exact context its CV,
+  selection fields, LaTeX templates with guidance and typed limits. Each application freezes the exact context its CV,
   cover letter and form answers were written from. A CV or letter revision is its
   `.tex` source and the PDF built from it; Openings reads its text from the source
   for review, search and comparison between revisions, without running TeX.
@@ -47,13 +47,13 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   side with the open requirements; download both PDFs, apply on the employer's
   site and **Mark applied**. A later change to the documents clears the mark.
 - **Stay consistent:** applications built on older inputs are flagged after a
-  change to a part their documents use (Profile header and summary, confirmed
-  policy items, templates, Career), naming the part, and a PDF built from another
+  change to a part their documents use (Profile header and summary, facts and
+  writing rules in Preferences, templates, Career), naming the part, and a PDF built from another
   source than its revision's is refused.
 - **Track:** follow applications through Preparing, Ready, Applied, Interview,
   Offer and Closed as a list or a board. Record the employer's rejection,
   interview or offer with its date, and close the ones that never answered as
-  **No reply** after a period your Policy sets.
+  **No reply** after a period you set in Preferences.
 - **Learn:** **Insights** shows which applications get answers: response, interview
   and offer rates and the time to an answer by role family, seniority, source,
   location and month, withheld for samples too small to read.
@@ -72,7 +72,7 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
 Openings works best when your own AI agent runs it. The server ships
 [workflow skills](skills/) and serves them to any connected agent (`skills_list`,
 `skills_get` and one MCP prompt per skill). With them, an agent reviews new jobs
-against your policy, prepares a CV and letter for every shortlisted job, records
+against your Preferences, prepares a CV and letter for every shortlisted job, records
 employer requirements, tunes searches and keeps your Career record current. You
 answer its questions, apply to the prepared Drafts and mark them Applied.
 

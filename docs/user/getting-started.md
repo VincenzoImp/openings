@@ -27,13 +27,13 @@ did it:
    Settings, **Agent access**). Then tell your agent "Set up my Openings
    workspace." The step says whether the agent has called yet, and updates by
    itself.
-2. **Your record.** What the agent builds with you: the Profile, the Policy,
+2. **Your record.** What the agent builds with you: the Profile, Preferences,
    the first searches, Career entries, claims and templates, each done, in
    progress or not started, with the agent's open questions. You can fill in the
    first three yourself under their row: your name, headline, place and email;
    the facts employers ask about (such as a work authorization) and how many
-   days without an answer make an application unanswered (the "No reply" rule of
-   your Policy, 30 days until you set it); and a first saved search.
+   days without an answer make an application unanswered (the no-reply period
+   in Preferences, 30 days until you set it); and a first saved search.
 3. **First applications.** How every day works once the record is complete.
 
 **Skip for now** goes to Today. Until you finish or skip the guide, Today offers
@@ -41,14 +41,14 @@ to continue it; Settings, **Workspace**, **Open the setup guide** opens it at an
 time. The browser remembers whether you skipped it; nothing about the guide is
 stored in the workspace.
 
-![The setup guide: the record the agent builds, with the Profile and Policy basics](../images/setup.png)
+![The setup guide: the record the agent builds, with the Profile and Preferences basics](../images/setup.png)
 
 ## Finding your way
 
 The navigation has three groups. **Work** holds Today, Applications, Jobs (the
 tabs To review, Shortlist, Dismissed and All, each with the selected job beside
 the list; after you shortlist or dismiss a job in To review or the Shortlist, the
-next job of the list is shown) and Activity. **Library** holds Career, Policy and Templates. **System** holds
+next job of the list is shown) and Activity. **Library** holds Career, Preferences and Templates. **System** holds
 Collection and Settings. The numbers beside Applications and Activity count the
 applications ready to apply and the agent's open questions; the line at the bottom
 names the agent while one of its runs is open.
@@ -64,8 +64,8 @@ cards below answer three questions:
   away; the question stays open.
 - **What happened:** the pipeline (Preparing, Ready, Applied, Interview, Offer,
   each a link to its list), the agent's runs and collection **since your last
-  visit**, and the applications **waiting for a reply** longer than the period of
-  the "No reply" decision in your Policy (30 days when it has none), with
+  visit**, and the applications **waiting for a reply** longer than the no-reply period
+  set in Preferences (30 days unless you change it), with
   **Record replies** to open them and **Close N as no reply**.
 
 "Since your last visit" starts where your previous visit ended: a visit lasts
@@ -94,7 +94,7 @@ browser, and the theme follows the system until you choose one.
    optional reason.
 4. In **Collection**, add a saved search or company board, preview it, then enable
    its schedule. New sources start paused.
-5. Add [career entries and claims](career.md), templates and writing instructions.
+5. Add [career entries and claims](career.md), templates and writing rules.
    Follow [Application documents](applications.md) to prepare and review files.
 
 ![Jobs to review beside the selected job, with its signals, posting and timeline](../images/jobs.png)

@@ -1,9 +1,9 @@
 # Career entries and claims
 
-Career stores your profile, reusable entries and claims. A template and its writing
-instructions determine how those records appear in an application document. Your
-rules and preferences are not part of Career: they are items of the
-[Policy](policy.md).
+Career stores your profile, reusable entries and claims. A template and your
+writing rules determine how those records appear in an application document. Your
+rules and preferences are not part of Career: they live in
+[Preferences](preferences.md).
 
 An **entry** holds stable facts: type, title, optional organization, dates, skill
 tags and an optional detailed description. A **claim** belongs to one entry and
@@ -68,7 +68,7 @@ the first spelling and order. Tags do not infer proficiency or experience length
 
 You can also create Skill entries such as **Languages**, **Infrastructure** or
 **Communication**. A claim can contain a list, a single skill or an explanatory
-sentence. Choose the convention that suits your templates and instructions.
+sentence. Choose the convention that suits your templates and writing rules.
 
 ## API and agents
 
@@ -96,7 +96,7 @@ Prepared application contexts freeze the selected entries, claims, dates and
 ordering. Later edits affect future contexts. Review generated wording and files
 before recording a submission.
 
-Target roles and preferences are Decision items of the [Policy](policy.md).
+Target roles and what you rule out are statements in [Preferences](preferences.md).
 
 Import previews keep the pasted text while you review it. Leaving an unfinished
 import asks before discarding it. If a versioned editor reports a conflict, review

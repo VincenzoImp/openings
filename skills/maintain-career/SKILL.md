@@ -37,40 +37,33 @@ happened. Keep dates, contribution scope, maturity and source confidence, with
 provenance in metadata rather than dated appendices. Use import preview before
 an import, and inspect every created or changed record.
 
-## Policy
+## Preferences
 
-The owner's rules and facts live in the policy (`policy_get`), not in Profile
-metadata: `decision` (what to shortlist and dismiss), `eligibility` (facts
-employers ask about), `writing` (document rules with scope `cv`, `letter` or
-`all`) and `facts` (anything else the owner confirmed). Each section has its own
-version; every write sends the current version of the section it changes.
+The owner's preferences and facts live in Preferences (`preferences_get`), not
+in Profile metadata, in the owner's own words: `looking_for` (what the owner is
+looking for), `ruled_out` (what the owner rules out), `facts` (facts employers
+ask about), `writing` (writing rules with scope `cv`, `letter` or `all`) and
+`working_with_me` (instructions you follow). Each section has its own version.
 
-- Add a rule or fact the owner stated with `policy_add`: a short label, the
-  statement in the owner's words, a typed value when there is one (a number, a
-  date, a list). Your item is a proposal until the owner confirms it in the
-  dashboard under **Policy**; an agent token cannot call `policy_confirm`. Say
-  in the report which items wait, and ask with `questions_ask` when a decision
-  depends on one.
-- After the upgrades to 0.19 and 0.23 the `facts` section holds the old
-  Profile metadata, one unconfirmed item per key (`origin.source:
-  "profile_metadata"`), and `decision` holds the old Profile preferences and
-  target roles text (`origin.source` `profile_preferences` or `profile_roles`,
-  or `profile_preferences_removed` or `profile_roles_removed` for a text 0.23
-  copied when it removed the fields). Sort them with the owner: split a block
-  into single statements (`policy_add`), move an item to its section
-  (`policy_move`), give it a label and a typed value (`policy_update`), and
-  remove what is obsolete (`policy_remove`). The Profile metadata keeps its
-  copy until the owner removes it; do not delete it for them.
-- Changing the content of a confirmed item makes it a proposal again. Change
-  wording only when the owner asked for it or the fact changed.
-- A decision item may carry a `rule` on a collection signal. Propose it with
-  `enabled` left false: only the owner enables a rule, and no rule is applied
-  at collection yet.
+- Record a preference or fact the owner stated with `preferences_update`: read
+  the section, add the statement in the owner's words to its `items` and write
+  the whole list back with the section's version. Change or remove a statement
+  only when the owner asked for it or the fact changed.
+- After the upgrades to 0.19, 0.23 and 0.24, statements copied from the old
+  Profile metadata, preferences and target roles, the old general instructions
+  and template rule statements (suffixed "(from template <name>)") sit in the
+  sections; former proposals start with "(proposed by …, not confirmed)". Sort
+  them with the owner: split a block into single statements,
+  move a statement to its section (remove it from one, add it to the other) and
+  remove what is obsolete. The Profile metadata keeps its copy until the owner
+  removes it; do not delete it for them.
+- Nothing in Preferences acts automatically: no job is dismissed by a
+  statement. Apply them yourself when you review jobs and write documents.
 
 Keep the Profile for who the owner is: name, contact, headline, summary and
-links. Keep rules of one document layout in its template (`rules.statements`
-beside the typed limits). Remove a rule from one place when it is moved to the
-other.
+links. Writing rules have one home, the `writing` section of Preferences
+(scope `cv` or `letter` for one document); a template keeps its source, files,
+guidance and typed limits.
 
 ## Claim hygiene
 
@@ -93,13 +86,14 @@ assets together with the expected version.
 
 Existing Drafts keep their frozen contexts. After the change, list stale Drafts
 with `staleness_list` (REST `GET /staleness`); each report names the
-changed Profile part, policy item, guidance, template, entry or claim and the
-affected revisions. Only what documents use counts: Profile metadata,
-decision items, unconfirmed proposals, template names,
-entry and claim order, claim selection fields, free-form metadata and spacing
-never make a Draft stale, and a writing item scoped to the CV or the letter concerns that
-document only. Contexts prepared before 0.19 froze no policy, so policy changes
-are not compared for them (`comparison.policy: "not_frozen"`).
+changed Profile part, Preferences statement (of `facts` or `writing`, added
+or removed), template, entry or claim and the affected revisions. Only what
+documents use counts: Profile metadata, the other Preferences sections,
+template names, entry and claim order, claim selection fields, free-form
+metadata and spacing never make a Draft stale, and a writing rule scoped to the
+CV or the letter concerns that document only. Contexts prepared before 0.24
+froze no Preferences, so Preferences changes are not compared for them
+(`comparison.preferences: "not_frozen"`).
 Propagate the change to Drafts the owner has not yet submitted when it improves
 them: prepare a new context with the same deliberate selections, save new
 revisions linked with `previous_id`, check them like new work, keep earlier
