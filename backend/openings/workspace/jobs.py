@@ -32,7 +32,6 @@ class JobReads:
                 "location",
                 "url",
                 "triage",
-                "availability",
                 "metadata",
                 "content_version",
                 "version",

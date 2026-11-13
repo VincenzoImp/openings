@@ -126,7 +126,8 @@ def schema_eleven_workspace(path):
 
 
 def rows(conn, table):
-    added = SCHEMA_TWELVE_COLUMNS.get(table, ())
+    # Schema 14 dropped jobs.availability (kept in a note when it held a value).
+    added = (*SCHEMA_TWELVE_COLUMNS.get(table, ()), *(("availability",) if table == "jobs" else ()))
     names = [f'"{row[0]}"' for row in columns(conn, table) if row[0] not in added]
     without_rowid = "WITHOUT ROWID" in (
         conn.execute("SELECT sql FROM sqlite_master WHERE name=?", (table,)).fetchone()[0] or ""
@@ -146,7 +147,7 @@ def test_upgrade_keeps_every_row_and_fills_only_the_new_columns(tmp_path):
     workspace = Workspace(path)
     fresh = Database(tmp_path / "fresh.sqlite")
     with closing(sqlite3.connect(path)) as conn, closing(sqlite3.connect(fresh.path)) as reference:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 13
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 14
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert not conn.execute("PRAGMA foreign_key_check").fetchall()
         assert table_names(conn) == table_names(reference)

@@ -33,6 +33,7 @@ from openings.operations import remove_installation_credentials, restore_databas
 from openings.snapshots import payload_text, store_context
 from openings.workspace import Workspace
 from schema_fixtures import columns, index_names, make_schema_seven, table_names
+from timeline_fixtures import guided_application
 
 # The schema 8 list summary and input summary, as released.
 OLD_SUMMARY = (
@@ -98,7 +99,7 @@ def seed(path, *, entries=6, claims=4, applications=3, narrative=60, seed=3):
         ProfileUpdate(
             expected_version=career.get_profile()["version"],
             name="Alex Example",
-            roles="Backend engineer",
+            headline="Backend engineer",
             summary=words(rng, 80),
         )
     )
@@ -149,9 +150,7 @@ def seed(path, *, entries=6, claims=4, applications=3, narrative=60, seed=3):
                 "posting": words(rng, 80),
             }
         )
-        application_ids.append(
-            workspace.create_application({"job_id": job["id"], "note": f"Note {index} ✓"})["id"]
-        )
+        application_ids.append(guided_application(workspace, job["id"], f"Note {index} ✓")["id"])
     return workspace, knowledge, claim_ids, templates, application_ids
 
 
@@ -542,7 +541,7 @@ def test_context_files_keep_their_ids_through_rest_and_stay_immutable(tmp_path):
         assert content.content == before["file_bytes"][row["id"]]
         grant = client.post(f"/api/v1/files/{row['id']}/download").json()
         assert client.get(grant["url"], headers=grant["headers"]).content == content.content
-        assert client.delete(f"/api/v1/files/{row['id']}").status_code == 409
+        assert client.delete(f"/api/v1/files/{row['id']}?expected_version=1").status_code == 409
         refused = client.post(
             "/api/v1/files/uploads",
             json={"owner_type": "context", "owner_id": row["context_id"], "name": "x", "size": 1},

@@ -16,7 +16,7 @@ from openings.workspace import Workspace
 from outcome_fixtures import SCHEMA_ELEVEN_COLUMNS
 from schema_fixtures import SCHEMA_EIGHT_COLUMNS, columns, make_schema_seven
 from signal_fixtures import SCHEMA_TWELVE_COLUMNS
-from timeline_fixtures import older_rows
+from timeline_fixtures import guided_application, older_rows
 
 SCHEMA_SEVEN_COLUMNS = ("requirements", "deadline", "priority")
 
@@ -36,12 +36,11 @@ def seeded(path):
     job = workspace.ingest_job(
         {"title": "Synthetic platform engineer", "company": "Example", "posting": "Run APIs."}
     )
-    application = workspace.create_application(
-        {
-            "job_id": job["id"],
-            "note": "Synthetic guidance",
-            "questions": [{"id": "why", "label": "Why this role?"}],
-        }
+    application = guided_application(
+        workspace,
+        job["id"],
+        "Synthetic guidance",
+        questions=[{"id": "why", "label": "Why this role?"}],
     )
     application = workspace.update_application(
         application["id"],
@@ -87,7 +86,7 @@ def test_schema_six_upgrade_preserves_records_and_matches_a_new_workspace(tmp_pa
                 *SCHEMA_TWELVE_COLUMNS.get(table, ()),
             )
             assert older_rows(conn, table, added) == rows, table
-    assert current["note"] == current["pinned_note"]["body"] == "Synthetic guidance"
+    assert current["pinned_note"]["body"] == "Synthetic guidance"
     # The new fields are usable straight away.
     updated = upgraded.update_application(
         application["id"], {"expected_version": current["version"], "priority": 2}
@@ -119,7 +118,8 @@ def test_restore_upgrades_a_schema_six_backup_without_changing_it(tmp_path):
     restore_database(target, source)
     assert source.read_bytes() == original
     restored = target.get_application(application["id"])
-    assert restored["requirements"] == [] and restored["note"] == "Synthetic guidance"
+    assert restored["requirements"] == []
+    assert restored["pinned_note"]["body"] == "Synthetic guidance"
     with target.db.connect() as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
 
@@ -283,7 +283,7 @@ def test_applications_filter_by_the_time_they_were_applied(tmp_path):
         created = workspace.create_application({"job_id": job["id"]})
         fields = {"status": "applied", "applied_at": when} if when else {}
         return workspace.update_application(
-            created["id"], {"expected_version": created["version"], "note": title, **fields}
+            created["id"], {"expected_version": created["version"], **fields}
         )["id"]
 
     old = applied("Old", "2026-09-01T09:00:00Z")

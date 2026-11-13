@@ -170,7 +170,6 @@ OPERATIONS = (
         params=(Param("value", TokenInput),),
         call=lambda s, value: s.create_token(value.name, value.kind, value.idempotency_key),
         rest=(Route("POST", "/tokens", "token"),),
-        aliases=("token_create",),
         tool=Tool(
             WRITE,
             "Create a named API/MCP token of kind owner (full access, the default) or agent (scoped). Save its secret; it is returned only once. Owner only: an agent token is refused with forbidden.",
@@ -186,7 +185,6 @@ OPERATIONS = (
         params=(Param("token_id", str),),
         call=lambda s, token_id: s.revoke_token(token_id),
         rest=(Route("DELETE", "/tokens/{token_id}", "revoke"),),
-        aliases=("token_revoke",),
         tool=Tool(
             REMOVE,
             "Revoke an API/MCP token, including the current token if selected. Owner only: an agent token is refused with forbidden.",
@@ -214,7 +212,6 @@ OPERATIONS = (
         access="owner",
         call=restore_grant,
         rest=(Route("POST", "/backup/restore", "restore", custom=True),),
-        aliases=("workspace_restore_upload",),
         tool=Tool(
             REMOVE,
             "Reserve a scoped raw SQLite upload that replaces workspace data; installation authentication stays unchanged. Owner only: an agent token is refused with forbidden.",

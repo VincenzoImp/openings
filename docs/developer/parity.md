@@ -16,8 +16,7 @@ How to read the evidence:
   by the test helper are excluded). An operation with neither has no working
   dashboard path.
 - **Editor** is `raw JSON` when a free-form JSON input is edited as JSON text.
-- **MCP** names the tool; the inventory also lists its deprecated aliases, which
-  are removed in 0.23.
+- **MCP** names the tool, `<resource>_<verb>`.
 - Input comparisons use names from OpenAPI and the MCP tool schemas. A name the
   dashboard files never mention cannot be set there; a mentioned name may still
   lack a control, so those lists are lower bounds.
@@ -34,7 +33,7 @@ How to read the evidence:
 | Owner only (refused for an agent token) | 9 |
 | Without a working dashboard path | 7 |
 | Reached only through another operation | 7 |
-| With inputs the dashboard never mentions | 29 |
+| With inputs the dashboard never mentions | 28 |
 | With free-form JSON edited as raw JSON | 0 |
 | With different REST and MCP input names | 1 |
 | With a dashboard path exercised by e2e | 111 |
@@ -81,7 +80,6 @@ operation. They can be set over REST or MCP only.
 |---|---|---|
 | `jobs.list` | `created_until`, `job_type`, `posting_language`, `posting_language_not`, `remote`, `requires` | Jobs filters by tab (queue), search, signal, text completeness, who dismissed and rule, and the All tab by company, place, source, work style and added from; `posting_language`, `posting_language_not`, `requires`, `job_type`, `remote` and `created_until` also serve agents and scripts. |
 | `jobs.create` | `idempotency_key`, `metadata`, `raw`, `source_id`, `source_key` | Add a job sends the address, role, company, location and pasted text; other details are corrected afterwards as keys and values (`jobs.update`). `raw`, `source_key` and `source_id` are collector fields for scripted imports. |
-| `jobs.update` | `availability` | Correct the job edits role, company, place, address, text and the other details as keys and values. `availability` is deprecated since 0.21: whether the source still lists the posting is the no_longer_listed signal. |
 | `jobs.resolve` | `source_key` | Add a job looks the address up when it is typed and offers to open the job already in the workspace; `source_key` serves collectors and scripts. |
 | `jobs.duplicates` | `match_location`, `offset`, `queue` | A job's Possible copies lists its group at the default confidence; `queue`, `match_location` and `offset` page the workspace-wide list for agents and scripts. |
 | `notes.create` | `idempotency_key` | — |
@@ -221,7 +219,7 @@ missing from the inventory.
 | Operation | REST | MCP | Access | Dashboard location | Dashboard code | Editor | E2E |
 |---|---|---|---|---|---|---|---|
 | `profile.read`<br>Read profile, links, metadata and version | `GET /career/profile` | `profile_get` | any | Career: profile | pages/career/ProfileCard.tsx | structured | 9 |
-| `profile.update`<br>Edit profile/preferences/contact | `PATCH /career/profile` | `profile_update` | any | Career: profile and Other details | pages/career/ProfileCard.tsx | structured | 1 |
+| `profile.update`<br>Edit profile/contact | `PATCH /career/profile` | `profile_update` | any | Career: profile and Other details | pages/career/ProfileCard.tsx | structured | 1 |
 | `knowledge.list`<br>Search/filter paginated career entries summaries | `GET /career/knowledge` | `knowledge_list` | any | Career: career entries: list/search | pages/Career.tsx<br>pages/activity/RequestForm.tsx<br>pages/review/ContextDialog.tsx | structured | 10 |
 | `knowledge.read`<br>Read full career entries | `GET /career/knowledge/{knowledge_id}` | `knowledge_get` | any | Career: career entries: detail | pages/career/EntryEditor.tsx | structured | 8 |
 | `knowledge.create`<br>Create career entries | `POST /career/knowledge` | `knowledge_create` | any | Career: career entries: add | pages/career/EntryEditor.tsx | structured | 1 |

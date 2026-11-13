@@ -90,7 +90,7 @@ def test_complete_entry_workflow_headers_order_and_frozen_context(tmp_path, tran
                 response = client.request(
                     method,
                     "/api/v1" + path,
-                    params=arguments if method == "GET" else None,
+                    params=arguments.get("value", arguments) if method == "GET" else None,
                     json=arguments.get("value") if method != "GET" else None,
                 )
                 response.raise_for_status()
@@ -136,7 +136,7 @@ def test_complete_entry_workflow_headers_order_and_frozen_context(tmp_path, tran
         )
         assert first["narrative"] == "" and first["position"] == 0 and first["skills"] == ["Python"]
         summary = call(
-            "knowledge_list", "GET", "/career/knowledge", {"q": "Cloud", "summary": True}
+            "knowledge_list", "GET", "/career/knowledge", {"value": {"q": "Cloud", "summary": True}}
         )
         assert summary["total"] == 1
         row = summary["items"][0]
@@ -177,9 +177,9 @@ def test_complete_entry_workflow_headers_order_and_frozen_context(tmp_path, tran
                 "value": {"expected_version": c1["version"], "position": 5},
             },
         )
-        rows = call("claims_list", "GET", "/career/claims", {"q": "Cloud", "summary": True})[
-            "items"
-        ]
+        rows = call(
+            "claims_list", "GET", "/career/claims", {"value": {"q": "Cloud", "summary": True}}
+        )["items"]
         assert [row["id"] for row in rows] == [c2["id"], c1["id"]]
         assert rows[0]["knowledge_organization"] == "Example Cloud"
 

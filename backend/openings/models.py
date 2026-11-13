@@ -60,11 +60,6 @@ class JobPatch(Versioned):
     url: str | None = Field(default=None, max_length=4000)
     posting: str | None = Field(default=None, max_length=200_000)
     metadata: dict[str, Any] | None = None
-    availability: Literal["open", "closed", "unknown"] | None = Field(
-        default=None,
-        description="Deprecated since 0.21: a manual note that nothing reads. Whether the source still lists the posting is signals.no_longer_listed.",
-        deprecated=True,
-    )
 
     @field_validator("url")
     @classmethod
@@ -121,14 +116,6 @@ class NotePin(Versioned):
         default=True,
         description="True pins the note (unpinning the note pinned in the same scope); false unpins it.",
     )
-
-
-# Deprecated application note: the text of the application's pinned note.
-DEPRECATED_NOTE = (
-    "Deprecated since 0.22, removed in 0.23: the application's pinned note "
-    "(pinned_note). Writing it edits that note, creates it pinned when there is none, "
-    "or unpins it when empty. Use notes_create with pinned=true, notes_update and notes_pin."
-)
 
 
 class Question(Input):
@@ -209,7 +196,6 @@ OUTCOMES = ("accepted", "rejected", "not_pursued", "no_response")
 
 class ApplicationInput(Input):
     job_id: str
-    note: str = Field(default="", max_length=30_000, description=DEPRECATED_NOTE, deprecated=True)
     questions: list[Question] = Field(default_factory=list, max_length=100)
     priority: Priority | None = None
     deadline: str | None = Field(default=None, description="Closing date as YYYY-MM-DD.")
@@ -227,9 +213,6 @@ class ApplicationPatch(Versioned):
     outcome: Outcome | None = Field(
         default=None,
         description="Required to close: accepted, rejected (by the employer), not_pursued (stopped by the owner) or no_response (no answer within the no-reply period; only for a sent application).",
-    )
-    note: str | None = Field(
-        default=None, max_length=30_000, description=DEPRECATED_NOTE, deprecated=True
     )
     questions: list[Question] | None = Field(default=None, max_length=100)
     answers: dict[str, Any] | None = None
@@ -274,15 +257,8 @@ class ApplicationPatch(Versioned):
 
     @model_validator(mode="after")
     def reject_null_fields(self):
-        for key in self.model_fields_set & {
-            "status",
-            "note",
-            "questions",
-            "answers",
-            "requirements",
-        }:
-            # __dict__, not getattr: reading the deprecated note warns.
-            if self.__dict__[key] is None:
+        for key in self.model_fields_set & {"status", "questions", "answers", "requirements"}:
+            if getattr(self, key) is None:
                 raise ValueError(f"{key} cannot be null; omit it to keep the existing value.")
         return self
 

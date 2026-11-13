@@ -5,6 +5,7 @@ import sqlite3
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from openings.activity import ActivityService
 from openings.actors import OWNER, SYSTEM, acting_as, token_actor
@@ -13,6 +14,7 @@ from openings.career import CareerService, TemplateCreate
 from openings.documents import ContextCreate, DocumentService
 from openings.errors import DomainError
 from openings.workspace import Workspace
+from timeline_fixtures import guided_application
 
 AGENT = token_actor("agent-token", "Synthetic agent", "agent")
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
@@ -31,9 +33,7 @@ def seeded(workspace):
             older["id"],
             {"expected_version": older["version"], "status": "closed", "outcome": "not_pursued"},
         )
-        current = workspace.create_application(
-            {"job_id": first_job["id"], "note": "Lead with the platform work."}
-        )
+        current = guided_application(workspace, first_job["id"], "Lead with the platform work.")
         on_job = workspace.add_note(first_job["id"], {"body": "Recruiter is Synthetic Person."})
         on_older = workspace.add_note(
             first_job["id"], {"body": "Not this time.", "application_id": older["id"]}
@@ -218,44 +218,28 @@ def test_one_pinned_note_per_scope_and_pinning_is_recorded(tmp_path):
         conn.execute("UPDATE notes SET pinned_at='2026-01-01' WHERE id=?", (second["id"],))
 
 
-def test_the_deprecated_application_note_is_the_pinned_note(tmp_path):
+def test_the_application_note_field_is_gone_and_the_pinned_note_holds_guidance(tmp_path):
+    """0.23 removed the application ``note`` field; the pinned note is the one place."""
     workspace = Workspace(tmp_path / "timeline.sqlite")
     target = job(workspace)
+    with pytest.raises(ValidationError):
+        workspace.create_application({"job_id": target["id"], "note": "Removed field"})
     text = "Ünïcode ✓\r\nTrailing space  \n\n"
-    application = workspace.create_application({"job_id": target["id"], "note": text})
-    assert application["note"] == text
+    application = guided_application(workspace, target["id"], text)
+    assert "note" not in application
     pinned = application["pinned_note"]
     assert (pinned["body"], pinned["scope"], pinned["pinned"]) == (text, "application", True)
-    version = application["version"]
-    # Editing the field edits the note, not the application.
-    edited = workspace.update_application(
-        application["id"], {"expected_version": version, "note": "Revised guidance"}
-    )
-    assert edited["note"] == "Revised guidance" and edited["version"] == version
-    assert workspace.get_note(pinned["id"])["version"] == 2
-    # The same text is no change.
-    workspace.update_application(
-        application["id"], {"expected_version": version, "note": "Revised guidance"}
-    )
-    assert workspace.get_note(pinned["id"])["version"] == 2
+    with pytest.raises(ValidationError):
+        workspace.update_application(
+            application["id"], {"expected_version": application["version"], "note": "x"}
+        )
+    assert workspace.get_note(pinned["id"])["version"] == 1
     # Searching applications finds the pinned note's text.
+    workspace.update_note(pinned["id"], {"expected_version": 1, "body": "Revised guidance"})
     assert workspace.list_applications(q="Revised guid")["total"] == 1
-    # Empty unpins it and keeps the note.
-    cleared = workspace.update_application(
-        application["id"], {"expected_version": version, "note": ""}
-    )
-    assert (cleared["note"], cleared["pinned_note"]) == ("", None)
-    assert workspace.get_note(pinned["id"])["body"] == "Revised guidance"
+    workspace.pin_note(pinned["id"], {"expected_version": 2, "pinned": False})
+    assert workspace.get_application(application["id"])["pinned_note"] is None
     assert workspace.list_applications(q="Revised guid")["total"] == 0
-    # Writing again starts a new pinned note.
-    again = workspace.update_application(
-        application["id"], {"expected_version": version, "note": "New guidance"}
-    )
-    assert again["pinned_note"]["id"] != pinned["id"]
-    # A stale version is refused before anything is written.
-    with pytest.raises(DomainError):
-        workspace.update_application(application["id"], {"expected_version": 99, "note": "x"})
-    assert workspace.get_application(application["id"])["note"] == "New guidance"
 
 
 def test_new_contexts_freeze_the_pinned_note(tmp_path):

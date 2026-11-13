@@ -16,8 +16,6 @@ const blank: Profile = {
   location: "",
   email: "",
   phone: "",
-  roles: "",
-  preferences: "",
   summary: "",
   links: [],
   metadata: {},
@@ -68,8 +66,6 @@ function ProfileForm({ profile }: { profile: Profile }) {
           email: text("email"),
           phone: text("phone"),
           summary: text("summary"),
-          roles: text("roles"),
-          preferences: text("preferences"),
           links: links.filter((link) => link.url.trim()),
           metadata: details.value,
         }),
@@ -178,34 +174,9 @@ function ProfileForm({ profile }: { profile: Profile }) {
           </div>
         </fieldset>
         <p className="caption wide">
-          Decision rules, eligibility and writing rules are not here any more:
-          they are items in your <a href="#policy">Policy</a>.
+          Target roles, preferences, decision rules, eligibility and writing
+          rules are items in your <a href="#policy">Policy</a>.
         </p>
-        <details className="wide">
-          <summary>
-            Target roles and preferences, kept from earlier versions
-          </summary>
-          <div className="form-grid sub-fields">
-            <Field
-              label="Target roles"
-              hint="Being replaced by Decision items in the Policy."
-              className="wide"
-            >
-              <input name="roles" defaultValue={profile.roles} />
-            </Field>
-            <Field
-              label="Preferences"
-              hint="Being replaced by Decision items in the Policy."
-              className="wide"
-            >
-              <textarea
-                name="preferences"
-                rows={3}
-                defaultValue={profile.preferences}
-              />
-            </Field>
-          </div>
-        </details>
         <fieldset className="field wide">
           <legend>Other details</legend>
           <p className="caption">

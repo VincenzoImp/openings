@@ -3,6 +3,7 @@
 import sqlite3
 from contextlib import closing
 
+from compat_fixtures import undo_compat
 from document_fixtures import undo_documents
 from openings.db import APPLICATIONS
 
@@ -86,6 +87,8 @@ def older_rows(conn, table, added=()):
     skipped = set(added) | set(SCHEMA_THIRTEEN_NOTE_COLUMNS if table == "notes" else ())
     if table == "applications":
         skipped.add("note")
+    if table == "jobs":
+        skipped.add("availability")  # dropped by schema 14, kept in a note
     names = ",".join(f'"{name}"' for name in present if name not in skipped)
     copied = " WHERE origin<>'upgrade'" if table == "notes" and "origin" in present else ""
     return conn.execute(f"SELECT {names} FROM {table}{copied} ORDER BY 1").fetchall()
@@ -98,6 +101,7 @@ def make_schema_twelve(path, content=None):
     stored in schema 12 (see ``document_fixtures.undo_documents``).
     """
     with closing(sqlite3.connect(path)) as conn:
+        undo_compat(conn)  # first undo schema 14
         undo_documents(conn, content)
         undo_timeline(conn)
         conn.execute("PRAGMA user_version=12")
@@ -105,3 +109,13 @@ def make_schema_twelve(path, content=None):
         assert not conn.execute("PRAGMA foreign_key_check").fetchall()
         # Keep the whole database in the one file, as a downloaded backup is.
         conn.execute("PRAGMA journal_mode=DELETE")
+
+
+def guided_application(workspace, job_id, text, **fields):
+    """Start an application whose standing guidance is its pinned note.
+
+    Before 0.23 the deprecated ``note`` field of a create did the same.
+    """
+    application = workspace.create_application({"job_id": job_id, **fields})
+    workspace.add_note(job_id, {"body": text, "application_id": application["id"], "pinned": True})
+    return workspace.get_application(application["id"])

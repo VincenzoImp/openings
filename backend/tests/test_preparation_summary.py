@@ -46,7 +46,7 @@ def test_preparation_uses_current_revision_files_and_review(tmp_path):
         )
         assert current() == [{"kind": "resume", "revisions": 1, "pdf": 0, "approved": 0}]
         assert workspace.get_application(application["id"])["status"] == "draft"
-        documents.delete_document(second["id"])
+        documents.delete_document(second["id"], second["version"])
         assert current()[0]["approved"] == 1
 
 

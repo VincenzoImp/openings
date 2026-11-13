@@ -281,7 +281,6 @@ def build():
             rest_names |= names
             in_path |= parameters
             free |= loose
-        # The tool's own inputs; the names after it are deprecated aliases (#167).
         mcp_names = mcp_inputs(tools[entry["mcp"][0]]) if entry["mcp"] else set()
         rows.append(
             {
@@ -327,8 +326,7 @@ def build():
         "  by the test helper are excluded). An operation with neither has no working",
         "  dashboard path.",
         "- **Editor** is `raw JSON` when a free-form JSON input is edited as JSON text.",
-        "- **MCP** names the tool; the inventory also lists its deprecated aliases, which",
-        "  are removed in 0.23.",
+        "- **MCP** names the tool, `<resource>_<verb>`.",
         "- Input comparisons use names from OpenAPI and the MCP tool schemas. A name the",
         "  dashboard files never mention cannot be set there; a mentioned name may still",
         "  lack a control, so those lists are lower bounds.",

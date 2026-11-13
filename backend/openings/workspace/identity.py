@@ -116,7 +116,6 @@ class JobIdentity:
                     "url",
                     "source",
                     "triage",
-                    "availability",
                     "complete",
                     "version",
                     "created_at",
