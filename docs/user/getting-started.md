@@ -14,6 +14,35 @@ Images support Linux amd64 and arm64. Docker Compose pins the release; the host
 needs no Python, Node or TeX installation. [Contributing](../../CONTRIBUTING.md)
 covers local builds.
 
+## Set up your workspace
+
+Open `http://127.0.0.1:8080` and choose an owner password of at least 10
+characters (or set `OPENINGS_PASSWORD` in `.env` before the first start). A new
+workspace opens on the **setup guide** instead of Today. It has three steps, and
+every state in it is read from the workspace, so it shows what is done whoever
+did it:
+
+1. **Connect your agent.** Create an agent token, copy it once, and add the
+   configuration for Claude Code, Codex or another MCP client (the same as
+   Settings, **Agent access**). Then tell your agent "Set up my Openings
+   workspace." The step says whether the agent has called yet, and updates by
+   itself.
+2. **Your record.** What the agent builds with you: the Profile, the Policy,
+   the first searches, Career entries, claims and templates, each done, in
+   progress or not started, with the agent's open questions. You can fill in the
+   first three yourself under their row: your name, headline, place and email;
+   the facts employers ask about (such as a work authorization) and how many
+   days without an answer make an application unanswered (the "No reply" rule of
+   your Policy, 30 days until you set it); and a first saved search.
+3. **First applications.** How every day works once the record is complete.
+
+**Skip for now** goes to Today. Until you finish or skip the guide, Today offers
+to continue it; Settings, **Workspace**, **Open the setup guide** opens it at any
+time. The browser remembers whether you skipped it; nothing about the guide is
+stored in the workspace.
+
+![The setup guide: the record the agent builds, with the Profile and Policy basics](../images/setup.png)
+
 ## Finding your way
 
 The navigation has three groups. **Work** holds Today, Applications, Jobs (the
@@ -52,8 +81,7 @@ browser, and the theme follows the system until you choose one.
 
 ## Your first job
 
-1. Open `http://127.0.0.1:8080` and choose an owner password of at least 10 characters.
-   For unattended setup, set `OPENINGS_PASSWORD` in `.env` before the first start.
+1. Sign in at `http://127.0.0.1:8080` (see above for the first start).
 2. In **Jobs** (it opens on **To review**), choose **Add a job**. Paste a URL
    or enter the title, company and full posting. The address is looked up first:
    a job already in your workspace is shown instead of a copy. If URL extraction

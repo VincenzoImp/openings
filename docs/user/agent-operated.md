@@ -37,7 +37,7 @@ An agent with shell access can do most of this for you with
 password and create the API token yourself.
 
 1. [Install Openings](getting-started.md) and create an **Agent** token in
-   Settings. An agent token runs the whole search but cannot change your
+   the setup guide a new workspace opens on, or in Settings. An agent token runs the whole search but cannot change your
    password, manage tokens, restore a backup or answer its own questions
    (see [token kinds](agents.md#token-kinds)).
 2. Give your agent the skills. A connected agent gets them from the server

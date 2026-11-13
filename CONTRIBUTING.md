@@ -93,14 +93,12 @@ checks:
 
 - **Size.** `npm --prefix frontend run budget` reads the build and fails when the
   first screen's compressed JavaScript exceeds 110 kB, a later screen adds more
-  than 40 kB, or the stylesheets exceed 15 kB. A page that cannot meet its budget
-  yet gets a named, temporary allowance in `frontend/scripts/budget.mjs` with the
-  stage that removes it; never raise a budget.
+  than 40 kB, or the stylesheets exceed 15 kB. Never raise a budget: load the
+  code later or make it smaller.
 - **Accessibility.** `frontend/tests/accessibility.spec.ts` runs axe on every
   screen in both themes at both widths: no serious or critical finding against
-  WCAG 2.2 AA. Add a new screen or tab to its list. Fix a finding in the shell or
-  a component; a finding inside a page that a later stage rebuilds may be listed
-  as an exclusion for that rule and that part of the page, with its stage.
+  WCAG 2.2 AA. Add a new screen or tab to its list, and fix a finding where it
+  is; there are no exclusions.
 - **Contrast.** `frontend/tests/contrast.test.mjs` computes the contrast of every
   token pair in the design document's colour table from
   `frontend/src/design/tokens.css`. Change a colour in both places.
@@ -111,8 +109,9 @@ checks:
   run's report, `frontend/tests/applications.spec.ts` goes from Today's
   Review to Mark applied and records an employer response the same way,
   `frontend/tests/system.spec.ts` moves through the Collection tabs and switches
-  scheduled collection, revokes tokens, and `frontend/tests/skills.spec.ts`
-  opens a skill and saves its local notes.
+  scheduled collection, revokes tokens, `frontend/tests/skills.spec.ts`
+  opens a skill and saves its local notes, and `frontend/tests/setup.spec.ts`
+  moves through the steps of the setup guide.
 
 The browser tests run on the synthetic workspace of
 `backend/tests/dashboard_server.py` and `backend/tests/today_fixtures.py`. The
@@ -138,25 +137,50 @@ regenerate it; `pytest` fails while it is out of date:
 uv run python scripts/inventory.py
 ```
 
-### Parity matrix
+### Parity
 
-[docs/developer/parity.md](docs/developer/parity.md) is generated from the operation
-inventory, the REST/MCP contract, the dashboard source and browser evidence. After
-changing an operation, a route, a tool or the dashboard's REST calls, regenerate it;
-`pytest` fails while it is out of date:
+The rule: every operation exists on REST and MCP alike, and the dashboard offers
+it through a path that a browser test really uses. CI fails a pull request that
+breaks it:
+
+- `uv run pytest` runs `scripts/parity_matrix.py --check`
+  (`backend/tests/test_interfaces.py`) and `backend/tests/test_parity_gate.py`.
+  They fail when [the matrix](docs/developer/parity.md) is out of date, when an
+  operation lacks REST or MCP, when a dashboard path has no browser test in the
+  recorded evidence (`docs/developer/parity-e2e.json`), when a REST input has no
+  dashboard control or a name differs between REST and MCP, or when the
+  dashboard source names an `/api/v1` route outside the inventory.
+- The browser tests in CI run with `OPENINGS_PARITY_EVIDENCE` set: the fixture
+  in `frontend/tests/fixtures.ts` writes, per test, the REST requests the
+  dashboard itself sent (Chromium desktop; the helpers' setup requests are left
+  out). The next step, `scripts/parity_matrix.py --gate <directory>`, fails when
+  an operation has no dashboard path in that run, or when the dashboard called a
+  route outside the inventory. Every spec imports `test` from `./fixtures`.
+
+A difference can be documented instead of closed only with a reason, in
+`docs/developer/parity-notes.json`: `exempt` for an operation only an API token
+performs (an agent's run, its questions, taking a request), `via` with a `note`
+for one the dashboard reaches through another operation, `inputs` for a REST input
+that serves agents and scripts (top-level `inputs` applies to every operation),
+`interfaces` for an input on one interface only, and `answered_by_test` when a
+browser test gives the server's answer itself because the real one would disturb
+the other tests. A reason that no longer applies fails the check, so the notes
+stay true.
+
+After changing an operation, a route, a tool or the dashboard's REST calls,
+regenerate the matrix:
 
 ```bash
 uv run python scripts/parity_matrix.py
 ```
 
-After changing the browser tests, re-record which operations the dashboard really
-called (needs the built dashboard and Playwright Chromium):
+After changing the browser tests or the dashboard's requests, re-record which
+operations the dashboard really called (needs the built dashboard and Playwright
+Chromium; about three minutes) and commit the evidence with the change:
 
 ```bash
 uv run python scripts/parity_matrix.py --e2e
 ```
-
-Remarks that code cannot derive live in `docs/developer/parity-notes.json`.
 
 ### Documentation screenshots
 
