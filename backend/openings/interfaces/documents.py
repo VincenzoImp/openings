@@ -248,11 +248,6 @@ EXEMPTIONS = (
     Exemption(
         "binary.transfers",
         "Logical file actions are equivalent across interfaces; raw HTTP bytes use scoped grants rather than base64 MCP payloads. Backup/export use their own scoped operational grants.",
-        rest=(
-            Route("PUT", "/transfers", "upload", custom=True),
-            Route("GET", "/transfers", "download", custom=True),
-        ),
-        tools=("files_reserve_upload", "files_reserve_download"),
     ),
 )
 SURFACES = (Surface("resource", "openings://contexts/{context_id}"),)
