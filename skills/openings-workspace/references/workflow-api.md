@@ -76,6 +76,22 @@ mechanics, not personal selection or writing policy.
   Missing output or a failed check remains incomplete; do not delete the attempt
   or dismiss the job to conceal a preparation failure.
 
+## Employer responses
+
+- `responses_add(application_id, value)` / `POST /applications/{id}/responses`
+  records an owner-reported answer (`kind`, `date`, `note`,
+  `idempotency_key`) without moving the stage. `responses_update` /
+  `PATCH /responses/{id}` and `responses_remove` / `DELETE /responses/{id}` take
+  the response's `expected_version`; `responses_list` /
+  `GET /applications/{id}/responses` reads them.
+- `application_update` moving a sent application to Interview or Offer, or
+  closing it as `rejected`, records the response itself (`response_date`,
+  `response_note`); `outcome: "no_response"` with `concluded_on` closes a sent
+  application that never got an answer.
+- `applications_list(value: {no_reply_due: true})` /
+  `GET /applications?no_reply_due=true` lists the Applied applications past the
+  no-reply period; `insights_get` / `GET /insights` reads the rates.
+
 ## Runs and questions
 
 - `runs_start(value)` / `POST /runs` takes `workflow`, `scope`, optional

@@ -146,8 +146,12 @@ application's current `expected_version`. Openings refuses with
 instead of retrying. The server checks files, review states and blocking
 requirements only: your content, layout and consistency checks come first.
 Ready is a stored step, not a stage. The application stays Draft; job interest
-stays saved. The owner finds it under **Ready to apply**, submits on the company
-site and records Applied. Openings clears the mark when a revision, context, file
+stays saved. The owner finds it under **Ready to apply** on Today and opens its
+review page (`#review?application=APPLICATION_ID` in the dashboard): the posting,
+CV and letter side by side, the requirements still open and the form questions
+without an answer. From there the owner downloads both PDFs, submits on the
+company site and chooses **Mark applied**. Point the owner to that page when you
+report a ready Draft. Openings clears the mark when a revision, context, file
 or blocking requirement changes afterwards; after such rework, repeat the checks
 and mark it ready again. Do not mark a Draft ready while a question about it is
 open or its inputs are stale in a way that matters.
