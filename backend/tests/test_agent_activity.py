@@ -37,6 +37,7 @@ from schema_fixtures import (
     table_names,
 )
 from signal_fixtures import SCHEMA_TWELVE_COLUMNS
+from timeline_fixtures import older_rows
 
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 AGENT = token_actor("token-agent", "Synthetic agent")
@@ -678,10 +679,7 @@ def test_schema_seven_upgrade_preserves_rows_and_matches_a_new_workspace(tmp_pat
         assert conn.execute("PRAGMA user_version").fetchone()[0] == 7
         assert not {"runs", "questions"} & table_names(conn)
         assert "actor_kind" not in {row[0] for row in columns(conn, "events")}
-        before = {
-            table: conn.execute(f"SELECT * FROM {table} ORDER BY 1").fetchall()
-            for table in preserved
-        }
+        before = {table: older_rows(conn, table) for table in preserved}
     assert len(before["events"]) >= 4
 
     upgraded = Workspace(path)
@@ -702,10 +700,11 @@ def test_schema_seven_upgrade_preserves_rows_and_matches_a_new_workspace(tmp_pat
                 + SCHEMA_ELEVEN_COLUMNS.get(table, ())
                 + SCHEMA_TWELVE_COLUMNS.get(table, ())
             )
-            names = [row[0] for row in columns(conn, table) if row[0] not in added]
-            assert (
-                conn.execute(f"SELECT {','.join(names)} FROM {table} ORDER BY 1").fetchall() == rows
-            )
+            assert older_rows(conn, table, added) == rows, table
+    # The application note is its pinned note, by an unknown author before 0.17.
+    pinned = upgraded.get_application(application["id"])["pinned_note"]
+    assert (pinned["body"], pinned["origin"]) == ("Synthetic guidance", "upgrade")
+    assert pinned["author"]["label"] == UNKNOWN_LABEL
     # Earlier changes have no recorded actor and say so; they are never guessed.
     history = upgraded.application_events(application["id"])["items"]
     assert len(history) == 2

@@ -472,6 +472,10 @@ class JobIdentity:
             )
             c.execute("DELETE FROM job_identities WHERE job_id=?", (source_id,))
             c.execute("UPDATE posting_details SET job_id=? WHERE job_id=?", (target_id, source_id))
+            # One pinned note per job: the kept job's pin stays, the merged one's is unpinned.
+            kept = self._pinned_row(c, target_id, None)
+            if kept is not None:
+                self._unpin_scope(c, source_id, None, kept["id"])
             for table in (
                 "postings",
                 "applications",

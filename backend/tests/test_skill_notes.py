@@ -227,7 +227,7 @@ def test_a_schema_eleven_workspace_gains_the_table(tmp_path):
     Workspace(path)
     fresh = Database(tmp_path / "fresh.sqlite")
     with closing(sqlite3.connect(path)) as conn, closing(sqlite3.connect(fresh.path)) as reference:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 12
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 13
         assert table_names(conn) == table_names(reference)
         sql = "SELECT sql FROM sqlite_master WHERE name='skill_notes'"
         assert conn.execute(sql).fetchone() == reference.execute(sql).fetchone()
@@ -237,7 +237,7 @@ def test_a_schema_eleven_workspace_gains_the_table(tmp_path):
     schema_eleven(stepped)
     with closing(sqlite3.connect(stepped)) as conn:
         upgrade(conn)
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 12
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         assert "skill_notes" in table_names(conn)
 
     source = tmp_path / "backup11.sqlite"
