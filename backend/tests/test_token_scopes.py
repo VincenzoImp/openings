@@ -8,7 +8,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openings.actors import OWNER, acting_as, current_actor, token_actor
-from openings.app import create_app
 from openings.errors import DomainError
 
 PASSWORD = "synthetic-password"

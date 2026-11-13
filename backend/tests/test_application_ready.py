@@ -9,7 +9,6 @@ from fastapi.testclient import TestClient
 from document_fixtures import PDF, attach, source_revision
 from openings.activity import ActivityService
 from openings.actors import OWNER, acting_as, token_actor
-from openings.app import create_app
 from openings.career import TemplateCreate
 from openings.documents import ContextCreate, DocumentCreate, ReviewUpdate, UploadReservation
 from openings.errors import DomainError
