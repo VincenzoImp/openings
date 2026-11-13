@@ -10,8 +10,9 @@ from pathlib import Path
 
 from .common import encode, now
 from .compaction import compact
-from .db import MIGRATIONS, SCHEMA_VERSION, apply_schema, upgrade
+from .db import SCHEMA_VERSION, schema_error, utc_stamp
 from .errors import DomainError
+from .migrations import CONVERSIONS, UpgradeError, m15
 from .retention import KEPT_RUNS_PER_SOURCE, retention_days
 
 # Slack for sidecar files and for an upgraded copy slightly larger than its upload.
@@ -149,28 +150,33 @@ def remove_installation_credentials(path):
 
 
 def restore_database(workspace, source_path):
-    with sqlite3.connect(source_path) as source:
+    with closing(sqlite3.connect(source_path)) as source:
         version = source.execute("PRAGMA user_version").fetchone()[0]
-    if version in MIGRATIONS:
-        # Upgrade a copy of an earlier supported backup; the uploaded file stays unchanged.
+    if version in CONVERSIONS:
+        # Convert a copy of a backup of the previous schema; the uploaded file is only
+        # read. The removed records go to an archive beside the database, as in an
+        # upgrade at startup.
         upgraded = workspace.db.temp_file("upgrade")
+        path = workspace.db.path
+        archive = path.with_name(f"{path.stem}.pre-{m15.RELEASE}-archive-restored-{utc_stamp()}.json")
         try:
-            with (
-                closing(sqlite3.connect(source_path)) as source,
-                closing(sqlite3.connect(upgraded)) as target,
-            ):
-                source.backup(target)
-                try:
-                    upgrade(target)
-                except sqlite3.Error as error:
-                    raise DomainError(
-                        422, "backup_integrity", "The backup could not be upgraded to this schema."
-                    ) from error
+            try:
+                CONVERSIONS[version](source_path, upgraded, archive)
+            except UpgradeError as error:
+                raise DomainError(
+                    422, "backup_integrity", "The backup could not be upgraded to this schema."
+                ) from error
             result = _restore_current(workspace, upgraded)
+        except BaseException:
+            archive.unlink(missing_ok=True)
+            raise
         finally:
             workspace.db.remove_temp(upgraded)
-        compact(workspace.db)  # an upgrade can leave most of the copied file free
+        compact(workspace.db)
         return result
+    if version != SCHEMA_VERSION:
+        error = schema_error(version)
+        raise DomainError(422, "backup_version", error.message, error.details)
     return _restore_current(workspace, source_path)
 
 
@@ -257,8 +263,6 @@ def _restore_current(workspace, source_path):
                             (now(),),
                         )
                         target.commit()
-                        # A backup may predate current indexes.
-                        apply_schema(target)
                 except BaseException:
                     with (
                         sqlite3.connect(rollback_name) as previous,
