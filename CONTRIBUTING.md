@@ -79,9 +79,26 @@ and `nightly.yml` must equal the `@playwright/test` version in the lock file; th
 `e2e` job fails early when they differ. Browser binaries are development tools,
 outside the core.
 
-A browser test that fails because of the order of the specs (they share one
-server and database until #220) is quarantined with `test.fixme` and a comment
-linking #220, never retried silently.
+The global setup seeds one synthetic workspace into a snapshot file
+(`backend/tests/dashboard_server.py --seed`) and signs the owner in once. Each
+Playwright worker starts its own server on a private copy of that snapshot, on a
+free port it reads from the server's output, and an automatic fixture restores
+the copy (`POST /__e2e__/reset`, a route of the test server only) before every
+test. Tests therefore run fully in parallel and in any order, and a test may
+change anything. `frontend/tests/isolation.spec.ts` checks this. CI runs four
+workers in each of two shards (`e2e (1)`, `e2e (2)`) with one retry, and a test
+that passes only on its retry fails the run (`failOnFlakyTests`): a flaky test is
+reported and fixed, never hidden or quarantined.
+
+### Backend fixtures
+
+`backend/tests/conftest.py` builds one fresh database at the current schema per
+test session (per xdist worker) and copies it per test. Its fixtures are
+`database_path`, `workspace`, `app` (owner password set), `client` (signed in as
+the owner, with the CSRF header), `owner_token`, `agent_token` and `mcp` (an MCP
+client with the agent token). Use them instead of building a workspace or an
+application in a test module; `*_fixtures.py` modules keep only data builders.
+The default run (`uv run pytest -n auto`) skips the `performance` marker.
 
 ### Backend time budgets
 
@@ -126,17 +143,26 @@ The dashboard has budgets that CI checks:
   moves through the steps of the setup guide.
 
 The browser tests run on the synthetic workspace of
-`backend/tests/dashboard_server.py` and `backend/tests/today_fixtures.py`. The
-four projects share one server, so a test that changes data makes its own
-records and reads the numbers it compares from the API.
+`backend/tests/dashboard_server.py` and `backend/tests/today_fixtures.py`, and
+each test starts from it unchanged.
 
 Screens use the components in `frontend/src/design` and add no global styles.
 
-Each run starts its own server on a free local port, so runs in several checkouts
-or worktrees can overlap. Set `OPENINGS_E2E_PORT` to choose the port, for example
-`OPENINGS_E2E_PORT=18084 npm run test:e2e`. The run gives its server a one-time
-token and stops before the first test if the port is already in use or the server
-that answers there is not the one it started.
+Every server listens on a port the system chooses, so runs in several checkouts
+or worktrees can overlap. To look at the synthetic workspace by hand, run
+`uv run python backend/tests/dashboard_server.py --port 18084`.
+
+### Screenshots for review
+
+`npm --prefix frontend run screenshots` writes an image of every screen of the
+seeded workspace, including key states (empty, populated, dialog open), at
+1440×1000 and 390×844 in the light and dark themes to `frontend/screenshots/`
+(not committed). The Screenshots workflow runs it on every pull request that
+touches `frontend/` and uploads the `screenshots` artifact. Embed the images of
+every changed screen in the pull request (before and after for a rebuilt
+screen). Add a new screen or state with one line in
+`frontend/tests/screenshots.spec.ts`. These images are for people to look at;
+there is no pixel comparison.
 
 ### Parity
 
@@ -151,8 +177,10 @@ operation that is not owner-only has exactly one MCP tool with its name.
 ### Documentation screenshots
 
 `docs/images/*.png` come from a synthetic workspace (fictional people, companies
-and documents) at 1440×1000 in the light theme. Check each image before
-committing it.
+and documents) at 1440×1000 in the light theme:
+`npm --prefix frontend run screenshots -- --docs` rewrites the images that
+`frontend/tests/screenshots.spec.ts` marks with a `docs` name. Check each image
+before committing it.
 
 ### Agent round trip
 
@@ -278,8 +306,10 @@ request whose required checks pass on a branch that is up to date with `main`;
 force-pushes and deletion are blocked, and nobody, administrators included, can
 bypass it. No review is required (single owner). The required checks are the job
 names of `.github/workflows/ci.yml`: `backend`, `frontend`, `e2e` and
-`container (amd64)`. A change that renames or splits those jobs (for example
-sharding `e2e`) updates the ruleset in the same pull request.
+`container (amd64)`. `e2e` is a gate that passes only when every browser shard
+(`e2e (1)`, `e2e (2)`) passed, so the number of shards can change without
+touching the ruleset. A change that renames those jobs updates the ruleset in
+the same pull request.
 
 The ruleset was created with:
 

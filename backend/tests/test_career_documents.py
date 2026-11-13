@@ -37,8 +37,8 @@ from timeline_fixtures import guided_application
 
 
 @pytest.fixture
-def workspace(tmp_path):
-    workspace = Workspace(tmp_path / "workspace.sqlite")
+def workspace(database_path):
+    workspace = Workspace(database_path)
     career = CareerService(workspace)
     documents = DocumentService(workspace, max_file_bytes=1024 * 1024)
     profile = career.get_profile()
