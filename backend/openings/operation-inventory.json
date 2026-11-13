@@ -1214,6 +1214,22 @@
       "notes": "expected_version is required. The application's stage and outcome do not change."
     },
     {
+      "id": "insights.read",
+      "group": "Applications and documents",
+      "operation": "Read response, interview and offer rates of sent applications, overall and by group",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/insights"
+        }
+      ],
+      "mcp": [
+        "insights_get"
+      ],
+      "dashboard": "Applications: Insights",
+      "notes": "Only employer responses count. Sent applications (applied_at, a sent stage or a response) form the sample; Drafts and attempts closed without being sent are counted under excluded, and agent dismissals are jobs, never applications. Rates are null with withheld below min_sample sent applications (default 5, 1 to 100); groups by role_family, seniority, location, source_kind, source and month applied; applied_since/applied_until narrow the sample by applied_at. Role family and seniority come from a keyword mapping of the job title (English, German, French, Italian)."
+    },
+    {
       "id": "contexts.list",
       "group": "Applications and documents",
       "operation": "List/filter compact frozen-context metadata",
