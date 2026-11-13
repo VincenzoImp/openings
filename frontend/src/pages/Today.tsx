@@ -5,25 +5,29 @@ import type {
   ListResult,
   OwnerQuestion,
   Overview,
-  PolicySection,
   Run,
 } from "../api";
 import { Pipeline } from "../design";
 import { PageHead } from "../library/common";
-import { dayBefore } from "../library/time";
 import { useFresh } from "../library/useFresh";
-import { useUrlFilters } from "../state";
 import type { Links } from "./activity/records";
 import { lastRunLine } from "./activity/wording";
+import { READY_QUEUE, stageHref } from "./applications/links";
 import { Decisions } from "./today/Decisions";
-import { READY_QUEUE, Ready } from "./today/Ready";
+import { Ready } from "./today/Ready";
 import { Since } from "./today/Since";
-import { DEFAULT_REPLY_DAYS, replyDays, todaySummary } from "./today/summary";
+import { todaySummary } from "./today/summary";
 import { beginVisit, sinceOf, touchVisit } from "./today/visit";
-import { Progress, Waiting } from "./today/Waiting";
+import { Waiting } from "./today/Waiting";
 
 const NONE = { items: [], total: 0 };
-const APPLICATIONS = ["applications", "jobs", "documents", "files"];
+const APPLICATIONS = [
+  "applications",
+  "jobs",
+  "documents",
+  "files",
+  "responses",
+];
 
 /** The visit Today counts "since your last visit" from (see today/visit.ts). */
 function useVisit() {
@@ -64,7 +68,6 @@ function useVisit() {
  */
 export default function TodayPage(links: Links) {
   const { since, firstVisit } = useVisit();
-  const [period, setPeriod] = useUrlFilters({ since: "", until: "" });
   const ready = useFresh<ListResult<Application>>(
     "/applications?readiness=ready&sort=deadline&limit=5",
     NONE,
@@ -85,20 +88,14 @@ export default function TodayPage(links: Links) {
     NONE,
     ["questions"],
   );
-  // The period after which a sent application has waited long is the owner's
-  // "No reply" decision in the policy, when it holds a number of days.
-  const policy = useFresh<PolicySection | null>("/policy/decision", null, [
-    "policy",
-  ]);
-  const days = policy.data ? replyDays(policy.data.items) : DEFAULT_REPLY_DAYS;
-  const until = dayBefore(days);
+  // Applied applications past the no-reply period: the number of days of the
+  // owner's "No reply" decision in the policy, or 30, as the server reads it.
   const waiting = useFresh<ListResult<Application>>(
-    policy.loading
-      ? null
-      : `/applications?status=applied&applied_until=${until}&limit=1`,
+    "/applications?no_reply_due=true&limit=1",
     NONE,
-    APPLICATIONS,
+    [...APPLICATIONS, "policy"],
   );
+  const days = waiting.data.no_reply?.days ?? 30;
   const runs = useFresh<ListResult<Run>>(
     `/runs?active_since=${encodeURIComponent(since)}&limit=5`,
     NONE,
@@ -110,11 +107,10 @@ export default function TodayPage(links: Links) {
     NONE,
     ["collection", "sources"],
   );
-  const overview = useFresh<Overview | null>(
-    `/overview?${new URLSearchParams(Object.entries(period).filter(([, value]) => value))}`,
-    null,
-    ["applications", "jobs"],
-  );
+  const overview = useFresh<Overview | null>("/overview", null, [
+    "applications",
+    "jobs",
+  ]);
 
   const counted = [ready, questions, blocked, waiting, lastRun];
   const summary = counted.some((item) => item.error)
@@ -122,7 +118,7 @@ export default function TodayPage(links: Links) {
         lead: "Some of today's numbers could not be loaded.",
         rest: "The cards below say which, and let you try again.",
       }
-    : counted.some((item) => item.loading) || policy.loading
+    : counted.some((item) => item.loading)
       ? null
       : todaySummary(
           {
@@ -166,7 +162,7 @@ export default function TodayPage(links: Links) {
                 {
                   label: "Preparing",
                   value: counts ? (stage("draft") ?? 0) - marked : undefined,
-                  href: "#applications?status=draft",
+                  href: stageHref("preparing"),
                 },
                 {
                   label: "Ready",
@@ -181,7 +177,7 @@ export default function TodayPage(links: Links) {
                 ].map(([label, name]) => ({
                   label,
                   value: stage(name),
-                  href: `#applications?status=${name}`,
+                  href: stageHref(name),
                 })),
               ]}
             />
@@ -191,15 +187,9 @@ export default function TodayPage(links: Links) {
               runs={runs}
               collection={collection}
             />
-            <Waiting
-              list={waiting}
-              applied={stage("applied")}
-              days={days}
-              until={until}
-            />
+            <Waiting list={waiting} applied={stage("applied")} days={days} />
           </div>
         </div>
-        <Progress overview={overview} period={period} onPeriod={setPeriod} />
       </div>
     </>
   );
