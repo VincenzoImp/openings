@@ -13,8 +13,7 @@ import {
 
 // Applications (stage 3 of #135): the pipeline as a list and a board, the
 // employer's responses, bulk actions, Insights and the review page with its
-// tabs. The four projects share one server, so every test that changes
-// something makes its own applications, named after the project.
+// tabs. Each test starts from the seeded workspace (fixtures.ts).
 const cookies: Cookies = ownerSession();
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {
@@ -100,9 +99,13 @@ async function make(page: Page, title: string, options: Options = {}) {
       status: options.status,
       ...(options.appliedDaysAgo !== undefined
         ? {
-            applied_at: new Date(
-              Date.now() - options.appliedDaysAgo * 86_400_000,
-            ).toISOString(),
+            // Calendar days, as the dashboard counts them: 50 × 24 h can be
+            // 49 local days across a daylight saving change.
+            applied_at: (() => {
+              const day = new Date();
+              day.setDate(day.getDate() - options.appliedDaysAgo);
+              return day.toISOString();
+            })(),
           }
         : {}),
     });
@@ -555,9 +558,7 @@ test("answers and the questions of the form are edited without JSON", async ({
     .toBe(1);
 });
 
-// Quarantined: order-dependent on the shared e2e server and database (failed on
-// CI in November 2026). Restore once each worker has its own workspace, #220.
-test.fixme("requirements, the plan and a concurrent change in the details", async ({
+test("requirements, the plan and a concurrent change in the details", async ({
   page,
 }) => {
   const application = await make(page, unique("Planned"), {
@@ -682,9 +683,7 @@ test.fixme("requirements, the plan and a concurrent change in the details", asyn
   ).toContainText("Lead with the API work.");
 });
 
-// Quarantined: order-dependent on the shared e2e server and database (failed on
-// CI in November 2026). Restore once each worker has its own workspace, #220.
-test.fixme("documents, revisions, frozen copies and their files are managed in the review page", async ({
+test("documents, revisions, frozen copies and their files are managed in the review page", async ({
   page,
 }) => {
   const application = await make(page, unique("Documents"));

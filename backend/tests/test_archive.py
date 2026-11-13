@@ -12,11 +12,6 @@ from openings.errors import DomainError
 from openings.workspace import Workspace
 
 
-@pytest.fixture
-def workspace(tmp_path):
-    return Workspace(tmp_path / "workspace.sqlite")
-
-
 def job(workspace, **updates):
     return workspace.ingest_job(
         {

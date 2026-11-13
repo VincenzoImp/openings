@@ -1,6 +1,5 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import { createServer } from "node:net";
 import { test, expect, type Page } from "@playwright/test";
+import { startServer, type Server } from "./server";
 
 // The performance budget of the dashboard: on a synthetic
 // workspace of 25,000 jobs (with their ingest signals) and 500 applications,
@@ -11,56 +10,20 @@ import { test, expect, type Page } from "@playwright/test";
 const BUDGET_MS = 300;
 const RUNS = 7;
 const JOBS = 25000;
-let server: ChildProcess | undefined;
+let server: Server | undefined;
 let base = "";
-
-function freePort() {
-  return new Promise<number>((resolve, reject) => {
-    const probe = createServer();
-    probe.once("error", reject);
-    probe.listen(0, "127.0.0.1", () => {
-      const { port } = probe.address() as { port: number };
-      probe.close(() => resolve(port));
-    });
-  });
-}
 
 test.beforeAll(async () => {
   test.setTimeout(300_000);
-  const port = await freePort();
-  base = `http://127.0.0.1:${port}`;
-  server = spawn(
-    "uv",
-    [
-      "run",
-      "--project",
-      "..",
-      "python",
-      "../backend/tests/dashboard_server.py",
-    ],
-    {
-      env: {
-        ...process.env,
-        OPENINGS_E2E_PORT: String(port),
-        OPENINGS_E2E_TOKEN: "performance",
-        OPENINGS_E2E_JOBS: String(JOBS),
-        OPENINGS_E2E_APPLICATIONS: "500",
-      },
-      stdio: "ignore",
-    },
-  );
-  const started = Date.now();
-  while (Date.now() - started < 280_000) {
-    try {
-      if ((await fetch(base + "/health")).ok) return;
-    } catch {}
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  throw Error("The large synthetic workspace did not start.");
+  server = await startServer({
+    env: { OPENINGS_E2E_JOBS: String(JOBS), OPENINGS_E2E_APPLICATIONS: "500" },
+    timeout: 280_000,
+  });
+  base = server.url;
 });
 
-test.afterAll(() => {
-  server?.kill();
+test.afterAll(async () => {
+  await server?.stop();
 });
 
 async function signIn(page: Page) {

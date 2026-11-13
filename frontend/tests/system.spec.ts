@@ -12,8 +12,7 @@ import {
 // The System screens: Collection (sources, runs and tasks, the provider
 // request gate) and Settings (agent access, backup and restore, workspace).
 // The browser-test server runs no acquisition worker, so a run stays queued
-// until it is stopped. The four projects share one server: each test makes
-// its own records and reads the numbers it compares from the API.
+// until it is stopped. Each test starts from the seeded workspace (fixtures.ts).
 const cookies: Cookies = ownerSession();
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {

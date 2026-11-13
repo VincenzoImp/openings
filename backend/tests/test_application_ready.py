@@ -20,13 +20,6 @@ AGENT = token_actor("token-agent", "Synthetic agent")
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 
 
-@pytest.fixture
-def app(tmp_path):
-    app = create_app(tmp_path / "ready.sqlite", start_worker=False)
-    app.state.auth.setup("synthetic-password")
-    return app
-
-
 def start(app, title="Synthetic engineer", **fields):
     workspace = app.state.workspace
     job = workspace.ingest_job({"title": title, "company": "Example", "posting": "Build APIs."})
