@@ -520,11 +520,13 @@ img.frame {
 .claim-text {
   align-items: flex-start;
 }
-.input.move {
-  width: auto;
-  min-height: 28px;
-  padding: 0 var(--s2);
-  font-size: var(--t-sm);
+.input.days {
+  width: 6rem;
+}
+ul.chips {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 .wrap {
   flex-wrap: wrap;
@@ -570,9 +572,6 @@ img.frame {
   gap: var(--s2);
 }
 @media (max-width: 860px) {
-  .input.move {
-    min-height: 44px;
-  }
   .link-row {
     grid-template-columns: minmax(0, 1fr) auto;
   }

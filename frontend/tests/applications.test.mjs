@@ -195,14 +195,15 @@ test("what changed since the documents were written, in words", () => {
   });
   const summary = change({ input: "profile", id: "summary", label: "Summary" });
   const authorization = change({
-    input: "policy",
-    id: "p1",
-    label: "Work authorization",
-    section: "eligibility",
+    input: "preferences",
+    id: "facts:a1",
+    label: "Work authorization: EU citizen",
+    section: "facts",
+    state: "removed",
   });
   const page = change({
-    input: "policy",
-    id: "p2",
+    input: "preferences",
+    id: "writing:b2",
     label: "One page",
     section: "writing",
     state: "added",
@@ -212,14 +213,18 @@ test("what changed since the documents were written, in words", () => {
     [summary, authorization, template].map((item) =>
       staleness.changeName(item),
     ),
-    ["Profile summary", "Policy “Work authorization”", "Template “MASTER CV”"],
+    [
+      "Profile summary",
+      "Preference “Work authorization: EU citizen”",
+      "Template “MASTER CV”",
+    ],
   );
   assert.deepEqual(
     [summary, authorization, page, template].map(staleness.changeState),
     [
       "changed",
-      "changed · Facts employers ask about",
-      "added · Rules for your documents",
+      "removed · Facts about me",
+      "added · Writing rules",
       "changed · version 1 → 2",
     ],
   );
@@ -264,13 +269,13 @@ test("what changed since the documents were written, in words", () => {
         kind: "resume",
         context_id: "c",
         changes: [summary, page],
-        comparison: { profile: "parts", policy: "items" },
+        comparison: { profile: "parts", preferences: "items" },
       },
       {
         kind: "cover_letter",
         context_id: "c",
         changes: [summary],
-        comparison: { profile: "parts", policy: "not_frozen" },
+        comparison: { profile: "parts", preferences: "not_frozen" },
       },
     ],
   };
@@ -280,7 +285,7 @@ test("what changed since the documents were written, in words", () => {
   assert.equal(staleness.comparisonNotes(report).length, 1);
   assert.match(
     staleness.comparisonNotes(report)[0],
-    /before the policy existed/,
+    /before Preferences existed/,
   );
 });
 

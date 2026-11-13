@@ -174,8 +174,9 @@ function ProfileForm({ profile }: { profile: Profile }) {
           </div>
         </fieldset>
         <p className="caption wide">
-          Target roles, preferences, decision rules, eligibility and writing
-          rules are items in your <a href="#policy">Policy</a>.
+          What you look for, what you rule out, facts employers ask about and
+          writing rules are statements in your{" "}
+          <a href="#preferences">Preferences</a>.
         </p>
         <fieldset className="field wide">
           <legend>Other details</legend>

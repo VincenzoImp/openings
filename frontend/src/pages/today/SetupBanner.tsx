@@ -40,8 +40,8 @@ export function SetupBanner() {
         </div>
       }
     >
-      The setup guide shows what is done: your agent, your profile, your policy
-      and a first search.
+      The setup guide shows what is done: your agent, your profile, your
+      preferences and a first search.
     </Banner>
   );
 }

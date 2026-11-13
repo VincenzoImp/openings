@@ -31,7 +31,6 @@ const since = (days: number | null) =>
 function dismissedLine(row: Pick<YieldRow, "dismissed" | "dismissed_by">) {
   if (!row.dismissed) return "";
   const parts = [
-    [row.dismissed_by.rule, "by your rules"],
     [row.dismissed_by.agent, "by an agent"],
     [row.dismissed_by.owner, "by you"],
   ]
@@ -199,25 +198,6 @@ export function SourceYieldView() {
           </GridTable>
         )}
       </Card>
-      {data && data.total.dismissed_by_rule.length > 0 && (
-        <Card title="Dismissed by your rules">
-          <ul className="list" aria-label="Jobs each rule dismissed">
-            {data.total.dismissed_by_rule.map((rule) => (
-              <li key={rule.item_id}>
-                <div className="grow">
-                  <span className="title">{rule.label}</span>
-                </div>
-                <a
-                  className="btn sm"
-                  href={`#jobs?section=dismissed&rule_id=${encodeURIComponent(rule.item_id)}`}
-                >
-                  {plural(rule.dismissed, "job")}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
     </div>
   );
 }
