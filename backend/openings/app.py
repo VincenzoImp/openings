@@ -19,39 +19,55 @@ from pydantic import Field
 from starlette.background import BackgroundTask
 
 from . import __version__
-from .activity import (
-    ActivityService,
+from .activity import ActivityService
+from .actors import SYSTEM, acting_as, current_actor, require_owner
+from .agent_requests import RequestService
+from .auth import COOKIE, MAX_AGE, Auth, LoginGuard
+from .career import CareerService
+from .discovery import DiscoveryService
+from .documents import DocumentService
+from .errors import DomainError
+from .insights import InsightsService
+from .interfaces.activity import (
     register_api as register_activity_api,
     register_mcp as register_activity_mcp,
 )
-from .actors import SYSTEM, acting_as, current_actor, require_owner
-from .agent_requests import (
-    RequestService,
+from .interfaces.agent_requests import (
     register_api as register_request_api,
     register_mcp as register_request_mcp,
 )
-from .api import register_core, register_core_mcp
-from .auth import COOKIE, MAX_AGE, Auth, LoginGuard
-from .career import (
-    CareerService,
+from .interfaces.career import (
     register_api as register_career_api,
     register_mcp as register_career_mcp,
 )
-from .discovery import (
-    DiscoveryService,
+from .interfaces.core import register_core, register_core_mcp
+from .interfaces.discovery import (
     register_api as register_discovery_api,
     register_mcp as register_discovery_mcp,
 )
-from .documents import (
-    DocumentService,
+from .interfaces.documents import (
     register_api as register_document_api,
     register_mcp as register_document_mcp,
 )
-from .errors import DomainError
-from .insights import (
-    InsightsService,
+from .interfaces.insights import (
     register_api as register_insights_api,
     register_mcp as register_insights_mcp,
+)
+from .interfaces.outcomes import (
+    register_api as register_response_api,
+    register_mcp as register_response_mcp,
+)
+from .interfaces.policy import (
+    register_api as register_policy_api,
+    register_mcp as register_policy_mcp,
+)
+from .interfaces.skills import (
+    register_api as register_skills_api,
+    register_mcp as register_skills_mcp,
+)
+from .interfaces.source_yield import (
+    register_api as register_yield_api,
+    register_mcp as register_yield_mcp,
 )
 from .limits import REQUEST_LIMIT, BodyLimit
 from .mcp_server import OpeningsMCP
@@ -62,27 +78,11 @@ from .operations import (
     restore_database,
     storage_status,
 )
-from .outcomes import (
-    ResponseService,
-    register_api as register_response_api,
-    register_mcp as register_response_mcp,
-)
-from .policy import (
-    PolicyService,
-    register_api as register_policy_api,
-    register_mcp as register_policy_mcp,
-)
+from .outcomes import ResponseService
+from .policy import PolicyService
 from .skill_notes import SkillNotesService
-from .skills import (
-    SkillLibrary,
-    register_api as register_skills_api,
-    register_mcp as register_skills_mcp,
-)
-from .source_yield import (
-    YieldService,
-    register_api as register_yield_api,
-    register_mcp as register_yield_mcp,
-)
+from .skills import SkillLibrary
+from .source_yield import YieldService
 from .transfers import SnapshotResponse
 from .worker import Worker
 from .workspace import Workspace

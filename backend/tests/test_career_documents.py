@@ -21,7 +21,6 @@ from openings.career import (
     ProfileUpdate,
     TemplateCreate,
     TemplateUpdate,
-    register_api as register_career_api,
 )
 from openings.documents import (
     ContextCreate,
@@ -29,9 +28,10 @@ from openings.documents import (
     DocumentService,
     ReviewUpdate,
     UploadReservation,
-    register_api,
 )
 from openings.errors import DomainError
+from openings.interfaces.career import register_api as register_career_api
+from openings.interfaces.documents import register_api
 from openings.workspace import Workspace
 
 
