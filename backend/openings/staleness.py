@@ -5,13 +5,17 @@ inputs changed since, so an agent can deliberately prepare a new context and new
 document revisions.
 
 A context records the versions it froze and, in ``context_inputs.parts``, a short hash
-of each part: each Profile part, each policy item and each template's content. The
-report compares only what documents use: the Profile parts of a CV or letter header
-and summary, and the confirmed items of the policy sections ``eligibility``,
-``writing`` and ``facts``. Profile ``metadata``, ``preferences`` and ``roles`` and the
-``decision`` section are frozen as well, but choosing jobs is their purpose, so editing
-them leaves every Draft current. A writing item scoped to the CV or the letter
-concerns that document only.
+of each part: each Profile part, each policy item, the general instructions and the
+content of each template, Career entry and claim. The report compares only what
+documents use: the Profile parts of a CV or letter header and summary, the confirmed
+items of the policy sections ``eligibility``, ``writing`` and ``facts``, the guidance
+text, a template's source, guidance and rules, an entry's kind, title, organization,
+dates, skills and narrative, and a claim's wording and entry. Profile ``metadata``,
+``preferences`` and ``roles``, the ``decision`` section, names, positions, default flags,
+claim selection fields and free-form metadata are frozen as well but never make a
+document stale, and neither does a new version whose content is the same. Text is
+compared with its runs of whitespace made single spaces, except a template's source. A writing
+item scoped to the CV or the letter concerns that document only.
 """
 
 from __future__ import annotations
@@ -19,7 +23,7 @@ from __future__ import annotations
 import hashlib
 import json
 
-from .career import DEFAULT_PROFILE
+from .career import DEFAULT_GUIDANCE, DEFAULT_PROFILE
 from .db import encode
 from .snapshots import payload_text
 
@@ -43,12 +47,31 @@ DOCUMENT_PROFILE_PARTS = ("name", "headline", "contact", "links", "summary")
 DOCUMENT_POLICY_SECTIONS = ("eligibility", "writing", "facts")
 # An item's content: what a write changes when it unconfirms an item (policy.CONTENT_FIELDS).
 POLICY_ITEM_FIELDS = ("label", "statement", "value", "value_type", "scope", "rule")
-# A template's content; its name and default flag do not reach a document.
-TEMPLATE_FIELDS = ("kind", "tex", "guidance", "rules")
+# The content of a frozen record that documents use, with the value a missing field
+# counts as. Names, positions, default flags, claim selection fields (they rank claims
+# for the next selection) and free-form metadata (provenance) do not reach a document.
+RECORD_FIELDS = {
+    "template": {"kind": None, "tex": "", "guidance": "", "rules": {}},
+    "knowledge": {
+        "kind": None,
+        "title": "",
+        "organization": "",
+        "dates": None,
+        "skills": [],
+        "narrative": "",
+    },
+    "claim": {"knowledge_id": None, "text": ""},
+}
+# Where each kind is frozen in the payload and stored live, and its JSON columns.
+RECORD_SOURCES = {
+    "template": ("templates", "templates", ("rules",)),
+    "knowledge": ("knowledge", "knowledge", ("dates", "skills")),
+    "claim": ("claims", "claims", ()),
+}
 # The document kind a writing scope concerns; "all" concerns every kind.
 SCOPE_KINDS = {"cv": "resume", "letter": "cover_letter"}
 # Bump when the stored parts change shape: rows of another format are derived again.
-PARTS_FORMAT = 1
+PARTS_FORMAT = 2
 LABEL_CHARS = 120
 
 _CONTEXT_INPUTS = (
@@ -71,7 +94,15 @@ _COLUMNS = (
     "context_id,created_at,profile_version,instructions_version,templates,knowledge,claims,"
     "policy,parts"
 )
-_UNSPLIT = {"format": PARTS_FORMAT, "profile": None, "policy": None, "templates": {}}
+_UNSPLIT = {
+    "format": PARTS_FORMAT,
+    "profile": None,
+    "policy": None,
+    "instructions": None,
+    "templates": {},
+    "knowledge": {},
+    "claims": {},
+}
 
 
 def digest(value) -> str:
@@ -79,20 +110,49 @@ def digest(value) -> str:
     return hashlib.sha256(encode(value).encode()).hexdigest()[:16]
 
 
+# Source text, where spacing can matter; every other text is compared as prose.
+VERBATIM = {"tex"}
+
+
+def _content(fields):
+    """Fields as compared: prose with its runs of whitespace made single spaces."""
+    return {
+        name: " ".join(value.split()) if isinstance(value, str) and name not in VERBATIM else value
+        for name, value in fields.items()
+    }
+
+
 def profile_hashes(profile: dict) -> dict:
     """The hash of every Profile part; a field the Profile lacks counts as its default."""
     return {
-        part: digest({name: profile.get(name, DEFAULT_PROFILE[name]) for name in names})
+        part: digest(_content({name: profile.get(name, DEFAULT_PROFILE[name]) for name in names}))
         for part, (_, names) in PROFILE_PARTS.items()
     }
 
 
 def policy_item_hash(item: dict) -> str:
-    return digest({name: item.get(name) for name in POLICY_ITEM_FIELDS})
+    return digest(_content({name: item.get(name) for name in POLICY_ITEM_FIELDS}))
 
 
-def template_hash(template: dict) -> str:
-    return digest({name: template.get(name) for name in TEMPLATE_FIELDS})
+def record_hash(kind: str, record: dict) -> str:
+    """The hash of what documents use of one template, Career entry or claim."""
+    return digest(
+        _content({name: record.get(name, default) for name, default in RECORD_FIELDS[kind].items()})
+    )
+
+
+def instructions_hash(general) -> str:
+    return digest(_content({"general": general}))
+
+
+def _record_hashes(kind, items):
+    if not isinstance(items, list):
+        return {}
+    return {
+        item["id"]: record_hash(kind, item)
+        for item in items
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
 
 
 def frozen_parts(text: str) -> dict:
@@ -106,7 +166,7 @@ def frozen_parts(text: str) -> dict:
     try:
         profile = data.get("profile")
         policy = data.get("policy")
-        templates = data.get("templates")
+        instructions = data.get("instructions")
         return {
             "format": PARTS_FORMAT,
             "profile": profile_hashes(profile) if isinstance(profile, dict) else None,
@@ -128,13 +188,13 @@ def frozen_parts(text: str) -> dict:
             }
             if isinstance(policy, dict)
             else None,
-            "templates": {
-                item["id"]: template_hash(item)
-                for item in templates
-                if isinstance(item, dict) and isinstance(item.get("id"), str)
-            }
-            if isinstance(templates, list)
-            else {},
+            "instructions": instructions_hash(instructions.get("general"))
+            if isinstance(instructions, dict) and "general" in instructions
+            else None,
+            **{
+                key: _record_hashes(kind, data.get(key))
+                for kind, (key, _, _) in RECORD_SOURCES.items()
+            },
         }
     except TypeError, ValueError, AttributeError:
         return dict(_UNSPLIT)
@@ -331,6 +391,25 @@ def _concerns(change, kind):
     return any(SCOPE_KINDS.get(scope) == kind for scope in scopes)
 
 
+def _current_hashes(connection, kind, identifiers):
+    """The content hashes of live records of one kind."""
+    if not identifiers:
+        return {}
+    _, table, json_columns = RECORD_SOURCES[kind]
+    names = ",".join(f'"{name}"' for name in RECORD_FIELDS[kind])
+    result = {}
+    for row in connection.execute(
+        f"SELECT id,{names} FROM {table} WHERE id IN ({_placeholders(identifiers)})",
+        list(identifiers),
+    ):
+        record = dict(row)
+        for name in json_columns:
+            if record[name] is not None:
+                record[name] = json.loads(record[name])
+        result[record.pop("id")] = record_hash(kind, record)
+    return result
+
+
 def context_changes(connection, context_ids) -> dict[str, dict]:
     """Return {context_id: {created_at, changes, comparison}} for the given frozen contexts.
 
@@ -368,12 +447,16 @@ def context_changes(connection, context_ids) -> dict[str, dict]:
             row[key] = json.loads(row[key] or "[]")
         row["parts"] = json.loads(row["parts"])
     profile, profile_version = _setting(connection, "profile")
+    instructions, instructions_version = _setting(connection, "instructions")
     current = {
         "profile": (profile_hashes({**DEFAULT_PROFILE, **profile}), profile_version),
         "policy": _current_policy(connection)
         if any(row["parts"].get("policy") is not None for row in frozen)
         else ({}, {}),
-        "instructions": _setting(connection, "instructions")[1],
+        "instructions": (
+            instructions_hash(instructions.get("general", DEFAULT_GUIDANCE)),
+            instructions_version,
+        ),
         "template": _current_versions(
             connection, "templates", {item[0] for row in frozen for item in row["templates"]}
         ),
@@ -387,24 +470,19 @@ def context_changes(connection, context_ids) -> dict[str, dict]:
             ",approved",
         ),
     }
-    # A template whose version moved may only have changed name or default flag.
-    moved = {
-        identifier
-        for row in frozen
-        for identifier, version, _ in row["templates"]
-        if identifier in current["template"]
-        and current["template"][identifier]["version"] != version
-    }
-    template_hashes = {
-        row["id"]: template_hash(dict(row, rules=json.loads(row["rules"] or "{}")))
-        for row in (
-            connection.execute(
-                f"SELECT id,kind,tex,guidance,rules FROM templates WHERE id IN ({_placeholders(moved)})",
-                list(moved),
-            )
-            if moved
-            else ()
+    # A record whose version moved may have changed only what documents do not use.
+    hashes = {
+        kind: _current_hashes(
+            connection,
+            kind,
+            {
+                identifier
+                for row in frozen
+                for identifier, version, _ in row[RECORD_SOURCES[kind][0]]
+                if identifier in current[kind] and current[kind][identifier]["version"] != version
+            },
         )
+        for kind in RECORD_SOURCES
     }
     result = {}
     for row in frozen:
@@ -412,23 +490,13 @@ def context_changes(connection, context_ids) -> dict[str, dict]:
         changes = _profile_changes(row, parts, current["profile"])
         changes += _policy_changes(row, parts, current["policy"])
         before = row["instructions_version"] or 0
-        if current["instructions"] != before:
+        text_hash, version = current["instructions"]
+        if version != before and parts.get("instructions") != text_hash:
             changes.append(
-                _change(
-                    "instructions",
-                    None,
-                    "Instructions",
-                    "changed",
-                    before,
-                    current["instructions"],
-                )
+                _change("instructions", None, "Instructions", "changed", before, version)
             )
-        frozen_templates = parts.get("templates") or {}
-        for kind, key in (
-            ("template", "templates"),
-            ("knowledge", "knowledge"),
-            ("claim", "claims"),
-        ):
+        for kind, (key, _, _) in RECORD_SOURCES.items():
+            frozen_hashes = parts.get(key) or {}
             for identifier, version, label in row[key]:
                 live = current[kind].get(identifier)
                 state = None
@@ -436,10 +504,9 @@ def context_changes(connection, context_ids) -> dict[str, dict]:
                     state = "deleted"
                 elif kind == "claim" and not live["approved"]:
                     state = "unapproved"
-                elif live["version"] != version and not (
-                    kind == "template"
-                    and frozen_templates.get(identifier) is not None
-                    and frozen_templates[identifier] == template_hashes.get(identifier)
+                elif live["version"] != version and (
+                    frozen_hashes.get(identifier) is None
+                    or frozen_hashes[identifier] != hashes[kind].get(identifier)
                 ):
                     state = "changed"
                 if state:
