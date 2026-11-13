@@ -97,7 +97,9 @@ class RunFinish(Input):
         description="Statement of limits, for example that nothing was submitted.",
     )
     method: str = Field(
-        default="", max_length=8000, description="What the workflow or the product lacked."
+        default="",
+        max_length=8000,
+        description="What the workflow or the product lacked during this run. The owner may turn it into local notes of the skill (skill_notes_update).",
     )
 
 
@@ -306,6 +308,11 @@ class ActivityService:
             if subject["type"] in queries and subject["id"]:
                 wanted.setdefault(subject["type"], set()).add(subject["id"])
         labels = {}
+        for item in items:
+            subject = item["subject"]
+            # A skill is named by its name; its notes have no row of their own to look up.
+            if subject["type"] == "skill" and subject["id"]:
+                labels[("skill", subject["id"])] = subject["id"]
         for kind, identifiers in wanted.items():
             sql = queries[kind].format(",".join("?" for _ in identifiers))
             for row in conn.execute(sql, sorted(identifiers)):
@@ -362,6 +369,8 @@ class ActivityService:
                 "SELECT count(*) FROM requests WHERE run_id=?", (row["id"],)
             ).fetchone()[0],
             "summary": report.get("summary", ""),
+            # What the workflow lacked; the owner may turn it into a skill's local notes.
+            "method": report.get("method", ""),
         }
         if full:
             result["report"] = report or None

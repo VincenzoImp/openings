@@ -35,6 +35,7 @@ flowchart LR
 | `backend/openings/app.py`, `api.py` | Authentication, REST/MCP registration and dashboard hosting |
 | `backend/openings/schema.sql` | Relational ownership, SQLite indexes and JSON payloads |
 | `frontend/src` | Dashboard using REST; no duplicated domain decisions |
+| `backend/openings/skills.py`, `skill_notes.py` | Shipped skills served read-only; per-workspace local notes appended when a skill is served |
 | `skills/` | Agent workflow skills (Agent Skills format) and their shared references |
 
 The [operation inventory](../../backend/openings/operation-inventory.json) is
@@ -143,6 +144,18 @@ dashboard path, and lists every gap. Read [REST](../user/api.md) and
   Like questions, requests reference a job, application or Career entry with
   `ON DELETE SET NULL`, keep a label and follow a job through a merge. The
   server runs no agent: a request is only read.
+- **Skill notes:** skills ship with the server and are never edited. A
+  workspace keeps local notes per skill in `skill_notes`, one immutable row per
+  version (at most 2,000 characters; the highest version is current, so the
+  earlier versions are the history). A save names the version it replaces (0
+  for the first) and leaves an attributed `skill_notes_updated` event with the
+  skill and version only. `skill_notes.serve` is the one place that appends the
+  notes to `SKILL.md` under "Local notes for this workspace", for REST,
+  `skill_get` and the MCP prompts alike; reference files are served as shipped.
+  Any authenticated actor may write: the agent discovers what a workflow lacks
+  while running it, the notes stay in the workspace, and each version names its
+  author and can be restored. A finished run's `method` is listed with the run
+  so the owner can turn it into notes.
 - **Token scope:** a token is `owner` or `agent`. Owner-only operations call
   `actors.require_owner` in the shared service, so REST and MCP refuse an agent
   token alike with `403 forbidden`; the inventory marks them `access: owner` and
@@ -173,7 +186,10 @@ memory and releasing SQLite readers before cancellation or thread changes.
 Backups use SQLite's online backup API. A restore preserves
 installation authentication, recent provider request history and later cooldowns.
 
-Workspaces and backups use schema 11 (0.20). Opening schema 10 adds the
+Workspaces and backups use schema 12 (0.21). Opening schema 11 adds the
+`skill_notes` table (`skill_notes.migrate`); nothing else changes.
+
+Schema 11 (0.20) was an additive change with one table rebuild. Opening schema 10 adds the
 `responses` table (an employer's answer to a sent application: kind, date, note,
 whether the date is estimated, how it was recorded, attribution, version and
 idempotency key; one per application, kind and day except `other`) and rebuilds
@@ -238,8 +254,8 @@ applications gain `ready_at` with who set it, API tokens gain a kind, and the
 owner tokens with unchanged access. Schema 6 is upgraded through schema 7 in the same
 transaction (application priority, deadline and requirements), and schema 5
 through schema 6 (removing obsolete derived data and preserving owned records and
-immutable snapshots). Restore accepts schema 11 and upgrades a copy of a schema 5,
-6, 7, 8, 9 or 10 backup. Other historical formats require the matching release.
+immutable snapshots). Restore accepts schema 12 and upgrades a copy of a schema 5,
+6, 7, 8, 9, 10 or 11 backup. Other historical formats require the matching release.
 
 ## Acquisition
 

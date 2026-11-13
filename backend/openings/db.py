@@ -11,7 +11,7 @@ from pathlib import Path
 from .errors import DomainError
 from .posting import posting_complete
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 SCHEMA_SQL = Path(__file__).with_name("schema.sql")
 TEMP_PREFIX = ".openings-temp-"
 
@@ -317,6 +317,12 @@ def _migrate_10_to_11(conn):
         conn.execute("ALTER TABLE context_inputs ADD COLUMN parts TEXT")
 
 
+def _migrate_11_to_12(conn):
+    from . import skill_notes
+
+    skill_notes.migrate(conn)
+
+
 # Each step upgrades from its key to the next version; steps chain inside one transaction.
 MIGRATIONS = {
     5: _migrate_5_to_6,
@@ -325,6 +331,7 @@ MIGRATIONS = {
     8: _migrate_8_to_9,
     9: _migrate_9_to_10,
     10: _migrate_10_to_11,
+    11: _migrate_11_to_12,
 }
 
 

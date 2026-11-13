@@ -51,7 +51,8 @@
       "mcp": [
         "skills_list"
       ],
-      "dashboard": "Settings: Connect an agent"
+      "dashboard": "Settings: Skills",
+      "notes": "Each skill lists its reference files (file_details: path, bytes, first heading) and local_notes: the version, author and length of its current notes, or null."
     },
     {
       "id": "skills.read",
@@ -70,7 +71,40 @@
       "mcp": [
         "skill_get"
       ],
-      "dashboard": "Settings: Connect an agent"
+      "dashboard": "Settings: Skills",
+      "notes": "SKILL.md ends with the workspace's local notes under \"Local notes for this workspace\" (version, day and author); local_notes=false returns the shipped text alone. Reference files are served as shipped."
+    },
+    {
+      "id": "skills.notes.read",
+      "group": "Archive",
+      "operation": "Read a skill's local notes for this workspace with earlier versions",
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/api/v1/skills/{name}/notes"
+        }
+      ],
+      "mcp": [
+        "skill_notes_get"
+      ],
+      "dashboard": "Settings: Skills: local notes",
+      "notes": "Text, version (0 when none), who wrote it and up to 50 earlier versions, newest first."
+    },
+    {
+      "id": "skills.notes.update",
+      "group": "Archive",
+      "operation": "Replace a skill's local notes",
+      "rest": [
+        {
+          "method": "PUT",
+          "path": "/api/v1/skills/{name}/notes"
+        }
+      ],
+      "mcp": [
+        "skill_notes_update"
+      ],
+      "dashboard": "Settings: Skills: local notes",
+      "notes": "At most 2000 characters; empty clears the notes. expected_version is the current version (0 for the first notes); a stale one returns 409 with details.current_version. Each save is a new attributed version with a skill_notes_updated event; the same text again is no change. The owner session, owner tokens and agent tokens may write. The shipped skill text never changes: the notes are appended when the skill is served."
     },
     {
       "id": "overview.read",
