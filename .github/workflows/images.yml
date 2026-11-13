@@ -1,8 +1,9 @@
 name: Release images
 
-# Flow: version -> checks (CI) -> image (native amd64/arm64: build, push by digest,
-# smoke-test that digest) -> publish (multi-arch index from the tested digests,
-# tagged X.Y.Z and X.Y) -> release (GitHub Release from the CHANGELOG section).
+# Flow: version -> checks (CI) and audit -> image (native amd64/arm64: build with
+# SBOM and max provenance, push by digest, smoke-test that digest) -> publish
+# (multi-arch index from the tested digests, tagged X.Y.Z and X.Y) -> release
+# (GitHub Release from the CHANGELOG section).
 
 on:
   push:
@@ -66,9 +67,32 @@ jobs:
     needs: version
     uses: ./.github/workflows/ci.yml
 
+  # Pull requests no longer audit dependencies (nightly.yml does, weekly);
+  # a release still refuses to publish over a known advisory.
+  audit:
+    needs: version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.13.8'
+          python-version: '3.14'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+      - name: Audit locked runtime Python dependencies
+        run: |
+          uv export --locked --no-dev --no-emit-project --no-hashes --output-file /tmp/openings-requirements.txt
+          uvx --from pip-audit==2.10.1 pip-audit --requirement /tmp/openings-requirements.txt --no-deps --disable-pip
+      - name: Audit npm dependencies
+        run: npm --prefix frontend audit --audit-level=moderate
+
   image:
     name: image (${{ matrix.arch }})
-    needs: [version, checks]
+    needs: [version, checks, audit]
     if: github.event_name == 'push' || inputs.publish
     runs-on: ${{ matrix.runner }}
     permissions:
@@ -104,6 +128,8 @@ jobs:
             VCS_REF=${{ github.sha }}
           cache-from: type=gha,scope=core-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=core-${{ matrix.arch }}
+          sbom: true
+          provenance: mode=max
       - name: Smoke the pushed digest
         shell: bash
         env:

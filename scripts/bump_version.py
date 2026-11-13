@@ -9,9 +9,9 @@ standard library and edits the lock files' own project entries in place.
 """
 
 import argparse
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = r"(?P<version>\d+\.\d+\.\d+(?:[-.+][0-9A-Za-z.-]+)?)"

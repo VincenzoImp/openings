@@ -35,9 +35,9 @@ OPENINGS_IMAGE=openings:local docker compose up -d --build
 ## Verify a change
 
 ```bash
-uv run ruff check backend
-uv run ruff format --check backend
-uv run pytest
+uv run ruff check backend scripts
+uv run ruff format --check backend scripts
+uv run pytest -n auto
 python3 scripts/bump_version.py --check
 npm --prefix frontend run build
 npm --prefix frontend run budget
@@ -70,8 +70,16 @@ The four projects cover Chromium and WebKit at desktop/mobile widths. A fifth,
 `chromium-performance`, starts its own workspace of 25,000 jobs (with their
 ingest signals) and 500 applications and fails when the Applications list or
 the jobs to review take 300 ms or more to show 200 rows (the median of seven
-loads). CI runs Chromium at both widths and the
-performance project. Browser binaries are development tools, outside the core.
+loads). CI runs Chromium at both widths inside the official Playwright container
+image, so it downloads no browsers; WebKit at both widths and the performance
+project run weekly in `.github/workflows/nightly.yml`. The image tag in `ci.yml`
+and `nightly.yml` must equal the `@playwright/test` version in the lock file; the
+`e2e` job fails early when they differ. Browser binaries are development tools,
+outside the core.
+
+A browser test that fails because of the order of the specs (they share one
+server and database until #220) is quarantined with `test.fixme` and a comment
+linking #220, never retried silently.
 
 ### Backend time budgets
 
@@ -82,9 +90,12 @@ budget: the Applications list, the reads of Today, the job inbox (with counts
 and facets), text search, the overview, the staleness report, insights, source
 yield and the timeline of a busy job and application. The budgets are about six
 times the time measured on a laptop, so a slower CI runner passes and a real
-regression does not. It runs with `pytest`; select it alone with
-`uv run pytest -m performance`. Never raise a budget to make a change
-pass: make the read faster, or explain in the pull request why it must cost more.
+regression does not. It is marked `performance`, which the default `pytest` run
+deselects (`addopts` in `pyproject.toml`), together with the 500-context storage
+benchmark and the labelled duplicate benchmark; run them with
+`uv run pytest -m performance`. CI runs them weekly. Never raise a budget to make
+a change pass: make the read faster, or explain in the pull request why it must
+cost more.
 
 ### Dashboard budgets
 
@@ -231,9 +242,13 @@ its upgrade and restore consequences.
 
 ## Releases
 
-CI checks formatting, backend/frontend tests, version consistency, dependency
-audits, an installed wheel and native Linux amd64/arm64 core images. Container
-smoke checks authentication, nonroot startup and packaged source/resource hashes.
+CI checks formatting, backend/frontend tests, version consistency, an installed
+wheel and the core image (amd64 on pull requests; amd64 and arm64 on `main` and
+in releases). Container smoke checks authentication, nonroot startup and packaged
+source/resource hashes. The weekly workflow runs the performance tests, WebKit,
+the large-workspace browser budget and the dependency audits; check its latest
+run on `main` before each release. The release workflow audits dependencies
+again and attaches an SBOM and provenance attestation to each image.
 Dependabot proposes weekly grouped updates for Python, npm, GitHub Actions and
 Docker base images.
 
@@ -264,3 +279,49 @@ Before a release, review the changelog and a practical collection → applicatio
 external-agent documents → review → backup/restore workflow. Hardware claims need
 measurements with a stated platform and workload. Distinguish observed resource
 use, container limits and host requirements.
+
+## Repository settings
+
+`main` is protected by a branch ruleset: every change arrives through a pull
+request whose required checks pass on a branch that is up to date with `main`;
+force-pushes and deletion are blocked, and nobody, administrators included, can
+bypass it. No review is required (single owner). The required checks are the job
+names of `.github/workflows/ci.yml`: `backend`, `frontend`, `e2e` and
+`container (amd64)`. A change that renames or splits those jobs (for example
+sharding `e2e`) updates the ruleset in the same pull request.
+
+The ruleset was created with:
+
+```bash
+gh api --method POST repos/VincenzoImp/openings/rulesets --input - <<'JSON'
+{
+  "name": "main",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
+  "rules": [
+    {"type": "deletion"},
+    {"type": "non_fast_forward"},
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "do_not_enforce_on_create": false,
+        "required_status_checks": [
+          {"context": "backend", "integration_id": 15368},
+          {"context": "frontend", "integration_id": 15368},
+          {"context": "e2e", "integration_id": 15368},
+          {"context": "container (amd64)", "integration_id": 15368}
+        ]
+      }
+    }
+  ]
+}
+JSON
+```
+
+`15368` is the GitHub Actions app, so only Actions can report these checks. To
+change the checks, find the ruleset id with
+`gh api repos/VincenzoImp/openings/rulesets` and send the same body with
+`gh api --method PUT repos/VincenzoImp/openings/rulesets/<id> --input -`.
