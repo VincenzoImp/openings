@@ -355,7 +355,7 @@ def test_planning_fields_have_rest_and_mcp_parity(tmp_path, transport):
             return 200, result.get("structuredContent") or json.loads(result["content"][0]["text"])
 
         status, created = call(
-            "application_create",
+            "applications_create",
             "POST",
             "/applications",
             {
@@ -371,7 +371,7 @@ def test_planning_fields_have_rest_and_mcp_parity(tmp_path, transport):
         )
         assert status == 200 and created["readiness"] == "blocked"
         status, updated = call(
-            "application_update",
+            "applications_update",
             "PATCH",
             f"/applications/{created['id']}",
             {
@@ -385,7 +385,7 @@ def test_planning_fields_have_rest_and_mcp_parity(tmp_path, transport):
         )
         assert status == 200 and updated["readiness"] == "none" and updated["deadline"] is None
         status, _ = call(
-            "application_update",
+            "applications_update",
             "PATCH",
             f"/applications/{created['id']}",
             {
@@ -405,7 +405,7 @@ def test_planning_fields_have_rest_and_mcp_parity(tmp_path, transport):
         assert (item["priority"], item["deadline"], item["readiness"]) == (2, None, "none")
         assert item["open_requirements"] == item["blocking_requirements"] == 0
         status, got = call(
-            "application_get",
+            "applications_get",
             "GET",
             f"/applications/{created['id']}",
             {"application_id": created["id"]},

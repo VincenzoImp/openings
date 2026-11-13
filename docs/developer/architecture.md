@@ -30,6 +30,7 @@ flowchart LR
 | `backend/openings/snapshots.py`, `compaction.py` | Content-addressed storage of frozen contexts; giving freed pages back to the data volume |
 | `backend/openings/retention.py` | Refresh events, what an observation stores, pruning of finished collection runs and tasks |
 | `backend/openings/operations.py` | Backup credentials, restore, the room a restore needs and storage status |
+| `backend/openings/idempotency.py` | Idempotency keys of the creates whose records have no key column |
 | `backend/openings/activity.py`, `actors.py` | Actor of each change, agent runs with reports, questions for the owner, change log |
 | `backend/openings/agent_requests.py`, `subjects.py` | Requests for the agent; the subject reference shared with questions |
 | `backend/openings/discovery/` | Typed sources, schedules and queue operations |
@@ -81,7 +82,7 @@ Each logical operation is declared once, as an `Operation` in its area's
 `interfaces/` module (`OPERATIONS`): its inventory id, group and label, its
 `resource` and `verb`, its parameters (`Param`), the service call, its REST
 routes (`Route`: method, path, route name, status code) and its MCP tool
-(`Tool`: name, annotations, description), and `access="owner"` where the service
+(`Tool`: annotations, description), and `access="owner"` where the service
 requires owner authority. `registry.bind_rest` and `registry.bind_mcp` generate
 the FastAPI routes and MCP tools from it, both calling the same service code:
 
@@ -103,17 +104,35 @@ the FastAPI routes and MCP tools from it, both calling the same service code:
 
 REST routes are registered in declaration order, which matters for matching
 (`/jobs/resolve` before `/jobs/{job_id}`); MCP tools follow the same order within
-an area. `canonical_name` (`<resource>_<verb>`) is the name of the naming scheme
-of decision 11; today every tool keeps its current `Tool.name`. When the scheme
-is adopted, `Tool.name` becomes the canonical name and `aliases` lists the
-earlier ones: `bind_mcp` registers each alias as the same tool, its description
-starting "Deprecated alias of <name>.", and the inventory lists it after the
-tool's name.
+an area. A tool is named `canonical_name`, `<resource>_<verb>` with a plural
+resource (decision 11); no tool is named by hand, so a clearer name means a
+clearer `resource` or `verb` (`files_reserve_upload`, `workspace_backup`,
+`tokens_revoke`). A singular resource names one record of the workspace or a
+mass noun (`profile`, `policy`, `workspace`, `knowledge`, `staleness`).
+
+A tool's arguments have one shape: the record ids a REST path names, flat;
+`expected_version` of a delete, flat; and one `value`, the REST body of a write
+or the query string of a read (`query_model`). Every paged list returns `items`,
+`total`, `limit` and `offset` and summaries by default; every delete names
+`expected_version` (a file's version is always 1: files never change); every
+create accepts `idempotency_key`. Records without a key column keep their key
+in `idempotency_keys` (`idempotency.py`: the table, the key, a SHA-256 of the
+request and the record's id; a key whose record is gone is free again).
+
+The names and shapes before 0.22 stay until 0.23. `aliases` lists a tool's
+earlier names: `bind_mcp` registers each as the same tool, its description
+starting "Deprecated alias of <name>; removed in 0.23.", and the inventory lists
+it after the tool's name. An `Alias` with `params` keeps the arguments the
+earlier tool took, where the new tool takes them differently.
+`Tool.legacy` names the `value` fields a tool still accepts as deprecated flat
+arguments, for the lists that took flat filters before. `scripts/inventory.py`
+writes the tables of both into the [upgrade guide](../user/upgrading-0.22.md).
 
 `scripts/inventory.py` writes `operation-inventory.json` from the declarations
 and `interfaces/inventory-notes.json`, which holds the inventory's order,
-dashboard locations and remarks. `pytest` fails while the file is out of date,
-or when a declared route, tool or surface is not registered.
+dashboard locations and remarks. `pytest` fails while the file or the upgrade
+guide's tables are out of date, or when a declared route, tool or surface is not
+registered.
 
 ## Data and workflow rules
 
@@ -276,7 +295,7 @@ or when a declared route, tool or surface is not registered.
   for the first) and leaves an attributed `skill_notes_updated` event with the
   skill and version only. `skill_notes.serve` is the one place that appends the
   notes to `SKILL.md` under "Local notes for this workspace", for REST,
-  `skill_get` and the MCP prompts alike; reference files are served as shipped.
+  `skills_get` and the MCP prompts alike; reference files are served as shipped.
   Any authenticated actor may write: the agent discovers what a workflow lacks
   while running it, the notes stay in the workspace, and each version names its
   author and can be restored. A finished run's `method` is listed with the run
@@ -295,8 +314,9 @@ or when a declared route, tool or surface is not registered.
   reason. A new operation that changes current revisions must call it too.
 - **Concurrency:** typed inputs, optimistic versions, idempotency keys, foreign
   keys and short transactions protect shared state. Run one application process
-  per workspace; database connections do not cross threads. Mutable job and
-  application deletion requires the current version as well.
+  per workspace; database connections do not cross threads. Every deletion
+  names the current version; a note, revision or file deleted without one is
+  accepted until 0.23.
 
 SQLite uses WAL and stores SHA-256-deduplicated BLOBs for attachments. Lists return
 compact paginated summaries; full postings, narratives, contexts and file bytes

@@ -241,6 +241,7 @@ def assert_reproduced(workspace, before):
             "owner_id": row["context_id"],
             "source_sha256": None,
             "url": f"/api/v1/files/{row['id']}/content",
+            "version": 1,
         }
 
 

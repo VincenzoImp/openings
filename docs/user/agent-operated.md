@@ -41,7 +41,7 @@ password and create the API token yourself.
    password, manage tokens, restore a backup or answer its own questions
    (see [token kinds](agents.md#token-kinds)).
 2. Give your agent the skills. A connected agent gets them from the server
-   itself: `skills_list` and `skill_get` tools, and one MCP prompt per skill,
+   itself: `skills_list` and `skills_get` tools, and one MCP prompt per skill,
    always matching the running version. Clients that support
    [Agent Skills](https://agentskills.io/specification) can also load the
    repository's `skills/` directory.

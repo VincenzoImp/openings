@@ -8,6 +8,7 @@ from ..actors import SYSTEM, current_actor
 from ..common import check_version, new_id, now
 from ..db import encode
 from ..errors import DomainError
+from ..idempotency import fingerprint, remember, replay
 from ..identities import job_identities, normalize_url
 from ..job_signals import store_text_signals
 from ..models import JobInput, JobPatch
@@ -19,15 +20,31 @@ from ..snapshots import collect_unused
 class JobChanges:
     """Adding, correcting, triaging and forgetting jobs."""
 
-    def ingest_job(self, value, defer_signals=False):
+    def replayed_job(self, key, digest):
+        """The job an earlier request with this idempotency key gave, or None."""
+        if not key:
+            return None
+        with self.db.transaction() as c:
+            job_id = replay(c, "jobs", key, digest)
+        if job_id is None:
+            return None
+        return {**self.get_job(job_id), "created": False}
+
+    def ingest_job(self, value, defer_signals=False, digest=None):
         """Store a posting as a new job or as a refresh of the job it identifies.
 
         A new job gets its text signals in the same transaction, then its duplicate
         and the policy rules (``SignalService.after_ingest``). A caller holding the
         database lock passes ``defer_signals`` and runs that step after releasing it.
+        A request with an idempotency key gives the same job when retried; ``digest``
+        is the fingerprint of the request as sent, before a URL was read.
         """
         value = value if isinstance(value, JobInput) else JobInput.model_validate(value)
-        data = value.model_dump()
+        digest = digest or fingerprint(value)
+        replayed = self.replayed_job(value.idempotency_key, digest)
+        if replayed:
+            return replayed
+        data = value.model_dump(exclude={"idempotency_key"})
         if not value.url and not value.posting.strip():
             raise DomainError(422, "job_content", "Provide a job URL or posting text.")
         url = normalize_url(value.url)
@@ -148,6 +165,7 @@ class JobChanges:
                         stamp,
                     ),
                 )
+            remember(c, "jobs", value.idempotency_key, digest, job_id)
         if prior is None and not defer_signals:
             # A job the owner adds in the dashboard is never dismissed by a rule.
             self.signals.after_ingest(job_id, apply_rules=current_actor().kind != "owner")

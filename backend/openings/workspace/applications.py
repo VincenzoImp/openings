@@ -242,6 +242,8 @@ class ApplicationReads:
         return {
             "items": items,
             "total": total,
+            "limit": limit,
+            "offset": offset,
             "stage_counts": counts,
             "ready_count": ready_count,
             "no_reply": no_reply,

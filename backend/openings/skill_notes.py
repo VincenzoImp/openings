@@ -2,7 +2,7 @@
 
 Skills ship with the server and match its version; a workspace never edits them.
 Instead it keeps local notes for a skill, appended under their own heading
-whenever the skill is served (``skill_get`` and ``GET /skills/{name}``, and the
+whenever the skill is served (``skills_get`` and ``GET /skills/{name}``, and the
 skill's MCP prompt), all through :func:`serve`. The shipped text is never
 modified or stored here.
 

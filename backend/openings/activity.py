@@ -121,6 +121,13 @@ class RunQuery(Input):
         return normalized_date(value, end=info.field_name == "started_until")
 
 
+class RunRead(Input):
+    """The page of a run's changes that runs_get returns."""
+
+    changes_limit: int = Field(default=50, ge=1, le=200)
+    changes_offset: int = Field(default=0, ge=0)
+
+
 class QuestionAsk(Input):
     question: str = Field(min_length=1, max_length=2000)
     why: str = Field(
@@ -565,7 +572,12 @@ class ActivityService:
                 (*params, value.limit, value.offset),
             ).fetchall()
             total = conn.execute("SELECT count(*) FROM runs" + clause, params).fetchone()[0]
-            return {"items": [self._run(conn, row) for row in rows], "total": total}
+            return {
+                "items": [self._run(conn, row) for row in rows],
+                "total": total,
+                "limit": value.limit,
+                "offset": value.offset,
+            }
 
     # Questions for the owner
 
@@ -740,4 +752,9 @@ class ActivityService:
                 (*params, value.limit, value.offset),
             ).fetchall()
             total = conn.execute("SELECT count(*) FROM questions q" + clause, params).fetchone()[0]
-        return {"items": [self._question(row) for row in rows], "total": total}
+        return {
+            "items": [self._question(row) for row in rows],
+            "total": total,
+            "limit": value.limit,
+            "offset": value.offset,
+        }

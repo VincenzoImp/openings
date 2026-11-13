@@ -1,8 +1,8 @@
 """REST routes and MCP tools of documents."""
 
-from typing import Literal
+from typing import Annotated
 
-from fastapi import Request
+from fastapi import Query, Request
 from mcp.types import ToolAnnotations
 
 from ..common import encode
@@ -10,12 +10,23 @@ from ..documents import (
     ContextCreate,
     DocumentCreate,
     DocumentService,
-    OwnerType,
     ReviewUpdate,
     StalenessStage,
     UploadReservation,
 )
-from .registry import Exemption, Operation, Param, Route, Surface, Tool, bind_mcp, bind_rest
+from ..documents.models import ContextQuery, DocumentQuery, FileQuery, StalenessQuery
+from .registry import (
+    Alias,
+    Exemption,
+    Operation,
+    Param,
+    Route,
+    Surface,
+    Tool,
+    bind_mcp,
+    bind_rest,
+    query_model,
+)
 
 LOOKUP = ToolAnnotations(
     readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
@@ -30,6 +41,14 @@ DELETE = ToolAnnotations(
     readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False
 )
 
+# A delete that took no version before 0.22 still accepts none until 0.23 (#167).
+OPTIONAL_VERSION = Param(
+    "expected_version",
+    int | None,
+    None,
+    rest=(Annotated[int | None, Query(ge=1)], None),
+)
+
 OPERATIONS = (
     Operation(
         "contexts.list",
@@ -37,18 +56,12 @@ OPERATIONS = (
         "list",
         "Applications and documents",
         "List/filter compact frozen-context metadata",
-        params=(
-            Param("application_id", str, ""),
-            Param("limit", int, 100),
-            Param("offset", int, 0),
-            Param("summary", bool, False),
-            Param("q", str, ""),
-        ),
-        call=lambda s, application_id, limit, offset, summary, q: s.list_contexts(
-            application_id, limit, offset, summary, q
-        ),
+        params=(query_model(ContextQuery),),
+        call=lambda s, value: s.list_contexts(**(value or ContextQuery()).model_dump()),
         rest=(Route("GET", "/contexts", "list_contexts"),),
-        tool=Tool("contexts_list", LOOKUP, method="list_contexts"),
+        tool=Tool(
+            LOOKUP, DocumentService.list_contexts.__doc__, legacy=tuple(ContextQuery.model_fields)
+        ),
     ),
     Operation(
         "contexts.create",
@@ -59,7 +72,8 @@ OPERATIONS = (
         params=(Param("value", ContextCreate),),
         call=lambda s, value: s.prepare_context(value),
         rest=(Route("POST", "/contexts", "prepare_context", status_code=201),),
-        tool=Tool("application_prepare_context", ADD, method="prepare_context"),
+        aliases=("application_prepare_context",),
+        tool=Tool(ADD, method="prepare_context"),
     ),
     Operation(
         "contexts.read",
@@ -70,7 +84,7 @@ OPERATIONS = (
         params=(Param("context_id", str),),
         call=lambda s, context_id: s.get_context(context_id),
         rest=(Route("GET", "/contexts/{context_id}", "get_context"),),
-        tool=Tool("contexts_get", LOOKUP, method="get_context"),
+        tool=Tool(LOOKUP, method="get_context"),
     ),
     Operation(
         "documents.list",
@@ -78,20 +92,14 @@ OPERATIONS = (
         "list",
         "Applications and documents",
         "List/filter paginated revision summaries",
-        params=(
-            Param("application_id", str, ""),
-            Param("kind", str, ""),
-            Param("limit", int, 100),
-            Param("offset", int, 0),
-            Param("summary", bool, True),
-            Param("q", str, ""),
-            Param("review_state", Literal["draft", "approved"] | None, None),
-        ),
-        call=lambda s, application_id, kind, limit, offset, summary, q, review_state: (
-            s.list_documents(application_id, kind, limit, offset, summary, q, review_state)
-        ),
+        params=(query_model(DocumentQuery),),
+        call=lambda s, value: s.list_documents(**(value or DocumentQuery()).model_dump()),
         rest=(Route("GET", "/documents", "list_documents"),),
-        tool=Tool("documents_list", LOOKUP, method="list_documents"),
+        tool=Tool(
+            LOOKUP,
+            DocumentService.list_documents.__doc__,
+            legacy=tuple(DocumentQuery.model_fields),
+        ),
     ),
     Operation(
         "documents.create",
@@ -102,7 +110,7 @@ OPERATIONS = (
         params=(Param("value", DocumentCreate),),
         call=lambda s, value: s.create_document(value),
         rest=(Route("POST", "/documents", "create_document", status_code=201),),
-        tool=Tool("documents_create", REPLACE, method="create_document"),
+        tool=Tool(REPLACE, method="create_document"),
     ),
     Operation(
         "documents.read",
@@ -113,7 +121,7 @@ OPERATIONS = (
         params=(Param("document_id", str),),
         call=lambda s, document_id: s.get_document(document_id),
         rest=(Route("GET", "/documents/{document_id}", "get_document"),),
-        tool=Tool("documents_get", LOOKUP, method="get_document"),
+        tool=Tool(LOOKUP, method="get_document"),
     ),
     Operation(
         "documents.compare",
@@ -124,7 +132,7 @@ OPERATIONS = (
         params=(Param("document_id", str), Param("other_id", str, "")),
         call=lambda s, document_id, other_id: s.compare_documents(document_id, other_id),
         rest=(Route("GET", "/documents/{document_id}/comparison", "compare_documents"),),
-        tool=Tool("documents_compare", LOOKUP, method="compare_documents"),
+        tool=Tool(LOOKUP, method="compare_documents"),
     ),
     Operation(
         "applications.staleness_list",
@@ -132,17 +140,24 @@ OPERATIONS = (
         "list",
         "Applications and documents",
         "List attempts whose current revisions use outdated inputs",
-        params=(
-            Param("status", StalenessStage, "draft"),
-            Param("stale_only", bool, True),
-            Param("limit", int, 50),
-            Param("offset", int, 0),
-        ),
-        call=lambda s, status, stale_only, limit, offset: s.list_staleness(
-            status, stale_only, limit, offset
-        ),
+        params=(query_model(StalenessQuery),),
+        call=lambda s, value: s.list_staleness(**(value or StalenessQuery()).model_dump()),
         rest=(Route("GET", "/staleness", "list_staleness"),),
-        tool=Tool("applications_staleness", LOOKUP, method="list_staleness"),
+        aliases=(
+            Alias(
+                "applications_staleness",
+                params=(
+                    Param("status", StalenessStage, "draft"),
+                    Param("stale_only", bool, True),
+                    Param("limit", int, 50),
+                    Param("offset", int, 0),
+                ),
+                call=lambda s, status, stale_only, limit, offset: s.list_staleness(
+                    status, stale_only, limit, offset
+                ),
+            ),
+        ),
+        tool=Tool(LOOKUP, DocumentService.list_staleness.__doc__),
     ),
     Operation(
         "applications.staleness",
@@ -153,7 +168,8 @@ OPERATIONS = (
         params=(Param("application_id", str),),
         call=lambda s, application_id: s.application_staleness(application_id),
         rest=(Route("GET", "/applications/{application_id}/staleness", "application_staleness"),),
-        tool=Tool("application_staleness", LOOKUP, method="application_staleness"),
+        aliases=("application_staleness",),
+        tool=Tool(LOOKUP, method="application_staleness"),
     ),
     Operation(
         "documents.review",
@@ -164,7 +180,7 @@ OPERATIONS = (
         params=(Param("document_id", str), Param("value", ReviewUpdate)),
         call=lambda s, document_id, value: s.review_document(document_id, value),
         rest=(Route("POST", "/documents/{document_id}/review", "review_document"),),
-        tool=Tool("documents_review", REPLACE, method="review_document"),
+        tool=Tool(REPLACE, method="review_document"),
     ),
     Operation(
         "documents.delete",
@@ -172,10 +188,12 @@ OPERATIONS = (
         "delete",
         "Applications and documents",
         "Delete an entire revision and its files",
-        params=(Param("document_id", str),),
-        call=lambda s, document_id: s.delete_document(document_id),
+        params=(Param("document_id", str), OPTIONAL_VERSION),
+        call=lambda s, document_id, expected_version: s.delete_document(
+            document_id, expected_version
+        ),
         rest=(Route("DELETE", "/documents/{document_id}", "delete_document"),),
-        tool=Tool("documents_delete", DELETE, method="delete_document"),
+        tool=Tool(DELETE, DocumentService.delete_document.__doc__),
     ),
     Operation(
         "files.list",
@@ -183,28 +201,15 @@ OPERATIONS = (
         "list",
         "Applications and documents",
         "List/filter paginated file metadata",
-        params=(
-            Param("owner_type", OwnerType | None, None),
-            Param("owner_id", str, ""),
-            Param("limit", int, 100),
-            Param("offset", int, 0),
-            Param("summary", bool, False),
-            Param("q", str, ""),
-            Param("media_type", str, ""),
-            Param("application_id", str, ""),
-        ),
-        call=lambda s, owner_type, owner_id, limit, offset, summary, q, media_type, application_id: (
-            s.list_files(
-                owner_type, owner_id, limit, offset, summary, q, media_type, application_id
-            )
-        ),
+        params=(query_model(FileQuery),),
+        call=lambda s, value: s.list_files(**(value or FileQuery()).model_dump()),
         rest=(Route("GET", "/files", "list_files"),),
-        tool=Tool("files_list", LOOKUP, method="list_files"),
+        tool=Tool(LOOKUP, DocumentService.list_files.__doc__, legacy=tuple(FileQuery.model_fields)),
     ),
     Operation(
         "files.upload",
         "files",
-        "upload",
+        "reserve_upload",
         "Applications and documents",
         "Upload exact raw bytes to a mutable owner",
         params=(Param("value", UploadReservation),),
@@ -213,7 +218,7 @@ OPERATIONS = (
             Route("POST", "/files/uploads", "reserve_upload", status_code=201),
             Route("PUT", "/transfers", "upload", custom=True),
         ),
-        tool=Tool("files_reserve_upload", ADD, method="reserve_upload"),
+        tool=Tool(ADD, method="reserve_upload"),
     ),
     Operation(
         "files.read",
@@ -224,12 +229,12 @@ OPERATIONS = (
         params=(Param("file_id", str),),
         call=lambda s, file_id: s.get_file(file_id),
         rest=(Route("GET", "/files/{file_id}", "get_file"),),
-        tool=Tool("files_get", LOOKUP, method="get_file"),
+        tool=Tool(LOOKUP, method="get_file"),
     ),
     Operation(
         "files.download",
         "files",
-        "download",
+        "reserve_download",
         "Applications and documents",
         "Download/preview exact file bytes",
         params=(Param("file_id", str),),
@@ -245,7 +250,7 @@ OPERATIONS = (
             Route("POST", "/files/{file_id}/download", "reserve_download"),
             Route("GET", "/transfers", "download", custom=True),
         ),
-        tool=Tool("files_reserve_download", ADD, method="reserve_download"),
+        tool=Tool(ADD, method="reserve_download"),
     ),
     Operation(
         "files.delete",
@@ -253,10 +258,10 @@ OPERATIONS = (
         "delete",
         "Applications and documents",
         "Delete a live knowledge/template/job asset",
-        params=(Param("file_id", str),),
-        call=lambda s, file_id: s.delete_file(file_id),
+        params=(Param("file_id", str), OPTIONAL_VERSION),
+        call=lambda s, file_id, expected_version: s.delete_file(file_id, expected_version),
         rest=(Route("DELETE", "/files/{file_id}", "delete_file"),),
-        tool=Tool("files_delete", DELETE, method="delete_file"),
+        tool=Tool(DELETE, DocumentService.delete_file.__doc__),
     ),
 )
 

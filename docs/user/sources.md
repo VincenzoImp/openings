@@ -188,7 +188,7 @@ rule with the jobs it dismissed and opens them in Jobs.
 
 ![Yield by source: collected, kept, applied, answered and dismissed jobs for each saved search and company board](../images/yield.png)
 
-REST `GET /collection/yield?since=&until=&min_sample=` and MCP `collection_yield`
+REST `GET /collection/yield?since=&until=&min_sample=` and MCP `sources_yield`
 return the same counts with `likely_duplicates`, `no_longer_listed`,
 `dismissed_by` and `dismissed_by_rule`.
 

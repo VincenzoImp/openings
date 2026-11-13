@@ -275,7 +275,12 @@ class JobReads:
                 (*args, limit, offset),
             ).fetchall()
             total = connection.execute("SELECT count(*)" + base + where, args).fetchone()[0]
-            result = {"items": [self._compact_job(row) for row in rows], "total": total}
+            result = {
+                "items": [self._compact_job(row) for row in rows],
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+            }
             if include_counts:
                 result["counts"] = self._job_counts(
                     connection,

@@ -185,7 +185,7 @@ def test_rest_and_mcp_return_the_same_yield(tmp_path):
                 "jsonrpc": "2.0",
                 "id": 1,
                 "method": "tools/call",
-                "params": {"name": "collection_yield", "arguments": {"value": {"min_sample": 3}}},
+                "params": {"name": "sources_yield", "arguments": {"value": {"min_sample": 3}}},
             },
         )
         result = response.json()["result"]

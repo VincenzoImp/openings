@@ -11,6 +11,7 @@ the deprecated ``application.note`` field reads and writes until 0.23.
 from ..actors import current_actor, pop_actor
 from ..common import check_version, new_id, now
 from ..errors import DomainError, missing
+from ..idempotency import fingerprint, remember, replay
 from ..models import NoteInput, NotePatch, NotePin
 
 NOTE_SELECT = "SELECT n.*,r.workflow AS run_workflow FROM notes n LEFT JOIN runs r ON r.id=n.run_id"
@@ -61,8 +62,14 @@ class Notes:
         self.get_job(job_id)
         if value.application_id and self.get_application(value.application_id)["job_id"] != job_id:
             raise DomainError(422, "note_owner", "Application belongs to a different job.")
+        digest = fingerprint({**value.model_dump(mode="json"), "job_id": job_id})
         with self.db.transaction() as c:
-            note_id = self.insert_note(c, job_id, value.application_id, value.body, value.pinned)
+            note_id = replay(c, "notes", value.idempotency_key, digest)
+            if note_id is None:
+                note_id = self.insert_note(
+                    c, job_id, value.application_id, value.body, value.pinned
+                )
+                remember(c, "notes", value.idempotency_key, digest, note_id)
         return self.get_note(note_id)
 
     def insert_note(self, conn, job_id, application_id, body, pinned=False):
@@ -96,11 +103,13 @@ class Notes:
         )
         return note_id
 
-    def delete_note(self, note_id):
+    def delete_note(self, note_id, expected_version=None):
+        """Delete a note with its current version; without one (deprecated, until 0.23) as it stands."""
         with self.db.transaction() as c:
             row = c.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()
             if row is None:
                 missing("Note")
+            check_version(row, expected_version)
             c.execute("DELETE FROM notes WHERE id=?", (note_id,))
             self.event(
                 "note_deleted",

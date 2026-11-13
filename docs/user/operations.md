@@ -118,7 +118,7 @@ proxy's limit. To find it, check the client address of proxied requests in
 `docker compose logs openings`.
 
 Operational grants from `workspace_backup`, `workspace_export` and
-`workspace_restore_upload` expire after 120 seconds and work once; request a new
+`workspace_restore` expire after 120 seconds and work once; request a new
 grant for each transfer or retry.
 
 ## Troubleshooting

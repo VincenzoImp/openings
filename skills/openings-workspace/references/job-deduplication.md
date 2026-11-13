@@ -54,8 +54,8 @@ for example a copy without a requisition ID next to two requisitions).
 A job collected after another that it likely repeats carries the same score as
 `signals.duplicate` (`job_id`, `confidence`, `tier`, from the medium tier up),
 computed once when it was collected. After checking, merge a verified
-duplicate with `job_merge`, or record a different vacancy with
-`job_distinct(job_id, {other_id})`: the flag goes and is not computed again.
+duplicate with `jobs_merge`, or record a different vacancy with
+`jobs_distinct(job_id, {other_id})`: the flag goes and is not computed again.
 
 These are review signals, not identity, and nothing is merged automatically. A
 high tier is a strong suggestion; an identical advertisement reused for two
@@ -83,7 +83,7 @@ continuing. Repeated collection alone does not authorize another application.
 An Applied, Interview or Offer attempt is not a new preparation request. Resume
 an intended Draft; start no later attempt after Closed without explicit scope.
 
-The supported merge is `job_merge(job_id, value: {target_id, expected_version,
+The supported merge is `jobs_merge(job_id, value: {target_id, expected_version,
 target_version})` or `POST /jobs/{source_id}/merge` with the same body. Read both
 versions immediately before it. The source is merged into the chosen target;
 source identities, postings, applications, events, notes and owned files move to
@@ -99,7 +99,7 @@ skip new preparation for the duplicate group until resolved. Never use job forge
 or delete an application to remove a duplicate.
 
 If identity is uncertain, report both IDs and the reason; do not merge or dismiss
-on similarity alone. A supported job note (`note_add`, body plus optional
+on similarity alone. A supported job note (`notes_create`, body plus optional
 `application_id`) can record the candidate canonical ID without inventing a metadata
 field. If an explicitly authorized cleanup uses dismissal instead of merge for a
 confirmed duplicate, note the canonical ID and reason first; preserve all history.

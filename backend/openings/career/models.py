@@ -170,6 +170,12 @@ class KnowledgeCreate(KnowledgeFields):
     position: int | None = Field(default=None, ge=0, strict=True)
     narrative: str = Field(default="", max_length=100000)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    idempotency_key: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description="Retrying with the same key and request returns the record the first request created.",
+    )
 
 
 class KnowledgeUpdate(KnowledgeFields, NonNullUpdate):
@@ -193,6 +199,12 @@ CLAIM_FIELDS = ("default_in_cv", "role", "group")
 
 class ClaimCreate(Input):
     knowledge_id: str
+    idempotency_key: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description="Retrying with the same key and request returns the record the first request created.",
+    )
     text: str = Field(min_length=1, max_length=5000)
     approved: bool = False
     position: int | None = Field(default=None, ge=0, strict=True)
@@ -245,6 +257,12 @@ class TemplateCreate(Input):
     guidance: str = Field(default="", max_length=20000)
     rules: dict[str, Any] = Field(default_factory=dict, description=RULES_DESCRIPTION)
     is_default: bool = False
+    idempotency_key: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description="Retrying with the same key and request returns the record the first request created.",
+    )
 
     @field_validator("rules")
     @classmethod
@@ -281,6 +299,32 @@ class CareerImport(Input):
     knowledge: list[KnowledgeCreate] = Field(default_factory=list, max_length=200)
     profile: dict[str, Any] | None = None
     expected_profile_version: int | None = Field(default=None, ge=0, strict=True)
+
+
+# The filters, page and detail of each list: MCP's value, REST's query string.
+class KnowledgeQuery(Input):
+    q: str = ""
+    kind: str = ""
+    limit: int = 100
+    offset: int = 0
+    summary: bool = True
+
+
+class ClaimQuery(Input):
+    knowledge_id: str = ""
+    approved: bool | None = None
+    limit: int = 100
+    offset: int = 0
+    summary: bool = True
+    q: str = ""
+
+
+class TemplateQuery(Input):
+    kind: str = ""
+    limit: int = 100
+    offset: int = 0
+    summary: bool = True
+    q: str = ""
 
 
 def validate_rules(value):

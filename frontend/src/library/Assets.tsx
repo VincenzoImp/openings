@@ -179,7 +179,11 @@ export function Assets({
           onConfirm={async () => {
             if (
               await mutate(
-                () => api(`/files/${removing.id}`, "DELETE"),
+                () =>
+                  api(
+                    `/files/${removing.id}?expected_version=${removing.version ?? 1}`,
+                    "DELETE",
+                  ),
                 "File removed.",
               )
             )

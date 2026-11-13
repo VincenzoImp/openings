@@ -89,7 +89,7 @@ full PDF and extracted text, then update the template source, rules, guidance an
 assets together with the expected version.
 
 Existing Drafts keep their frozen contexts. After the change, list stale Drafts
-with `applications_staleness` (REST `GET /staleness`); each report names the
+with `staleness_list` (REST `GET /staleness`); each report names the
 changed Profile part, policy item, guidance, template, entry or claim and the
 affected revisions. Only what documents use counts: Profile metadata,
 preferences and roles, decision items, unconfirmed proposals, template names,
@@ -100,7 +100,7 @@ are not compared for them (`comparison.policy: "not_frozen"`).
 Propagate the change to Drafts the owner has not yet submitted when it improves
 them: prepare a new context with the same deliberate selections, save new
 revisions linked with `previous_id`, check them like new work, keep earlier
-revisions and report each updated Draft. Re-run `application_staleness` to confirm
+revisions and report each updated Draft. Re-run `staleness_get` to confirm
 the new leaves are current. Leave a Draft stale when the change does not matter to
 it, and say so in the report.
 

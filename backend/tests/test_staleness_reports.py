@@ -70,7 +70,7 @@ async def test_staleness_reports_changed_inputs_without_rewriting_contexts(tmp_p
         )
     signature = contexts[0]["signature"]
 
-    assert documents.list_staleness() == {"items": [], "total": 0}
+    assert documents.list_staleness() == {"items": [], "total": 0, "limit": 50, "offset": 0}
     assert documents.list_staleness(stale_only=False)["total"] == 2
     assert workspace.get_application(applications[0]["id"])["stale_inputs"] == []
 
@@ -144,11 +144,11 @@ async def test_staleness_reports_changed_inputs_without_rewriting_contexts(tmp_p
         )
     )
     assert documents.application_staleness(applications[0]["id"])["stale"] is False
-    result = await app.state.mcp.call_tool("applications_staleness", {})
+    result = await app.state.mcp.call_tool("staleness_list", {})
     listed = json.loads(result.content[0].text)
     assert [item["application_id"] for item in listed["items"]] == [applications[1]["id"]]
     single = await app.state.mcp.call_tool(
-        "application_staleness", {"application_id": applications[1]["id"]}
+        "staleness_get", {"application_id": applications[1]["id"]}
     )
     assert json.loads(single.content[0].text)["inputs"] == report["inputs"]
 

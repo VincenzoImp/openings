@@ -85,13 +85,13 @@ def test_lists_default_to_compact_records_with_full_opt_in(tmp_path):
     app, headers, _jobs, _application = populated(tmp_path)
     with TestClient(app, base_url="http://localhost:8080") as client:
         rest = client.get("/api/v1/jobs", headers=headers).json()
-        mcp = structured(call(client, headers, "jobs_search", {}))
+        mcp = structured(call(client, headers, "jobs_list", {}))
         assert "facets" not in rest and mcp == rest and rest["total"] == 3
         faceted = client.get("/api/v1/jobs?include_facets=true", headers=headers).json()
         assert faceted["facets"]["companies"] == ["Example 0", "Example 1"]
         assert faceted["items"] == rest["items"]
         mcp_faceted = structured(
-            call(client, headers, "jobs_search", {"value": {"include_facets": True}}, 2)
+            call(client, headers, "jobs_list", {"value": {"include_facets": True}}, 2)
         )
         assert mcp_faceted == faceted
 
@@ -159,7 +159,7 @@ def test_job_and_application_mutations_return_compact_jobs(tmp_path):
             call(
                 client,
                 headers,
-                "job_triage",
+                "jobs_triage",
                 {"job_id": job["id"], "value": {"triage": "dismissed", "expected_version": 1}},
             )
         )
@@ -168,7 +168,7 @@ def test_job_and_application_mutations_return_compact_jobs(tmp_path):
             call(
                 client,
                 headers,
-                "job_update",
+                "jobs_update",
                 {"job_id": job["id"], "value": {"title": "Renamed", "expected_version": 2}},
                 2,
             )
@@ -211,7 +211,7 @@ def test_settings_conflicts_report_current_version(tmp_path):
 
         for ident, (name, arguments, current) in enumerate(
             [
-                ("career_update_profile", {"value": {"name": "Synthetic"}}, profile["version"]),
+                ("profile_update", {"value": {"name": "Synthetic"}}, profile["version"]),
                 ("instructions_update", {"value": {"general": "Write."}}, instructions["version"]),
                 ("collection_update", {"value": {"enabled": False}}, collection["version"]),
             ],
@@ -255,7 +255,7 @@ def test_logout_revokes_browser_sessions_but_keeps_api_tokens(tmp_path):
         client.cookies.clear()
 
         assert client.get("/api/v1/jobs", headers=headers).status_code == 200
-        assert structured(call(client, headers, "jobs_search", {}))["total"] == 3
+        assert structured(call(client, headers, "jobs_list", {}))["total"] == 3
 
         again = client.post("/api/v1/auth/login", json={"password": PASSWORD})
         assert again.status_code == 200
