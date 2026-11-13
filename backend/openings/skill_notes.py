@@ -34,27 +34,7 @@ from .models import Input
 MAX_LENGTH = 2000
 HISTORY = 50
 
-# Mirrored in schema.sql; the 11 -> 12 migration creates the same objects.
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS skill_notes (
- skill TEXT NOT NULL CHECK(length(skill) BETWEEN 1 AND 100),
- version INTEGER NOT NULL CHECK(version>=1),
- text TEXT NOT NULL DEFAULT '' CHECK(length(text)<=2000),
- created_by_kind TEXT, created_by_id TEXT, created_by_name TEXT, created_by_token_kind TEXT,
- created_at TEXT NOT NULL,
- PRIMARY KEY(skill,version)
-);
-"""
-
 HEADING = "## Local notes for this workspace"
-
-
-def migrate(conn):
-    """Create the table of an upgraded workspace, one statement at a time."""
-    # executescript would commit the surrounding upgrade.
-    for statement in SCHEMA.split(";\n"):
-        if statement.strip():
-            conn.execute(statement)
 
 
 def normalize(text: str) -> str:
