@@ -1,5 +1,7 @@
 """REST routes and MCP tools of career."""
 
+from mcp.types import ToolAnnotations
+
 from ..career import (
     CareerImport,
     CareerService,
@@ -13,151 +15,288 @@ from ..career import (
     TemplateCreate,
     TemplateUpdate,
 )
+from .registry import Operation, Param, Route, Tool, bind_mcp, bind_rest
+
+LOOKUP = ToolAnnotations(
+    readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+)
+REPLACE = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+)
+ADD = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False
+)
+DELETE = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False
+)
+
+OPERATIONS = (
+    Operation(
+        "profile.read",
+        "profile",
+        "get",
+        "Career and templates",
+        "Read profile, links, metadata and version",
+        params=(),
+        call=lambda s: s.get_profile(),
+        rest=(Route("GET", "/career/profile", "get_profile"),),
+        tool=Tool("career_get_profile", LOOKUP, method="get_profile"),
+    ),
+    Operation(
+        "profile.update",
+        "profile",
+        "update",
+        "Career and templates",
+        "Edit profile/preferences/contact",
+        params=(Param("value", ProfileUpdate),),
+        call=lambda s, value: s.update_profile(value),
+        rest=(Route("PATCH", "/career/profile", "update_profile"),),
+        tool=Tool("career_update_profile", REPLACE, method="update_profile"),
+    ),
+    Operation(
+        "knowledge.list",
+        "knowledge",
+        "list",
+        "Career and templates",
+        "Search/filter paginated career entries summaries",
+        params=(
+            Param("q", str, ""),
+            Param("kind", str, ""),
+            Param("limit", int, 100),
+            Param("offset", int, 0),
+            Param("summary", bool, False),
+        ),
+        call=lambda s, q, kind, limit, offset, summary: s.list_knowledge(
+            q, kind, limit, offset, summary
+        ),
+        rest=(Route("GET", "/career/knowledge", "list_knowledge"),),
+        tool=Tool("knowledge_list", LOOKUP, method="list_knowledge"),
+    ),
+    Operation(
+        "knowledge.create",
+        "knowledge",
+        "create",
+        "Career and templates",
+        "Create career entries",
+        params=(Param("value", KnowledgeCreate),),
+        call=lambda s, value: s.create_knowledge(value),
+        rest=(Route("POST", "/career/knowledge", "create_knowledge", status_code=201),),
+        tool=Tool("knowledge_create", ADD, method="create_knowledge"),
+    ),
+    Operation(
+        "knowledge.read",
+        "knowledge",
+        "get",
+        "Career and templates",
+        "Read full career entries",
+        params=(Param("knowledge_id", str),),
+        call=lambda s, knowledge_id: s.get_knowledge(knowledge_id),
+        rest=(Route("GET", "/career/knowledge/{knowledge_id}", "get_knowledge"),),
+        tool=Tool("knowledge_get", LOOKUP, method="get_knowledge"),
+    ),
+    Operation(
+        "knowledge.update",
+        "knowledge",
+        "update",
+        "Career and templates",
+        "Edit career entries with version protection",
+        params=(Param("knowledge_id", str), Param("value", KnowledgeUpdate)),
+        call=lambda s, knowledge_id, value: s.update_knowledge(knowledge_id, value),
+        rest=(Route("PATCH", "/career/knowledge/{knowledge_id}", "update_knowledge"),),
+        tool=Tool("knowledge_update", REPLACE, method="update_knowledge"),
+    ),
+    Operation(
+        "knowledge.delete",
+        "knowledge",
+        "delete",
+        "Career and templates",
+        "Delete live career entries",
+        params=(Param("knowledge_id", str), Param("expected_version", int)),
+        call=lambda s, knowledge_id, expected_version: s.delete_knowledge(
+            knowledge_id, expected_version
+        ),
+        rest=(Route("DELETE", "/career/knowledge/{knowledge_id}", "delete_knowledge"),),
+        tool=Tool("knowledge_delete", DELETE, method="delete_knowledge"),
+    ),
+    Operation(
+        "claims.list",
+        "claims",
+        "list",
+        "Career and templates",
+        "Search/filter paginated claims summaries",
+        params=(
+            Param("knowledge_id", str, ""),
+            Param("approved", bool | None, None),
+            Param("limit", int, 100),
+            Param("offset", int, 0),
+            Param("summary", bool, False),
+            Param("q", str, ""),
+        ),
+        call=lambda s, knowledge_id, approved, limit, offset, summary, q: s.list_claims(
+            knowledge_id, approved, limit, offset, summary, q
+        ),
+        rest=(Route("GET", "/career/claims", "list_claims"),),
+        tool=Tool("claims_list", LOOKUP, method="list_claims"),
+    ),
+    Operation(
+        "claims.create",
+        "claims",
+        "create",
+        "Career and templates",
+        "Create claim",
+        params=(Param("value", ClaimCreate),),
+        call=lambda s, value: s.create_claim(value),
+        rest=(Route("POST", "/career/claims", "create_claim", status_code=201),),
+        tool=Tool("claims_create", ADD, method="create_claim"),
+    ),
+    Operation(
+        "claims.read",
+        "claims",
+        "get",
+        "Career and templates",
+        "Read full claim",
+        params=(Param("claim_id", str),),
+        call=lambda s, claim_id: s.get_claim(claim_id),
+        rest=(Route("GET", "/career/claims/{claim_id}", "get_claim"),),
+        tool=Tool("claims_get", LOOKUP, method="get_claim"),
+    ),
+    Operation(
+        "claims.update",
+        "claims",
+        "update",
+        "Career and templates",
+        "Edit claim with version protection",
+        params=(Param("claim_id", str), Param("value", ClaimUpdate)),
+        call=lambda s, claim_id, value: s.update_claim(claim_id, value),
+        rest=(Route("PATCH", "/career/claims/{claim_id}", "update_claim"),),
+        tool=Tool("claims_update", REPLACE, method="update_claim"),
+    ),
+    Operation(
+        "claims.delete",
+        "claims",
+        "delete",
+        "Career and templates",
+        "Delete live claim",
+        params=(Param("claim_id", str), Param("expected_version", int)),
+        call=lambda s, claim_id, expected_version: s.delete_claim(claim_id, expected_version),
+        rest=(Route("DELETE", "/career/claims/{claim_id}", "delete_claim"),),
+        tool=Tool("claims_delete", DELETE, method="delete_claim"),
+    ),
+    Operation(
+        "templates.list",
+        "templates",
+        "list",
+        "Career and templates",
+        "Search/filter paginated templates summaries",
+        params=(
+            Param("kind", str, ""),
+            Param("limit", int, 100),
+            Param("offset", int, 0),
+            Param("summary", bool, False),
+            Param("q", str, ""),
+        ),
+        call=lambda s, kind, limit, offset, summary, q: s.list_templates(
+            kind, limit, offset, summary, q
+        ),
+        rest=(Route("GET", "/templates", "list_templates"),),
+        tool=Tool("templates_list", LOOKUP, method="list_templates"),
+    ),
+    Operation(
+        "templates.create",
+        "templates",
+        "create",
+        "Career and templates",
+        "Create template",
+        params=(Param("value", TemplateCreate),),
+        call=lambda s, value: s.create_template(value),
+        rest=(Route("POST", "/templates", "create_template", status_code=201),),
+        tool=Tool("templates_create", ADD, method="create_template"),
+    ),
+    Operation(
+        "templates.read",
+        "templates",
+        "get",
+        "Career and templates",
+        "Read full template",
+        params=(Param("template_id", str),),
+        call=lambda s, template_id: s.get_template(template_id),
+        rest=(Route("GET", "/templates/{template_id}", "get_template"),),
+        tool=Tool("templates_get", LOOKUP, method="get_template"),
+    ),
+    Operation(
+        "templates.update",
+        "templates",
+        "update",
+        "Career and templates",
+        "Edit template with version protection",
+        params=(Param("template_id", str), Param("value", TemplateUpdate)),
+        call=lambda s, template_id, value: s.update_template(template_id, value),
+        rest=(Route("PATCH", "/templates/{template_id}", "update_template"),),
+        tool=Tool("templates_update", REPLACE, method="update_template"),
+    ),
+    Operation(
+        "templates.delete",
+        "templates",
+        "delete",
+        "Career and templates",
+        "Delete live template",
+        params=(Param("template_id", str), Param("expected_version", int)),
+        call=lambda s, template_id, expected_version: s.delete_template(
+            template_id, expected_version
+        ),
+        rest=(Route("DELETE", "/templates/{template_id}", "delete_template"),),
+        tool=Tool("templates_delete", DELETE, method="delete_template"),
+    ),
+    Operation(
+        "instructions.read",
+        "instructions",
+        "get",
+        "Career and templates",
+        "Read general document writing instructions",
+        params=(),
+        call=lambda s: s.get_instructions(),
+        rest=(Route("GET", "/instructions", "get_instructions"),),
+        tool=Tool("instructions_get", LOOKUP, method="get_instructions"),
+    ),
+    Operation(
+        "instructions.update",
+        "instructions",
+        "update",
+        "Career and templates",
+        "Edit general document writing instructions",
+        params=(Param("value", InstructionsUpdate),),
+        call=lambda s, value: s.update_instructions(value),
+        rest=(Route("PATCH", "/instructions", "update_instructions"),),
+        tool=Tool("instructions_update", REPLACE, method="update_instructions"),
+    ),
+    Operation(
+        "career.preview_import",
+        "career",
+        "preview_import",
+        "Career and templates",
+        "Preview JSON/text career import without mutation",
+        params=(Param("value", ImportPreview),),
+        call=lambda s, value: s.preview_import(value),
+        rest=(Route("POST", "/career/import/preview", "preview_import"),),
+        tool=Tool("career_preview_import", LOOKUP, method="preview_import"),
+    ),
+    Operation(
+        "career.import",
+        "career",
+        "import",
+        "Career and templates",
+        "Confirm append-only evidence and optional versioned profile import",
+        params=(Param("value", CareerImport),),
+        call=lambda s, value: s.import_knowledge(value),
+        rest=(Route("POST", "/career/import", "import_knowledge", status_code=201),),
+        tool=Tool("career_import", ADD, method="import_knowledge"),
+    ),
+)
 
 
 def register_api(router, career: CareerService):
-    @router.get("/career/profile")
-    def get_profile():
-        return career.get_profile()
-
-    @router.patch("/career/profile")
-    def update_profile(value: ProfileUpdate):
-        return career.update_profile(value)
-
-    @router.get("/career/knowledge")
-    def list_knowledge(
-        q: str = "", kind: str = "", limit: int = 100, offset: int = 0, summary: bool = False
-    ):
-        return career.list_knowledge(q, kind, limit, offset, summary)
-
-    @router.post("/career/knowledge", status_code=201)
-    def create_knowledge(value: KnowledgeCreate):
-        return career.create_knowledge(value)
-
-    @router.get("/career/knowledge/{knowledge_id}")
-    def get_knowledge(knowledge_id: str):
-        return career.get_knowledge(knowledge_id)
-
-    @router.patch("/career/knowledge/{knowledge_id}")
-    def update_knowledge(knowledge_id: str, value: KnowledgeUpdate):
-        return career.update_knowledge(knowledge_id, value)
-
-    @router.delete("/career/knowledge/{knowledge_id}")
-    def delete_knowledge(knowledge_id: str, expected_version: int):
-        return career.delete_knowledge(knowledge_id, expected_version)
-
-    @router.get("/career/claims")
-    def list_claims(
-        knowledge_id: str = "",
-        approved: bool | None = None,
-        limit: int = 100,
-        offset: int = 0,
-        summary: bool = False,
-        q: str = "",
-    ):
-        return career.list_claims(knowledge_id, approved, limit, offset, summary, q)
-
-    @router.post("/career/claims", status_code=201)
-    def create_claim(value: ClaimCreate):
-        return career.create_claim(value)
-
-    @router.get("/career/claims/{claim_id}")
-    def get_claim(claim_id: str):
-        return career.get_claim(claim_id)
-
-    @router.patch("/career/claims/{claim_id}")
-    def update_claim(claim_id: str, value: ClaimUpdate):
-        return career.update_claim(claim_id, value)
-
-    @router.delete("/career/claims/{claim_id}")
-    def delete_claim(claim_id: str, expected_version: int):
-        return career.delete_claim(claim_id, expected_version)
-
-    @router.get("/templates")
-    def list_templates(
-        kind: str = "", limit: int = 100, offset: int = 0, summary: bool = False, q: str = ""
-    ):
-        return career.list_templates(kind, limit, offset, summary, q)
-
-    @router.post("/templates", status_code=201)
-    def create_template(value: TemplateCreate):
-        return career.create_template(value)
-
-    @router.get("/templates/{template_id}")
-    def get_template(template_id: str):
-        return career.get_template(template_id)
-
-    @router.patch("/templates/{template_id}")
-    def update_template(template_id: str, value: TemplateUpdate):
-        return career.update_template(template_id, value)
-
-    @router.delete("/templates/{template_id}")
-    def delete_template(template_id: str, expected_version: int):
-        return career.delete_template(template_id, expected_version)
-
-    @router.get("/instructions")
-    def get_instructions():
-        return career.get_instructions()
-
-    @router.patch("/instructions")
-    def update_instructions(value: InstructionsUpdate):
-        return career.update_instructions(value)
-
-    @router.post("/career/import/preview")
-    def preview_import(value: ImportPreview):
-        return career.preview_import(value)
-
-    @router.post("/career/import", status_code=201)
-    def import_knowledge(value: CareerImport):
-        return career.import_knowledge(value)
+    bind_rest(router, OPERATIONS, career)
 
 
 def register_mcp(mcp, career: CareerService):
-    from mcp.types import ToolAnnotations
-
-    for name, handler in [
-        ("career_get_profile", career.get_profile),
-        ("career_update_profile", career.update_profile),
-        ("knowledge_list", career.list_knowledge),
-        ("knowledge_get", career.get_knowledge),
-        ("knowledge_create", career.create_knowledge),
-        ("knowledge_update", career.update_knowledge),
-        ("knowledge_delete", career.delete_knowledge),
-        ("claims_list", career.list_claims),
-        ("claims_get", career.get_claim),
-        ("claims_create", career.create_claim),
-        ("claims_update", career.update_claim),
-        ("claims_delete", career.delete_claim),
-        ("templates_list", career.list_templates),
-        ("templates_get", career.get_template),
-        ("templates_create", career.create_template),
-        ("templates_update", career.update_template),
-        ("templates_delete", career.delete_template),
-        ("instructions_get", career.get_instructions),
-        ("instructions_update", career.update_instructions),
-        ("career_preview_import", career.preview_import),
-        ("career_import", career.import_knowledge),
-    ]:
-        read_only = name.endswith(("_get", "_list")) or name in {
-            "career_get_profile",
-            "career_preview_import",
-            "instructions_get",
-        }
-        mcp.add_tool(
-            handler,
-            name=name,
-            annotations=ToolAnnotations(
-                readOnlyHint=read_only,
-                destructiveHint=name.endswith("_delete"),
-                idempotentHint=read_only
-                or name
-                in {
-                    "career_update_profile",
-                    "instructions_update",
-                    "knowledge_update",
-                    "claims_update",
-                    "templates_update",
-                },
-                openWorldHint=False,
-            ),
-        )
+    bind_mcp(mcp, OPERATIONS, career)
