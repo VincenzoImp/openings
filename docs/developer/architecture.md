@@ -66,12 +66,12 @@ belongs to the module of its concern.
 
 | Package | Modules |
 |---|---|
-| `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage, rule dismissals and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py` notes, their author, run and pin; `timeline.py` the timeline of a job or an application; `applications.py` derived readiness, preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, responses, Ready and deletion; `bulk.py` per-item bulk results; `overview.py` the funnel |
+| `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage, rule dismissals and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py` notes, their author, run and pin; `timeline.py` the timeline of a job or an application; `readiness.py` computed Ready (the one rule lists, reads, counts and filters use); `applications.py` preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, Mark applied and its undo, deletion; `shortlist.py` the application a shortlist starts and its undo; `replies.py` employer replies through the application update; `bulk.py` per-item bulk results; `overview.py` the funnel |
 | `discovery/` | `service.py` the provider gate (`http_budget`, `fetch_bytes`); `models.py` typed inputs; `network.py` the public-address policy and the bounded fetch; `resolution.py` board detection and source configuration; `feeds.py` posting readers (Lever, Ashby, RSS) and adapter dispatch; `sources.py` source schemas, preview and writes; `runs.py` the global switch, provider policies, queueing, scheduling and run records; `tasks.py` leases, retry and running one collection |
-| `documents/` | `contexts.py` frozen contexts and their staleness reports; `revisions.py` creation, cited evidence, review, comparison and deletion; `sources.py` the source and PDF of a CV or letter and its derived text; `text.py` readable text of a TeX source; `latex.py` what CV and letter class commands print; `files.py` owned files and scoped transfer grants; `models.py` inputs |
+| `documents/` | `contexts.py` frozen contexts and their staleness reports; `revisions.py` creation with upload grants, cited evidence, comparison and deletion; `sources.py` when a CV or letter is complete, the pairing of its source and PDF and its text; `text.py` readable text of a TeX source; `pdf.py` readable text of a PDF (pypdf); `latex.py` what CV and letter class commands print; `files.py` owned files and scoped transfer grants; `models.py` inputs |
 | `career/` | `profile.py` Profile and instructions; `entries.py` Career entries; `claims.py`; `templates.py`; `imports.py`; `models.py` inputs and defaults; `records.py` row helpers shared with documents |
 | `policy/` | `service.py` item writes, confirmation and rule preview; `models.py` sections, the signal registry `SIGNALS` and inputs; `records.py` records as read and the frozen policy |
-| `interfaces/` | One module per area declaring its operations and binding them to its service: `core.py` (workspace, jobs, notes, applications, overview), `career.py`, `documents.py`, `discovery.py`, `activity.py`, `agent_requests.py`, `policy.py`, `outcomes.py`, `insights.py`, `source_yield.py`, `skills.py` and `system.py` (sign-in, tokens, capabilities, backup, restore, examples, export); `registry.py` the declaration and its binding |
+| `interfaces/` | One module per area declaring its operations and binding them to its service: `core.py` (workspace, jobs, notes, applications, overview), `career.py`, `documents.py`, `discovery.py`, `activity.py`, `agent_requests.py`, `policy.py`, `insights.py`, `source_yield.py`, `skills.py` and `system.py` (sign-in, tokens, capabilities, backup, restore, examples, export); `registry.py` the declaration and its binding |
 
 Services never import FastAPI routing or MCP registration; `interfaces/` binds
 them, and `app.py` calls each area in a fixed order. Smaller concerns stay single
@@ -153,27 +153,38 @@ route, tool or surface is not registered.
   An observation's `payload` holds only what is read back: `source_key` (finding
   the observation again) and `raw.job_url_direct` (the employer's apply link used
   by duplicate scoring); add a field there only together with its reader.
-- **Lifecycle:** triage (`inbox`/`saved`/`dismissed`) stores interest independently.
-  The derived `queue=inbox` and `queue=shortlist` exclude any application history;
-  Shortlist requires saved interest. Starting an application retains saved interest
-  and creates Preparing (`draft`), removing it from pending queues. Closed attempts
-  stay in Applications. Deleting the final attempt deliberately restores pending
-  queue membership; closing as not pursued preserves preparation history.
-  Draft/Applied/Interview/Offer/Closed belongs to the application; each job permits
-  one non-Closed attempt, enforced by the shared service and a partial unique
-  index. Reopening and merging respect that constraint. Closing requires an
-  explicit outcome. Forget permanently removes job-owned records.
+- **Lifecycle:** triage is `new`, `shortlisted` or `dismissed`. Shortlisting starts
+  the application (stage Shortlisted, `from_shortlist`) in the triage's transaction
+  when the job has no open one; starting an application shortlists its job. Undoing
+  a shortlist (back to `new` or `dismissed`) deletes that application only while it
+  is empty, otherwise `409 application_has_work` names what it holds
+  (`workspace/shortlist.py`). Closing an application never changes the job's
+  triage; deleting a job's last application returns it to New.
+  Shortlisted/Applied/Interview/Offer/Closed belongs to the application; each job
+  permits one non-Closed attempt, enforced by the shared service and a partial
+  unique index. Reopening and merging respect that constraint (a merge drops an
+  empty shortlist application of the two). Closing requires an explicit outcome.
+  Mark applied (`status=applied`, `applied_at` defaulting to now) is the owner's
+  act and never automatic; going back to Shortlisted undoes it while no reply
+  exists. Forget permanently removes job-owned records.
 - **Snapshots:** preparing a context freezes the job, career evidence, instructions,
   questions, selected templates and exact assets. Later profile edits affect new
   contexts. A changed document is a new revision with its own uploaded files.
-  Attachment changes increment the document version; approval checks that version
-  so concurrent uploads cannot be approved unseen.
-- **Documents:** a CV or letter revision (`SOURCE_KINDS`) is its files: one
-  `.tex` source and one PDF, whose upload names the source's SHA-256
-  (`files.source_sha256`); a PDF of another source is refused before its bytes
-  are stored (`documents/sources.py`). It stores no content (`content` stays
-  `{}`), only the claim and Career entry ids it cites, an optional note and the
-  text derived from its source when the source arrives (`documents.text`).
+  Attachment changes increment the document version.
+- **Documents:** a CV or letter revision (`SOURCE_KINDS`: `cv`, `letter`) is its
+  files: a required PDF and an optional `.tex` source (inline at creation, at most
+  256 KB, or uploaded). Creating it returns one-shot upload grants (`uploads.pdf`,
+  and `uploads.source` for a source file); it is incomplete until its PDF is
+  stored, then complete and immutable (`409 revision_complete`). With a source, the
+  PDF upload names the source's SHA-256 (`files.source_sha256`) and a PDF of
+  another source is refused before its bytes are stored (`documents/sources.py`);
+  a PDF-only revision names none. It stores no content (`content` stays `{}`), only
+  the claim and Career entry ids it cites, an optional note and its readable text
+  (`documents.text`, `text_from`): derived from the source when there is one
+  (`tex`), otherwise read from the PDF with pypdf, pure Python and pinned
+  (`documents/pdf.py`, `pdf`). A PDF without readable text leaves `text` NULL and
+  is still complete; a PDF-only revision stored without text (an upgraded one) is
+  read on its first read.
   `documents/text.py` derives it without a TeX runtime, as a reader sees the
   PDF: the body after `\begin{document}`, the source's own `\newcommand`/`\def`
   macros expanded a bounded number of times, the commands of CV and letter
@@ -184,8 +195,7 @@ route, tool or surface is not registered.
   (their brace arguments stay as text), accents composed, and the breaks TeX
   makes kept as lines. The same source always gives
   the same text, so the stored text can be checked against it; a parser change
-  needs a schema step that derives it again. Approval of a CV or letter requires
-  its source and PDF. `compare_documents` diffs two revisions' text by line with
+  needs a schema step that derives it again. `compare_documents` diffs two revisions' text by line with
   `difflib`; form answers keep structured content and compare it as
   `path: value` lines. Content a CV or letter stored before schema 13 is kept
   read-only in `legacy_content`.
@@ -270,7 +280,8 @@ route, tool or surface is not registered.
   `note_unpinned`. `Workspace.timeline` is the one read of a job's or an
   application's notes and events: a `UNION ALL` of both tables with the scope
   (`job`, or `application` when the row has an `application_id`), the kind
-  (`note`, `event`, or `response` for an event whose subject is a response), the
+  (`note`, `event`, or `reply` for an event whose subject is a reply, or a response
+  before 0.24), the
   actor and the run, filtered by kind, who, scope and period, ordered pinned
   first and then by time, with counts by kind. An application's timeline holds
   its rows and its job's rows without an application. `note_added` and
@@ -307,12 +318,20 @@ route, tool or surface is not registered.
   `test_interfaces.py` calls each one. Scoped operational grants (backup, export,
   restore) carry the requesting actor. A backup made for an agent token has the
   installation's password hash, session secret and tokens removed from the copy.
-- **Ready:** every shared service that changes what Ready was judged on clears it
-  in its own transaction through `Workspace.clear_ready`: a new revision or
-  context, a deleted revision, a file added to a current revision, an unresolved
-  blocking requirement, leaving Preparing. Each clearing bumps the application
-  version and leaves an attributed `application_ready_cleared` event with its
-  reason. A new operation that changes current revisions must call it too.
+- **Ready:** computed, never stored (`workspace/readiness.py`, one SQL expression and
+  one function used by lists, reads, counts and filters): an application is Ready
+  when it is Shortlisted, every kind in `required_documents` (a subset of `cv`,
+  `letter`, both by default, CHECK-enforced) has a current complete revision (no
+  revision names it as `previous_id`, its PDF is stored) and no blocking
+  requirement is unresolved. `missing` names what is lacking (`cv`, `letter`,
+  `requirement:<id>`). Form answers never affect it.
+- **Replies:** one write path, `applications_update` with `reply`
+  (`workspace/replies.py`): recording one moves the stage when its kind implies it
+  (`interview`, `offer`, `rejection` closes as rejected; `other` never) in the same
+  transaction with one `reply_added` event naming the stage it moved; a correction
+  or removal (`reply.id`) never moves it. No reply is an outcome closed by hand
+  (`needs=reply_overdue` lists the Applied applications without a reply past the
+  period); nothing closes automatically.
 - **Concurrency:** typed inputs, optimistic versions, idempotency keys, foreign
   keys and short transactions protect shared state. Run one application process
   per workspace; database connections do not cross threads. Every deletion
@@ -321,11 +340,8 @@ route, tool or surface is not registered.
 SQLite uses WAL and stores SHA-256-deduplicated BLOBs for attachments. Lists return
 compact paginated summaries; full postings, narratives, contexts and file bytes
 are separate reads. Application preparation summaries count current revision leaves
-and their exact PDF/review state; derived readiness combines them with unresolved
-blocking employer requirements stored on the application. Ready is a stored step
-on top of that derivation (`ready_at` and who set it): marking is refused while a
-check fails, `readiness` reports `ready` only while the mark and every check hold,
-and `reviewed` when the checks pass without the mark. Byte downloads and record exports prepare a
+by kind and how many are complete; Ready and `missing` are computed from the same
+leaves and the unresolved blocking requirements. Byte downloads and record exports prepare a
 temporary snapshot on the database thread before streaming, preserving bounded
 memory and releasing SQLite readers before cancellation or thread changes.
 Backups use SQLite's online backup API. A restore preserves
@@ -344,14 +360,17 @@ and imports only the standard library. It does not change the workspace in
 place: it creates `<db>.next` from `schema.sql`, attaches the schema-14 file
 read-only and copies every kept table with one `INSERT ... SELECT` in one
 transaction (`TABLES`: per-table column expressions and row filters; `FOLDS`:
-rows the upgrade creates), then rebuilds the search index. Values that leave the
+rows the upgrade creates, such as the Shortlisted application of each shortlisted
+job without an open one and an event per stored Ready mark), then rebuilds the
+search index. Values that leave the
 schema go to `<stem>.pre-0.24-archive.json` beside the database (mode 0600,
 written through a temporary name): `SECTIONS` of removed records, every
 non-default value of a dropped column (`dropped_columns`), stored texts that were
 not JSON (`repaired_json`) and any table nothing copies (`dropped_tables`).
 Before the swap it checks the new file's integrity, that no reference broke that
 was not broken before, the row count of every table (copied plus created), the
-`INVARIANTS` (applications not Closed, bytes of stored files) and the archive
+`INVARIANTS` (applications not Closed besides those it starts, shortlisted jobs,
+CV and letter revisions with a PDF, bytes of stored files) and the archive
 read back against its sources; any failure removes the new file and the archive
 and refuses the start. The swap renames the original to
 `<stem>.pre-0.24.sqlite` (the pre-upgrade copy, byte for byte the schema-14 file,
