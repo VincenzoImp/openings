@@ -1,18 +1,32 @@
 """Synthetic, isolated server for browser workflows; no acquisition workers.
 
-Listens on 127.0.0.1:$OPENINGS_E2E_PORT (a free port when unset) and answers
-`/__e2e__/run` with $OPENINGS_E2E_TOKEN, so a Playwright run can verify that it
-reached the server it started. The route exists only in this test server.
+Two steps, so that every Playwright worker serves its own copy of one seeded
+workspace:
+
+    dashboard_server.py --seed SNAPSHOT
+        builds the synthetic workspace into SNAPSHOT and prints one JSON line
+        with an owner session cookie that is valid in every copy of it;
+    dashboard_server.py --snapshot SNAPSHOT [--port 0]
+        serves a private copy of SNAPSHOT and prints
+        "Synthetic workspace at http://127.0.0.1:<port>" once it listens.
+
+Without --snapshot the server seeds a temporary workspace first. Only this
+server answers `POST /__e2e__/reset`, which restores its copy to the snapshot
+between tests; the product application has no such route.
 
 $OPENINGS_E2E_JOBS and $OPENINGS_E2E_APPLICATIONS set the size of the workspace
 (60 jobs and 53 applications by default). Above 500 jobs they are written in
 bulk (large_fixtures.py), so 5,000 jobs and 500 applications take seconds.
 """
 
+import argparse
+import asyncio
 import json
 import os
 import socket
+import sqlite3
 import tempfile
+from contextlib import closing
 from pathlib import Path
 
 import uvicorn
@@ -22,34 +36,57 @@ from jobs_fixtures import seed_jobs
 from large_fixtures import seed_large
 from openings.actors import OWNER, acting_as
 from openings.app import create_app
+from openings.auth import COOKIE
 from openings.career import ClaimCreate, KnowledgeCreate, ProfileUpdate, TemplateCreate
 from openings.common import new_id, now
 from openings.documents import ContextCreate
 from openings.policy import SECTIONS
 from today_fixtures import seed_today
 
-RUN_PATH = "/__e2e__/run"
+RESET_PATH = "/__e2e__/reset"
+PASSWORD = "synthetic-browser-password"
 # Above this many jobs the workspace is seeded in bulk (large_fixtures.py).
 LARGE = 500
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def free_port():
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        return probe.getsockname()[1]
+def copy_database(source, target):
+    """Copy one SQLite database onto another with the online backup API."""
+    with closing(sqlite3.connect(source)) as origin, closing(sqlite3.connect(target)) as copy:
+        origin.backup(copy)
 
 
-def identified(app, token):
-    """Wrap the application so that only this process answers RUN_PATH with its run token."""
-    body = token.encode()
+def resettable(app, snapshot):
+    """Wrap the application so that RESET_PATH restores its database to the snapshot.
+
+    Everything the workspace stores lives in its SQLite file; the in-memory
+    state that depends on it (the duplicate index, sign-in limits and used
+    operation grants) is cleared with it.
+    """
+    workspace, auth, guard = app.state.workspace, app.state.auth, app.state.login_guard
+
+    def reset():
+        with (
+            workspace.db.lock,
+            workspace.db.connect() as live,
+            closing(sqlite3.connect(snapshot)) as origin,
+        ):
+            origin.backup(live)
+        workspace.reset_duplicates()
+        guard.clients.clear()
+        guard.succeeded()
+        with auth.used_operations.lock:
+            auth.used_operations.expiries.clear()
 
     async def serve(scope, receive, send):
-        if scope["type"] != "http" or scope["path"] != RUN_PATH:
+        if scope["type"] != "http" or scope["path"] != RESET_PATH:
             return await app(scope, receive, send)
-        headers = [(b"content-type", b"text/plain"), (b"cache-control", b"no-store")]
-        await send({"type": "http.response.start", "status": 200, "headers": headers})
-        await send({"type": "http.response.body", "body": body})
+        status = 405
+        if scope["method"] == "POST":
+            await asyncio.to_thread(reset)
+            status = 204
+        await send({"type": "http.response.start", "status": status, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
 
     return serve
 
@@ -179,99 +216,127 @@ def seed_library(app, agent):
         conn.execute("UPDATE policy_sections SET version=version+1 WHERE section='facts'")
 
 
-def main():
-    port = int(os.environ.get("OPENINGS_E2E_PORT") or free_port())
-    token = os.environ.get("OPENINGS_E2E_TOKEN", "")
-    # The default workspace is small; a performance check sets a large one, for
-    # example OPENINGS_E2E_JOBS=5000 OPENINGS_E2E_APPLICATIONS=500.
-    jobs = int(os.environ.get("OPENINGS_E2E_JOBS") or 60)
-    applications = int(os.environ.get("OPENINGS_E2E_APPLICATIONS") or 53)
-    with tempfile.TemporaryDirectory(prefix="openings-dashboard-") as directory:
-        path = Path(directory) / "workspace.sqlite"
-        app = create_app(path, start_worker=False)
-        workspace, career = app.state.workspace, app.state.career
-        # One client for setup and seeding: an application starts its MCP sessions once.
-        with TestClient(app) as client:
-            client.post("/api/v1/auth/setup", json={"password": "synthetic-browser-password"})
-            for index in range(35):
-                evidence = career.create_knowledge(
-                    KnowledgeCreate(
-                        kind="project",
-                        title=f"Synthetic project {index:02d}",
-                        organization="Example Labs",
-                        narrative="Built reliable Python services.",
-                        skills=["Python"],
-                    )
+def seed(path, jobs=60, applications=53):
+    """Build the synthetic workspace at `path`; return the owner's session cookie.
+
+    The cookie is signed with the workspace's own secret, so it stays valid in
+    every copy of the file and after every reset.
+    """
+    app = create_app(path, start_worker=False)
+    workspace, career = app.state.workspace, app.state.career
+    # One client for setup and seeding: an application starts its MCP sessions once.
+    with TestClient(app) as client:
+        client.post("/api/v1/auth/setup", json={"password": PASSWORD})
+        for index in range(35):
+            evidence = career.create_knowledge(
+                KnowledgeCreate(
+                    kind="project",
+                    title=f"Synthetic project {index:02d}",
+                    organization="Example Labs",
+                    narrative="Built reliable Python services.",
+                    skills=["Python"],
                 )
-                career.create_claim(
-                    ClaimCreate(
-                        knowledge_id=evidence["id"],
-                        text=f"Synthetic claim {index:02d}",
-                        approved=True,
-                    )
+            )
+            career.create_claim(
+                ClaimCreate(
+                    knowledge_id=evidence["id"],
+                    text=f"Synthetic claim {index:02d}",
+                    approved=True,
                 )
-                career.create_template(
-                    TemplateCreate(
-                        name=f"Synthetic CV {index:02d}", tex="Synthetic TeX", is_default=index == 0
-                    )
+            )
+            career.create_template(
+                TemplateCreate(
+                    name=f"Synthetic CV {index:02d}", tex="Synthetic TeX", is_default=index == 0
                 )
-            # Before the numbered jobs, so those stay the newest records of every list.
-            seed_today(app, client, lambda agent: seed_library(app, agent))
-            seed_jobs(app)
-        # A large workspace (the performance budget) is written in one transaction.
-        if jobs > LARGE:
-            seed_large(workspace, jobs, applications)
-            # Its signals, as a started workspace computes them in the background.
-            workspace.signals.backfill()
-        for index in range(0 if jobs > LARGE else jobs):
-            job = workspace.ingest_job(
+            )
+        # Before the numbered jobs, so those stay the newest records of every list.
+        seed_today(app, client, lambda agent: seed_library(app, agent))
+        seed_jobs(app)
+        cookie = client.post("/api/v1/auth/login", json={"password": PASSWORD}).cookies[COOKIE]
+    # A large workspace (the performance budget) is written in one transaction.
+    if jobs > LARGE:
+        seed_large(workspace, jobs, applications)
+        # Its signals, as a started workspace computes them in the background.
+        workspace.signals.backfill()
+    for index in range(0 if jobs > LARGE else jobs):
+        job = workspace.ingest_job(
+            {
+                "title": f"Synthetic engineer {index:02d}",
+                "company": "Example Labs",
+                "location": "Zurich / Remote",
+                "posting": "Build reliable services.\n\nResponsibilities\nDesign practical APIs and work with a small team.",
+                "url": f"https://example.test/jobs/{index}",
+            }
+        )
+        if index < applications:
+            application = workspace.create_application(
                 {
-                    "title": f"Synthetic engineer {index:02d}",
-                    "company": "Example Labs",
-                    "location": "Zurich / Remote",
-                    "posting": "Build reliable services.\n\nResponsibilities\nDesign practical APIs and work with a small team.",
-                    "url": f"https://example.test/jobs/{index}",
+                    "job_id": job["id"],
+                    "questions": [{"id": "motivation", "label": "Why this role?", "type": "text"}],
                 }
             )
-            if index < applications:
-                application = workspace.create_application(
-                    {
-                        "job_id": job["id"],
-                        "questions": [
-                            {"id": "motivation", "label": "Why this role?", "type": "text"}
-                        ],
-                    }
-                )
-                application = workspace.update_application(
+            application = workspace.update_application(
+                application["id"],
+                {
+                    "expected_version": application["version"],
+                    "answers": {"motivation": "Synthetic motivation."},
+                },
+            )
+            stage = ["draft", "applied", "interview", "offer", "closed"][index % 5]
+            if stage != "draft":
+                workspace.update_application(
                     application["id"],
                     {
                         "expected_version": application["version"],
-                        "answers": {"motivation": "Synthetic motivation."},
+                        "status": stage,
+                        **({"outcome": "rejected"} if stage == "closed" else {}),
                     },
                 )
-                stage = ["draft", "applied", "interview", "offer", "closed"][index % 5]
-                if stage != "draft":
-                    workspace.update_application(
-                        application["id"],
-                        {
-                            "expected_version": application["version"],
-                            "status": stage,
-                            **({"outcome": "rejected"} if stage == "closed" else {}),
-                        },
-                    )
-                if index == 0:
-                    app.state.documents.prepare_context(
-                        ContextCreate(application_id=application["id"])
-                    )
-            elif index < applications + 3:
-                workspace.set_triage(job["id"], "saved", job["version"])
-        print(f"Synthetic workspace at http://127.0.0.1:{port}", flush=True)
-        uvicorn.run(
-            identified(create_app(path, start_worker=False), token),
-            host="127.0.0.1",
-            port=port,
-            log_level="error",
-        )
+            if index == 0:
+                app.state.documents.prepare_context(ContextCreate(application_id=application["id"]))
+        elif index < applications + 3:
+            workspace.set_triage(job["id"], "saved", job["version"])
+    # One self-contained file: copies and resets read it without its WAL.
+    with closing(sqlite3.connect(path)) as conn:
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    return f"{COOKIE}={cookie}"
+
+
+def serve(snapshot, directory, port=0):
+    """Serve a private copy of `snapshot` from `directory` until interrupted."""
+    live = Path(directory) / "workspace.sqlite"
+    copy_database(snapshot, live)
+    app = create_app(live, start_worker=False)
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", port))
+    # The worker that started this process reads the address from this line.
+    print(f"Synthetic workspace at http://127.0.0.1:{listener.getsockname()[1]}", flush=True)
+    server = uvicorn.Server(uvicorn.Config(resettable(app, snapshot), log_level="error"))
+    server.run(sockets=[listener])
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--seed", type=Path, help="build the workspace into this file and exit")
+    parser.add_argument("--snapshot", type=Path, help="serve a copy of this seeded workspace")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("OPENINGS_E2E_PORT") or 0))
+    args = parser.parse_args()
+    # The default workspace is small; a performance check sets a large one, for
+    # example OPENINGS_E2E_JOBS=5000 OPENINGS_E2E_APPLICATIONS=500.
+    size = (
+        int(os.environ.get("OPENINGS_E2E_JOBS") or 60),
+        int(os.environ.get("OPENINGS_E2E_APPLICATIONS") or 53),
+    )
+    if args.seed:
+        print(json.dumps({"session": seed(args.seed, *size)}), flush=True)
+        return
+    with tempfile.TemporaryDirectory(prefix="openings-dashboard-") as directory:
+        snapshot = args.snapshot
+        if snapshot is None:
+            snapshot = Path(directory) / "seed" / "snapshot.sqlite"
+            snapshot.parent.mkdir()
+            seed(snapshot, *size)
+        serve(snapshot, directory, args.port)
 
 
 if __name__ == "__main__":

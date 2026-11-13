@@ -2,8 +2,8 @@ import { test, expect, type Page } from "./fixtures";
 import { go, isNarrow, ownerSession, type Cookies } from "./session";
 
 // The Library screens built with the design system: Policy, Career and
-// Templates. Every dashboard path of their operations is exercised here; the
-// four projects share one server, so each test names its own records.
+// Templates. Every dashboard path of their operations is exercised here. Each
+// test starts from the seeded workspace (fixtures.ts).
 const cookies: Cookies = ownerSession();
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {
@@ -274,9 +274,7 @@ test("keyboard only: a policy item is edited, saved and moved", async ({
   await expect(row).toHaveCount(0);
 });
 
-// Quarantined: order-dependent on the shared e2e server and database (failed on
-// CI in November 2026). Restore once each worker has its own workspace, #220.
-test.fixme("a policy conflict reloads the section and keeps the unsaved text", async ({
+test("a policy conflict reloads the section and keeps the unsaved text", async ({
   page,
 }) => {
   const label = unique("Salary");
