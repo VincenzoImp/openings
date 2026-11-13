@@ -1,10 +1,7 @@
-"""Release contract: every advertised operation resolves on REST and MCP."""
+"""Release contract: declarations, the running app and owner-only access agree."""
 
 import json
 import re
-import subprocess
-import sys
-from pathlib import Path
 
 import pytest
 from fastapi import APIRouter, FastAPI
@@ -12,7 +9,7 @@ from fastapi.testclient import TestClient
 from mcp.types import ToolAnnotations
 
 from openings.app import create_app
-from openings.interfaces import catalog, inventory_text
+from openings.interfaces import catalog
 from openings.interfaces.registry import (
     Operation,
     Param,
@@ -20,51 +17,9 @@ from openings.interfaces.registry import (
     Tool,
     bind_mcp,
     bind_rest,
-    inventory,
+    capability_entries,
 )
 from openings.mcp_server import OpeningsMCP
-
-
-def route_path(path):
-    return re.sub(r"\{[^}]+\}", "{}", path).rstrip("/")
-
-
-@pytest.mark.asyncio
-async def test_operation_inventory_covers_runtime_interfaces(tmp_path):
-    app = create_app(tmp_path / "operations.sqlite", start_worker=False)
-    with TestClient(app) as client:
-        session = client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
-        assert session.status_code == 200
-        inventory = client.get("/api/v1/capabilities").json()
-    tools = {tool.name: tool for tool in await app.state.mcp.list_tools()}
-    routes = {
-        (method.upper(), route_path(path))
-        for path, methods in app.openapi()["paths"].items()
-        for method in methods
-    }
-    advertised = set()
-    for operation in inventory["operations"]:
-        assert operation["dashboard"], operation["id"]
-        for route in operation["rest"]:
-            identity = (route["method"], route_path(route["path"]))
-            assert identity in routes, (operation["id"], identity)
-            advertised.add(identity)
-        for name in operation["mcp"]:
-            assert name in tools, (operation["id"], name)
-    for exception in inventory["exceptions"]:
-        assert exception["reason"]
-        advertised.update((item["method"], route_path(item["path"])) for item in exception["rest"])
-    assert not {route for route in routes - advertised if route[1].startswith("/api/v1")}
-    assert set(tools) == {
-        name for operation in inventory["operations"] for name in operation["mcp"]
-    }
-    assert all(tool.annotations is not None for tool in tools.values())
-
-
-def test_operation_inventory_is_generated_from_the_declarations():
-    """operation-inventory.json is what scripts/inventory.py writes from the declarations."""
-    path = Path(__file__).resolve().parents[2] / "backend/openings/operation-inventory.json"
-    assert path.read_text() == inventory_text(), "Run `uv run python scripts/inventory.py`."
 
 
 @pytest.mark.asyncio
@@ -96,20 +51,8 @@ async def test_every_declared_route_tool_and_surface_is_registered(tmp_path):
     assert len({operation.id for operation in operations}) == len(operations)
 
 
-def test_parity_matrix_is_current():
-    """The committed matrix matches the inventory, contract and dashboard source."""
-    root = Path(__file__).resolve().parents[2]
-    result = subprocess.run(
-        [sys.executable, str(root / "scripts/parity_matrix.py"), "--check"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 0, result.stderr
-
-
 # One representative call per owner-only operation: REST request arguments and MCP
-# tool arguments. An operation marked access=owner without an entry fails the test.
+# tool arguments. An operation declared access=owner without an entry fails the test.
 OWNER_ONLY_CALLS = {
     "password.update": (
         {"json": {"password": "another-synthetic-password"}},
@@ -139,25 +82,35 @@ OWNER_ONLY_CALLS = {
 
 
 def test_owner_only_operations_refuse_an_agent_token_on_rest_and_mcp(tmp_path):
-    """Every operation the inventory marks access=owner returns forbidden to an agent token."""
+    """Every operation declared access=owner returns forbidden to an agent token."""
     app = create_app(tmp_path / "access.sqlite", start_worker=False)
     app.state.auth.setup("synthetic-password")
     agent = app.state.auth.create_token("Synthetic agent", "agent")["token"]
     owner = app.state.auth.create_token("Synthetic owner token", "owner")["token"]
+    marked = {
+        operation.id: {
+            "rest": [
+                {"method": route.method, "path": "/api/v1" + route.path} for route in operation.rest
+            ],
+            "mcp": [operation.canonical_name] if operation.tool else [],
+        }
+        for operation in catalog()[0]
+        if operation.access == "owner"
+    }
+    assert set(marked) == set(OWNER_ONLY_CALLS)
     with TestClient(app, base_url="http://localhost:8080") as client:
-        inventory = client.get(
+        capabilities = client.get(
             "/api/v1/capabilities", headers={"Authorization": "Bearer " + agent}
         ).json()
-        assert set(inventory["access"]) == {"owner", "default"}
-        marked = {
-            operation["id"]: operation
-            for operation in inventory["operations"]
-            if operation.get("access") == "owner"
+        assert capabilities["token_kind"] == "agent"
+        assert {item["name"] for item in capabilities["operations"] if "access" in item} == {
+            operation.canonical_name for operation in catalog()[0] if operation.access == "owner"
         }
-        assert all(
-            operation.get("access", "owner") == "owner" for operation in inventory["operations"]
+        owner_view = client.get(
+            "/api/v1/capabilities", headers={"Authorization": "Bearer " + owner}
         )
-        assert set(marked) == set(OWNER_ONLY_CALLS)
+        assert owner_view.json()["token_kind"] == "owner"
+        assert len(owner_view.content) < 10_000
 
         def over_mcp(token, name, arguments):
             response = client.post(
@@ -204,7 +157,7 @@ class Greeter:
 
 
 @pytest.mark.asyncio
-async def test_one_declaration_gives_a_route_a_tool_and_an_inventory_entry():
+async def test_one_declaration_gives_a_route_a_tool_and_a_capability():
     """A synthetic operation, declared once, binds to REST and MCP under one name."""
     operation = Operation(
         "greetings.read",
@@ -231,7 +184,6 @@ async def test_one_declaration_gives_a_route_a_tool_and_an_inventory_entry():
     assert tools["greetings_get"].description == "Greet someone."
     result = await mcp.call_tool("greetings_get", {"name": "Ada"})
     assert "Hello Ada" in result.content[0].text
-    notes = {"operations": [{"id": "greetings.read", "dashboard": "None"}], "exceptions": []}
-    entry = inventory((operation,), (), notes)["operations"][0]
-    assert entry["rest"] == [{"method": "GET", "path": "/api/v1/greetings/{name}"}]
-    assert entry["mcp"] == ["greetings_get"]
+    assert capability_entries((operation,)) == [
+        {"name": "greetings_get", "method": "GET", "path": "/greetings/{name}"}
+    ]

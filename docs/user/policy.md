@@ -40,27 +40,10 @@ An item counts when you have confirmed it.
 Agents read proposals but do not rely on them, and a prepared application
 marks each item it froze as confirmed or not.
 
-## After the upgrade to 0.19
+## Upgrades
 
-Earlier versions kept this information in the Profile: free-form `metadata`,
-and the **Target roles** and **Preferences** fields. The upgrade copies it and
-changes nothing in the Profile:
-
-- every top-level key of the Profile metadata becomes one item in **Facts**,
-  tagged **Unsorted**, with the original value. A nested value is shown as a
-  collapsed structure;
-- **Preferences** and **Target roles** become one item each in **Decision**.
-
-The copied items are not confirmed. Sort them with **Confirm as a fact**,
-**Move to…** and **Edit**: give each a label, write the statement, and choose a
-kind of value to replace a copied structure. Your agent can do the sorting and
-ask you to confirm (the `maintain-career` skill describes it).
-
-0.23 removed the Profile's **Target roles** and **Preferences** fields. Before
-removing them, the upgrade checks that an item of the policy holds each text
-(in any section, ignoring differences of spacing); a text that none holds, for
-example one edited after 0.19, becomes one more unconfirmed **Decision** item,
-marked as copied when 0.23 removed the field.
+Workspaces older than 0.23 must be opened once with 0.23 first; release
+history is in [CHANGELOG.md](../../CHANGELOG.md).
 
 ## Rules on a signal
 

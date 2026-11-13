@@ -2,12 +2,9 @@
 
 Each area module declares its operations (``OPERATIONS``), and may declare
 transport exemptions (``EXEMPTIONS``) and hand-registered MCP resources or
-prompts (``SURFACES``). ``catalog`` collects them for the operation inventory
+prompts (``SURFACES``). ``catalog`` collects them for ``/api/v1/capabilities``
 and the interface tests.
 """
-
-import json
-from pathlib import Path
 
 from . import (
     activity,
@@ -23,7 +20,6 @@ from . import (
     source_yield,
     system,
 )
-from .registry import inventory
 
 AREAS = (
     system,
@@ -39,7 +35,6 @@ AREAS = (
     insights,
     source_yield,
 )
-NOTES = Path(__file__).with_name("inventory-notes.json")
 
 
 def catalog():
@@ -50,13 +45,3 @@ def catalog():
         exemptions.extend(getattr(area, "EXEMPTIONS", ()))
         surfaces.extend(getattr(area, "SURFACES", ()))
     return operations, exemptions, surfaces
-
-
-def inventory_document():
-    """The operation inventory generated from the declarations and their remarks."""
-    operations, exemptions, _ = catalog()
-    return inventory(operations, exemptions, json.loads(NOTES.read_text()))
-
-
-def inventory_text():
-    return json.dumps(inventory_document(), indent=2) + "\n"

@@ -28,16 +28,10 @@ function syntheticPdf() {
 async function call(page: Page, path: string, method = "GET", body?: unknown) {
   return page.evaluate(
     async ({ path, method, body }) => {
-      // The header separates test setup from requests made by the dashboard
-      // (scripts/parity_matrix.py records only the latter).
-      const setup = { "X-Openings-E2E-Setup": "1" };
-      const session = await fetch("/api/v1/auth/session", {
-        headers: setup,
-      }).then((r) => r.json());
+      const session = await fetch("/api/v1/auth/session").then((r) => r.json());
       const response = await fetch("/api/v1" + path, {
         method,
         headers: {
-          ...setup,
           "Content-Type": "application/json",
           "X-CSRF-Token": session.csrf_token,
         },
