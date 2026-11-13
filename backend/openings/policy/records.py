@@ -41,7 +41,6 @@ def item_record(row):
     row["origin"] = (
         {"source": origin, "key": key, "note": ORIGIN_NOTES.get(origin, "")} if origin else None
     )
-    row.pop("idempotency_key")
     return row
 
 

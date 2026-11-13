@@ -37,7 +37,6 @@ def note_record(row):
         else None,
         "pinned": row["pinned_at"] is not None,
         "pinned_at": row["pinned_at"],
-        "origin": row["origin"],
     }
     return record
 

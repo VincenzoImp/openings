@@ -9,6 +9,7 @@ from ..career.models import DEFAULT_GUIDANCE, DEFAULT_PROFILE
 from ..career.records import _get, _page, _setting
 from ..common import decode_record, encode, new_id, now
 from ..errors import DomainError, conflict, missing
+from ..idempotency import fingerprint, remember, replay
 from ..policy import frozen_policy
 from ..snapshots import payload_text, store_context
 from ..staleness import application_staleness, store_context_inputs
@@ -21,16 +22,12 @@ class ContextOperations:
     def prepare_context(self, value: ContextCreate) -> dict:
         """Freeze job, career evidence, approved claims, templates/assets and stored instructions for an external agent. Use an idempotency key for retries."""
         request = value.model_dump(exclude={"idempotency_key"})
+        digest = fingerprint(value)
         with self.db.transaction() as conn:
-            if value.idempotency_key:
-                existing = conn.execute(
-                    "SELECT * FROM contexts WHERE idempotency_key=?", (value.idempotency_key,)
-                ).fetchone()
-                if existing:
-                    record = self.context_record(conn, existing)
-                    if record["payload"].get("request") != request:
-                        conflict("This idempotency key was used for another preparation request.")
-                    return record
+            replayed = replay(conn, "contexts", value.idempotency_key, digest)
+            if replayed:
+                existing = conn.execute("SELECT * FROM contexts WHERE id=?", (replayed,)).fetchone()
+                return self.context_record(conn, existing)
             application = _get(conn, "applications", value.application_id, "Application")
             job = _get(conn, "jobs", application["job_id"], "Job")
             if job["triage"] == "dismissed":
@@ -167,15 +164,10 @@ class ContextOperations:
             encoded = encode(snapshot)
             signature = hashlib.sha256(encoded.encode()).hexdigest()
             conn.execute(
-                "INSERT INTO contexts(id,application_id,signature,idempotency_key,created_at) VALUES(?,?,?,?,?)",
-                (
-                    context_id,
-                    value.application_id,
-                    signature,
-                    value.idempotency_key,
-                    timestamp,
-                ),
+                "INSERT INTO contexts(id,application_id,signature,created_at) VALUES(?,?,?,?)",
+                (context_id, value.application_id, signature, timestamp),
             )
+            remember(conn, "contexts", value.idempotency_key, digest, context_id)
             # The payload's shared values and asset files are stored once, as parts.
             store_context(
                 conn, context_id, encoded, [{**asset, "name": asset["path"]} for asset in assets]
@@ -204,7 +196,6 @@ class ContextOperations:
             "application_id": row["application_id"],
             "payload": json.loads(payload_text(conn, row["id"], row["frame"])),
             "signature": row["signature"],
-            "idempotency_key": row["idempotency_key"],
             "created_at": row["created_at"],
             "resource_uri": f"openings://contexts/{row['id']}",
         }

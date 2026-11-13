@@ -442,12 +442,7 @@ function Entry({
     return (
       <li className={note.pinned ? "is-pinned" : undefined}>
         <div className="grow">
-          <div className="title">
-            {note.pinned ? "Pinned note" : "Note"}
-            {note.origin === "upgrade" && (
-              <span className="muted"> · copied from the application note</span>
-            )}
-          </div>
+          <div className="title">{note.pinned ? "Pinned note" : "Note"}</div>
           <div className="meta prose">{note.body}</div>
           {line}
         </div>

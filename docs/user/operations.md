@@ -36,12 +36,15 @@ cron job or any setup:
   `0` turns daily backups off. When the volume has less than 1.2 times the
   database size free, the backup is skipped with a warning in the log and tried
   again on the next cycle.
-- **Copies before an upgrade.** Before a new release upgrades the workspace
-  format in place, it writes `openings.pre-schema<old>-<UTC time>.sqlite` beside
-  the workspace, verified the same way. When the volume has less than 2.2 times
-  the database size free, or the copy fails its check, the server does not start
-  and says how much space it needs; the workspace file is not touched. The two
-  most recent copies are kept.
+- **Copies before an upgrade.** An upgrade never changes the workspace file in
+  place without a copy. The 0.24 upgrade writes a new file and keeps the original,
+  unchanged, as `openings.pre-0.24.sqlite` ([Upgrade the workspace
+  format](#upgrade-the-workspace-format)); it is never deleted automatically. A
+  release that upgrades a file in place first writes
+  `openings.pre-schema<old>-<UTC time>.sqlite` beside the workspace, verified the
+  same way as a daily backup, and keeps the two most recent. When the volume lacks
+  the room either needs, the server does not start and says how much space it
+  needs; the workspace file is not touched.
 
 **Settings → Backup and restore → Automatic backups** (owner only) shows when the
 last daily backup was written and how many are kept, lists every copy with
@@ -196,7 +199,7 @@ docker compose down
 cd "$(docker volume inspect openings_workspace --format '{{ .Mountpoint }}')"
 mv openings.sqlite openings.failed-upgrade.sqlite
 rm -f openings.sqlite-wal openings.sqlite-shm
-cp -p openings.pre-schema<old>-<UTC time>.sqlite openings.sqlite
+cp -p openings.pre-0.24.sqlite openings.sqlite  # or openings.pre-schema<old>-<UTC time>.sqlite
 # Pin the previous release, e.g. OPENINGS_IMAGE=docker.io/vincenzoimp/openings:<previous>
 docker compose up -d
 ```
@@ -206,13 +209,43 @@ open a workspace upgraded by a later one, so the copy is the only way back.
 
 ## Upgrade the workspace format
 
-The server keeps a verified copy of the workspace before every in-place upgrade
-([Backups](#backups)); downloading a backup first is still a good idea. A release
-upgrades the workspace to its schema on start, in one transaction, and a restore
-upgrades a copy of an older backup the same way; the uploaded file is not changed.
-A workspace cannot be opened by an earlier release ([Roll back an
-upgrade](#roll-back-an-upgrade)). Workspaces older than 0.23 must be opened once
-with 0.23 first; release history is in [CHANGELOG.md](../../CHANGELOG.md).
+A release opens a workspace of its own schema or of the **previous schema only**
+and upgrades the latter on start. A workspace written by an older release must
+first be opened once with the release named in the error message (for example:
+"This workspace was written by Openings older than 0.23. Open it once with the
+0.23 image, then start this version."), then with the new one. A workspace
+written by a newer release is refused. Release history is in
+[CHANGELOG.md](../../CHANGELOG.md).
+
+The 0.24 upgrade (schema 14 to 15) builds a new workspace file and copies the data
+in, so an upgraded workspace has exactly the layout of a new one:
+
+1. It needs free space of 2.2 times the database plus the archive below; without
+   it the server does not start, names the space it needs and changes nothing.
+2. It writes `openings.sqlite.next` from the new layout and copies every record
+   into it in one transaction.
+3. Records and fields 0.24 no longer keeps are written to
+   `openings.pre-0.24-archive.json` beside the workspace (owner-readable only,
+   0600): a JSON file with `format`, `from_schema`, `counts` and one section per
+   removed table or field. Fields that leave the schema are kept there by record
+   id under `dropped_columns`, and stored text that was not valid JSON under
+   `repaired_json` (the record keeps an empty value).
+4. It checks the new file (integrity, references between records, the number of
+   rows of every table, applications that are not Closed, the bytes of stored
+   files, the archive read back). If any check fails, the new file and the archive
+   are removed and the server does not start, with the reason.
+5. The original file becomes `openings.pre-0.24.sqlite`, byte for byte as it was,
+   and the new file takes its name. The log names both files.
+
+If the process stops during the upgrade, the next start either finishes the last
+step or removes `openings.sqlite.next` and runs the upgrade again; the original
+is never written. `openings.pre-0.24.sqlite` stays until you delete it in
+**Settings → Backup and restore → Automatic backups**. To go back, follow [Roll
+back an upgrade](#roll-back-an-upgrade) with that file and the 0.23 image;
+changes made after the upgrade are not in it. Restoring a 0.23 backup into 0.24
+upgrades a copy the same way: the uploaded file is not changed and the archive is
+written beside the workspace as `openings.pre-0.24-archive-restored-<UTC
+time>.json`.
 
 After an upgrade that frees space, the start takes longer once: the database file
 is rewritten without the freed space (seconds on an SSD, longer on slow storage).
