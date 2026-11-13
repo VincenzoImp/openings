@@ -43,8 +43,6 @@ await page.locator("input[name=password]").fill(password);
 await page.getByRole("button", { name: "Sign in", exact: true }).click();
 await page.locator(".main h1").waitFor();
 
-const dialog = () => page.locator("dialog[open]").last();
-
 async function open(hash) {
   await page.goto("/#" + hash);
   await page.reload();
@@ -166,8 +164,19 @@ await shot("application-ready");
 
 await open("collection");
 await shot("collection");
-await page.getByRole("button", { name: "Edit settings" }).first().click();
-await dialog().waitFor();
+await page
+  .getByRole("table", { name: "Sources" })
+  .getByRole("button", { name: "Edit", exact: true })
+  .first()
+  .click();
+// The source form opens under the list; show it once its fields are there.
+await page.locator("section:has(#source-editor) [name=name]").waitFor();
+await settle();
+await page
+  .locator("#source-editor")
+  .evaluate((heading) =>
+    window.scrollTo(0, heading.getBoundingClientRect().top + window.scrollY - 88),
+  );
 await shot("collection-settings");
 
 await open("career?section=knowledge");
@@ -186,10 +195,20 @@ await shot("templates");
 
 await open("settings?section=agents");
 await shot("agent-access");
+// A new token is shown once; the screenshot shows an example in its place.
+await page.getByLabel("Token name").fill("interview-agent");
+await page.getByLabel("Token name").press("Enter");
+await page.locator("pre.secret").waitFor();
 await page
-  .getByRole("heading", { name: "Access tokens." })
-  .scrollIntoViewIfNeeded();
+  .locator("pre.secret")
+  .evaluate((secret) => (secret.textContent = "op_EXAMPLE0000000000000000000000"));
+// The confirmation toast would cover the form.
+await page.locator(".toast button").click();
 await shot("access-tokens");
+
+await open("settings?section=skills&skill=review-inbox");
+await page.locator("section.skill pre.skill-text").waitFor();
+await shot("skills");
 
 await open("activity");
 await page.getByRole("heading", { name: "Activity", exact: true }).waitFor();

@@ -615,6 +615,7 @@ def seed(s: Seeder):
 
     answers(s)
     activity(s, lumen, cedar, orbit)
+    skill_notes(s)
 
 
 def answers(s: Seeder):
@@ -666,6 +667,28 @@ def answers(s: Seeder):
                 "application_id": app["id"],
             },
         )
+
+
+def skill_notes(s: Seeder):
+    """Local notes of a skill: the owner's first version, then the agent's addition."""
+    first = s.owner(
+        "PUT",
+        "/skills/review-inbox/notes",
+        json={
+            "expected_version": 0,
+            "text": "Leave every job at Northstar Labs for me, even when it looks like "
+            "a duplicate.",
+        },
+    )
+    s.call(
+        "PUT",
+        "/skills/review-inbox/notes",
+        json={
+            "expected_version": first["version"],
+            "text": first["text"] + "\n\nWhen a posting mentions on-call work, quote the "
+            "sentence in your reason.",
+        },
+    )
 
 
 def activity(s: Seeder, lumen, cedar, orbit):
