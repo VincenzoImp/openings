@@ -5,7 +5,8 @@ Listens on 127.0.0.1:$OPENINGS_E2E_PORT (a free port when unset) and answers
 reached the server it started. The route exists only in this test server.
 
 $OPENINGS_E2E_JOBS and $OPENINGS_E2E_APPLICATIONS set the size of the workspace
-(60 jobs and 53 applications by default).
+(60 jobs and 53 applications by default). Above 500 jobs they are written in
+bulk (large_fixtures.py), so 5,000 jobs and 500 applications take seconds.
 """
 
 import json
@@ -23,9 +24,12 @@ from openings.career import ClaimCreate, KnowledgeCreate, ProfileUpdate, Templat
 from openings.common import new_id, now
 from openings.documents import ContextCreate
 from openings.policy import SECTIONS
+from large_fixtures import seed_large
 from today_fixtures import seed_today
 
 RUN_PATH = "/__e2e__/run"
+# Above this many jobs the workspace is seeded in bulk (large_fixtures.py).
+LARGE = 500
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -212,7 +216,10 @@ def main():
                 )
             # Before the numbered jobs, so those stay the newest records of every list.
             seed_today(app, client, lambda agent: seed_library(app, agent))
-        for index in range(jobs):
+        # A large workspace (the performance budget) is written in one transaction.
+        if jobs > LARGE:
+            seed_large(workspace, jobs, applications)
+        for index in range(0 if jobs > LARGE else jobs):
             job = workspace.ingest_job(
                 {
                     "title": f"Synthetic engineer {index:02d}",
