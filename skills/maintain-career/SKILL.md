@@ -90,8 +90,13 @@ assets together with the expected version.
 
 Existing Drafts keep their frozen contexts. After the change, list stale Drafts
 with `applications_staleness` (REST `GET /staleness`); each report names the
-changed Profile, guidance, template, entry or claim and the affected revisions.
-Contexts prepared since 0.19 also record the policy section versions they froze.
+changed Profile part, policy item, guidance, template, entry or claim and the
+affected revisions. Only what documents use counts: Profile metadata,
+preferences and roles, decision items, unconfirmed proposals, template names,
+entry and claim order, claim selection fields, free-form metadata and spacing
+never make a Draft stale, and a writing item scoped to the CV or the letter concerns that
+document only. Contexts prepared before 0.19 froze no policy, so policy changes
+are not compared for them (`comparison.policy: "not_frozen"`).
 Propagate the change to Drafts the owner has not yet submitted when it improves
 them: prepare a new context with the same deliberate selections, save new
 revisions linked with `previous_id`, check them like new work, keep earlier

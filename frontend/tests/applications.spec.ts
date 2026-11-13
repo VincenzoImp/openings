@@ -763,6 +763,95 @@ test("documents, revisions, frozen copies and their files are managed in the rev
   );
 });
 
+test("the Inputs tab and the list name the parts that changed since the documents were written", async ({
+  page,
+}) => {
+  const stamp = unique("Inputs");
+  const application = await make(page, stamp);
+  const add = async (section: string, body: Record<string, unknown>) =>
+    (
+      await call(page, `/policy/${section}/items`, "POST", {
+        expected_version: (await call(page, `/policy/${section}`)).version,
+        ...body,
+      })
+    ).item;
+  const authorization = await add("eligibility", {
+    label: `Work authorization ${stamp}`,
+    statement: "EU citizen.",
+  });
+  const onePage = await add("writing", {
+    label: `One page ${stamp}`,
+    statement: "Keep the CV to one page.",
+    scope: "cv",
+  });
+  const context = await call(page, "/contexts", "POST", {
+    application_id: application.id,
+  });
+  for (const kind of ["resume", "cover_letter"])
+    await call(page, "/documents", "POST", {
+      application_id: application.id,
+      context_id: context.id,
+      kind,
+      title: kind === "resume" ? "CV" : "Letter",
+      content: { text: "Synthetic text." },
+    });
+  const profile = async (fields: Record<string, unknown>) =>
+    call(page, "/career/profile", "PATCH", {
+      expected_version: (await call(page, "/career/profile")).version,
+      ...fields,
+    });
+  const before = await call(page, "/career/profile");
+
+  // Metadata is not used by documents: they stay current.
+  await profile({ metadata: { ...before.metadata, synthetic: stamp } });
+  await go(page, `review?application=${application.id}&tab=inputs`);
+  await settled(page);
+  await expect(page.getByText("Inputs are current")).toBeVisible();
+
+  // The summary, an eligibility fact and a CV rule change.
+  await profile({ summary: `${before.summary} ${stamp}` });
+  for (const [item, statement] of [
+    [authorization, "EU citizen, no sponsorship needed."],
+    [onePage, "One page, no photo."],
+  ])
+    await call(page, `/policy/items/${item.id}`, "PATCH", {
+      expected_version: (await call(page, `/policy/${item.section}`)).version,
+      statement,
+    });
+  await page.reload();
+  await settled(page);
+  await expect(page.getByText("Inputs changed since")).toBeVisible();
+  const changes = page.getByRole("list", {
+    name: "Inputs changed since the documents were written",
+  });
+  await expect(changes.getByRole("listitem")).toHaveText([
+    /^Profile summary\s*changed$/,
+    new RegExp(
+      `^Policy “Work authorization ${stamp}”\\s*changed · Facts employers ask about$`,
+    ),
+    new RegExp(
+      `^Policy “One page ${stamp}”\\s*changed · Rules for your documents · CV only$`,
+    ),
+  ]);
+  await expect(changes).not.toContainText("Metadata");
+  await fitsViewport(page);
+
+  // The list names the first change and counts the others.
+  await go(page, `applications?q=${encodeURIComponent(stamp)}`);
+  await settled(page);
+  await expect(row(page, stamp)).toContainText("Inputs changed");
+  await expect(row(page, stamp)).toContainText("Profile summary and 2 more");
+
+  // Put the shared Profile and policy back for the other tests.
+  await profile({ summary: before.summary, metadata: before.metadata });
+  for (const item of [authorization, onePage])
+    await call(
+      page,
+      `/policy/items/${item.id}?expected_version=${(await call(page, `/policy/${item.section}`)).version}`,
+      "DELETE",
+    );
+});
+
 test("the timeline records responses, notes and who made each change", async ({
   page,
 }) => {

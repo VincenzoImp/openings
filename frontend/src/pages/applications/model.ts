@@ -170,7 +170,7 @@ export function documentState(app: Application): Label[] {
       });
   }
   if (app.status === "draft" && app.stale_inputs?.length)
-    lines.push({ text: "Inputs changed since written", tone: "attention" });
+    lines.push({ text: "Inputs changed", tone: "attention" });
   return lines;
 }
 const capital = (text: string) => text[0].toUpperCase() + text.slice(1);

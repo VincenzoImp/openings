@@ -4,7 +4,7 @@ import sqlite3
 from contextlib import closing
 
 # Columns schema 11 added to existing tables.
-SCHEMA_ELEVEN_COLUMNS = {"applications": ("concluded_on",)}
+SCHEMA_ELEVEN_COLUMNS = {"applications": ("concluded_on",), "context_inputs": ("parts",)}
 # The applications table and its indexes as released with schema 10 (0.19).
 APPLICATIONS_TEN = """CREATE TABLE IF NOT EXISTS applications (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -56,6 +56,7 @@ def make_schema_ten(path):
         conn.execute("DROP TABLE applications_current")
         for index in INDEXES_TEN:
             conn.execute(index)
+        conn.execute("ALTER TABLE context_inputs DROP COLUMN parts")
         conn.execute("PRAGMA legacy_alter_table=OFF")
         conn.execute("PRAGMA user_version=10")
         conn.commit()

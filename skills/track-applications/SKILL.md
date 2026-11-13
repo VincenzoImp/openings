@@ -50,8 +50,9 @@ Classify:
   [Prepare Shortlist](../prepare-shortlist/SKILL.md) readiness checks;
 - **incomplete**: a document, file or review step is missing;
 - **blocked**: an employer requirement or open question needs the owner;
-- **stale**: the frozen context predates a relevant Profile, Career or template
-  change (`applications_staleness` lists these with the changed inputs), or the
+- **stale**: the frozen context predates a change to a part its documents use:
+  the Profile header or summary, a confirmed policy item, guidance, a template or
+  Career (`applications_staleness` names each changed part), or the
   posting changed after preparation;
 - **expired**: the posting is closed or past its deadline.
 

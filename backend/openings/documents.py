@@ -682,7 +682,7 @@ class DocumentService:
         return self.get_document(document_id)
 
     def application_staleness(self, application_id: str) -> dict:
-        """Report whether an application's current revision leaves were built on a context older than the current Profile, instructions, templates or selected Career entries/claims. Read-only; contexts stay frozen."""
+        """Report whether an application's current revision leaves were built on older inputs than documents use now, naming each changed part: Profile parts (name, headline, contact details, links, summary), confirmed policy items of eligibility, writing (by scope) and facts, general instructions, selected templates, Career entries and claims. Profile metadata, preferences, roles and decision items do not make documents stale. Read-only; contexts stay frozen."""
         with self.db.connect() as conn:
             row = conn.execute(
                 "SELECT id,status,version FROM applications WHERE id=?", (application_id,)
@@ -699,7 +699,7 @@ class DocumentService:
         limit: int = 50,
         offset: int = 0,
     ) -> dict:
-        """List applications in one stage (default draft; "all" for every stage) whose current revisions use outdated contexts, with the changed inputs. stale_only=false also lists current ones. Read-only."""
+        """List applications in one stage (default draft; "all" for every stage) whose current revisions were built on older inputs, with each changed part (as application_staleness). stale_only=false also lists current ones. Read-only."""
         _page(limit, offset)
         where, params = ("AND a.status=?", [status]) if status != "all" else ("", [])
         with self.db.connect() as conn:

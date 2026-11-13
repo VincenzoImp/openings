@@ -1290,8 +1290,8 @@
       "mcp": [
         "application_staleness"
       ],
-      "dashboard": "Applications: Built on older inputs indicator and detail",
-      "notes": "Compares the Profile, instructions, template, Career entry and claim versions frozen in each current leaf's context with the current records. Read-only; refreshing means preparing a new context and new revisions."
+      "dashboard": "Applications: Inputs changed indicator and the review page Inputs tab",
+      "notes": "Compares what each current leaf's context froze with the current records, only for what documents use: Profile parts (name, headline, contact, links, summary) by hash, confirmed eligibility/writing/facts policy items by content (a scoped writing item concerns its document kind only), and the content documents use of the instructions and the selected templates, Career entries and claims (names, positions, default flags, claim selection fields, metadata and spacing are ignored). Each change names its part (input, id, label, state, section for policy); each document carries comparison {profile: parts|whole, policy: items|not_frozen}. Read-only; refreshing means preparing a new context and new revisions."
     },
     {
       "id": "applications.staleness_list",
@@ -1306,8 +1306,8 @@
       "mcp": [
         "applications_staleness"
       ],
-      "dashboard": "Applications: Built on older inputs badges on cards and rows",
-      "notes": "status (default draft, or all), stale_only (default true), limit, offset. Application list/read summaries also include stale_inputs."
+      "dashboard": "Applications: Inputs changed tag and first change on rows",
+      "notes": "status (default draft, or all), stale_only (default true), limit, offset. Application list/read summaries also include stale_inputs, stale_changes (the first three changes) and stale_changes_total."
     },
     {
       "id": "documents.list",
