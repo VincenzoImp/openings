@@ -526,7 +526,7 @@ def register_core_mcp(mcp, workspace, requests):
             "actor": current_actor().describe(),
             "open_requests": requests.count_open(),
             "storage": storage_status(workspace.db),
-            "workflow": "Read open requests for the agent first. Read career, templates and stored instructions; prepare a frozen context; write and compile externally; submit document revisions and PDF/source files; track progress explicitly.",
+            "workflow": "Read open requests for the agent first. Read career, templates and stored instructions; prepare a frozen context; write and compile externally; save document revisions and PDF/source files; track progress explicitly.",
         }
 
     bind_mcp(mcp, OPERATIONS, workspace)

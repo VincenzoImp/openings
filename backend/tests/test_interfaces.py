@@ -143,7 +143,7 @@ def test_owner_only_operations_refuse_an_agent_token_on_rest_and_mcp(tmp_path):
     app = create_app(tmp_path / "access.sqlite", start_worker=False)
     app.state.auth.setup("synthetic-password")
     agent = app.state.auth.create_token("Synthetic agent", "agent")["token"]
-    owner = app.state.auth.create_token("Synthetic owner token")["token"]
+    owner = app.state.auth.create_token("Synthetic owner token", "owner")["token"]
     with TestClient(app, base_url="http://localhost:8080") as client:
         inventory = client.get(
             "/api/v1/capabilities", headers={"Authorization": "Bearer " + agent}

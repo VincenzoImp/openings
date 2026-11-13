@@ -47,7 +47,8 @@ stored in the workspace.
 
 The navigation has three groups. **Work** holds Today, Applications, Jobs (the
 tabs To review, Shortlist, Dismissed and All, each with the selected job beside
-the list) and Activity. **Library** holds Career, Policy and Templates. **System** holds
+the list; after you shortlist or dismiss a job in To review or the Shortlist, the
+next job of the list is shown) and Activity. **Library** holds Career, Policy and Templates. **System** holds
 Collection and Settings. The numbers beside Applications and Activity count the
 applications ready to apply and the agent's open questions; the line at the bottom
 names the agent while one of its runs is open.

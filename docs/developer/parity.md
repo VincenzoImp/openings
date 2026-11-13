@@ -144,7 +144,7 @@ with `403 forbidden` on REST and MCP; `test_interfaces.py` checks each one.
 | `requests.create` | `POST /requests` | `requests_create` | The owner writes; an agent never writes requests for itself. A request never authorises what the operating mandate forbids. |
 | `requests.withdraw` | `POST /requests/{request_id}/withdraw` | `requests_withdraw` | The owner withdraws; the record stays readable. |
 | `tokens.list` | `GET /tokens` | `tokens_list` | Token secrets are not returned after creation. Each token has a kind: owner (full access) or agent. |
-| `tokens.create` | `POST /tokens` | `tokens_create` | kind is owner (default, full access) or agent (scoped). The secret is returned once. The dashboard form defaults to agent. |
+| `tokens.create` | `POST /tokens` | `tokens_create` | kind is agent (default, scoped) or owner (full access). The secret is returned once. The dashboard form defaults to agent. |
 | `tokens.revoke` | `DELETE /tokens/{token_id}` | `tokens_revoke` | May revoke the caller token; subsequent requests require another valid credential. |
 | `password.update` | `POST /auth/password` | `owner_password_update` | Retains API tokens; cookie caller must log in again. |
 

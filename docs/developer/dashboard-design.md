@@ -129,6 +129,14 @@ statement list (policy items, rules, requirements), key/value editor, pipeline
 strip, stat and rate bar, paper preview, split view with a detail panel, stepper,
 fixed action bar, dialog, toast, empty and error states.
 
+A confirmation toast goes by itself after six seconds, waiting while the pointer
+or focus is on it, and may carry one action such as **Undo**; an error toast
+stays until it is closed. On narrow screens toasts sit above the bottom bar and
+above a fixed action bar. Opening a dialog closes the toast from before it; a
+toast raised while it is open shows where the page's toast would be, outside the
+dialog's box. Tab strips scroll sideways on narrow screens, fade at an edge that
+hides tabs and keep the selected tab in view.
+
 Each component is built once in #135 with its states (default, hover, focus,
 disabled, loading, error) and its keyboard behaviour, and no page file exceeds
 about 400 lines.
@@ -267,9 +275,11 @@ when that issue lands; the table says which parts those are.
   filters by readiness and outcome, sorts, and shows a list or a board. The list
   is an ARIA grid of rows (`role="table"`, `row`, `cell`) instead of a `<table>`,
   so that a row can stack into labelled cells under 860 px and still be read as
-  a table; rows use `content-visibility: auto`. Selection acts in bulk: close as
-  no reply, close with an outcome, reopen, mark ready, not ready, delete.
-  **Record response** opens a form under the row; **Close N as no reply** lists
+  a table; every row of the page is laid out, so the list is exactly as tall as
+  its rows. Selection acts in bulk: close as no reply, close with an outcome,
+  reopen, mark ready, not ready, delete; the bar offers only the actions valid
+  for every selected application. **Record response** opens a form under the
+  row, which closes when the stage, a filter, the order or the page changes; **Close N as no reply** lists
   the applications before closing them. Today's "Close N as no reply" and
   Waiting card use the `no_reply_due` filter and the shared no-reply period
   (`outcomes.no_reply_period`), so the period has one definition.

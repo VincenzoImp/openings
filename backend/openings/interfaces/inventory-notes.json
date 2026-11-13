@@ -594,7 +594,7 @@
     {
       "id": "tokens.create",
       "dashboard": "Settings: Agent access, Create a token (owner or agent)",
-      "notes": "kind is owner (default, full access) or agent (scoped). The secret is returned once. The dashboard form defaults to agent."
+      "notes": "kind is agent (default, scoped) or owner (full access). The secret is returned once. The dashboard form defaults to agent."
     },
     {
       "id": "tokens.revoke",

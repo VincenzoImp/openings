@@ -41,8 +41,6 @@
   min-height: var(--row);
   padding: var(--s2) var(--s4);
   border-top: 1px solid var(--line);
-  content-visibility: auto;
-  contain-intrinsic-size: auto 64px;
 }
 .grid-head .grid-row {
   min-height: 0;
@@ -51,7 +49,6 @@
   color: var(--ink-2);
   font-size: var(--t-xs);
   font-weight: 600;
-  content-visibility: visible;
 }
 .grid-head + [role="rowgroup"] > .grid-row:first-child {
   border-top: 0;
@@ -90,7 +87,6 @@
 }
 .grid-row.expansion {
   border-top: 0;
-  content-visibility: visible;
 }
 .is-selected .caption,
 .expansion .caption,
@@ -219,6 +215,28 @@
 .respond-caption {
   grid-column: 1 / -1;
 }
+/* In a dialog: the choice, the date, the note at full width, then the
+   buttons, Cancel before the main one, at the end of the line. */
+.respond.stacked {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  padding: 0;
+}
+.respond.stacked input[type="date"] {
+  max-width: 220px;
+}
+.respond.stacked textarea {
+  width: 100%;
+  resize: vertical;
+}
+.respond-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--s2);
+  padding-top: var(--s2);
+  border-top: 1px solid var(--line);
+}
 
 /* Review: posting, CV and letter side by side; one at a time on a phone. */
 .panes {
@@ -305,6 +323,9 @@
   flex-wrap: wrap;
   margin-bottom: var(--s4);
 }
+.review-head > .all-sent {
+  flex-basis: 100%;
+}
 .review-head h1 {
   margin: var(--s2) 0 var(--s1);
 }
@@ -328,7 +349,6 @@
     flex-wrap: wrap;
     gap: var(--s2) var(--s3);
     padding: var(--s3) var(--s4);
-    contain-intrinsic-size: auto 160px;
   }
   .grid-row .tags {
     margin-top: var(--s1);

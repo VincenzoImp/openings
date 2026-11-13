@@ -26,7 +26,7 @@ from ..operations import (
     storage_status,
 )
 from ..transfers import SnapshotResponse
-from .registry import Exemption, Operation, Param, Route, Tool, bind_mcp, bind_rest
+from .registry import Exemption, Operation, Param, Route, Tool, bind_mcp, bind_rest, renamed
 
 
 class PasswordInput(Input):
@@ -36,8 +36,8 @@ class PasswordInput(Input):
 class TokenInput(Input):
     name: str = Field(min_length=1, max_length=100)
     kind: Literal["owner", "agent"] = Field(
-        default="owner",
-        description="owner has full access; agent cannot change the owner password, manage tokens, restore a backup, answer questions for the owner or write requests for the agent.",
+        default="agent",
+        description="agent (the default) is scoped; owner has full access; agent cannot change the owner password, manage tokens, restore a backup, answer questions for the owner or write requests for the agent.",
     )
     idempotency_key: str | None = Field(
         default=None,
@@ -329,7 +329,7 @@ def register_system(router, mcp, workspace, auth, public_url):
         name="capabilities_get",
         description="Read the logical operation matrix, REST routes, MCP tools and dashboard locations.",
         annotations=READ,
-    )(capabilities)
+    )(renamed(capabilities, "capabilities_get"))
 
     bind_rest(router, OPERATIONS, auth)
     bind_mcp(mcp, OPERATIONS, auth)
