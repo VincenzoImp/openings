@@ -8,11 +8,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 from curl_cffi import CurlOpt
 
-from openings import discovery as module
+from discovery_fixtures import patch_discovery
 from openings._vendor.jobspy.util import RequestsRotating, TLSRotating
 from openings.collectors.pinning import PinnedAdapter, curl_resolve_entry
 from openings.collectors.policy import ProviderPatch
-from openings.discovery import DiscoveryService
+from openings.discovery import DiscoveryService, network
 from openings.errors import DomainError
 from openings.workspace import Workspace
 
@@ -73,7 +73,7 @@ def synthetic_resolver(monkeypatch, answers):
         family = socket.AF_INET6 if ":" in address else socket.AF_INET
         return [(family, socket.SOCK_STREAM, 6, "", (address, port))]
 
-    monkeypatch.setattr(module.socket, "getaddrinfo", resolve)
+    monkeypatch.setattr(network.socket, "getaddrinfo", resolve)
     return calls
 
 
@@ -93,7 +93,7 @@ def test_provider_sessions_connect_to_the_checked_address(
 ):
     port = local_server.server_address[1]
     # Treat the synthetic server as public; the name itself is unresolvable by the system.
-    monkeypatch.setattr(module, "is_public_address", lambda address: address == "127.0.0.1")
+    patch_discovery(monkeypatch, "is_public_address", lambda address: address == "127.0.0.1")
     calls = synthetic_resolver(monkeypatch, {"pinned.test": ["127.0.0.1"] * 4})
     session = session_for(gate, session_class)
     try:
@@ -132,7 +132,7 @@ def test_every_redirect_hop_of_a_provider_session_is_pinned(
 ):
     port = local_server.server_address[1]
     local_server.redirect = f"http://rebind.test:{port}/secret"
-    monkeypatch.setattr(module, "is_public_address", lambda address: address == "127.0.0.1")
+    patch_discovery(monkeypatch, "is_public_address", lambda address: address == "127.0.0.1")
     synthetic_resolver(
         monkeypatch,
         {"start.test": ["127.0.0.1", "127.0.0.1"], "rebind.test": ["127.0.0.1", "10.0.0.8"]},
