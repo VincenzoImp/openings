@@ -10,12 +10,22 @@ from fastapi.testclient import TestClient
 from context_fixtures import insert_legacy_context, legacy_prepare_context, make_schema_eight
 from openings.actors import OWNER, acting_as, token_actor
 from openings.app import create_app
-from openings.career import CareerService, ProfileUpdate, TemplateCreate, TemplateUpdate
+from openings.career import (
+    CareerService,
+    ClaimCreate,
+    ClaimUpdate,
+    InstructionsUpdate,
+    KnowledgeCreate,
+    KnowledgeUpdate,
+    ProfileUpdate,
+    TemplateCreate,
+    TemplateUpdate,
+)
 from openings.db import MIGRATIONS, SCHEMA_VERSION
 from openings.documents import ContextCreate, DocumentCreate, DocumentService
 from openings.policy import PolicyService
 from openings.snapshots import payload_text
-from openings.staleness import frozen_parts
+from openings.staleness import PARTS_FORMAT, frozen_parts
 from openings.workspace import Workspace
 from outcome_fixtures import make_schema_ten
 from test_context_parts import seed
@@ -332,7 +342,15 @@ def test_older_contexts_compare_what_they_froze_and_say_what_they_cannot(tmp_pat
     services = Services(Workspace(path))
     parts = _parts(path)
     assert parts[legacy]["policy"] is None and parts[legacy]["profile"]
-    assert parts[unreadable] == {"format": 1, "profile": None, "policy": None, "templates": {}}
+    assert parts[unreadable] == {
+        "format": PARTS_FORMAT,
+        "profile": None,
+        "policy": None,
+        "instructions": None,
+        "templates": {},
+        "knowledge": {},
+        "claims": {},
+    }
     first, second = (services.report(application_id) for application_id in applications[:2])
     assert first["stale"] is False
     assert first["documents"][0]["comparison"] == {"profile": "parts", "policy": "not_frozen"}
@@ -351,3 +369,86 @@ def test_older_contexts_compare_what_they_froze_and_say_what_they_cannot(tmp_pat
     assert services.report(applications[0])["stale"] is False
     services.profile(summary="Changed summary.")
     assert changed(services.report(applications[0])) == [("profile", "Summary", "changed")]
+
+
+def test_records_are_compared_by_the_content_documents_use(tmp_path):
+    app = create_app(tmp_path / "records.sqlite", start_worker=False)
+    services = Services(app.state.workspace)
+    career = services.career
+    template = career.create_template(
+        TemplateCreate(name="MASTER CV", kind="resume", tex="Synthetic", is_default=True)
+    )
+    entry = career.create_knowledge(
+        KnowledgeCreate(title="Backend Engineer", narrative="Built services.")
+    )
+    claim = career.create_claim(
+        ClaimCreate(knowledge_id=entry["id"], text="Reduced latency by 20%.", approved=True)
+    )
+    job = services.workspace.ingest_job({"title": "Synthetic role", "posting": "Build APIs."})
+    application_id = services.workspace.create_application({"job_id": job["id"]})["id"]
+    services.draft(application_id)
+
+    def edit_entry(**fields):
+        current = career.get_knowledge(entry["id"])
+        career.update_knowledge(
+            entry["id"], KnowledgeUpdate(expected_version=current["version"], **fields)
+        )
+
+    def edit_claim(**fields):
+        current = career.get_claim(claim["id"])
+        career.update_claim(claim["id"], ClaimUpdate(expected_version=current["version"], **fields))
+
+    def edit_instructions(general):
+        current = career.get_instructions()
+        career.update_instructions(
+            InstructionsUpdate(expected_version=current["version"], general=general)
+        )
+
+    # New versions that change nothing documents use.
+    edit_entry(metadata={"source": "https://example.test/synthetic"}, position=4)
+    edit_claim(metadata={"source": "synthetic"}, role="core", group="Scale", default_in_cv=True)
+    general = career.get_instructions()["general"]
+    edit_instructions("Changed for a moment.")
+    edit_instructions(general)
+    edit_instructions(general + "\n\n  ")  # spacing only
+    edit_entry(narrative="Built   services.\n")
+    current = career.get_template(template["id"])
+    career.update_template(
+        template["id"], TemplateUpdate(expected_version=current["version"], name="Renamed CV")
+    )
+    # Records the context never froze.
+    career.create_knowledge(KnowledgeCreate(title="Later entry", narrative="Synthetic."))
+    career.create_claim(ClaimCreate(knowledge_id=entry["id"], text="A later claim.", approved=True))
+    report = services.report(application_id)
+    assert report["stale"] is False, report["changes"]
+
+    # Content documents use.
+    edit_entry(narrative="Built and operated services.")
+    edit_claim(text="Reduced latency by 25%.")
+    edit_instructions("Be concise.")
+    current = career.get_template(template["id"])
+    career.update_template(
+        template["id"], TemplateUpdate(expected_version=current["version"], tex="Changed")
+    )
+    assert changed(services.report(application_id)) == [
+        ("instructions", "Instructions", "changed"),
+        ("template", "MASTER CV", "changed"),
+        ("knowledge", "Backend Engineer", "changed"),
+        ("claim", "Reduced latency by 20%.", "changed"),
+    ]
+
+
+def test_part_hashes_of_an_earlier_format_are_derived_again(drafted):
+    services, application_id, _, context = drafted
+    path = services.workspace.db.path
+    expected = _parts(path)
+    with services.workspace.db.transaction() as conn:
+        conn.execute(
+            "UPDATE context_inputs SET parts=? WHERE context_id=?",
+            (
+                json.dumps({"format": 1, "profile": None, "policy": None, "templates": {}}),
+                context["id"],
+            ),
+        )
+    assert services.report(application_id)["stale"] is False
+    assert _parts(path) == expected
