@@ -126,25 +126,30 @@ complete missing steps on a compatible incomplete revision. Save changed output
 as the appropriate new revision. An approved parent does not supply files or
 approval to a new child. Resolve concurrent branches explicitly.
 
-Keep the revision's structured `content` identical in wording to the uploaded
-`.tex` source and its PDF: when you edit the source after saving content, save the
-edited text as a new revision instead of uploading a diverging file. Run
-`documents_consistency` before review; `documents_review` refuses a mismatch.
-Upload exact source/PDF files and verify size and hashes. Download and validate
-the actual PDFs; a successful transfer is not a PDF-quality check. Read the
-post-upload document version, then mark document review approved only after the
-agent checks pass. Do not attribute this review to a human.
+A CV or letter revision is its `.tex` source and the PDF built from it, with
+the claim and Career entry ids it uses (`claim_ids`, `knowledge_ids`) and an
+optional `note` on what changed. It has no `content`: create the revision with
+`documents_create`, upload its one source, then the PDF with `source_sha256`, the
+SHA-256 of that source. Openings refuses a PDF that names another source
+(`source_mismatch`), so compile the exact source you uploaded. Read the
+revision's `text`, which the server derives from the source, to check what the
+owner will review; `documents_compare` shows what changed since the previous
+revision. When you change the source, save a new revision with its own source
+and PDF. Verify upload sizes and hashes. Download and validate the actual PDFs;
+a successful transfer is not a PDF-quality check. Read the post-upload document
+version, then mark document review approved only after the agent checks pass.
+Do not attribute this review to a human.
 
 ## Readiness and handoff
 
 Re-read the intended CV and CL leaves and their files. Both must match the chosen
-context and content, report `consistent` from `documents_consistency`, have valid checked PDFs and exact sources, and have approved
-review states. Only then mark the Draft ready: `application_ready` with the
+context, have their exact source and a valid checked PDF built from it, and have
+approved review states. Only then mark the Draft ready: `application_ready` with the
 application's current `expected_version`. Openings refuses with
 `application_not_ready` and names the failed check (`blocked`, `none`,
 `missing_pdf`, `unreviewed`) when the stored records disagree; fix that step
 instead of retrying. The server checks files, review states and blocking
-requirements only: your content, layout and consistency checks come first.
+requirements only: your content and layout checks come first.
 Ready is a stored step, not a stage. The application stays Draft; job interest
 stays saved. The owner finds it under **Ready to apply** on Today and opens its
 review page (`#review?application=APPLICATION_ID` in the dashboard): the posting,

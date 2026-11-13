@@ -189,6 +189,20 @@ async def exercise(base, token, folder, tectonic):
                 )
                 pdf = source.with_suffix(".pdf").read_bytes()
                 checks["external_compilation"] = pdf.startswith(b"%PDF-")
+                refused = await session.call_tool(
+                    "documents_create",
+                    {
+                        "value": {
+                            "application_id": application["id"],
+                            "kind": "resume",
+                            "content": {"text": "Free-form wording."},
+                        }
+                    },
+                )
+                checks["cv_content_refused"] = refused.is_error and (
+                    "content_not_accepted" in refused.content[0].text
+                    or "source and PDF" in refused.content[0].text
+                )
                 document = unpack(
                     await session.call_tool(
                         "documents_create",
@@ -198,46 +212,52 @@ async def exercise(base, token, folder, tectonic):
                                 "context_id": context["id"],
                                 "kind": "resume",
                                 "title": "CV",
-                                "content": {
-                                    "bullets": [
-                                        {
-                                            "text": "Reduced latency by 20%.",
-                                            "evidence_ids": [evidence["id"]],
-                                            "claim_ids": [claim["id"]],
-                                        }
-                                    ]
-                                },
+                                "claim_ids": [claim["id"]],
+                                "knowledge_ids": [evidence["id"]],
+                                "note": "Built from the synthetic template.",
                             }
                         },
                     )
                 )
-                uploaded = []
-                for name, data, media in [
-                    ("application.pdf", pdf, "application/pdf"),
-                    ("application.tex", source.read_bytes(), "application/x-tex"),
-                ]:
-                    reservation = unpack(
-                        await session.call_tool(
-                            "files_reserve_upload",
-                            {
-                                "value": {
-                                    "owner_type": "document",
-                                    "owner_id": document["id"],
-                                    "name": name,
-                                    "media_type": media,
-                                    "size": len(data),
-                                    "sha256": hashlib.sha256(data).hexdigest(),
-                                }
-                            },
-                        )
-                    )
+                checks["cv_has_no_content"] = "content" not in document
+
+                async def send(document_id, name, data, media, source_sha256=None):
+                    value = {
+                        "owner_type": "document",
+                        "owner_id": document_id,
+                        "name": name,
+                        "media_type": media,
+                        "size": len(data),
+                        "sha256": hashlib.sha256(data).hexdigest(),
+                    }
+                    if source_sha256:
+                        value["source_sha256"] = source_sha256
+                    result = await session.call_tool("files_reserve_upload", {"value": value})
+                    if result.is_error:
+                        return None, result.content[0].text
+                    reservation = unpack(result)
                     response = await http.put(
                         urljoin(base, reservation["url"]),
                         headers=reservation["headers"],
                         content=data,
                     )
                     response.raise_for_status()
-                    stored = response.json()
+                    return response.json(), None
+
+                tex_bytes = source.read_bytes()
+                tex_sha = hashlib.sha256(tex_bytes).hexdigest()
+                _, early = await send(
+                    document["id"], "application.pdf", pdf, "application/pdf", tex_sha
+                )
+                checks["pdf_waits_for_its_source"] = bool(early) and "source" in early
+                uploaded = []
+                for name, data, media, built in [
+                    ("application.tex", tex_bytes, "application/x-tex", None),
+                    ("application.pdf", pdf, "application/pdf", tex_sha),
+                ]:
+                    stored, error = await send(document["id"], name, data, media, built)
+                    if error:
+                        raise RuntimeError(error)
                     uploaded.append(stored)
                     download = unpack(
                         await session.call_tool("files_reserve_download", {"file_id": stored["id"]})
@@ -246,6 +266,26 @@ async def exercise(base, token, folder, tectonic):
                         urljoin(base, download["url"]), headers=download["headers"]
                     )
                     checks["exact_" + name] = fetched.content == data
+                checks["pdf_names_its_source"] = uploaded[1]["source_sha256"] == tex_sha
+                current = unpack(
+                    await session.call_tool("documents_get", {"document_id": document["id"]})
+                )
+                checks["text_derived_from_source"] = (
+                    current["source_sha256"] == tex_sha
+                    and "Reduced API p95 latency by 20%" in (current["text"] or "")
+                    and "\\" not in current["text"]
+                    and current["claim_ids"] == [claim["id"]]
+                )
+                reviewed = unpack(
+                    await session.call_tool(
+                        "documents_review",
+                        {
+                            "document_id": document["id"],
+                            "value": {"expected_version": current["version"]},
+                        },
+                    )
+                )
+                checks["source_and_pdf_approved"] = reviewed["review_state"] == "approved"
                 revised = unpack(
                     await session.call_tool(
                         "documents_create",
@@ -254,14 +294,28 @@ async def exercise(base, token, folder, tectonic):
                                 "application_id": application["id"],
                                 "previous_id": document["id"],
                                 "kind": "resume",
-                                "content": {
-                                    "text": "Edited content awaiting a newly compiled PDF."
-                                },
+                                "note": "Edited source awaiting a newly compiled PDF.",
                             }
                         },
                     )
                 )
                 checks["revision_has_no_inherited_pdf"] = revised["files"] == []
+                edited = tex_bytes.replace(b"Linux.", b"Linux, Kubernetes.")
+                _, error = await send(revised["id"], "application.tex", edited, "application/x-tex")
+                _, mismatch = await send(
+                    revised["id"], "application.pdf", pdf, "application/pdf", tex_sha
+                )
+                comparison = unpack(
+                    await session.call_tool("documents_compare", {"document_id": revised["id"]})
+                )
+                checks["changed_source_compared"] = (
+                    error is None
+                    and comparison["other_id"] == document["id"]
+                    and (comparison["added"], comparison["removed"]) == (1, 1)
+                    and [line["change"] for line in comparison["lines"] if line["change"] != "same"]
+                    == ["removed", "added"]
+                )
+                checks["pdf_of_another_source_refused"] = bool(mismatch) and "source" in mismatch
                 summaries = unpack(
                     await session.call_tool(
                         "documents_list",
@@ -370,7 +424,7 @@ async def exercise(base, token, folder, tectonic):
                     )
                     checks["backup_exact_pdf"] = (
                         restored.execute(
-                            "SELECT content FROM blobs WHERE sha256=?", (uploaded[0]["sha256"],)
+                            "SELECT content FROM blobs WHERE sha256=?", (uploaded[1]["sha256"],)
                         ).fetchone()[0]
                         == pdf
                     )

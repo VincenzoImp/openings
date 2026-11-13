@@ -29,17 +29,19 @@ Step-by-step MCP/REST sequences behind the workflow skills: [Prepare Shortlist](
    extracted text and layout. If a compiler is unavailable, save the sources and
    report the missing PDF.
 6. Create draft revisions with `documents_create`, keeping application/context
-   ownership. Structured bullets can cite `evidence_ids` and `claim_ids`. Reserve
-   each PDF/source upload with `files_reserve_upload`: safe relative name, exact
-   size, media type and optional SHA-256. Transfer raw bytes using the returned
-   HTTP method, URL and headers; verify the stored files. Binary bodies do not
-   belong in MCP arguments.
+   ownership and citing `claim_ids` and `knowledge_ids`; a CV or letter takes no
+   `content`. Reserve its `.tex` source upload with `files_reserve_upload`: safe
+   relative name, exact size, media type and optional SHA-256. Then reserve the
+   PDF with `source_sha256` set to the source's SHA-256. Transfer raw bytes
+   using the returned HTTP method, URL and headers; verify the stored files and
+   read the revision's derived `text`. Binary bodies do not belong in MCP
+   arguments.
 7. An answers document archives a revision. Update the application's live
    `answers` separately with `application_update`, current `expected_version`
    and question IDs. Leave progress and review state unchanged unless requested.
 
-A PDF does not record submission. Changed content needs a new revision using
-`previous_id` and its own files. Approved revisions reject uploads. Attachment
+A PDF does not record submission. A changed source needs a new revision using
+`previous_id` and its own source and PDF; `documents_compare` shows what changed. Approved revisions reject uploads. Attachment
 changes increment versions: reread and review current files before approval.
 Prepare a new context when updated source knowledge is needed.
 
