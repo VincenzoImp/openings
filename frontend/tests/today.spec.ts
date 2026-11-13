@@ -55,7 +55,7 @@ test("Today answers the owner's three questions with the workspace's own numbers
     page,
     "/applications?readiness=blocked&status=draft&limit=1",
   );
-  // The synthetic policy's "No reply" decision says 45 days; the server reads it.
+  // The synthetic settings say 45 days of no reply; the server reads them.
   const waiting = await call(page, "/applications?no_reply_due=true&limit=1");
   expect(waiting.no_reply.days).toBe(45);
   expect(waiting.total).toBe(
@@ -212,7 +212,7 @@ test("Today answers the owner's three questions with the workspace's own numbers
   );
   await expect(collection.locator(".tag")).toHaveText("Needs attention");
 
-  // Waiting for a reply: how many waited longer than the policy's period.
+  // Waiting for a reply: how many waited longer than the no-reply period.
   const wait = card(page, "Waiting for a reply");
   await expect(wait.locator("header .count")).toHaveText(
     String(counts.stage_counts.applied),

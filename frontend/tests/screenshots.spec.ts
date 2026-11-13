@@ -60,7 +60,7 @@ const SCREENS: Screen[] = [
     },
   },
   { name: "career", route: "career?section=knowledge", docs: "career" },
-  { name: "policy", route: "policy", docs: "policy" },
+  { name: "preferences", route: "preferences", docs: "preferences" },
   { name: "templates", route: "templates", docs: "templates" },
   { name: "collection", route: "collection", docs: "collection" },
   { name: "activity", route: "activity" },
