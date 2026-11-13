@@ -498,6 +498,7 @@
       "a job with its details, the dismissed job, the dialogs and the selection have no serious accessibility finding",
       "a likely duplicate is decided inside the job: different, then merged",
       "a note is edited, an application started and a job forgotten from its page",
+      "a screen that fails to load offers a reload",
       "a template's source, typed rules, assets and sample are managed end to end",
       "adding a job by its address finds the one already in the workspace",
       "an enabled rule dismisses a collected job, names itself and the job can be restored",
