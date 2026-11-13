@@ -1,5 +1,5 @@
-// Class names of the design system's components, kept apart from React so the
-// mapping from older variant names can be tested without a browser.
+// Class names of the design system's components, kept apart from React so
+// they can be tested without a browser.
 
 /** Join class names, dropping empty and repeated ones. */
 export function cx(...names: (string | false | null | undefined)[]) {
@@ -9,38 +9,28 @@ export function cx(...names: (string | false | null | undefined)[]) {
   return [...seen].join(" ");
 }
 
-// Names the pages written before the design system still pass.
-const buttonAliases: Record<string, string> = {
-  small: "sm",
-  subtle: "quiet",
-  "danger-fill": "danger",
-  default: "",
-  md: "",
-};
-
-/** Classes of a button: `variant` and `className` may hold several names. */
+/**
+ * Classes of a button: `variant` and `className` may hold several names;
+ * `md` is the default size and adds none.
+ */
 export function buttonClass(
   variant = "",
   size = "",
   className = "",
   iconOnly = false,
 ) {
-  const names = `${variant} ${size} ${className}`
-    .split(/\s+/)
-    .map((name) => buttonAliases[name] ?? name);
-  return cx(iconOnly ? "icon-btn" : "btn", ...names);
+  return cx(
+    iconOnly ? "icon-btn" : "btn",
+    variant,
+    size === "md" ? "" : size,
+    className,
+  );
 }
 
 export type Tone =
   "neutral" | "ready" | "attention" | "danger" | "info" | "agent";
-const toneAliases: Record<string, Tone> = {
-  green: "ready",
-  amber: "attention",
-  neutral: "neutral",
-};
 
-/** Classes of a tag; `green` and `amber` are the older names of two tones. */
-export function tagClass(tone = "neutral", className = "") {
-  const resolved = toneAliases[tone] ?? tone;
-  return cx("tag", resolved === "neutral" ? "" : resolved, className);
+/** Classes of a tag; the neutral tone adds none. */
+export function tagClass(tone: Tone = "neutral", className = "") {
+  return cx("tag", tone === "neutral" ? "" : tone, className);
 }
