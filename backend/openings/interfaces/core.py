@@ -296,7 +296,7 @@ OPERATIONS = (
         ),
         tool=Tool(
             READ_ONLY,
-            "Read the timeline of a job (job_id) or of an application (application_id): its notes and recorded changes in one list, pinned notes first, then newest first. A job's timeline includes its applications' entries; an application's includes its job's. Each entry has type (note or event), kind (note, event or response), scope (job or application), actor (who), run and either note (body, version, pinned, origin) or event (kind, payload of identifiers and field names, subject). Filter by kinds, who (owner, agent, system, unknown), scope, since and until; counts gives the entries of each kind for the other filters. Page with limit and offset.",
+            "Read the timeline of a job (job_id) or of an application (application_id): its notes and recorded changes in one list, pinned notes first, then newest first. A job's timeline includes its applications' entries; an application's includes its job's. Each entry has type (note or event), kind (note, event or response), scope (job or application), actor (who), run and either note (body, version, pinned) or event (kind, payload of identifiers and field names, subject). Filter by kinds, who (owner, agent, system, unknown), scope, since and until; counts gives the entries of each kind for the other filters. Page with limit and offset.",
         ),
     ),
     Operation(

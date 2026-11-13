@@ -1,4 +1,4 @@
-"""Backup copies stay on the data volume and restores bring current indexes."""
+"""Backup copies stay on the data volume and leave no sidecars."""
 
 import sqlite3
 import tempfile
@@ -8,26 +8,11 @@ from fastapi.testclient import TestClient
 
 from openings.app import create_app
 from openings.db import TEMP_PREFIX
-from openings.operations import restore_database
 
 
 def indexes(path):
     with sqlite3.connect(path) as conn:
         return {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='index'")}
-
-
-def test_restore_recreates_indexes_missing_from_an_older_backup(tmp_path):
-    app = create_app(tmp_path / "data" / "live.sqlite", start_worker=False)
-    workspace = app.state.workspace
-    workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build."})
-    backup = tmp_path / "older.sqlite"
-    workspace.db.backup(backup)
-    with sqlite3.connect(backup) as conn:
-        conn.execute("DROP INDEX jobs_triage")
-    assert "jobs_triage" not in indexes(backup)
-    restore_database(workspace, backup)
-    assert "jobs_triage" in indexes(workspace.db.path)
-    assert not list(workspace.db.path.parent.glob(TEMP_PREFIX + "*"))
 
 
 def test_restore_route_leaves_no_wal_sidecars_of_its_upload(tmp_path):

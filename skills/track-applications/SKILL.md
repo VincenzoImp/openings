@@ -90,8 +90,7 @@ When the owner reports an employer's answer, record it with the day it arrived:
   such as a request for references, is `responses_create` with `kind`
   (`interview` or `other`), `date`, a short `note` and an `idempotency_key`;
 - a mistaken record: `responses_update` or `responses_delete` with the
-  response's `expected_version`. A response marked `estimated` got its date
-  from the upgrade; correct it when the owner knows the day.
+  response's `expected_version`.
 
 Use Closed with `not_pursued` only for the owner's or an authorized decision not
 to continue, never for an employer rejection.

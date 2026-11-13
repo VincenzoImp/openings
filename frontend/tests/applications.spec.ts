@@ -477,7 +477,6 @@ test("keyboard only: an employer response is recorded from an Applied row", asyn
       kind: "rejection",
       date: localDay(0),
       note: "Position filled internally.",
-      origin: "stage",
     }),
   ]);
 

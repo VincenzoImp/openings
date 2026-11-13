@@ -6,7 +6,8 @@ import json
 
 from ..actors import column_names, current_actor, require_owner
 from ..common import encode, new_id, now
-from ..errors import DomainError, conflict, missing
+from ..errors import DomainError, missing
+from ..idempotency import fingerprint, remember, replay
 from .models import (
     CONTENT_FIELDS,
     RULE_ACTIONS,
@@ -119,16 +120,11 @@ class PolicyService:
             require_owner("enable a policy rule")
         item_id, stamp = new_id(), now()
         confirmed = (None,) * 5 if actor.is_agent else (stamp, *actor.columns())
+        digest = fingerprint({"section": section, **value.model_dump(mode="json")})
         with self.db.transaction() as conn:
-            if value.idempotency_key:
-                old = conn.execute(
-                    "SELECT id,section,label FROM policy_items WHERE idempotency_key=?",
-                    (value.idempotency_key,),
-                ).fetchone()
-                if old:
-                    if (old["section"], old["label"]) != (section, value.label):
-                        conflict("This idempotency key was used for another policy item.")
-                    return self._result(conn, section, old["id"])
+            replayed = replay(conn, "policy_items", value.idempotency_key, digest)
+            if replayed:
+                return self._result(conn, section, replayed)
             row = _section_row(conn, section)
             _check(row, value.expected_version)
             count = conn.execute(
@@ -146,7 +142,7 @@ class PolicyService:
                 "confirmed_at,confirmed_by_kind,confirmed_by_id,confirmed_by_name,confirmed_by_token_kind,"
                 "created_by_kind,created_by_id,created_by_name,created_by_token_kind,"
                 "updated_by_kind,updated_by_id,updated_by_name,updated_by_token_kind,"
-                "idempotency_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     item_id,
                     section,
@@ -162,11 +158,11 @@ class PolicyService:
                     *confirmed,
                     *actor.columns(),
                     *actor.columns(),
-                    value.idempotency_key,
                     stamp,
                     stamp,
                 ),
             )
+            remember(conn, "policy_items", value.idempotency_key, digest, item_id)
             self._bump(conn, section, stamp)
             self._event(
                 conn,

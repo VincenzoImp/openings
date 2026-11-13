@@ -7,6 +7,7 @@ from ..actors import current_actor
 from ..common import check_version, new_id, now
 from ..db import encode
 from ..errors import DomainError, conflict, missing
+from ..idempotency import fingerprint, remember, replay
 from ..models import ApplicationInput, ApplicationPatch, ApplicationReady
 from ..outcomes import not_sent, record_response, today
 from ..snapshots import collect_unused
@@ -48,26 +49,21 @@ class ApplicationChanges:
         value = (
             value if isinstance(value, ApplicationInput) else ApplicationInput.model_validate(value)
         )
+        digest = fingerprint(value)
         with self.db.transaction() as c:
+            replayed = replay(c, "applications", value.idempotency_key, digest)
+            if replayed:
+                return self.get_application(replayed)
             job = c.execute("SELECT * FROM jobs WHERE id=?", (value.job_id,)).fetchone()
             if not job:
                 missing("Job")
-            if value.idempotency_key:
-                old = c.execute(
-                    "SELECT id,job_id FROM applications WHERE idempotency_key=?",
-                    (value.idempotency_key,),
-                ).fetchone()
-                if old:
-                    if old["job_id"] != value.job_id:
-                        conflict("This idempotency key already belongs to another job.")
-                    return self.get_application(old["id"])
             if job["triage"] == "dismissed":
                 conflict("Restore the dismissed job before preparing an application.")
             self._check_active_application(c, value.job_id)
             self.validate_answers([q.model_dump() for q in value.questions], {})
             record_id, stamp = new_id(), now()
             c.execute(
-                "INSERT INTO applications(id,job_id,questions,priority,deadline,requirements,created_at,updated_at,idempotency_key) VALUES(?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO applications(id,job_id,questions,priority,deadline,requirements,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
                 (
                     record_id,
                     value.job_id,
@@ -79,9 +75,9 @@ class ApplicationChanges:
                     ),
                     stamp,
                     stamp,
-                    value.idempotency_key,
                 ),
             )
+            remember(c, "applications", value.idempotency_key, digest, record_id)
             c.execute(
                 "UPDATE jobs SET triage='saved',version=version+1,updated_at=? WHERE id=?",
                 (stamp, value.job_id),
@@ -228,7 +224,6 @@ class ApplicationChanges:
                     kind,
                     value.response_date or today(),
                     value.response_note or "",
-                    origin="stage",
                 )
         return self.get_application(application_id, compact_job=True)
 

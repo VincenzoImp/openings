@@ -27,9 +27,6 @@ export interface EmployerResponse {
   /** The day it arrived, YYYY-MM-DD. */
   date: string;
   note: string;
-  /** A day the 0.20 upgrade took from the last change, not from a stage move. */
-  estimated: boolean;
-  origin: "manual" | "stage" | "upgrade";
   version: number;
   created_by: Actor;
   updated_by: Actor;
@@ -228,8 +225,6 @@ export interface Note {
   /** At most one pinned note per job and per application; listed first. */
   pinned?: boolean;
   pinned_at?: string | null;
-  /** `upgrade`: the application note the 0.22 upgrade copied. */
-  origin?: "manual" | "upgrade";
 }
 export type TimelineKind = "note" | "event" | "response";
 /** One entry of a job's or an application's timeline: a note or a recorded change. */
@@ -249,7 +244,6 @@ export interface TimelineItem {
     updated_at: string;
     pinned: boolean;
     pinned_at: string | null;
-    origin: "manual" | "upgrade";
   } | null;
   event: {
     kind: string;
@@ -339,7 +333,6 @@ export interface Application extends Versioned {
     id: string;
     kind: ResponseKind;
     date: string;
-    estimated: boolean;
     count: number;
   } | null;
 }

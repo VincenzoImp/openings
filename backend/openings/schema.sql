@@ -1,70 +1,73 @@
-PRAGMA foreign_keys=ON;
-CREATE TABLE IF NOT EXISTS settings (
+-- Schema 15: the whole layout of a new workspace. It runs once, on a new file;
+-- an older workspace is copied into a file created from it (migrations/m15.py),
+-- so an upgraded workspace has exactly these objects.
+CREATE TABLE settings (
  key TEXT PRIMARY KEY, data TEXT NOT NULL CHECK(json_valid(data)), version INTEGER NOT NULL DEFAULT 1,
  updated_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS api_tokens (
+CREATE TABLE api_tokens (
  id TEXT PRIMARY KEY, name TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
  created_at TEXT NOT NULL, last_used_at TEXT,
  kind TEXT NOT NULL DEFAULT 'owner' CHECK(kind IN ('owner','agent'))
 );
-CREATE TABLE IF NOT EXISTS jobs (
+CREATE TABLE jobs (
  id TEXT PRIMARY KEY, title TEXT NOT NULL, company TEXT NOT NULL, location TEXT NOT NULL DEFAULT '',
  url TEXT NOT NULL DEFAULT '', posting TEXT NOT NULL DEFAULT '', triage TEXT NOT NULL DEFAULT 'inbox'
  CHECK(triage IN ('inbox','saved','dismissed')),
- metadata TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(metadata)), overrides TEXT NOT NULL DEFAULT '{}',
+ metadata TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(metadata)), overrides TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(overrides)),
  content_version INTEGER NOT NULL DEFAULT 1, version INTEGER NOT NULL DEFAULT 1,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
- -- The current dismissal (schema 12): when, by whom, through which policy rule
+ -- The current dismissal: when, by whom, through which policy rule
  -- (its item id and label, kept if the item is removed) and why. Cleared on restore.
  dismissed_at TEXT, dismissed_by_kind TEXT, dismissed_by_id TEXT, dismissed_by_name TEXT,
  dismissed_by_token_kind TEXT, dismissed_rule_id TEXT, dismissed_rule_label TEXT,
  dismissed_reason TEXT NOT NULL DEFAULT ''
 );
-CREATE INDEX IF NOT EXISTS jobs_url ON jobs(url);
-CREATE INDEX IF NOT EXISTS jobs_triage ON jobs(triage,created_at);
-CREATE VIRTUAL TABLE IF NOT EXISTS jobs_fts USING fts5(title,company,posting,content='jobs',content_rowid='rowid');
-CREATE TRIGGER IF NOT EXISTS jobs_ai AFTER INSERT ON jobs BEGIN
+CREATE INDEX jobs_url ON jobs(url);
+CREATE INDEX jobs_triage ON jobs(triage,created_at);
+-- The default order of the jobs list.
+CREATE INDEX jobs_created ON jobs(created_at DESC,id);
+CREATE VIRTUAL TABLE jobs_fts USING fts5(title,company,posting,content='jobs',content_rowid='rowid');
+CREATE TRIGGER jobs_ai AFTER INSERT ON jobs BEGIN
  INSERT INTO jobs_fts(rowid,title,company,posting) VALUES(new.rowid,new.title,new.company,new.posting); END;
-CREATE TRIGGER IF NOT EXISTS jobs_ad AFTER DELETE ON jobs BEGIN
+CREATE TRIGGER jobs_ad AFTER DELETE ON jobs BEGIN
  INSERT INTO jobs_fts(jobs_fts,rowid,title,company,posting) VALUES('delete',old.rowid,old.title,old.company,old.posting); END;
-CREATE TRIGGER IF NOT EXISTS jobs_au AFTER UPDATE OF title,company,posting ON jobs BEGIN
+CREATE TRIGGER jobs_au AFTER UPDATE OF title,company,posting ON jobs BEGIN
  INSERT INTO jobs_fts(jobs_fts,rowid,title,company,posting) VALUES('delete',old.rowid,old.title,old.company,old.posting);
  INSERT INTO jobs_fts(rowid,title,company,posting) VALUES(new.rowid,new.title,new.company,new.posting); END;
-CREATE TABLE IF NOT EXISTS sources (
- id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, config TEXT NOT NULL DEFAULT '{}',
- enabled INTEGER NOT NULL DEFAULT 0, schedule TEXT NOT NULL DEFAULT '{}', version INTEGER NOT NULL DEFAULT 1,
+CREATE TABLE sources (
+ id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, config TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(config)),
+ enabled INTEGER NOT NULL DEFAULT 0, schedule TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(schedule)), version INTEGER NOT NULL DEFAULT 1,
  last_run_at TEXT, last_scheduled_at TEXT, last_error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS postings (
+CREATE TABLE postings (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
  source_id TEXT REFERENCES sources(id) ON DELETE SET NULL, identity TEXT NOT NULL UNIQUE,
- url TEXT NOT NULL DEFAULT '', payload TEXT NOT NULL DEFAULT '{}', content_hash TEXT NOT NULL,
+ url TEXT NOT NULL DEFAULT '', payload TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(payload)), content_hash TEXT NOT NULL,
  first_seen_at TEXT NOT NULL, last_seen_at TEXT NOT NULL,
- -- Set when a complete run of a company board no longer listed this posting
- -- (schema 12); cleared when it is seen again.
+ -- Set when a complete run of a company board no longer listed this posting;
+ -- cleared when it is seen again.
  unlisted_at TEXT
 );
-CREATE INDEX IF NOT EXISTS postings_job ON postings(job_id);
-CREATE TABLE IF NOT EXISTS job_identities (
+CREATE INDEX postings_job ON postings(job_id);
+CREATE TABLE job_identities (
  identity TEXT NOT NULL, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
  PRIMARY KEY(identity,job_id)
-);
-CREATE INDEX IF NOT EXISTS job_identities_job ON job_identities(job_id);
-CREATE TABLE IF NOT EXISTS posting_details (
+) WITHOUT ROWID;
+CREATE INDEX job_identities_job ON job_identities(job_id);
+CREATE TABLE posting_details (
  identity TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
  checked_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS posting_details_job ON posting_details(job_id);
--- applications: db.APPLICATIONS without note, which schema 13 moved to a pinned
--- note. concluded_on is the day an application closed as no_response was
--- concluded (schema 11).
-CREATE TABLE IF NOT EXISTS applications (
+CREATE INDEX posting_details_job ON posting_details(job_id);
+-- concluded_on is the day an application closed as no_response was concluded.
+CREATE TABLE applications (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
  status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','applied','interview','offer','closed')),
  outcome TEXT CHECK(outcome IS NULL OR outcome IN ('accepted','rejected','not_pursued','no_response')),
- questions TEXT NOT NULL DEFAULT '[]', answers TEXT NOT NULL DEFAULT '{}',
- version INTEGER NOT NULL DEFAULT 1, idempotency_key TEXT UNIQUE, applied_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ questions TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(questions)),
+ answers TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(answers)),
+ version INTEGER NOT NULL DEFAULT 1, applied_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
  priority INTEGER CHECK(priority IS NULL OR priority BETWEEN 1 AND 5),
  deadline TEXT CHECK(deadline IS NULL OR (length(deadline)=10 AND date(deadline)=deadline)),
  requirements TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(requirements) AND json_type(requirements)='array'),
@@ -72,92 +75,93 @@ CREATE TABLE IF NOT EXISTS applications (
  concluded_on TEXT CHECK(concluded_on IS NULL OR (length(concluded_on)=10 AND date(concluded_on)=concluded_on))
 );
 -- An agent run: opened by an API token, closed with a stored report.
-CREATE TABLE IF NOT EXISTS runs (
+CREATE TABLE runs (
  id TEXT PRIMARY KEY, token_id TEXT NOT NULL, token_name TEXT NOT NULL,
  workflow TEXT NOT NULL, scope TEXT NOT NULL DEFAULT '',
  status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','finished','interrupted')),
  note TEXT NOT NULL DEFAULT '', report TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(report)),
  change_counts TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(change_counts)),
- superseded_by TEXT, idempotency_key TEXT UNIQUE, version INTEGER NOT NULL DEFAULT 1,
+ superseded_by TEXT, version INTEGER NOT NULL DEFAULT 1,
  started_at TEXT NOT NULL, last_activity_at TEXT NOT NULL, ended_at TEXT, updated_at TEXT NOT NULL,
  token_kind TEXT
 );
 -- One record per change. job_id/application_id keep the owning timeline (and its
 -- deletion); subject_* names the changed record of any type; actor_* and run_id
 -- say who changed it (a token with its kind, owner or agent). Rows written before
--- schema 8 have no actor.
-CREATE TABLE IF NOT EXISTS events (
+-- 0.17 have no actor.
+CREATE TABLE events (
  id TEXT PRIMARY KEY, job_id TEXT REFERENCES jobs(id) ON DELETE CASCADE,
  application_id TEXT REFERENCES applications(id) ON DELETE CASCADE,
- kind TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL,
+ kind TEXT NOT NULL, payload TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(payload)), created_at TEXT NOT NULL,
  subject_type TEXT, subject_id TEXT, actor_kind TEXT, actor_id TEXT, actor_name TEXT,
  actor_token_kind TEXT, run_id TEXT REFERENCES runs(id) ON DELETE SET NULL
 );
-CREATE INDEX IF NOT EXISTS events_app ON events(application_id,created_at);
+CREATE INDEX events_app ON events(application_id,created_at);
 -- A note on a job, or on one application when application_id is set (its scope).
 -- author_* and run_id say who wrote it; pinned_at marks the one pinned note of
--- its scope; origin 'upgrade' is an application note the 0.22 upgrade copied
--- (schema 13).
-CREATE TABLE IF NOT EXISTS notes (
+-- its scope.
+CREATE TABLE notes (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
  application_id TEXT REFERENCES applications(id) ON DELETE CASCADE, body TEXT NOT NULL,
  version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
  author_kind TEXT, author_id TEXT, author_name TEXT, author_token_kind TEXT,
- run_id TEXT REFERENCES runs(id) ON DELETE SET NULL, pinned_at TEXT,
- origin TEXT NOT NULL DEFAULT 'manual' CHECK(origin IN ('manual','upgrade'))
+ run_id TEXT REFERENCES runs(id) ON DELETE SET NULL, pinned_at TEXT
 );
-CREATE TABLE IF NOT EXISTS knowledge (
+CREATE TABLE knowledge (
  id TEXT PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL, organization TEXT NOT NULL DEFAULT '',
  dates TEXT CHECK(dates IS NULL OR json_valid(dates)), skills TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(skills)),
  position INTEGER NOT NULL DEFAULT 0 CHECK(position>=0), narrative TEXT NOT NULL DEFAULT '',
- metadata TEXT NOT NULL DEFAULT '{}', version INTEGER NOT NULL DEFAULT 1,
+ metadata TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(metadata)), version INTEGER NOT NULL DEFAULT 1,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS claims (
+CREATE TABLE claims (
  id TEXT PRIMARY KEY, knowledge_id TEXT NOT NULL REFERENCES knowledge(id) ON DELETE CASCADE,
- text TEXT NOT NULL, approved INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL DEFAULT 0 CHECK(position>=0), metadata TEXT NOT NULL DEFAULT '{}',
+ text TEXT NOT NULL, approved INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL DEFAULT 0 CHECK(position>=0),
+ metadata TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(metadata)),
  version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
- -- Typed selection fields (schema 10): in the CV unless the job says otherwise, how
+ -- Typed selection fields: in the CV unless the job says otherwise, how
  -- strongly the claim is preferred, and a free short group name.
  default_in_cv INTEGER NOT NULL DEFAULT 0 CHECK(default_in_cv IN (0,1)),
  role TEXT NOT NULL DEFAULT 'supporting' CHECK(role IN ('core','supporting','bench')),
  "group" TEXT NOT NULL DEFAULT ''
 );
-CREATE TABLE IF NOT EXISTS templates (
+CREATE TABLE templates (
  id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('resume','cover_letter')),
- tex TEXT NOT NULL DEFAULT '', guidance TEXT NOT NULL DEFAULT '', rules TEXT NOT NULL DEFAULT '{}',
+ tex TEXT NOT NULL DEFAULT '', guidance TEXT NOT NULL DEFAULT '', rules TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(rules)),
  is_default INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 1,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS templates_default ON templates(kind) WHERE is_default=1;
-CREATE TABLE IF NOT EXISTS contexts (
+CREATE UNIQUE INDEX templates_default ON templates(kind) WHERE is_default=1;
+CREATE TABLE contexts (
  id TEXT PRIMARY KEY, application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
- signature TEXT NOT NULL, idempotency_key TEXT UNIQUE, created_at TEXT NOT NULL,
+ signature TEXT NOT NULL, created_at TEXT NOT NULL,
  -- The payload is rebuilt from frame literals and context_parts (snapshots.py); the
  -- other columns summarise it for lists.
- frame TEXT NOT NULL DEFAULT '[]', job_title, company, note_preview, knowledge_count INTEGER,
+ frame TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(frame)), job_title, company, note_preview, knowledge_count INTEGER,
  claim_count INTEGER, template_name, file_count INTEGER NOT NULL DEFAULT 0
 );
 -- Derived from immutable contexts: the input versions each context froze. Rebuildable.
-CREATE TABLE IF NOT EXISTS context_inputs (
+CREATE TABLE context_inputs (
  context_id TEXT PRIMARY KEY REFERENCES contexts(id) ON DELETE CASCADE,
  created_at TEXT NOT NULL, profile_version INTEGER, instructions_version INTEGER,
- templates TEXT NOT NULL DEFAULT '[]', knowledge TEXT NOT NULL DEFAULT '[]', claims TEXT NOT NULL DEFAULT '[]',
- -- Policy section versions, {"decision":3,...}; NULL for a context frozen before schema 10.
- policy TEXT,
- -- Short hashes of the parts it froze (schema 11): Profile parts, policy items and
- -- template contents, compared by staleness.py. Derived from the payload.
- parts TEXT
+ templates TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(templates)),
+ knowledge TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(knowledge)),
+ claims TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(claims)),
+ -- Policy section versions, {"decision":3,...}; NULL for a context frozen before 0.19.
+ policy TEXT CHECK(policy IS NULL OR json_valid(policy)),
+ -- Short hashes of the parts it froze: Profile parts, policy items and template
+ -- contents, compared by staleness.py. Derived from the payload.
+ parts TEXT CHECK(parts IS NULL OR json_valid(parts))
 );
--- A document revision (schema 13). A CV or letter (resume, cover_letter) is its
+-- A document revision. A CV or letter (resume, cover_letter) is its
 -- uploaded .tex source and PDF (files): content stays '{}', text is derived from the
 -- source (documents/text.py, NULL without one) and legacy_content keeps, read-only,
--- the content such a revision had before schema 13. Form answers and other kinds
+-- the content such a revision had before 0.22. Form answers and other kinds
 -- keep structured content. claim_ids and knowledge_ids are the evidence it cites.
-CREATE TABLE IF NOT EXISTS documents (
+CREATE TABLE documents (
  id TEXT PRIMARY KEY, application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
  context_id TEXT REFERENCES contexts(id) ON DELETE CASCADE, kind TEXT NOT NULL,
- title TEXT NOT NULL DEFAULT '', content TEXT NOT NULL DEFAULT '{}',
+ title TEXT NOT NULL DEFAULT '', content TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(content)),
  previous_id TEXT REFERENCES documents(id) ON DELETE SET NULL,
  review_state TEXT NOT NULL DEFAULT 'draft', version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL,
  text TEXT, legacy_content TEXT CHECK(legacy_content IS NULL OR json_valid(legacy_content)),
@@ -165,10 +169,10 @@ CREATE TABLE IF NOT EXISTS documents (
  claim_ids TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(claim_ids) AND json_type(claim_ids)='array'),
  knowledge_ids TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(knowledge_ids) AND json_type(knowledge_ids)='array')
 );
-CREATE TABLE IF NOT EXISTS blobs (
+CREATE TABLE blobs (
  sha256 TEXT PRIMARY KEY, content BLOB NOT NULL, size INTEGER NOT NULL
 );
-CREATE TABLE IF NOT EXISTS files (
+CREATE TABLE files (
  id TEXT PRIMARY KEY, sha256 TEXT NOT NULL REFERENCES blobs(sha256), name TEXT NOT NULL,
  media_type TEXT NOT NULL DEFAULT 'application/octet-stream', size INTEGER NOT NULL,
  knowledge_id TEXT REFERENCES knowledge(id) ON DELETE CASCADE,
@@ -176,65 +180,66 @@ CREATE TABLE IF NOT EXISTS files (
  context_id TEXT REFERENCES contexts(id) ON DELETE CASCADE,
  document_id TEXT REFERENCES documents(id) ON DELETE CASCADE,
  job_id TEXT REFERENCES jobs(id) ON DELETE CASCADE, created_at TEXT NOT NULL,
- -- The SHA-256 of the source a revision's PDF was built from (schema 13); NULL for
- -- every other file and for PDFs uploaded before.
+ -- The SHA-256 of the source a revision's PDF was built from; NULL for every other
+ -- file and for PDFs uploaded before 0.22.
  source_sha256 TEXT,
  CHECK((knowledge_id IS NOT NULL)+(template_id IS NOT NULL)+(context_id IS NOT NULL)+
        (document_id IS NOT NULL)+(job_id IS NOT NULL)=1)
 );
-CREATE TABLE IF NOT EXISTS transfer_grants (
- token_hash TEXT PRIMARY KEY, payload TEXT NOT NULL, method TEXT NOT NULL,
+CREATE TABLE transfer_grants (
+ token_hash TEXT PRIMARY KEY, payload TEXT NOT NULL CHECK(json_valid(payload)), method TEXT NOT NULL,
  expires_at TEXT NOT NULL, used INTEGER NOT NULL DEFAULT 0
 );
-CREATE TABLE IF NOT EXISTS collection_runs (
+CREATE TABLE collection_runs (
  id TEXT PRIMARY KEY, source_id TEXT REFERENCES sources(id) ON DELETE SET NULL,
  source_name TEXT NOT NULL, source_version INTEGER NOT NULL,
  source_snapshot TEXT NOT NULL CHECK(json_valid(source_snapshot)),
  overrides TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(overrides)), planned_at TEXT,
  created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS collection_runs_source ON collection_runs(source_id,created_at);
-CREATE TABLE IF NOT EXISTS tasks (
+CREATE INDEX collection_runs_source ON collection_runs(source_id,created_at);
+CREATE TABLE tasks (
  id TEXT PRIMARY KEY, kind TEXT NOT NULL, source_id TEXT REFERENCES sources(id) ON DELETE SET NULL,
  run_id TEXT REFERENCES collection_runs(id) ON DELETE CASCADE,
  job_id TEXT REFERENCES jobs(id) ON DELETE CASCADE, state TEXT NOT NULL DEFAULT 'queued',
- payload TEXT NOT NULL DEFAULT '{}', result TEXT NOT NULL DEFAULT '{}', attempts INTEGER NOT NULL DEFAULT 0,
+ payload TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(payload)),
+ result TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(result)), attempts INTEGER NOT NULL DEFAULT 0,
  dedupe_key TEXT UNIQUE, next_run_at TEXT NOT NULL, lease_until TEXT, lease_owner TEXT, error TEXT,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS tasks_run ON tasks(run_id);
-CREATE INDEX IF NOT EXISTS tasks_due ON tasks(state,next_run_at);
-CREATE TABLE IF NOT EXISTS providers (
+CREATE INDEX tasks_run ON tasks(run_id);
+CREATE INDEX tasks_due ON tasks(state,next_run_at);
+CREATE TABLE providers (
  id TEXT PRIMARY KEY, policy TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(policy)),
  runtime TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(runtime)), version INTEGER NOT NULL DEFAULT 1,
  updated_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS applications_job ON applications(job_id,created_at DESC,id DESC);
-CREATE UNIQUE INDEX IF NOT EXISTS applications_active_job ON applications(job_id) WHERE status<>'closed';
-CREATE INDEX IF NOT EXISTS applications_status ON applications(status,updated_at);
-CREATE INDEX IF NOT EXISTS applications_deadline ON applications(deadline);
-CREATE INDEX IF NOT EXISTS applications_ready ON applications(ready_at) WHERE ready_at IS NOT NULL;
-CREATE INDEX IF NOT EXISTS documents_app ON documents(application_id,created_at);
-CREATE INDEX IF NOT EXISTS documents_context ON documents(context_id);
-CREATE INDEX IF NOT EXISTS contexts_app ON contexts(application_id,created_at);
-CREATE INDEX IF NOT EXISTS files_document ON files(document_id);
-CREATE INDEX IF NOT EXISTS files_context ON files(context_id);
-CREATE INDEX IF NOT EXISTS files_template ON files(template_id);
-CREATE INDEX IF NOT EXISTS files_knowledge ON files(knowledge_id);
-CREATE INDEX IF NOT EXISTS claims_knowledge ON claims(knowledge_id);
-CREATE INDEX IF NOT EXISTS documents_previous ON documents(previous_id);
-CREATE INDEX IF NOT EXISTS events_job ON events(job_id);
-CREATE INDEX IF NOT EXISTS events_created ON events(created_at);
-CREATE INDEX IF NOT EXISTS notes_job ON notes(job_id,created_at);
-CREATE INDEX IF NOT EXISTS notes_app ON notes(application_id);
-CREATE INDEX IF NOT EXISTS files_job ON files(job_id);
-CREATE INDEX IF NOT EXISTS files_blob ON files(sha256);
-CREATE INDEX IF NOT EXISTS tasks_job ON tasks(job_id);
-CREATE INDEX IF NOT EXISTS tasks_source ON tasks(source_id);
-CREATE INDEX IF NOT EXISTS postings_source ON postings(source_id);
+CREATE INDEX applications_job ON applications(job_id,created_at DESC,id DESC);
+CREATE UNIQUE INDEX applications_active_job ON applications(job_id) WHERE status<>'closed';
+CREATE INDEX applications_status ON applications(status,updated_at);
+CREATE INDEX applications_deadline ON applications(deadline);
+CREATE INDEX applications_ready ON applications(ready_at) WHERE ready_at IS NOT NULL;
+CREATE INDEX documents_app ON documents(application_id,created_at);
+CREATE INDEX documents_context ON documents(context_id);
+CREATE INDEX contexts_app ON contexts(application_id,created_at);
+CREATE INDEX files_document ON files(document_id);
+CREATE INDEX files_context ON files(context_id);
+CREATE INDEX files_template ON files(template_id);
+CREATE INDEX files_knowledge ON files(knowledge_id);
+CREATE INDEX claims_knowledge ON claims(knowledge_id);
+CREATE INDEX documents_previous ON documents(previous_id);
+CREATE INDEX events_job ON events(job_id);
+CREATE INDEX events_created ON events(created_at);
+CREATE INDEX notes_job ON notes(job_id,created_at);
+CREATE INDEX notes_app ON notes(application_id);
+CREATE INDEX files_job ON files(job_id);
+CREATE INDEX files_blob ON files(sha256);
+CREATE INDEX tasks_job ON tasks(job_id);
+CREATE INDEX tasks_source ON tasks(source_id);
+CREATE INDEX postings_source ON postings(source_id);
 -- A question for the owner. The subject reference becomes NULL when its record is
 -- deleted; subject_type and subject_label keep the question readable.
-CREATE TABLE IF NOT EXISTS questions (
+CREATE TABLE questions (
  id TEXT PRIMARY KEY, subject_type TEXT CHECK(subject_type IS NULL OR subject_type IN ('job','application','knowledge')),
  job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL,
  application_id TEXT REFERENCES applications(id) ON DELETE SET NULL,
@@ -247,13 +252,13 @@ CREATE TABLE IF NOT EXISTS questions (
  run_id TEXT REFERENCES runs(id) ON DELETE SET NULL,
  resolved_by_kind TEXT, resolved_by_id TEXT, resolved_by_name TEXT, resolved_by_token_kind TEXT,
  resolved_at TEXT,
- idempotency_key TEXT UNIQUE, version INTEGER NOT NULL DEFAULT 1,
+ version INTEGER NOT NULL DEFAULT 1,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
  CHECK((job_id IS NOT NULL)+(application_id IS NOT NULL)+(knowledge_id IS NOT NULL)<=1)
 );
 -- A request for the agent: an owner instruction read at the start of the next run.
 -- Like a question, it outlives its subject through subject_type and subject_label.
-CREATE TABLE IF NOT EXISTS requests (
+CREATE TABLE requests (
  id TEXT PRIMARY KEY, subject_type TEXT CHECK(subject_type IS NULL OR subject_type IN ('job','application','knowledge')),
  job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL,
  application_id TEXT REFERENCES applications(id) ON DELETE SET NULL,
@@ -266,52 +271,52 @@ CREATE TABLE IF NOT EXISTS requests (
  run_id TEXT REFERENCES runs(id) ON DELETE SET NULL,
  resolved_by_kind TEXT, resolved_by_id TEXT, resolved_by_name TEXT, resolved_by_token_kind TEXT,
  resolved_at TEXT,
- idempotency_key TEXT UNIQUE, version INTEGER NOT NULL DEFAULT 1,
+ version INTEGER NOT NULL DEFAULT 1,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
  CHECK((job_id IS NOT NULL)+(application_id IS NOT NULL)+(knowledge_id IS NOT NULL)<=1)
 );
-CREATE UNIQUE INDEX IF NOT EXISTS runs_open_token ON runs(token_id) WHERE status='open';
-CREATE INDEX IF NOT EXISTS runs_token ON runs(token_id,started_at);
-CREATE INDEX IF NOT EXISTS runs_status ON runs(status,started_at);
-CREATE INDEX IF NOT EXISTS runs_started ON runs(started_at);
-CREATE INDEX IF NOT EXISTS events_run ON events(run_id,created_at);
-CREATE INDEX IF NOT EXISTS events_subject ON events(subject_type,subject_id,created_at);
-CREATE INDEX IF NOT EXISTS questions_state ON questions(state,created_at);
-CREATE INDEX IF NOT EXISTS questions_resolved ON questions(state,resolved_at);
-CREATE INDEX IF NOT EXISTS questions_job ON questions(job_id);
-CREATE INDEX IF NOT EXISTS questions_application ON questions(application_id);
-CREATE INDEX IF NOT EXISTS questions_knowledge ON questions(knowledge_id);
-CREATE INDEX IF NOT EXISTS questions_run ON questions(run_id);
-CREATE INDEX IF NOT EXISTS requests_state ON requests(state,created_at);
-CREATE INDEX IF NOT EXISTS requests_created ON requests(created_at);
-CREATE INDEX IF NOT EXISTS requests_updated ON requests(updated_at);
-CREATE INDEX IF NOT EXISTS requests_job ON requests(job_id);
-CREATE INDEX IF NOT EXISTS requests_application ON requests(application_id);
-CREATE INDEX IF NOT EXISTS requests_knowledge ON requests(knowledge_id);
-CREATE INDEX IF NOT EXISTS requests_run ON requests(run_id);
+CREATE UNIQUE INDEX runs_open_token ON runs(token_id) WHERE status='open';
+CREATE INDEX runs_token ON runs(token_id,started_at);
+CREATE INDEX runs_status ON runs(status,started_at);
+CREATE INDEX runs_started ON runs(started_at);
+CREATE INDEX events_run ON events(run_id,created_at);
+CREATE INDEX events_subject ON events(subject_type,subject_id,created_at);
+CREATE INDEX questions_state ON questions(state,created_at);
+CREATE INDEX questions_resolved ON questions(state,resolved_at);
+CREATE INDEX questions_job ON questions(job_id);
+CREATE INDEX questions_application ON questions(application_id);
+CREATE INDEX questions_knowledge ON questions(knowledge_id);
+CREATE INDEX questions_run ON questions(run_id);
+CREATE INDEX requests_state ON requests(state,created_at);
+CREATE INDEX requests_created ON requests(created_at);
+CREATE INDEX requests_updated ON requests(updated_at);
+CREATE INDEX requests_job ON requests(job_id);
+CREATE INDEX requests_application ON requests(application_id);
+CREATE INDEX requests_knowledge ON requests(knowledge_id);
+CREATE INDEX requests_run ON requests(run_id);
 -- Content-addressed parts of frozen contexts; context files are served from them.
-CREATE TABLE IF NOT EXISTS snapshot_parts (
+CREATE TABLE snapshot_parts (
  id INTEGER PRIMARY KEY, hash TEXT NOT NULL,
  kind TEXT NOT NULL DEFAULT 'text' CHECK(kind IN ('text','list','asset')),
  content TEXT NOT NULL, blob TEXT REFERENCES blobs(sha256),
  UNIQUE(hash,kind), CHECK((kind='asset')=(blob IS NOT NULL))
 );
-CREATE INDEX IF NOT EXISTS snapshot_parts_blob ON snapshot_parts(blob) WHERE blob IS NOT NULL;
-CREATE TABLE IF NOT EXISTS snapshot_list_items (
+CREATE INDEX snapshot_parts_blob ON snapshot_parts(blob) WHERE blob IS NOT NULL;
+CREATE TABLE snapshot_list_items (
  list_id INTEGER NOT NULL REFERENCES snapshot_parts(id) ON DELETE CASCADE,
  position INTEGER NOT NULL, part_id INTEGER NOT NULL REFERENCES snapshot_parts(id),
  PRIMARY KEY(list_id,position)
 ) WITHOUT ROWID;
-CREATE INDEX IF NOT EXISTS snapshot_list_items_part ON snapshot_list_items(part_id);
-CREATE TABLE IF NOT EXISTS context_parts (
+CREATE INDEX snapshot_list_items_part ON snapshot_list_items(part_id);
+CREATE TABLE context_parts (
  context_id TEXT NOT NULL REFERENCES contexts(id) ON DELETE CASCADE,
  position INTEGER NOT NULL, part_id INTEGER NOT NULL REFERENCES snapshot_parts(id),
  file_id TEXT, file_created_at TEXT,
  PRIMARY KEY(context_id,position)
 ) WITHOUT ROWID;
-CREATE INDEX IF NOT EXISTS context_parts_part ON context_parts(part_id);
-CREATE UNIQUE INDEX IF NOT EXISTS context_parts_file ON context_parts(file_id) WHERE file_id IS NOT NULL;
-CREATE VIEW IF NOT EXISTS context_files AS
+CREATE INDEX context_parts_part ON context_parts(part_id);
+CREATE UNIQUE INDEX context_parts_file ON context_parts(file_id) WHERE file_id IS NOT NULL;
+CREATE VIEW context_files AS
  SELECT cp.file_id AS id, p.blob AS sha256, json_extract(p.content,'$.path') AS name,
   json_extract(p.content,'$.media_type') AS media_type, json_extract(p.content,'$.size') AS size,
   NULL AS knowledge_id, NULL AS template_id, cp.context_id AS context_id,
@@ -319,17 +324,17 @@ CREATE VIEW IF NOT EXISTS context_files AS
   NULL AS source_sha256
  FROM context_parts cp JOIN snapshot_parts p ON p.id=cp.part_id JOIN contexts c ON c.id=cp.context_id
  WHERE cp.file_id IS NOT NULL;
-CREATE VIEW IF NOT EXISTS all_files AS
+CREATE VIEW all_files AS
  SELECT id,sha256,name,media_type,size,knowledge_id,template_id,context_id,document_id,job_id,created_at,source_sha256 FROM files
  UNION ALL SELECT id,sha256,name,media_type,size,knowledge_id,template_id,context_id,document_id,job_id,created_at,source_sha256 FROM context_files;
 -- The owner's policy (policy.py): four sections with their own version, and their items.
 -- An item without confirmed_at is a proposal; origin marks a value copied from the Profile.
-CREATE TABLE IF NOT EXISTS policy_sections (
+CREATE TABLE policy_sections (
  section TEXT PRIMARY KEY CHECK(section IN ('decision','eligibility','writing','facts')),
  version INTEGER NOT NULL DEFAULT 0, updated_at TEXT,
  updated_by_kind TEXT, updated_by_id TEXT, updated_by_name TEXT, updated_by_token_kind TEXT
 );
-CREATE TABLE IF NOT EXISTS policy_items (
+CREATE TABLE policy_items (
  id TEXT PRIMARY KEY, section TEXT NOT NULL REFERENCES policy_sections(section),
  position INTEGER NOT NULL DEFAULT 0 CHECK(position>=0),
  label TEXT NOT NULL, statement TEXT NOT NULL DEFAULT '',
@@ -343,30 +348,27 @@ CREATE TABLE IF NOT EXISTS policy_items (
  confirmed_at TEXT, confirmed_by_kind TEXT, confirmed_by_id TEXT, confirmed_by_name TEXT, confirmed_by_token_kind TEXT,
  created_by_kind TEXT, created_by_id TEXT, created_by_name TEXT, created_by_token_kind TEXT,
  updated_by_kind TEXT, updated_by_id TEXT, updated_by_name TEXT, updated_by_token_kind TEXT,
- idempotency_key TEXT UNIQUE, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
  CHECK((value IS NULL)=(value_type IS NULL))
 );
-CREATE INDEX IF NOT EXISTS policy_items_section ON policy_items(section,position);
-INSERT OR IGNORE INTO policy_sections(section) VALUES ('decision'),('eligibility'),('writing'),('facts');
--- Employer responses to sent applications (outcomes.py, schema 11). estimated marks a
--- day the 0.20 upgrade took from updated_at because no stage-change event dated it.
-CREATE TABLE IF NOT EXISTS responses (
+CREATE INDEX policy_items_section ON policy_items(section,position);
+INSERT INTO policy_sections(section) VALUES ('decision'),('eligibility'),('writing'),('facts');
+-- Employer responses to sent applications (outcomes.py).
+CREATE TABLE responses (
  id TEXT PRIMARY KEY, application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
  kind TEXT NOT NULL CHECK(kind IN ('rejection','interview','offer','other')),
  date TEXT NOT NULL CHECK(length(date)=10 AND date(date)=date),
  note TEXT NOT NULL DEFAULT '',
- estimated INTEGER NOT NULL DEFAULT 0 CHECK(estimated IN (0,1)),
- origin TEXT NOT NULL DEFAULT 'manual' CHECK(origin IN ('manual','stage','upgrade')),
  created_by_kind TEXT, created_by_id TEXT, created_by_name TEXT, created_by_token_kind TEXT,
  updated_by_kind TEXT, updated_by_id TEXT, updated_by_name TEXT, updated_by_token_kind TEXT,
- idempotency_key TEXT UNIQUE, version INTEGER NOT NULL DEFAULT 1,
+ version INTEGER NOT NULL DEFAULT 1,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS responses_application ON responses(application_id,date);
-CREATE UNIQUE INDEX IF NOT EXISTS responses_once ON responses(application_id,kind,date) WHERE kind<>'other';
--- Local notes for a shipped skill (skill_notes.py, schema 12): one immutable row per
+CREATE INDEX responses_application ON responses(application_id,date);
+CREATE UNIQUE INDEX responses_once ON responses(application_id,kind,date) WHERE kind<>'other';
+-- Local notes for a shipped skill (skill_notes.py): one immutable row per
 -- version; the highest version is current. Appended when the skill is served.
-CREATE TABLE IF NOT EXISTS skill_notes (
+CREATE TABLE skill_notes (
  skill TEXT NOT NULL CHECK(length(skill) BETWEEN 1 AND 100),
  version INTEGER NOT NULL CHECK(version>=1),
  text TEXT NOT NULL DEFAULT '' CHECK(length(text)<=2000),
@@ -374,10 +376,10 @@ CREATE TABLE IF NOT EXISTS skill_notes (
  created_at TEXT NOT NULL,
  PRIMARY KEY(skill,version)
 );
--- Ingest signals of each job (job_signals.py, schema 12). Derived from the job and
+-- Ingest signals of each job (job_signals.py). Derived from the job and
 -- rebuildable, except distinct_from (pairs the owner judged different vacancies) and
 -- rules (the policy rules that matched when the job was collected).
-CREATE TABLE IF NOT EXISTS job_signals (
+CREATE TABLE job_signals (
  job_id TEXT PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
  format INTEGER NOT NULL, content_version INTEGER NOT NULL,
  language TEXT, language_confidence REAL,
@@ -389,20 +391,19 @@ CREATE TABLE IF NOT EXISTS job_signals (
  rules TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(rules)),
  computed_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS job_signals_duplicate ON job_signals(duplicate_of);
-CREATE INDEX IF NOT EXISTS job_signals_language ON job_signals(language);
-CREATE INDEX IF NOT EXISTS postings_unlisted ON postings(job_id) WHERE unlisted_at IS NOT NULL;
-CREATE INDEX IF NOT EXISTS jobs_dismissed_rule ON jobs(dismissed_rule_id) WHERE dismissed_rule_id IS NOT NULL;
--- One pinned note per job and per application (schema 13; workspace/timeline_upgrade.py).
-CREATE UNIQUE INDEX IF NOT EXISTS notes_pinned_application ON notes(application_id) WHERE pinned_at IS NOT NULL AND application_id IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS notes_pinned_job ON notes(job_id) WHERE pinned_at IS NOT NULL AND application_id IS NULL;
-CREATE INDEX IF NOT EXISTS notes_run ON notes(run_id);
--- Idempotency keys of creates whose records have no key column (idempotency.py, 0.22):
--- the record's table, the key, the SHA-256 of the request and the record it gave.
--- Created whenever a workspace opens, so no upgrade step is needed.
-CREATE TABLE IF NOT EXISTS idempotency_keys (
+CREATE INDEX job_signals_duplicate ON job_signals(duplicate_of);
+CREATE INDEX job_signals_language ON job_signals(language);
+CREATE INDEX postings_unlisted ON postings(job_id) WHERE unlisted_at IS NOT NULL;
+CREATE INDEX jobs_dismissed_rule ON jobs(dismissed_rule_id) WHERE dismissed_rule_id IS NOT NULL;
+-- One pinned note per job and per application.
+CREATE UNIQUE INDEX notes_pinned_application ON notes(application_id) WHERE pinned_at IS NOT NULL AND application_id IS NOT NULL;
+CREATE UNIQUE INDEX notes_pinned_job ON notes(job_id) WHERE pinned_at IS NOT NULL AND application_id IS NULL;
+CREATE INDEX notes_run ON notes(run_id);
+-- Idempotency keys of creates (idempotency.py): the record's table, the key, the
+-- SHA-256 of the request and the record it gave.
+CREATE TABLE idempotency_keys (
  scope TEXT NOT NULL, key TEXT NOT NULL, fingerprint TEXT NOT NULL,
  record_id TEXT NOT NULL, created_at TEXT NOT NULL,
  PRIMARY KEY(scope,key)
 );
-PRAGMA user_version=14;
+PRAGMA user_version=15;

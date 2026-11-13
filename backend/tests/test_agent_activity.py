@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from openings.activity import ActivityService
-from openings.actors import OWNER, UNKNOWN_LABEL, acting_as, current_actor, token_actor
+from openings.actors import OWNER, acting_as, current_actor, token_actor
 from openings.app import create_app
 from openings.career import (
     CareerService,
@@ -21,23 +21,11 @@ from openings.career import (
     TemplateCreate,
     TemplateUpdate,
 )
-from openings.db import SCHEMA_VERSION, Database
 from openings.discovery import CollectionWrite, DiscoveryService, SourceCreate, SourcePatch
 from openings.documents import ContextCreate, DocumentCreate, DocumentService, UploadReservation
 from openings.errors import DomainError
-from openings.operations import restore_database
 from openings.worker import Worker
 from openings.workspace import Workspace
-from outcome_fixtures import SCHEMA_ELEVEN_COLUMNS
-from schema_fixtures import (
-    SCHEMA_EIGHT_COLUMNS,
-    columns,
-    index_names,
-    make_schema_seven,
-    table_names,
-)
-from signal_fixtures import SCHEMA_TWELVE_COLUMNS
-from timeline_fixtures import older_rows
 
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 AGENT = token_actor("token-agent", "Synthetic agent")
@@ -541,7 +529,14 @@ def test_question_lifecycle_versions_and_answers_since(services):
             }
         )
         again = activity.ask_question(
-            {"question": "Is relocation to Zurich acceptable?", "idempotency_key": "relocation"}
+            {
+                "question": "Is relocation to Zurich acceptable?",
+                "why": "The role is on site.",
+                "subject_type": "job",
+                "subject_id": job["id"],
+                "choices": ["Yes", "No"],
+                "idempotency_key": "relocation",
+            }
         )
         general = activity.ask_question({"question": "Which notice period applies?"})
         with pytest.raises(DomainError) as other_key:
@@ -657,134 +652,6 @@ def test_questions_outlive_their_subject_with_a_label(tmp_path):
             )["state"]
             == "answered"
         )
-
-
-def schema_seven_workspace(path):
-    workspace = Workspace(path)
-    job = add_job(workspace)
-    application = workspace.create_application({"job_id": job["id"]})
-    workspace.add_note(
-        job["id"],
-        {"body": "Synthetic guidance", "application_id": application["id"], "pinned": True},
-    )
-    workspace.update_application(
-        application["id"], {"expected_version": application["version"], "status": "applied"}
-    )
-    note = workspace.add_note(job["id"], {"body": "Synthetic note"})
-    make_schema_seven(path)
-    return job, application, note
-
-
-def test_schema_seven_upgrade_preserves_rows_and_matches_a_new_workspace(tmp_path):
-    path = tmp_path / "schema7.sqlite"
-    job, application, note = schema_seven_workspace(path)
-    preserved = ("jobs", "applications", "events", "notes", "postings", "settings")
-    with sqlite3.connect(path) as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 7
-        assert not {"runs", "questions"} & table_names(conn)
-        assert "actor_kind" not in {row[0] for row in columns(conn, "events")}
-        before = {table: older_rows(conn, table) for table in preserved}
-    assert len(before["events"]) >= 4
-
-    upgraded = Workspace(path)
-    fresh = Database(tmp_path / "fresh.sqlite")
-    with sqlite3.connect(path) as conn, sqlite3.connect(fresh.path) as reference:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
-        assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
-        assert not conn.execute("PRAGMA foreign_key_check").fetchall()
-        assert table_names(conn) == table_names(reference)
-        assert index_names(conn) == index_names(reference)
-        for table in table_names(reference) - {"jobs_fts"}:
-            if table.startswith("jobs_fts"):
-                continue
-            assert sorted(columns(conn, table)) == sorted(columns(reference, table)), table
-        for table, rows in before.items():
-            added = (
-                SCHEMA_EIGHT_COLUMNS.get(table, ())
-                + SCHEMA_ELEVEN_COLUMNS.get(table, ())
-                + SCHEMA_TWELVE_COLUMNS.get(table, ())
-            )
-            assert older_rows(conn, table, added) == rows, table
-    # The application note is its pinned note, by an unknown author before 0.17.
-    pinned = upgraded.get_application(application["id"])["pinned_note"]
-    assert (pinned["body"], pinned["origin"]) == ("Synthetic guidance", "upgrade")
-    assert pinned["author"]["label"] == UNKNOWN_LABEL
-    # Earlier changes have no recorded actor and say so; they are never guessed.
-    history = upgraded.application_events(application["id"])["items"]
-    assert len(history) == 2
-    assert {item["actor"]["label"] for item in history} == {UNKNOWN_LABEL}
-    assert history[0]["actor"] == {
-        "kind": "unknown",
-        "id": None,
-        "name": None,
-        "token_kind": None,
-        "label": "unknown (before 0.17)",
-    }
-    assert history[0]["subject"] == {"type": "application", "id": application["id"]}
-    assert history[0]["run_id"] is None
-    assert upgraded.get_note(note["id"])["author"]["kind"] == "unknown"
-    assert ActivityService(upgraded).list_events({"actor": "unknown"})["total"] == len(
-        before["events"]
-    )
-    # New changes are attributed straight away.
-    with acting_as(AGENT):
-        ActivityService(upgraded).start_run({"workflow": "track-applications"})
-        upgraded.add_note(job["id"], {"body": "After the upgrade"})
-    newest = upgraded.db.one("SELECT * FROM events ORDER BY created_at DESC LIMIT 1")
-    assert newest["actor_name"] == "Synthetic agent" and newest["run_id"]
-
-
-def test_failed_schema_eight_upgrade_rolls_back(tmp_path):
-    path = tmp_path / "partial.sqlite"
-    schema_seven_workspace(path)
-    with sqlite3.connect(path) as conn:
-        # A conflicting column makes a later migration statement fail.
-        conn.execute("ALTER TABLE notes ADD COLUMN author_id TEXT")
-    with pytest.raises(sqlite3.OperationalError):
-        Workspace(path)
-    with sqlite3.connect(path) as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 7
-        assert not {"runs", "questions"} & table_names(conn)
-        assert "actor_kind" not in {row[0] for row in columns(conn, "events")}
-
-
-def test_restore_upgrades_a_schema_seven_backup_without_changing_it(tmp_path):
-    source = tmp_path / "backup.sqlite"
-    job, application, note = schema_seven_workspace(source)
-    original = source.read_bytes()
-    with sqlite3.connect(source) as conn:
-        count = conn.execute("SELECT count(*) FROM events").fetchone()[0]
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 7
-    app = create_app(tmp_path / "live.sqlite", start_worker=False)
-    app.state.auth.setup("synthetic-password")
-    token = app.state.auth.create_token("Synthetic agent", "owner")
-    with TestClient(app) as client:
-        restored = client.post(
-            "/api/v1/backup/restore",
-            content=original,
-            headers={**bearer(token), "Content-Type": "application/vnd.sqlite3"},
-        )
-        assert restored.status_code == 200, restored.text
-        history = client.get("/api/v1/events", headers=bearer(token)).json()
-    assert source.read_bytes() == original
-    target = app.state.workspace
-    with target.db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
-    assert target.get_application(application["id"])["pinned_note"]["body"] == (
-        "Synthetic guidance"
-    )
-    assert target.get_note(note["id"])["body"] == "Synthetic note"
-    # The backup's own history is intact and unattributed; the restore itself is recorded.
-    assert history["total"] == count + 1
-    assert history["items"][0]["kind"] == "workspace_restored"
-    assert history["items"][0]["actor"]["label"] == "Synthetic agent"
-    assert {item["actor"]["kind"] for item in history["items"][1:]} == {"unknown"}
-    # Runs and questions work on the restored workspace.
-    with acting_as(token_actor(token["id"], token["name"])):
-        assert app.state.activity.start_run({"workflow": "review-inbox"})["status"] == "open"
-    direct = Workspace(tmp_path / "direct.sqlite")
-    restore_database(direct, source)
-    assert direct.get_job(job["id"])["title"] == "Synthetic engineer"
 
 
 def test_rest_and_mcp_expose_the_same_runs_questions_and_changes(app):

@@ -1,34 +1,16 @@
 """Application priority, deadline, employer requirements and readiness (schema 7)."""
 
 import json
-import sqlite3
 
 import pytest
 from fastapi.testclient import TestClient
 
 from document_fixtures import attach, attach_pdf
 from openings.app import create_app
-from openings.db import SCHEMA_VERSION, Database
 from openings.documents import DocumentCreate, ReviewUpdate
 from openings.errors import DomainError
-from openings.operations import restore_database
 from openings.workspace import Workspace
-from outcome_fixtures import SCHEMA_ELEVEN_COLUMNS
-from schema_fixtures import SCHEMA_EIGHT_COLUMNS, columns, make_schema_seven
-from signal_fixtures import SCHEMA_TWELVE_COLUMNS
-from timeline_fixtures import guided_application, older_rows
-
-SCHEMA_SEVEN_COLUMNS = ("requirements", "deadline", "priority")
-
-
-def make_schema_six(path):
-    """Turn a current workspace into the released schema 6 layout, keeping its rows."""
-    make_schema_seven(path)
-    with sqlite3.connect(path) as conn:
-        conn.execute("DROP INDEX applications_deadline")
-        for column in SCHEMA_SEVEN_COLUMNS:
-            conn.execute(f"ALTER TABLE applications DROP COLUMN {column}")
-        conn.execute("PRAGMA user_version=6")
+from timeline_fixtures import guided_application
 
 
 def seeded(path):
@@ -47,81 +29,6 @@ def seeded(path):
         {"expected_version": application["version"], "answers": {"why": "Synthetic answer."}},
     )
     return workspace, job, application
-
-
-def test_schema_six_upgrade_preserves_records_and_matches_a_new_workspace(tmp_path):
-    path = tmp_path / "schema6.sqlite"
-    workspace, job, application = seeded(path)
-    job = workspace.get_job(job["id"])
-    make_schema_six(path)
-    with sqlite3.connect(path) as conn:
-        assert "priority" not in {row[0] for row in columns(conn, "applications")}
-        before = {
-            table: older_rows(conn, table) for table in ("jobs", "applications", "events", "notes")
-        }
-
-    upgraded = Workspace(path)
-    current = upgraded.get_application(application["id"])
-    assert current["version"] == application["version"]
-    assert current["answers"] == {"why": "Synthetic answer."}
-    assert (current["priority"], current["deadline"], current["requirements"]) == (None, None, [])
-    assert current["readiness"] == "none"
-    assert upgraded.get_job(job["id"])["version"] == job["version"]
-    fresh = Database(tmp_path / "fresh.sqlite")
-    with (
-        sqlite3.connect(path) as conn,
-        sqlite3.connect(fresh.path) as reference,
-    ):
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
-        assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
-        assert not conn.execute("PRAGMA foreign_key_check").fetchall()
-        assert sorted(columns(conn, "applications")) == sorted(columns(reference, "applications"))
-        index = "SELECT name FROM sqlite_master WHERE type='index' AND name='applications_deadline'"
-        assert conn.execute(index).fetchone()
-        for table, rows in before.items():
-            added = (
-                *SCHEMA_SEVEN_COLUMNS,
-                *SCHEMA_EIGHT_COLUMNS.get(table, ()),
-                *SCHEMA_ELEVEN_COLUMNS.get(table, ()),
-                *SCHEMA_TWELVE_COLUMNS.get(table, ()),
-            )
-            assert older_rows(conn, table, added) == rows, table
-    assert current["pinned_note"]["body"] == "Synthetic guidance"
-    # The new fields are usable straight away.
-    updated = upgraded.update_application(
-        application["id"], {"expected_version": current["version"], "priority": 2}
-    )
-    assert updated["priority"] == 2 and updated["version"] == current["version"] + 1
-
-
-def test_failed_upgrade_rolls_back_and_leaves_schema_six(tmp_path):
-    path = tmp_path / "partial.sqlite"
-    seeded(path)
-    make_schema_six(path)
-    with sqlite3.connect(path) as conn:
-        # A conflicting column makes the second migration statement fail.
-        conn.execute("ALTER TABLE applications ADD COLUMN deadline TEXT")
-    with pytest.raises(sqlite3.OperationalError):
-        Workspace(path)
-    with sqlite3.connect(path) as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 6
-        names = {row[0] for row in columns(conn, "applications")}
-        assert "priority" not in names and "requirements" not in names
-
-
-def test_restore_upgrades_a_schema_six_backup_without_changing_it(tmp_path):
-    source = tmp_path / "backup.sqlite"
-    _, _, application = seeded(source)
-    make_schema_six(source)
-    original = source.read_bytes()
-    target = Workspace(tmp_path / "live.sqlite")
-    restore_database(target, source)
-    assert source.read_bytes() == original
-    restored = target.get_application(application["id"])
-    assert restored["requirements"] == []
-    assert restored["pinned_note"]["body"] == "Synthetic guidance"
-    with target.db.connect() as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
 
 
 def test_planning_fields_validate_and_clear_explicitly(tmp_path):
