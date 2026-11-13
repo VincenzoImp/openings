@@ -11,6 +11,7 @@ bulk (large_fixtures.py), so 5,000 jobs and 500 applications take seconds.
 
 import json
 import os
+import shutil
 import socket
 import tempfile
 from pathlib import Path
@@ -20,6 +21,7 @@ from fastapi.testclient import TestClient
 
 from jobs_fixtures import seed_jobs
 from large_fixtures import seed_large
+from openings import backups
 from openings.actors import OWNER, acting_as
 from openings.app import create_app
 from openings.career import ClaimCreate, KnowledgeCreate, ProfileUpdate, TemplateCreate
@@ -265,6 +267,14 @@ def main():
                     )
             elif index < applications + 3:
                 workspace.set_triage(job["id"], "saved", job["version"])
+        # One daily backup, and copies kept before earlier upgrades for the
+        # browser tests to download and delete (one per project, with spares).
+        daily = backups.run_backup(workspace.db, backups.backup_dir(workspace.db), 3)
+        for day in range(1, 9):
+            shutil.copyfile(
+                backups.backup_dir(workspace.db) / daily["name"],
+                path.parent / f"{path.stem}.pre-schema13-202601{day:02d}T080000Z.sqlite",
+            )
         print(f"Synthetic workspace at http://127.0.0.1:{port}", flush=True)
         uvicorn.run(
             identified(create_app(path, start_worker=False), token),
