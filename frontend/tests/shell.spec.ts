@@ -301,7 +301,9 @@ test("a screen that fails to load offers a reload", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("no horizontal page scroll from 360 to 1600 px on every screen", async ({
+// Quarantined: order-dependent on the shared e2e server and database (failed on
+// CI in November 2026). Restore once each worker has its own workspace, #220.
+test.fixme("no horizontal page scroll from 360 to 1600 px on every screen", async ({
   page,
 }) => {
   test.skip(
