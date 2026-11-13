@@ -19,7 +19,7 @@ workflow lacks while running it; notes stay in this workspace, are served only
 to its agents, never change the shipped text, and every version is attributed
 (the served section names who wrote it), so the owner sees each change and
 restores any earlier version from the dashboard. Personal criteria still belong
-to the owner's policy, not to skill notes.
+to the owner's Preferences, not to skill notes.
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ def serve(content: str, note: dict | None) -> str:
         f"{content.rstrip()}\n\n---\n\n{HEADING}\n\n"
         f"Written in this workspace (version {note['version']}, {day} by {who}). "
         "They add to the shipped skill above for this workspace only; the operating "
-        "mandate and the owner's policy still apply.\n\n"
+        "mandate and the owner's Preferences still apply.\n\n"
         f"{note['text']}\n"
     )
 

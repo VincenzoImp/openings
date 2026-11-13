@@ -38,7 +38,7 @@ def test_export_stream_survives_worker_thread_changes(tmp_path, monkeypatch, sna
     workspace.ingest_job(
         JobInput(title="Synthetic role", company="Example", posting="Build Python APIs.")
     )
-    workspace.set_settings("instructions", {"general": "Reviewed synthetic evidence."})
+    workspace.set_settings("workspace", {"no_reply_days": 21})
     executors = [ThreadPoolExecutor(max_workers=1) for _ in range(2)]
     calls = 0
 
@@ -71,7 +71,7 @@ def test_export_stream_survives_worker_thread_changes(tmp_path, monkeypatch, sna
         assert archive["format"] == "openings-records-v1"
         assert archive["files_include_bytes"] is False
         assert archive["jobs"][0]["title"] == "Synthetic role"
-        assert archive["settings"]["instructions"]["general"] == "Reviewed synthetic evidence."
+        assert archive["settings"]["workspace"]["no_reply_days"] == 21
         assert "auth" not in archive["settings"]
         assert int(response.headers["content-length"]) == len(response.content)
         assert snapshots and all(snapshot.closed for snapshot in snapshots)
@@ -87,7 +87,7 @@ def test_export_keeps_one_snapshot_during_concurrent_writes(tmp_path, monkeypatc
     workspace.ingest_job(
         JobInput(title="First role", company="Example", posting="Build reliable services.")
     )
-    workspace.set_settings("instructions", {"general": "Before export"})
+    workspace.set_settings("workspace", {"no_reply_days": 21})
     dumps = json.dumps
     changed = False
 
@@ -98,7 +98,7 @@ def test_export_keeps_one_snapshot_during_concurrent_writes(tmp_path, monkeypatc
             workspace.ingest_job(
                 JobInput(title="Later role", company="Example", posting="Another posting.")
             )
-            workspace.set_settings("instructions", {"general": "After export began"})
+            workspace.set_settings("workspace", {"no_reply_days": 60})
         return dumps(value, *args, **kwargs)
 
     with TestClient(app) as client:
@@ -108,7 +108,7 @@ def test_export_keeps_one_snapshot_during_concurrent_writes(tmp_path, monkeypatc
     archive = response.json()
     assert changed
     assert [job["title"] for job in archive["jobs"]] == ["First role"]
-    assert archive["settings"]["instructions"]["general"] == "Before export"
+    assert archive["settings"]["workspace"]["no_reply_days"] == 21
     assert workspace.db.one("SELECT count(*) n FROM jobs")["n"] == 2
 
 
