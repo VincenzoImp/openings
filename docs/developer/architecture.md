@@ -165,7 +165,23 @@ memory and releasing SQLite readers before cancellation or thread changes.
 Backups use SQLite's online backup API. A restore preserves
 installation authentication, recent provider request history and later cooldowns.
 
-Workspaces and backups use schema 10 (0.19), an additive change. Opening schema 9
+Workspaces and backups use schema 11 (0.20). Opening schema 10 adds the
+`responses` table (an employer's answer to a sent application: kind, date, note,
+whether the date is estimated, how it was recorded, attribution, version and
+idempotency key; one per application, kind and day except `other`) and rebuilds
+`applications` to allow the `no_response` outcome and add `concluded_on`. The
+rebuild copies every row with its rowid, recreates the table's indexes and
+triggers from their saved SQL and runs with foreign keys off; the upgrade fails
+unless `foreign_key_check` reports nothing it did not report before. It then
+records one response, by the system and without an event, for each application
+in Interview or Offer and each rejected one with a sent date: dated by the last
+event that moved it to that stage, else its last change with `estimated` set.
+Nothing else changes. `outcomes.no_reply_period` is the only definition of the
+no-reply period (the days of the Policy decision item labelled "No reply",
+confirmed items first, else 30); `insights.py` maps titles to role family and
+seniority with fixed keyword tables and no model.
+
+Schema 10 (0.19) was an additive change. Opening schema 9
 creates the policy tables, adds `default_in_cv`, `role` and `group` to `claims`
 and `policy` to `context_inputs`, and copies the Profile's free-form values:
 one unconfirmed `facts` item per top-level `metadata` key, holding the original
@@ -214,8 +230,8 @@ applications gain `ready_at` with who set it, API tokens gain a kind, and the
 owner tokens with unchanged access. Schema 6 is upgraded through schema 7 in the same
 transaction (application priority, deadline and requirements), and schema 5
 through schema 6 (removing obsolete derived data and preserving owned records and
-immutable snapshots). Restore accepts schema 10 and upgrades a copy of a schema 5,
-6, 7, 8 or 9 backup. Other historical formats require the matching release.
+immutable snapshots). Restore accepts schema 11 and upgrades a copy of a schema 5,
+6, 7, 8, 9 or 10 backup. Other historical formats require the matching release.
 
 ## Acquisition
 
