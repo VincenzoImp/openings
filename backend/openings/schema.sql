@@ -142,12 +142,21 @@ CREATE TABLE IF NOT EXISTS context_inputs (
  -- template contents, compared by staleness.py. Derived from the payload.
  parts TEXT
 );
+-- A document revision (schema 13). A CV or letter (resume, cover_letter) is its
+-- uploaded .tex source and PDF (files): content stays '{}', text is derived from the
+-- source (documents/text.py, NULL without one) and legacy_content keeps, read-only,
+-- the content such a revision had before schema 13. Form answers and other kinds
+-- keep structured content. claim_ids and knowledge_ids are the evidence it cites.
 CREATE TABLE IF NOT EXISTS documents (
  id TEXT PRIMARY KEY, application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
  context_id TEXT REFERENCES contexts(id) ON DELETE CASCADE, kind TEXT NOT NULL,
  title TEXT NOT NULL DEFAULT '', content TEXT NOT NULL DEFAULT '{}',
  previous_id TEXT REFERENCES documents(id) ON DELETE SET NULL,
- review_state TEXT NOT NULL DEFAULT 'draft', version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL
+ review_state TEXT NOT NULL DEFAULT 'draft', version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL,
+ text TEXT, legacy_content TEXT CHECK(legacy_content IS NULL OR json_valid(legacy_content)),
+ note TEXT NOT NULL DEFAULT '',
+ claim_ids TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(claim_ids) AND json_type(claim_ids)='array'),
+ knowledge_ids TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(knowledge_ids) AND json_type(knowledge_ids)='array')
 );
 CREATE TABLE IF NOT EXISTS blobs (
  sha256 TEXT PRIMARY KEY, content BLOB NOT NULL, size INTEGER NOT NULL
@@ -160,6 +169,9 @@ CREATE TABLE IF NOT EXISTS files (
  context_id TEXT REFERENCES contexts(id) ON DELETE CASCADE,
  document_id TEXT REFERENCES documents(id) ON DELETE CASCADE,
  job_id TEXT REFERENCES jobs(id) ON DELETE CASCADE, created_at TEXT NOT NULL,
+ -- The SHA-256 of the source a revision's PDF was built from (schema 13); NULL for
+ -- every other file and for PDFs uploaded before.
+ source_sha256 TEXT,
  CHECK((knowledge_id IS NOT NULL)+(template_id IS NOT NULL)+(context_id IS NOT NULL)+
        (document_id IS NOT NULL)+(job_id IS NOT NULL)=1)
 );
@@ -296,12 +308,13 @@ CREATE VIEW IF NOT EXISTS context_files AS
  SELECT cp.file_id AS id, p.blob AS sha256, json_extract(p.content,'$.path') AS name,
   json_extract(p.content,'$.media_type') AS media_type, json_extract(p.content,'$.size') AS size,
   NULL AS knowledge_id, NULL AS template_id, cp.context_id AS context_id,
-  NULL AS document_id, NULL AS job_id, coalesce(cp.file_created_at,c.created_at) AS created_at
+  NULL AS document_id, NULL AS job_id, coalesce(cp.file_created_at,c.created_at) AS created_at,
+  NULL AS source_sha256
  FROM context_parts cp JOIN snapshot_parts p ON p.id=cp.part_id JOIN contexts c ON c.id=cp.context_id
  WHERE cp.file_id IS NOT NULL;
 CREATE VIEW IF NOT EXISTS all_files AS
- SELECT id,sha256,name,media_type,size,knowledge_id,template_id,context_id,document_id,job_id,created_at FROM files
- UNION ALL SELECT id,sha256,name,media_type,size,knowledge_id,template_id,context_id,document_id,job_id,created_at FROM context_files;
+ SELECT id,sha256,name,media_type,size,knowledge_id,template_id,context_id,document_id,job_id,created_at,source_sha256 FROM files
+ UNION ALL SELECT id,sha256,name,media_type,size,knowledge_id,template_id,context_id,document_id,job_id,created_at,source_sha256 FROM context_files;
 -- The owner's policy (policy.py): four sections with their own version, and their items.
 -- An item without confirmed_at is a proposal; origin marks a value copied from the Profile.
 CREATE TABLE IF NOT EXISTS policy_sections (
@@ -373,4 +386,4 @@ CREATE INDEX IF NOT EXISTS job_signals_duplicate ON job_signals(duplicate_of);
 CREATE INDEX IF NOT EXISTS job_signals_language ON job_signals(language);
 CREATE INDEX IF NOT EXISTS postings_unlisted ON postings(job_id) WHERE unlisted_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS jobs_dismissed_rule ON jobs(dismissed_rule_id) WHERE dismissed_rule_id IS NOT NULL;
-PRAGMA user_version=12;
+PRAGMA user_version=13;

@@ -155,7 +155,7 @@ def test_upgrade_keeps_every_row_and_backfills_exactly(tmp_path):
     workspace = Workspace(path)
     fresh = Database(tmp_path / "fresh.sqlite")
     with closing(sqlite3.connect(path)) as conn, closing(sqlite3.connect(fresh.path)) as reference:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 12
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 13
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert not conn.execute("PRAGMA foreign_key_check").fetchall()
         assert table_names(conn) == table_names(reference)
@@ -168,7 +168,11 @@ def test_upgrade_keeps_every_row_and_backfills_exactly(tmp_path):
             assert tuple(new)[: len(old)] == tuple(old)
             assert new[-1] is None
         for table in CHILDREN:
-            assert after[table] == before[table], table
+            # Later schemas only append columns (documents gain those of schema 13).
+            assert [tuple(row)[: len(old)] for row, old in zip(after[table], before[table])] == [
+                tuple(old) for old in before[table]
+            ], table
+            assert len(after[table]) == len(before[table]), table
         assert after["indexes"] == before["indexes"]
         assert after["references"] == before["references"]
         # The table holds the new definition and accepts the new outcome.

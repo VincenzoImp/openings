@@ -16,6 +16,11 @@ from datetime import UTC, datetime, timedelta
 from openings.common import new_id
 
 PDF = b"%PDF-1.4\nSynthetic large-workspace PDF"
+# The text a CV or letter derives from its source: about 2,500 characters.
+DOCUMENT_TEXT = "\n".join(
+    f"• Built reliable data services for team {index}, measured and documented."
+    for index in range(32)
+)
 TITLES = (
     "Data Engineer",
     "Senior Backend Engineer",
@@ -199,14 +204,14 @@ def seed_large(workspace, jobs, applications, sources=0):
             for kind in ("resume", "cover_letter"):
                 document_id = new_id()
                 conn.execute(
-                    "INSERT INTO documents(id,application_id,kind,title,content,review_state,created_at) "
+                    "INSERT INTO documents(id,application_id,kind,title,text,review_state,created_at) "
                     "VALUES(?,?,?,?,?,?,?)",
                     (
                         document_id,
                         app_id,
                         kind,
                         "CV" if kind == "resume" else "Letter",
-                        json.dumps({"text": "Synthetic."}),
+                        f"{job_rows[index][2]}\n{DOCUMENT_TEXT}",
                         "approved" if ready or status != "draft" else "draft",
                         stamp(created),
                     ),

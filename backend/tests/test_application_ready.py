@@ -6,6 +6,7 @@ import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
+from document_fixtures import PDF, attach, source_revision
 from openings.activity import ActivityService
 from openings.actors import OWNER, acting_as, token_actor
 from openings.app import create_app
@@ -16,7 +17,6 @@ from openings.workspace import Workspace
 from schema_fixtures import columns, make_schema_seven
 
 AGENT = token_actor("token-agent", "Synthetic agent")
-PDF = b"%PDF-1.4\nSynthetic test PDF"
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 
 
@@ -33,36 +33,36 @@ def start(app, title="Synthetic engineer", **fields):
     return workspace.create_application({"job_id": job["id"], **fields})
 
 
-def upload(app, document_id, name="document.pdf"):
+def put(app):
+    # No lifespan: an application starts its MCP session manager only once.
+    return TestClient(app).put
+
+
+def upload(app, document_id, name="photo.png"):
+    """Add a file that is neither the source nor the PDF to a revision."""
     grant = app.state.documents.reserve_upload(
         UploadReservation(
             owner_type="document",
             owner_id=document_id,
             name=name,
             size=len(PDF),
-            media_type="application/pdf",
+            media_type="image/png",
         )
     )
-    # No lifespan: an application starts its MCP session manager only once.
-    return TestClient(app).put(grant["url"], headers=grant["headers"], content=PDF)
+    return put(app)(grant["url"], headers=grant["headers"], content=PDF)
 
 
 def approved(app, application, kind="resume", previous_id=None, text="Synthetic content."):
-    """Save one revision, attach its PDF and approve it."""
-    documents = app.state.documents
-    document = documents.create_document(
-        DocumentCreate(
-            application_id=application["id"],
-            kind=kind,
-            title=kind,
-            previous_id=previous_id,
-            content={"text": text},
-        )
-    )
-    assert upload(app, document["id"]).status_code == 200
-    current = documents.get_document(document["id"])
-    return documents.review_document(
-        document["id"], ReviewUpdate(expected_version=current["version"])
+    """Save one revision with its source and PDF and approve it."""
+    return source_revision(
+        app.state.documents,
+        put(app),
+        application["id"],
+        kind,
+        text,
+        title=kind,
+        previous_id=previous_id,
+        approve=True,
     )
 
 
@@ -120,11 +120,9 @@ def test_marking_ready_is_refused_until_every_check_passes(app):
         },
     )
     assert refusal(workspace, application)["check"] == "none"
-    cv = documents.create_document(
-        DocumentCreate(application_id=application["id"], kind="resume", content={"text": "A"})
-    )
+    cv = documents.create_document(DocumentCreate(application_id=application["id"], kind="resume"))
     assert refusal(workspace, application)["check"] == "missing_pdf"
-    assert upload(app, cv["id"]).status_code == 200
+    attach(documents, put(app), cv["id"], "A")
     details = refusal(workspace, application)
     assert (details["check"], details["readiness"]) == ("unreviewed", "unreviewed")
     cv = documents.get_document(cv["id"])
@@ -186,20 +184,18 @@ def test_a_new_revision_or_context_clears_ready(app):
                 application_id=application["id"],
                 kind="resume",
                 previous_id=cv["id"],
-                content={"text": "Changed"},
             )
         )
     current = cleared(workspace, application, "document_created", "token")
     assert current["readiness"] == "missing_pdf"
     assert workspace.list_applications(readiness="ready")["total"] == 0
-    # Saving identical content again creates no revision and is not a change.
+    # Saving the same empty revision again creates no revision and is not a change.
     count = len(workspace.application_events(application["id"])["items"])
     documents.create_document(
         DocumentCreate(
             application_id=application["id"],
             kind="resume",
             previous_id=cv["id"],
-            content={"text": "Changed"},
         )
     )
     assert len(workspace.application_events(application["id"])["items"]) == count
@@ -230,7 +226,7 @@ def test_a_file_added_to_a_current_revision_clears_ready(app):
     application, cv = ready(app)
     # Approved revisions refuse new files, so a ready application cannot change this way.
     with pytest.raises(DomainError, match="Approved documents are immutable"):
-        upload(app, cv["id"], "second.pdf")
+        upload(app, cv["id"])
     assert workspace.get_application(application["id"])["ready_at"]
     # Should a current revision ever be writable again, its upload clears the step.
     with sqlite3.connect(workspace.db.path) as conn:
@@ -240,12 +236,12 @@ def test_a_file_added_to_a_current_revision_clears_ready(app):
             UploadReservation(
                 owner_type="document",
                 owner_id=cv["id"],
-                name="second.pdf",
+                name="photo.png",
                 size=len(PDF),
-                media_type="application/pdf",
+                media_type="image/png",
             )
         )
-    uploaded = TestClient(app).put(grant["url"], headers=grant["headers"], content=PDF)
+    uploaded = put(app)(grant["url"], headers=grant["headers"], content=PDF)
     assert uploaded.status_code == 200
     # The raw upload is attributed to the token that reserved it.
     cleared(workspace, application, "file_uploaded", "token")

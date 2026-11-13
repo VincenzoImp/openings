@@ -81,7 +81,6 @@ class Services:
                     context_id=context["id"],
                     kind=kind,
                     title=kind,
-                    content={"text": "Synthetic."},
                 )
             )
         return context

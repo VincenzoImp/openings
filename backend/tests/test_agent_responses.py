@@ -52,7 +52,7 @@ def populated(tmp_path):
     application = ws.create_application({"job_id": jobs[0]["id"]})
     with ws.db.transaction() as connection:
         connection.execute(
-            "INSERT INTO documents(id,application_id,kind,title,content,review_state,version,created_at) VALUES('doc-1',?,'resume','CV',?,'draft',1,?)",
+            "INSERT INTO documents(id,application_id,kind,title,content,review_state,version,created_at) VALUES('doc-1',?,'answers','Form',?,'draft',1,?)",
             (application["id"], encode({"sections": ["Synthetic content"] * 50}), STAMP),
         )
         connection.execute(
