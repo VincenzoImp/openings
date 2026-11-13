@@ -22,6 +22,8 @@ DEFAULT_RETENTION_DAYS = 90
 KEPT_RUNS_PER_SOURCE = 20
 # One pass removes at most this many runs, tasks and events of each kind.
 PRUNE_BATCH = 500
+# Days an idempotency key keeps answering retries before it is forgotten.
+IDEMPOTENCY_KEY_DAYS = 30
 _FINISHED = "('succeeded','failed','cancelled')"
 
 
@@ -52,6 +54,23 @@ def retention_days():
         return DEFAULT_RETENTION_DAYS
 
 
+def prune_idempotency_keys(db, days=IDEMPOTENCY_KEY_DAYS, batch=PRUNE_BATCH):
+    """Forget one bounded batch of idempotency keys older than ``days``; return how many.
+
+    A retry comes within minutes or hours of its first request; after a month the
+    key only takes room. The records the keys point to stay.
+    """
+    cutoff = (datetime.fromisoformat(now()) - timedelta(days=days)).isoformat(
+        timespec="microseconds"
+    )
+    with db.transaction() as conn:
+        return conn.execute(
+            "DELETE FROM idempotency_keys WHERE (scope,key) IN (SELECT scope,key FROM "
+            "idempotency_keys WHERE created_at<? ORDER BY created_at LIMIT ?)",
+            (cutoff, batch),
+        ).rowcount
+
+
 def prune(db, days=None, keep=KEPT_RUNS_PER_SOURCE, batch=PRUNE_BATCH):
     """Remove one bounded batch of old finished collection work; report what was removed.
 
@@ -61,7 +80,9 @@ def prune(db, days=None, keep=KEPT_RUNS_PER_SOURCE, batch=PRUNE_BATCH):
     outside an agent run, go with them.
     """
     days = retention_days() if days is None else days
-    removed = {"runs": 0, "tasks": 0, "events": 0, "more": False}
+    removed = {"runs": 0, "tasks": 0, "events": 0, "keys": 0, "more": False}
+    removed["keys"] = prune_idempotency_keys(db, batch=batch)
+    removed["more"] = removed["keys"] >= batch
     if days <= 0:
         return removed
     cutoff = (datetime.fromisoformat(now()) - timedelta(days=days)).isoformat(
@@ -104,7 +125,7 @@ def prune(db, days=None, keep=KEPT_RUNS_PER_SOURCE, batch=PRUNE_BATCH):
                 (kind, cutoff, batch),
             ).rowcount
         removed["events"] = events
-        removed["more"] = len(runs) >= batch or loose >= batch or events >= batch
+        removed["more"] = removed["more"] or len(runs) >= batch or loose >= batch or events >= batch
     if removed["runs"] or removed["tasks"] or removed["events"]:
         LOG.info(
             "Pruned %d collection runs, %d tasks and %d of their records older than %d days.",

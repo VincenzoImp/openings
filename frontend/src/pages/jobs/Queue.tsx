@@ -56,6 +56,8 @@ export function Queue({
   counts,
   selected,
   onSelect,
+  onRows,
+  leaving,
   onAdd,
   own,
 }: {
@@ -65,6 +67,10 @@ export function Queue({
   counts?: JobCounts;
   selected: string;
   onSelect: (id: string) => void;
+  /** The ids of the rows shown, in order, whenever they change. */
+  onRows: (ids: string[]) => void;
+  /** Before a triage: what moves the selection on once the job left the list. */
+  leaving: (id: string) => (() => void) | null;
   onAdd: () => void;
   /** The languages the owner works in, from the policy. */
   own: Set<string> | null;
@@ -87,6 +93,9 @@ export function Queue({
   const [failures, setFailures] = useState<string[]>([]);
   const offset = Number(filters.offset) || 0;
   const rows = list.data.items;
+  useEffect(() => {
+    onRows(rows.map((item) => item.id));
+  }, [rows, onRows]);
   const scope = [section, ...NARROWING.map((key) => filters[key])].join("|");
   useEffect(() => {
     setSelection({});
@@ -140,7 +149,8 @@ export function Queue({
       if (ok && created) location.hash = reviewHref(created.id);
       return;
     }
-    await mutate(
+    const next = leaving(id);
+    const ok = await mutate(
       () =>
         api(`/jobs/${id}/triage`, "POST", {
           triage: action,
@@ -154,6 +164,7 @@ export function Queue({
             ? "Restored."
             : "Returned to the jobs to review.",
     );
+    if (ok) next?.();
   }
   const count = Object.keys(selection).length;
   return (

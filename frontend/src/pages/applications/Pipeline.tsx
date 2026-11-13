@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   calendarDate,
   readinessLabels,
@@ -25,6 +25,7 @@ import { BulkBar } from "./BulkBar";
 import {
   DEFAULTS,
   STAGES,
+  bulkActions,
   listQuery,
   outcomeLabels,
   stageCounts,
@@ -108,6 +109,10 @@ export function Pipeline({
     setSelection({});
     setFailures([]);
   }, [scope]);
+  // An inline form belongs to the rows it was opened among: any change of
+  // stage, filter, order or page closes it.
+  const shown = [scope, ...Object.values(filters)].join("|");
+  useEffect(() => setOpen(null), [shown]);
   const filtered =
     q ||
     filters.outcome ||
@@ -147,6 +152,14 @@ export function Pipeline({
     );
   }
   const selected = Object.keys(selection).length;
+  // The selected records, also those of other pages, as last read.
+  const seen = useRef(new Map<string, Application>());
+  for (const item of list.data.items) seen.current.set(item.id, item);
+  const actions = bulkActions(
+    Object.keys(selection)
+      .map((id) => seen.current.get(id))
+      .filter((item): item is Application => !!item),
+  );
   const rows = list.data.items;
   const firstReady = rows.find(
     (item) => item.status === "draft" && item.ready_at,
@@ -340,6 +353,7 @@ export function Pipeline({
             {selected > 0 && (
               <BulkBar
                 selection={selection}
+                actions={actions}
                 hint={
                   filters.waiting
                     ? `Applied, no reply for more than ${days} days`

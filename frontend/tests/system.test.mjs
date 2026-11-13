@@ -150,3 +150,18 @@ test("a skill's text, its shared references and appended notes", () => {
   assert.equal(settings.megabytes(5 * 1024 ** 2), "5.0 MiB");
   assert.equal(settings.megabytes(3 * 1024 ** 3), "3.0 GiB");
 });
+
+test("a search line leaves out an empty query and names the place", () => {
+  const search = (config) => ({ kind: "jobspy", config });
+  assert.equal(
+    collection.sourceLine(search({ query: "", location: "" })),
+    "Search · All locations",
+  );
+  assert.equal(
+    collection.sourceLine(
+      search({ query: "  data engineer ", country: "switzerland" }),
+    ),
+    'Search · "data engineer" · switzerland',
+  );
+  assert.deepEqual(collection.NATIONAL, ["indeed", "glassdoor"]);
+});

@@ -191,7 +191,7 @@ def test_an_agent_token_keeps_the_workflow_operations(app, client):
 def test_an_agent_backup_carries_no_installation_credentials(app, client, tmp_path):
     workspace, auth = app.state.workspace, app.state.auth
     agent = auth.create_token("Synthetic agent", "agent")
-    owner = auth.create_token("Synthetic owner token")
+    owner = auth.create_token("Synthetic owner token", "owner")
     job = workspace.ingest_job({"title": "Kept job", "company": "Example", "posting": "Build."})
     secrets = workspace.get_settings("auth")["data"]
     needles = [
@@ -235,16 +235,17 @@ def test_an_agent_backup_carries_no_installation_credentials(app, client, tmp_pa
 
 
 def test_an_owner_token_keeps_full_access_and_chooses_the_kind(app, client):
-    owner = app.state.auth.create_token("Synthetic owner token")
+    owner = app.state.auth.create_token("Synthetic owner token", "owner")
     assert owner["kind"] == "owner"
     headers = bearer(owner)
-    # The kind defaults to owner on both interfaces, so existing scripts keep working.
-    default = client.post("/api/v1/tokens", json={"name": "Script"}, headers=headers).json()
-    scoped, error = tool(
-        client, owner, "tokens_create", {"value": {"name": "Agent on laptop", "kind": "agent"}}
+    # The kind defaults to the scoped agent on both interfaces, as in the dashboard.
+    default = client.post("/api/v1/tokens", json={"name": "Agent on laptop"}, headers=headers)
+    script, error = tool(
+        client, owner, "tokens_create", {"value": {"name": "Script", "kind": "owner"}}
     )
-    assert error is None and (default["kind"], scoped["kind"]) == ("owner", "agent")
-    assert scoped["token"].startswith("op_")
+    default = default.json()
+    assert error is None and (default["kind"], script["kind"]) == ("agent", "owner")
+    assert default["token"].startswith("op_")
     listed, error = tool(client, owner, "tokens_list")
     assert error is None
     assert client.get("/api/v1/tokens", headers=headers).json() == listed
@@ -255,7 +256,7 @@ def test_an_owner_token_keeps_full_access_and_chooses_the_kind(app, client):
     }
     assert "token_hash" not in listed["items"][0] and "token" not in listed["items"][0]
     created = app.state.activity.list_events({"kind": "token_created"})["items"][0]
-    assert created["payload"] == {"name": "Agent on laptop", "kind": "agent"}
+    assert created["payload"] == {"name": "Script", "kind": "owner"}
     assert created["actor"]["token_kind"] == "owner"
     for body in ({"name": "Invalid", "kind": "admin"}, {"name": "Invalid", "kind": None}):
         invalid = client.post("/api/v1/tokens", json=body, headers=headers)
@@ -263,7 +264,7 @@ def test_an_owner_token_keeps_full_access_and_chooses_the_kind(app, client):
         assert invalid.status_code == 422
         assert invalid.json()["error"]["code"] == error["code"] == "validation"
     # The owner can run everything from an external session: answer, revoke, change the password.
-    asked = question(app, scoped)
+    asked = question(app, default)
     answered, error = tool(
         client,
         owner,

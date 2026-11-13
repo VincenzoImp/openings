@@ -424,3 +424,21 @@ def test_rest_and_mcp_mark_ready_with_the_same_inputs_and_errors(app):
             "/api/v1/applications", params={"ready_since": "soon"}, headers=headers
         )
         assert invalid.status_code == 422
+
+
+def test_undoing_mark_applied_restores_the_ready_draft(app):
+    workspace = app.state.workspace
+    marked, _ = ready(app)
+    applied = workspace.update_application(
+        marked["id"], {"expected_version": marked["version"], "status": "applied"}
+    )
+    assert applied["applied_at"] and applied["ready_at"] is None
+    # Undo, as the dashboard does: back to Preparing without a sent day, then Ready again.
+    draft = workspace.update_application(
+        marked["id"],
+        {"expected_version": applied["version"], "status": "draft", "applied_at": None},
+    )
+    assert (draft["status"], draft["applied_at"]) == ("draft", None)
+    assert not draft.get("responses")
+    again = workspace.set_ready(marked["id"], {"expected_version": draft["version"]})
+    assert again["readiness"] == "ready" and again["status"] == "draft"

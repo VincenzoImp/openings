@@ -74,9 +74,10 @@
   color: var(--ink-2);
 }
 
-/* One message at a time, above the bottom bar on narrow screens. Inside an
-   open dialog the dialog shows its own copy, because a modal dialog covers
-   the page. */
+/* One message at a time, above the bottom bar and any fixed action bar on
+   narrow screens. An open modal dialog covers the page, so the dialog shows
+   its own copy, placed where the page's toast would be, outside the dialog's
+   box. */
 .toast {
   position: fixed;
   bottom: var(--s5);
@@ -100,7 +101,7 @@
 }
 .toast button {
   flex: none;
-  width: 28px;
+  min-width: 28px;
   height: 28px;
   padding: 0;
   border: 0;
@@ -111,6 +112,12 @@
   line-height: 1;
   cursor: pointer;
 }
+.toast .toast-action {
+  padding: 0 var(--s2);
+  font: 600 var(--t-md) / 1 var(--sans);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .toast button:focus-visible {
   outline-color: currentColor;
 }
@@ -118,16 +125,19 @@ body:has(dialog[open]) .toast:not(.dialog-toast) {
   display: none;
 }
 .dialog .dialog-toast {
-  position: static;
-  transform: none;
-  flex: none;
-  max-width: none;
-  margin: var(--s3) var(--s4);
+  left: 50%;
 }
 @media (max-width: 860px) {
   .toast {
     left: 50%;
     bottom: calc(var(--tabbar) + var(--s3) + env(safe-area-inset-bottom));
     width: max-content;
+  }
+  /* A fixed action bar (the review page, a job) keeps its buttons in reach. */
+  body:has(.sticky-actions:not(.split[data-pane="0"] > :nth-child(2) *))
+    .toast {
+    bottom: calc(
+      var(--tabbar) + 64px + var(--s3) + env(safe-area-inset-bottom)
+    );
   }
 }
