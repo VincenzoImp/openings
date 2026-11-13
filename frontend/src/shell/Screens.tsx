@@ -16,6 +16,7 @@ const loaders = {
   policy: () => import("../pages/Policy"),
   templates: () => import("../pages/Templates"),
   settings: () => import("../pages/Settings"),
+  setup: () => import("../pages/Setup"),
 };
 
 /** Start loading a screen's code before it is opened. */
@@ -36,6 +37,7 @@ export const SettingsPage = lazy(loaders.settings);
 export const JobsPage = lazy(loaders.jobs);
 export const ApplicationsPage = lazy(loaders.applications);
 export const ReviewPage = lazy(loaders.review);
+export const SetupPage = lazy(loaders.setup);
 
 interface BoundaryProps {
   /** What failed, for the message: "Applications". */

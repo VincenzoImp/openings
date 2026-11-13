@@ -5,6 +5,7 @@ export { Button, IconButton, type ButtonProps } from "./Button";
 export { Tag, Count, ActorChip } from "./Tag";
 export { Card, CardBody, List, ListRow } from "./Card";
 export { Tabs, TabPanel, SegmentedControl, type TabItem } from "./Tabs";
+export { Stepper, type Step } from "./Stepper";
 export { Field, Switch } from "./Field";
 export {
   Banner,

@@ -184,12 +184,6 @@
   text-align: center;
 }
 
-@media (min-width: 861px) {
-  /* Wide pages keep the old pages' working width until each is rebuilt. */
-  .page:has(> .legacy) {
-    max-width: 1400px;
-  }
-}
 @media (max-width: 860px) {
   .app {
     display: block;

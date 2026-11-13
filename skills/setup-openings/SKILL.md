@@ -32,7 +32,8 @@ Skip this section when the owner already has a reachable Openings URL.
 
 ## Connect
 
-The owner creates an **Agent** token in **Settings → Agent access** and starts
+The owner creates an **Agent** token in the dashboard's setup guide, which a new
+workspace opens on, or in **Settings → Agent access**, and starts
 the agent client with `OPENINGS_URL`, `OPENINGS_TOKEN` and, for a private
 certificate authority, `OPENINGS_CA_FILE`. Recommend an agent token, not an owner
 token: it runs every workflow and cannot change the owner password, manage

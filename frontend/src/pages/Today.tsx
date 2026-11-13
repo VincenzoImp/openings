@@ -15,6 +15,7 @@ import { lastRunLine } from "./activity/wording";
 import { READY_QUEUE, stageHref } from "./applications/links";
 import { Decisions } from "./today/Decisions";
 import { Ready } from "./today/Ready";
+import { SetupBanner } from "./today/SetupBanner";
 import { Since } from "./today/Since";
 import { todaySummary } from "./today/summary";
 import { beginVisit, sinceOf, touchVisit } from "./today/visit";
@@ -145,6 +146,7 @@ export default function TodayPage(links: Links) {
         )}
       </PageHead>
       <div className="roomy">
+        <SetupBanner />
         <div className="cols">
           <div className="roomy">
             <Ready list={ready} />
