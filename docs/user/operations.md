@@ -22,6 +22,53 @@ omits binary file contents and is not a restorable backup. Download it with
 **Export records** in the same tab, `GET /api/v1/export`, or the scoped `workspace_export` MCP grant. Use the
 backup action to capture changes from an active WAL journal consistently.
 
+## Backups
+
+The server keeps its own copies of the workspace on the data volume, without a
+cron job or any setup:
+
+- **Daily backups.** About once a day the worker writes
+  `openings-<UTC time>.sqlite` into `OPENINGS_BACKUP_DIR` (default: a `backups`
+  folder beside the workspace file, `/data/backups` in the container). Each copy
+  is the whole workspace, written with `VACUUM INTO` under a temporary name,
+  checked with `quick_check`, made readable by the server user only (0600) and
+  then renamed into place. The newest `OPENINGS_BACKUP_KEEP` (default 3) are kept;
+  `0` turns daily backups off. When the volume has less than 1.2 times the
+  database size free, the backup is skipped with a warning in the log and tried
+  again on the next cycle.
+- **Copies before an upgrade.** Before a new release upgrades the workspace
+  format in place, it writes `openings.pre-schema<old>-<UTC time>.sqlite` beside
+  the workspace, verified the same way. When the volume has less than 2.2 times
+  the database size free, or the copy fails its check, the server does not start
+  and says how much space it needs; the workspace file is not touched. The two
+  most recent copies are kept.
+
+**Settings → Backup and restore → Automatic backups** (owner only) shows when the
+last daily backup was written and how many are kept, lists every copy with
+Download, and lets you delete a copy taken before an upgrade once you no longer
+need to go back (daily backups rotate by themselves). Over REST, as the owner or
+with an owner token: `GET /api/v1/backups`, `GET /api/v1/backups/{name}` and
+`DELETE /api/v1/backups/{name}` (pre-upgrade copies only). These copies include
+the password hash, the session secret and the token hashes, so an agent token is
+refused and no MCP tool reaches them. `GET /health` reports the age of the
+newest daily backup (`backup.last_at`, `age_hours`, `ok`) and the worker's
+heartbeat (`worker.heartbeat_age_seconds`); it answers 503 when the worker has
+stopped cycling, so the container healthcheck fails.
+
+To restore a daily backup, download it and restore it under **Restore** below.
+
+These copies live on the same disk as the workspace. Copying them to another
+machine is your job; for example, from the Docker host:
+
+```bash
+# Copy new backups of the named volume to another machine (older ones stay there).
+rsync -a "$(docker volume inspect openings_workspace --format '{{ .Mountpoint }}')/backups/" \
+  backup-host:openings-backups/
+# Or keep versioned, encrypted copies with restic.
+restic -r sftp:backup-host:openings-restic backup \
+  "$(docker volume inspect openings_workspace --format '{{ .Mountpoint }}')/backups"
+```
+
 ## Restore or move hosts
 
 On the destination host, install the same Openings release and set its owner
@@ -100,7 +147,7 @@ stored.
 
 Settings supports named API tokens of two kinds, independent token revocation and
 owner password changes; the parts that need owner authority (tokens, restore,
-the password) are marked **Owner only**. An **agent** token cannot change the password, manage
+the password, the automatic backups) are marked **Owner only**. An **agent** token cannot change the password, manage
 tokens, restore a backup or answer a question for the owner; an **owner** token
 has full access ([token kinds](agents.md#token-kinds)). Tokens created before
 version 0.17 are owner tokens. A password change rotates browser sessions and
@@ -138,13 +185,34 @@ grant for each transfer or retry.
 
 For development commands and release gates, see [Contributing](../../CONTRIBUTING.md).
 
+## Roll back an upgrade
+
+When a release that upgraded the workspace format misbehaves, go back to the
+previous image with the copy it kept:
+
+```bash
+docker compose down
+# The container's volume, e.g. /var/lib/docker/volumes/openings_workspace/_data
+cd "$(docker volume inspect openings_workspace --format '{{ .Mountpoint }}')"
+mv openings.sqlite openings.failed-upgrade.sqlite
+rm -f openings.sqlite-wal openings.sqlite-shm
+cp -p openings.pre-schema<old>-<UTC time>.sqlite openings.sqlite
+# Pin the previous release, e.g. OPENINGS_IMAGE=docker.io/vincenzoimp/openings:<previous>
+docker compose up -d
+```
+
+Changes made after the upgrade are not in the copy. An earlier release cannot
+open a workspace upgraded by a later one, so the copy is the only way back.
+
 ## Upgrade the workspace format
 
-Back up before upgrading. A release upgrades the workspace to its schema on
-start, in one transaction, and a restore upgrades a copy of an older backup the
-same way; the uploaded file is not changed. A workspace cannot be opened by an
-earlier release. Workspaces older than 0.23 must be opened once with 0.23 first;
-release history is in [CHANGELOG.md](../../CHANGELOG.md).
+The server keeps a verified copy of the workspace before every in-place upgrade
+([Backups](#backups)); downloading a backup first is still a good idea. A release
+upgrades the workspace to its schema on start, in one transaction, and a restore
+upgrades a copy of an older backup the same way; the uploaded file is not changed.
+A workspace cannot be opened by an earlier release ([Roll back an
+upgrade](#roll-back-an-upgrade)). Workspaces older than 0.23 must be opened once
+with 0.23 first; release history is in [CHANGELOG.md](../../CHANGELOG.md).
 
 After an upgrade that frees space, the start takes longer once: the database file
 is rewritten without the freed space (seconds on an SSD, longer on slow storage).
