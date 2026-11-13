@@ -44,10 +44,13 @@ const SCREENS = [
   "templates?section=assets",
   "templates?section=preview",
   "collection",
-  "collection?section=companies",
+  "collection?section=runs",
+  "collection?section=runs&view=tasks",
+  "collection?section=providers",
   "settings",
-  "settings?section=collection",
-  "settings?section=activity",
+  "settings?section=skills",
+  "settings?section=skills&skill=prepare-shortlist",
+  "settings?section=backup",
   "settings?section=workspace",
 ];
 

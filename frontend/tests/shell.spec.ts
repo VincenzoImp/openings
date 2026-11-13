@@ -339,7 +339,12 @@ test("no horizontal page scroll from 360 to 1600 px on every screen", async ({
       ["templates", "Templates"],
       ["templates?section=rules", "Templates"],
       ["collection", "Collection"],
+      ["collection?section=runs", "Collection"],
+      ["collection?section=providers", "Collection"],
       ["settings", "Settings"],
+      ["settings?section=skills&skill=prepare-shortlist", "Settings"],
+      ["settings?section=backup", "Settings"],
+      ["settings?section=workspace", "Settings"],
     ]) {
       await page.goto("/#" + route);
       await expect(page.locator(".main h1")).toHaveText(title);

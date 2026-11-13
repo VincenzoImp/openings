@@ -34,6 +34,7 @@ export const subjectNames: Record<string, string> = {
   policy_item: "Policy item",
   token: "API token",
   workspace: "Workspace",
+  skill: "Skill",
 };
 
 /** The kinds of change the timeline filters by, each a set of record kinds. */
@@ -62,7 +63,11 @@ export const changeGroups = [
     label: "Questions and requests",
     types: ["question", "request"],
   },
-  { id: "settings", label: "Settings", types: ["token", "workspace"] },
+  {
+    id: "settings",
+    label: "Settings and skills",
+    types: ["token", "workspace", "skill"],
+  },
 ];
 export const groupOf = (type?: string | null) =>
   changeGroups.find((group) => group.types.includes(type || ""));
@@ -79,11 +84,14 @@ function screenOf(type: string, id?: string | null) {
     policy_item: "#policy",
     source: "#collection",
     collection: "#collection",
-    collection_run: "#collection",
-    provider: "#collection",
-    task: "#collection",
+    collection_run: "#collection?section=runs",
+    provider: "#collection?section=providers",
+    task: "#collection?section=runs&view=tasks",
     token: "#settings?section=agents",
-    workspace: "#settings",
+    workspace: "#settings?section=workspace",
+    skill: id
+      ? `#settings?section=skills&skill=${encodeURIComponent(id)}`
+      : "#settings?section=skills",
   };
   return routes[type];
 }

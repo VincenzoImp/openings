@@ -81,6 +81,7 @@ export const SCREENS: Record<string, string> = {
 export const ALIASES: Record<string, string> = {
   overview: "today",
   jobs: "inbox",
+  skills: "settings",
 };
 
 /** Screens built with the design system; the others keep the older stylesheet. */
@@ -92,6 +93,8 @@ export const REBUILT = [
   "career",
   "policy",
   "templates",
+  "collection",
+  "settings",
 ];
 
 export const HOME = "today";
@@ -132,10 +135,43 @@ function upgradeApplications(params: URLSearchParams) {
 }
 
 /**
+ * The query of a System screen in an earlier version, rewritten: the provider
+ * settings and the task list of the old Settings moved to Collection, and the
+ * two lists of the old Collection (saved searches, companies) are one list of
+ * sources filtered by kind. Returns the new hash, or null.
+ */
+function upgradeSystem(name: string, params: URLSearchParams) {
+  const section = params.get("section");
+  if (name === "skills") {
+    params.set("section", "skills");
+    return `#settings?${params}`;
+  }
+  if (name === "settings" && section === "collection")
+    return "#collection?section=providers";
+  if (name === "settings" && section === "activity") {
+    params.set("section", "runs");
+    const view = params.get("activity_view");
+    params.delete("activity_view");
+    if (view === "tasks") params.set("view", "tasks");
+    return `#collection?${params}`;
+  }
+  if (
+    name === "collection" &&
+    (section === "searches" || section === "companies")
+  ) {
+    params.delete("section");
+    params.set("kind", section === "searches" ? "search" : "board");
+    return `#collection?${params}`;
+  }
+  return null;
+}
+
+/**
  * The hash rewritten to its canonical route, keeping the query; null if it
  * already is. An application opened over any screen (`?application=`, the old
- * drawer, with `detail=` for its tab) is its review page, and the old
- * Overview's period (`#overview?since=`) is the Progress of Insights.
+ * drawer, with `detail=` for its tab) is its review page, the old
+ * Overview's period (`#overview?since=`) is the Progress of Insights, and
+ * the moved parts of Settings and Collection open where they are now.
  */
 export function canonicalHash(hash: string) {
   const [name, query = ""] = hash.replace(/^#/, "").split("?");
@@ -154,6 +190,8 @@ export function canonicalHash(hash: string) {
   }
   if (name === "applications" && upgradeApplications(params))
     return `#applications?${params}`;
+  const system = upgradeSystem(name, params);
+  if (system) return system;
   if (!(name in ALIASES)) return null;
   return `#${ALIASES[name]}${query ? "?" + query : ""}`;
 }

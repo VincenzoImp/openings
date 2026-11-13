@@ -324,8 +324,6 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
                   <TemplatesPage />
                 ) : (
                   <SettingsPage
-                    theme={theme}
-                    onTheme={toggleTheme}
                     onLogout={() =>
                       onLogout().catch((e) =>
                         notify(
