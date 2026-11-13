@@ -84,7 +84,7 @@ export function Decisions({
             {incomplete > 0 && (
               <a
                 className="btn quiet sm"
-                href="#inbox?queue=all&complete=false"
+                href="#jobs?section=all&complete=false"
               >
                 {incomplete === 1
                   ? "1 job needs its full posting"

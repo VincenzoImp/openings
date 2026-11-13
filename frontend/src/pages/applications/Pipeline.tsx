@@ -325,7 +325,7 @@ export function Pipeline({
               filtered ? (
                 <Button onClick={clear}>Clear filters</Button>
               ) : (
-                <a className="btn" href="#shortlist">
+                <a className="btn" href="#jobs?section=shortlist">
                   Open the Shortlist
                 </a>
               )

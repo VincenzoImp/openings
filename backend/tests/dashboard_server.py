@@ -18,6 +18,7 @@ from pathlib import Path
 import uvicorn
 from fastapi.testclient import TestClient
 
+from jobs_fixtures import seed_jobs
 from large_fixtures import seed_large
 from openings.actors import OWNER, acting_as
 from openings.app import create_app
@@ -216,6 +217,7 @@ def main():
                 )
             # Before the numbered jobs, so those stay the newest records of every list.
             seed_today(app, client, lambda agent: seed_library(app, agent))
+            seed_jobs(app)
         # A large workspace (the performance budget) is written in one transaction.
         if jobs > LARGE:
             seed_large(workspace, jobs, applications)

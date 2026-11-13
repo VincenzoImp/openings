@@ -95,12 +95,12 @@ test("questions are answered with a choice and a comment, corrected and withdraw
     question.getByRole("link", { name: "Asked in this run" }),
   ).toHaveAttribute("href", `#activity?section=runs&run=${run.id}`);
   await fitsViewport(page);
-  // The subject opens the job over Activity.
+  // The subject opens the job in Jobs; Back returns to the question.
   await question.getByRole("link", { name: /^Job: Hybrid role/ }).click();
-  await expect(dialog(page)).toContainText(job.title);
-  await dialog(page)
-    .getByRole("button", { name: "Close dialog", exact: true })
-    .click();
+  await expect(page).toHaveURL(new RegExp(`#jobs\\?job=${job.id}$`));
+  await expect(page.locator("#job-title")).toHaveText(job.title);
+  await page.goBack();
+  await expect(page.locator(".main h1")).toHaveText("Activity");
 
   // A comment and a choice are sent together.
   await question.getByRole("button", { name: "Write an answer" }).click();
@@ -276,9 +276,10 @@ test("keyboard only: move through the Activity tabs and open a run's report", as
     .last()
     .getByRole("link", { name: /^Note: Hybrid role/ })
     .click();
-  await expect(dialog(page)).toContainText(job.title);
-  await page.keyboard.press("Escape");
-  await expect(dialog(page)).toHaveCount(0);
+  await expect(page.locator("#job-title")).toHaveText(job.title);
+  await expect(
+    page.getByRole("list", { name: "Timeline of this job" }),
+  ).toContainText("Note");
 
   // An interrupted run says why it has no report and keeps its changes.
   await go(page, "activity?section=runs");
@@ -411,28 +412,18 @@ test("the owner writes requests, follows the agent's result and withdraws one", 
 
   // The job's own "Ask your agent" lists the request about it and writes
   // another one about the job.
-  await go(page, `inbox?job=${job.id}`);
-  await expect(dialog(page).locator(".ask-agent")).toContainText(
-    "1 request waiting",
-  );
-  await dialog(page)
-    .getByRole("button", { name: "Ask your agent", exact: true })
-    .click();
+  await go(page, `jobs?section=all&job=${job.id}`);
+  const detail = page.locator(".job-detail");
+  await detail.getByText("Ask your agent", { exact: true }).click();
+  await expect(detail.getByRole("article", { name: about })).toBeVisible();
   const later = unique("Check the salary range");
-  await dialog(page).getByLabel("Request for your agent").fill(later);
-  await dialog(page)
-    .getByRole("button", { name: "Send request", exact: true })
+  await detail.getByLabel("A request about this job").fill(later);
+  await detail
+    .getByRole("button", { name: "Send the request", exact: true })
     .click();
   await expect(
-    dialog(page).getByRole("article", { name: later }),
-  ).toContainText("Waiting for the agent");
-  await dialog(page)
-    .getByRole("button", { name: "Close dialog", exact: true })
-    .click();
-  await expect(dialog(page).locator(".ask-agent")).toContainText(
-    "2 requests waiting",
-  );
-  await page.keyboard.press("Escape");
+    detail.getByRole("article", { name: later }).locator(".tag"),
+  ).toHaveText("Waiting for your agent");
 
   // The agent takes it in a run and reports the result.
   const run = await as("/runs", "POST", {

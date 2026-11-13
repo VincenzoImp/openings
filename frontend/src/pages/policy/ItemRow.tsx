@@ -15,6 +15,7 @@ import {
 } from "../../design";
 import { describe } from "../../design/kv";
 import { ruleText, scopeLabels, valueText } from "./model";
+import { RuleMatches } from "./RuleMatches";
 
 /** The tags beside an item's label: scope, signal and what is not confirmed. */
 export function ItemTags({
@@ -84,6 +85,7 @@ export function ItemBody({
             {!signalsApplied &&
               " Signals arrive in a later release: until then the rule is stored and nothing is dismissed."}
           </span>
+          {signalsApplied && <RuleMatches item={item} />}
         </div>
       )}
     </>
