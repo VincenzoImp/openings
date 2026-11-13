@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.22.0 — 2026-11-13
+
+The breaking group of the redesign: one timeline, documents that are their source, and one name per operation. **Read [Upgrading to 0.22](docs/user/upgrading-0.22.md) before upgrading scripts or agents.**
+
+- **One timeline** for each job and application: notes and attributed changes in one list, pinned note first, with scope and filters by kind, who, scope and period (`GET /jobs/{id}/timeline`, `GET /applications/{id}/timeline`, MCP `timeline_get`). Notes record their run and can be pinned, one per job and per application (`POST /notes/{id}/pin`, `notes_pin`).
+- **The application note becomes the pinned note.** The `note` field is deprecated: it is still read and written through the pinned note until 0.23; reads return `pinned_note`.
+- **Breaking: a CV or letter revision is its `.tex` source and the PDF built from it**, plus `claim_ids`, `knowledge_ids` and an optional `note`. Creating one with `content` is refused (`422 content_not_accepted`). The PDF upload names its source (`source_sha256`); a PDF of another source, a second source or a second PDF is refused, and approval needs both.
+- The server derives readable text from the source without TeX (moderncv, letter, scrlttr2 and article commands as the PDF prints them). Reads return it as `text`, document search covers it, and `documents_compare` compares two revisions line by line.
+- **Removed:** `documents_consistency`, `GET /documents/{id}/consistency`, `allow_content_mismatch` and "Approve with differences".
+- **One name per operation:** MCP tools are named `<resource>_<verb>` (`jobs_get`, `jobs_list`, `applications_update`, `profile_get`, `contexts_create`, `staleness_list`, `sources_yield`, `workspace_restore`…). The 30 earlier names stay until 0.23 as deprecated aliases with their earlier arguments; the upgrade guide lists them.
+- **One argument shape:** path identifiers and a delete's `expected_version` flat, one `value` for the body or a read's filters. Lists that took flat filters accept them until 0.23.
+- **Lists** return `limit` and `offset` with `total`. **Breaking:** Career entries, claims, templates, contexts and files return summaries by default; pass `summary=false` for full records.
+- **Deletes** of notes, document revisions and files take `expected_version` (a delete without it is accepted until 0.23). **Idempotency keys** on every create.
+- Dashboard: the review page and the job detail share the timeline; the Details note field is the pinned note editor; each CV and letter shows its PDF with a switch to its text and the changes since the previous revision.
+- Internal: the backend is split into packages by concern, and REST routes, MCP tools and the operation inventory are generated from one declaration per operation. A test enforces time budgets for the hot reads on a 25,000-job workspace. `docs/user/configuration.md` lists every environment variable.
+
+**Database schema 13.** A schema 5–12 workspace is upgraded automatically at start in one transaction. Each non-empty application note is copied byte for byte into a pinned note (checked before committing) and `applications.note` is dropped; CV and letter `content` moves unchanged to read-only `legacy_content`, cited ids are copied, text is derived for every revision with a source, and files gain `source_sha256`. Files, hashes, review states, versions and frozen contexts are unchanged. Restore accepts schema 13 and upgrades a copy of an older backup. A schema 13 workspace cannot be opened by 0.21 or earlier: back up before upgrading.
+
 ## 0.21.0 — 2026-11-13
 
 Jobs that explain themselves, rules that act on them, and the System screens on the new design.
