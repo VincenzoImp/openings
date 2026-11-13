@@ -14,7 +14,6 @@ from openings.career import (
     CareerService,
     ClaimCreate,
     ClaimUpdate,
-    InstructionsUpdate,
     KnowledgeCreate,
     KnowledgeUpdate,
     ProfileUpdate,
@@ -24,6 +23,7 @@ from openings.career import (
 from openings.discovery import CollectionWrite, DiscoveryService, SourceCreate, SourcePatch
 from openings.documents import ContextCreate, DocumentCreate, DocumentService, UploadReservation
 from openings.errors import DomainError
+from openings.preferences import PreferencesService
 from openings.worker import Worker
 from openings.workspace import Workspace
 
@@ -185,7 +185,11 @@ def test_every_kind_of_write_leaves_an_attributed_record_without_content(tmp_pat
         career.update_profile(
             ProfileUpdate(expected_version=profile["version"], email="owner@example.test")
         )
-        career.update_instructions(InstructionsUpdate(expected_version=1, general=secret))
+        preferences = PreferencesService(workspace)
+        preferences.update_preferences(
+            "writing", {"expected_version": 0, "items": [{"text": secret}]}
+        )
+        preferences.update_settings({"expected_version": 0, "no_reply_days": 40})
         entry = career.create_knowledge(KnowledgeCreate(title="Synthetic role", narrative=secret))
         entry = career.update_knowledge(
             entry["id"], KnowledgeUpdate(expected_version=entry["version"], narrative=secret + "!")
@@ -239,7 +243,8 @@ def test_every_kind_of_write_leaves_an_attributed_record_without_content(tmp_pat
     rows = workspace.db.all("SELECT * FROM events ORDER BY created_at")
     assert {row["kind"] for row in rows} >= {
         "profile_updated",
-        "instructions_updated",
+        "preferences_updated",
+        "settings_updated",
         "knowledge_created",
         "knowledge_updated",
         "claim_created",

@@ -33,7 +33,7 @@ const SCREENS = [
   "career",
   "career?section=knowledge",
   "career?section=claims",
-  "policy",
+  "preferences",
   "templates",
   "templates?section=rules",
   "templates?section=assets",
@@ -192,7 +192,7 @@ for (const theme of ["light", "dark"]) {
       const record = page.getByRole("list", { name: "Your record" });
       for (const [button, key] of [
         [/the profile$/, "setup-profile"],
-        [/the policy$/, "setup-policy"],
+        [/the preferences$/, "setup-preferences"],
         [/^Add a search$/, "setup-search"],
       ] as const) {
         await record.getByRole("button", { name: button }).click();
@@ -218,9 +218,7 @@ for (const theme of ["light", "dark"]) {
         );
       const flagged = (await api("/jobs?signal=likely_duplicate&limit=1"))
         .items[0];
-      const ruled = (
-        await api("/jobs?triage=dismissed&dismissed_by=rule&limit=1")
-      ).items[0];
+      const dismissed = (await api("/jobs?triage=dismissed&limit=1")).items[0];
       // A likely duplicate with every detail section open.
       await go(page, `jobs?job=${flagged.id}`);
       await settled(page);
@@ -231,7 +229,7 @@ for (const theme of ["light", "dark"]) {
         await summary.click();
       await settled(page);
       expect(await findings(page, "job")).toEqual([]);
-      await go(page, `jobs?section=dismissed&job=${ruled.id}`);
+      await go(page, `jobs?section=dismissed&job=${dismissed.id}`);
       await settled(page);
       expect(await findings(page, "dismissed-job")).toEqual([]);
       // Dismiss with a reason, merge, add a job.

@@ -16,6 +16,16 @@ from ..job_signals import (
     signal_record,
 )
 from ..posting import posting_complete, posting_complete_sql
+from ..preferences import spoken_languages
+
+
+def unspoken_sql(spoken):
+    """Jobs that require a language outside ``spoken``: a group none of whose languages is spoken."""
+    marks = ",".join("?" for _ in spoken)
+    return (
+        "EXISTS(SELECT 1 FROM job_signals s, json_each(s.required) g WHERE s.job_id=j.id "
+        f"AND NOT EXISTS(SELECT 1 FROM json_each(g.value) c WHERE c.value IN ({marks})))"
+    )
 
 
 class JobReads:
@@ -127,7 +137,7 @@ class JobReads:
         posting_language_not=None,
         requires=None,
         dismissed_by=None,
-        rule_id=None,
+        unspoken=None,
     ):
         conditions, args = [], []
         if signal:
@@ -151,11 +161,11 @@ class JobReads:
             args.append(normalize_languages([requires])[0])
         if dismissed_by:
             if dismissed_by not in DISMISSED_BY:
-                raise DomainError(422, "dismissed_by", "Choose rule, agent, owner or other.")
+                raise DomainError(422, "dismissed_by", "Choose agent, owner or other.")
             conditions.append("j.triage='dismissed' AND " + DISMISSED_BY[dismissed_by])
-        if rule_id:
-            conditions.append("j.dismissed_rule_id=?")
-            args.append(rule_id)
+        if unspoken:
+            conditions.append("NOT " + unspoken_sql(unspoken))
+            args.extend(unspoken)
         if triage == "active":
             conditions.append("j.triage!='dismissed'")
         elif triage:
@@ -213,8 +223,8 @@ class JobReads:
         posting_language_not=None,
         requires=None,
         dismissed_by=None,
-        rule_id=None,
         include_counts=False,
+        hide_unspoken_required=None,
     ):
         limit, offset = min(max(int(limit), 1), 200), max(int(offset), 0)
         signal_filters = {
@@ -224,6 +234,9 @@ class JobReads:
             "requires": requires,
         }
         with self.db.connect() as connection:
+            spoken = spoken_languages(connection) if hide_unspoken_required is not None else []
+            hide = bool(hide_unspoken_required and spoken)
+            signal_filters["unspoken"] = spoken if hide else None
             where, args = self._job_filters(
                 q,
                 triage,
@@ -236,7 +249,6 @@ class JobReads:
                 created_until,
                 complete,
                 dismissed_by=dismissed_by,
-                rule_id=rule_id,
                 **signal_filters,
             )
             base = " FROM jobs j"
@@ -263,6 +275,24 @@ class JobReads:
                 "limit": limit,
                 "offset": offset,
             }
+            if hide_unspoken_required is not None:
+                result["unspoken_required"] = self._unspoken_count(
+                    connection,
+                    spoken,
+                    hide,
+                    q,
+                    triage=triage,
+                    company=company,
+                    location=location,
+                    source=source,
+                    remote=remote,
+                    job_type=job_type,
+                    created_since=created_since,
+                    created_until=created_until,
+                    complete=complete,
+                    dismissed_by=dismissed_by,
+                    **{**signal_filters, "unspoken": None},
+                )
             if include_counts:
                 result["counts"] = self._job_counts(
                     connection,
@@ -300,6 +330,17 @@ class JobReads:
                 )
                 facets[name] = [r[0] for r in facet_rows if r[0] not in (None, "")]
         return {**result, "facets": facets}
+
+    def _unspoken_count(self, connection, spoken, hidden, q="", **filters):
+        """How many jobs of the same filters require a language the owner does not speak."""
+        count = 0
+        if spoken:
+            where, args = self._job_filters(q, **filters)
+            joined = (where + " AND " if where else " WHERE ") + unspoken_sql(spoken)
+            count = connection.execute(
+                "SELECT count(*) FROM jobs j" + joined, [*args, *spoken]
+            ).fetchone()[0]
+        return {"spoken_languages": spoken, "count": count, "hidden": hidden}
 
     def _job_counts(self, connection, q="", **filters):
         """Jobs of each triage and dismissed jobs by who dismissed them, for the same filters."""

@@ -162,23 +162,28 @@ test("the setup guide reads the workspace and fills in the basics", async ({
     email: current.email,
   });
 
-  // A fact employers ask about, and the no-reply period as it is.
-  const label = unique("Synthetic permit");
-  await part(page, "Policy")
-    .getByRole("button", { name: /the policy$/ })
+  // What you look for, and the no-reply period as it is.
+  const wanted = unique("Synthetic platform roles");
+  await part(page, "Preferences")
+    .getByRole("button", { name: /the preferences$/ })
     .click();
-  const facts = page.getByRole("form", {
-    name: "Add a fact employers ask about",
+  const looking = page.getByRole("form", {
+    name: "Add to What I'm looking for",
   });
-  await facts.getByLabel("Fact").fill(label);
-  await facts
-    .getByLabel("What is true for you")
-    .fill("Synthetic work permit until 2030.");
-  await facts.getByRole("button", { name: "Add the fact" }).click();
-  await toast(page, "Added to Eligibility.");
+  await looking.getByLabel("Statement").fill(wanted);
+  await looking.getByRole("button", { name: "Add", exact: true }).click();
+  await toast(page, "Added to What I'm looking for.");
   await expect(
-    page.getByRole("list", { name: "Eligibility facts" }),
-  ).toContainText(label);
+    page.getByRole("list", { name: "What I'm looking for" }),
+  ).toContainText(wanted);
+  const stored = (await call(page, "/preferences")) as {
+    sections: { section: string; items: { text: string }[] }[];
+  };
+  expect(
+    stored.sections
+      .find((section) => section.section === "looking_for")!
+      .items.at(-1),
+  ).toEqual({ text: wanted });
   const days = (await call(page, "/applications?limit=1")).no_reply.days;
   const period = page.locator("form", {
     has: page.getByRole("heading", {
@@ -189,18 +194,8 @@ test("the setup guide reads the workspace and fills in the basics", async ({
     String(days),
   );
   await period.getByRole("button", { name: "Save the period" }).click();
-  await toast(page, `after ${days} days can be closed as no reply`);
+  await toast(page, `after ${days} days count as no reply`);
   expect((await call(page, "/applications?limit=1")).no_reply.days).toBe(days);
-  const eligibility = (await call(page, "/policy/eligibility")) as {
-    version: number;
-    items: { id: string; label: string }[];
-  };
-  const added = eligibility.items.find((item) => item.label === label)!;
-  await call(
-    page,
-    `/policy/items/${added.id}?expected_version=${eligibility.version}`,
-    "DELETE",
-  );
   await fitsViewport(page);
 
   // A first search, with the form of Collection.

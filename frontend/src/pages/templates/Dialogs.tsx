@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { api, version, type Instructions, type Template } from "../../api";
+import { api, version, type Template } from "../../api";
 import { Button, Dialog, ErrorBanner, Field, Loading } from "../../design";
 import { useResource, useWorkspace } from "../../state";
 
@@ -165,56 +165,6 @@ export function TemplateSettings({
           </Button>
         </div>
       </form>
-    </Dialog>
-  );
-}
-
-/** The general writing instructions every new application context includes. */
-export function InstructionsDialog({ onClose }: { onClose: () => void }) {
-  const { data, loading, error, reload } = useResource<Instructions>(
-    "/instructions",
-    { general: "", version: 1 },
-  );
-  const { mutate, pending } = useWorkspace();
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    if (
-      await mutate(
-        () =>
-          api("/instructions", "PATCH", {
-            expected_version: data.version,
-            general: form.get("general"),
-          }),
-        "General instructions saved.",
-      )
-    )
-      onClose();
-  }
-  return (
-    <Dialog title="General writing instructions" onClose={onClose}>
-      {error ? (
-        <ErrorBanner message={error} retry={reload} />
-      ) : loading ? (
-        <Loading label="Loading the instructions…" />
-      ) : (
-        <form className="stack" onSubmit={submit} key={data.version}>
-          <Field
-            label="Instructions for every document"
-            hint="Stored once and read by your agent with each template's own guidance. Rules you decide once belong in the Policy."
-          >
-            <textarea name="general" rows={10} defaultValue={data.general} />
-          </Field>
-          <div className="row">
-            <Button variant="primary" disabled={pending}>
-              Save instructions
-            </Button>
-            <Button type="button" onClick={onClose}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      )}
     </Dialog>
   );
 }

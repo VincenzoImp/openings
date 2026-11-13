@@ -48,9 +48,9 @@ from .interfaces.insights import (
     register_api as register_insights_api,
     register_mcp as register_insights_mcp,
 )
-from .interfaces.policy import (
-    register_api as register_policy_api,
-    register_mcp as register_policy_mcp,
+from .interfaces.preferences import (
+    register_api as register_preferences_api,
+    register_mcp as register_preferences_mcp,
 )
 from .interfaces.skills import (
     register_api as register_skills_api,
@@ -63,7 +63,7 @@ from .interfaces.source_yield import (
 from .interfaces.system import register_system
 from .limits import REQUEST_LIMIT, BodyLimit
 from .mcp_server import OpeningsMCP
-from .policy import PolicyService
+from .preferences import PreferencesService
 from .skill_notes import SkillNotesService
 from .skills import SkillLibrary
 from .source_yield import YieldService
@@ -89,7 +89,7 @@ def create_app(database=None, start_worker=True):
     discovery = DiscoveryService(workspace)
     activity = ActivityService(workspace)
     requests = RequestService(workspace)
-    policy = PolicyService(workspace)
+    preferences = PreferencesService(workspace)
     insights = InsightsService(workspace)
     source_yield = YieldService(workspace)
     workspace.discovery = discovery
@@ -109,7 +109,7 @@ def create_app(database=None, start_worker=True):
     register_discovery_mcp(mcp, discovery)
     register_activity_mcp(mcp, activity)
     register_request_mcp(mcp, requests)
-    register_policy_mcp(mcp, policy)
+    register_preferences_mcp(mcp, preferences)
     register_insights_mcp(mcp, insights)
     register_yield_mcp(mcp, source_yield)
     skills = SkillLibrary()
@@ -139,7 +139,7 @@ def create_app(database=None, start_worker=True):
     app.state.workspace, app.state.auth, app.state.mcp = workspace, auth, mcp
     app.state.career, app.state.documents, app.state.discovery = career, documents, discovery
     app.state.activity, app.state.requests = activity, requests
-    app.state.policy = policy
+    app.state.preferences = preferences
     app.state.skill_notes = skill_notes
     app.state.insights = insights
     app.state.source_yield = source_yield
@@ -271,7 +271,7 @@ def create_app(database=None, start_worker=True):
     register_discovery_api(router, discovery)
     register_activity_api(router, activity)
     register_request_api(router, requests)
-    register_policy_api(router, policy)
+    register_preferences_api(router, preferences)
     register_insights_api(router, insights)
     register_yield_api(router, source_yield)
     app.include_router(router)

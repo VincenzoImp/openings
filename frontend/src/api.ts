@@ -7,12 +7,10 @@ export interface ListResult<T> {
   /** On the application list: the no-reply period and how many wait past it. */
   no_reply?: NoReply;
 }
-/** The period after which a sent application has had no reply, from the policy. */
+/** The period after which a sent application has had no reply, from the settings. */
 export interface NoReply {
   days: number;
-  source: "policy" | "default";
-  item_id: string | null;
-  confirmed: boolean;
+  source: "settings" | "default";
   /** Applied applications without a reply for longer than `days`. */
   overdue?: number;
 }
@@ -46,12 +44,6 @@ export interface ApplicationSummary extends Versioned {
   status: Stage;
   outcome: string | null;
 }
-/** A policy rule that matched a job when it was collected. */
-export interface MatchedRule {
-  item_id: string;
-  label: string;
-  action: "dismiss" | "flag";
-}
 /** What collection found out about a job, without a model. */
 export interface JobSignals {
   /** False until the signals of a job collected before 0.21 are computed. */
@@ -69,14 +61,12 @@ export interface JobSignals {
   } | null;
   no_longer_listed: boolean;
   unlisted_at: string | null;
-  rules: MatchedRule[];
 }
-export type DismissedBy = "rule" | "agent" | "owner" | "other";
+export type DismissedBy = "agent" | "owner" | "other";
 export interface Dismissal {
   at: string | null;
   by: Actor;
   category: DismissedBy;
-  rule: { item_id: string; label: string } | null;
   reason: string;
 }
 /** One sighting of a posting by a source. */
@@ -122,12 +112,13 @@ export interface Job extends Versioned {
 }
 export interface JobList extends ListResult<Job> {
   counts?: JobCounts;
-}
-export interface RulePreview {
-  matches: number;
-  inbox: number;
-  pending: number;
-  examples: { id: string; title: string; company: string }[];
+  /** With `hide_unspoken_required`: the jobs of these filters that require a language the owner does not speak. */
+  unspoken_required?: {
+    spoken_languages: string[];
+    count: number;
+    /** Whether they are left out of this list. */
+    hidden: boolean;
+  };
 }
 export interface YieldCounts {
   collected: number;
@@ -152,7 +143,6 @@ export interface YieldRow extends YieldCounts {
   last_error: string | null;
   providers: (YieldCounts & { provider: string; label: string })[];
   dismissed_by: Record<DismissedBy, number>;
-  dismissed_by_rule: { item_id: string; label: string; dismissed: number }[];
   kept_rate: number | null;
   withheld: string | null;
 }
@@ -161,10 +151,9 @@ export interface SourceYield {
   min_sample: number;
   items: YieldRow[];
   total: YieldCounts &
-    Pick<
-      YieldRow,
-      "name" | "dismissed_by" | "dismissed_by_rule" | "kept_rate" | "withheld"
-    > & { sources: number };
+    Pick<YieldRow, "name" | "dismissed_by" | "kept_rate" | "withheld"> & {
+      sources: number;
+    };
 }
 export interface DuplicateJob extends Versioned {
   title: string;
@@ -329,10 +318,10 @@ export interface Application extends Versioned {
   } | null;
 }
 export type StaleInput =
-  "profile" | "policy" | "instructions" | "template" | "knowledge" | "claim";
+  "profile" | "preferences" | "template" | "knowledge" | "claim";
 export interface StaleChange {
   input: StaleInput;
-  /** A Profile part (null: the whole Profile), a policy item or a record. */
+  /** A Profile part (null: the whole Profile), `<section>:<hash>` of a statement, or a record. */
   id: string | null;
   label: string;
   state:
@@ -345,8 +334,8 @@ export interface StaleChange {
     | "confirmed";
   frozen_version: number | null;
   current_version: number | null;
-  /** A policy item's section. */
-  section?: PolicySectionName;
+  /** A statement's Preferences section. */
+  section?: PreferenceSectionName;
 }
 export interface Staleness {
   application_id: string;
@@ -363,7 +352,7 @@ export interface Staleness {
     /** How the frozen copy was compared; null without one. */
     comparison: {
       profile: "parts" | "whole";
-      policy: "items" | "not_frozen";
+      preferences: "items" | "not_frozen";
     } | null;
     changes: StaleChange[];
   }[];
@@ -442,19 +431,11 @@ export const claimRoles = {
   bench: "Bench",
 } as const;
 export type ClaimRole = keyof typeof claimRoles;
-export interface RuleStatement {
-  id: string;
-  label: string;
-  statement: string;
-  scope: string | null;
-  position: number;
-}
-/** Typed limits, rule statements and any other free-form key. */
+/** Typed limits and any other free-form key (engine, date_format). */
 export interface TemplateRules extends Json {
   max_pages?: number;
   max_bullets?: number;
   max_bullet_chars?: number;
-  statements?: RuleStatement[];
 }
 export interface Template extends Versioned {
   name: string;
@@ -466,66 +447,41 @@ export interface Template extends Versioned {
   file_count?: number;
   updated_at?: string;
 }
-export const policySections = {
-  decision: "Decision",
-  eligibility: "Eligibility",
-  writing: "Writing",
-  facts: "Facts",
+export const preferenceSections = {
+  looking_for: "What I'm looking for",
+  ruled_out: "What I rule out",
+  facts: "Facts about me",
+  writing: "Writing rules",
+  working_with_me: "Working with me",
 } as const;
-export type PolicySectionName = keyof typeof policySections;
-export type PolicyValueType =
-  "text" | "number" | "date" | "boolean" | "list" | "structured";
-export interface PolicyRule {
-  signal: string;
-  condition: { operator: string; value: unknown };
-  action: string;
+export type PreferenceSectionName = keyof typeof preferenceSections;
+export type WritingScope = "all" | "cv" | "letter";
+/** One statement in the owner's words; only a writing rule has a scope. */
+export interface PreferenceItem {
+  text: string;
+  scope?: WritingScope;
 }
-export interface PolicyItem {
-  id: string;
-  section: PolicySectionName;
-  position: number;
-  label: string;
-  statement: string;
-  value: unknown;
-  value_type: PolicyValueType | null;
-  note: string;
-  scope: "cv" | "letter" | "all" | null;
-  rule: PolicyRule | null;
-  enabled: boolean;
-  confirmed: boolean;
-  confirmed_at: string | null;
-  confirmed_by: Actor | null;
-  created_by: Actor | null;
-  updated_by: Actor | null;
-  origin: { source: string; key: string; note: string } | null;
-  created_at: string;
-  updated_at: string;
-}
-export interface PolicySection {
-  section: PolicySectionName;
+export interface PreferenceSection {
+  section: PreferenceSectionName;
+  title: string;
   description: string;
+  items: PreferenceItem[];
   version: number;
   updated_at: string | null;
-  updated_by: Actor | null;
-  items: PolicyItem[];
-  total: number;
-  unconfirmed: number;
+  /** "owner", "agent:<name>" or "system". */
+  updated_by: string | null;
 }
-export interface PolicySignal {
-  signal: string;
-  label: string;
-  description: string;
-  operators: { operator: string; value_type: PolicyValueType }[];
-}
-export interface Policy {
-  sections: PolicySection[];
-  signals: PolicySignal[];
-  rule_actions: string[];
-  signals_applied: boolean;
-}
-export interface Instructions {
-  general: string;
+/** The two typed settings: the no-reply period and the languages spoken. */
+export interface WorkspaceSettings {
+  no_reply_days: number;
+  /** ISO 639-1 codes. */
+  spoken_languages: string[];
   version: number;
+  updated_at: string | null;
+}
+export interface Preferences {
+  sections: PreferenceSection[];
+  settings: WorkspaceSettings;
 }
 export interface Document extends Versioned {
   application_id: string;

@@ -10,8 +10,8 @@ import {
 
 // Jobs (stage 4 of #135): the tabs New, Shortlisted, Dismissed and All
 // beside the selected job, its signals, the duplicate decision inside the job,
-// rule dismissals that name their rule, and the yield of each source in
-// Collection. Each test starts from the seeded workspace (fixtures.ts).
+// hiding jobs that require a language the owner does not speak, and the yield
+// of each source in Collection. Each test starts from the seeded workspace (fixtures.ts).
 const cookies: Cookies = ownerSession();
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {
@@ -149,13 +149,13 @@ test("keyboard only: a job is shortlisted, another dismissed with a reason and r
   await fitsViewport(page);
 });
 
-test("an enabled rule dismisses a collected job, names itself and the job can be restored", async ({
+test("jobs requiring a language I don't speak are hidden on request, never dismissed", async ({
   page,
 }) => {
   const token = await agentToken(page);
-  const title = unique("Ruled out");
-  const url = `https://jobs.example.test/ruled/${Date.now()}`;
-  // An agent collects the job: the owner's language rule dismisses it at once.
+  const title = unique("Bergwerk role");
+  const url = `https://jobs.example.test/german/${Date.now()}`;
+  // An agent collects the job: it stays in New, with its requirement.
   const collected = await call(
     page,
     "/jobs",
@@ -163,47 +163,47 @@ test("an enabled rule dismisses a collected job, names itself and the job can be
     { title, company: "Bergwerk AG", url, posting: GERMAN },
     token,
   );
-  expect(collected.triage).toBe("dismissed");
-  expect(collected.dismissal.rule.label).toBe("Languages outside my list");
-  await go(page, "jobs?section=dismissed&dismissed_by=rule");
+  expect(collected.triage).toBe("new");
+  expect(collected.dismissal).toBeNull();
+  await go(page, "jobs");
   await settled(page);
   await page.getByRole("searchbox", { name: "Search jobs" }).fill(title);
-  const ruled = row(page, title);
-  await expect(ruled).toContainText(
-    "Dismissed by the rule “Languages outside my list”",
-  );
-  await expect(ruled).toContainText("Requires German");
-  await ruled.getByRole("link", { name: title }).click();
-  await expect(detail(page).locator(".banner")).toContainText(
-    "Dismissed by the rule “Languages outside my list”",
-  );
-  // The rule in Policy says what it did and links to its dismissals.
-  await go(page, "policy");
-  await settled(page);
-  const item = page
-    .locator("li")
-    .filter({ hasText: "Languages outside my list" })
-    .first();
-  await expect(item).toContainText(
-    /It matches \d+ of the \d+ jobs? in New now/,
-  );
-  await item.getByRole("link", { name: /jobs? dismissed by it$/ }).click();
-  await expect(page).toHaveURL(/#jobs\?section=dismissed&rule_id=/);
+  const german = row(page, title);
+  await expect(german).toContainText("Requires German");
+  const toggle = page.getByRole("switch", {
+    name: "Hide jobs requiring languages I don't speak",
+  });
+  await expect(toggle).not.toBeChecked();
+  const chips = page.locator(".queue-chips").filter({ has: toggle });
+  await expect(chips).toContainText("would hide 1 of 1");
+  await toggle.click();
+  await expect(toggle).toBeChecked();
+  await expect(page).toHaveURL(/hide_unspoken=true/);
+  await expect(german).toHaveCount(0);
+  await expect(chips).toContainText("hides 1 of 1");
+  await expect(page.getByText("No job matches")).toBeVisible();
+  // Hiding changes nothing about the job.
+  expect((await call(page, `/jobs/${collected.id}`)).triage).toBe("new");
+  // The setting holds across the tabs, and turns off again.
+  await page.getByRole("tab", { name: /^All/ }).click();
+  await expect(toggle).toBeChecked();
   await page.getByRole("searchbox", { name: "Search jobs" }).fill(title);
-  await row(page, title)
-    .getByRole("button", { name: /^Restore/ })
-    .click();
-  await expect(toast(page)).toContainText("Restored");
-  // Restored stays restored when the source sees the posting again.
-  const again = await call(
-    page,
-    "/jobs",
-    "POST",
-    { title, company: "Bergwerk AG", url, posting: GERMAN },
-    token,
-  );
-  expect(again.triage).toBe("new");
-  expect(again.dismissal).toBeNull();
+  await expect(german).toHaveCount(0);
+  await toggle.click();
+  await expect(german).toBeVisible();
+  // Without spoken languages there is nothing to hide: Preferences says which.
+  const settings = (await call(page, "/preferences")).settings;
+  await call(page, "/settings", "PATCH", {
+    expected_version: settings.version,
+    spoken_languages: [],
+  });
+  await page.reload();
+  await settled(page);
+  await expect(toggle).toHaveCount(0);
+  await expect(
+    page.locator(".queue-chips").getByRole("link", { name: "Preferences" }),
+  ).toHaveAttribute("href", "#preferences");
+  await fitsViewport(page);
 });
 
 test("a likely duplicate is decided inside the job: different, then merged", async ({
@@ -360,19 +360,7 @@ test("signals filter the list and Collection shows what each source yielded", as
   await page.getByRole("button", { name: "All time" }).click();
   await settled(page);
   await expect(table).toBeVisible();
-  const dismissedByRule = page
-    .getByRole("list", { name: "Jobs each rule dismissed" })
-    .getByRole("link")
-    .first();
-  // Clear of the bottom bar of a phone before the click.
-  await dismissedByRule.evaluate((link) =>
-    link.scrollIntoView({ block: "center" }),
-  );
-  await dismissedByRule.click();
-  await expect(page).toHaveURL(/#jobs\?section=dismissed&rule_id=/);
-  await expect(page.locator(".job-list > li").first()).toContainText(
-    "Dismissed by the rule",
-  );
+  await expect(page.getByText("Dismissed by your rules")).toHaveCount(0);
   await fitsViewport(page);
 });
 

@@ -5,7 +5,9 @@
 //   later screen   JavaScript a screen adds to what is loaded       40 kB
 //   stylesheet     every stylesheet of the dashboard together       15 kB
 //
-// Sizes are gzip (level 9) in kB of 1000 bytes, as Vite reports them.
+// Sizes are gzip (level 9) in kB of 1000 bytes, as Vite reports them. The
+// design system gallery (ui.html) is not part of the dashboard: its size is
+// reported for information and held to no budget.
 import { readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 
@@ -44,7 +46,9 @@ const scripts = (keys) =>
   [...keys].map((key) => manifest[key].file).filter((f) => f.endsWith(".js"));
 const total = (files) => files.reduce((sum, file) => sum + gzip(file), 0);
 
-const entry = Object.keys(manifest).find((key) => manifest[key].isEntry);
+const ENTRY = "index.html";
+const GALLERY = "ui.html";
+const entry = manifest[ENTRY]?.isEntry ? ENTRY : null;
 if (!entry || !manifest[HOME]) {
   console.error(`The manifest has no entry or no ${HOME}.`);
   process.exit(2);
@@ -57,7 +61,20 @@ const add = (name, size, limit, note = "") =>
   rows.push({ name, size, limit, note, ok: size <= limit });
 
 add("First screen JavaScript", total([...firstFiles]), BUDGET.first);
-const screens = Object.keys(manifest)
+// The dashboard: the entry and every chunk it can load, without the gallery.
+function reachable(key, seen = new Set()) {
+  if (seen.has(key)) return seen;
+  seen.add(key);
+  const chunk = manifest[key];
+  for (const next of [
+    ...(chunk.imports || []),
+    ...(chunk.dynamicImports || []),
+  ])
+    reachable(next, seen);
+  return seen;
+}
+const dashboard = reachable(entry);
+const screens = [...dashboard]
   .filter((key) => manifest[key].isDynamicEntry && key !== HOME)
   .sort();
 for (const key of screens) {
@@ -69,9 +86,20 @@ for (const key of screens) {
   );
 }
 const styles = new Set(
-  Object.values(manifest).flatMap((chunk) => chunk.css || []),
+  [...dashboard].flatMap((key) => manifest[key].css || []),
 );
 add("Stylesheet", total([...styles]), BUDGET.css, `${styles.size} files`);
+
+const info = [];
+if (manifest[GALLERY]) {
+  const gallery = closure(GALLERY);
+  const own = scripts(gallery).filter((file) => !firstFiles.has(file));
+  info.push(["Gallery JavaScript (own)", total(own)]);
+  const css = [
+    ...new Set([...gallery].flatMap((key) => manifest[key].css || [])),
+  ];
+  info.push(["Gallery stylesheet", total(css)]);
+}
 
 const kb = (bytes) => (bytes / KB).toFixed(2).padStart(7) + " kB";
 const width = Math.max(...rows.map((row) => row.name.length));
@@ -82,6 +110,8 @@ for (const row of rows)
       row.ok ? "ok" : "OVER"
     }${row.note ? `  (${row.note})` : ""}`,
   );
+for (const [name, size] of info)
+  console.log(`${name.padEnd(width)}  ${kb(size)}  (information)`);
 const over = rows.filter((row) => !row.ok);
 if (over.length) {
   console.error(

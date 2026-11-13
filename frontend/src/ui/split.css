@@ -1,0 +1,139 @@
+@layer ui {
+  .ui-split {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(340px, 0.9fr) minmax(0, 1.1fr);
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+  }
+  .ui-split-list,
+  .ui-split-detail {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .ui-split-list {
+    border-right: 1px solid var(--border);
+  }
+  .ui-split-detail {
+    position: relative;
+    background: var(--bg);
+  }
+  .ui-detail-bar {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
+    height: var(--detail-bar-h);
+    padding: 0 var(--s-3) 0 var(--s-5);
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px);
+    color: var(--text-3);
+    font: var(--t-xs);
+    letter-spacing: 0;
+  }
+  .ui-detail-pos {
+    margin-left: var(--s-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .ui-detail-spacer {
+    flex: 1;
+  }
+  .ui-detail-back {
+    display: none;
+  }
+  .ui-detail-body {
+    max-width: 760px;
+    padding: var(--s-5) var(--pane-pad) var(--s-16);
+  }
+
+  .ui-actionbar {
+    display: none;
+  }
+
+  /* Under 1024 px the detail is a drawer over the list. */
+  @container app (max-width: 1023px) {
+    .ui-split {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .ui-split-list {
+      border-right: 0;
+    }
+    .ui-split-detail {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 10;
+      width: min(640px, 100%);
+      border-left: 1px solid var(--border);
+      box-shadow: var(--shadow-lg);
+      visibility: hidden;
+      translate: 16px 0;
+      opacity: 0;
+      transition:
+        translate var(--d-slow) var(--ease),
+        opacity var(--d-slow) var(--ease),
+        visibility 0s linear var(--d-slow);
+    }
+    .ui-split[data-open] .ui-split-detail {
+      visibility: visible;
+      translate: 0 0;
+      opacity: 1;
+      transition:
+        translate var(--d-slow) var(--ease),
+        opacity var(--d-slow) var(--ease);
+    }
+    .ui-detail-back {
+      display: inline-flex;
+    }
+  }
+  /* Under 720 px it is a pushed page. */
+  @container app (max-width: 719px) {
+    .ui-split-detail {
+      width: 100%;
+      border-left: 0;
+      box-shadow: none;
+    }
+    .ui-detail-bar {
+      padding-left: var(--s-2);
+    }
+    .ui-detail-body {
+      padding: var(--s-4) var(--s-4) var(--s-12);
+    }
+  }
+  @container app (max-width: 719px) {
+    .ui-split-detail {
+      display: flex;
+      flex-direction: column;
+    }
+    .ui-split-detail > .ui-detail-body {
+      flex: 1;
+    }
+    .ui-actionbar {
+      position: sticky;
+      bottom: 0;
+      z-index: 3;
+      display: flex;
+      gap: var(--s-2);
+      padding: 10px var(--s-3) calc(10px + env(safe-area-inset-bottom));
+      border-top: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .ui-actionbar .ui-btn {
+      flex: 1;
+      height: var(--touch);
+      font-size: 14px;
+    }
+    .ui-actionbar .ui-icon-btn {
+      flex: none;
+      width: var(--touch);
+      border-color: var(--border-strong);
+    }
+  }
+}

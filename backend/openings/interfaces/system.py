@@ -469,7 +469,7 @@ def register_system(router, mcp, workspace, auth, public_url):
 
     @router.get("/examples")
     def examples():
-        names = ["career.json", "policy.json", "cv.tex", "letter.tex"]
+        names = ["career.json", "preferences.json", "cv.tex", "letter.tex"]
         directory = Path(
             os.environ.get("OPENINGS_EXAMPLES", Path(__file__).resolve().parents[3] / "examples")
         )
@@ -483,7 +483,7 @@ def register_system(router, mcp, workspace, auth, public_url):
 
     @router.get("/examples/{name}")
     def example_file(name: str):
-        if name not in {"career.json", "policy.json", "cv.tex", "letter.tex"}:
+        if name not in {"career.json", "preferences.json", "cv.tex", "letter.tex"}:
             raise DomainError(404, "not_found", "Example not found.")
         path = (
             Path(
@@ -502,7 +502,7 @@ def register_system(router, mcp, workspace, auth, public_url):
         def records():
             json_fields = {
                 "jobs": ["metadata", "overrides"],
-                "job_signals": ["required", "welcome", "distinct_from", "rules"],
+                "job_signals": ["required", "welcome", "distinct_from"],
                 "postings": ["payload"],
                 "applications": ["questions", "answers", "requirements", "required_documents"],
                 "events": ["payload"],
@@ -510,7 +510,7 @@ def register_system(router, mcp, workspace, auth, public_url):
                 "questions": ["choices"],
                 "knowledge": ["metadata", "dates", "skills"],
                 "claims": ["metadata"],
-                "policy_items": ["value", "rule"],
+                "preference_sections": ["items"],
                 "templates": ["rules"],
                 "documents": ["content", "legacy_content", "claim_ids", "knowledge_ids"],
                 "sources": ["config", "schedule"],
@@ -530,8 +530,7 @@ def register_system(router, mcp, workspace, auth, public_url):
                 "knowledge",
                 "claims",
                 "templates",
-                "policy_sections",
-                "policy_items",
+                "preference_sections",
                 "skill_notes",
                 "contexts",
                 "documents",
@@ -562,7 +561,7 @@ def register_system(router, mcp, workspace, auth, public_url):
                     yield "]"
                 settings = {}
                 for row in conn.execute(
-                    "SELECT key,data FROM settings WHERE key IN ('profile','instructions','collection')"
+                    "SELECT key,data FROM settings WHERE key IN ('profile','workspace','collection')"
                 ):
                     data = json.loads(row["data"])
                     settings[row["key"]] = redact_secrets(data)

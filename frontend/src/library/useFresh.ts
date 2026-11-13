@@ -11,7 +11,7 @@ import { useWorkspace } from "../state";
 
 /**
  * Read a record and keep it current: it is read again after any change to
- * one of `scopes` (the first path segment of a REST route, such as "policy")
+ * one of `scopes` (the first path segment of a REST route, such as "preferences")
  * and after a workspace refresh. Unlike `useResource` the new value always
  * replaces the old one, so the screen must keep its own unsaved text in state.
  */

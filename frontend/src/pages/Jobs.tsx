@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { JobList, PolicySection } from "../api";
+import type { JobList, Preferences } from "../api";
 import { Button, Card, EmptyState, Split, Tabs } from "../design";
 import { PageHead } from "../library/common";
 import { useFresh } from "../library/useFresh";
@@ -42,13 +42,17 @@ export default function JobsPage({ onOpenApplication }: Links) {
   const q = useDebounce(filters.q);
   const counted = new URLSearchParams({ limit: "1", include_counts: "true" });
   if (q) counted.set("q", q);
+  // The tabs count what their lists show, hidden languages included.
+  if (filters.hide_unspoken === "true")
+    counted.set("hide_unspoken_required", "true");
   const counts = useFresh<JobList>(`/jobs?${counted}`, NONE, JOB_SCOPES);
-  const decision = useFresh<PolicySection | null>("/policy/decision", null, [
-    "policy",
+  const preferences = useFresh<Preferences | null>("/preferences", null, [
+    "preferences",
+    "settings",
   ]);
   const own = useMemo(
-    () => ownLanguages(decision.data?.items || []),
-    [decision.data],
+    () => ownLanguages(preferences.data?.settings.spoken_languages),
+    [preferences.data],
   );
   const select = (job: string) => {
     setValues({ job });
@@ -80,8 +84,8 @@ export default function JobsPage({ onOpenApplication }: Links) {
         }
       >
         Everything collection found. Your agent reviews new jobs against your
-        policy; you can shortlist or dismiss any of them yourself, and every
-        dismissal can be restored.
+        preferences; you can shortlist or dismiss any of them yourself, and
+        every dismissal can be restored.
       </PageHead>
       <Tabs
         id="jobs"

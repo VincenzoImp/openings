@@ -1045,10 +1045,12 @@ test("documents, revisions, frozen copies and their files are managed in the rev
   await expect(revisions.locator(":scope > li")).toHaveCount(1);
 
   // An input changes after the copy: the Inputs tab says what changed.
-  const instructions = await call(page, "/instructions");
-  await call(page, "/instructions", "PATCH", {
-    expected_version: instructions.version,
-    general: instructions.general + "\nSynthetic change.",
+  const writing = (await call(page, "/preferences")).sections.find(
+    (section: { section: string }) => section.section === "writing",
+  );
+  await call(page, "/preferences/writing", "PUT", {
+    expected_version: writing.version,
+    items: [...writing.items, { text: "Synthetic writing rule." }],
   });
   // The change was made elsewhere: the page shows it once read again.
   await page.reload();
@@ -1059,7 +1061,7 @@ test("documents, revisions, frozen copies and their files are managed in the rev
     page.getByRole("list", {
       name: "Inputs changed since the documents were written",
     }),
-  ).toContainText("General instructions");
+  ).toContainText("Preference “Synthetic writing rule.”");
   expect((await call(page, `/applications/${application.id}`)).answers).toEqual(
     {},
   );
@@ -1070,22 +1072,29 @@ test("the Inputs tab and the list name the parts that changed since the document
 }) => {
   const stamp = unique("Inputs");
   const application = await make(page, stamp);
-  const add = async (section: string, body: Record<string, unknown>) =>
-    (
-      await call(page, `/policy/${section}/items`, "POST", {
-        expected_version: (await call(page, `/policy/${section}`)).version,
-        ...body,
-      })
-    ).item;
-  const authorization = await add("eligibility", {
-    label: `Work authorization ${stamp}`,
-    statement: "EU citizen.",
-  });
-  const onePage = await add("writing", {
-    label: `One page ${stamp}`,
-    statement: "Keep the CV to one page.",
-    scope: "cv",
-  });
+  const sectionOf = async (name: string) =>
+    (await call(page, "/preferences")).sections.find(
+      (section: { section: string }) => section.section === name,
+    );
+  /** Replace one statement of a section (or add it), as an agent would. */
+  const write = async (
+    name: string,
+    from: string | null,
+    item: { text: string; scope?: string },
+  ) => {
+    const section = await sectionOf(name);
+    const items = section.items.filter(
+      (other: { text: string }) => other.text !== from,
+    );
+    await call(page, `/preferences/${name}`, "PUT", {
+      expected_version: section.version,
+      items: [...items, item],
+    });
+  };
+  const authorization = `Work authorization ${stamp}: EU citizen.`;
+  const onePage = `One page ${stamp}: keep the CV to one page.`;
+  await write("facts", null, { text: authorization });
+  await write("writing", null, { text: onePage, scope: "cv" });
   const context = await call(page, "/contexts", "POST", {
     application_id: application.id,
   });
@@ -1109,16 +1118,16 @@ test("the Inputs tab and the list name the parts that changed since the document
   await settled(page);
   await expect(page.getByText("Inputs are current")).toBeVisible();
 
-  // The summary, an eligibility fact and a CV rule change.
+  // The summary, a fact and a CV rule change: a changed statement is the
+  // old one removed and the new one added.
   await profile({ summary: `${before.summary} ${stamp}` });
-  for (const [item, statement] of [
-    [authorization, "EU citizen, no sponsorship needed."],
-    [onePage, "One page, no photo."],
-  ])
-    await call(page, `/policy/items/${item.id}`, "PATCH", {
-      expected_version: (await call(page, `/policy/${item.section}`)).version,
-      statement,
-    });
+  await write("facts", authorization, {
+    text: `Work authorization ${stamp}: no sponsorship needed.`,
+  });
+  await write("writing", onePage, {
+    text: `One page ${stamp}: no photo.`,
+    scope: "cv",
+  });
   await page.reload();
   await settled(page);
   await expect(page.getByText("Inputs changed since")).toBeVisible();
@@ -1128,10 +1137,16 @@ test("the Inputs tab and the list name the parts that changed since the document
   await expect(changes.getByRole("listitem")).toHaveText([
     /^Profile summary\s*changed$/,
     new RegExp(
-      `^Policy “Work authorization ${stamp}”\\s*changed · Facts employers ask about$`,
+      `^Preference “Work authorization ${stamp}: no sponsorship needed.”\\s*added · Facts about me$`,
     ),
     new RegExp(
-      `^Policy “One page ${stamp}”\\s*changed · Rules for your documents · CV only$`,
+      `^Preference “Work authorization ${stamp}: EU citizen.”\\s*removed · Facts about me$`,
+    ),
+    new RegExp(
+      `^Preference “One page ${stamp}: no photo.”\\s*added · Writing rules · CV only$`,
+    ),
+    new RegExp(
+      `^Preference “One page ${stamp}: keep the CV to one page.”\\s*removed · Writing rules · CV only$`,
     ),
   ]);
   await expect(changes).not.toContainText("Metadata");
@@ -1141,16 +1156,7 @@ test("the Inputs tab and the list name the parts that changed since the document
   await go(page, `applications?q=${encodeURIComponent(stamp)}`);
   await settled(page);
   await expect(row(page, stamp)).toContainText("Inputs changed");
-  await expect(row(page, stamp)).toContainText("Profile summary and 2 more");
-
-  // Put the shared Profile and policy back for the other tests.
-  await profile({ summary: before.summary, metadata: before.metadata });
-  for (const item of [authorization, onePage])
-    await call(
-      page,
-      `/policy/items/${item.id}?expected_version=${(await call(page, `/policy/${item.section}`)).version}`,
-      "DELETE",
-    );
+  await expect(row(page, stamp)).toContainText("Profile summary and 4 more");
 });
 
 test("the timeline records replies, notes and who made each change", async ({

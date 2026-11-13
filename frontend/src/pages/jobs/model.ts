@@ -1,10 +1,16 @@
 // What the Jobs screen shows about a job, in words: its tab, its signals, who
 // dismissed it and where it came from. No React: tested directly.
-import type { DismissedBy, Job, JobCounts, PolicyItem } from "../../api";
+import type { DismissedBy, Job, JobCounts } from "../../api";
 import { dayTime } from "../../library/time.ts";
 
 /** Changes to these REST resources read the jobs again (useFresh scopes). */
-export const JOB_SCOPES = ["jobs", "applications", "notes", "files", "policy"];
+export const JOB_SCOPES = [
+  "jobs",
+  "applications",
+  "notes",
+  "files",
+  "settings",
+];
 
 export type Section = "new" | "shortlisted" | "dismissed" | "all";
 export const SECTIONS: { id: Section; label: string }[] = [
@@ -32,8 +38,8 @@ export const DEFAULTS = {
   /** Empty: the tab's own order (most recently dismissed in Dismissed). */
   sort: "",
   dismissed_by: "",
-  /** The dismissals of one policy rule (from Collection, Yield). */
-  rule_id: "",
+  /** "true": leave out the jobs requiring a language the owner does not speak. */
+  hide_unspoken: "",
   company: "",
   location: "",
   source: "",
@@ -56,7 +62,6 @@ export const NARROWING: (keyof Filters)[] = [
   "signal",
   "complete",
   "dismissed_by",
-  "rule_id",
   "company",
   "location",
   "source",
@@ -73,7 +78,6 @@ export const SIGNAL_FILTERS: Record<string, string> = {
   likely_duplicate: "Likely duplicate",
   no_longer_listed: "No longer listed",
   language_required: "Requires a language",
-  flagged: "Flagged by a rule",
   pending: "Signals pending",
 };
 export const SORTS: Record<string, string> = {
@@ -85,7 +89,6 @@ export const SORTS: Record<string, string> = {
 };
 export const DISMISSED_BY: { id: "" | DismissedBy; label: string }[] = [
   { id: "", label: "All" },
-  { id: "rule", label: "By a policy rule" },
   { id: "agent", label: "By an agent" },
   { id: "owner", label: "By you" },
   { id: "other", label: "Other" },
@@ -106,10 +109,14 @@ export function listQuery(filters: Filters, limit: number) {
   if (section !== "all") query.set("triage", section);
   for (const key of NARROWING) {
     const value = filters[key];
-    const dismissedOnly = key === "dismissed_by" || key === "rule_id";
-    if (!value || (dismissedOnly && section !== "dismissed")) continue;
+    if (!value || (key === "dismissed_by" && section !== "dismissed")) continue;
     query.set(key, value);
   }
+  // Always named, so the list reports how many jobs the toggle hides.
+  query.set(
+    "hide_unspoken_required",
+    filters.hide_unspoken === "true" ? "true" : "false",
+  );
   query.set("sort", sortOf(filters));
   query.set("limit", String(limit));
   const offset = Number(filters.offset) || 0;
@@ -156,37 +163,30 @@ export interface Label {
 }
 
 /**
- * The languages the owner works in, from the policy: the list of a confirmed
- * decision rule on required languages ("dismiss postings that require a
- * language outside my list"). Null when the policy does not say.
+ * The languages the owner speaks, from the settings (Preferences, Facts about
+ * me), as a set of codes. Null when none is listed.
  */
-export function ownLanguages(items: PolicyItem[]) {
-  const rule = items.find(
-    (item) =>
-      item.confirmed &&
-      item.rule?.signal === "language_required" &&
-      item.rule.condition.operator === "not_in",
-  )?.rule;
-  if (!rule || !Array.isArray(rule.condition.value)) return null;
-  const codes = new Set<string>();
-  for (const value of rule.condition.value as unknown[]) {
-    const key = String(value).trim().toLowerCase();
-    const code =
-      key.length === 2
-        ? key
-        : Object.entries(LANGUAGES).find(
-            ([, name]) => name.toLowerCase() === key,
-          )?.[0];
-    if (code) codes.add(code);
-  }
-  return codes.size ? codes : null;
+export function ownLanguages(codes: string[] | null | undefined) {
+  return codes?.length ? new Set(codes) : null;
+}
+
+/**
+ * What the languages toggle says: "would hide 3 of 40", or "hides 3 of 40"
+ * while it is on, counting the list as it would be without hiding.
+ */
+export function unspokenLine(
+  report: { count: number; hidden: boolean } | undefined,
+  total: number,
+) {
+  if (!report) return "";
+  const all = report.hidden ? total + report.count : total;
+  return `${report.hidden ? "hides" : "would hide"} ${report.count} of ${all}`;
 }
 
 /**
  * The signals of a job as short tags, most telling first. `full` adds what a
- * list row leaves out: a requirement or posting language the owner meets and
- * every rule that matched. With the owner's languages, a requirement none of
- * them meets needs attention.
+ * list row leaves out: a requirement or posting language the owner meets.
+ * With the owner's languages, a requirement none of them meets needs attention.
  */
 export function signalTags(
   job: Job,
@@ -219,22 +219,15 @@ export function signalTags(
     });
   for (const code of signals?.welcome || [])
     tags.push({ text: `${languageName(code)} welcome` });
-  for (const rule of signals?.rules || [])
-    if (rule.action === "flag" || full)
-      tags.push({
-        text: `${rule.action === "flag" ? "Flagged" : "Rule"}: ${rule.label}`,
-        tone: "info",
-      });
   if (job.complete === false)
     tags.push({ text: "Text incomplete", tone: "attention" });
   return tags;
 }
 
-/** Who dismissed a job, in words: "the rule “Languages outside my list”". */
+/** Who dismissed a job, in words: "You", the token's name or "System". */
 export function dismissedBy(job: Job) {
   const dismissal = job.dismissal;
   if (!dismissal) return "";
-  if (dismissal.rule) return `the rule “${dismissal.rule.label}”`;
   if (dismissal.category === "owner") return "You";
   if (dismissal.by.kind === "token") return dismissal.by.name || "An API token";
   if (dismissal.by.kind === "system") return "System";

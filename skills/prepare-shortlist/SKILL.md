@@ -17,7 +17,7 @@ Read [Openings workspace](../openings-workspace/SKILL.md) for transport, exact
 schemas, contexts, document revisions and transfers. Use
 [Career claims](../career-claims/SKILL.md) for writing. Personal preferences and
 all document-selection rules come from current Openings records: the owner's
-policy (`policy_get`), the typed claim fields and the templates.
+Preferences (`preferences_get`), the typed claim fields and the templates.
 
 ## Run and questions
 
@@ -45,16 +45,16 @@ files to recover progress from the database. Keep a Ready application whose
 documents pass the checks unchanged; do not generate another application or
 documents just to rerun.
 
-For each job, read the full posting, the current Profile, the policy (`decision`
-for fit, `eligibility` for what the employer asks, `writing` for the documents),
-Career evidence, general guidance and both selected templates. Check its
+For each job, read the full posting, the current Profile, the Preferences
+(`looking_for` and `ruled_out` for fit, `facts` for what the employer asks,
+`writing` for the documents, `working_with_me` for how to work), Career
+evidence and both selected templates with their guidance. Check its
 application attempts and read the job's timeline (`timeline_get` with `job_id`):
 the pinned notes first, which are the owner's standing guidance for the job and
 for each application; a context freezes the application's pinned note as its
-`application_note`. A prepared context freezes the policy sections with their
-versions (`payload.policy`): write from that copy, follow the confirmed
-`writing` items whose scope is `all` or matches the document (`cv`, `letter`),
-and never rely on an item with `confirmed: false`.
+`application_note`. A prepared context freezes the Preferences sections with
+their versions (`payload.preferences`): write from that copy and follow the
+`writing` rules whose scope is `all` or matches the document (`cv`, `letter`).
 Resume the intended open Shortlisted application or the attempt returned by a
 concurrent-creation conflict. Use an idempotency key for retryable creation. Do
 not reset other stages or start another attempt after Closed without the
@@ -77,7 +77,7 @@ and report them while independent jobs continue.
 ## Order and employer requirements
 
 Work through the cohort in a deliberate order: live deadlines first, then the
-strongest fit with the policy's decision items, then the rest. A large cohort is prepared
+strongest fit with What I'm looking for, then the rest. A large cohort is prepared
 in that order so a partial run still leaves the most valuable applications Ready.
 `applications_list` with `sort: "deadline"` or `sort: "priority"` gives that
 order, and `needs: "documents"` finds the ones that still need a document.
@@ -103,7 +103,7 @@ inputs through the supported context mechanism and authorized Career maintenance
 
 Prepare a context with explicit CV/CL template IDs and the evidence/claims the
 documents need. Use a consistent key for retries of the same request. Read the
-returned frozen instructions, content and assets. Compare relevant inputs before
+returned frozen Preferences, guidance, content and assets. Compare relevant inputs before
 reusing a context; prepare a deliberate new context if different inputs are needed.
 
 Start the CV from MASTER. Keep an effective unchanged CV when appropriate.

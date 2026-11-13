@@ -1,0 +1,254 @@
+@layer ui {
+  .ui-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1-5);
+    min-width: 0;
+  }
+  .ui-field-label {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-2);
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+    letter-spacing: 0;
+    color: var(--text);
+  }
+  .ui-field-optional {
+    font: var(--t-xs);
+    color: var(--text-3);
+    font-weight: var(--w-regular);
+  }
+  .ui-field-hint {
+    font: var(--t-xs);
+    color: var(--text-3);
+    letter-spacing: 0;
+  }
+  .ui-field-error {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-1-5);
+    font: var(--t-xs);
+    color: var(--danger);
+    letter-spacing: 0;
+  }
+  .ui-field-error .ui-icon {
+    margin-top: 1px;
+  }
+
+  .ui-input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: var(--input-h);
+    padding: 0 10px;
+    border: 1px solid var(--control);
+    border-radius: var(--r-md);
+    background: var(--bg);
+    color: var(--text);
+    font: var(--t-md);
+    letter-spacing: var(--tr-md);
+    transition:
+      border-color var(--d-fast) var(--ease),
+      box-shadow var(--d-fast) var(--ease);
+  }
+  .ui-input::placeholder {
+    color: var(--text-3);
+    opacity: 1;
+  }
+  .ui-input:hover:not(:disabled, :focus) {
+    border-color: color-mix(in srgb, var(--control) 70%, var(--text));
+  }
+  .ui-input:focus,
+  .ui-input:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: var(--focus-input);
+  }
+  .ui-input[aria-invalid="true"] {
+    border-color: var(--danger);
+  }
+  .ui-input[aria-invalid="true"]:focus {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 20%, transparent);
+  }
+  .ui-input:disabled {
+    color: var(--text-disabled);
+    background: var(--bg-subtle);
+    cursor: not-allowed;
+  }
+  .ui-textarea {
+    height: auto;
+    min-height: 92px;
+    padding: 7px 10px;
+    line-height: 21px;
+    resize: vertical;
+  }
+
+  .ui-select {
+    position: relative;
+    display: block;
+    min-width: 0;
+  }
+  .ui-select select {
+    appearance: none;
+    padding-right: 32px;
+    cursor: pointer;
+  }
+  .ui-select-chevron {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    translate: 0 -50%;
+    color: var(--text-3);
+    pointer-events: none;
+  }
+
+  /* Checkbox and switch with the label on the right */
+  .ui-toggle {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: var(--s-2);
+    min-height: 24px;
+    padding: 3px 0;
+    font: var(--t-sm);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .ui-toggle-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-top: 0;
+  }
+  .ui-checkbox,
+  .ui-switch {
+    appearance: none;
+    flex: none;
+    margin: 1px 0 0;
+    cursor: pointer;
+    transition:
+      background-color var(--d-fast) var(--ease),
+      border-color var(--d-fast) var(--ease);
+  }
+  .ui-checkbox {
+    position: relative;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--control);
+    border-radius: var(--r-sm);
+    background: var(--bg);
+  }
+  .ui-checkbox:checked,
+  .ui-checkbox:indeterminate {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .ui-checkbox:checked::after {
+    content: "";
+    position: absolute;
+    left: 4.5px;
+    top: 1.5px;
+    width: 5px;
+    height: 9px;
+    border: solid var(--on-accent);
+    border-width: 0 2px 2px 0;
+    rotate: 45deg;
+  }
+  .ui-checkbox:indeterminate::after {
+    content: "";
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    top: 6.5px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--on-accent);
+  }
+  .ui-switch {
+    position: relative;
+    width: 30px;
+    height: 18px;
+    border: 1px solid var(--control);
+    border-radius: var(--r-full);
+    background: var(--bg);
+  }
+  .ui-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--control);
+    transition:
+      translate var(--d-base) var(--ease),
+      background-color var(--d-fast) var(--ease);
+  }
+  .ui-switch:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .ui-switch:checked::after {
+    translate: 12px 0;
+    background: var(--on-accent);
+  }
+  .ui-checkbox:focus-visible,
+  .ui-switch:focus-visible {
+    box-shadow: var(--focus-ring);
+  }
+  .ui-checkbox:disabled,
+  .ui-switch:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  /* Search */
+  .ui-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    height: 30px;
+    min-width: 0;
+    padding: 0 6px 0 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--bg);
+    color: var(--text-3);
+    transition:
+      border-color var(--d-fast) var(--ease),
+      box-shadow var(--d-fast) var(--ease);
+  }
+  .ui-search:hover {
+    border-color: var(--border-strong);
+  }
+  .ui-search:focus-within {
+    border-color: var(--accent);
+    box-shadow: var(--focus-input);
+  }
+  .ui-search input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: var(--t-sm);
+    outline: none;
+  }
+  .ui-search input:focus-visible {
+    box-shadow: none;
+  }
+  .ui-search input::placeholder {
+    color: var(--text-3);
+    opacity: 1;
+  }
+  .ui-search input::-webkit-search-cancel-button {
+    appearance: none;
+  }
+  .ui-search:focus-within .ui-kbd {
+    display: none;
+  }
+}

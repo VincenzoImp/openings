@@ -71,7 +71,7 @@ def dismiss_reason():
     return Field(
         default=None,
         max_length=500,
-        description="With dismissed: why, in a short sentence, shown in the Dismissed list (for example 'Junior role; the policy targets senior roles').",
+        description="With dismissed: why, in a short sentence, shown in the Dismissed list (for example 'Junior role; I look for senior roles').",
     )
 
 
@@ -455,11 +455,10 @@ class JobQuery(Input):
     created_since: str | None = None
     created_until: str | None = None
     signal: (
-        Literal["likely_duplicate", "no_longer_listed", "language_required", "flagged", "pending"]
-        | None
+        Literal["likely_duplicate", "no_longer_listed", "language_required", "pending"] | None
     ) = Field(
         default=None,
-        description="Only jobs with this ingest signal: likely_duplicate (flagged as a copy of an earlier job), no_longer_listed (the board stopped listing it), language_required (the posting states a required language), flagged (a flag rule of the policy matched) or pending (signals not computed yet).",
+        description="Only jobs with this ingest signal: likely_duplicate (flagged as a copy of an earlier job), no_longer_listed (the board stopped listing it), language_required (the posting states a required language) or pending (signals not computed yet).",
     )
     posting_language: str | None = Field(
         default=None,
@@ -476,12 +475,13 @@ class JobQuery(Input):
         max_length=40,
         description="Only postings that state this language as required (alone or as one of alternatives).",
     )
-    dismissed_by: Literal["rule", "agent", "owner", "other"] | None = Field(
+    dismissed_by: Literal["agent", "owner", "other"] | None = Field(
         default=None,
-        description="Only dismissed jobs, by who dismissed them: a policy rule, an agent token, the owner (dashboard or owner token) or other (the system, or before 0.21 without a record).",
+        description="Only dismissed jobs, by who dismissed them: an agent token, the owner (dashboard or owner token) or other (the system, or before 0.21 without a record).",
     )
-    rule_id: str | None = Field(
-        default=None, max_length=100, description="Only jobs dismissed by this policy item's rule."
+    hide_unspoken_required: bool | None = Field(
+        default=None,
+        description="true: leave out jobs that require a language outside the owner's spoken_languages (settings); nothing is dismissed. With true or false the response's unspoken_required gives how many jobs of these filters require such a language. No effect while spoken_languages is empty.",
     )
     sort: Literal["newest", "oldest", "company", "title", "dismissed"] = Field(
         default="newest", description="dismissed: most recently dismissed first."

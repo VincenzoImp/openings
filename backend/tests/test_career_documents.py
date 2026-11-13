@@ -15,7 +15,6 @@ from openings.career import (
     CareerService,
     ClaimCreate,
     ClaimUpdate,
-    InstructionsUpdate,
     KnowledgeCreate,
     KnowledgeUpdate,
     ProfileUpdate,
@@ -31,6 +30,7 @@ from openings.documents import (
 from openings.errors import DomainError
 from openings.interfaces.career import register_api as register_career_api
 from openings.interfaces.documents import register_api
+from openings.preferences import PreferencesService
 from openings.workspace import Workspace
 from timeline_fixtures import guided_application
 
@@ -134,16 +134,13 @@ def test_relevant_profile_edits_are_distinct_from_contacts_and_templates(workspa
     assert career.get_knowledge(evidence["id"])["narrative"].startswith("Built Python")
 
 
-def test_context_freezes_stored_instructions_evidence_and_file_bytes(workspace):
+def test_context_freezes_preferences_evidence_and_file_bytes(workspace):
     ws, career, documents, client, evidence, _, template, application = workspace
     asset, _ = upload(
         documents, client, "template", template["id"], "assets/logo.txt", b"synthetic logo"
     )
-    instruction = career.get_instructions()
-    career.update_instructions(
-        InstructionsUpdate(
-            expected_version=instruction["version"], general="Use supplied facts only."
-        )
+    PreferencesService(ws).update_preferences(
+        "writing", {"expected_version": 0, "items": [{"text": "Use supplied facts only."}]}
     )
     request = ContextCreate(
         application_id=application["id"],
@@ -151,7 +148,11 @@ def test_context_freezes_stored_instructions_evidence_and_file_bytes(workspace):
         note="Keep the technical details.",
     )
     frozen = documents.prepare_context(request)
-    assert frozen["payload"]["instructions"]["general"] == "Use supplied facts only."
+    assert frozen["payload"]["preferences"]["writing"] == {
+        "version": 1,
+        "items": [{"text": "Use supplied facts only.", "scope": "all"}],
+    }
+    assert "general" not in frozen["payload"]["instructions"]
     assert (
         frozen["payload"]["instructions"]["template_append"][template["id"]]
         == "Use concise wording."

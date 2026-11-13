@@ -74,7 +74,7 @@ test("every shipped hash route still opens its screen, and design names are alia
     "applications",
     "collection",
     "career",
-    "policy",
+    "preferences",
     "templates",
     "settings",
   ])
@@ -128,7 +128,7 @@ test("navigation has three groups, and the old job queues belong to Jobs", () =>
     ]),
     [
       ["Work", ["Today", "Applications", "Jobs", "Activity"]],
-      ["Library", ["Career", "Policy", "Templates"]],
+      ["Library", ["Career", "Preferences", "Templates"]],
       ["System", ["Collection", "Settings"]],
     ],
   );

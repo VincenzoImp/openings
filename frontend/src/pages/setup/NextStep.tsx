@@ -15,8 +15,8 @@ export function NextStep({ applications }: { applications: number }) {
         <ol className="next-list">
           <li>
             <strong>Collection finds jobs</strong> on the schedule of your
-            searches. Jobs that break a rule you switched on are dismissed at
-            once, and can be restored.
+            searches. Nothing is dismissed automatically; Jobs can hide the ones
+            requiring a language you do not speak.
           </li>
           <li>
             <strong>You shortlist the ones you want</strong>; shortlisting

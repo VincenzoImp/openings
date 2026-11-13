@@ -85,6 +85,25 @@ PLANNED = (
             "WHERE key='instructions' AND json_valid(data)"
         ),
     ),
+    (
+        "policy items longer than 2000 characters as text",
+        "SELECT count(*) FROM policy_items WHERE length(label)+length(statement)+length(note)>1900",
+    ),
+    (
+        "policy items per section above 200",
+        (
+            "SELECT count(*) FROM (SELECT section FROM policy_items GROUP BY section "
+            "HAVING count(*)>200)"
+        ),
+    ),
+    (
+        "language rules (spoken languages)",
+        (
+            "SELECT count(*) FROM policy_items WHERE section='decision' AND json_valid(rule) "
+            "AND json_extract(rule,'$.signal')='language_required' "
+            "AND json_extract(rule,'$.condition.operator')='not_in'"
+        ),
+    ),
     # #214 applications and documents
     (
         "applications with a stored Ready mark",
@@ -293,7 +312,44 @@ def rehearse(path):
             "copied": report["copied"],
             "created": report["created"],
             "archive": report["archive"],
+            "after": after_upgrade(copy),
         }
+
+
+# Aggregates of the upgraded copy, one block per change of the migration.
+AFTER = (
+    # #213 Preferences
+    (
+        "preference statements by section",
+        "SELECT section, json_array_length(items) FROM preference_sections ORDER BY section",
+    ),
+    (
+        "writing rules by scope",
+        (
+            "SELECT json_extract(i.value,'$.scope'), count(*) FROM preference_sections s, "
+            "json_each(s.items) i WHERE s.section='writing' GROUP BY 1"
+        ),
+    ),
+    (
+        "preference statements longer than 2000 characters",
+        (
+            "SELECT count(*) FROM preference_sections s, json_each(s.items) i "
+            "WHERE length(json_extract(i.value,'$.text'))>2000"
+        ),
+    ),
+    (
+        "settings no_reply_days set, spoken languages",
+        (
+            "SELECT json_type(data,'$.no_reply_days') IS NOT NULL, "
+            "json_array_length(data,'$.spoken_languages') FROM settings WHERE key='workspace'"
+        ),
+    ),
+)
+
+
+def after_upgrade(path):
+    with closing(connect(path)) as conn:
+        return {label: [list(row) for row in conn.execute(sql)] for label, sql in AFTER}
 
 
 def main():

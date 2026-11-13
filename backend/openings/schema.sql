@@ -17,11 +17,9 @@ CREATE TABLE jobs (
  metadata TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(metadata)), overrides TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(overrides)),
  content_version INTEGER NOT NULL DEFAULT 1, version INTEGER NOT NULL DEFAULT 1,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
- -- The current dismissal: when, by whom, through which policy rule
- -- (its item id and label, kept if the item is removed) and why. Cleared on restore.
+ -- The current dismissal: when, by whom and why. Cleared on restore.
  dismissed_at TEXT, dismissed_by_kind TEXT, dismissed_by_id TEXT, dismissed_by_name TEXT,
- dismissed_by_token_kind TEXT, dismissed_rule_id TEXT, dismissed_rule_label TEXT,
- dismissed_reason TEXT NOT NULL DEFAULT ''
+ dismissed_by_token_kind TEXT, dismissed_reason TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX jobs_url ON jobs(url);
 CREATE INDEX jobs_triage ON jobs(triage,created_at);
@@ -148,14 +146,12 @@ CREATE TABLE contexts (
 -- Derived from immutable contexts: the input versions each context froze. Rebuildable.
 CREATE TABLE context_inputs (
  context_id TEXT PRIMARY KEY REFERENCES contexts(id) ON DELETE CASCADE,
- created_at TEXT NOT NULL, profile_version INTEGER, instructions_version INTEGER,
+ created_at TEXT NOT NULL, profile_version INTEGER,
  templates TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(templates)),
  knowledge TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(knowledge)),
  claims TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(claims)),
- -- Policy section versions, {"decision":3,...}; NULL for a context frozen before 0.19.
- policy TEXT CHECK(policy IS NULL OR json_valid(policy)),
- -- Short hashes of the parts it froze: Profile parts, policy items and template
- -- contents, compared by staleness.py. Derived from the payload.
+ -- Short hashes of the parts it froze: Profile parts, Preferences statements and
+ -- template contents, compared by staleness.py. Derived from the payload.
  parts TEXT CHECK(parts IS NULL OR json_valid(parts))
 );
 -- A document revision. A CV or letter (cv, letter) is its PDF and optional .tex
@@ -333,32 +329,21 @@ CREATE VIEW context_files AS
 CREATE VIEW all_files AS
  SELECT id,sha256,name,media_type,size,knowledge_id,template_id,context_id,document_id,job_id,created_at,source_sha256 FROM files
  UNION ALL SELECT id,sha256,name,media_type,size,knowledge_id,template_id,context_id,document_id,job_id,created_at,source_sha256 FROM context_files;
--- The owner's policy (policy.py): four sections with their own version, and their items.
--- An item without confirmed_at is a proposal; origin marks a value copied from the Profile.
-CREATE TABLE policy_sections (
- section TEXT PRIMARY KEY CHECK(section IN ('decision','eligibility','writing','facts')),
- version INTEGER NOT NULL DEFAULT 0, updated_at TEXT,
- updated_by_kind TEXT, updated_by_id TEXT, updated_by_name TEXT, updated_by_token_kind TEXT
+-- The owner's Preferences (preferences.py): five sections of statements in the
+-- owner's words, each replaced whole with its own version. An item is
+-- {"text": ...}, and in writing {"text": ..., "scope": "all"|"cv"|"letter"}.
+-- updated_by is the actor label: owner, agent:<token name> or system.
+CREATE TABLE preference_sections (
+ section TEXT PRIMARY KEY CHECK(section IN ('looking_for','ruled_out','facts','writing','working_with_me')),
+ items TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(items) AND json_type(items)='array'),
+ version INTEGER NOT NULL DEFAULT 0, updated_at TEXT, updated_by TEXT
 );
-CREATE TABLE policy_items (
- id TEXT PRIMARY KEY, section TEXT NOT NULL REFERENCES policy_sections(section),
- position INTEGER NOT NULL DEFAULT 0 CHECK(position>=0),
- label TEXT NOT NULL, statement TEXT NOT NULL DEFAULT '',
- value TEXT CHECK(value IS NULL OR json_valid(value)),
- value_type TEXT CHECK(value_type IS NULL OR value_type IN ('text','number','date','boolean','list','structured')),
- note TEXT NOT NULL DEFAULT '',
- scope TEXT CHECK(scope IS NULL OR scope IN ('cv','letter','all')),
- rule TEXT CHECK(rule IS NULL OR json_valid(rule)),
- enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)),
- origin TEXT, origin_key TEXT,
- confirmed_at TEXT, confirmed_by_kind TEXT, confirmed_by_id TEXT, confirmed_by_name TEXT, confirmed_by_token_kind TEXT,
- created_by_kind TEXT, created_by_id TEXT, created_by_name TEXT, created_by_token_kind TEXT,
- updated_by_kind TEXT, updated_by_id TEXT, updated_by_name TEXT, updated_by_token_kind TEXT,
- created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
- CHECK((value IS NULL)=(value_type IS NULL))
-);
-CREATE INDEX policy_items_section ON policy_items(section,position);
-INSERT INTO policy_sections(section) VALUES ('decision'),('eligibility'),('writing'),('facts');
+INSERT INTO preference_sections(section) VALUES ('looking_for'),('ruled_out'),('facts'),('working_with_me');
+-- A new workspace starts with the one writing rule every document follows.
+INSERT INTO preference_sections(section,items) VALUES ('writing',json_array(json_object('text',
+ 'Use only the supplied career evidence. Never invent qualifications, dates or metrics. '
+ || 'Select relevant approved claims or write accurate new wording from detailed evidence. '
+ || 'Respect the template and answer limits; make missing facts visible.','scope','all')));
 -- Employer replies to sent applications (outcomes.py).
 CREATE TABLE replies (
  id TEXT PRIMARY KEY, application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
@@ -383,8 +368,7 @@ CREATE TABLE skill_notes (
  PRIMARY KEY(skill,version)
 );
 -- Ingest signals of each job (job_signals.py). Derived from the job and
--- rebuildable, except distinct_from (pairs the owner judged different vacancies) and
--- rules (the policy rules that matched when the job was collected).
+-- rebuildable, except distinct_from (pairs the owner judged different vacancies).
 CREATE TABLE job_signals (
  job_id TEXT PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
  format INTEGER NOT NULL, content_version INTEGER NOT NULL,
@@ -394,13 +378,11 @@ CREATE TABLE job_signals (
  duplicate_checked INTEGER NOT NULL DEFAULT 0 CHECK(duplicate_checked IN (0,1)),
  duplicate_of TEXT REFERENCES jobs(id) ON DELETE SET NULL, duplicate_confidence REAL,
  distinct_from TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(distinct_from)),
- rules TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(rules)),
  computed_at TEXT NOT NULL
 );
 CREATE INDEX job_signals_duplicate ON job_signals(duplicate_of);
 CREATE INDEX job_signals_language ON job_signals(language);
 CREATE INDEX postings_unlisted ON postings(job_id) WHERE unlisted_at IS NOT NULL;
-CREATE INDEX jobs_dismissed_rule ON jobs(dismissed_rule_id) WHERE dismissed_rule_id IS NOT NULL;
 -- One pinned note per job and per application.
 CREATE UNIQUE INDEX notes_pinned_application ON notes(application_id) WHERE pinned_at IS NOT NULL AND application_id IS NOT NULL;
 CREATE UNIQUE INDEX notes_pinned_job ON notes(job_id) WHERE pinned_at IS NOT NULL AND application_id IS NULL;

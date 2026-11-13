@@ -46,8 +46,8 @@ letter leaves and files, its `requirements` and its job posting. Classify:
 - **incomplete**: a required document or its PDF is missing;
 - **blocked**: an employer requirement or open question needs the owner;
 - **stale**: the frozen context predates a change to a part its documents use:
-  the Profile header or summary, a confirmed policy item, guidance, a template or
-  Career (`staleness_list` names each changed part), or the
+  the Profile header or summary, a Facts about me or Writing rules statement, a
+  template or Career (`staleness_list` names each changed part), or the
   posting changed after preparation;
 - **expired**: the posting is closed or past its deadline.
 
@@ -60,8 +60,8 @@ standing guidance for that application.
 
 ## Prioritize Ready applications
 
-Order Ready applications for the owner: live deadlines first, then fit with the
-policy's decision items, then posting age. `sort: "deadline"` and `sort: "priority"` list
+Order Ready applications for the owner: live deadlines first, then fit with
+What I'm looking for in the owner's Preferences, then posting age. `sort: "deadline"` and `sort: "priority"` list
 dated or prioritized attempts first, combined with `stage: "ready"`. Give one line per application with the reason.
 Do not invent deadlines; mark unknown ones as unknown. Record a deadline the
 posting or owner states, and an owner-agreed `priority`, on the application.
@@ -92,14 +92,14 @@ to continue, never for an employer rejection.
 ## No reply
 
 `applications_list` with `needs: "reply_overdue"` lists Applied applications
-without a reply sent longer ago than the no-reply period; the result's `no_reply` gives the period's
-`days`, its `source` (`policy` or `default`, 30 days) and whether the owner
-`confirmed` the Policy item. Report them with their sent dates and propose
-closing them as no reply. Close them (`applications_update` or
+without a reply sent longer ago than the no-reply period; the result's
+`no_reply` gives the period's `days` and its `source` (`settings`, the owner's
+`no_reply_days`, or `default`, 30 days). Report them with their sent dates and
+propose closing them as no reply. Close them (`applications_update` or
 `applications_bulk` with `outcome: "no_response"` and `concluded_on`, today
-when omitted) only when the owner asks or a confirmed "No reply" decision item
-says to; otherwise ask with one `questions_ask` that lists them. Nothing closes
-automatically. Never close an Interview or Offer as no reply.
+when omitted) only when the owner asks or Working with me in the owner's
+Preferences says to; otherwise ask with one `questions_ask` that lists them.
+Nothing closes automatically. Never close an Interview or Offer as no reply.
 
 ## Patterns
 
@@ -112,6 +112,6 @@ never sent are counted apart in `excluded`; dismissed jobs never had an
 application. Do not read applications the owner closed without applying as
 preferences: the owner applies to every feasible prepared application, and
 closures record feasibility.
-Present patterns as observations for the owner to weigh, not as changes to the
-policy. Report using the shared
+Present patterns as observations for the owner to weigh, not as changes to
+the Preferences. Report using the shared
 [run report](../openings-workspace/references/run-report.md).

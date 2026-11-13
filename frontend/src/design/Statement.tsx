@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { IconButton } from "./Button";
 import { cx } from "./classes";
 
-/** An ordered list of short statements: policy items, template rules. */
+/** An ordered list of short statements, such as those of Preferences. */
 export function StatementList({
   label,
   children,

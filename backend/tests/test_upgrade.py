@@ -24,6 +24,10 @@ from openings.workspace import Workspace
 
 FIXTURE = Path(__file__).with_name("fixtures") / f"workspace-{SCHEMA_VERSION - 1}.sql.gz"
 
+# Tables 0.24 removes (archived whole) and adds (filled by the upgrade's folds).
+REMOVED_TABLES = {"policy_sections", "policy_items"}  # #213
+ADDED_TABLES = {"preference_sections"}  # #213
+
 
 class Killed(BaseException):
     """A process stopped from outside: no cleanup code runs."""
@@ -77,11 +81,12 @@ def structure(path):
 
 
 def counts(path):
+    """Rows per table, without the tables 0.24 removes or adds."""
     with closing(sqlite3.connect(path)) as conn:
         return {
             name: conn.execute(f'SELECT count(*) FROM "{name}"').fetchone()[0]
             for name in tables(conn)
-            if not name.startswith("jobs_fts")
+            if not name.startswith("jobs_fts") and name not in REMOVED_TABLES | ADDED_TABLES
         }
 
 
@@ -151,7 +156,7 @@ def test_generic_changes_keep_every_value(upgraded):
     # Ids, versions and every kept value are copied unchanged.
     # Rows an upgrade fold adds (#214) are not in the original.
     for table, columns in (
-        ("jobs", "id,title,company,posting,version,created_at,dismissed_reason"),
+        ("jobs", "id,title,company,posting,version,created_at"),
         ("applications", "id,job_id,outcome,version,questions,answers,requirements"),
         ("events", "id,job_id,application_id,kind,payload,actor_kind,actor_name,run_id"),
         ("documents", "id,previous_id,text,legacy_content,claim_ids"),
@@ -297,6 +302,162 @@ def test_stored_ready_marks_are_archived_with_an_event_and_ready_is_computed(upg
     }
 
 
+# #213 Preferences replace Policy.
+
+
+def preferences(path):
+    rows = query(path, "SELECT section,items,version,updated_by FROM preference_sections")
+    return {section: (json.loads(items), version, by) for section, items, version, by in rows}
+
+
+def texts(path, section):
+    return [item["text"] for item in preferences(path)[section][0]]
+
+
+def test_policy_items_become_preferences_with_their_text(upgraded):
+    path, pre_upgrade = upgraded[:2]
+    sections = preferences(path)
+    assert set(sections) == {"looking_for", "ruled_out", "facts", "writing", "working_with_me"}
+    # A decision item goes to What I rule out only when its rule dismissed jobs.
+    target = (
+        "Target roles: Shortlist data, backend and platform engineering roles at mid to senior "
+        "level."
+    )
+    places = (
+        "Locations: Dismiss roles that need me on site outside these places. (Zurich, Basel, "
+        "Remote, Europe)"
+    )
+    assert texts(path, "looking_for") == [target, places]
+    proposed = (
+        "(proposed by agent:career-agent, not confirmed) Postings no longer listed: Dismiss jobs "
+        "to review when their source stops listing them. (Automatic rule removed in 0.24: "
+        "no_longer_listed is yes → dismiss)"
+    )
+    assert texts(path, "ruled_out") == [proposed]
+    facts = texts(path, "facts")
+    # The language rule and the No reply item are kept as text and become settings.
+    assert facts[0].startswith("Languages outside my list: Dismiss postings that require")
+    assert facts[0].endswith(
+        "(Automatic rule removed in 0.24: language_required not_in English, Italian → dismiss)"
+    )
+    # The statement repeats the label, so it stands alone.
+    assert facts[1].startswith('Close an application as "no reply"')
+    assert facts[1].endswith("(45 days)")
+    assert facts[2] == (
+        "Work authorization: EU citizen with a Swiss B permit. (2028-06-30) — note: "
+        + query(pre_upgrade, "SELECT note FROM policy_items WHERE label='Work authorization'")[0][0]
+    )
+    assert facts[4].startswith("(proposed by agent:career-agent, not confirmed) No relocation")
+    assert facts[7] == (
+        '(proposed by system, not confirmed) Interview availability: {"days": ["Tue", "Thu"], '
+        '"from": "16:00", "timezone": "Europe/Zurich"}'
+    )
+    assert len(facts) == 8
+    settings = json.loads(query(path, "SELECT data FROM settings WHERE key='workspace'")[0][0])
+    assert settings == {"no_reply_days": 45, "spoken_languages": ["en", "it"]}
+    # Every label, statement and note is kept byte for byte, each item exactly once.
+    every = [text for section in sections.values() for text in (i["text"] for i in section[0])]
+    for label, statement, note in query(
+        pre_upgrade, "SELECT label,statement,note FROM policy_items"
+    ):
+        # A label the statement repeats is left out.
+        named = label if label.casefold() not in statement.casefold() else ""
+        holding = [text for text in every if statement in text and named in text and note in text]
+        assert len(holding) == 1, label
+    assert sections["working_with_me"] == ([], 0, None)
+    assert {name: value[1:] for name, value in sections.items() if value[0]} == {
+        name: (1, "system") for name in ("looking_for", "ruled_out", "facts", "writing")
+    }
+
+
+def test_writing_rules_gather_policy_instructions_and_template_statements(upgraded):
+    path, pre_upgrade = upgraded[:2]
+    writing = preferences(path)["writing"][0]
+    assert [item["scope"] for item in writing] == [
+        "all",
+        "letter",
+        "cv",
+        "all",
+        "all",
+        "letter",
+        "letter",
+    ]
+    general = json.loads(
+        query(pre_upgrade, "SELECT data FROM settings WHERE key='instructions'")[0][0]
+    )["general"]
+    assert writing[4]["text"] == general
+    assert writing[5:] == [
+        {
+            "text": "Opening: Name the role and one result that fits it. (from template "
+            "Synthetic letter)",
+            "scope": "letter",
+        },
+        {"text": "No links in the body. (from template Synthetic letter)", "scope": "letter"},
+    ]
+    # The template keeps its limits and other settings; the instructions setting is gone.
+    rules = query(path, "SELECT rules FROM templates WHERE name='Synthetic letter'")[0][0]
+    assert json.loads(rules) == {"date_format": "MMM YYYY", "engine": "lualatex", "max_pages": 1}
+    assert query(path, "SELECT count(*) FROM settings WHERE key='instructions'") == [(0,)]
+
+
+def test_rule_dismissals_are_kept_with_the_rule_as_reason(upgraded):
+    path, pre_upgrade = upgraded[:2]
+    before = query(
+        pre_upgrade,
+        "SELECT id,dismissed_rule_label,dismissed_reason,dismissed_by_kind FROM jobs "
+        "WHERE dismissed_rule_id IS NOT NULL ORDER BY id",
+    )
+    assert before and all(reason == "" for _, _, reason, _ in before)
+    after = query(
+        path,
+        "SELECT id,dismissed_reason,dismissed_by_kind,triage FROM jobs WHERE id IN "
+        f"({','.join('?' for _ in before)}) ORDER BY id",
+        [row[0] for row in before],
+    )
+    assert after == [(job, label, by, "dismissed") for job, label, _, by in before]
+    assert query(
+        path, "SELECT dismissed_reason FROM jobs WHERE dismissed_reason<>'' ORDER BY id"
+    ) == (
+        query(
+            pre_upgrade,
+            "SELECT CASE WHEN dismissed_reason='' THEN dismissed_rule_label ELSE dismissed_reason "
+            "END FROM jobs WHERE dismissed_reason<>'' OR dismissed_rule_label IS NOT NULL ORDER BY id",
+        )
+    )
+
+
+def test_the_archive_keeps_the_policy_whole(upgraded):
+    pre_upgrade, archive_path = upgraded[1:3]
+    archive = json.loads(archive_path.read_text())
+    policy = archive["policy"]
+    assert len(policy["items"]) == 15 and len(policy["sections"]) == 4
+    assert {item["id"] for item in policy["items"]} == {
+        row[0] for row in query(pre_upgrade, "SELECT id FROM policy_items")
+    }
+    assert [row["key"] for row in policy["general_instructions"]] == ["instructions"]
+    assert [row["name"] for row in policy["template_rules"]] == ["Synthetic letter"]
+    assert "statements" in json.loads(policy["template_rules"][0]["rules"])
+    dropped = archive["dropped_columns"]
+    assert len(dropped["jobs.dismissed_rule_id"]) == len(dropped["jobs.dismissed_rule_label"]) == 2
+    assert len(dropped["job_signals.rules"]) == 2
+    assert "context_inputs.policy" not in dropped and "policy_items" not in archive.get(
+        "dropped_tables", {}
+    )
+
+
+def test_a_workspace_without_policy_items_keeps_the_default_writing_rule(tmp_path):
+    path = load_fixture(
+        tmp_path / "openings.sqlite",
+        "DELETE FROM policy_items; DELETE FROM settings WHERE key='instructions'; "
+        "UPDATE templates SET rules='{}';",
+    )
+    Database(path)
+    sections = preferences(path)
+    assert [len(sections[name][0]) for name in ("looking_for", "facts", "writing")] == [0, 0, 1]
+    assert sections["writing"][0][0]["text"].startswith("Use only the supplied career evidence.")
+    assert query(path, "SELECT count(*) FROM settings WHERE key='workspace'") == [(0,)]
+
+
 # Archive.
 
 
@@ -322,9 +483,9 @@ def test_the_archive_holds_every_dropped_value_with_the_counts_of_its_source(upg
         key = f"{table}.{column}"
         assert sorted((item["id"], item["value"]) for item in dropped[key]) == sorted(rows)
         assert archive["counts"]["dropped_columns." + key] == len(rows)
-    assert set(archive["counts"]) == {
-        f"{top}.{sub}" for top in ("dropped_columns",) for sub in dropped
-    } | {section.name for section in m15.SECTIONS}
+    assert {key for key in archive["counts"] if key.startswith("dropped_columns.")} == {
+        f"dropped_columns.{sub}" for sub in dropped
+    }
 
 
 def test_a_backup_of_the_previous_schema_is_restored_upgraded(tmp_path):

@@ -9,13 +9,13 @@ from openings.app import create_app
 from openings.career import (
     ClaimCreate,
     ClaimUpdate,
-    InstructionsUpdate,
     KnowledgeCreate,
     ProfileUpdate,
     TemplateCreate,
     TemplateUpdate,
 )
 from openings.documents import ContextCreate, DocumentCreate
+from openings.preferences import PreferencesService
 
 SOURCE = r"""\documentclass{article}
 \usepackage{hyperref}
@@ -84,20 +84,19 @@ async def test_staleness_reports_changed_inputs_without_rewriting_contexts(tmp_p
     career.update_profile(
         ProfileUpdate(expected_version=profile["version"], headline="Platform engineer")
     )
-    career.update_instructions(
-        InstructionsUpdate(
-            expected_version=career.get_instructions()["version"], general="Be concise."
-        )
+    PreferencesService(workspace).update_preferences(
+        "writing", {"expected_version": 0, "items": [{"text": "Be concise."}]}
     )
     career.update_claim(claim["id"], ClaimUpdate(expected_version=claim["version"], approved=False))
 
     report = documents.application_staleness(applications[0]["id"])
     assert report["stale"] is True
-    assert report["inputs"] == ["profile", "instructions", "template", "claim"]
+    assert report["inputs"] == ["profile", "preferences", "template", "claim"]
     changes = {(item["input"], item["state"]) for item in report["changes"]}
     assert changes == {
         ("profile", "changed"),
-        ("instructions", "changed"),
+        ("preferences", "added"),
+        ("preferences", "removed"),
         ("template", "changed"),
         ("claim", "unapproved"),
     }

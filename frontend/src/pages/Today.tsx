@@ -93,12 +93,12 @@ export default function TodayPage(links: Links) {
     NONE,
     ["questions"],
   );
-  // Applied applications without a reply past the no-reply period, as the
-  // server reads it; they are closed as no reply by hand.
+  // Applied applications without a reply past the no-reply period (the owner's
+  // setting in Preferences, or 30), as the server reads it; closed by hand.
   const waiting = useFresh<ListResult<Application>>(
     "/applications?needs=reply_overdue&sort=applied&limit=200",
     NONE,
-    [...APPLICATIONS, "policy"],
+    [...APPLICATIONS, "settings"],
   );
   const days = waiting.data.no_reply?.days ?? 30;
   const runs = useFresh<ListResult<Run>>(
