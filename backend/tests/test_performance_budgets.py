@@ -52,6 +52,8 @@ BUDGETS_MS = {
     "staleness": (("/api/v1/staleness?status=all&stale_only=false",), 100),
     "insights": (("/api/v1/insights",), 100),
     "source yield": (("/api/v1/collection/yield",), 600),
+    # Revisions are searched in the text derived from their sources.
+    "document search": (("/api/v1/documents?q=Northstar&limit=100",), 50),
 }
 
 

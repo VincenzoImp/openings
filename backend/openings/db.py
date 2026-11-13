@@ -11,7 +11,7 @@ from pathlib import Path
 from .errors import DomainError
 from .posting import posting_complete
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 SCHEMA_SQL = Path(__file__).with_name("schema.sql")
 TEMP_PREFIX = ".openings-temp-"
 
@@ -331,6 +331,17 @@ def _migrate_11_to_12(conn):
     job_signals.migrate(conn)
 
 
+def _migrate_12_to_13(conn):
+    # Source-canonical documents: a CV or letter revision is its .tex source and
+    # PDF. Its structured content moves, unchanged, to legacy_content (read-only),
+    # the evidence ids it cited are copied to claim_ids and knowledge_ids, and its
+    # text is derived from the attached source. Files gain source_sha256 (NULL for
+    # every existing file). Ids, files, hashes, review states and versions stay.
+    from .documents.upgrade import migrate_to_13
+
+    migrate_to_13(conn)
+
+
 # Each step upgrades from its key to the next version; steps chain inside one transaction.
 MIGRATIONS = {
     5: _migrate_5_to_6,
@@ -340,6 +351,7 @@ MIGRATIONS = {
     9: _migrate_9_to_10,
     10: _migrate_10_to_11,
     11: _migrate_11_to_12,
+    12: _migrate_12_to_13,
 }
 
 

@@ -28,7 +28,8 @@ SHARED_INSTRUCTIONS = ("general", "template_append")
 # A shorter value costs more as a reference than as text in the frame.
 MIN_PART_CHARS = 200
 
-# Mirrored in schema.sql; the 8 -> 9 migration creates the same objects.
+# Mirrored in schema.sql; the 8 -> 9 migration creates the same objects. The file
+# views gain source_sha256 in schema 13 (documents/upgrade.py builds them again).
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS snapshot_parts (
  id INTEGER PRIMARY KEY, hash TEXT NOT NULL,

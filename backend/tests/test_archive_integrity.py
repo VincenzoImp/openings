@@ -63,7 +63,7 @@ def test_approval_checks_file_set_but_parallel_upload_grants_remain_valid(tmp_pa
     documents = DocumentService(workspace)
     job = workspace.ingest_job({"posting": "Build APIs"})
     application = workspace.create_application({"job_id": job["id"]})
-    doc = documents.create_document(DocumentCreate(application_id=application["id"]))
+    doc = documents.create_document(DocumentCreate(application_id=application["id"], kind="other"))
     api = FastAPI()
 
     @api.exception_handler(DomainError)
