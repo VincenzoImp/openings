@@ -29,7 +29,8 @@ SUMMARY_COLUMNS = (
 def readable_lines(row) -> list[str]:
     """The lines a comparison reads: the derived text, else structured content as text."""
     if row.get("text") is not None:
-        return row["text"].splitlines()
+        # Blank lines only separate paragraphs; they are not compared.
+        return [line for line in row["text"].splitlines() if line.strip()]
     if row["kind"] in SOURCE_KINDS:
         return []
     lines = []

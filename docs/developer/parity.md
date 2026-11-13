@@ -32,7 +32,7 @@ How to read the evidence:
 | Owner only (refused for an agent token) | 9 |
 | Without a working dashboard path | 7 |
 | Reached only through another operation | 7 |
-| With inputs the dashboard never mentions | 22 |
+| With inputs the dashboard never mentions | 23 |
 | With free-form JSON edited as raw JSON | 0 |
 | With different REST and MCP input names | 1 |
 | With a dashboard path exercised by e2e | 111 |
@@ -91,6 +91,7 @@ operation. They can be set over REST or MCP only.
 | `insights.read` | `applied_until` | Insights uses the default minimum sample of 5 and `applied_since` for the last 90 days; `min_sample` and `applied_until` serve agents and scripts. |
 | `contexts.list` | `q` | Inputs lists the application's frozen copies 20 at a time; `q` serves agents and scripts. |
 | `contexts.create` | `template_id` | The context dialog sends `template_ids`; `template_id` is the single-template form of the same input. |
+| `documents.create` | `claim_ids`, `knowledge_ids` | Add a document and New revision send the title, frozen copy, note, the CV or letter's source and PDF, or form content; the agent cites `claim_ids` and `knowledge_ids`, which an open revision shows as counts. |
 | `files.list` | `q` | A job's Files lists all of its files; `q` serves agents and scripts. |
 | `events.list` | `application_id`, `job_id`, `subject_id`, `subject_type` | The Activity timeline filters changes by who made them (owner, API tokens or one token, system, not recorded), by kind of record (`subject_types`), by period and by run; the job, application and subject filters serve agents and scripts; the job and application timelines read `timeline.read`. |
 | `runs.list` | `started_since`, `started_until`, `token_id` | Activity filters runs by status; Today lists the runs active since the last visit (`active_since`). The workflow, token and start-time filters serve agents and scripts. |
@@ -264,10 +265,10 @@ missing from the inventory.
 | `applications.staleness`<br>Report whether an attempt's current revisions use outdated inputs | `GET /applications/{application_id}/staleness` | `application_staleness` | any | Applications: Inputs changed indicator and the review page Inputs tab | pages/review/Inputs.tsx | structured | 3 |
 | `applications.staleness_list`<br>List attempts whose current revisions use outdated inputs | `GET /staleness` | `applications_staleness` | any | Applications: Inputs changed tag and first change on rows | via `applications.list`, `applications.staleness` | — | — |
 | `documents.list`<br>List/filter paginated revision summaries | `GET /documents` | `documents_list` | any | Applications: documents/history | pages/review/DocumentPanes.tsx<br>pages/review/Revisions.tsx | structured | 13 |
-| `documents.read`<br>Read exact revision content, chain number and files | `GET /documents/{document_id}` | `documents_get` | any | Applications: revision detail and preview | pages/review/DocumentPanes.tsx<br>pages/review/Revisions.tsx | structured | 7 |
-| `documents.create`<br>Save content as a new immutable revision | `POST /documents` | `documents_create` | any | Applications: add/edit content as a new revision | pages/review/RevisionDialog.tsx | structured | 1 |
-| `documents.review`<br>Approve the exact revision content/files | `POST /documents/{document_id}/review` | `documents_review` | any | Applications: Approve revision | pages/review/Revisions.tsx | structured | 1 |
-| `documents.consistency`<br>Compare structured content text with the attached .tex source | `GET /documents/{document_id}/consistency` | `documents_consistency` | any | Applications: approval reports content/source differences | pages/review/Revisions.tsx | structured | 2 |
+| `documents.read`<br>Read a revision: derived text or form content, evidence, chain number and files | `GET /documents/{document_id}` | `documents_get` | any | Applications: revision detail and preview | pages/review/DocumentPanes.tsx<br>pages/review/Revisions.tsx | structured | 7 |
+| `documents.create`<br>Create a new immutable revision (CV/letter: then upload source and PDF) | `POST /documents` | `documents_create` | any | Applications: Add a document / New revision (source and PDF upload) | pages/review/RevisionDialog.tsx | structured | 1 |
+| `documents.review`<br>Approve the exact revision and its files | `POST /documents/{document_id}/review` | `documents_review` | any | Applications: Approve revision | pages/review/Revisions.tsx | structured | 1 |
+| `documents.compare`<br>Compare the text of two revisions line by line | `GET /documents/{document_id}/comparison` | `documents_compare` | any | Applications: review page Documents tab, Compare with the previous revision | api.ts<br>pages/review/Revisions.tsx | structured | 2 |
 | `documents.delete`<br>Delete an entire revision and its files | `DELETE /documents/{document_id}` | `documents_delete` | any | Applications: delete revision | pages/review/Revisions.tsx | structured | 1 |
 | `files.list`<br>List/filter paginated file metadata | `GET /files` | `files_list` | any | Career/Templates/Applications/Inbox: assets and files | api.ts<br>library/Assets.tsx<br>pages/review/Inputs.tsx | structured | 28 |
 | `files.read`<br>Read immutable file metadata and content URL | `GET /files/{file_id}` | `files_get` | any | Career/Templates/Applications/Inbox: file details | library/Assets.tsx | structured | 3 |

@@ -1492,7 +1492,7 @@
         "documents_compare"
       ],
       "dashboard": "Applications: review page Documents tab, Compare with the previous revision",
-      "notes": "other_id defaults to the revision this one replaces (previous_id). Line by line: CV and letter revisions compare the text derived from their .tex sources, form answers and other kinds their structured content as path: value lines. Each line is same, added or removed; text.document/text.other say whether each side has text (a CV or letter without a source has none). Same application only."
+      "notes": "other_id defaults to the revision this one replaces (previous_id). Line by line: CV and letter revisions compare the text derived from their .tex sources, form answers and other kinds their structured content as path: value lines; blank lines are not compared. Each line is same, added or removed; text.document/text.other say whether each side has text (a CV or letter without a source has none). Same application only."
     },
     {
       "id": "documents.delete",
