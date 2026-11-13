@@ -9,7 +9,7 @@ export interface Destination {
   /** Routes shown under this destination (the two queues of Jobs). */
   routes?: string[];
   /** Which number the navigation shows beside the label. */
-  count?: "ready" | "questions" | "inbox";
+  count?: "ready" | "questions" | "new";
 }
 export interface NavGroup {
   group: string;
@@ -28,8 +28,8 @@ export const NAV: NavGroup[] = [
         routes: ["applications", "review"],
         count: "ready",
       },
-      // To review (the old Inbox), Shortlist, Dismissed and All are tabs of Jobs.
-      { id: "jobs", label: "Jobs", count: "inbox" },
+      // New (the old Inbox), Shortlisted, Dismissed and All are tabs of Jobs.
+      { id: "jobs", label: "Jobs", count: "new" },
       { id: "activity", label: "Activity", count: "questions" },
     ],
   },
@@ -91,10 +91,11 @@ export function routeOf(hash: string) {
   return route in SCREENS ? route : HOME;
 }
 
-// The stage filter of the old Applications page: Preparing no longer includes
-// the Ready applications, and `readiness=ready` alone was the Ready queue.
+// The stage filter of the old Applications page: Preparing (draft) is now
+// Shortlisted, and `readiness=ready` alone was the Ready queue.
 const OLD_STAGES: Record<string, string> = {
-  draft: "preparing",
+  draft: "shortlisted",
+  shortlisted: "shortlisted",
   applied: "applied",
   interview: "interview",
   offer: "offer",
@@ -109,9 +110,19 @@ function upgradeApplications(params: URLSearchParams) {
     changed = true;
   }
   const stage = params.get("stage");
-  if (params.get("readiness") === "ready" && (!stage || stage === "all")) {
+  if (stage === "preparing") {
+    params.set("stage", "shortlisted");
+    changed = true;
+  }
+  // Ready is computed now: the queue is in deadline order.
+  if (params.get("sort") === "ready") {
+    params.set("sort", "deadline");
+    changed = true;
+  }
+  if (params.has("readiness")) {
+    if (params.get("readiness") === "ready" && (!stage || stage === "all"))
+      params.set("stage", "ready");
     params.delete("readiness");
-    params.set("stage", "ready");
     changed = true;
   }
   return changed;
@@ -120,7 +131,7 @@ function upgradeApplications(params: URLSearchParams) {
 // The queues of the old Inbox page, as tabs and filters of Jobs.
 const OLD_QUEUES: Record<string, Record<string, string>> = {
   inbox: {},
-  shortlist: { section: "shortlist" },
+  shortlist: { section: "shortlisted" },
   dismissed: { section: "dismissed" },
   all: { section: "all" },
   applications: { section: "all" },

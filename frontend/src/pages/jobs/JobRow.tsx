@@ -38,7 +38,7 @@ export function Tags({ items }: { items: Label[] }) {
   );
 }
 
-export type RowAction = "saved" | "dismissed" | "inbox" | "start";
+export type RowAction = "shortlisted" | "dismissed" | "new" | "open";
 
 /** One job of a list: its signals, where it came from, and the actions of its tab. */
 export function JobRow({
@@ -127,12 +127,12 @@ export function JobRow({
       </div>
       {section !== "all" && (
         <div className="row row-actions">
-          {section === "review" && (
+          {section === "new" && (
             <>
               <Button
                 size="sm"
                 disabled={busy}
-                onClick={() => onAction("saved")}
+                onClick={() => onAction("shortlisted")}
               >
                 Shortlist{name}
               </Button>
@@ -146,33 +146,25 @@ export function JobRow({
               </Button>
             </>
           )}
-          {section === "shortlist" && (
+          {section === "shortlisted" && (
             <>
-              <Button
-                size="sm"
-                disabled={busy}
-                onClick={() => onAction("start")}
-              >
-                Start application{name}
-              </Button>
+              {job.application && job.application.status !== "closed" && (
+                <Button size="sm" onClick={() => onAction("open")}>
+                  Open the application{name}
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="quiet"
                 disabled={busy}
-                onClick={() => onAction("inbox")}
+                onClick={() => onAction("new")}
               >
-                Remove{name}
+                Back to New{name}
               </Button>
             </>
           )}
           {section === "dismissed" && (
-            <Button
-              size="sm"
-              disabled={busy}
-              onClick={() =>
-                onAction(job.application_count ? "saved" : "inbox")
-              }
-            >
+            <Button size="sm" disabled={busy} onClick={() => onAction("new")}>
               Restore{name}
             </Button>
           )}

@@ -23,7 +23,7 @@ Record a known closing date in the application `deadline` (YYYY-MM-DD). Do not
 store requirements in job metadata: an explicit metadata edit can stop later
 source refreshes of that job. Do not duplicate them in the application's notes.
 
-An unresolved blocking requirement makes the application's derived `readiness`
-`blocked`. It stays Draft and is reported as not ready, with the requirement and
-the owner decision it needs. Mark it `resolved` only after the owner decides or
+An unresolved blocking requirement keeps the application from being Ready: its
+computed `missing` names `requirement:<id>`. It stays Shortlisted and is
+reported as not Ready, with the requirement and the owner decision it needs. Mark it `resolved` only after the owner decides or
 supplies the item, and record that decision in its `note`.

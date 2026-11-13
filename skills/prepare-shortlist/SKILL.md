@@ -1,20 +1,20 @@
 ---
 name: prepare-shortlist
-description: Prepare job-specific CV and cover-letter drafts for Openings Shortlist jobs, using current evidence and frozen template rules, with resumable document and PDF checks before the owner applies manually.
+description: Prepare the job-specific CV and letter of Openings Shortlisted applications, using current evidence and frozen template rules, with resumable document and PDF checks until each is Ready and the owner applies manually.
 compatibility: Requires access to the Openings MCP server or REST API, as described in the openings-workspace skill.
 ---
 
 # Prepare Shortlist
 
-Use this workflow to prepare CVs and letters for every Shortlist job, as routine
+Use this workflow to prepare CVs and letters for every Shortlisted application, as routine
 work under the [operating mandate](../openings-workspace/references/operating-mandate.md), or to resume that preparation.
-A readiness audit is read-only. Preparation creates or completes Draft
-applications and marks each complete one ready; it never submits online, sends
-employer messages or marks Applied.
-The owner submits each ready Draft manually and then marks it Applied or closes it.
+An audit of what is Ready is read-only. Preparation completes the required
+documents of Shortlisted applications until each is Ready; it never submits
+online, sends employer messages or marks Applied.
+The owner submits each Ready application manually and then marks it Applied or closes it.
 
 Read [Openings workspace](../openings-workspace/SKILL.md) for transport, exact
-schemas, contexts, document revisions, transfers and review. Use
+schemas, contexts, document revisions and transfers. Use
 [Career claims](../career-claims/SKILL.md) for writing. Personal preferences and
 all document-selection rules come from current Openings records: the owner's
 policy (`policy_get`), the typed claim fields and the templates.
@@ -35,12 +35,15 @@ stored [run report](../openings-workspace/references/run-report.md).
 
 ## Scope and checkpoint
 
-Snapshot the requested actionable Shortlist IDs before creating applications.
-A created application leaves that queue, even while incomplete. An optional local log can record cohort IDs and pending steps, but must not be
-required to resume. On each run, read server applications with Draft status as
-well as the actionable Shortlist. Inspect their contexts, revision leaves and
-files to recover progress from the database. Keep an already complete compatible
-Draft unchanged; do not generate another application or documents just to rerun.
+Shortlisting a job starts its application in stage Shortlisted, so the cohort is
+the Shortlisted applications that are not Ready (`applications_list` with
+`stage: "shortlisted"`, or `needs: "documents"` for the ones missing a required
+document; each row's `missing` names what is left). Snapshot the requested IDs
+before writing. An optional local log can record cohort IDs and pending steps,
+but must not be required to resume. Inspect their contexts, revision leaves and
+files to recover progress from the database. Keep a Ready application whose
+documents pass the checks unchanged; do not generate another application or
+documents just to rerun.
 
 For each job, read the full posting, the current Profile, the policy (`decision`
 for fit, `eligibility` for what the employer asks, `writing` for the documents),
@@ -52,22 +55,22 @@ for each application; a context freezes the application's pinned note as its
 versions (`payload.policy`): write from that copy, follow the confirmed
 `writing` items whose scope is `all` or matches the document (`cv`, `letter`),
 and never rely on an item with `confirmed: false`.
-Resume the intended open Draft or the attempt returned by a concurrent-creation
-conflict. Use an idempotency key for retryable creation. Do not reset other stages
-or start another attempt after Closed without the requested authority.
+Resume the intended open Shortlisted application or the attempt returned by a
+concurrent-creation conflict. Use an idempotency key for retryable creation. Do
+not reset other stages or start another attempt after Closed without the
+requested authority.
 
-A resumed run includes its incomplete cohort applications even though they are
-no longer in actionable Shortlist. If the task log is unavailable, recover only
-Drafts whose ownership and requested scope can be established from server data;
-report an ambiguous case rather than create a duplicate or alter an unrelated one.
+If the task log is unavailable, recover only applications whose ownership and
+requested scope can be established from server data; report an ambiguous case
+rather than create a duplicate or alter an unrelated one.
 
 ## Duplicate preflight
 
 Before any application creation, use the shared
 [vacancy identity check](../openings-workspace/references/job-deduplication.md).
 Compare the requested cohort with existing job records and application attempts,
-including ones outside Shortlist. Resolve only verified duplicates within scope.
-Reuse the canonical record and its Draft; a different job ID is not permission to
+including ones outside the cohort. Resolve only verified duplicates within scope.
+Reuse the canonical record and its application; a different job ID is not permission to
 prepare or apply for the same vacancy again. Leave ambiguous groups unresolved
 and report them while independent jobs continue.
 
@@ -75,13 +78,14 @@ and report them while independent jobs continue.
 
 Work through the cohort in a deliberate order: live deadlines first, then the
 strongest fit with the policy's decision items, then the rest. A large cohort is prepared
-in that order so a partial run still leaves the most valuable Drafts complete.
-For existing Drafts, `applications_list` with `sort: "deadline"` or
-`sort: "priority"` gives that order, and `readiness` (`none`, `missing_pdf`,
-`unreviewed`, `blocked`, `reviewed`, `ready`) finds the ones that still need work:
-`reviewed` passes every check but is not yet marked ready. Record a
+in that order so a partial run still leaves the most valuable applications Ready.
+`applications_list` with `sort: "deadline"` or `sort: "priority"` gives that
+order, and `needs: "documents"` finds the ones that still need a document.
+Record a
 known closing date as the application `deadline` and the agreed order as
-`priority` (1 highest to 5); never invent either.
+`priority` (1 highest to 5); never invent either. When the employer asks for
+only a CV (or only a letter), set the application's `required_documents` with
+`applications_update`; it defaults to both.
 
 Before freezing inputs for a job, run the
 [employer requirements preflight](../openings-workspace/references/employer-requirements.md).
@@ -115,7 +119,7 @@ pinned: the pinned note is the owner's standing guidance). Check the CV and lett
 attribution and personal details. Resolve every placeholder. Do not use the
 general letter MASTER unchanged as if it addressed a specific employer.
 
-## Render, attach and review
+## Render, check and attach
 
 Compile changed sources with a compatible available tool. Reuse an existing
 unchanged PDF only after checking its content, source references and compatibility.
@@ -127,51 +131,50 @@ Find the intended current document leaf for each kind. When resuming, check
 `staleness_get`: a leaf built on older inputs is refreshed with a new
 context and new revisions when the change matters. Reuse matching work;
 complete missing steps on a compatible incomplete revision. Save changed output
-as the appropriate new revision. An approved parent does not supply files or
-approval to a new child. Resolve concurrent branches explicitly.
+as the appropriate new revision. A complete parent does not supply files to a
+new child. Resolve concurrent branches explicitly.
 
-A CV or letter revision is its `.tex` source and the PDF built from it, with
-the claim and Career entry ids it uses (`claim_ids`, `knowledge_ids`) and an
-optional `note` on what changed. It has no `content`: create the revision with
-`documents_create`, upload its one source, then the PDF with `source_sha256`, the
-SHA-256 of that source. Openings refuses a PDF that names another source
-(`source_mismatch`), so compile the exact source you uploaded. Read the
-revision's `text`, which the server derives from the source, to check what the
-owner will review; `documents_compare` shows what changed since the previous
-revision. When you change the source, save a new revision with its own source
-and PDF. Verify upload sizes and hashes. Download and validate the actual PDFs;
-a successful transfer is not a PDF-quality check. Read the post-upload document
-version, then mark document review approved only after the agent checks pass.
-Do not attribute this review to a human.
+A CV or letter revision is a PDF and, when you compiled it, the `.tex` source it
+was built from, with the claim and Career entry ids it uses (`claim_ids`,
+`knowledge_ids`) and an optional `note` on what changed. It has no `content`.
+Because a revision becomes complete and immutable as soon as its PDF is stored,
+and Ready counts complete revisions, finish the content, layout and PDF checks
+before you create it. Then call `documents_create` with `pdf` (name, size,
+SHA-256) and the source inline (`source`) or as `source_file`, and PUT the bytes
+to the returned `uploads` grants, the source first. With a source, the PDF names
+its SHA-256 (`source_sha256`) and Openings refuses a PDF that names another
+source (`source_mismatch`), so upload the exact source you compiled. Read the
+revision's `text` (from the source, or extracted from the PDF when there is
+none) to check what the owner will read; `documents_compare` shows what changed
+since the previous revision. When you change anything, save a new revision with
+its own files. Verify upload sizes and hashes; a successful transfer is not a
+PDF-quality check.
 
-## Readiness and handoff
+## Ready and handoff
 
-Re-read the intended CV and CL leaves and their files. Both must match the chosen
-context, have their exact source and a valid checked PDF built from it, and have
-approved review states. Only then mark the Draft ready: `applications_ready` with the
-application's current `expected_version`. Openings refuses with
-`application_not_ready` and names the failed check (`blocked`, `none`,
-`missing_pdf`, `unreviewed`) when the stored records disagree; fix that step
-instead of retrying. The server checks files, review states and blocking
-requirements only: your content and layout checks come first.
-Ready is a stored step, not a stage. The application stays Draft; job interest
-stays saved. The owner finds it under **Ready to apply** on Today and opens its
-review page (`#review?application=APPLICATION_ID` in the dashboard): the posting,
-CV and letter side by side, the requirements still open and the form questions
-without an answer. From there the owner downloads both PDFs, submits on the
-company site and chooses **Mark applied**. Point the owner to that page when you
-report a ready Draft. Openings clears the mark when a revision, context, file
-or blocking requirement changes afterwards; after such rework, repeat the checks
-and mark it ready again. Do not mark a Draft ready while a question about it is
-open or its inputs are stale in a way that matters.
+Ready is computed, not marked: an application is Ready when it is Shortlisted,
+every document in its `required_documents` has a current complete revision and
+no blocking requirement is unresolved. Re-read the application: `ready` and
+`missing` (for example `["letter"]` or `["requirement:<id>"]`) say what is
+left; fix that step. The server checks files and blocking requirements only:
+your content and layout checks come first. The application stays Shortlisted
+until the owner marks it applied. The owner finds it under **Ready to apply**
+on Today and opens its review page (`#review?application=APPLICATION_ID` in the
+dashboard): the posting, CV and letter side by side, the requirements still
+open and the form questions without an answer. From there the owner downloads
+the PDFs, submits on the company site and chooses **Mark applied**. Point the
+owner to that page when you report a Ready application. A new incomplete
+revision or a new blocking requirement makes it not Ready again until the work
+is finished. Do not finish a document while a question about it is open or its
+inputs are stale in a way that matters.
 
-If a tool, source, upload or check fails, keep the actual Draft incomplete.
+If a tool, source, upload or check fails, keep the actual revision incomplete.
 Record the precise failed step and continue independent jobs where possible.
 Do not delete the application, dismiss the job or create another attempt to hide
 an error. On rerun, inspect server state and resume that step.
 
 Report each application with its ID, CV/CL revision IDs, verified files and any
-remaining problem. Separate ready Drafts from incomplete ones and from those
+remaining problem. Separate Ready applications from incomplete ones and from those
 blocked by employer requirements. Use the shared
 [run report](../openings-workspace/references/run-report.md); state explicitly
 that no application was submitted or marked Applied by this workflow.

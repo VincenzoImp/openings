@@ -1,25 +1,16 @@
 import { useState, type FormEvent } from "react";
-import {
-  api,
-  localToday,
-  type Application,
-  type EmployerResponse,
-  type ListResult,
-  type ResponseKind,
-} from "../../api";
+import { api, localToday, type Application, type Reply } from "../../api";
 import {
   ActorChip,
   Button,
-  ErrorBanner,
   Field,
-  Loading,
   Statement,
   StatementList,
 } from "../../design";
 import { ConfirmDialog } from "../../library/common";
 import { shortDate } from "../../library/time";
-import { useResource, useWorkspace } from "../../state";
-import { responseLabels } from "../applications/model";
+import { useWorkspace } from "../../state";
+import { replyLabels } from "../applications/model";
 import { Respond } from "../applications/Respond";
 
 /** "10 Oct" for a calendar day (YYYY-MM-DD), read in local time. */
@@ -28,11 +19,14 @@ export const day = (value: string) => {
   return shortDate(new Date(year, month - 1, date));
 };
 
+/** Correct a reply's kind, day or note: an update of its application. */
 function Edit({
-  response,
+  application,
+  reply,
   onDone,
 }: {
-  response: EmployerResponse;
+  application: Application;
+  reply: Reply;
   onDone: () => void;
 }) {
   const { mutate, pending } = useWorkspace();
@@ -41,13 +35,16 @@ function Edit({
     const form = new FormData(event.currentTarget);
     const ok = await mutate(
       () =>
-        api(`/responses/${response.id}`, "PATCH", {
-          expected_version: response.version,
-          kind: form.get("kind"),
-          date: form.get("date"),
-          note: String(form.get("note") || ""),
+        api(`/applications/${application.id}`, "PATCH", {
+          expected_version: application.version,
+          reply: {
+            id: reply.id,
+            kind: form.get("kind"),
+            date: form.get("date"),
+            note: String(form.get("note") || ""),
+          },
         }),
-      "Response corrected.",
+      "Reply corrected.",
     );
     if (ok) onDone();
   }
@@ -55,28 +52,28 @@ function Edit({
     <form
       className="edit-grid grow"
       onSubmit={save}
-      aria-label="Correct the response"
+      aria-label="Correct the reply"
     >
-      <Field label="Answer">
-        <select name="kind" defaultValue={response.kind}>
-          {Object.entries(responseLabels).map(([value, label]) => (
+      <Field label="What happened">
+        <select name="kind" defaultValue={reply.kind}>
+          {Object.entries(replyLabels).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
             </option>
           ))}
         </select>
       </Field>
-      <Field label="Date of the answer">
+      <Field label="Date of the reply">
         <input
           type="date"
           name="date"
           required
           max={localToday()}
-          defaultValue={response.date}
+          defaultValue={reply.date}
         />
       </Field>
       <Field label="Note" className="wide">
-        <input name="note" maxLength={2000} defaultValue={response.note} />
+        <input name="note" maxLength={2000} defaultValue={reply.note} />
       </Field>
       <div className="row wide">
         <Button variant="primary" size="sm" disabled={pending}>
@@ -91,8 +88,8 @@ function Edit({
 }
 
 /**
- * The employer's answers to this application, newest first, each with who
- * recorded it; the day stays correctable. A sent application can record one.
+ * The employer's replies to this application, newest first, each with who
+ * recorded it; a reply stays correctable. A sent application can record one.
  */
 export function Responses({
   application,
@@ -104,20 +101,16 @@ export function Responses({
   const { mutate } = useWorkspace();
   const [editing, setEditing] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  const [removing, setRemoving] = useState<EmployerResponse | null>(null);
-  const list = useResource<ListResult<EmployerResponse>>(
-    `/applications/${application.id}/responses`,
-    { items: [], total: 0 },
-  );
-  const responses = list.data.items;
+  const [removing, setRemoving] = useState<Reply | null>(null);
+  const replies = application.replies || [];
   const sent = ["applied", "interview", "offer"].includes(application.status);
   return (
-    <section className="stack" aria-labelledby="responses-title">
+    <section className="stack" aria-labelledby="replies-title">
       <div className="spread">
-        <h3 id="responses-title">Employer responses</h3>
+        <h3 id="replies-title">Employer replies</h3>
         {sent && !adding && (
           <Button size="sm" icon="plus" onClick={() => setAdding(true)}>
-            Record a response
+            Record reply
           </Button>
         )}
       </div>
@@ -130,77 +123,78 @@ export function Responses({
           />
         </div>
       )}
-      {list.error && <ErrorBanner message={list.error} retry={list.reload} />}
-      {list.loading ? (
-        <Loading label="Loading the responses…" />
-      ) : responses.length ? (
-        <StatementList label="Employer responses">
-          {responses.map((response) => (
+      {replies.length ? (
+        <StatementList label="Employer replies">
+          {replies.map((reply) => (
             <Statement
-              key={response.id}
-              name={`${responseLabels[response.kind as ResponseKind]} of ${response.date}`}
+              key={reply.id}
+              name={`${replyLabels[reply.kind]} of ${reply.date}`}
               movable={false}
-              editing={editing === response.id}
-              label={`${responseLabels[response.kind as ResponseKind]} · ${day(response.date)}`}
-              caption={<ActorChip actor={response.created_by} />}
+              editing={editing === reply.id}
+              label={`${replyLabels[reply.kind]} · ${day(reply.date)}`}
+              caption={<ActorChip actor={reply.created_by} />}
               actions={
                 <>
                   <Button
                     size="sm"
                     variant="quiet"
-                    onClick={() => setEditing(response.id)}
+                    onClick={() => setEditing(reply.id)}
                   >
                     Edit
-                    <span className="sr"> the response of {response.date}</span>
+                    <span className="sr"> the reply of {reply.date}</span>
                   </Button>
                   <Button
                     size="sm"
                     variant="quiet danger"
-                    onClick={() => setRemoving(response)}
+                    onClick={() => setRemoving(reply)}
                   >
                     Remove
-                    <span className="sr"> the response of {response.date}</span>
+                    <span className="sr"> the reply of {reply.date}</span>
                   </Button>
                 </>
               }
             >
-              {editing === response.id ? (
-                <Edit response={response} onDone={() => setEditing(null)} />
+              {editing === reply.id ? (
+                <Edit
+                  application={application}
+                  reply={reply}
+                  onDone={() => setEditing(null)}
+                />
               ) : (
-                response.note && <p className="prose">{response.note}</p>
+                reply.note && <p className="prose">{reply.note}</p>
               )}
             </Statement>
           ))}
         </StatementList>
       ) : (
         <p className="muted">
-          {application.status === "draft"
-            ? "Once you send this application, the employer's answers are recorded here."
-            : "No answer is recorded."}
+          {application.status === "shortlisted"
+            ? "Once you send this application, the employer's replies are recorded here."
+            : "No reply is recorded."}
         </p>
       )}
       {removing && (
         <ConfirmDialog
-          title="Remove this response?"
-          confirm="Remove the response"
+          title="Remove this reply?"
+          confirm="Remove the reply"
           keep="Keep it"
           onClose={() => setRemoving(null)}
           onConfirm={async () => {
             if (
               await mutate(
                 () =>
-                  api(
-                    `/responses/${removing.id}?expected_version=${removing.version}`,
-                    "DELETE",
-                  ),
-                "Response removed.",
+                  api(`/applications/${application.id}`, "PATCH", {
+                    expected_version: application.version,
+                    reply: { id: removing.id, remove: true },
+                  }),
+                "Reply removed.",
               )
             )
               setRemoving(null);
           }}
         >
           <p>
-            The {responseLabels[removing.kind as ResponseKind].toLowerCase()} of{" "}
+            The {replyLabels[removing.kind].toLowerCase()} of{" "}
             {day(removing.date)} is removed. The stage of the application does
             not change.
           </p>

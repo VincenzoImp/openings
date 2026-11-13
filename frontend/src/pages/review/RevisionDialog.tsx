@@ -1,8 +1,11 @@
 import { useState, type FormEvent } from "react";
 import {
   api,
+  fileSpec,
+  sendUpload,
   uploadFile,
   type Application,
+  type DocumentWithUploads,
   type Document,
   type Json,
   type ListResult,
@@ -15,22 +18,25 @@ import { isSourceKind, kindLabels } from "./model";
 const NONE = { items: [], total: 0 };
 
 /**
- * Save a document as a new revision. A CV or letter is its .tex source and
- * the PDF built from it, with an optional note; form answers and other kinds
- * keep their text or fields. Earlier revisions never change.
+ * Save a document as a new revision. A CV or letter is its PDF, with an
+ * optional .tex source it was built from and an optional note; form answers and
+ * other kinds keep their text or fields. Earlier revisions never change.
  */
 export function RevisionDialog({
   application,
   previous,
+  kind: preset,
   onClose,
 }: {
   application: Application;
   /** The revision this one replaces; none for a new document. */
   previous?: Document;
+  /** The kind of a new document, chosen by the slot it is uploaded from. */
+  kind?: string;
   onClose: () => void;
 }) {
   const { mutate, pending } = useWorkspace();
-  const [kind, setKind] = useState(previous?.kind || "resume");
+  const [kind, setKind] = useState(previous?.kind || preset || "cv");
   const sourceKind = isSourceKind(kind);
   const structured =
     !sourceKind && !!previous && typeof previous.content?.text !== "string";
@@ -46,6 +52,7 @@ export function RevisionDialog({
   // What a failed save already stored, so saving again only retries the rest.
   const [created, setCreated] = useState<string | null>(null);
   const [sourceSha, setSourceSha] = useState<string | null>(null);
+  const [pdfDone, setPdfDone] = useState(false);
   const contexts = useResource<ListResult<Json>>(
     previous
       ? null
@@ -58,8 +65,12 @@ export function RevisionDialog({
     const form = new FormData(event.currentTarget);
     const ok = await mutate(async () => {
       let id = created;
+      let grants: DocumentWithUploads["uploads"];
+      // The grant of a PDF built from a source names the source's hash only when
+      // the browser could compute it; otherwise the PDF is reserved after the source.
+      const sourceSpec = sourceKind && source ? await fileSpec(source) : null;
       if (!id) {
-        const document = await api<Document>("/documents", "POST", {
+        const document = await api<DocumentWithUploads>("/documents", "POST", {
           application_id: application.id,
           context_id: previous?.context_id || form.get("context_id") || null,
           previous_id: previous?.id || null,
@@ -67,7 +78,10 @@ export function RevisionDialog({
           title: String(form.get("title") || ""),
           note: String(form.get("note") || ""),
           ...(sourceKind
-            ? {}
+            ? {
+                ...(file ? { pdf: await fileSpec(file) } : {}),
+                ...(sourceSpec ? { source_file: sourceSpec } : {}),
+              }
             : {
                 content: structured
                   ? content.value
@@ -75,14 +89,24 @@ export function RevisionDialog({
               }),
         });
         id = document.id;
+        grants = document.uploads;
         setCreated(id);
       }
       let built = sourceSha;
       if (sourceKind && source && !built) {
-        built = (await uploadFile(source, "document", id)).sha256 || null;
+        built =
+          (grants?.source
+            ? await sendUpload(grants.source, source)
+            : await uploadFile(source, "document", id)
+          ).sha256 || null;
         setSourceSha(built);
       }
-      if (file) await uploadFile(file, "document", id, built);
+      if (file && !pdfDone) {
+        if (grants?.pdf && (!source || sourceSpec?.sha256))
+          await sendUpload(grants.pdf, file);
+        else await uploadFile(file, "document", id, built);
+        setPdfDone(true);
+      }
     }, "Revision saved.");
     if (ok) onClose();
   }
@@ -97,7 +121,7 @@ export function RevisionDialog({
         <p className="muted">
           {previous
             ? `It replaces revision ${previous.revision_number || 1}, which stays unchanged.`
-            : "Store a document your agent prepared outside Openings. Adding it does not submit the application."}
+            : "Store a CV, a letter or another document. Adding it does not submit the application."}
         </p>
         <div className="form-grid">
           <Field label="Kind">
@@ -105,7 +129,7 @@ export function RevisionDialog({
               name="kind"
               value={kind}
               onChange={(event) => setKind(event.target.value)}
-              disabled={!!previous || locked}
+              disabled={!!previous || !!preset || locked}
             >
               {Object.entries(kindLabels).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -119,7 +143,9 @@ export function RevisionDialog({
               name="title"
               required
               maxLength={300}
-              defaultValue={previous?.title}
+              defaultValue={
+                previous?.title || (preset ? kindLabels[preset] : "")
+              }
               disabled={locked}
             />
           </Field>
@@ -140,25 +166,26 @@ export function RevisionDialog({
         {sourceKind ? (
           <>
             <Field
-              label="Source (.tex)"
-              hint="The revision's text is read from it."
-            >
-              <input
-                type="file"
-                accept=".tex,.ltx"
-                required={!sourceSha}
-                disabled={!!sourceSha}
-                onChange={(event) => setSource(event.target.files?.[0] || null)}
-              />
-            </Field>
-            <Field
               label="PDF"
-              hint="Optional now, needed to approve. It must be built from this source."
+              hint="The document you send. The revision is complete once its PDF is stored."
             >
               <input
                 type="file"
                 accept=".pdf,application/pdf"
+                required={!pdfDone}
+                disabled={pdfDone}
                 onChange={(event) => setFile(event.target.files?.[0] || null)}
+              />
+            </Field>
+            <Field
+              label="Source (.tex)"
+              hint="Optional: the source the PDF was built from. Its text is read from it; without one the text is read from the PDF."
+            >
+              <input
+                type="file"
+                accept=".tex,.ltx"
+                disabled={!!sourceSha || pdfDone}
+                onChange={(event) => setSource(event.target.files?.[0] || null)}
               />
             </Field>
           </>

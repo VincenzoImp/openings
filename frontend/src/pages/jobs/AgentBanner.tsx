@@ -23,7 +23,7 @@ export function AgentBanner() {
   const since = run?.ended_at || run?.last_activity_at;
   const arrived = useFresh<JobList>(
     since
-      ? `/jobs?queue=inbox&limit=1&created_since=${encodeURIComponent(since)}`
+      ? `/jobs?triage=new&limit=1&created_since=${encodeURIComponent(since)}`
       : null,
     NONE,
     JOB_SCOPES,

@@ -22,7 +22,7 @@ const SCREENS = [
   "applications?stage=applied",
   "applications?section=insights",
   "jobs",
-  "jobs?section=shortlist",
+  "jobs?section=shortlisted",
   "jobs?section=dismissed",
   "jobs?section=all",
   "jobs?signal=likely_duplicate",
@@ -219,7 +219,7 @@ for (const theme of ["light", "dark"]) {
       const flagged = (await api("/jobs?signal=likely_duplicate&limit=1"))
         .items[0];
       const ruled = (
-        await api("/jobs?queue=dismissed&dismissed_by=rule&limit=1")
+        await api("/jobs?triage=dismissed&dismissed_by=rule&limit=1")
       ).items[0];
       // A likely duplicate with every detail section open.
       await go(page, `jobs?job=${flagged.id}`);
@@ -276,9 +276,9 @@ for (const theme of ["light", "dark"]) {
           path,
         );
       const ready = (
-        await api("/applications?status=draft&ready=true&sort=deadline&limit=1")
+        await api("/applications?stage=ready&sort=deadline&limit=1")
       ).items[0];
-      const sent = (await api("/applications?status=interview&limit=1"))
+      const sent = (await api("/applications?stage=interview&limit=1"))
         .items[0];
       for (const [id, tab] of [
         [ready.id, "answers"],
@@ -315,7 +315,7 @@ for (const theme of ["light", "dark"]) {
       for (const wording of ["First wording.", "Second wording."]) {
         previous = await call(page, "/documents", "POST", {
           application_id: application.id,
-          kind: "resume",
+          kind: "cv",
           title: "CV",
           previous_id: previous?.id ?? null,
         });
@@ -343,11 +343,11 @@ for (const theme of ["light", "dark"]) {
         page.getByRole("list", { name: "Changes since revision 1" }),
       ).toBeVisible();
       expect(await findings(page, "review-comparison")).toEqual([]);
-      // The form that records an employer response, under its row.
+      // The form that records an employer reply, under its row.
       await go(page, "applications?stage=interview");
       await settled(page);
       await page
-        .getByRole("button", { name: /^Record response/ })
+        .getByRole("button", { name: /^Record reply/ })
         .first()
         .click();
       await expect(page.locator("form.respond")).toBeVisible();

@@ -9,7 +9,7 @@ compatibility: Requires a machine with Docker Compose v2 for installation, or an
 Use this workflow when the owner wants to start using Openings, or when a
 workspace exists but is not yet ready for the routine workflows. It ends when
 the workspace has a career record, a Profile policy, both templates and running
-sources, and the owner knows their own part: apply to Drafts and mark them
+sources, and the owner knows their own part: apply to Ready applications and mark them
 Applied or close them.
 
 Read [Openings workspace](../openings-workspace/SKILL.md) for connection and
@@ -95,7 +95,7 @@ Work in this order; each step uses records the next ones need.
 3. **Templates.** Start from the repository `examples/cv.tex` and
    `examples/letter.tex` or the owner's own documents. Build a one-page CV
    MASTER from the Career record, compile it, check the PDF, and store source,
-   guidance and rules in the resume template. Do the same for the letter template.
+   guidance and rules in the CV template. Do the same for the letter template.
 4. **Instructions.** Store general writing guidance with `instructions_update`:
    language register, evidence rules, what never to claim.
 5. **Searches.** Follow [Manage sources](../manage-sources/SKILL.md): keyword
@@ -104,7 +104,7 @@ Work in this order; each step uses records the next ones need.
 
 ## Hand over
 
-Run one [Review Inbox](../review-inbox/SKILL.md) pass and prepare one Draft with
+Run one [Review new jobs](../review-inbox/SKILL.md) pass and prepare one application with
 [Prepare Shortlist](../prepare-shortlist/SKILL.md) so the owner can see a real
 result. Explain the owner's part in two sentences and report with the shared
 [run report](../openings-workspace/references/run-report.md), including the

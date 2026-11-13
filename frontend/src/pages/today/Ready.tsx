@@ -70,9 +70,9 @@ export function Ready({ list }: { list: Fresh<ListResult<Application>> }) {
             </List>
           ) : (
             <EmptyState title="Nothing is ready to apply">
-              Your agent marks an application ready when its documents are
-              written, built and approved. It then appears here, closest
-              deadline first.
+              A shortlisted application is Ready once its required documents are
+              uploaded as PDFs and no blocking requirement is open. It then
+              appears here, closest deadline first.
             </EmptyState>
           )
         }

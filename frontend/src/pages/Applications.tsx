@@ -6,7 +6,7 @@ import { DEFAULTS, type Filters } from "./applications/model";
 import { Pipeline } from "./applications/Pipeline";
 
 /**
- * Every application from its first Draft to the employer's answer: the
+ * Every application from its shortlist to the employer's reply: the
  * pipeline as a list or a board, and Insights from the employers' answers.
  * `#applications?stage=…` opens a stage and `section=insights` the insights;
  * the shell rewrites the old page's `status=` and `readiness=ready`
@@ -19,8 +19,8 @@ export default function ApplicationsPage() {
   return (
     <>
       <PageHead title="Applications">
-        Every attempt, from the first Draft to the employer's answer. You send
-        each application yourself; here you record what happened.
+        Every attempt, from the shortlist to the employer's reply. You send each
+        application yourself; here you record what happened.
       </PageHead>
       <Tabs
         id="applications"

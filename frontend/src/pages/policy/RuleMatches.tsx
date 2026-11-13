@@ -31,7 +31,7 @@ export function RuleMatches({ item }: { item: PolicyItem }) {
     return () => abort.abort();
   }, [rule, revision]);
   const dismissed = useFresh<JobList>(
-    `/jobs?rule_id=${encodeURIComponent(item.id)}&queue=dismissed&limit=1`,
+    `/jobs?rule_id=${encodeURIComponent(item.id)}&triage=dismissed&limit=1`,
     NONE,
     ["jobs"],
   );
@@ -39,7 +39,7 @@ export function RuleMatches({ item }: { item: PolicyItem }) {
   return (
     <span className="muted rule-matches">
       {preview &&
-        `It matches ${preview.matches} of the ${plural(preview.inbox, "job")} to review now${
+        `It matches ${preview.matches} of the ${plural(preview.inbox, "job")} in New now${
           preview.pending
             ? `, ${preview.pending} of them without signals yet`
             : ""

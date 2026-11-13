@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   api,
-  newId,
-  type Application,
   type BulkResult,
   type JobCounts,
   type JobList,
@@ -22,6 +20,7 @@ import { useFresh } from "../../library/useFresh";
 import { selectRecords, useDebounce, useWorkspace } from "../../state";
 import { reviewHref } from "../applications/links";
 import { BulkBar } from "./BulkBar";
+import { triageError } from "./Detail";
 import { JobRow, type RowAction } from "./JobRow";
 import { MoreFilters } from "./MoreFilters";
 import {
@@ -39,8 +38,8 @@ import {
 const NONE: JobList = { items: [], total: 0 };
 const LIMIT = 200;
 const LABELS: Record<Section, string> = {
-  review: "Jobs to review",
-  shortlist: "Shortlisted jobs without an application",
+  new: "New jobs",
+  shortlisted: "Shortlisted jobs",
   dismissed: "Dismissed jobs",
   all: "All jobs",
 };
@@ -138,31 +137,30 @@ export function Queue({
     );
   }
   async function act(id: string, version: number, action: RowAction) {
-    if (action === "start") {
-      let created: Application | undefined;
-      const ok = await mutate(async () => {
-        created = await api<Application>("/applications", "POST", {
-          job_id: id,
-          idempotency_key: newId(),
-        });
-      }, "Application started. Your agent prepares its documents.");
-      if (ok && created) location.hash = reviewHref(created.id);
+    if (action === "open") {
+      const application = rows.find((item) => item.id === id)?.application;
+      if (application) location.hash = reviewHref(application.id);
       return;
     }
     const next = leaving(id);
     const ok = await mutate(
-      () =>
-        api(`/jobs/${id}/triage`, "POST", {
-          triage: action,
-          expected_version: version,
-        }),
+      async () => {
+        try {
+          await api(`/jobs/${id}/triage`, "POST", {
+            triage: action,
+            expected_version: version,
+          });
+        } catch (error) {
+          throw triageError(error);
+        }
+      },
       action === "dismissed"
         ? "Dismissed. It can be restored from Dismissed."
-        : action === "saved"
-          ? "Shortlisted."
+        : action === "shortlisted"
+          ? "Shortlisted. Its application is started."
           : section === "dismissed"
             ? "Restored."
-            : "Returned to the jobs to review.",
+            : "Back to New.",
     );
     if (ok) next?.();
   }
@@ -321,10 +319,10 @@ export function Queue({
           title={
             narrowed
               ? "No job matches"
-              : section === "review"
-                ? "Nothing to review"
-                : section === "shortlist"
-                  ? "The Shortlist is empty"
+              : section === "new"
+                ? "No new job"
+                : section === "shortlisted"
+                  ? "No shortlisted job"
                   : section === "dismissed"
                     ? "No dismissed job"
                     : "No job yet"
@@ -339,7 +337,7 @@ export function Queue({
                   </a>
                 )}
               </>
-            ) : section === "all" || section === "review" ? (
+            ) : section === "all" || section === "new" ? (
               <Button onClick={onAdd} icon="plus">
                 Add a job
               </Button>
@@ -348,10 +346,10 @@ export function Queue({
         >
           {narrowed
             ? `${counts ? plural(counts.all, "job is", "jobs are") + " stored. " : ""}Search looks at titles, companies and posting text.`
-            : section === "review"
-              ? "New jobs from your searches and company boards arrive here. Your agent reviews them against your policy."
-              : section === "shortlist"
-                ? "Shortlist the jobs you want to pursue. Your agent starts a Draft for each in its next prepare-shortlist run."
+            : section === "new"
+              ? "New jobs from your searches and company boards arrive here. Shortlist the ones you want, dismiss the rest."
+              : section === "shortlisted"
+                ? "Shortlist the jobs you want to pursue: shortlisting starts each one's application."
                 : section === "dismissed"
                   ? "Dismissed jobs stay remembered here, so they are not collected again, and can be restored."
                   : "Add a posting by its address, or set up a saved search in Collection."}
@@ -387,15 +385,11 @@ export function Queue({
         label="Job pages"
         onChange={(next) => setFilters({ offset: String(next) })}
       />
-      {section === "shortlist" && counts && counts.applications > 0 && (
+      {section === "shortlisted" && rows.length > 0 && (
         <footer>
           <span className="muted grow">
-            {plural(
-              counts.applications,
-              "job already has",
-              "jobs already have",
-            )}{" "}
-            an application.
+            Each shortlisted job has its application: prepare and send it from
+            Applications.
           </span>
           <a className="btn quiet sm" href="#applications">
             Applications

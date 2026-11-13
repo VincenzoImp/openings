@@ -12,7 +12,7 @@ import {
 } from "./session";
 
 // Applications (stage 3 of #135): the pipeline as a list and a board, the
-// employer's responses, bulk actions, Insights and the review page with its
+// employer's replies, bulk actions, Insights and the review page with its
 // tabs. Each test starts from the seeded workspace (fixtures.ts).
 const cookies: Cookies = ownerSession();
 const errors = new WeakMap<Page, string[]>();
@@ -38,8 +38,7 @@ const localDay = (offset = 0) => {
 };
 const toast = (page: Page) => page.locator(".app-toast").last();
 /** The Ready applications in Today's order, as the review page reads them. */
-const READY_QUEUE =
-  "/applications?status=draft&ready=true&sort=deadline&limit=200";
+const READY_QUEUE = "/applications?stage=ready&sort=deadline&limit=200";
 /** The one opened after `id` is marked applied. */
 const nextOf = (queue: { id: string }[], id: string) => {
   const index = queue.findIndex((item) => item.id === id);
@@ -79,28 +78,16 @@ async function make(page: Page, title: string, options: Options = {}) {
     deadline: options.deadline,
   });
   if (options.ready) {
-    for (const kind of ["resume", "cover_letter"]) {
+    // Ready is computed: a complete CV and letter (source and PDF) make it so.
+    for (const kind of ["cv", "letter"]) {
       const document = await call(page, "/documents", "POST", {
         application_id: application.id,
         kind,
-        title: kind === "resume" ? "CV" : "Letter",
+        title: kind === "cv" ? "CV" : "Letter",
       });
       await attachSource(page, document.id, "Synthetic text.", kind);
-      const current = await call(page, `/documents/${document.id}`);
-      await call(page, `/documents/${document.id}/review`, "POST", {
-        review_state: "approved",
-        expected_version: current.version,
-      });
     }
     application = await call(page, `/applications/${application.id}`);
-    application = await call(
-      page,
-      `/applications/${application.id}/ready`,
-      "POST",
-      {
-        expected_version: application.version,
-      },
-    );
   }
   if (options.status) {
     application = await call(page, `/applications/${application.id}`, "PATCH", {
@@ -197,14 +184,14 @@ test("keyboard only: a ready application is reviewed from Today and marked appli
   else await expect(page.getByText("All sent.")).toBeVisible();
   const sent = await call(page, `/applications/${application.id}`);
   expect(sent.applied_at).toBeTruthy();
-  // The Ready history stays in the timeline.
+  // Mark applied stays in the timeline.
   const history = await call(page, `/applications/${application.id}/events`);
   expect(history.items.map((event: any) => event.kind)).toContain(
-    "application_marked_ready",
+    "application_updated",
   );
   await go(page, `review?application=${application.id}`);
   await expect(
-    page.getByRole("button", { name: "Record response" }).first(),
+    page.getByRole("button", { name: "Record reply" }).first(),
   ).toBeVisible();
   await fitsViewport(page);
 });
@@ -232,7 +219,7 @@ test("after Mark applied the next Ready application opens, with Undo", async ({
   await expect(toast(page)).toContainText("Marked applied.");
   const sent = await call(page, `/applications/${first.id}`);
   expect([sent.status, !!sent.applied_at]).toEqual(["applied", true]);
-  // Undo: back to the first one, Preparing and Ready again, never sent.
+  // Undo: back to the first one, Shortlisted and Ready again, never sent.
   await toast(page).getByRole("button", { name: "Undo" }).click();
   await expect(page).toHaveURL(
     new RegExp(`#review\\?application=${first.id}$`),
@@ -240,16 +227,15 @@ test("after Mark applied the next Ready application opens, with Undo", async ({
   await expect
     .poll(async () => {
       const back = await call(page, `/applications/${first.id}`);
-      return [back.status, back.applied_at, back.readiness];
+      return [back.status, back.applied_at, back.ready];
     })
-    .toEqual(["draft", null, "ready"]);
+    .toEqual(["shortlisted", null, true]);
   await expect(
     page.getByRole("button", { name: "Mark applied" }).first(),
   ).toBeVisible();
   // The last one: no other application is ready, so the page says so.
-  await page.route(
-    /\/api\/v1\/applications\?status=draft&ready=true/,
-    (route) => route.fulfill({ json: { items: [first], total: 1 } }),
+  await page.route(/\/api\/v1\/applications\?stage=ready/, (route) =>
+    route.fulfill({ json: { items: [first], total: 1 } }),
   );
   await page.getByRole("button", { name: "Mark applied" }).first().click();
   await expect(page.getByText("All sent.")).toBeVisible();
@@ -258,9 +244,9 @@ test("after Mark applied the next Ready application opens, with Undo", async ({
     new RegExp(`#review\\?application=${first.id}$`),
   );
   await expect(
-    page.getByRole("button", { name: "Record response" }).first(),
+    page.getByRole("button", { name: "Record reply" }).first(),
   ).toBeVisible();
-  await page.unroute(/\/api\/v1\/applications\?status=draft&ready=true/);
+  await page.unroute(/\/api\/v1\/applications\?stage=ready/);
   // The second one leaves the queue, so the next project starts from its own.
   const left = await call(page, `/applications/${second.id}`);
   await call(page, `/applications/${second.id}`, "PATCH", {
@@ -274,33 +260,32 @@ test("after Mark applied the next Ready application opens, with Undo", async ({
   await fitsViewport(page);
 });
 
-test("the response dialog lays its fields out one under the other, without an earlier toast", async ({
+test("the reply dialog lays its fields out one under the other, without an earlier toast", async ({
   page,
 }) => {
   const application = await make(page, unique("Dialog layout"), {
     ready: true,
   });
   // Stay on this page after Mark applied: it is the only Ready one here.
-  await page.route(
-    /\/api\/v1\/applications\?status=draft&ready=true/,
-    (route) => route.fulfill({ json: { items: [application], total: 1 } }),
+  await page.route(/\/api\/v1\/applications\?stage=ready/, (route) =>
+    route.fulfill({ json: { items: [application], total: 1 } }),
   );
   await go(page, `review?application=${application.id}`);
   await settled(page);
   await page.getByRole("button", { name: "Mark applied" }).first().click();
   await expect(toast(page)).toContainText("Marked applied.");
-  await page.unroute(/\/api\/v1\/applications\?status=draft&ready=true/);
-  await page.getByRole("button", { name: "Record response" }).first().click();
+  await page.unroute(/\/api\/v1\/applications\?stage=ready/);
+  await page.getByRole("button", { name: "Record reply" }).first().click();
   const box = dialog(page);
   await expect(box).toBeVisible();
   // The confirmation from before the dialog is gone, inside it and outside.
   await expect(page.locator(".app-toast")).toHaveCount(0);
   const form = box.getByRole("form", {
-    name: /Record the employer's response/,
+    name: /Record the employer's reply/,
   });
   const body = (await box.locator(".dialog-body").boundingBox())!;
   const note = (await form.getByLabel("Note").boundingBox())!;
-  const date = (await form.getByLabel("Date of the answer").boundingBox())!;
+  const date = (await form.getByLabel("Date of the reply").boundingBox())!;
   const choice = (await form.getByRole("group").first().boundingBox())!;
   // Choice, date, note: one under the other, the note as wide as the form.
   expect(date.y).toBeGreaterThan(choice.y + choice.height - 1);
@@ -310,18 +295,17 @@ test("the response dialog lays its fields out one under the other, without an ea
     .getByRole("button", { name: "Cancel" })
     .boundingBox())!;
   const save = (await form
-    .getByRole("button", { name: "Save and move to Interview" })
+    .getByRole("button", { name: "Save the interview" })
     .boundingBox())!;
   // The buttons come after the note, Cancel before the main one, at the end.
   expect(cancel.y).toBeGreaterThan(note.y + note.height - 1);
   expect(save.x).toBeGreaterThan(cancel.x);
   expect(body.x + body.width - (save.x + save.width)).toBeLessThan(40);
+  await expect(form).toContainText("The application moves to Interview.");
   await form.getByLabel("Note").fill("Call with the team lead.");
-  await form
-    .getByRole("button", { name: "Save and move to Interview" })
-    .click();
+  await form.getByRole("button", { name: "Save the interview" }).click();
   await expect(box).toHaveCount(0);
-  await expect(toast(page)).toContainText("Response saved.");
+  await expect(toast(page)).toContainText("Reply saved.");
   await expect
     .poll(
       async () => (await call(page, `/applications/${application.id}`)).status,
@@ -329,18 +313,16 @@ test("the response dialog lays its fields out one under the other, without an ea
     .toBe("interview");
 });
 
-test("an inline response form closes when the stage changes", async ({
-  page,
-}) => {
+test("an inline reply form closes when the stage changes", async ({ page }) => {
   const title = unique("Inline form");
   await make(page, title, { status: "applied" });
   await go(page, `applications?stage=applied&q=${encodeURIComponent(title)}`);
   await settled(page);
   await row(page, title)
-    .getByRole("button", { name: /^Record response/ })
+    .getByRole("button", { name: /^Record reply/ })
     .click();
   const form = page.getByRole("form", {
-    name: /Record the employer's response/,
+    name: /Record the employer's reply/,
   });
   await expect(form).toBeVisible();
   await page
@@ -379,58 +361,102 @@ test("the list is as tall as its rows: no empty rows below them", async ({
   await expect(last.getByRole("link").first()).toBeVisible();
 });
 
-test("marking applied is refused cleanly once the application is no longer ready", async ({
+test("without LaTeX: a PDF CV and letter uploaded in the review page make the application Ready", async ({
+  page,
+}) => {
+  const title = unique("PDF only");
+  const application = await make(page, title);
+  expect([application.ready, application.missing]).toEqual([
+    false,
+    ["cv", "letter"],
+  ]);
+  await go(page, `review?application=${application.id}&tab=details`);
+  await settled(page);
+  await expect(
+    page.locator(".banner").filter({ hasText: "Not ready yet" }),
+  ).toContainText("Missing: CV, letter");
+  for (const [name, file] of [
+    ["CV", "cv.pdf"],
+    ["Letter", "letter.pdf"],
+  ]) {
+    // On a phone one document is shown at a time.
+    if (isNarrow(page))
+      await page
+        .getByRole("group", { name: "Shown document" })
+        .getByRole("button", { name, exact: true })
+        .click();
+    await page
+      .getByRole("button", { name: `Upload PDF of the ${name}` })
+      .first()
+      .click();
+    await dialog(page)
+      .getByLabel("PDF", { exact: true })
+      .setInputFiles({
+        name: file,
+        mimeType: "application/pdf",
+        buffer: syntheticPdf(`Synthetic ${name}`),
+      });
+    await dialog(page)
+      .getByRole("button", { name: "Save the revision" })
+      .click();
+    await expect(toast(page)).toContainText("Revision saved.");
+    await expect(dialog(page)).toHaveCount(0);
+  }
+  await expect
+    .poll(
+      async () => (await call(page, `/applications/${application.id}`)).ready,
+    )
+    .toBe(true);
+  const documents = await call(
+    page,
+    `/documents?application_id=${application.id}&summary=true`,
+  );
+  expect(documents.items.map((item: any) => item.complete)).toEqual([
+    true,
+    true,
+  ]);
+  await expect(page.locator(".review-head .tag").first()).toHaveText("Ready");
+  await expect(
+    page.locator(".banner").filter({ hasText: "Ready to apply" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Mark applied" }).first(),
+  ).toBeVisible();
+});
+
+test("a new revision without its PDF leaves Ready, and the page says what is missing", async ({
   page,
 }) => {
   const title = unique("No longer ready");
   const application = await make(page, title, { ready: true });
-  await go(page, `review?application=${application.id}`);
-  await settled(page);
-  // Another session saves a new revision: the Ready mark is cleared.
+  expect(application.ready).toBe(true);
+  const documents = await call(
+    page,
+    `/documents?application_id=${application.id}&kind=cv&summary=true`,
+  );
+  // A new CV revision replaces the complete one; it has no PDF yet.
   await call(page, "/documents", "POST", {
     application_id: application.id,
-    kind: "resume",
+    kind: "cv",
     title: "Changed CV",
+    previous_id: documents.items[0].id,
   });
-  await page.getByRole("button", { name: "Mark applied" }).first().click();
-  await expect(toast(page)).toContainText("no longer ready");
-  expect((await call(page, `/applications/${application.id}`)).status).toBe(
-    "draft",
-  );
-  await expect(page.getByRole("button", { name: "Mark applied" })).toHaveCount(
-    0,
-  );
-});
-
-test("the Ready mark is removed and set again under Details", async ({
-  page,
-}) => {
-  const title = unique("Ready mark");
-  const application = await make(page, title, { ready: true });
+  const after = await call(page, `/applications/${application.id}`);
+  expect([after.ready, after.missing]).toEqual([false, ["cv"]]);
   await go(page, `review?application=${application.id}&tab=details`);
   await settled(page);
-  await page.getByRole("button", { name: "Not ready", exact: true }).click();
-  await expect(toast(page)).toContainText("No longer marked ready.");
-  await expect
-    .poll(
-      async () =>
-        (await call(page, `/applications/${application.id}`)).ready_at,
-    )
-    .toBeNull();
-  await page.getByRole("button", { name: "Mark ready", exact: true }).click();
-  await expect(toast(page)).toContainText("Marked ready to apply.");
-  await expect
-    .poll(
-      async () =>
-        (await call(page, `/applications/${application.id}`)).readiness,
-    )
-    .toBe("ready");
+  await expect(page.locator(".review-head .tag").first()).toHaveText(
+    "Shortlisted",
+  );
+  await expect(
+    page.locator(".banner").filter({ hasText: "Not ready yet" }),
+  ).toContainText("Missing: CV");
 });
 
-test("keyboard only: an employer response is recorded from an Applied row", async ({
+test("keyboard only: an employer reply is recorded from an Applied row", async ({
   page,
 }) => {
-  const prefix = unique("Response row");
+  const prefix = unique("Reply row");
   const rejected = await make(page, `${prefix} rejected`, {
     status: "applied",
   });
@@ -448,11 +474,11 @@ test("keyboard only: an employer response is recorded from an Applied row", asyn
 
   // Rejection, with the keyboard: the form takes focus on its first choice.
   await row(page, `${prefix} rejected`)
-    .getByRole("button", { name: /^Record response/ })
+    .getByRole("button", { name: /^Record reply/ })
     .focus();
   await page.keyboard.press("Enter");
   const form = page.getByRole("form", {
-    name: /Record the employer's response/,
+    name: /Record the employer's reply/,
   });
   await expect(
     form.getByRole("button", { name: "Interview", exact: true }),
@@ -469,13 +495,13 @@ test("keyboard only: an employer response is recorded from an Applied row", asyn
   await page.keyboard.type("Position filled internally.");
   await page.keyboard.press(tabKey(page));
   await expect(
-    form.getByRole("button", { name: "Save and close as rejected" }),
+    form.getByRole("button", { name: "Save the rejection" }),
   ).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(toast(page)).toContainText("Rejection saved");
+  await expect(toast(page)).toContainText("Reply saved");
   const closed = await call(page, `/applications/${rejected.id}`);
   expect([closed.status, closed.outcome]).toEqual(["closed", "rejected"]);
-  expect(closed.responses).toEqual([
+  expect(closed.replies).toEqual([
     expect.objectContaining({
       kind: "rejection",
       date: localDay(0),
@@ -485,22 +511,20 @@ test("keyboard only: an employer response is recorded from an Applied row", asyn
 
   // An interview invitation moves the application to Interview.
   await row(page, `${prefix} invited`)
-    .getByRole("button", { name: /^Record response/ })
+    .getByRole("button", { name: /^Record reply/ })
     .click();
-  await form.getByLabel("Date of the answer").fill(localDay(-2));
-  await form
-    .getByRole("button", { name: "Save and move to Interview" })
-    .click();
+  await form.getByLabel("Date of the reply").fill(localDay(-2));
+  await form.getByRole("button", { name: "Save the interview" }).click();
   await expect
     .poll(async () => (await call(page, `/applications/${invited.id}`)).status)
     .toBe("interview");
-  expect(
-    (await call(page, `/applications/${invited.id}`)).responses[0],
-  ).toEqual(expect.objectContaining({ kind: "interview", date: localDay(-2) }));
+  expect((await call(page, `/applications/${invited.id}`)).replies[0]).toEqual(
+    expect.objectContaining({ kind: "interview", date: localDay(-2) }),
+  );
 
   // No reply closes the application on the day it was concluded.
   await row(page, `${prefix} silent`)
-    .getByRole("button", { name: /^Record response/ })
+    .getByRole("button", { name: /^Record reply/ })
     .click();
   await form.getByRole("button", { name: "No reply", exact: true }).click();
   await expect(form.getByLabel("Note")).toHaveCount(0);
@@ -516,7 +540,8 @@ test("keyboard only: an employer response is recorded from an Applied row", asyn
   await go(page, `applications?stage=closed&q=${encodeURIComponent(prefix)}`);
   await settled(page);
   await expect(row(page, `${prefix} rejected`)).toContainText(
-    /Rejection · .*, after 0 days/,
+    // Sent now (UTC) and answered today (local): 0 days, 1 near midnight.
+    /Rejection · .*, after (0|1) days/,
   );
   await expect(row(page, `${prefix} silent`)).toContainText(
     /No reply · closed .* after (49|50|51) days/,
@@ -540,7 +565,7 @@ test("selected applications are closed as no reply, reopened and deleted togethe
   const bar = page.getByRole("group", { name: "Selected applications" });
   await expect(bar).toContainText("3 selected");
   // Only the actions valid for every selected application are offered: the
-  // Draft was never sent and is not Ready, the others are not Preparing.
+  // shortlisted one was never sent, the others are not Shortlisted.
   await expect(bar.getByRole("button")).toHaveText([
     "Close…",
     "Delete…",
@@ -606,40 +631,41 @@ test("the pipeline counts each stage, filters and shows a board", async ({
   const counts = await call(page, "/applications?limit=1");
   const chips = page.getByRole("group", { name: "Stage" }).getByRole("button");
   await expect(chips).toHaveText([
-    `All${counts.total}`,
-    `Preparing${counts.stage_counts.draft - counts.ready_count}`,
-    `Ready${counts.ready_count}`,
+    `Shortlisted${counts.stage_counts.shortlisted}`,
+    `Ready${counts.stage_counts.ready}`,
     `Applied${counts.stage_counts.applied}`,
     `Interview${counts.stage_counts.interview}`,
     `Offer${counts.stage_counts.offer}`,
     `Closed${counts.stage_counts.closed}`,
+    `All${counts.total}`,
   ]);
-  // Ready is its own stage; Preparing no longer includes it.
+  // Ready is computed: the Shortlisted applications whose documents are complete.
   await chips.filter({ hasText: /^Ready/ }).click();
   await expect(page).toHaveURL(/stage=ready/);
   await expect(
     page.getByRole("table", { name: "Applications" }).getByRole("row"),
-  ).toHaveCount(counts.ready_count + 1);
+  ).toHaveCount(counts.stage_counts.ready + 1);
   await expect(
     page.getByRole("link", { name: /^Review / }).first(),
   ).toHaveClass(/primary/);
   await page.getByLabel("Sort", { exact: true }).selectOption("deadline");
   await expect(page).toHaveURL(/sort=deadline/);
-  await page.getByLabel("Readiness", { exact: true }).selectOption("blocked");
-  await expect(
-    page.getByRole("heading", { name: "No application matches" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Clear filters" }).first().click();
+  // The Readiness filter is gone: the stage chips say it.
+  await expect(page.getByLabel("Readiness", { exact: true })).toHaveCount(0);
   await page
     .getByRole("searchbox", { name: "Search applications" })
     .fill("Harbor Bank");
   await chips.filter({ hasText: /^All/ }).click();
-  await expect(row(page, "Platform Engineer")).toContainText(
-    "Blocking requirement",
+  const harbor = row(page, "Platform Engineer").filter({
+    hasText: "Harbor Bank",
+  });
+  await expect(harbor).toContainText("Blocking requirement");
+  // What Ready lacks, in words.
+  await expect(harbor).toContainText("Missing: CV, letter, a requirement");
+  await expect(harbor.getByRole("link", { name: /^Decide/ })).toHaveAttribute(
+    "href",
+    /tab=requirements$/,
   );
-  await expect(
-    row(page, "Platform Engineer").getByRole("link", { name: /^Decide/ }),
-  ).toHaveAttribute("href", /tab=requirements$/);
   await page.getByRole("searchbox", { name: "Search applications" }).fill("");
 
   // The board: one column per open stage, the rest of a stage in the list.
@@ -647,7 +673,7 @@ test("the pipeline counts each stage, filters and shows a board", async ({
   await expect(page).toHaveURL(/view=board/);
   const board = page.getByRole("region", { name: "Applications as a board" });
   await expect(board.locator("section h3")).toHaveText([
-    /^Preparing/,
+    /^Shortlisted/,
     /^Ready/,
     /^Applied/,
     /^Interview/,
@@ -702,7 +728,14 @@ test("answers and the questions of the form are edited without JSON", async ({
   await go(page, `review?application=${application.id}&tab=answers`);
   await settled(page);
   await page.getByLabel("Why this role?").fill("Synthetic motivation.");
+  // The page reads the application again after the save, with its new version.
+  const reread = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/api/v1/applications/${application.id}`) &&
+      response.request().method() === "GET",
+  );
   await page.getByRole("button", { name: "Save answers" }).click();
+  await reread;
   await expect
     .poll(
       async () => (await call(page, `/applications/${application.id}`)).answers,
@@ -879,19 +912,6 @@ test("requirements, the plan and a concurrent change in the details", async ({
   ).toContainText("Lead with the API work.");
 });
 
-/**
- * Load the review page afresh on its Documents tab. After a save with files,
- * the tab's list can keep a read from before the files arrived (seen on a
- * loaded CI runner, never locally); the rebuilt application page replaces
- * this loader (#214, #224).
- */
-async function reopenDocuments(page: Page, applicationId: string) {
-  await page.waitForLoadState("networkidle");
-  await page.goto("about:blank");
-  await go(page, `review?application=${applicationId}&tab=documents`);
-  await settled(page);
-}
-
 test("documents, revisions, frozen copies and their files are managed in the review page", async ({
   page,
 }) => {
@@ -935,7 +955,7 @@ test("documents, revisions, frozen copies and their files are managed in the rev
     .click();
   await again;
 
-  // A CV from that copy: its source and the PDF built from it, approved,
+  // A CV from that copy: its source and the PDF built from it, complete,
   // revised, compared with the first revision and deleted.
   await page.getByRole("tab", { name: "Documents" }).click();
   await page.getByRole("button", { name: "Add a document" }).click();
@@ -956,18 +976,19 @@ test("documents, revisions, frozen copies and their files are managed in the rev
   await dialog(page).getByLabel("Note").fill("Leads with the data work.");
   await dialog(page).getByRole("button", { name: "Save the revision" }).click();
   await expect(dialog(page)).toHaveCount(0);
-  await reopenDocuments(page, application.id);
+  // The list reads the new revision and its files without a reload.
   const revisions = page.getByRole("list", { name: "Document revisions" });
+  await expect(
+    revisions.getByText("Complete", { exact: true }).first(),
+  ).toBeVisible();
   await revisions.getByRole("button", { name: /^Open Workflow CV/ }).click();
   await expect(
     revisions.getByRole("document", { name: "Text of revision 1" }),
   ).toHaveText("Synthetic document text.");
   await expect(revisions).toContainText("PDF, built from workflow.tex");
   await expect(revisions).toContainText("Leads with the data work.");
-  await page.getByRole("button", { name: "Approve this revision" }).click();
-  await expect(
-    revisions.getByText("Approved", { exact: true }).first(),
-  ).toBeVisible();
+  // A complete revision is immutable: no file is added to it.
+  await expect(page.getByRole("button", { name: "Add a file" })).toHaveCount(0);
   await expect(
     page.locator('iframe[title^="Preview of the CV"]'),
   ).toBeVisible();
@@ -994,17 +1015,18 @@ test("documents, revisions, frozen copies and their files are managed in the rev
       mimeType: "application/x-tex",
       buffer: syntheticTex("Changed synthetic document."),
     });
+  await dialog(page)
+    .getByLabel("PDF", { exact: true })
+    .setInputFiles({
+      name: "workflow.pdf",
+      mimeType: "application/pdf",
+      buffer: syntheticPdf("Changed synthetic document."),
+    });
   await dialog(page).getByRole("button", { name: "Save the revision" }).click();
   await expect(dialog(page)).toHaveCount(0);
-  await reopenDocuments(page, application.id);
   await expect(revisions.locator(":scope > li")).toHaveCount(2);
   await revisions.getByRole("button", { name: /^Open/ }).first().click();
-  await expect(
-    page.getByText("Add the PDF built from the source before approving."),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Approve this revision" }),
-  ).toBeDisabled();
+  await expect(revisions).toContainText("PDF, built from workflow.tex");
   await page.getByRole("button", { name: "Compare with revision 1" }).click();
   const changes = page.getByRole("list", {
     name: "Changes since revision 1",
@@ -1067,12 +1089,12 @@ test("the Inputs tab and the list name the parts that changed since the document
   const context = await call(page, "/contexts", "POST", {
     application_id: application.id,
   });
-  for (const kind of ["resume", "cover_letter"])
+  for (const kind of ["cv", "letter"])
     await call(page, "/documents", "POST", {
       application_id: application.id,
       context_id: context.id,
       kind,
-      title: kind === "resume" ? "CV" : "Letter",
+      title: kind === "cv" ? "CV" : "Letter",
     });
   const profile = async (fields: Record<string, unknown>) =>
     call(page, "/career/profile", "PATCH", {
@@ -1131,7 +1153,7 @@ test("the Inputs tab and the list name the parts that changed since the document
     );
 });
 
-test("the timeline records responses, notes and who made each change", async ({
+test("the timeline records replies, notes and who made each change", async ({
   page,
 }) => {
   const stamp = unique("Timeline");
@@ -1164,37 +1186,41 @@ test("the timeline records responses, notes and who made each change", async ({
   );
   await expect(history).toContainText("Owner (dashboard)");
 
-  // An employer response: recorded, its day corrected, then removed.
-  await page.getByRole("button", { name: "Record a response" }).click();
+  // An employer reply: recorded, its day corrected, then removed.
+  await page
+    .getByRole("region", { name: "Employer replies" })
+    .getByRole("button", { name: "Record reply" })
+    .click();
   const form = page.getByRole("form", {
-    name: /Record the employer's response/,
+    name: /Record the employer's reply/,
   });
   await form.getByRole("button", { name: "Other", exact: true }).click();
   await form.getByLabel("Note").fill("Asked for references.");
-  await form.getByRole("button", { name: "Save the answer" }).click();
-  const responses = page.getByRole("list", { name: "Employer responses" });
-  await expect(responses).toContainText("Other answer");
-  await responses.getByRole("button", { name: /^Edit/ }).click();
+  await form.getByRole("button", { name: "Save the reply" }).click();
+  const replies = page.getByRole("list", { name: "Employer replies" });
+  await expect(replies).toContainText("Other reply");
+  // Another reply leaves the stage as it was.
+  expect((await call(page, `/applications/${application.id}`)).status).toBe(
+    "applied",
+  );
+  await replies.getByRole("button", { name: /^Edit/ }).click();
   await page
-    .getByRole("form", { name: "Correct the response" })
-    .getByLabel("Date of the answer")
+    .getByRole("form", { name: "Correct the reply" })
+    .getByLabel("Date of the reply")
     .fill(localDay(-3));
   await page
-    .getByRole("form", { name: "Correct the response" })
+    .getByRole("form", { name: "Correct the reply" })
     .getByRole("button", { name: "Save" })
     .click();
   await expect
     .poll(
       async () =>
-        (await call(page, `/applications/${application.id}/responses`)).items[0]
-          .date,
+        (await call(page, `/applications/${application.id}`)).replies[0].date,
     )
     .toBe(localDay(-3));
-  await responses.getByRole("button", { name: /^Remove/ }).click();
-  await dialog(page)
-    .getByRole("button", { name: "Remove the response" })
-    .click();
-  await expect(page.getByText("No answer is recorded.")).toBeVisible();
+  await replies.getByRole("button", { name: /^Remove/ }).click();
+  await dialog(page).getByRole("button", { name: "Remove the reply" }).click();
+  await expect(page.getByText("No reply is recorded.")).toBeVisible();
 
   // A note on the application, then deleted after asking.
   await page
@@ -1255,6 +1281,8 @@ test("the agent is asked from the review page and the application is deleted", a
       async () => (await call(page, `/applications/${application.id}`)).outcome,
     )
     .toBe("not_pursued");
+  // The page has read the closed application before the next action.
+  await expect(page.locator(".review-head .tag").first()).toHaveText("Closed");
   await page.getByRole("button", { name: "Delete this application" }).click();
   await dialog(page)
     .getByRole("button", { name: "Delete the application" })

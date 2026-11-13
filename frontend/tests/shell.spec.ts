@@ -206,17 +206,17 @@ test("design names are aliases and old routes keep their deep links", async ({
   await expect(page.getByLabel("Sent from")).toHaveValue("2026-01-01");
   // The old Applications page: its stage filter and the drawer's address.
   await go(page, "applications?status=draft&view=list");
-  await expect(page).toHaveURL(/#applications\?view=list&stage=preparing$/);
+  await expect(page).toHaveURL(/#applications\?view=list&stage=shortlisted$/);
   await expect(
     page.getByRole("group", { name: "Stage" }).getByRole("button", {
-      name: /^Preparing/,
+      name: /^Shortlisted/,
     }),
   ).toHaveAttribute("aria-pressed", "true");
   await go(page, "applications?readiness=ready&sort=ready");
-  await expect(page).toHaveURL(/#applications\?sort=ready&stage=ready$/);
+  await expect(page).toHaveURL(/#applications\?sort=deadline&stage=ready$/);
   const [first] = (
     await page.evaluate(() =>
-      fetch("/api/v1/applications?status=applied&limit=1").then((response) =>
+      fetch("/api/v1/applications?stage=applied&limit=1").then((response) =>
         response.json(),
       ),
     )
@@ -243,8 +243,8 @@ test("design names are aliases and old routes keep their deep links", async ({
   for (const [route, url, tab] of [
     ["jobs?queue=dismissed", /#jobs\?section=dismissed$/, /^Dismissed/],
     ["inbox?queue=dismissed", /#jobs\?section=dismissed$/, /^Dismissed/],
-    ["inbox", /#jobs$/, /^To review/],
-    ["shortlist", /#jobs\?section=shortlist$/, /^Shortlist/],
+    ["inbox", /#jobs$/, /^New/],
+    ["shortlist", /#jobs\?section=shortlisted$/, /^Shortlisted/],
     ["inbox?queue=all", /#jobs\?section=all$/, /^All$/],
   ] as const) {
     await go(page, route);
@@ -267,7 +267,7 @@ test("navigation counts come from the workspace and the agent line shows an open
       (path) => fetch("/api/v1" + path).then((response) => response.json()),
       path,
     );
-  const ready = (await api("/applications?status=draft&limit=1")).ready_count;
+  const ready = (await api("/applications?limit=1")).stage_counts.ready;
   const applications = page
     .getByRole("navigation", { name: "Main" })
     .getByRole("link", { name: /^Applications/ });
@@ -316,9 +316,8 @@ for (const width of [360, 390, 600, 860, 861, 1024, 1280, 1600])
         (path) => fetch("/api/v1" + path).then((response) => response.json()),
         path,
       );
-    const ready = (await api("/applications?status=draft&ready=true&limit=1"))
-      .items[0];
-    const sent = (await api("/applications?status=interview&limit=1")).items[0];
+    const ready = (await api("/applications?stage=ready&limit=1")).items[0];
+    const sent = (await api("/applications?stage=interview&limit=1")).items[0];
     // A job with every kind of signal: a likely duplicate of a job in progress.
     const flagged = (await api("/jobs?signal=likely_duplicate&limit=1"))
       .items[0];

@@ -6,25 +6,26 @@ import { dayTime } from "../../library/time.ts";
 /** Changes to these REST resources read the jobs again (useFresh scopes). */
 export const JOB_SCOPES = ["jobs", "applications", "notes", "files", "policy"];
 
-export type Section = "review" | "shortlist" | "dismissed" | "all";
+export type Section = "new" | "shortlisted" | "dismissed" | "all";
 export const SECTIONS: { id: Section; label: string }[] = [
-  { id: "review", label: "To review" },
-  { id: "shortlist", label: "Shortlist" },
+  { id: "new", label: "New" },
+  { id: "shortlisted", label: "Shortlisted" },
   { id: "dismissed", label: "Dismissed" },
   { id: "all", label: "All" },
 ];
-const QUEUES: Record<Section, string | null> = {
-  review: "inbox",
-  shortlist: "shortlist",
-  dismissed: "dismissed",
-  all: null,
+// The tab names of earlier versions.
+const OLD_SECTIONS: Record<string, Section> = {
+  review: "new",
+  shortlist: "shortlisted",
 };
 export const sectionOf = (value: string): Section =>
-  SECTIONS.some((item) => item.id === value) ? (value as Section) : "review";
+  SECTIONS.some((item) => item.id === value)
+    ? (value as Section)
+    : OLD_SECTIONS[value] || "new";
 
 /** The filters of the address; the shell maps the old Inbox's names to them. */
 export const DEFAULTS = {
-  section: "review",
+  section: "new",
   q: "",
   signal: "",
   complete: "",
@@ -102,8 +103,7 @@ export const sortOf = (filters: Filters) => {
 export function listQuery(filters: Filters, limit: number) {
   const query = new URLSearchParams();
   const section = sectionOf(filters.section);
-  const queue = QUEUES[section];
-  if (queue) query.set("queue", queue);
+  if (section !== "all") query.set("triage", section);
   for (const key of NARROWING) {
     const value = filters[key];
     const dismissedOnly = key === "dismissed_by" || key === "rule_id";
@@ -120,13 +120,7 @@ export function listQuery(filters: Filters, limit: number) {
 /** The count a tab shows. */
 export function sectionCount(section: Section, counts?: JobCounts) {
   if (!counts) return undefined;
-  return section === "review"
-    ? counts.inbox
-    : section === "shortlist"
-      ? counts.shortlist
-      : section === "dismissed"
-        ? counts.dismissed
-        : undefined;
+  return section === "all" ? undefined : counts[section];
 }
 
 export const LANGUAGES: Record<string, string> = {
@@ -288,7 +282,7 @@ export function foundLine(job: Job, now = new Date()) {
 /** The state of a job in the All tab: its application, else its queue. */
 export function placeTag(job: Pick<Job, "application" | "triage">): Label {
   const stages: Record<string, string> = {
-    draft: "Preparing",
+    shortlisted: "Shortlisted",
     applied: "Applied",
     interview: "Interview",
     offer: "Offer",
@@ -299,13 +293,13 @@ export function placeTag(job: Pick<Job, "application" | "triage">): Label {
       text: stages[job.application.status] || job.application.status,
       tone: job.application.status === "closed" ? undefined : "info",
     };
-  if (job.triage === "saved") return { text: "Shortlist" };
+  if (job.triage === "shortlisted") return { text: "Shortlisted" };
   if (job.triage === "dismissed") return { text: "Dismissed" };
-  return { text: "To review" };
+  return { text: "New" };
 }
 
-/** The tabs a triaged job leaves: To review and the Shortlist. */
-export const QUEUE_SECTIONS: Section[] = ["review", "shortlist"];
+/** The tabs a triaged job leaves: New and Shortlisted. */
+export const QUEUE_SECTIONS: Section[] = ["new", "shortlisted"];
 
 /**
  * The job to show once `id` leaves the list: the next row, or the previous
