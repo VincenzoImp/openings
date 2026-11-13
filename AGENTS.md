@@ -1,11 +1,11 @@
 # Working on Openings
 
 Read README.md, CONTRIBUTING.md and docs/developer/architecture.md before changing
-behavior. The running OpenAPI schema and MCP tools describe the current contract;
-backend/openings/operation-inventory.json maps logical operations across interfaces.
+behavior. The running OpenAPI schema and MCP `tools/list` are the contract.
 
-- Keep business logic in shared services. Dashboard, REST and MCP must expose the
-  same useful operations, allowing documented authentication/transport differences.
+- Keep business logic in shared services. Every dashboard action is a REST
+  operation; every operation that is not owner-only is also an MCP tool. REST and
+  MCP may offer more than the dashboard.
 - Preserve version checks, context/document immutability, exact file ownership,
   reversible dismissal and deliberate permanent deletion.
 - Keep incomplete automatic candidates in collection checkpoints; admit usable

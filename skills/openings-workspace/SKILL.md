@@ -33,11 +33,10 @@ verification. MCP and REST expose the same workflow semantics.
 
 ## Start
 
-Start with `workspace_info`, `capabilities_get` and the connected tool schemas.
+Start with `workspace_info` and the connected tool schemas (`tools/list`).
 For REST, inspect `/api/openapi.json`. `workspace_info` names the token and its
 kind (`actor.token_kind`). An `agent` token does the whole job search and is
-refused with `forbidden` for owner-only operations (`access: owner` in
-`capabilities_get`): the owner password, token management, restore and answering
+refused with `forbidden` for owner-only operations: the owner password, token management, restore and answering
 a question for the owner, and writing or withdrawing a request for the agent.
 Do not work around a refusal; tell the owner what needs their action.
 `workspace_info` also reports `open_requests`: the owner's instructions waiting

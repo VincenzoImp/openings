@@ -1,6 +1,5 @@
-// Size budgets of the built dashboard (docs/developer/dashboard-design.md,
-// "Budgets"). Reads the Vite manifest of `npm run build`, prints a table and
-// exits with 1 when a budget is exceeded.
+// Size budgets of the built dashboard. Reads the Vite manifest of
+// `npm run build`, prints a table and exits with 1 when a budget is exceeded.
 //
 //   first screen   JavaScript needed to show the home screen       110 kB
 //   later screen   JavaScript a screen adds to what is loaded       40 kB

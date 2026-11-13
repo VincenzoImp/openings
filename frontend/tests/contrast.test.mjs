@@ -2,16 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-// The contrast of every token pair in the colour table of
-// docs/developer/dashboard-design.md, computed from src/design/tokens.css in
-// both themes. The table states the lowest ratio of each token on the
-// backgrounds it is used on; this test recomputes it and holds it to WCAG AA.
+// The contrast of every token on the backgrounds it is used on, computed from
+// src/design/tokens.css in both themes and held to WCAG AA.
 const css = readFileSync(
   new URL("../src/design/tokens.css", import.meta.url),
-  "utf8",
-);
-const design = readFileSync(
-  new URL("../../docs/developer/dashboard-design.md", import.meta.url),
   "utf8",
 );
 
@@ -63,62 +57,17 @@ const pairs = {
   },
 };
 
-// Rows of the table: | `--token` | use | light | dark | lowest light / dark |
-const documented = {};
-for (const line of design.split("\n")) {
-  const cells = line.split("|").map((cell) => cell.trim());
-  const token = cells[1]?.match(/^`(--[\w-]+)`$/)?.[1];
-  const lowest = cells[5]?.match(/^([\d.]+) \/ ([\d.]+)$/);
-  if (!token || !lowest) continue;
-  documented[token] = {
-    light: { value: cells[3], lowest: Number(lowest[1]) },
-    dark: { value: cells[4], lowest: Number(lowest[2]) },
-  };
-}
-
-test("the design document's colour table lists every token with a contrast claim", () => {
-  assert.deepEqual(Object.keys(documented).sort(), Object.keys(pairs).sort());
-});
-
 for (const [token, { on, min }] of Object.entries(pairs))
   for (const [theme, tokens] of Object.entries(themes))
-    test(`${token} in the ${theme} theme meets ${min}:1 and its documented lowest contrast`, () => {
-      const doc = documented[token][theme];
-      assert.equal(
-        tokens[token],
-        doc.value.replaceAll("`", "").toLowerCase(),
-        `${token} differs from the design document`,
-      );
-      const ratios = on.map((background) => ({
-        background,
-        value: ratio(tokens[token], tokens[background]),
-      }));
-      for (const { background, value } of ratios)
+    test(`${token} in the ${theme} theme meets ${min}:1`, () => {
+      for (const background of on) {
+        const value = ratio(tokens[token], tokens[background]);
         assert.ok(
           value >= min - 0.05,
           `${token} on ${background} is ${value.toFixed(2)}:1, below ${min}:1`,
         );
-      const lowest = Math.min(...ratios.map((item) => item.value));
-      assert.ok(
-        Math.abs(lowest - doc.lowest) < 0.1,
-        `lowest contrast of ${token} is ${lowest.toFixed(2)}:1, the document says ${doc.lowest}:1`,
-      );
+      }
     });
-
-test("surface colours match the design document", () => {
-  const row = design
-    .split("\n")
-    .find((line) => line.startsWith("| `--bg`, `--surface`, `--card`"));
-  const cells = row.split("|").map((cell) => cell.trim());
-  for (const [theme, cell] of [
-    ["light", cells[3]],
-    ["dark", cells[4]],
-  ])
-    assert.deepEqual(
-      surfaces.map((name) => themes[theme][name]),
-      cell.replaceAll("`", "").split(", "),
-    );
-});
 
 for (const [theme, tokens] of Object.entries(themes)) {
   test(`text on filled and soft backgrounds is readable in the ${theme} theme`, () => {
