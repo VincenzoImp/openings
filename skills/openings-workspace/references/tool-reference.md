@@ -212,6 +212,16 @@ asked and a page of the changes made (`changes_limit`, `changes_offset`);
 `runs_list` filters by `status` (`open`, `finished`, `interrupted`), `workflow`,
 `token_id`, start time and `active_since` (last activity at or after a time). An open run without a write or note for two hours is
 reported as `interrupted`; it stays open, and a later write revives it.
+Each listed run carries its report's `summary` and `method`.
+
+`skill_get(name)` returns `SKILL.md` with this workspace's local notes appended
+under `## Local notes for this workspace` (`local_notes: false` for the shipped
+text alone); reference files are served as shipped. `skill_notes_get(name)`
+returns `text`, `version` (0 when none), the author and up to 50 earlier
+versions. `skill_notes_update(name, {"expected_version": N, "text": "..."})`
+replaces the whole notes (at most 2,000 characters; empty clears them); a stale
+version returns `409 conflict` with `details.current_version`. An agent token may
+write notes; every version names its author and the owner can restore any.
 
 `questions_ask` takes `question`, `why`, optional `subject_type` (`job`,
 `application`, `knowledge`) with `subject_id`, optional `choices` and an

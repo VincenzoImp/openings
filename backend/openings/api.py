@@ -7,6 +7,7 @@ from mcp.types import ToolAnnotations
 
 from . import __version__
 from .actors import current_actor
+from .db import SCHEMA_VERSION
 from .models import (
     ApplicationBulk,
     ApplicationInput,
@@ -35,6 +36,7 @@ def register_core(router: APIRouter, workspace, requests):
             "origin": os.environ.get("OPENINGS_PUBLIC_URL", str(request.base_url)).rstrip("/"),
             "name": "Openings",
             "version": __version__,
+            "schema_version": SCHEMA_VERSION,
             "api_base": "/api/v1",
             "mcp_endpoint": "/mcp",
             "single_owner": True,
@@ -148,7 +150,7 @@ def register_core(router: APIRouter, workspace, requests):
 def register_core_mcp(mcp, workspace, requests):
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     def workspace_info(ctx: Context) -> dict:
-        """Read workspace capabilities, who this token is (actor, with token_kind owner or agent), open_requests, the number of owner requests waiting for an agent (requests_list), and storage: database size, free space on the data volume, the largest backup a restore accepts and the days finished collection runs are kept. Use REST transfer grants for file bytes."""
+        """Read workspace capabilities, the version and schema_version, who this token is (actor, with token_kind owner or agent), open_requests, the number of owner requests waiting for an agent (requests_list), and storage: database size, free space on the data volume, the largest backup a restore accepts and the days finished collection runs are kept. Use REST transfer grants for file bytes."""
         request = ctx.request_context.request
         origin = os.environ.get("OPENINGS_PUBLIC_URL") or (
             str(request.base_url).rstrip("/") if request else None
@@ -156,6 +158,7 @@ def register_core_mcp(mcp, workspace, requests):
         return {
             "name": "Openings",
             "version": __version__,
+            "schema_version": SCHEMA_VERSION,
             "origin": origin,
             "api_base": "/api/v1",
             "actor": current_actor().describe(),

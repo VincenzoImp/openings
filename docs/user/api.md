@@ -46,6 +46,7 @@ Paste the posting when extraction cannot obtain the complete text.
 | Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `GET /documents/{id}/consistency`, `POST /documents/{id}/review` |
 | Files | `GET /files`, `GET/DELETE /files/{id}`, `GET /files/{id}/content`, `POST /files/uploads`, `POST /files/{id}/download` |
 | Agent activity | `GET /events`; `GET/POST /runs`, `GET/PATCH /runs/{id}`, `POST /runs/{id}/finish`; `GET/POST /questions`, `GET /questions/{id}`, `POST /questions/{id}/answer`, `POST /questions/{id}/withdraw`; `GET/POST /requests`, `GET /requests/{id}`, `POST /requests/{id}/take`, `/complete`, `/decline`, `/withdraw` |
+| Skills | `GET /skills`, `GET /skills/{name}`, `GET /skills/{name}/files/{path}`, `GET/PUT /skills/{name}/notes` |
 | Operations | `GET /workspace`, `/capabilities`, `/overview`, `/export`, `/backup`; `POST /backup/restore`; `/tokens`; `POST /auth/password` |
 
 List routes return `{items,total}` and accept bounded `limit`/`offset` where
@@ -224,7 +225,8 @@ notes return `author`. Entries from before version 0.17 have
 title, company, location or posting text (`job_refreshed`, with the field names);
 the `posting_updated` kind of earlier releases no longer exists.
 
-`GET /workspace` and `workspace_info` return `storage`: `database_bytes`,
+`GET /workspace` and `workspace_info` return `schema_version` (the database
+schema of this release, 12 in 0.21) and `storage`: `database_bytes`,
 `free_bytes` on the data volume, `restore_limit_bytes` (the largest backup a
 restore accepts now), `restore_limit_configured_bytes` (the optional
 `OPENINGS_MAX_RESTORE_MB` bound, or null), `retention_days` and
@@ -263,6 +265,9 @@ stores a progress `note`. `GET /runs/{id}?changes_limit=50&changes_offset=0`
 returns the report, the questions asked and the changes made; `GET /runs` filters
 by `status`, `workflow`, `token_id`, `started_since`, `started_until` and
 `active_since` (last activity at or after a time: a start, a change or the end).
+Each listed run carries `summary` and `method`, the report's account of what the
+workflow lacked (empty when none), which the owner may turn into the skill's
+[local notes](#skills-and-local-notes).
 `GET /questions` filters by `state`, `subject_type`, `subject_id`, `run_id` and
 `answered_since`; answer and withdraw take `expected_version`, and answering
 needs owner authority (an agent token gets `403 forbidden`). `GET /events`
@@ -306,6 +311,41 @@ by `state`, `subject_type`, `subject_id`, `run_id` and `updated_since`.
 `GET /workspace` returns `open_requests`, and `GET /runs/{id}` the requests the
 run handled. A request keeps its text, state and `subject.label` after its
 subject is deleted, and follows a job through a merge.
+
+## Skills and local notes
+
+`GET /skills` lists the shipped skills: `name`, `description`, `files`,
+`file_details` (`path`, `bytes` and the first heading as `title` for each file)
+and `local_notes` (`version`, `updated_at`, `updated_by`, `length`, or null).
+`GET /skills/{name}` reads `SKILL.md`, `GET /skills/{name}/files/{path}` a
+reference file. Skills ship with the server and are never edited by a workspace.
+
+A workspace adds **local notes** to a skill instead: at most 2,000 characters,
+appended to the served `SKILL.md` (over REST, `skill_get` and the MCP prompt
+alike) after a rule, under `## Local notes for this workspace`, with the
+version, the day and who wrote them. `?local_notes=false` returns the shipped
+text alone; reference files are served as shipped. The response's
+`local_notes` describes the current notes without their text.
+
+```bash
+# Read the notes with their earlier versions, newest first (version 0: none yet).
+curl -sS "$OPENINGS_URL/api/v1/skills/review-inbox/notes" -H "Authorization: Bearer $OPENINGS_TOKEN"
+
+# Replace them, naming the version they replace; empty text clears them.
+curl -sS -X PUT "$OPENINGS_URL/api/v1/skills/review-inbox/notes" \
+  -H "Authorization: Bearer $OPENINGS_TOKEN" -H "Content-Type: application/json" \
+  -d '{"expected_version": 0, "text": "Leave every job at Northstar Labs for the owner."}'
+```
+
+The notes return `skill`, `text`, `version`, `max_length`, `updated_at`,
+`updated_by`, `versions` (up to 50, each with `version`, `text`, `created_at`
+and `created_by`) and `versions_total`. A stale `expected_version` returns
+`409 conflict` with `details.current_version`; the same text again is no
+change. Each save is a new version with a `skill_notes_updated` change (subject
+`skill`). The dashboard session, owner tokens and agent tokens may write notes:
+an agent records a lasting method gap of this workspace, and the owner sees who
+wrote each version and restores any of them. Personal criteria belong to the
+[policy](policy.md).
 
 ## Identity and duplicates
 
