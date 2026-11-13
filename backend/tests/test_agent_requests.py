@@ -109,7 +109,7 @@ def test_request_lifecycle_versions_and_attribution(services):
         # A request can be declined without taking it first; the run is still recorded.
         declined = requests.decline_request(
             general["id"],
-            {"expected_version": 1, "reason": "A preference belongs in the Profile policy."},
+            {"expected_version": 1, "reason": "A preference belongs in Preferences."},
         )
     assert (done["state"], done["result"], done["version"]) == (
         "done",
@@ -122,7 +122,7 @@ def test_request_lifecycle_versions_and_attribution(services):
         run["id"],
         None,
     )
-    assert declined["result"] == "A preference belongs in the Profile policy."
+    assert declined["result"] == "A preference belongs in Preferences."
     with acting_as(OWNER):
         refused(
             lambda: requests.withdraw_request(created["id"], {"expected_version": 3}),

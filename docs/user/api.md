@@ -39,8 +39,8 @@ Paste the posting when extraction cannot obtain the complete text.
 | Applications | `GET/POST /applications`, `POST /applications/bulk`, `GET/PATCH/DELETE /applications/{id}`, `GET /applications/{id}/events`, `GET /applications/{id}/staleness`, `GET /staleness` |
 | Employer responses | `GET/POST /applications/{id}/responses`, `PATCH/DELETE /responses/{id}`; `GET /insights` |
 | Career | `GET/PATCH /career/profile`, CRUD `/career/knowledge` and `/career/claims`, `POST /career/import/preview` then `/career/import` |
-| Policy | `GET /policy`, `GET /policy/{section}`, `POST /policy/{section}/items`, `POST /policy/{section}/reorder`, `PATCH/DELETE /policy/items/{id}`, `POST /policy/items/{id}/confirm`, `/move`, `POST /policy/rules/preview` |
-| Templates/guidance | CRUD `/templates`, `GET/PATCH /instructions` |
+| Preferences | `GET /preferences`, `PUT /preferences/{section}`, `PATCH /settings` |
+| Templates | CRUD `/templates` |
 | Collection | `GET/PATCH /collection`, `GET /providers`, `PATCH /providers/{id}`, CRUD `/sources`, `/sources/schemas`, preview/run, `/sources/bulk`, `/collection/runs` and `GET /collection/yield` |
 | Tasks | `GET /tasks`, `GET /tasks/{id}`, `POST /tasks/{id}/cancel` or `/retry` |
 | Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `GET /documents/{id}/comparison`, `POST /documents/{id}/review` |
@@ -92,15 +92,15 @@ Application list/detail records include `preparation`: per-kind counts of curren
 revision leaves (`revisions`), leaves with their own PDF (`pdf`) and leaves with
 an approved PDF (`approved`). A new revision inherits neither files nor approval.
 These counts do not certify content quality, required document completeness or
-submission. `stale_inputs` lists the input kinds (`profile`, `policy`,
-`instructions`, `template`, `knowledge`, `claim`) that changed after the contexts
+submission. `stale_inputs` lists the input kinds (`profile`, `preferences`,
+`template`, `knowledge`, `claim`) that changed after the contexts
 of the current leaves were frozen; it is empty when they are current.
 `stale_changes` holds the first three changes of the staleness report and
 `stale_changes_total` their number.
 A version conflict returns HTTP 409 with the stored version, for example
 `{"error":{"code":"conflict","message":"…","details":{"current_version":4}}}`;
 reload before editing again. This includes settings records (profile,
-instructions, collection switch), document review and per-item errors from
+Preferences sections, settings, collection switch), document review and per-item errors from
 `/jobs/bulk` and `/sources/bulk`. MCP tool errors carry the same `code`, `status`,
 `message` and `details` as a JSON `{"error":{…}}` text result, including field
 lists for `validation` errors.
@@ -109,9 +109,9 @@ For Shortlist use `{"expected_version":3,"triage":"saved"}`; `inbox` returns a
 job without attempts to review and `dismissed` remembers it outside active review.
 A dismissal takes an optional `reason` (at most 500 characters), as does the
 `dismissed` action of `POST /jobs/bulk`. Every job read carries `dismissal`
-(null unless dismissed): `at`, `by` (the actor), `category` (`rule`, `agent`,
-`owner` or `other`), `rule` (`item_id` and `label` of the Policy rule that
-dismissed it, or null) and `reason`. Restoring a job clears it.
+(null unless dismissed): `at`, `by` (the actor), `category` (`agent`, `owner`
+or `other`) and `reason`. Restoring a job clears it. Nothing dismisses a job
+automatically.
 
 ### Ingest signals
 
@@ -123,8 +123,7 @@ its title or posting changes:
  "required": [["de"], ["en", "fr"]], "welcome": ["it"],
  "duplicate_checked": true,
  "duplicate": {"job_id": "EARLIER_JOB_ID", "confidence": 0.91, "tier": "high"},
- "no_longer_listed": false, "unlisted_at": null,
- "rules": [{"item_id": "POLICY_ITEM_ID", "label": "Languages", "action": "flag"}]}
+ "no_longer_listed": false, "unlisted_at": null}
 ```
 
 `language` is the language the posting is written in (ISO 639-1, or null when
@@ -133,32 +132,30 @@ one language of a group is enough, so the example needs German and English or
 French. `welcome` lists languages described as a plus. `duplicate` names an
 earlier job this one likely repeats, from the medium tier up; it is a review
 signal and nothing is merged. `POST /jobs/{id}/distinct` with
-`{"other_id": "EARLIER_JOB_ID"}` records two different vacancies: the flag goes
-and is not computed again for that pair. `no_longer_listed` is set when a full
+`{"other_id": "EARLIER_JOB_ID"}` records two different vacancies: the signal
+goes and is not computed again for that pair. `no_longer_listed` is set when a full
 run of a company board no longer lists the posting (`unlisted_at`), and cleared
-when the board lists it again. `rules` names the Policy rules that matched.
-`computed: false` marks a job whose signals are still being computed.
+when the board lists it again. Signals label and filter jobs; they never
+dismiss one. `computed: false` marks a job whose signals are still being computed.
 
-`GET /jobs` filters on them: `signal=likely_duplicate|no_longer_listed|language_required|flagged|pending`,
+`GET /jobs` filters on them: `signal=likely_duplicate|no_longer_listed|language_required|pending`,
 `posting_language=de`, `posting_language_not=en`, `requires=de` (codes or names
-such as `German`), `dismissed_by=rule|agent|owner|other`, `rule_id=ITEM_ID` and
-`sort=dismissed` (most recently dismissed first). `include_counts=true` adds
+such as `German`), `dismissed_by=agent|owner|other` and `sort=dismissed` (most
+recently dismissed first). `hide_unspoken_required=true` leaves out jobs whose
+required languages are outside the `spoken_languages` setting (a job is left
+out when one required group has no spoken language); with `true` or `false`
+the response adds `unspoken_required`: `spoken_languages`, the `count` of such
+jobs under the other filters and whether they are `hidden`. `include_counts=true` adds
 `counts`: jobs in each queue (`inbox`, `shortlist`, `applications`,
 `dismissed`, `all`) and `dismissed_by`, for the same filters.
 
 Whether a company board still lists a posting is `signals.no_longer_listed`.
 
-A Policy rule acts on these signals: see [Policy](policy.md#rules-on-a-signal).
-`POST /policy/rules/preview` with `{"rule": {"signal": "language_required",
-"condition": {"operator": "not_in", "value": ["English"]}, "action": "dismiss"}}`
-returns `matches`, `inbox` (jobs to review now), `pending` (without signals yet)
-and up to five `examples`, and changes nothing.
-
 `GET /collection/yield?since=2026-08-01&until=&min_sample=10` returns, per
 source (`items`, with `source_id`, `name`, `kind`, `providers` for searches) and
 in `total`: `collected`, `to_review`, `shortlisted`, `applied`, `responded`,
-`interviews`, `offers`, `dismissed`, `dismissed_by` (`rule`, `agent`, `owner`,
-`other`), `dismissed_by_rule`, `likely_duplicates`, `no_longer_listed` and
+`interviews`, `offers`, `dismissed`, `dismissed_by` (`agent`, `owner`,
+`other`), `likely_duplicates`, `no_longer_listed` and
 `kept_rate` (shortlisted over collected; `null` with `withheld:
 "too_few_collected"` below `min_sample`). Each job counts once, for the source that collected it first and
 by the time it was added; jobs added by hand or by a removed source have a row
@@ -196,9 +193,8 @@ recorded as applied: `status=applied&applied_until=2026-10-12` lists the ones
 still waiting for a reply since that day. `no_reply_due=true` lists the Applied
 applications sent longer ago than the no-reply period, and `ready=false` the
 Preparing ones not marked ready. Every list returns `no_reply`: the period in
-`days`, its `source` (`policy`, the number in the Decision item labelled "No
-reply", with `item_id` and whether it is `confirmed`; otherwise `default`, 30
-days) and how many applications are `due`. Each row has its `last_response`
+`days`, its `source` (`settings`, the `no_reply_days` setting, or `default`,
+30 days) and how many applications are `due`. Each row has its `last_response`
 (`kind`, `date`, `count`) and `concluded_on`.
 Create and `PATCH` accept `priority` (1 highest to 5), `deadline` (`YYYY-MM-DD`)
 and `requirements`, a list of `{id, kind, text, blocking, resolved, note}`.
@@ -274,11 +270,11 @@ submitted-attempt cohort. Career nonnullable PATCH fields reject explicit null:
 omit unchanged fields, or clear text/lists/objects with empty values. Entry dates
 are nullable; `dates: null` clears them. See [Career](career.md) for structured
 headers, partial dates, skills, ordering and the typed selection fields of a
-claim (`default_in_cv`, `role`, `group`), and [Policy](policy.md) for the
-owner's rules and facts, their section versions and who may confirm an item.
-Target roles and preferences are Decision items of the policy. Template `rules` hold the typed limits,
-`statements` (a list of `{id, label, statement, scope, position}`; `id` and
-`position` are filled in) and any other free-form key.
+claim (`default_in_cv`, `role`, `group`), and [Preferences](preferences.md)
+for what the owner is looking for, rules out, states as facts and wants in
+documents. Template `rules` hold the typed limits (`max_pages`, `max_bullets`,
+`max_bullet_chars`) and free keys such as `engine` or `date_format`; writing
+rules belong in Preferences, and `rules.statements` is refused.
 
 ## Notes and the timeline
 
@@ -450,8 +446,8 @@ and `created_by`) and `versions_total`. A stale `expected_version` returns
 change. Each save is a new version with a `skill_notes_updated` change (subject
 `skill`). The dashboard session, owner tokens and agent tokens may write notes:
 an agent records a lasting method gap of this workspace, and the owner sees who
-wrote each version and restores any of them. Personal criteria belong to the
-[policy](policy.md).
+wrote each version and restores any of them. Personal criteria belong to
+[Preferences](preferences.md).
 
 ## Identity and duplicates
 
@@ -546,7 +542,8 @@ settings, defaults, run counters and request pacing.
 
 1. `POST /contexts` with `application_id` and optional `template_id`/`template_ids`,
    evidence/claim IDs, note and `idempotency_key`. The context freezes the selected
-   profile, evidence, instructions, questions and template assets.
+   profile, evidence, Preferences, template guidance, questions and template
+   assets.
 2. `POST /documents` with `application_id`, `context_id`, `kind`, `title`, the
    evidence it uses (`claim_ids`, `knowledge_ids`) and an optional `note`. Kinds:
    `resume`, `cover_letter`, `answers`, `other`. A CV or letter (`resume`,
@@ -613,14 +610,12 @@ content as `path: value` lines.
 
 ### Stale contexts
 
-A context prepared since 0.19 contains `policy`: the four sections with their
-versions and items, each item marked `confirmed` or not. Earlier contexts are
-unchanged and have no `policy`.
+A context prepared since 0.24 contains `preferences`: each section with its
+`version` and `items`. Earlier contexts are unchanged.
 
-Contexts record the inputs they froze: the instructions version, each selected
-template, Career entry and claim with its version, and a short hash of each
-Profile part, each policy item, the general instructions and the content of each
-template, entry and claim.
+Contexts record the inputs they froze: each selected template, Career entry and
+claim with its version, and a short hash of each Profile part, each Preferences
+statement and the content of each template, entry and claim.
 `GET /applications/{id}/staleness` compares them with the current records for
 each current revision leaf and returns `stale`, `inputs`, `changes` and
 per-document status (`current`, `stale` or `no_context`) with that document's
@@ -630,15 +625,14 @@ Only what documents use is compared:
 
 - **Profile:** the parts `name`, `headline`, `contact` (email, phone, location),
   `links` and `summary`. `metadata` is frozen too but never makes a document
-  stale: rules and facts belong in the policy. (Contexts frozen before 0.23 also
-  hold the Profile's `preferences` and `roles`; they are not compared.)
-- **Policy:** the confirmed items of `eligibility`, `writing` and `facts`, by
-  content (label, statement, value, scope, rule). Decision items, unconfirmed
-  proposals and the order of items are not compared. A writing item scoped to
-  `cv` concerns the CV (`resume`) only, one scoped to `letter` the letter
-  (`cover_letter`) only.
-- **Instructions, templates, entries and claims:** by the content documents
-  use: the guidance text; a template's kind, source, guidance and rules; an
+  stale: rules and facts belong in Preferences. (Contexts frozen before 0.23
+  also hold the Profile's `preferences` and `roles`; they are not compared.)
+- **Preferences:** the statements of `facts` and `writing`, by content (text
+  and scope). The other sections and the order of statements are not compared.
+  A writing rule scoped to `cv` concerns the CV (`resume`) only, one scoped to
+  `letter` the letter (`cover_letter`) only.
+- **Templates, entries and claims:** by the content documents
+  use: a template's kind, source, guidance and rules; an
   entry's kind, title, organization, dates, skills and narrative; a claim's text
   and entry. A new version that only changes a name, a position, the default
   flag, a claim's selection fields (`default_in_cv`, `role`, `group`) or
@@ -648,19 +642,18 @@ Only what documents use is compared:
 - Text is compared with its runs of whitespace made single spaces, except a
   template's source.
 
-A change has `input` (`profile`, `policy`, `instructions`, `template`,
-`knowledge` or `claim`), `id` (the Profile part, the policy item or the record),
-`label`, `state`, `frozen_version` and `current_version`; a policy change also
-has its `section`, and its versions are the section's. States: `changed`,
-`deleted` and `unapproved` for records; `changed`, `added`, `removed` (deleted
-or moved to `decision`), `unconfirmed` and `confirmed` (confirmed since the
-context froze it as a proposal) for policy items.
+A change has `input` (`profile`, `preferences`, `template`, `knowledge` or
+`claim`), `id` (the Profile part, `<section>:<hash>` for a statement, or the
+record), `label`, `state`, `frozen_version` and `current_version`; a
+Preferences change also has its `section`, its label is the statement's text
+and its versions are the section's. States: `changed`, `deleted` and
+`unapproved` for records; `added` and `removed` for statements (an edited
+statement is removed and added).
 
 `comparison` says what a document's context allowed: `profile` is `parts`, or
 `whole` when the frozen payload could not be read part by part (`id` is then
-null and the Profile version is compared); `policy` is `items`, or `not_frozen`
-for a context prepared before 0.19, which holds no policy and is not compared
-for it.
+null and the Profile version is compared); `preferences` is `items`, or
+`not_frozen` for a context prepared before 0.24, which is not compared for it.
 
 `GET /staleness` lists such reports across applications: `status` defaults to
 `draft` (`all` for every stage), `stale_only` defaults to `true`,

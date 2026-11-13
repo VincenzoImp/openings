@@ -16,6 +16,7 @@ import {
   EmptyState,
   ErrorBanner,
   Loading,
+  Switch,
 } from "../../design";
 import { Pager, plural } from "../../library/common";
 import { useFresh } from "../../library/useFresh";
@@ -32,6 +33,7 @@ import {
   SORTS,
   listQuery,
   sortOf,
+  unspokenLine,
   type Filters,
   type Section,
 } from "./model";
@@ -72,7 +74,7 @@ export function Queue({
   /** Before a triage: what moves the selection on once the job left the list. */
   leaving: (id: string) => (() => void) | null;
   onAdd: () => void;
-  /** The languages the owner works in, from the policy. */
+  /** The languages the owner speaks, from the settings. */
   own: Set<string> | null;
 }) {
   const { mutate, pending } = useWorkspace();
@@ -93,10 +95,15 @@ export function Queue({
   const [failures, setFailures] = useState<string[]>([]);
   const offset = Number(filters.offset) || 0;
   const rows = list.data.items;
+  const unspoken = list.data.unspoken_required;
   useEffect(() => {
     onRows(rows.map((item) => item.id));
   }, [rows, onRows]);
-  const scope = [section, ...NARROWING.map((key) => filters[key])].join("|");
+  const scope = [
+    section,
+    filters.hide_unspoken,
+    ...NARROWING.map((key) => filters[key]),
+  ].join("|");
   useEffect(() => {
     setSelection({});
     setFailures([]);
@@ -114,11 +121,12 @@ export function Queue({
       return changed ? next : current;
     });
   }, [list.data]);
-  const narrowed = NARROWING.some((key) => filters[key]);
+  const narrowed = NARROWING.some((key) => filters[key]) || !!unspoken?.hidden;
   const clear = () =>
     setFilters(
       Object.fromEntries([
         ...NARROWING.map((key) => [key, ""]),
+        ["hide_unspoken", ""],
         ["offset", "0"],
       ]),
     );
@@ -263,18 +271,31 @@ export function Queue({
           />
         </div>
       )}
-      {section === "dismissed" && filters.rule_id && (
-        <div className="queue-chips">
-          <Button
-            size="sm"
-            icon="close"
-            onClick={() => setFilters({ rule_id: "", offset: "0" })}
-          >
-            Dismissed by one policy rule
-            <span className="sr">: remove this filter</span>
-          </Button>
-        </div>
-      )}
+      <div className="queue-chips row wrap">
+        {unspoken && !unspoken.spoken_languages.length ? (
+          <span className="caption">
+            To hide jobs requiring languages you don't speak, list yours in{" "}
+            <a href="#preferences">Preferences</a>.
+          </span>
+        ) : (
+          <>
+            <Switch
+              label="Hide jobs requiring languages I don't speak"
+              checked={filters.hide_unspoken === "true"}
+              onChange={(on) =>
+                setFilters({ hide_unspoken: on ? "true" : "", offset: "0" })
+              }
+            >
+              Hide jobs requiring languages I don't speak
+            </Switch>
+            {unspoken && (
+              <span className="caption num">
+                {unspokenLine(unspoken, list.data.total)}
+              </span>
+            )}
+          </>
+        )}
+      </div>
       {section === "all" && (
         <MoreFilters
           filters={filters}
@@ -349,7 +370,7 @@ export function Queue({
           {narrowed
             ? `${counts ? plural(counts.all, "job is", "jobs are") + " stored. " : ""}Search looks at titles, companies and posting text.`
             : section === "review"
-              ? "New jobs from your searches and company boards arrive here. Your agent reviews them against your policy."
+              ? "New jobs from your searches and company boards arrive here. Your agent reviews them against your preferences."
               : section === "shortlist"
                 ? "Shortlist the jobs you want to pursue. Your agent starts a Draft for each in its next prepare-shortlist run."
                 : section === "dismissed"

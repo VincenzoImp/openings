@@ -100,7 +100,7 @@ OPERATIONS = (
         rest=(Route("GET", "/jobs", "jobs"),),
         tool=Tool(
             READ_ONLY,
-            "Search compact paginated job summaries with location/source/remote/date/queue filters; include_facets=true adds filter value lists and include_counts=true the size of each queue. Each job has its ingest signals (posting language, languages the posting requires or welcomes, the earlier job it likely duplicates with a confidence, whether the source no longer lists it, policy rules that matched) and, when dismissed, its dismissal (who, why, which rule). Filter by signal, posting_language, posting_language_not, requires, dismissed_by or rule_id. Read jobs_get for full content.",
+            "Search compact paginated job summaries with location/source/remote/date/queue filters; include_facets=true adds filter value lists and include_counts=true the size of each queue. Each job has its ingest signals (posting language, languages the posting requires or welcomes, the earlier job it likely duplicates with a confidence, whether the source no longer lists it) and, when dismissed, its dismissal (who and why). Filter by signal, posting_language, posting_language_not, requires or dismissed_by; hide_unspoken_required=true leaves out jobs requiring a language the owner does not speak. Read jobs_get for full content.",
         ),
     ),
     Operation(
@@ -355,7 +355,7 @@ OPERATIONS = (
         rest=(Route("GET", "/applications", "applications"),),
         tool=Tool(
             READ_ONLY,
-            "Read paginated application summaries, stage totals and the ready count. Filter by exact job_id, query, stage, outcome, company or readiness (readiness=ready is the stored Ready step; reviewed passes every check but is not marked; ready=false lists the Preparing ones not marked); applied_since and applied_until filter by the time recorded as applied; no_reply_due=true lists the Applied applications past the no-reply period, to propose closing them as no_response. Each row has its last_response; no_reply gives the period, its source (the policy's No reply decision item and whether the owner confirmed it, or the 30-day default) and the number due. Sort by deadline, priority or ready time.",
+            "Read paginated application summaries, stage totals and the ready count. Filter by exact job_id, query, stage, outcome, company or readiness (readiness=ready is the stored Ready step; reviewed passes every check but is not marked; ready=false lists the Preparing ones not marked); applied_since and applied_until filter by the time recorded as applied; no_reply_due=true lists the Applied applications past the no-reply period, to propose closing them as no_response. Each row has its last_response; no_reply gives the period in days, its source (settings when the owner set no_reply_days, else the 30-day default) and the number due. Sort by deadline, priority or ready time.",
         ),
     ),
     Operation(
@@ -526,7 +526,7 @@ def register_core_mcp(mcp, workspace, requests):
             "actor": current_actor().describe(),
             "open_requests": requests.count_open(),
             "storage": storage_status(workspace.db),
-            "workflow": "Read open requests for the agent first. Read career, templates and stored instructions; prepare a frozen context; write and compile externally; save document revisions and PDF/source files; track progress explicitly.",
+            "workflow": "Read open requests for the agent first. Read Preferences, career and templates; prepare a frozen context; write and compile externally; save document revisions and PDF/source files; track progress explicitly.",
         }
 
     bind_mcp(mcp, OPERATIONS, workspace)

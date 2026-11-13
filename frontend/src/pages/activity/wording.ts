@@ -24,6 +24,15 @@ const places: Record<string, string> = {
   dismissed: "Dismissed",
 };
 
+// The titles of the Preferences sections a change names.
+const sectionTitles: Record<string, string> = {
+  looking_for: "What I'm looking for",
+  ruled_out: "What I rule out",
+  facts: "Facts about me",
+  writing: "Writing rules",
+  working_with_me: "Working with me",
+};
+
 /** What a change did beyond its name: where it moved a record, the fields it touched. */
 export function changeDetail(event: Activity) {
   const payload = event.payload || {};
@@ -33,6 +42,8 @@ export function changeDetail(event: Activity) {
   if (Array.isArray(payload.fields) && payload.fields.length)
     return "Fields: " + payload.fields.join(", ").replaceAll("_", " ");
   if (event.kind === "application_ready_cleared") return readyReason(payload);
+  if (event.kind === "preferences_updated" && payload.section)
+    return sectionTitles[String(payload.section)] || String(payload.section);
   return "";
 }
 
@@ -70,7 +81,7 @@ const counted: Record<string, [string, string]> = {
   claim_updated: ["claim edited", "claims edited"],
   knowledge_created: ["Career entry added", "Career entries added"],
   knowledge_updated: ["Career entry edited", "Career entries edited"],
-  policy_item_added: ["policy item proposed", "policy items proposed"],
+  preferences_updated: ["Preferences change", "Preferences changes"],
   source_updated: ["source changed", "sources changed"],
   skill_notes_updated: [
     "skill's local notes saved",

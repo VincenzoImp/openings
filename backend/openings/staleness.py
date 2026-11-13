@@ -1,21 +1,23 @@
-"""Compare frozen contexts with the current Profile, policy, instructions, templates and Career.
+"""Compare frozen contexts with the current Profile, Preferences, templates and Career.
 
 Contexts stay immutable. This module only reads what they recorded and reports which
 inputs changed since, so an agent can deliberately prepare a new context and new
 document revisions.
 
 A context records the versions it froze and, in ``context_inputs.parts``, a short hash
-of each part: each Profile part, each policy item, the general instructions and the
-content of each template, Career entry and claim. The report compares only what
-documents use: the Profile parts of a CV or letter header and summary, the confirmed
-items of the policy sections ``eligibility``, ``writing`` and ``facts``, the guidance
-text, a template's source, guidance and rules, an entry's kind, title, organization,
-dates, skills and narrative, and a claim's wording and entry. Profile ``metadata``,
-the ``decision`` section, names, positions, default flags, claim selection fields and
-free-form metadata are frozen as well but never make a document stale, and neither
-does a new version whose content is the same. Text is compared with its runs of
-whitespace made single spaces, except a template's source. A writing item scoped to
-the CV or the letter concerns that document only.
+of each part: each Profile part, each Preferences statement and the content of each
+template, Career entry and claim. The report compares only what documents use: the
+Profile parts of a CV or letter header and summary, the statements of the
+Preferences sections ``facts`` and ``writing``, a template's source, guidance and
+rules, an entry's kind, title, organization, dates, skills and narrative, and a
+claim's wording and entry. Profile ``metadata``, the other Preferences sections,
+names, positions, default flags, claim selection fields and free-form metadata are
+frozen as well but never make a document stale, and neither does a new version whose
+content is the same. Text is compared with its runs of whitespace made single spaces,
+except a template's source. A statement is identified by its content: an edited one
+is reported as removed and added. A writing rule scoped to the CV or the letter
+concerns that document only. Contexts frozen before 0.24 (with the rules and general
+instructions of that time) compare only their Profile and records.
 """
 
 from __future__ import annotations
@@ -23,11 +25,11 @@ from __future__ import annotations
 import hashlib
 import json
 
-from .career import DEFAULT_GUIDANCE, DEFAULT_PROFILE
+from .career import DEFAULT_PROFILE
 from .db import encode
 from .snapshots import payload_text
 
-INPUT_KINDS = ("profile", "policy", "instructions", "template", "knowledge", "claim")
+INPUT_KINDS = ("profile", "preferences", "template", "knowledge", "claim")
 
 # Each Profile part with its plain name and the fields it covers.
 PROFILE_PARTS = {
@@ -40,12 +42,10 @@ PROFILE_PARTS = {
 }
 # The parts a CV or letter uses. Metadata holds free-form extension values that
 # documents do not use. (The preferences and roles parts that contexts frozen before
-# 0.23 stored are never compared: they became decision items of the policy.)
+# 0.23 stored are never compared.)
 DOCUMENT_PROFILE_PARTS = ("name", "headline", "contact", "links", "summary")
-# Decision items shortlist and dismiss jobs; documents use the other sections.
-DOCUMENT_POLICY_SECTIONS = ("eligibility", "writing", "facts")
-# An item's content: what a write changes when it unconfirms an item (policy.CONTENT_FIELDS).
-POLICY_ITEM_FIELDS = ("label", "statement", "value", "value_type", "scope", "rule")
+# The Preferences sections documents use.
+DOCUMENT_SECTIONS = ("facts", "writing")
 # The content of a frozen record that documents use, with the value a missing field
 # counts as. Names, positions, default flags, claim selection fields (they rank claims
 # for the next selection) and free-form metadata (provenance) do not reach a document.
@@ -70,34 +70,25 @@ RECORD_SOURCES = {
 # The document kind a writing scope concerns; "all" concerns every kind.
 SCOPE_KINDS = {"cv": "resume", "letter": "cover_letter"}
 # Bump when the stored parts change shape: rows of another format are derived again.
-PARTS_FORMAT = 2
+PARTS_FORMAT = 3
 LABEL_CHARS = 120
 
 _CONTEXT_INPUTS = (
     "SELECT ?1,?2,"
     "json_extract(?3,'$.profile.version'),"
-    "json_extract(?3,'$.instructions.version'),"
     "(SELECT json_group_array(json_array(json_extract(value,'$.id'),json_extract(value,'$.version'),json_extract(value,'$.name')))"
     " FROM json_each(?3,'$.templates')),"
     "(SELECT json_group_array(json_array(json_extract(value,'$.id'),json_extract(value,'$.version'),json_extract(value,'$.title')))"
     " FROM json_each(?3,'$.knowledge')),"
     "(SELECT json_group_array(json_array(json_extract(value,'$.id'),json_extract(value,'$.version'),substr(json_extract(value,'$.text'),1,120)))"
     " FROM json_each(?3,'$.claims')),"
-    # The policy section versions a context froze, {"decision":3,...}. A context from
-    # before schema 10 froze no policy and keeps NULL.
-    "CASE WHEN json_type(?3,'$.policy')='object' THEN"
-    " (SELECT json_group_object(key,json_extract(value,'$.version')) FROM json_each(?3,'$.policy')) END,"
     "?4"
 )
-_COLUMNS = (
-    "context_id,created_at,profile_version,instructions_version,templates,knowledge,claims,"
-    "policy,parts"
-)
+_COLUMNS = "context_id,created_at,profile_version,templates,knowledge,claims,parts"
 _UNSPLIT = {
     "format": PARTS_FORMAT,
     "profile": None,
-    "policy": None,
-    "instructions": None,
+    "preferences": None,
     "templates": {},
     "knowledge": {},
     "claims": {},
@@ -129,8 +120,27 @@ def profile_hashes(profile: dict) -> dict:
     }
 
 
-def policy_item_hash(item: dict) -> str:
-    return digest(_content({name: item.get(name) for name in POLICY_ITEM_FIELDS}))
+def statement_hash(item: dict) -> str:
+    """The hash of one Preferences statement: its text and, for a writing rule, its scope."""
+    return digest(_content({"text": item.get("text"), "scope": item.get("scope")}))
+
+
+def _statements(sections) -> dict:
+    """{section: {version, items: [[hash, label, scope], ...]}} of the sections documents use."""
+    result = {}
+    for section in DOCUMENT_SECTIONS:
+        value = sections.get(section)
+        if not isinstance(value, dict):
+            continue
+        result[section] = {
+            "version": value.get("version"),
+            "items": [
+                [statement_hash(item), str(item.get("text") or "")[:LABEL_CHARS], item.get("scope")]
+                for item in value.get("items") or ()
+                if isinstance(item, dict)
+            ],
+        }
+    return result
 
 
 def record_hash(kind: str, record: dict) -> str:
@@ -138,10 +148,6 @@ def record_hash(kind: str, record: dict) -> str:
     return digest(
         _content({name: record.get(name, default) for name, default in RECORD_FIELDS[kind].items()})
     )
-
-
-def instructions_hash(general) -> str:
-    return digest(_content({"general": general}))
 
 
 def _record_hashes(kind, items):
@@ -164,32 +170,11 @@ def frozen_parts(text: str) -> dict:
         return dict(_UNSPLIT)
     try:
         profile = data.get("profile")
-        policy = data.get("policy")
-        instructions = data.get("instructions")
+        preferences = data.get("preferences")
         return {
             "format": PARTS_FORMAT,
             "profile": profile_hashes(profile) if isinstance(profile, dict) else None,
-            # [id, hash, label, scope, confirmed] for each item of each section.
-            "policy": {
-                section: [
-                    [
-                        item["id"],
-                        policy_item_hash(item),
-                        str(item.get("label") or "")[:LABEL_CHARS],
-                        item.get("scope"),
-                        int(item.get("confirmed") is True),
-                    ]
-                    for item in value.get("items") or ()
-                    if isinstance(item, dict) and isinstance(item.get("id"), str)
-                ]
-                for section, value in policy.items()
-                if isinstance(value, dict)
-            }
-            if isinstance(policy, dict)
-            else None,
-            "instructions": instructions_hash(instructions.get("general"))
-            if isinstance(instructions, dict) and "general" in instructions
-            else None,
+            "preferences": _statements(preferences) if isinstance(preferences, dict) else None,
             **{
                 key: _record_hashes(kind, data.get(key))
                 for kind, (key, _, _) in RECORD_SOURCES.items()
@@ -275,29 +260,18 @@ def _setting(connection, key):
     return (data if isinstance(data, dict) else {}), row["version"]
 
 
-def _current_policy(connection):
-    """Section versions and the confirmed items of the sections documents use."""
-    versions = dict(
-        tuple(row) for row in connection.execute("SELECT section,version FROM policy_sections")
-    )
-    items = {}
-    for row in connection.execute(
-        "SELECT section,id,label,statement,value,value_type,scope,rule,confirmed_at "
-        "FROM policy_items WHERE section IN "
-        f"({_placeholders(DOCUMENT_POLICY_SECTIONS)}) ORDER BY section,position,created_at,id",
-        DOCUMENT_POLICY_SECTIONS,
-    ):
-        item = dict(row)
-        for name in ("value", "rule"):
-            item[name] = json.loads(item[name]) if item[name] is not None else None
-        items[item["id"]] = {
-            "section": item["section"],
-            "hash": policy_item_hash(item),
-            "label": item["label"],
-            "scope": item["scope"],
-            "confirmed": item["confirmed_at"] is not None,
+def _current_preferences(connection):
+    """The statements of the sections documents use, as ``_statements`` reads them."""
+    return _statements(
+        {
+            row[0]: {"version": row[2], "items": json.loads(row[1])}
+            for row in connection.execute(
+                "SELECT section,items,version FROM preference_sections WHERE section IN "
+                f"({_placeholders(DOCUMENT_SECTIONS)})",
+                DOCUMENT_SECTIONS,
+            )
         }
-    return versions, items
+    )
 
 
 def _change(kind, identifier, label, state, before, after, **more):
@@ -330,55 +304,36 @@ def _profile_changes(row, parts, current):
     ]
 
 
-def _policy_changes(row, parts, current):
-    versions, items = current
-    frozen_sections = parts.get("policy")
-    if frozen_sections is None:
+def _preference_changes(parts, current):
+    """Statements added to or removed from facts and writing since the context froze them."""
+    frozen = parts.get("preferences")
+    if frozen is None:
         return []
-    frozen_versions = json.loads(row["policy"] or "{}")
-    frozen = {
-        identifier: {
-            "section": section,
-            "hash": digest_,
-            "label": label,
-            "scope": scope,
-            "confirmed": bool(confirmed),
-        }
-        for section in DOCUMENT_POLICY_SECTIONS
-        for identifier, digest_, label, scope, confirmed in frozen_sections.get(section) or ()
-    }
-
-    def change(identifier, item, state, scopes):
-        section = item["section"]
-        return _change(
-            "policy",
-            identifier,
-            item["label"],
-            state,
-            frozen_versions.get(section),
-            versions.get(section, 0),
-            section=section,
-            _scopes=scopes,
-        )
-
     changes = []
-    for identifier, now in items.items():
-        then = frozen.get(identifier)
-        used_then = bool(then and then["confirmed"])
-        if not now["confirmed"]:
-            if used_then:
-                changes.append(
-                    change(identifier, now, "unconfirmed", {then["scope"], now["scope"]})
-                )
-        elif not used_then:
-            changes.append(
-                change(identifier, now, "confirmed" if then else "added", {now["scope"]})
-            )
-        elif then["hash"] != now["hash"]:
-            changes.append(change(identifier, now, "changed", {then["scope"], now["scope"]}))
-    for identifier, then in frozen.items():
-        if then["confirmed"] and identifier not in items:
-            changes.append(change(identifier, then, "removed", {then["scope"]}))
+    for section in DOCUMENT_SECTIONS:
+        then, now = frozen.get(section) or {}, current.get(section) or {}
+        before, after = then.get("version"), now.get("version", 0)
+        then_items, now_items = then.get("items") or [], now.get("items") or []
+        then_hashes = {item[0] for item in then_items}
+        now_hashes = {item[0] for item in now_items}
+        for state, items, other in (
+            ("added", now_items, then_hashes),
+            ("removed", then_items, now_hashes),
+        ):
+            for digest_, label, scope in items:
+                if digest_ not in other:
+                    changes.append(
+                        _change(
+                            "preferences",
+                            f"{section}:{digest_}",
+                            label,
+                            state,
+                            before,
+                            after,
+                            section=section,
+                            _scopes={scope},
+                        )
+                    )
     return changes
 
 
@@ -412,7 +367,7 @@ def _current_hashes(connection, kind, identifiers):
 def context_changes(connection, context_ids) -> dict[str, dict]:
     """Return {context_id: {created_at, changes, comparison}} for the given frozen contexts.
 
-    A policy change carries ``_scopes``, the writing scopes it concerns, until
+    A Preferences change carries ``_scopes``, the writing scopes it concerns, until
     ``application_staleness`` applies them to each document kind.
     """
     context_ids = list(dict.fromkeys(identifier for identifier in context_ids if identifier))
@@ -446,16 +401,11 @@ def context_changes(connection, context_ids) -> dict[str, dict]:
             row[key] = json.loads(row[key] or "[]")
         row["parts"] = json.loads(row["parts"])
     profile, profile_version = _setting(connection, "profile")
-    instructions, instructions_version = _setting(connection, "instructions")
     current = {
         "profile": (profile_hashes({**DEFAULT_PROFILE, **profile}), profile_version),
-        "policy": _current_policy(connection)
-        if any(row["parts"].get("policy") is not None for row in frozen)
-        else ({}, {}),
-        "instructions": (
-            instructions_hash(instructions.get("general", DEFAULT_GUIDANCE)),
-            instructions_version,
-        ),
+        "preferences": _current_preferences(connection)
+        if any(row["parts"].get("preferences") is not None for row in frozen)
+        else {},
         "template": _current_versions(
             connection, "templates", {item[0] for row in frozen for item in row["templates"]}
         ),
@@ -487,13 +437,7 @@ def context_changes(connection, context_ids) -> dict[str, dict]:
     for row in frozen:
         parts = row["parts"]
         changes = _profile_changes(row, parts, current["profile"])
-        changes += _policy_changes(row, parts, current["policy"])
-        before = row["instructions_version"] or 0
-        text_hash, version = current["instructions"]
-        if version != before and parts.get("instructions") != text_hash:
-            changes.append(
-                _change("instructions", None, "Instructions", "changed", before, version)
-            )
+        changes += _preference_changes(parts, current["preferences"])
         for kind, (key, _, _) in RECORD_SOURCES.items():
             frozen_hashes = parts.get(key) or {}
             for identifier, version, label in row[key]:
@@ -524,7 +468,7 @@ def context_changes(connection, context_ids) -> dict[str, dict]:
             "changes": changes,
             "comparison": {
                 "profile": "whole" if parts.get("profile") is None else "parts",
-                "policy": "not_frozen" if parts.get("policy") is None else "items",
+                "preferences": "not_frozen" if parts.get("preferences") is None else "items",
             },
         }
     return result

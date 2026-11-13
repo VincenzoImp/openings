@@ -89,9 +89,8 @@ const asActivity = (event: Event, at: string): Activity => ({
 export function eventTitle(event: Event) {
   if (event.kind === "triage_changed") {
     const to = event.payload?.to;
-    const rule = event.payload?.rule ? " by a policy rule" : "";
     return to === "dismissed"
-      ? `Dismissed${rule}`
+      ? "Dismissed"
       : to === "saved"
         ? "Shortlisted"
         : event.payload?.from === "dismissed"

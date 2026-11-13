@@ -1,0 +1,50 @@
+{
+  "format": "openings-preferences-example-v1",
+  "note": "Synthetic Preferences. Each section's items are the body of PUT /api/v1/preferences/{section} (with expected_version); settings is the body of PATCH /api/v1/settings (with expected_version).",
+  "sections": {
+    "looking_for": [
+      {
+        "text": "Data, backend and platform engineering roles at mid to senior level."
+      },
+      { "text": "On site in Zurich or Basel, or remote within Europe." }
+    ],
+    "ruled_out": [
+      { "text": "Roles that need me on site outside Zurich, Basel or remote Europe." },
+      { "text": "Pure frontend roles and agencies that hire for clients." }
+    ],
+    "facts": [
+      {
+        "text": "Work authorization: EU citizen with a Swiss B permit, valid until 2028-06-30."
+      },
+      { "text": "Available from February 2027." },
+      { "text": "Notice period: one month to the end of a month." },
+      { "text": "Expected salary for roles paid in Germany: EUR 95,000 a year." }
+    ],
+    "writing": [
+      {
+        "text": "Use only the supplied career evidence. Never invent qualifications, dates or metrics.",
+        "scope": "all"
+      },
+      { "text": "Never volunteer weaknesses or missing skills.", "scope": "all" },
+      {
+        "text": "Three paragraphs, under 200 words. One concrete result per paragraph.",
+        "scope": "letter"
+      },
+      {
+        "text": "The CV fits one page. Drop the oldest experience first.",
+        "scope": "cv"
+      },
+      {
+        "text": "British spelling. Plain words; no \"passionate\", no \"leverage\".",
+        "scope": "all"
+      }
+    ],
+    "working_with_me": [
+      {
+        "text": "Ask before dismissing more than 50 jobs at once; show me a sample first."
+      },
+      { "text": "Never submit an application or contact an employer for me." }
+    ]
+  },
+  "settings": { "no_reply_days": 45, "spoken_languages": ["en", "it"] }
+}

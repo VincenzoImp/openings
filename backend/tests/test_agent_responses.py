@@ -193,11 +193,11 @@ def test_settings_conflicts_report_current_version(tmp_path):
     app, headers, jobs, _application = populated(tmp_path)
     with TestClient(app, base_url="http://localhost:8080") as client:
         profile = client.get("/api/v1/career/profile", headers=headers).json()
-        instructions = client.get("/api/v1/instructions", headers=headers).json()
+        settings = client.get("/api/v1/preferences", headers=headers).json()["settings"]
         collection = client.get("/api/v1/collection", headers=headers).json()
         for method, path, body, current in [
             ("PATCH", "/api/v1/career/profile", {"name": "Synthetic"}, profile["version"]),
-            ("PATCH", "/api/v1/instructions", {"general": "Write."}, instructions["version"]),
+            ("PATCH", "/api/v1/settings", {"no_reply_days": 40}, settings["version"]),
             ("PATCH", "/api/v1/collection", {"enabled": False}, collection["version"]),
             ("POST", "/api/v1/documents/doc-1/review", {"review_state": "approved"}, 1),
         ]:
@@ -212,7 +212,7 @@ def test_settings_conflicts_report_current_version(tmp_path):
         for ident, (name, arguments, current) in enumerate(
             [
                 ("profile_update", {"value": {"name": "Synthetic"}}, profile["version"]),
-                ("instructions_update", {"value": {"general": "Write."}}, instructions["version"]),
+                ("settings_update", {"value": {"no_reply_days": 40}}, settings["version"]),
                 ("collection_update", {"value": {"enabled": False}}, collection["version"]),
             ],
             start=10,

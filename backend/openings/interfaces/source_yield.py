@@ -17,7 +17,7 @@ OPERATIONS = (
         rest=(Route("GET", "/collection/yield", "collection_yield"),),
         tool=Tool(
             ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False),
-            "Read what each collection source (saved search or company board) yielded for the jobs it first collected in the period: collected, still to review, shortlisted (kept), applied, employer responses (responded, interviews, offers), dismissed by a policy rule, an agent, the owner or other and by rule, likely duplicates and postings no longer listed; searches are also split by job board. kept_rate is null below min_sample collected jobs (default 10). Use it to narrow, pause or remove sources that collect much and keep little.",
+            "Read what each collection source (saved search or company board) yielded for the jobs it first collected in the period: collected, still to review, shortlisted (kept), applied, employer responses (responded, interviews, offers), dismissed by an agent, the owner or other, likely duplicates and postings no longer listed; searches are also split by job board. kept_rate is null below min_sample collected jobs (default 10). Use it to narrow, pause or remove sources that collect much and keep little.",
         ),
     ),
 )

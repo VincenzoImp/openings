@@ -109,7 +109,7 @@ function Choices({
 
 /**
  * Prepare a frozen copy of the record for the agent: the job, the templates,
- * the Career entries and approved claims, the policy and instructions. It is
+ * the Career entries and approved claims, and the Preferences. It is
  * saved and downloaded; it never changes afterwards.
  */
 export function ContextDialog({

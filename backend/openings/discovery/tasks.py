@@ -245,7 +245,7 @@ class TaskOperations:
         def store(posting):
             created = store_locked(posting)
             if created:
-                # Duplicate and policy rules, outside the lock (see ingest_job).
+                # The duplicate signal, outside the lock (see ingest_job).
                 try:
                     self.workspace.signals.after_ingest(created)
                 except Exception:  # a signal never fails the collection
@@ -368,7 +368,6 @@ class TaskOperations:
                     unlisted = unlist_missing(connection, source, result["started_at"], now())
                 if unlisted:
                     result["unlisted"] = result.get("unlisted", 0) + len(unlisted)
-                    self.workspace.signals.after_unlisted(unlisted)
         return result
 
     def run_task(self, task, owner):

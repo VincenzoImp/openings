@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { ListResult, Policy, Profile } from "../../api";
+import type { ListResult, Preferences, Profile } from "../../api";
 import { useFresh } from "../../library/useFresh";
 import type { SetupFacts, SetupToken } from "./model";
 
@@ -11,14 +11,25 @@ const BLANK = {
   email: "",
   version: 0,
 } as Profile;
-const NO_POLICY = { sections: [] } as unknown as Policy;
+const NO_PREFERENCES: Preferences = {
+  sections: [],
+  settings: {
+    no_reply_days: 30,
+    spoken_languages: [],
+    version: 0,
+    updated_at: null,
+  },
+};
 // The agent works while the guide is open: read everything again this often.
 const POLL = 10_000;
 
 /** What the guide reads, kept current while it is open. */
 export function useSetup() {
   const profile = useFresh<Profile>("/career/profile", BLANK, ["career"]);
-  const policy = useFresh<Policy>("/policy", NO_POLICY, ["policy"]);
+  const preferences = useFresh<Preferences>("/preferences", NO_PREFERENCES, [
+    "preferences",
+    "settings",
+  ]);
   const sources = useFresh("/sources?limit=1", NONE, ["sources"]);
   const tokens = useFresh<ListResult<SetupToken>>("/tokens", NONE, ["tokens"]);
   const entries = useFresh("/career/knowledge?limit=1", NONE, ["career"]);
@@ -26,14 +37,14 @@ export function useSetup() {
   const templates = useFresh("/templates?limit=1", NONE, ["templates"]);
   const applications = useFresh("/applications?limit=1", NONE, [
     "applications",
-    "policy",
+    "settings",
   ]);
   const questions = useFresh("/questions?state=open&limit=1", NONE, [
     "questions",
   ]);
   const all = [
     profile,
-    policy,
+    preferences,
     sources,
     tokens,
     entries,
@@ -51,7 +62,7 @@ export function useSetup() {
   }, []);
   const facts: SetupFacts = {
     profile: profile.data,
-    sections: policy.data.sections,
+    sections: preferences.data.sections,
     noReply: applications.data.no_reply ?? null,
     sources: sources.data.total,
     tokens: tokens.data.items,
@@ -63,7 +74,7 @@ export function useSetup() {
   return {
     facts,
     profile: profile.data,
-    policy: policy.data,
+    preferences: preferences.data,
     questions: questions.data.total,
     loading: all.some((read) => read.loading),
     error: all.find((read) => read.error)?.error ?? null,

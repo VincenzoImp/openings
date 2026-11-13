@@ -1,4 +1,4 @@
-// Small pieces the Library screens (Career, Policy, Templates) share.
+// Small pieces the Library screens (Career, Preferences, Templates) share.
 import type { ReactNode } from "react";
 import { Button, Dialog, ErrorBanner, Loading } from "../design";
 import { useWorkspace } from "../state";

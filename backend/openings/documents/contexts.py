@@ -5,12 +5,12 @@ from __future__ import annotations
 import hashlib
 import json
 
-from ..career.models import DEFAULT_GUIDANCE, DEFAULT_PROFILE
+from ..career.models import DEFAULT_PROFILE
 from ..career.records import _get, _page, _setting
 from ..common import decode_record, encode, new_id, now
 from ..errors import DomainError, conflict, missing
 from ..idempotency import fingerprint, remember, replay
-from ..policy import frozen_policy
+from ..preferences import frozen_preferences
 from ..snapshots import payload_text, store_context
 from ..staleness import application_staleness, store_context_inputs
 from .models import OWNER_COLUMNS, ContextCreate, StalenessStage
@@ -20,7 +20,7 @@ class ContextOperations:
     """Preparing, reading and listing contexts; staleness reports."""
 
     def prepare_context(self, value: ContextCreate) -> dict:
-        """Freeze job, career evidence, approved claims, templates/assets and stored instructions for an external agent. Use an idempotency key for retries."""
+        """Freeze job, career evidence, approved claims, templates/assets and the owner's Preferences for an external agent. Use an idempotency key for retries."""
         request = value.model_dump(exclude={"idempotency_key"})
         digest = fingerprint(value)
         with self.db.transaction() as conn:
@@ -41,7 +41,6 @@ class ContextOperations:
             application["note"] = pinned["body"] if pinned else ""
             job = decode_record(job, ["metadata", "overrides"])
             profile = _setting(conn, "profile", DEFAULT_PROFILE)
-            instructions = _setting(conn, "instructions", {"general": DEFAULT_GUIDANCE})
             knowledge = [
                 decode_record(dict(row), ["metadata", "dates", "skills"])
                 for row in conn.execute("SELECT * FROM knowledge ORDER BY position,created_at,id")
@@ -149,8 +148,6 @@ class ContextOperations:
                 "claims": claims,
                 "templates": templates,
                 "instructions": {
-                    "general": instructions["data"].get("general", DEFAULT_GUIDANCE),
-                    "version": instructions["version"],
                     "template_append": {row["id"]: row["guidance"] for row in templates},
                     "application_note": "\n\n".join(
                         part for part in [application["note"], value.note] if part
@@ -158,8 +155,8 @@ class ContextOperations:
                 },
                 "questions": application["questions"],
                 "files": assets,
-                # Each policy section with its version; an unconfirmed item says so.
-                "policy": frozen_policy(conn),
+                # Each Preferences section with its version and statements.
+                "preferences": frozen_preferences(conn),
             }
             encoded = encode(snapshot)
             signature = hashlib.sha256(encoded.encode()).hexdigest()
@@ -246,7 +243,7 @@ class ContextOperations:
         }
 
     def application_staleness(self, application_id: str) -> dict:
-        """Report whether an application's current revision leaves were built on older inputs than documents use now, naming each changed part: Profile parts (name, headline, contact details, links, summary), confirmed policy items of eligibility, writing (by scope) and facts, general instructions, selected templates, Career entries and claims. Profile metadata, preferences, roles and decision items do not make documents stale. Read-only; contexts stay frozen."""
+        """Report whether an application's current revision leaves were built on older inputs than documents use now, naming each changed part: Profile parts (name, headline, contact details, links, summary), Preferences statements of facts and writing (by scope), selected templates, Career entries and claims. Profile metadata and the other Preferences sections do not make documents stale. Read-only; contexts stay frozen."""
         with self.db.connect() as conn:
             row = conn.execute(
                 "SELECT id,status,version FROM applications WHERE id=?", (application_id,)

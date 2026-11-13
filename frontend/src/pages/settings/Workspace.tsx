@@ -149,7 +149,7 @@ export function Workspace({
           <div className="body stack">
             <p>
               The steps of a new workspace and what is done: your agent, your
-              profile, your policy and a first search.
+              profile, your preferences and a first search.
             </p>
             <div className="row">
               <a className="btn sm" href="#setup">

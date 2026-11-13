@@ -22,10 +22,10 @@ flowchart LR
 | `backend/openings/workspace/` | Job identities, triage, notes, application attempts and reporting |
 | `backend/openings/duplicates.py`, `duplicate_signals.py` | Read-only duplicate candidates: per-job signals, pair confidence and groups |
 | `backend/openings/language_signals.py` | Deterministic text signals: the posting's language and the languages it requires or welcomes |
-| `backend/openings/job_signals.py` | Ingest signals of each job (stored, backfilled), listing observations, the dismissal record and policy rules applied to new jobs |
+| `backend/openings/job_signals.py` | Ingest signals of each job (stored, backfilled), listing observations and the dismissal record; labels and filters, never a dismissal |
 | `backend/openings/source_yield.py` | Yield of each collection source and search, from collected jobs to employer answers |
-| `backend/openings/career/` | Profile, detailed evidence, claims, templates and instructions |
-| `backend/openings/policy/` | The owner's policy: four sections of items, section versions, owner confirmation, signal rules |
+| `backend/openings/career/` | Profile, detailed evidence, claims and templates |
+| `backend/openings/preferences.py` | The owner's Preferences: five free-text sections with their versions, and the settings `no_reply_days` and `spoken_languages` |
 | `backend/openings/documents/` | Frozen contexts, document revisions and scoped file transfers |
 | `backend/openings/snapshots.py`, `compaction.py` | Content-addressed storage of frozen contexts; giving freed pages back to the data volume |
 | `backend/openings/retention.py` | Refresh events, what an observation stores, pruning of finished collection runs and tasks |
@@ -67,12 +67,11 @@ belongs to the module of its concern.
 
 | Package | Modules |
 |---|---|
-| `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage, rule dismissals and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py` notes, their author, run and pin; `timeline.py` the timeline of a job or an application; `applications.py` derived readiness, preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, responses, Ready and deletion; `bulk.py` per-item bulk results; `overview.py` the funnel |
+| `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py` notes, their author, run and pin; `timeline.py` the timeline of a job or an application; `applications.py` derived readiness, preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, responses, Ready and deletion; `bulk.py` per-item bulk results; `overview.py` the funnel |
 | `discovery/` | `service.py` the provider gate (`http_budget`, `fetch_bytes`); `models.py` typed inputs; `network.py` the public-address policy and the bounded fetch; `resolution.py` board detection and source configuration; `feeds.py` posting readers (Lever, Ashby, RSS) and adapter dispatch; `sources.py` source schemas, preview and writes; `runs.py` the global switch, provider policies, queueing, scheduling and run records; `tasks.py` leases, retry and running one collection |
 | `documents/` | `contexts.py` frozen contexts and their staleness reports; `revisions.py` creation, cited evidence, review, comparison and deletion; `sources.py` the source and PDF of a CV or letter and its derived text; `text.py` readable text of a TeX source; `latex.py` what CV and letter class commands print; `files.py` owned files and scoped transfer grants; `models.py` inputs |
-| `career/` | `profile.py` Profile and instructions; `entries.py` Career entries; `claims.py`; `templates.py`; `imports.py`; `models.py` inputs and defaults; `records.py` row helpers shared with documents |
-| `policy/` | `service.py` item writes, confirmation and rule preview; `models.py` sections, the signal registry `SIGNALS` and inputs; `records.py` records as read and the frozen policy |
-| `interfaces/` | One module per area declaring its operations and binding them to its service: `core.py` (workspace, jobs, notes, applications, overview), `career.py`, `documents.py`, `discovery.py`, `activity.py`, `agent_requests.py`, `policy.py`, `outcomes.py`, `insights.py`, `source_yield.py`, `skills.py` and `system.py` (sign-in, tokens, capabilities, backup, restore, examples, export); `registry.py` the declaration and its binding |
+| `career/` | `profile.py` the Profile; `entries.py` Career entries; `claims.py`; `templates.py`; `imports.py`; `models.py` inputs and defaults; `records.py` row helpers shared with documents |
+| `interfaces/` | One module per area declaring its operations and binding them to its service: `core.py` (workspace, jobs, notes, applications, overview), `career.py`, `documents.py`, `discovery.py`, `activity.py`, `agent_requests.py`, `preferences.py`, `outcomes.py`, `insights.py`, `source_yield.py`, `skills.py` and `system.py` (sign-in, tokens, capabilities, backup, restore, examples, export); `registry.py` the declaration and its binding |
 
 Services never import FastAPI routing or MCP registration; `interfaces/` binds
 them, and `app.py` calls each area in a fixed order. Smaller concerns stay single
@@ -113,7 +112,7 @@ an area. A tool is named `canonical_name`, `<resource>_<verb>` with a plural
 resource (decision 11); no tool is named by hand, so a clearer name means a
 clearer `resource` or `verb` (`files_reserve_upload`, `workspace_backup`,
 `tokens_revoke`). A singular resource names one record of the workspace or a
-mass noun (`profile`, `policy`, `workspace`, `knowledge`, `staleness`).
+mass noun (`profile`, `preferences`, `workspace`, `knowledge`, `staleness`).
 
 A tool's arguments have one shape: the record ids a REST path names, flat;
 `expected_version` of a delete, flat; and one `value`, the REST body of a write
@@ -193,7 +192,7 @@ route, tool or surface is not registered.
 - **Snapshot storage:** a context's payload is one canonical JSON text, and its
   signature is the SHA-256 of that text. `snapshots.py` stores the text as a frame
   of literals with one part between each pair: every Career entry, claim and
-  template, the Profile, the job and the general instructions are parts, stored
+  template, the Profile, the job, the template guidance and each Preferences section are parts, stored
   once in `snapshot_parts` under the SHA-256 of their own text and shared by all
   contexts (`context_parts`; a list part names its items in `snapshot_list_items`).
   Reading a context concatenates frame and parts, so payload and signature are
@@ -204,33 +203,28 @@ route, tool or surface is not registered.
   removes the parts and bytes nothing references any more, in the same transaction
   or once per bulk run. Foreign keys make a dangling reference impossible.
 - **Staleness:** contexts are never rewritten. `context_inputs` is derived from
-  each payload: the versions it froze, the policy section versions (NULL before
-  schema 10) and `parts`, a 16-hex-digit SHA-256 prefix of each Profile part,
-  each policy item (with its label, scope and confirmation), the general
-  instructions and the content of each template, entry and claim. `staleness.py`
+  each payload: the versions it froze and `parts`, a 16-hex-digit SHA-256 prefix
+  of each Profile part, each Preferences statement of `facts` and `writing` (with
+  its scope) and the content of each template, entry and claim. `staleness.py`
   compares them with the live records on read, only for what documents use
-  (`DOCUMENT_PROFILE_PARTS`, the confirmed items of `DOCUMENT_POLICY_SECTIONS`,
+  (`DOCUMENT_PROFILE_PARTS`, the statements of `DOCUMENT_SECTIONS`, identified by
+  content, so an edit is a removal and an addition,
   `RECORD_FIELDS` of templates, entries and claims, prose with whitespace runs
   collapsed): a moved version settles on its content hash, an equal version needs
-  no read. It filters a scoped writing item per document kind. Rows without part hashes, or of another
+  no read. It filters a scoped writing rule per document kind. Rows without part hashes, or of another
   `PARTS_FORMAT`, are derived again from the frozen payload when the workspace
   opens or a report reads them; a payload that cannot be read stores no part
   and is compared by whole Profile version. Refreshing means a new context and
   new revisions.
-- **Policy:** `policy_sections` holds one version per section (`decision`,
-  `eligibility`, `writing`, `facts`) and `policy_items` their items in a dense
-  order. An item write names its section's version and bumps it by one; a move
-  names and bumps both sections. `confirmed_at` is set only by owner authority:
-  a content write (label, statement, value, scope, rule) by the session or an
-  owner token confirms, the same write by an agent token clears the
-  confirmation and switches the rule off, and `policy_confirm` and enabling a
-  rule call `actors.require_owner`. A value is typed (text, number, date,
-  boolean, list); `structured` exists only for a value copied by the upgrade and
-  cannot be written. A decision rule `{signal, condition, action}` is validated
-  against the registry `policy.SIGNALS`; `job_signals.SignalService` applies an
-  enabled, confirmed rule once to a new job when its signal arrives (see Signals).
-  Preparing a context freezes the four sections (`payload.policy`), each as its
-  own content-addressed part, so a section is stored again only when it changes.
+- **Preferences:** `preference_sections` holds one row per section
+  (`looking_for`, `ruled_out`, `facts`, `writing`, `working_with_me`) with its
+  statements as a JSON array (`{text}`, and `{text, scope}` in `writing`), its
+  version and the actor label of the last write. A write replaces the whole
+  section, names its version and bumps it by one; an unchanged list writes
+  nothing. Nothing is typed or applied automatically: the agent reads the text.
+  The two values the product itself uses live in the `workspace` setting:
+  `no_reply_days` and `spoken_languages`. Preparing a context freezes the
+  sections (`payload.preferences`), each as its own content-addressed part.
 - **Signals:** `job_signals` holds one row per job: the posting's language and
   confidence, required language groups (one language of a group suffices) and
   welcome languages from `language_signals` (weighted function words and phrase
@@ -243,14 +237,11 @@ route, tool or surface is not registered.
   pairs the owner or an agent declared different. `postings.unlisted_at` is set
   when an uncapped run of a company board completes without listing a posting
   whose job matches the source's filters, and cleared when it is seen again.
-  Rules act only on an untouched job (Inbox, no application, no triage change)
-  collected by a source or an agent, never on one the owner added in the
-  dashboard: `dismiss` sets the dismissal record with the rule's item id and
-  label (`jobs.dismissed_*`, also written for every manual dismissal and cleared
-  on restore), `flag` records the rule in `job_signals.rules`. Duplicates are
-  never merged. A restored job keeps its triage event, so a rule never acts on
-  it again. `PolicyService.preview_rule` counts the Inbox jobs a rule would
-  match. `source_yield` attributes each job to the source of its earliest
+  Signals are labels and filters only: nothing dismisses a job automatically.
+  `jobs.dismissed_*` records every dismissal (who, when, why) and is cleared on
+  restore. Duplicates are never merged. `jobs_list` with
+  `hide_unspoken_required` leaves out jobs with a required language group none
+  of whose languages is in `spoken_languages`, and reports how many. `source_yield` attributes each job to the source of its earliest
   observation and counts its outcome once.
 - **Truth:** approved claims and narrative evidence guide an external agent;
   reference/length validation does not establish factual accuracy. Review outputs.
@@ -370,8 +361,7 @@ is free after large deletions, `compaction.py` rewrites the file at start: a
 compact copy beside the database is copied back in one transaction, so an
 interruption leaves the previous file valid and the next start tries again.
 `outcomes.no_reply_period` is the only definition of the no-reply period (the
-days of the Policy decision item labelled "No reply", confirmed items first,
-else 30); `insights.py` maps titles to role family and seniority with fixed
+setting `no_reply_days`, else 30); `insights.py` maps titles to role family and seniority with fixed
 keyword tables and no model.
 
 Retention is one environment setting, `OPENINGS_RETENTION_DAYS` (default 90, 0

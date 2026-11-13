@@ -18,11 +18,7 @@ import {
   useUrlFilters,
 } from "../state";
 import { TemplateDetail } from "./templates/Detail";
-import {
-  CreateTemplate,
-  InstructionsDialog,
-  kindLabels,
-} from "./templates/Dialogs";
+import { CreateTemplate, kindLabels } from "./templates/Dialogs";
 
 const NONE: ListResult<Template> = { items: [], total: 0 };
 
@@ -41,7 +37,6 @@ export default function TemplatesPage() {
     ["templates", "files"],
   );
   const [creating, setCreating] = useState(false);
-  const [instructions, setInstructions] = useState(false);
   const [pane, setPane] = useState<0 | 1>(filters.template ? 1 : 0);
   const selected = filters.template || list.data.items[0]?.id || "";
   const detail = useResource<Template | null>(
@@ -59,20 +54,11 @@ export default function TemplatesPage() {
   const filtered = !!(query || filters.kind);
   return (
     <>
-      <PageHead
-        title="Templates"
-        actions={
-          <>
-            <Button onClick={() => setInstructions(true)}>
-              General instructions
-            </Button>
-            {add}
-          </>
-        }
-      >
-        The source your CVs and letters are built from, and the rules each one
-        must keep. Your agent compiles them on its own machine; the workspace
-        stores the files.
+      <PageHead title="Templates" actions={add}>
+        The source your CVs and letters are built from, with each one's guidance
+        and limits. Your agent compiles them on its own machine; the workspace
+        stores the files. Writing rules live in{" "}
+        <a href="#preferences">Preferences</a>.
       </PageHead>
       {list.error ? (
         <ErrorBanner message={list.error} retry={list.reload} />
@@ -189,9 +175,6 @@ export default function TemplatesPage() {
             setPane(1);
           }}
         />
-      )}
-      {instructions && (
-        <InstructionsDialog onClose={() => setInstructions(false)} />
       )}
     </>
   );

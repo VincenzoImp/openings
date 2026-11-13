@@ -14,7 +14,6 @@ const signals = (fields = {}) => ({
   duplicate: null,
   no_longer_listed: false,
   unlisted_at: null,
-  rules: [],
   ...fields,
 });
 const job = (fields = {}) => ({
@@ -44,17 +43,16 @@ test("each tab reads its queue, and only Dismissed filters by who dismissed", ()
   assert.equal(review.get("sort"), "newest");
   assert.equal(review.get("limit"), "200");
   const dismissed = model.listQuery(
-    filters({ section: "dismissed", dismissed_by: "rule", rule_id: "r1" }),
+    filters({ section: "dismissed", dismissed_by: "agent" }),
     200,
   );
   assert.equal(dismissed.get("queue"), "dismissed");
   assert.equal(dismissed.get("sort"), "dismissed");
-  assert.equal(dismissed.get("dismissed_by"), "rule");
-  assert.equal(dismissed.get("rule_id"), "r1");
+  assert.equal(dismissed.get("dismissed_by"), "agent");
   const all = model.listQuery(
     filters({
       section: "all",
-      dismissed_by: "rule",
+      dismissed_by: "agent",
       sort: "dismissed",
       q: "rust",
     }),
@@ -71,7 +69,7 @@ test("each tab reads its queue, and only Dismissed filters by who dismissed", ()
     shortlist: 2,
     applications: 1,
     dismissed: 3,
-    dismissed_by: { rule: 1, agent: 1, owner: 1, other: 0 },
+    dismissed_by: { agent: 1, owner: 2, other: 0 },
   };
   assert.equal(model.sectionCount("review", counts), 4);
   assert.equal(model.sectionCount("all", counts), undefined);
@@ -85,7 +83,6 @@ test("signals read as tags; the owner's languages decide what needs attention", 
       welcome: ["it"],
       duplicate: { job_id: "j0", confidence: 0.93, tier: "high" },
       no_longer_listed: true,
-      rules: [{ item_id: "r1", label: "Mention duplicates", action: "flag" }],
     }),
     complete: false,
   });
@@ -96,7 +93,6 @@ test("signals read as tags; the owner's languages decide what needs attention", 
     { text: "Requires English or French", tone: undefined },
     { text: "In German" },
     { text: "Italian welcome" },
-    { text: "Flagged: Mention duplicates", tone: "info" },
     { text: "Text incomplete", tone: "attention" },
   ]);
   const own = new Set(["en", "it"]);
@@ -108,7 +104,6 @@ test("signals read as tags; the owner's languages decide what needs attention", 
       ["Requires German", "attention"],
       ["In German", undefined],
       ["Italian welcome", undefined],
-      ["Flagged: Mention duplicates", "info"],
       ["Text incomplete", "attention"],
     ],
   );
@@ -120,19 +115,33 @@ test("signals read as tags; the owner's languages decide what needs attention", 
   );
 });
 
-test("the owner's languages come from a confirmed rule of the policy", () => {
-  const item = (fields) => ({
-    confirmed: true,
-    rule: {
-      signal: "language_required",
-      condition: { operator: "not_in", value: ["English", "it"] },
-      action: "dismiss",
-    },
-    ...fields,
-  });
-  assert.deepEqual([...model.ownLanguages([item({})])], ["en", "it"]);
-  assert.equal(model.ownLanguages([item({ confirmed: false })]), null);
+test("the owner's languages come from the settings", () => {
+  assert.deepEqual([...model.ownLanguages(["en", "it"])], ["en", "it"]);
   assert.equal(model.ownLanguages([]), null);
+  assert.equal(model.ownLanguages(undefined), null);
+});
+
+test("the languages toggle is always asked for and says how many it hides", () => {
+  assert.equal(
+    model.listQuery(filters(), 200).get("hide_unspoken_required"),
+    "false",
+  );
+  assert.equal(
+    model
+      .listQuery(filters({ hide_unspoken: "true" }), 200)
+      .get("hide_unspoken_required"),
+    "true",
+  );
+  // Off: the list holds them all; on: the list holds the rest.
+  assert.equal(
+    model.unspokenLine({ count: 3, hidden: false }, 40),
+    "would hide 3 of 40",
+  );
+  assert.equal(
+    model.unspokenLine({ count: 3, hidden: true }, 37),
+    "hides 3 of 40",
+  );
+  assert.equal(model.unspokenLine(undefined, 40), "");
 });
 
 test("a dismissal says who made it, when and why", () => {
@@ -148,18 +157,14 @@ test("a dismissal says who made it, when and why", () => {
   const dismissed = (dismissal) =>
     job({
       triage: "dismissed",
-      dismissal: { at, reason: "", rule: null, ...dismissal },
+      dismissal: { at, reason: "", ...dismissal },
     });
   assert.equal(
     model.dismissalLine(
-      dismissed({
-        by: by("system"),
-        category: "rule",
-        rule: { item_id: "r1", label: "Languages outside my list" },
-      }),
+      dismissed({ by: by("system"), category: "other" }),
       now,
     ),
-    "Dismissed by the rule “Languages outside my list” · Today 09:12",
+    "Dismissed by System · Today 09:12",
   );
   assert.equal(
     model.dismissedBy(
