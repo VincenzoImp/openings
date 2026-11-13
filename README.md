@@ -34,13 +34,19 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   readiness (blocked, no documents, missing PDF, needs review, reviewed, ready) and
   sort by deadline or priority. Close, reopen or delete applications in bulk.
 - **Hand over:** an application is marked **Ready** once its documents are approved
-  and nothing blocks it. Ready to apply is your queue, and a later change to the
-  documents clears the mark.
+  and nothing blocks it. Its review page shows the posting, CV and letter side by
+  side with the open requirements; download both PDFs, apply on the employer's
+  site and **Mark applied**. A later change to the documents clears the mark.
 - **Stay consistent:** applications built on older inputs are flagged after Profile,
   template or Career changes, and review checks a document's content against its
   `.tex` source.
-- **Track:** move applications through Preparing, Applied, Interview, Offer and
-  Closed with recorded outcomes, history and a progress funnel.
+- **Track:** follow applications through Preparing, Ready, Applied, Interview,
+  Offer and Closed as a list or a board. Record the employer's rejection,
+  interview or offer with its date, and close the ones that never answered as
+  **No reply** after a period your Policy sets.
+- **Learn:** **Insights** shows which applications get answers: response, interview
+  and offer rates and the time to an answer by role family, seniority, source,
+  location and month, withheld for samples too small to read.
 - **See what the agent did:** every change records who made it. An agent works in
   runs with a stored report, and asks you questions that you answer under **Activity**.
 - **Tell the agent what to do next:** write a request under **Activity**, or
@@ -49,7 +55,7 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
 - **Automate:** the dashboard, REST API and MCP share one service layer and the same
   operations.
 
-![Applications sorted by deadline with priority, readiness, a blocking requirement and bulk actions](docs/images/applications-planning.png)
+![The review page: the posting, CV and letter side by side with their PDFs, the place in the Ready queue and Mark applied](docs/images/review.png)
 
 ## Agent-operated
 
@@ -107,7 +113,7 @@ access, storage and upgrades.
 [Applications](docs/user/applications.md) · [Agents and MCP](docs/user/agents.md) ·
 [REST API](docs/user/api.md) · [Operations](docs/user/operations.md)
 
-![Application board sorted by deadline, with plan tags and stages from Preparing to Closed](docs/images/applications.png)
+![Applications: stage chips with their counts, the plan, documents and the employer's answer for each, and the next action](docs/images/applications.png)
 
 ## Project
 

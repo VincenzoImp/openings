@@ -258,6 +258,42 @@ when that issue lands; the table says which parts those are.
   ages, finished, interrupted and open runs with reports, questions with and
   without choices, requests in every state and collection runs.
 
+**Stage 3, Applications.**
+
+- **Applications** (`pages/Applications.tsx`, `pages/applications/`) has the
+  tabs Pipeline and Insights. The pipeline counts six stage chips (Preparing
+  without the Ready ones, Ready, Applied, Interview, Offer, Closed), searches,
+  filters by readiness and outcome, sorts, and shows a list or a board. The list
+  is an ARIA grid of rows (`role="table"`, `row`, `cell`) instead of a `<table>`,
+  so that a row can stack into labelled cells under 860 px and still be read as
+  a table; rows use `content-visibility: auto`. Selection acts in bulk: close as
+  no reply, close with an outcome, reopen, mark ready, not ready, delete.
+  **Record response** opens a form under the row; **Close N as no reply** lists
+  the applications before closing them. Today's "Close N as no reply" and
+  Waiting card use the `no_reply_due` filter and the shared no-reply period
+  (`outcomes.no_reply_period`), so the period has one definition.
+- **Review** (`pages/Review.tsx`, `pages/review/`) is the application's page,
+  `#review?application=…&tab=…`: the posting, CV and letter side by side with
+  their PDFs (one at a time on a phone), the place in the Ready queue in
+  Today's order with Next, Before you send, Download CV and letter, Open the
+  posting, Mark applied (refused with the reason when the application is no
+  longer Ready) and Not pursuing. The tabs Answers (one control per question,
+  never raw JSON), Requirements, Timeline (responses, changes, notes), Inputs
+  (contexts, staleness), Documents and Details keep every capability of the old
+  drawer. `#applications?application=…&detail=…` and the old `#overview?since=`
+  link are rewritten by the shell (`canonicalHash`).
+- **Insights** moved Progress there from Today. Rates come from
+  `GET /insights`; a group below the minimum sample (5) shows its counts and
+  "Too few to show a rate".
+- Components added to `frontend/src/design`: grid table (`Grid.tsx`), rate bar
+  (`Rate.tsx`), panes with a switch (`Panes.tsx`) and the response form
+  (`ResponseForm.tsx`), with their styles in `data.css`. The old Applications
+  page, its drawer and their rules in `legacy.css` are deleted.
+- Checks: `e2e/applications.spec.ts` (keyboard review from Today to Mark
+  applied, recording a response by keyboard, bulk no reply, board, old links)
+  and the `chromium-performance` project (`e2e/performance.spec.ts`): 200 rows
+  rendered in under 300 ms on 5000 jobs and 500 applications.
+
 **Stage 5, Library.**
 
 - **Policy** (`pages/Policy.tsx`, `pages/policy/`) is new: the four sections as

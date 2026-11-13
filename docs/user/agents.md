@@ -178,6 +178,35 @@ Prefer a compatible bulk patch when applying the same schedule or acquisition
 settings to several sources. Read per-source failures and retain untouched fields.
 The [Collection guide](sources.md) explains daily time slots, defaults and counters.
 
+## Employer responses and insights
+
+The owner sends applications and tells the agent what the employer did; record
+only outcomes the owner reported, never ones you infer from mail or a portal.
+
+- `responses_add(application_id, value)` records an answer to a sent
+  application: `kind` (`rejection`, `interview`, `offer` or `other`), `date`
+  (the day it arrived, not in the future, today when omitted), an optional
+  `note` and an `idempotency_key`. It does not move the stage; one response per
+  kind and day (except `other`) returns `response_exists`. A Draft that was
+  never sent returns `application_not_sent`. `responses_list`,
+  `responses_update` (with `expected_version`) and `responses_remove` correct
+  them; `application_get` includes `responses` and `last_response`.
+- `application_update` moving a sent application to Interview or Offer, or
+  closing it as `rejected`, records the matching response itself, dated
+  `response_date` (today when omitted), with an optional `response_note`.
+  Closing with `outcome: "no_response"` concludes it on `concluded_on`.
+- `applications_list` with `no_reply_due: true` lists Applied applications sent
+  longer ago than the no-reply period: the days of the Policy decision labelled
+  "No reply", or 30. Its result's `no_reply` names the period and whether the
+  owner confirmed it. Close them as `no_response` (one by one or with
+  `applications_bulk`) only under a confirmed rule; otherwise propose the list
+  and ask the owner with `questions_ask`.
+- `insights_get` returns response, interview and offer rates for sent
+  applications, the median days to a first answer and groups by role family,
+  seniority, location, source kind, named source and month. A group below
+  `min_sample` (default 5) shows counts and `withheld` instead of a rate. Drafts
+  never sent are counted apart; dismissed jobs never count.
+
 ## State rules
 
 - Job triage uses `inbox` (unreviewed interest), `saved` (saved interest) and `dismissed`.
