@@ -64,7 +64,7 @@ export function Insights() {
   const [period, setPeriod] = useUrlState("period", "all");
   const recent = period === "90";
   const report = useFresh<Report | null>(
-    `/insights${recent ? `?applied_since=${dayBefore(90)}` : ""}`,
+    "/insights" + (recent ? "?applied_since=" + dayBefore(90) : ""),
     null,
     SCOPES,
   );

@@ -22,7 +22,7 @@ import { dayTime } from "../../library/time";
 import { useResource, useWorkspace } from "../../state";
 import { changeDetail, changeLabel } from "../activity/wording";
 import { responseLabels } from "../applications/model";
-import { Responses } from "./Responses";
+import { Responses, day } from "./Responses";
 
 const NONE = { items: [], total: 0 };
 type Entry =
@@ -46,7 +46,7 @@ const titles: Record<string, string> = {
 function detail(event: Activity) {
   const payload = event.payload || {};
   if (event.kind?.startsWith("response_") && payload.kind)
-    return `${responseLabels[payload.kind as ResponseKind] || payload.kind}${payload.date ? " · " + payload.date : ""}`;
+    return `${responseLabels[payload.kind as ResponseKind] || payload.kind}${payload.date ? " · " + day(String(payload.date)) : ""}`;
   if (event.kind === "application_ready_cleared") return readyReason(payload);
   return changeDetail(event);
 }

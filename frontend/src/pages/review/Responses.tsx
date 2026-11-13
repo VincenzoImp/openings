@@ -28,7 +28,8 @@ const ORIGINS: Record<EmployerResponse["origin"], string> = {
   stage: "recorded with the stage change",
   upgrade: "taken from the stage when Openings was upgraded",
 };
-const day = (value: string) => {
+/** "10 Oct" for a calendar day (YYYY-MM-DD), read in local time. */
+export const day = (value: string) => {
   const [year, month, date] = value.split("-").map(Number);
   return shortDate(new Date(year, month - 1, date));
 };

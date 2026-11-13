@@ -218,6 +218,31 @@ test("marking applied is refused cleanly once the application is no longer ready
   );
 });
 
+test("the Ready mark is removed and set again under Details", async ({
+  page,
+}) => {
+  const title = unique("Ready mark");
+  const application = await make(page, title, { ready: true });
+  await go(page, `review?application=${application.id}&tab=details`);
+  await settled(page);
+  await page.getByRole("button", { name: "Not ready", exact: true }).click();
+  await expect(toast(page)).toContainText("No longer marked ready.");
+  await expect
+    .poll(
+      async () =>
+        (await call(page, `/applications/${application.id}`)).ready_at,
+    )
+    .toBeNull();
+  await page.getByRole("button", { name: "Mark ready", exact: true }).click();
+  await expect(toast(page)).toContainText("Marked ready to apply.");
+  await expect
+    .poll(
+      async () =>
+        (await call(page, `/applications/${application.id}`)).readiness,
+    )
+    .toBe("ready");
+});
+
 test("keyboard only: an employer response is recorded from an Applied row", async ({
   page,
 }) => {
