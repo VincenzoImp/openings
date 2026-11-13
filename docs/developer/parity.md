@@ -16,7 +16,7 @@ How to read the evidence:
   called the route without an error response (Chromium desktop; setup calls made
   by the test helpers are excluded).
 - **Editor** is `raw JSON` when a free-form JSON input is edited as JSON text.
-- **MCP** names the tool; the inventory also lists its deprecated aliases.
+- **MCP** names the tool, `<resource>_<verb>`.
 - Input comparisons use names from OpenAPI and the MCP tool schemas. An input
   counts as offered when its name occurs in the files that call the route or in
   the page and library modules they import; a mentioned name may still lack a
@@ -35,7 +35,7 @@ How to read the evidence:
 | With a dashboard path exercised by e2e | 117 |
 | Reached through another operation (documented) | 5 |
 | Without a dashboard path: agent only (documented) | 7 |
-| With inputs only agents and scripts set (documented) | 24 |
+| With inputs only agents and scripts set (documented) | 23 |
 | With inputs on one interface only (documented) | 1 |
 | **Gaps** | **0** |
 
@@ -83,7 +83,6 @@ REST inputs whose names do not occur in the dashboard code of the operation.
 | `jobs.create` | `raw` | The provider payload of a collector; in the dashboard the owner pastes the posting text. |
 | `jobs.create` | `source_id` | The collection source of a collected posting; a job added in the dashboard has none. |
 | `jobs.create` | `source_key` | A collector's identity of a posting at its source; a job added in the dashboard is identified by its address. |
-| `jobs.update` | `availability` | Deprecated since 0.21: whether the source still lists the posting is the No longer listed signal, shown on the job. |
 | `jobs.resolve` | `source_key` | A collector's identity of a posting; Add a job looks the address up. |
 | `jobs.duplicates` | `match_location` | The selected job's Possible copies lists its group at the default matching; requiring the same place tunes the workspace-wide list for agents and scripts. |
 | `notes.create` | `idempotency_key` | A retry key for agents and scripts that may send a create again after a lost answer. The dashboard sends each create once: its form is locked until the answer arrives. |
@@ -224,7 +223,7 @@ missing from the inventory.
 | Operation | REST | MCP | Access | Dashboard location | Dashboard code | Editor | E2E |
 |---|---|---|---|---|---|---|---|
 | `profile.read`<br>Read profile, links, metadata and version | `GET /career/profile` | `profile_get` | any | Career: profile | pages/career/ProfileCard.tsx<br>pages/setup/useSetup.ts<br>shell/setup.ts | structured | 14 |
-| `profile.update`<br>Edit profile/preferences/contact | `PATCH /career/profile` | `profile_update` | any | Career: profile and Other details | pages/career/ProfileCard.tsx<br>pages/setup/ProfileBasics.tsx | structured | 2 |
+| `profile.update`<br>Edit profile/contact | `PATCH /career/profile` | `profile_update` | any | Career: profile and Other details | pages/career/ProfileCard.tsx<br>pages/setup/ProfileBasics.tsx | structured | 2 |
 | `knowledge.list`<br>Search/filter paginated career entries summaries | `GET /career/knowledge` | `knowledge_list` | any | Career: career entries: list/search | pages/Career.tsx<br>pages/activity/RequestForm.tsx<br>pages/review/ContextDialog.tsx<br>pages/setup/useSetup.ts<br>shell/setup.ts | structured | 15 |
 | `knowledge.read`<br>Read full career entries | `GET /career/knowledge/{knowledge_id}` | `knowledge_get` | any | Career: career entries: detail | pages/career/EntryEditor.tsx | structured | 8 |
 | `knowledge.create`<br>Create career entries | `POST /career/knowledge` | `knowledge_create` | any | Career: career entries: add | pages/career/EntryEditor.tsx | structured | 1 |

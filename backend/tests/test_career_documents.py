@@ -33,6 +33,7 @@ from openings.errors import DomainError
 from openings.interfaces.career import register_api as register_career_api
 from openings.interfaces.documents import register_api
 from openings.workspace import Workspace
+from timeline_fixtures import guided_application
 
 
 @pytest.fixture
@@ -45,7 +46,7 @@ def workspace(tmp_path):
         ProfileUpdate(
             expected_version=profile["version"],
             name="Alex Example",
-            roles="Backend engineer",
+            headline="Backend engineer",
             summary="Built Python APIs.",
         )
     )
@@ -70,9 +71,7 @@ def workspace(tmp_path):
     job = workspace.ingest_job(
         {"title": "Backend Engineer", "company": "Example Co", "posting": "Build Python APIs."}
     )
-    application = workspace.create_application(
-        {"job_id": job["id"], "note": "Prefer practical examples."}
-    )
+    application = guided_application(workspace, job["id"], "Prefer practical examples.")
     api = FastAPI()
 
     @api.exception_handler(DomainError)
@@ -173,7 +172,7 @@ def test_context_freezes_stored_instructions_evidence_and_file_bytes(workspace):
             expected_version=evidence["version"], narrative="Edited after preparation."
         ),
     )
-    documents.delete_file(asset["id"])
+    documents.delete_file(asset["id"], 1)
     assert documents.prepare_context(request)["id"] == frozen["id"]
     old = documents.get_context(frozen["id"])
     file_id = old["payload"]["files"][0]["id"]

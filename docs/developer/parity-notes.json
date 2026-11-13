@@ -13,11 +13,6 @@
         "source_key": "A collector's identity of a posting at its source; a job added in the dashboard is identified by its address."
       }
     },
-    "jobs.update": {
-      "inputs": {
-        "availability": "Deprecated since 0.21: whether the source still lists the posting is the No longer listed signal, shown on the job."
-      }
-    },
     "jobs.resolve": {
       "inputs": {
         "source_key": "A collector's identity of a posting; Add a job looks the address up."
@@ -40,7 +35,10 @@
       }
     },
     "applications.staleness_list": {
-      "via": ["applications.list", "applications.staleness"],
+      "via": [
+        "applications.list",
+        "applications.staleness"
+      ],
       "note": "Each row of Applications carries its changed inputs (`stale_inputs`, `stale_changes`) and the review page's Inputs tab reads the full report of one application; the workspace-wide list serves an agent that refreshes documents."
     },
     "insights.read": {
@@ -103,7 +101,9 @@
       }
     },
     "questions.read": {
-      "via": ["questions.list"],
+      "via": [
+        "questions.list"
+      ],
       "note": "Activity and Today render each question from the list, which returns complete records; one question by id serves an agent following a link."
     },
     "questions.ask": {
@@ -115,7 +115,9 @@
       }
     },
     "requests.read": {
-      "via": ["requests.list"],
+      "via": [
+        "requests.list"
+      ],
       "note": "Activity renders each request from the list, which returns complete records; one request by id serves an agent following a link."
     },
     "requests.take": {
@@ -128,11 +130,15 @@
       "exempt": "Requests are what the owner asks the agent. The agent declines them with its token and a reason; Activity shows the reason."
     },
     "notes.list": {
-      "via": ["timeline.read"],
+      "via": [
+        "timeline.read"
+      ],
       "note": "The job and application timelines list every note with its scope, author, run and pin through the one timeline read; the notes alone serve agents."
     },
     "applications.history": {
-      "via": ["timeline.read"],
+      "via": [
+        "timeline.read"
+      ],
       "note": "The application's Timeline lists its lifecycle events with its notes and its job's entries through the one timeline read."
     },
     "collection.yield": {

@@ -11,7 +11,7 @@ from pathlib import Path
 from .errors import DomainError
 from .posting import posting_complete
 
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 SCHEMA_SQL = Path(__file__).with_name("schema.sql")
 TEMP_PREFIX = ".openings-temp-"
 
@@ -349,6 +349,21 @@ def _migrate_12_to_13(conn):
     migrate_to_13(conn)
 
 
+def _migrate_13_to_14(conn):
+    # 0.23 removes what 0.19 to 0.22 deprecated, keeping every value it held.
+    # A job's manual availability (anything but 'unknown') becomes a note on the
+    # job with the value, checked byte for byte, then jobs.availability is dropped.
+    # Each non-empty Profile preferences and roles text must be held by a policy
+    # item (0.19 copied them into decision items); one that is not is copied into
+    # a new unconfirmed decision item, and then both fields leave the Profile.
+    # Frozen contexts keep the Profile and job they froze.
+    from .policy import profile_upgrade
+    from .workspace import availability_upgrade
+
+    availability_upgrade.migrate(conn)
+    profile_upgrade.migrate(conn)
+
+
 # Each step upgrades from its key to the next version; steps chain inside one transaction.
 MIGRATIONS = {
     5: _migrate_5_to_6,
@@ -359,6 +374,7 @@ MIGRATIONS = {
     10: _migrate_10_to_11,
     11: _migrate_11_to_12,
     12: _migrate_12_to_13,
+    13: _migrate_13_to_14,
 }
 
 

@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS api_tokens (
 CREATE TABLE IF NOT EXISTS jobs (
  id TEXT PRIMARY KEY, title TEXT NOT NULL, company TEXT NOT NULL, location TEXT NOT NULL DEFAULT '',
  url TEXT NOT NULL DEFAULT '', posting TEXT NOT NULL DEFAULT '', triage TEXT NOT NULL DEFAULT 'inbox'
- CHECK(triage IN ('inbox','saved','dismissed')), availability TEXT NOT NULL DEFAULT 'unknown',
+ CHECK(triage IN ('inbox','saved','dismissed')),
  metadata TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(metadata)), overrides TEXT NOT NULL DEFAULT '{}',
  content_version INTEGER NOT NULL DEFAULT 1, version INTEGER NOT NULL DEFAULT 1,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
@@ -405,4 +405,4 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
  record_id TEXT NOT NULL, created_at TEXT NOT NULL,
  PRIMARY KEY(scope,key)
 );
-PRAGMA user_version=13;
+PRAGMA user_version=14;

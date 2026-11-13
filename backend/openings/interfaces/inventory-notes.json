@@ -208,7 +208,7 @@
     {
       "id": "profile.update",
       "dashboard": "Career: profile and Other details",
-      "notes": "links is a list of string-valued objects; metadata is an arbitrary finite JSON object of extension values. preferences and roles are deprecated in favour of decision items of the policy and stay readable and writable until the breaking release. expected_version required. A stale version returns 409 with details.current_version."
+      "notes": "links is a list of string-valued objects; metadata is an arbitrary finite JSON object of extension values. Preferences and target roles are decision items of the policy. expected_version required. A stale version returns 409 with details.current_version."
     },
     {
       "id": "knowledge.list",
@@ -351,17 +351,17 @@
     {
       "id": "applications.read",
       "dashboard": "Applications: attempt detail",
-      "notes": "readiness is derived from current revision leaves and unresolved blocking requirements; ready is reported only for an application marked ready (ready_at, ready_by) whose checks still pass. pinned_note is the application's pinned note; note, its text, is deprecated since 0.22 and removed in 0.23."
+      "notes": "readiness is derived from current revision leaves and unresolved blocking requirements; ready is reported only for an application marked ready (ready_at, ready_by) whose checks still pass. pinned_note is the application's pinned note, its standing guidance."
     },
     {
       "id": "applications.create",
       "dashboard": "Jobs: Start application (the selected job or a Shortlist row)",
-      "notes": "At most one non-Closed attempt per job. A conflicting new request reports the active application ID; idempotency keys support retries. Starting retains saved interest and leaves the pending Shortlist queue; it never submits or generates documents. Optional priority (1 highest to 5), deadline (YYYY-MM-DD) and structured employer requirements. note is deprecated since 0.22 (removed in 0.23): non-empty, it creates the application's pinned note."
+      "notes": "At most one non-Closed attempt per job. A conflicting new request reports the active application ID; idempotency keys support retries. Starting retains saved interest and leaves the pending Shortlist queue; it never submits or generates documents. Optional priority (1 highest to 5), deadline (YYYY-MM-DD) and structured employer requirements. Standing guidance is the application's pinned note (notes.create with application_id and pinned)."
     },
     {
       "id": "applications.update",
       "dashboard": "Applications: progress, planning, requirements and questions/answers",
-      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history. Entering Closed requires an explicit outcome: accepted, rejected, not_pursued or no_response (no answer within the no-reply period; only for a sent application, with concluded_on, today by default). Moving to Interview or Offer, or closing as rejected (or accepted without an offer on record) records the matching employer response, dated response_date (today by default) with response_note; a response of that kind on that day is never repeated, and its date stays correctable with responses.update. Reopening enforces one open attempt per job. applied_at, priority or deadline null clears the value. requirements replaces the whole list; keep existing ids. The returned job is the compact job summary. Leaving Preparing or adding/unresolving a blocking requirement clears the stored Ready step. note is deprecated since 0.22 (removed in 0.23): it edits the pinned note, adds it pinned when there is none, or unpins it when empty, without changing the application version."
+      "notes": "expected_version prevents lost updates; recorded state changes create lifecycle history. Entering Closed requires an explicit outcome: accepted, rejected, not_pursued or no_response (no answer within the no-reply period; only for a sent application, with concluded_on, today by default). Moving to Interview or Offer, or closing as rejected (or accepted without an offer on record) records the matching employer response, dated response_date (today by default) with response_note; a response of that kind on that day is never repeated, and its date stays correctable with responses.update. Reopening enforces one open attempt per job. applied_at, priority or deadline null clears the value. requirements replaces the whole list; keep existing ids. The returned job is the compact job summary. Leaving Preparing or adding/unresolving a blocking requirement clears the stored Ready step."
     },
     {
       "id": "applications.ready",

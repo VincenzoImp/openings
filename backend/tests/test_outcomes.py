@@ -153,7 +153,7 @@ def test_stage_moves_record_the_matching_response_once(workspace):
     )
     assert kinds(closed) == [("rejection", days_ago(1), "stage")]
     # Correcting the outcome of a closed application to rejected again records nothing new.
-    assert kinds(move(workspace, rejected, note="Synthetic")) == kinds(closed)
+    assert kinds(move(workspace, rejected, priority=2)) == kinds(closed)
 
     accepted_directly = attempt(workspace, "Synthetic analyst", status="interview")
     assert kinds(accepted_directly) == [("interview", today(), "stage")]

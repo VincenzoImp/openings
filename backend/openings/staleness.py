@@ -11,11 +11,11 @@ documents use: the Profile parts of a CV or letter header and summary, the confi
 items of the policy sections ``eligibility``, ``writing`` and ``facts``, the guidance
 text, a template's source, guidance and rules, an entry's kind, title, organization,
 dates, skills and narrative, and a claim's wording and entry. Profile ``metadata``,
-``preferences`` and ``roles``, the ``decision`` section, names, positions, default flags,
-claim selection fields and free-form metadata are frozen as well but never make a
-document stale, and neither does a new version whose content is the same. Text is
-compared with its runs of whitespace made single spaces, except a template's source. A writing
-item scoped to the CV or the letter concerns that document only.
+the ``decision`` section, names, positions, default flags, claim selection fields and
+free-form metadata are frozen as well but never make a document stale, and neither
+does a new version whose content is the same. Text is compared with its runs of
+whitespace made single spaces, except a template's source. A writing item scoped to
+the CV or the letter concerns that document only.
 """
 
 from __future__ import annotations
@@ -36,12 +36,11 @@ PROFILE_PARTS = {
     "contact": ("Contact details", ("email", "phone", "location")),
     "links": ("Links", ("links",)),
     "summary": ("Summary", ("summary",)),
-    "preferences": ("Preferences", ("preferences",)),
-    "roles": ("Target roles", ("roles",)),
     "metadata": ("Metadata", ("metadata",)),
 }
-# The parts a CV or letter uses. Preferences and roles became decision items of the
-# policy in 0.19 and metadata holds free-form extension values; documents use neither.
+# The parts a CV or letter uses. Metadata holds free-form extension values that
+# documents do not use. (The preferences and roles parts that contexts frozen before
+# 0.23 stored are never compared: they became decision items of the policy.)
 DOCUMENT_PROFILE_PARTS = ("name", "headline", "contact", "links", "summary")
 # Decision items shortlist and dismiss jobs; documents use the other sections.
 DOCUMENT_POLICY_SECTIONS = ("eligibility", "writing", "facts")
