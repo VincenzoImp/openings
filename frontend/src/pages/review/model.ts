@@ -30,11 +30,44 @@ export function currentOf<
 
 export const isPdf = (file: WorkspaceFile) =>
   file.media_type === "application/pdf" || /\.pdf$/i.test(file.name);
+/** A TeX source, as the server reads it: by name or media type. */
 export const isSource = (file: WorkspaceFile) =>
-  /\.(tex|ltx|md|txt)$/i.test(file.name) ||
-  ["application/x-tex", "text/x-tex", "text/markdown"].includes(
-    file.media_type,
-  );
+  /\.(tex|ltx)$/i.test(file.name) ||
+  [
+    "application/x-tex",
+    "text/x-tex",
+    "application/x-latex",
+    "text/x-latex",
+  ].includes(file.media_type.split(";")[0]);
+
+/** A CV or letter is its .tex source and PDF; other kinds keep structured content. */
+export const SOURCE_KINDS = ["resume", "cover_letter"];
+export const isSourceKind = (kind: string) => SOURCE_KINDS.includes(kind);
+
+/** The source and the PDF of a revision, and how the PDF names its source. */
+export function sourceAndPdf(revision: Pick<Document, "files">) {
+  const files = revision.files || [];
+  const source = files.find(isSource) || null;
+  const pdf = files.find(isPdf) || null;
+  const pairing = !pdf
+    ? null
+    : !pdf.source_sha256
+      ? "unnamed"
+      : source && pdf.source_sha256 === source.sha256
+        ? "matches"
+        : "other";
+  return { source, pdf, pairing };
+}
+
+/** Why a revision cannot be approved yet, or null. */
+export function approvalBlock(revision: Pick<Document, "kind" | "files">) {
+  if (!isSourceKind(revision.kind)) return null;
+  const { source, pdf } = sourceAndPdf(revision);
+  if (!source)
+    return "Add the .tex source before approving: its text is what you review.";
+  if (!pdf) return "Add the PDF built from the source before approving.";
+  return null;
+}
 
 export interface Notice {
   /** The tab that settles it. */

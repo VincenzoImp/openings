@@ -3,17 +3,17 @@ import {
   api,
   uploadFile,
   type Application,
-  type Consistency,
+  type Comparison,
   type Document,
   type ListResult,
   type WorkspaceFile,
 } from "../../api";
 import {
-  Banner,
   Button,
   ErrorBanner,
   Loading,
   Tag,
+  TextDiff,
   ValueTree,
 } from "../../design";
 import { FileDialog } from "../../library/Assets";
@@ -25,31 +25,61 @@ import {
   useUrlFilters,
   useWorkspace,
 } from "../../state";
-import { kindLabels } from "./model";
+import {
+  approvalBlock,
+  isPdf,
+  isSource,
+  isSourceKind,
+  kindLabels,
+  sourceAndPdf,
+} from "./model";
 import { RevisionDialog } from "./RevisionDialog";
 
 const NONE = { items: [], total: 0 };
 
-function Check({ report }: { report: Consistency }) {
-  if (report.status === "consistent")
-    return <p className="caption">{report.reason}</p>;
-  if (report.status === "not_checked")
-    return <p className="caption">{report.reason}</p>;
+/** The revision's text compared with the one it replaces. */
+function Changes({ document }: { document: Document }) {
+  const result = useResource<Comparison | null>(
+    `/documents/${document.id}/comparison`,
+    null,
+  );
+  if (result.error)
+    return <ErrorBanner message={result.error} retry={result.reload} />;
+  if (!result.data) return <Loading label="Comparing the revisions…" />;
+  const { added, removed, lines, text } = result.data;
+  const previous = (document.revision_number || 2) - 1;
+  if (!text.document || !text.other)
+    return (
+      <p className="caption">
+        {text.document ? `Revision ${previous}` : "This revision"} has no
+        source, so there is no text to compare.
+      </p>
+    );
   return (
-    <Banner tone="attention" title="The saved text and the .tex source differ">
-      <p>{report.reason}</p>
-      <ul className="plain">
-        {report.mismatches.slice(0, 5).map((item) => (
-          <li key={item.path}>
-            <span className="mono">{item.path}</span> {item.text}
-          </li>
-        ))}
-      </ul>
-    </Banner>
+    <div className="stack">
+      <p className="caption" role="status">
+        {added || removed
+          ? `Since revision ${previous}: ${added} ${added === 1 ? "line" : "lines"} added, ${removed} removed.`
+          : `The text is the same as in revision ${previous}.`}
+      </p>
+      {(added > 0 || removed > 0) && (
+        <TextDiff lines={lines} label={`Changes since revision ${previous}`} />
+      )}
+    </div>
   );
 }
 
-/** One revision opened: its text, files, source check and the actions on it. */
+/** What a file is to its revision: the source, the PDF and what it was built from. */
+function role(document: Document, file: WorkspaceFile) {
+  if (isSource(file)) return "Source";
+  if (!isPdf(file)) return "";
+  const { pairing, source } = sourceAndPdf(document);
+  if (pairing === "matches") return `PDF, built from ${source?.name}`;
+  if (pairing === "unnamed") return "PDF";
+  return "PDF of another source";
+}
+
+/** One revision opened: its text, files and evidence, the comparison and the actions on it. */
 function Detail({
   application,
   summary,
@@ -59,26 +89,56 @@ function Detail({
 }) {
   const { mutate, pending } = useWorkspace();
   const detail = useResource<Document | null>(`/documents/${summary.id}`, null);
-  const check = useResource<Consistency | null>(
-    `/documents/${summary.id}/consistency`,
-    null,
-  );
   const [opened, setOpened] = useState<WorkspaceFile | null>(null);
   const [revising, setRevising] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [comparing, setComparing] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
   const document = detail.data;
   if (detail.error)
     return <ErrorBanner message={detail.error} retry={detail.reload} />;
   if (!document) return <Loading label="Loading the revision…" />;
   const approved = document.review_state === "approved";
-  const mismatch = check.data?.status === "mismatch";
+  const sourceKind = isSourceKind(document.kind);
+  const { source } = sourceAndPdf(document);
+  const blocked = approved ? null : approvalBlock(document);
+  const claims = document.claim_ids?.length || 0;
+  const entries = document.knowledge_ids?.length || 0;
   return (
     <div className="stack revision">
-      {typeof document.content.text === "string" ? (
+      {sourceKind ? (
+        document.text ? (
+          <div
+            className="paper"
+            role="document"
+            aria-label={`Text of revision ${document.revision_number || 1}`}
+          >
+            {document.text}
+          </div>
+        ) : (
+          <p className="muted">
+            {source
+              ? "The source has no readable text."
+              : "No source yet. Add the .tex source the PDF is built from: its text appears here."}
+          </p>
+        )
+      ) : typeof document.content?.text === "string" ? (
         <div className="paper">{document.content.text || "No text."}</div>
       ) : (
-        <ValueTree value={document.content} />
+        <ValueTree value={document.content || {}} />
+      )}
+      {sourceKind && document.text && source && (
+        <p className="caption">
+          Text read from <span className="mono">{source.name}</span>, without
+          its layout. The PDF shows the layout.
+        </p>
+      )}
+      {document.note && <p>{document.note}</p>}
+      {(claims > 0 || entries > 0) && (
+        <p className="caption">
+          Cites {claims} {claims === 1 ? "claim" : "claims"} and {entries}{" "}
+          {entries === 1 ? "Career entry" : "Career entries"}.
+        </p>
       )}
       <ul className="list" aria-label="Files of the revision">
         {(document.files || []).map((file) => (
@@ -90,12 +150,25 @@ function Detail({
             >
               {file.name}
             </button>
+            {role(document, file) && (
+              <span className="caption">{role(document, file)}</span>
+            )}
             <span className="caption num">{fileSize(file.size)}</span>
           </li>
         ))}
         {!document.files?.length && <li className="muted">No file yet.</li>}
       </ul>
-      {check.data && <Check report={check.data} />}
+      {document.legacy_content && (
+        <details>
+          <summary>Content saved with this revision before 0.22</summary>
+          <p className="caption">
+            Kept as it was, read-only. The source and the PDF are the revision.
+          </p>
+          <ValueTree value={document.legacy_content} />
+        </details>
+      )}
+      {comparing && <Changes document={document} />}
+      {blocked && <p className="caption">{blocked}</p>}
       <div className="row">
         {!approved && (
           <>
@@ -109,7 +182,15 @@ function Detail({
                 event.target.value = "";
                 if (file)
                   void mutate(
-                    () => uploadFile(file, "document", document.id),
+                    () =>
+                      uploadFile(
+                        file,
+                        "document",
+                        document.id,
+                        /\.pdf$/i.test(file.name)
+                          ? document.source_sha256
+                          : null,
+                      ),
                     "File added.",
                   );
               }}
@@ -125,22 +206,32 @@ function Detail({
             <Button
               size="sm"
               variant="primary"
-              disabled={pending || check.loading}
+              disabled={pending || !!blocked}
               onClick={() =>
                 void mutate(
                   () =>
                     api(`/documents/${document.id}/review`, "POST", {
                       review_state: "approved",
                       expected_version: document.version,
-                      allow_content_mismatch: mismatch,
                     }),
                   "Revision approved.",
                 )
               }
             >
-              {mismatch ? "Approve with differences" : "Approve this revision"}
+              Approve this revision
             </Button>
           </>
+        )}
+        {document.previous_id && (
+          <Button
+            size="sm"
+            aria-expanded={comparing}
+            onClick={() => setComparing(!comparing)}
+          >
+            {comparing
+              ? "Hide the changes"
+              : `Compare with revision ${(document.revision_number || 2) - 1}`}
+          </Button>
         )}
         <Button size="sm" onClick={() => setRevising(true)}>
           New revision
@@ -188,7 +279,7 @@ function Detail({
   );
 }
 
-/** Every document revision of the application: find, open, approve, revise, delete. */
+/** Every document revision of the application: find, open, approve, compare, revise, delete. */
 export function Revisions({ application }: { application: Application }) {
   const [filters, setFilters] = useUrlFilters({
     doc_q: "",
@@ -216,8 +307,8 @@ export function Revisions({ application }: { application: Application }) {
         <input
           className="input"
           type="search"
-          aria-label="Search revisions by title"
-          placeholder="Search by title"
+          aria-label="Search revisions by title or text"
+          placeholder="Search titles and text"
           value={filters.doc_q}
           onChange={(event) =>
             setFilters({ doc_q: event.target.value, doc_offset: "0" })

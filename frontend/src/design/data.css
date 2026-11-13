@@ -240,6 +240,10 @@
   overflow: auto;
   padding: var(--s4);
 }
+.pane .segmented {
+  align-self: flex-start;
+  margin: var(--s3) var(--s4) 0;
+}
 .pane .frame {
   height: min(64vh, 720px);
   background: #fff;
@@ -262,6 +266,36 @@
 .posting {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.diff {
+  margin: 0;
+  padding: var(--s2) 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  font: var(--t-sm) / 1.5 var(--mono);
+}
+.diff > li {
+  padding: 1px var(--s3) 1px var(--s5);
+  text-indent: calc(-1 * var(--s4));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.diff .mark {
+  display: inline-block;
+  width: var(--s4);
+  text-indent: 0;
+}
+.diff > .added {
+  background: var(--ready-soft);
+}
+.diff > .removed {
+  background: var(--danger-soft);
+}
+.diff > .folded {
+  color: var(--ink-2);
+  font-family: var(--sans);
 }
 .pane-switch {
   margin-bottom: var(--s3);

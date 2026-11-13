@@ -317,6 +317,34 @@ test("recording an answer: a stage change with its response, or a response alone
   assert.equal(likelyChoice("interview"), "offer");
 });
 
+test("a CV or letter is approved with its source and the PDF built from it", () => {
+  const tex = { name: "cv.tex", media_type: "application/x-tex", sha256: "s1" };
+  const pdf = (built) => ({
+    name: "cv.pdf",
+    media_type: "application/pdf",
+    sha256: "p1",
+    source_sha256: built,
+  });
+  const cv = (files) => ({ kind: "resume", files });
+  assert.match(review.approvalBlock(cv([])), /source/);
+  assert.match(review.approvalBlock(cv([tex])), /PDF/);
+  assert.equal(review.approvalBlock(cv([tex, pdf("s1")])), null);
+  assert.equal(review.approvalBlock({ kind: "answers", files: [] }), null);
+  assert.equal(review.sourceAndPdf(cv([tex, pdf("s1")])).pairing, "matches");
+  assert.equal(review.sourceAndPdf(cv([tex, pdf(null)])).pairing, "unnamed");
+  assert.equal(review.sourceAndPdf(cv([tex, pdf("s2")])).pairing, "other");
+  assert.equal(review.sourceAndPdf(cv([tex])).pairing, null);
+  // Only TeX is a source, as the server reads it.
+  assert.equal(
+    review.isSource({ name: "notes.md", media_type: "text/markdown" }),
+    false,
+  );
+  assert.equal(
+    review.isSource({ name: "cv", media_type: "text/x-tex; charset=utf-8" }),
+    true,
+  );
+});
+
 test("the review page: current revisions, before you send, the queue and old tabs", () => {
   const revisions = [
     { id: "a", kind: "resume", created_at: "1", previous_id: null },

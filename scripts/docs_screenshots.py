@@ -183,7 +183,7 @@ class Seeder:
             json={"expected_version": app["version"], **fields},
         )
 
-    def upload(self, document, name, media_type, data):
+    def upload(self, document, name, media_type, data, source_sha256=None):
         grant = self.call(
             "POST",
             "/files/uploads",
@@ -194,6 +194,7 @@ class Seeder:
                 "media_type": media_type,
                 "size": len(data),
                 "sha256": hashlib.sha256(data).hexdigest(),
+                **({"source_sha256": source_sha256} if source_sha256 else {}),
             },
         )
         upload = grant.get("upload", grant)
@@ -206,8 +207,10 @@ class Seeder:
         )
         response.raise_for_status()
 
-    def document(self, app, context, kind, title, lines, pdf=True, approve=False, previous=None):
-        content = {"paragraphs": lines}
+    def document(
+        self, app, context, kind, title, lines, pdf=True, approve=False, previous=None, note=""
+    ):
+        """A CV or letter revision: its .tex source and, unless pdf=False, the PDF built from it."""
         document = self.call(
             "POST",
             "/documents",
@@ -216,16 +219,23 @@ class Seeder:
                 "context_id": context["id"],
                 "kind": kind,
                 "title": title,
-                "content": content,
+                "note": note,
                 **({"previous_id": previous["id"]} if previous else {}),
             },
         )
+        tex = "\\documentclass{article}\n\\begin{document}\n"
+        tex += "\n\n".join(line.replace("%", "\\%") for line in lines)
+        tex += "\n\\end{document}\n"
+        source = tex.encode()
+        name = "cv.tex" if kind == "resume" else "letter.tex"
+        self.upload(document, name, "application/x-tex", source)
         if pdf:
-            tex = "\\begin{document}\n" + "\n".join(line.replace("%", "\\%") for line in lines)
-            tex += "\n\\end{document}\n"
-            self.upload(document, "source.tex", "application/x-tex", tex.encode())
             self.upload(
-                document, f"{kind}.pdf", "application/pdf", synthetic_pdf(title, lines)
+                document,
+                f"{kind}.pdf",
+                "application/pdf",
+                synthetic_pdf(title, lines),
+                hashlib.sha256(source).hexdigest(),
             )
         if approve:
             current = self.call("GET", f"/documents/{document['id']}")
@@ -567,6 +577,7 @@ def seed(s: Seeder):
         "Engineering CV — updated experience",
         cv_lines + ["Helped four colleagues operate the services with runbooks."],
         previous=first,
+        note="Adds the runbook work the posting asks about.",
     )
     s.document(northstar, context, "cover_letter", "Cover letter", letter_lines)
 

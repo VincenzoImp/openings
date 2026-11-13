@@ -336,14 +336,15 @@ export interface Staleness {
     changes: StaleChange[];
   }[];
 }
-export interface Consistency {
+/** Two revisions' text compared line by line (`/documents/{id}/comparison`). */
+export interface Comparison {
   document_id: string;
-  status: "consistent" | "mismatch" | "not_checked";
-  reason: string;
-  checked: number;
-  mismatch_count: number;
-  mismatches: { path: string; text: string }[];
-  sources: { id: string; name: string }[];
+  other_id: string;
+  /** Whether each side has text: a CV or letter without a source has none. */
+  text: { document: boolean; other: boolean };
+  added: number;
+  removed: number;
+  lines: { change: "same" | "added" | "removed"; text: string }[];
 }
 export interface Profile {
   name: string;
@@ -501,7 +502,17 @@ export interface Document extends Versioned {
   context_id: string | null;
   kind: string;
   title: string;
-  content: Json;
+  /** Structured content of form answers and other kinds; a CV or letter has none. */
+  content?: Json;
+  /** Text derived from the revision's .tex source; null without one. */
+  text?: string | null;
+  /** Content a CV or letter stored before 0.22, read-only. */
+  legacy_content?: Json | null;
+  /** The SHA-256 of the revision's source, which its PDF names. */
+  source_sha256?: string | null;
+  note?: string;
+  claim_ids?: string[];
+  knowledge_ids?: string[];
   previous_id?: string;
   review_state: string;
   revision_number?: number;
@@ -514,6 +525,8 @@ export interface WorkspaceFile {
   size: number;
   media_type: string;
   sha256?: string;
+  /** For a revision's PDF: the SHA-256 of the source it was built from. */
+  source_sha256?: string | null;
   created_at?: string;
   download_url?: string;
   url?: string;
@@ -932,11 +945,22 @@ export async function sha256(file: File) {
     .map((n) => n.toString(16).padStart(2, "0"))
     .join("");
 }
+/** The media type an upload declares: a .tex source is TeX whatever the browser says. */
+export function mediaTypeOf(file: File) {
+  if (/\.(tex|ltx)$/i.test(file.name)) return "application/x-tex";
+  if (/\.pdf$/i.test(file.name)) return "application/pdf";
+  return file.type || "application/octet-stream";
+}
+/**
+ * Upload one file to its owner. A revision's PDF names the SHA-256 of the
+ * source it was built from (`sourceSha256`).
+ */
 export async function uploadFile(
   file: File,
   ownerType: string,
   ownerId: string,
-) {
+  sourceSha256?: string | null,
+): Promise<WorkspaceFile> {
   const ticket = await api<{
     url: string;
     headers?: Record<string, string>;
@@ -947,19 +971,26 @@ export async function uploadFile(
     name: file.name,
     size: file.size,
     sha256: await sha256(file),
-    media_type: file.type || "application/octet-stream",
+    media_type: mediaTypeOf(file),
+    ...(sourceSha256 ? { source_sha256: sourceSha256 } : {}),
   });
   const response = await fetch(ticket.url, {
     method: ticket.method || "PUT",
     headers: ticket.headers,
     body: file,
   });
-  if (!response.ok)
-    throw new ApiError("The file could not be uploaded.", response.status);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiError(
+      body?.error?.message || "The file could not be uploaded.",
+      response.status,
+      body?.error?.code,
+    );
+  }
   window.dispatchEvent(
     new CustomEvent("openings:changed", { detail: "/files" }),
   );
-  return response.json().catch(() => ({}));
+  return response.json() as Promise<WorkspaceFile>;
 }
 export async function fileUrl(file: WorkspaceFile) {
   if (file.url) return file.url;
