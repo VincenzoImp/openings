@@ -1,0 +1,357 @@
+"""Files owned by exact records and the scoped, single-use transfer grants."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import secrets
+from datetime import UTC, datetime, timedelta
+from pathlib import PurePosixPath
+from urllib.parse import quote
+
+from fastapi import Request
+
+from ..actors import acting_as, current_actor, from_columns
+from ..career import _get, _page
+from ..common import encode, new_id, now
+from ..errors import DomainError, conflict, missing
+from ..transfers import SnapshotResponse
+from .models import OWNER_COLUMNS, OWNER_TABLES, OwnerType, UploadReservation
+
+
+class FileOperations:
+    """Reading, uploading, downloading and deleting files."""
+
+    def _owner(self, conn, owner_type, owner_id, *, writable=False):
+        if owner_type not in OWNER_COLUMNS:
+            raise DomainError(422, "owner_type", "Unsupported file owner type.")
+        row = _get(conn, OWNER_TABLES[owner_type], owner_id, "File owner")
+        if writable and owner_type == "context":
+            conflict("Frozen context files are immutable.")
+        if writable and owner_type == "document" and row["review_state"] != "draft":
+            conflict(
+                "Approved documents are immutable. Create a new revision before uploading files."
+            )
+        if owner_type == "job":
+            return row, row["id"]
+        if owner_type in {"document", "context"}:
+            application = _get(conn, "applications", row["application_id"], "Application")
+            return row, application["job_id"]
+        return row, None
+
+    def _file_record(self, row):
+        result = {
+            key: row[key] for key in ["id", "sha256", "name", "media_type", "size", "created_at"]
+        }
+        for owner, column in OWNER_COLUMNS.items():
+            if row.get(column) is not None:
+                result.update(owner_type=owner, owner_id=row[column])
+                break
+        result["url"] = f"/api/v1/files/{row['id']}/content"
+        return result
+
+    def get_file(self, file_id: str) -> dict:
+        """Read immutable file metadata and its authenticated content URL, not binary bytes."""
+        row = self.db.one("SELECT * FROM all_files WHERE id=?", (file_id,))
+        if not row:
+            missing("File")
+        return self._file_record(row)
+
+    def list_files(
+        self,
+        owner_type: OwnerType | None = None,
+        owner_id: str = "",
+        limit: int = 100,
+        offset: int = 0,
+        summary: bool = False,
+        q: str = "",
+        media_type: str = "",
+        application_id: str = "",
+    ) -> dict:
+        """List file metadata by owner, name/media type or application context/revisions. Metadata is always compact, including with summary=true; fetch bytes through a scoped HTTP transfer."""
+        _page(limit, offset)
+        if owner_id and not owner_type:
+            raise DomainError(422, "file_owner", "Provide owner_type when filtering by owner_id.")
+        where, params = [], []
+        if owner_type:
+            if owner_type not in OWNER_COLUMNS:
+                raise DomainError(422, "owner_type", "Unsupported file owner type.")
+            if owner_id:
+                where.append(f"{OWNER_COLUMNS[owner_type]}=?")
+                params.append(owner_id)
+            else:
+                where.append(f"{OWNER_COLUMNS[owner_type]} IS NOT NULL")
+        if q:
+            where.append("name LIKE ?")
+            params.append(f"%{q}%")
+        if media_type:
+            where.append("media_type=?")
+            params.append(media_type)
+        if application_id:
+            where.append(
+                "(document_id IN (SELECT id FROM documents WHERE application_id=?) OR context_id IN (SELECT id FROM contexts WHERE application_id=?))"
+            )
+            params.extend([application_id, application_id])
+        clause = " WHERE " + " AND ".join(where) if where else ""
+        rows = self.db.all(
+            f"SELECT * FROM all_files{clause} ORDER BY created_at,name,id LIMIT ? OFFSET ?",
+            (*params, limit, offset),
+        )
+        return {
+            "items": [self._file_record(row) for row in rows],
+            "total": self.db.one(f"SELECT COUNT(*) AS n FROM all_files{clause}", params)["n"],
+        }
+
+    def _new_grant(self, conn, payload, method):
+        token = secrets.token_urlsafe(32)
+        expires = (datetime.now(UTC) + timedelta(minutes=10)).isoformat()
+        conn.execute("DELETE FROM transfer_grants WHERE expires_at<?", (now(),))
+        conn.execute(
+            "INSERT INTO transfer_grants(token_hash,payload,method,expires_at) VALUES(?,?,?,?)",
+            (hashlib.sha256(token.encode()).hexdigest(), encode(payload), method, expires),
+        )
+        return {
+            "url": "/api/v1/transfers",
+            "method": method,
+            "headers": {"X-Transfer-Token": token},
+            "expires_at": expires,
+            "max_bytes": payload.get("size"),
+        }
+
+    def reserve_upload(self, value: UploadReservation) -> dict:
+        """Reserve a short-lived bounded PUT transfer for one owner/name/size. Send raw bytes using returned URL/headers; SHA-256 is optional and verified when supplied."""
+        if value.size > self.max_file_bytes:
+            raise DomainError(
+                413, "file_size", f"Files must be at most {self.max_file_bytes} bytes."
+            )
+        with self.db.transaction() as conn:
+            _, job_id = self._owner(conn, value.owner_type, value.owner_id, writable=True)
+            payload = value.model_dump()
+            payload["sha256"] = value.sha256.lower() if value.sha256 else None
+            payload["job_id"] = job_id
+            # The raw upload carries only the grant, so the grant remembers who reserved it.
+            payload["actor"] = list(current_actor().columns())
+            return self._new_grant(conn, payload, "PUT")
+
+    def reserve_download(self, file_id: str) -> dict:
+        """Obtain a short-lived GET transfer for one existing file; resolve its URL against this workspace origin."""
+        with self.db.transaction() as conn:
+            row = _get(conn, "all_files", file_id, "File")
+            descriptor = self._file_record(row)
+            _, job_id = self._owner(conn, descriptor["owner_type"], descriptor["owner_id"])
+            return self._new_grant(
+                conn, {"file_id": file_id, "job_id": job_id, "size": row["size"]}, "GET"
+            )
+
+    def _grant(self, token, method, conn=None):
+        if not token:
+            raise DomainError(401, "transfer_token", "A valid transfer token is required.")
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        row = (
+            (
+                dict(raw)
+                if (
+                    raw := conn.execute(
+                        "SELECT * FROM transfer_grants WHERE token_hash=?", (token_hash,)
+                    ).fetchone()
+                )
+                else None
+            )
+            if conn is not None
+            else self.db.one("SELECT * FROM transfer_grants WHERE token_hash=?", (token_hash,))
+        )
+        if not row or row["expires_at"] <= now():
+            raise DomainError(401, "transfer_token", "This transfer token is invalid or expired.")
+        if row["method"] != method:
+            raise DomainError(
+                403, "transfer_method", "The transfer token does not permit this operation."
+            )
+        return row, json.loads(row["payload"])
+
+    async def upload(self, request: Request):
+        async with self._upload_slots:
+            return await self._upload(request)
+
+    async def _upload(self, request: Request):
+        token = request.headers.get("X-Transfer-Token", "")
+        _, scope = self._grant(token, "PUT")
+        data = bytearray()
+        async for chunk in request.stream():
+            if len(data) + len(chunk) > min(scope["size"], self.max_file_bytes):
+                raise DomainError(413, "file_size", "Uploaded bytes exceed the reserved size.")
+            data.extend(chunk)
+        if len(data) != scope["size"]:
+            raise DomainError(422, "file_size", "Uploaded bytes do not match the reserved size.")
+        actual_sha = hashlib.sha256(data).hexdigest()
+        if scope.get("sha256") and actual_sha != scope["sha256"]:
+            raise DomainError(422, "file_hash", "Uploaded bytes do not match the declared SHA-256.")
+        if scope["media_type"].split(";", 1)[0] == "application/pdf" and not data.startswith(
+            b"%PDF-"
+        ):
+            raise DomainError(422, "pdf_header", "The uploaded file is not a PDF.")
+        with self.db.transaction() as conn:
+            grant, current = self._grant(token, "PUT", conn)
+            self._owner(conn, current["owner_type"], current["owner_id"], writable=False)
+            if grant["used"]:
+                file_id = current.get("file_id")
+                existing = _get(conn, "files", file_id, "Completed upload") if file_id else None
+                if existing and existing["sha256"] == actual_sha:
+                    return self._file_record(existing)
+                conflict("This upload grant was already used.")
+            self._owner(conn, current["owner_type"], current["owner_id"], writable=True)
+            column = OWNER_COLUMNS[current["owner_type"]]
+            old = conn.execute(
+                f"SELECT * FROM files WHERE {column}=? AND name=?",
+                (current["owner_id"], current["name"]),
+            ).fetchone()
+            if old and old["sha256"] != actual_sha:
+                conflict(
+                    "A different file already uses this name. Create a document revision or remove the mutable asset first."
+                )
+            if old:
+                file_id = old["id"]
+            else:
+                file_id = new_id()
+                conn.execute(
+                    "INSERT OR IGNORE INTO blobs(sha256,content,size) VALUES(?,?,?)",
+                    (actual_sha, bytes(data), len(data)),
+                )
+                conn.execute(
+                    f"INSERT INTO files(id,sha256,name,media_type,size,{column},created_at) VALUES(?,?,?,?,?,?,?)",
+                    (
+                        file_id,
+                        actual_sha,
+                        current["name"],
+                        current["media_type"],
+                        len(data),
+                        current["owner_id"],
+                        now(),
+                    ),
+                )
+                if current["owner_type"] in {"template", "knowledge"}:
+                    conn.execute(
+                        f"UPDATE {OWNER_TABLES[current['owner_type']]} SET version=version+1,updated_at=? WHERE id=?",
+                        (now(), current["owner_id"]),
+                    )
+                elif current["owner_type"] == "document":
+                    conn.execute(
+                        "UPDATE documents SET version=version+1 WHERE id=?", (current["owner_id"],)
+                    )
+                uploader = from_columns(*(current.get("actor") or ()))
+                self._file_event(
+                    conn,
+                    "file_uploaded",
+                    file_id,
+                    current["owner_type"],
+                    current["owner_id"],
+                    current.get("job_id"),
+                    uploader,
+                )
+                if current["owner_type"] == "document":
+                    self._clear_ready_for_file(conn, current["owner_id"], uploader)
+            current["file_id"] = file_id
+            conn.execute(
+                "UPDATE transfer_grants SET used=1,payload=? WHERE token_hash=?",
+                (encode(current), grant["token_hash"]),
+            )
+            result = _get(conn, "files", file_id, "File")
+        return self._file_record(result)
+
+    def _clear_ready_for_file(self, conn, document_id, actor):
+        """A file added to a current revision changes what Ready was judged on."""
+        row = conn.execute(
+            "SELECT application_id FROM documents d WHERE d.id=? AND NOT EXISTS("
+            "SELECT 1 FROM documents child WHERE child.previous_id=d.id)",
+            (document_id,),
+        ).fetchone()
+        if row:
+            with acting_as(actor):
+                self.workspace.clear_ready(conn, row["application_id"], "file_uploaded")
+
+    def _file_event(self, conn, kind, file_id, owner_type, owner_id, job_id, actor=None):
+        application_id = None
+        if owner_type == "document":
+            application_id = _get(conn, "documents", owner_id, "Document revision")[
+                "application_id"
+            ]
+        self.workspace.event(
+            kind,
+            job_id,
+            application_id,
+            {"file_id": file_id, "owner_type": owner_type, "owner_id": owner_id},
+            conn,
+            subject=("file", file_id),
+            actor=actor,
+        )
+
+    def file_response(self, file_id: str, inline: bool = True):
+        row = self.db.one("SELECT * FROM all_files WHERE id=?", (file_id,))
+        if not row:
+            missing("File")
+        media_type = row["media_type"].split(";", 1)[0]
+        disposition = (
+            "inline"
+            if inline and media_type in {"application/pdf", "image/png", "image/jpeg", "image/webp"}
+            else "attachment"
+        )
+        filename = quote(PurePosixPath(row["name"]).name, safe="")
+
+        def chunks():
+            with self.db.connect() as conn:
+                blob_row = conn.execute(
+                    "SELECT rowid AS blob_rowid FROM blobs WHERE sha256=?", (row["sha256"],)
+                ).fetchone()
+                if not blob_row:
+                    missing("File bytes")
+                with conn.blobopen(
+                    "blobs", "content", blob_row["blob_rowid"], readonly=True
+                ) as blob:
+                    while chunk := blob.read(64 * 1024):
+                        yield chunk
+
+        return SnapshotResponse(
+            chunks(),
+            media_type=media_type,
+            headers={
+                "Content-Length": str(row["size"]),
+                "Content-Disposition": f"{disposition}; filename*=UTF-8''{filename}",
+                "X-Content-Type-Options": "nosniff",
+                "Cache-Control": "private, no-store",
+                "Content-Security-Policy": "sandbox; default-src 'none'; frame-ancestors 'self'",
+            },
+        )
+
+    def download(self, request: Request):
+        _, payload = self._grant(request.headers.get("X-Transfer-Token", ""), "GET")
+        return self.file_response(payload["file_id"], inline=False)
+
+    def delete_file(self, file_id: str) -> dict:
+        """Delete a live knowledge/template/job asset. Immutable context/document files require deleting the owning document instead."""
+        with self.db.transaction() as conn:
+            row = _get(conn, "all_files", file_id, "File")
+            descriptor = self._file_record(row)
+            if descriptor["owner_type"] in {"document", "context"}:
+                conflict(
+                    "Revision/context files are immutable. Delete the entire document or create a new revision."
+                )
+            conn.execute("DELETE FROM files WHERE id=?", (file_id,))
+            self._file_event(
+                conn,
+                "file_deleted",
+                file_id,
+                descriptor["owner_type"],
+                descriptor["owner_id"],
+                row["job_id"],
+            )
+            if descriptor["owner_type"] in {"knowledge", "template"}:
+                conn.execute(
+                    f"UPDATE {OWNER_TABLES[descriptor['owner_type']]} SET version=version+1,updated_at=? WHERE id=?",
+                    (now(), descriptor["owner_id"]),
+                )
+            for grant in conn.execute("SELECT token_hash,payload FROM transfer_grants").fetchall():
+                if json.loads(grant["payload"]).get("file_id") == file_id:
+                    conn.execute(
+                        "DELETE FROM transfer_grants WHERE token_hash=?", (grant["token_hash"],)
+                    )
+        self.db.collect_blobs()
+        return {"deleted": True, "id": file_id}
