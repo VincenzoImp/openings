@@ -1,0 +1,191 @@
+@layer ui {
+  .ui-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-1-5);
+    height: var(--control-h);
+    min-width: 0;
+    padding: 0 var(--s-3);
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    background: transparent;
+    color: var(--text);
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+    letter-spacing: 0;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      background-color var(--d-fast) var(--ease),
+      border-color var(--d-fast) var(--ease),
+      color var(--d-fast) var(--ease),
+      box-shadow var(--d-fast) var(--ease);
+  }
+  .ui-btn > .ui-icon:first-child:not(:only-child) {
+    margin-left: -2px;
+  }
+  .ui-btn-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ui-btn[data-variant="primary"] {
+    background: var(--primary);
+    color: var(--on-primary);
+    box-shadow: var(--shadow-xs);
+  }
+  .ui-btn[data-variant="primary"]:hover {
+    background: var(--primary-hover);
+  }
+  .ui-btn[data-variant="secondary"] {
+    background: var(--surface);
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-xs);
+  }
+  .ui-btn[data-variant="secondary"]:hover {
+    background: var(--hover);
+  }
+  .ui-btn[data-variant="ghost"] {
+    color: var(--text-2);
+  }
+  .ui-btn[data-variant="ghost"]:hover,
+  .ui-btn[data-variant="ghost"][aria-expanded="true"] {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .ui-btn[data-variant="danger"] {
+    background: var(--danger);
+    color: var(--on-danger);
+    box-shadow: var(--shadow-xs);
+  }
+  .ui-btn[data-variant="danger"]:hover {
+    background: color-mix(in srgb, var(--danger) 88%, var(--text));
+  }
+  .ui-btn[data-size="sm"] {
+    height: var(--control-h-sm);
+    padding: 0 10px;
+    font-size: 12.5px;
+  }
+  .ui-btn[data-size="touch"] {
+    height: var(--touch);
+    padding: 0 var(--s-4);
+    font-size: 14px;
+  }
+  .ui-btn:focus-visible {
+    box-shadow: var(--focus-ring);
+  }
+  .ui-btn:disabled,
+  .ui-btn[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+  .ui-btn:active:not(:disabled) {
+    transform: translateY(0.5px);
+  }
+
+  /* Icon-only */
+  .ui-icon-btn {
+    width: var(--control-h);
+    padding: 0;
+    color: var(--text-2);
+  }
+  .ui-icon-btn > .ui-icon:first-child {
+    margin: 0;
+  }
+  .ui-icon-btn[data-size="sm"] {
+    width: var(--control-h-sm);
+    padding: 0;
+  }
+  .ui-icon-btn[data-size="touch"] {
+    width: var(--touch);
+    padding: 0;
+  }
+  .ui-icon-btn:hover,
+  .ui-icon-btn[aria-expanded="true"] {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .ui-icon-btn[data-variant="raised"] {
+    width: var(--control-h-sm);
+    height: var(--control-h-sm);
+    background: var(--bg);
+    border-color: var(--border);
+    box-shadow: var(--shadow-xs);
+  }
+  .ui-icon-btn[data-variant="raised"]:hover {
+    background: var(--hover);
+  }
+
+  /* Tooltip of an icon button: its name and shortcut, on hover or focus. */
+  .ui-icon-btn[data-tip]::after {
+    content: attr(data-tip-text);
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 6px);
+    z-index: 20;
+    padding: 4px 8px;
+    border-radius: var(--r-md);
+    background: var(--primary);
+    color: var(--on-primary);
+    font: var(--t-xs);
+    font-weight: var(--w-medium);
+    white-space: pre;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, -2px);
+    transition:
+      opacity var(--d-fast) var(--ease),
+      transform var(--d-fast) var(--ease);
+  }
+  .ui-icon-btn[data-tip="above"]::after {
+    top: auto;
+    bottom: calc(100% + 6px);
+    transform: translate(-50%, 2px);
+  }
+  .ui-icon-btn[data-tip]:hover::after,
+  .ui-icon-btn[data-tip]:focus-visible::after {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    transition-delay: 400ms;
+  }
+  .ui-icon-btn[data-tip]:focus-visible::after {
+    transition-delay: 0ms;
+  }
+  .ui-icon-btn[aria-expanded="true"]::after {
+    display: none;
+  }
+  @media (hover: none) {
+    .ui-icon-btn[data-tip]::after {
+      display: none;
+    }
+  }
+
+  .ui-kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--bg-subtle);
+    color: var(--text-3);
+    font: 500 11px/1 var(--font);
+    letter-spacing: 0;
+  }
+  .ui-btn[data-variant="primary"] .ui-kbd {
+    background: transparent;
+    border-color: color-mix(in srgb, var(--on-primary) 24%, transparent);
+    color: color-mix(in srgb, var(--on-primary) 72%, transparent);
+  }
+  @media (hover: none) {
+    .ui-btn .ui-kbd {
+      display: none;
+    }
+  }
+}
