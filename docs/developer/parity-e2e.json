@@ -152,15 +152,10 @@
       "the review page, each of its tabs and the response form have no serious accessibility finding",
       "the timeline records responses, notes and who made each change"
     ],
-    "GET /api/v1/applications/{}/events": [
-      "design names are aliases and old routes keep their deep links",
-      "no horizontal page scroll from 360 to 1600 px on every screen",
-      "the review page, each of its tabs and the response form have no serious accessibility finding",
-      "the timeline records responses, notes and who made each change"
-    ],
     "GET /api/v1/applications/{}/responses": [
       "design names are aliases and old routes keep their deep links",
       "no horizontal page scroll from 360 to 1600 px on every screen",
+      "requirements, the plan and a concurrent change in the details",
       "the review page, each of its tabs and the response form have no serious accessibility finding",
       "the timeline records responses, notes and who made each change"
     ],
@@ -168,6 +163,13 @@
       "documents, revisions, frozen copies and their files are managed in the review page",
       "the Inputs tab and the list name the parts that changed since the documents were written",
       "the review page, each of its tabs and the response form have no serious accessibility finding"
+    ],
+    "GET /api/v1/applications/{}/timeline": [
+      "design names are aliases and old routes keep their deep links",
+      "no horizontal page scroll from 360 to 1600 px on every screen",
+      "requirements, the plan and a concurrent change in the details",
+      "the review page, each of its tabs and the response form have no serious accessibility finding",
+      "the timeline records responses, notes and who made each change"
     ],
     "GET /api/v1/auth/session": [
       "Insights shows the rates of sent applications and withholds small groups",
@@ -444,21 +446,10 @@
     ],
     "GET /api/v1/events": [
       "Settings creates an agent token that is refused owner operations",
-      "a job with its details, the dismissed job, the dialogs and the selection have no serious accessibility finding",
-      "a likely duplicate is decided inside the job: different, then merged",
-      "a note is edited, an application started and a job forgotten from its page",
       "activity?section=timeline has no serious accessibility finding",
-      "adding a job by its address finds the one already in the workspace",
-      "an enabled rule dismisses a collected job, names itself and the job can be restored",
-      "keyboard only: a job is shortlisted, another dismissed with a reason and restored",
       "keyboard only: move through the Activity tabs and open a run's report",
-      "live file and note deletion identify the item before removal",
       "no horizontal page scroll from 360 to 1600 px on every screen",
-      "questions are answered with a choice and a comment, corrected and withdrawn",
-      "queue count, posting hierarchy and query-safe selection",
-      "the owner writes requests, follows the agent's result and withdraws one",
-      "the timeline filters by who, kind, period and run, page by page",
-      "version conflict reviews latest values and reloads the editor with a usable version"
+      "the timeline filters by who, kind, period and run, page by page"
     ],
     "GET /api/v1/export": [
       "backup, records export and a guarded restore"
@@ -650,13 +641,12 @@
       "the owner writes requests, follows the agent's result and withdraws one",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
-    "GET /api/v1/jobs/{}/notes": [
+    "GET /api/v1/jobs/{}/timeline": [
       "a job with its details, the dismissed job, the dialogs and the selection have no serious accessibility finding",
       "a likely duplicate is decided inside the job: different, then merged",
       "a note is edited, an application started and a job forgotten from its page",
       "adding a job by its address finds the one already in the workspace",
       "an enabled rule dismisses a collected job, names itself and the job can be restored",
-      "design names are aliases and old routes keep their deep links",
       "keyboard only: a job is shortlisted, another dismissed with a reason and restored",
       "keyboard only: move through the Activity tabs and open a run's report",
       "live file and note deletion identify the item before removal",
@@ -664,8 +654,6 @@
       "questions are answered with a choice and a comment, corrected and withdrawn",
       "queue count, posting hierarchy and query-safe selection",
       "the owner writes requests, follows the agent's result and withdraws one",
-      "the review page, each of its tabs and the response form have no serious accessibility finding",
-      "the timeline records responses, notes and who made each change",
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "GET /api/v1/notes/{}": [
@@ -1125,7 +1113,8 @@
       "version conflict reviews latest values and reloads the editor with a usable version"
     ],
     "PATCH /api/v1/notes/{}": [
-      "a note is edited, an application started and a job forgotten from its page"
+      "a note is edited, an application started and a job forgotten from its page",
+      "requirements, the plan and a concurrent change in the details"
     ],
     "PATCH /api/v1/policy/items/{}": [
       "a policy conflict reloads the section and keeps the unsaved text",
@@ -1205,12 +1194,18 @@
     "POST /api/v1/jobs/{}/notes": [
       "a note is edited, an application started and a job forgotten from its page",
       "live file and note deletion identify the item before removal",
+      "requirements, the plan and a concurrent change in the details",
       "the timeline records responses, notes and who made each change"
     ],
     "POST /api/v1/jobs/{}/triage": [
       "a note is edited, an application started and a job forgotten from its page",
       "an enabled rule dismisses a collected job, names itself and the job can be restored",
       "keyboard only: a job is shortlisted, another dismissed with a reason and restored"
+    ],
+    "POST /api/v1/notes/{}/pin": [
+      "a note is edited, an application started and a job forgotten from its page",
+      "requirements, the plan and a concurrent change in the details",
+      "the timeline records responses, notes and who made each change"
     ],
     "POST /api/v1/policy/items/{}/confirm": [
       "policy items are added, edited, confirmed, switched, moved, reordered and removed"

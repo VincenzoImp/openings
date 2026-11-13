@@ -428,6 +428,8 @@ function affected(read: string, changed: string) {
       "templates",
       "instructions",
       "responses",
+      // An application carries its pinned note.
+      "notes",
     ].includes(b);
   if (a === "career" || a === "templates") return b === "files";
   if (a === "documents") return b === "files";

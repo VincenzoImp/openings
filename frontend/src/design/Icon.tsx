@@ -36,6 +36,8 @@ import {
   TriangleAlert,
   ChevronUp,
   ChevronDown,
+  Pin,
+  PinOff,
 } from "lucide-react";
 
 const icons = {
@@ -76,6 +78,8 @@ const icons = {
   warning: TriangleAlert,
   up: ChevronUp,
   down: ChevronDown,
+  pin: Pin,
+  unpin: PinOff,
 };
 export type IconName = keyof typeof icons;
 
