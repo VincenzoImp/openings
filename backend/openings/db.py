@@ -263,8 +263,9 @@ def _migrate_9_to_10(conn):
     migrate_profile(conn)
 
 
-# The applications table of schema 11; schema.sql holds the same text. Changing a
-# CHECK constraint in SQLite means building the table again (_migrate_10_to_11).
+# The applications table of schema 11; schema.sql holds the same text without
+# note, which schema 13 dropped. Changing a CHECK constraint in SQLite means
+# building the table again (_migrate_10_to_11).
 APPLICATIONS = """CREATE TABLE {name} (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
  status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','applied','interview','offer','closed')),
@@ -332,13 +333,19 @@ def _migrate_11_to_12(conn):
 
 
 def _migrate_12_to_13(conn):
+    # The breaking group of 0.22, both parts in this one transaction.
+    # One timeline: notes gain their author's run and a pin, and each application
+    # note becomes a pinned note with the same text (applications.note is dropped).
     # Source-canonical documents: a CV or letter revision is its .tex source and
     # PDF. Its structured content moves, unchanged, to legacy_content (read-only),
     # the evidence ids it cited are copied to claim_ids and knowledge_ids, and its
     # text is derived from the attached source. Files gain source_sha256 (NULL for
     # every existing file). Ids, files, hashes, review states and versions stay.
+    # The two parts touch different tables; neither reads what the other writes.
     from .documents.upgrade import migrate_to_13
+    from .workspace import timeline_upgrade
 
+    timeline_upgrade.migrate(conn)
     migrate_to_13(conn)
 
 

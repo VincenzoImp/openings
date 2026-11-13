@@ -70,6 +70,16 @@
   background: var(--accent-soft);
   box-shadow: inset 3px 0 0 var(--accent);
 }
+/* Who and when, under a timeline entry's text. */
+.list .entry-line {
+  margin-top: var(--s1);
+}
+/* A pinned note leads its timeline. */
+.list > li.is-pinned,
+.list.compact > li.is-pinned {
+  padding-left: var(--s3);
+  border-left: 3px solid var(--accent);
+}
 /* Captions on the soft accent use the stronger secondary ink. */
 .is-selected .caption {
   color: var(--ink-2);

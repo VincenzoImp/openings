@@ -45,7 +45,10 @@ Draft unchanged; do not generate another application or documents just to rerun.
 For each job, read the full posting, the current Profile, the policy (`decision`
 for fit, `eligibility` for what the employer asks, `writing` for the documents),
 Career evidence, general guidance and both selected templates. Check its
-application attempts. A prepared context freezes the policy sections with their
+application attempts and read the job's timeline (`timeline_get` with `job_id`):
+the pinned notes first, which are the owner's standing guidance for the job and
+for each application; a context freezes the application's pinned note as its
+`application_note`. A prepared context freezes the policy sections with their
 versions (`payload.policy`): write from that copy, follow the confirmed
 `writing` items whose scope is `all` or matches the document (`cv`, `letter`),
 and never rely on an item with `confirmed: false`.
@@ -107,7 +110,8 @@ uses its evidence links; it does not create an official bank claim.
 Write a letter for the actual role and company, with supported reasons and
 relevant examples. Present the strongest truthful case and never volunteer gaps
 (see [Career claims](../career-claims/SKILL.md)); record gaps for the owner in
-the application note instead. Check the CV and letter together for consistent positioning,
+a note on the application instead (`note_add` with `application_id`, not
+pinned: the pinned note is the owner's standing guidance). Check the CV and letter together for consistent positioning,
 attribution and personal details. Resolve every placeholder. Do not use the
 general letter MASTER unchanged as if it addressed a specific employer.
 

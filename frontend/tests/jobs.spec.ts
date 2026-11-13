@@ -410,6 +410,12 @@ test("a note is edited, an application started and a job forgotten from its page
   await dialog(page).getByLabel("Note").fill("Second thought.");
   await dialog(page).getByRole("button", { name: "Save the note" }).click();
   await expect(timeline).toContainText("Second thought.");
+  // Pinned, the note leads the timeline; changes stay listed below it.
+  await timeline.getByRole("button", { name: "Pin this note" }).click();
+  await expect(timeline.getByRole("listitem").first()).toContainText(
+    "Pinned note",
+  );
+  await expect(timeline).toContainText("Collected");
   // Shortlisted, then started: the review page of the new application opens.
   await actions(page).getByRole("button", { name: "Shortlist" }).click();
   await expect(toast(page)).toContainText("Shortlisted");

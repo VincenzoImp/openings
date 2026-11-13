@@ -79,10 +79,11 @@ performance project. Browser binaries are development tools, outside the core.
 25,000 jobs with their ingest signals, 500 applications, 20 sources and 60 frozen
 contexts in a few seconds, and fails when the median of five reads exceeds its
 budget: the Applications list, the reads of Today, the job inbox (with counts
-and facets), text search, the overview, the staleness report, insights and source
-yield. The budgets are about six times the time measured on a laptop, so a slower
-CI runner passes and a real regression does not. It runs with `pytest`; select it
-alone with `uv run pytest -m performance`. Never raise a budget to make a change
+and facets), text search, the overview, the staleness report, insights, source
+yield and the timeline of a busy job and application. The budgets are about six
+times the time measured on a laptop, so a slower CI runner passes and a real
+regression does not. It runs with `pytest`; select it alone with
+`uv run pytest -m performance`. Never raise a budget to make a change
 pass: make the read faster, or explain in the pull request why it must cost more.
 
 ### Dashboard budgets

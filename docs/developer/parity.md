@@ -27,11 +27,11 @@ How to read the evidence:
 
 | Measure | Operations |
 |---|---|
-| Logical operations in the inventory | 127 |
+| Logical operations in the inventory | 129 |
 | Without REST or without MCP | 0 |
 | Owner only (refused for an agent token) | 9 |
 | Without a working dashboard path | 7 |
-| Reached only through another operation | 5 |
+| Reached only through another operation | 7 |
 | With inputs the dashboard never mentions | 22 |
 | With free-form JSON edited as raw JSON | 0 |
 | With different REST and MCP input names | 1 |
@@ -62,8 +62,10 @@ The route itself is never called from the dashboard.
 
 | Operation | Dashboard uses | Remark |
 |---|---|---|
+| `notes.list` | `timeline.read` | The job and application timelines list every note with its scope, author, run and pin. |
 | `sources.delete` | `sources.bulk` | Remove, also for one source, sends a bulk action. |
 | `sources.run` | `sources.bulk` | Run once, also for one source, sends a bulk action. |
+| `applications.history` | `timeline.read` | The application's Timeline lists its events with its notes and its job's entries. |
 | `applications.staleness_list` | `applications.list`, `applications.staleness` | Rows use `stale_inputs`, `stale_changes` and `stale_changes_total` in the application list; details use the per-application report. There is no workspace-wide staleness view. |
 | `questions.read` | `questions.list` | Activity renders questions from the list, which returns complete records. |
 | `requests.read` | `requests.list` | Activity renders requests from the list, which returns complete records. |
@@ -90,7 +92,7 @@ operation. They can be set over REST or MCP only.
 | `contexts.list` | `q` | Inputs lists the application's frozen copies 20 at a time; `q` serves agents and scripts. |
 | `contexts.create` | `template_id` | The context dialog sends `template_ids`; `template_id` is the single-template form of the same input. |
 | `files.list` | `q` | A job's Files lists all of its files; `q` serves agents and scripts. |
-| `events.list` | `subject_id`, `subject_type` | The Activity timeline filters changes by who made them (owner, API tokens or one token, system, not recorded), by kind of record (`subject_types`), by period and by run; the job, application and subject filters serve the record histories, agents and scripts. |
+| `events.list` | `application_id`, `job_id`, `subject_id`, `subject_type` | The Activity timeline filters changes by who made them (owner, API tokens or one token, system, not recorded), by kind of record (`subject_types`), by period and by run; the job, application and subject filters serve agents and scripts; the job and application timelines read `timeline.read`. |
 | `runs.list` | `started_since`, `started_until`, `token_id` | Activity filters runs by status; Today lists the runs active since the last visit (`active_since`). The workflow, token and start-time filters serve agents and scripts. |
 | `runs.read` | `changes_offset` | The report counts all changes of a run and names the records of the first 100 (`changes_limit`); its link opens the timeline filtered by the run, which pages through every change. `changes_offset` serves agents and scripts. |
 | `questions.list` | `answered_since`, `run_id`, `subject_id` | Today and Activity filter questions by state; `answered_since` and the subject filters serve the agent's next run. |
@@ -171,11 +173,13 @@ missing from the inventory.
 | `jobs.merge`<br>Merge verified duplicate jobs and retain history | `POST /jobs/{job_id}/merge` | `job_merge` | any | Jobs: Same vacancy: merge; Merge with another job | pages/jobs/MergeDialog.tsx | structured | 1 |
 | `jobs.distinct`<br>Mark a job flagged as a likely duplicate as a different vacancy | `POST /jobs/{job_id}/distinct` | `job_distinct` | any | Jobs: job detail, Is this the same vacancy? Different | pages/jobs/Duplicate.tsx | structured | 1 |
 | `jobs.delete`<br>Permanently forget job-owned data and identities | `DELETE /jobs/{job_id}` | `job_forget` | any | Jobs: job details, Forget this job permanently; selection bar, Forget | pages/jobs/JobMore.tsx | structured | 1 |
-| `notes.list`<br>List job notes | `GET /jobs/{job_id}/notes` | `notes_list` | any | Jobs: job timeline; Application review: Timeline | pages/jobs/JobTimeline.tsx<br>pages/review/Timeline.tsx | structured | 16 |
-| `notes.read`<br>Read one note and its version | `GET /notes/{note_id}` | `note_get` | any | Jobs: job timeline, Edit this note | pages/jobs/JobTimeline.tsx | structured | 1 |
-| `notes.create`<br>Add a job note with optional application association | `POST /jobs/{job_id}/notes` | `note_add` | any | Jobs: job timeline, Add the note; Application review: Timeline | pages/jobs/JobTimeline.tsx<br>pages/review/Timeline.tsx | structured | 3 |
-| `notes.update`<br>Edit a note with version protection | `PATCH /notes/{note_id}` | `note_update` | any | Jobs: job timeline, Edit this note | pages/jobs/JobTimeline.tsx | structured | 1 |
-| `notes.delete`<br>Delete one note | `DELETE /notes/{note_id}` | `note_delete` | any | Jobs: job timeline; Application review: Timeline | pages/jobs/JobTimeline.tsx<br>pages/review/Timeline.tsx | structured | 1 |
+| `notes.list`<br>List the notes of a job and its applications | `GET /jobs/{job_id}/notes` | `notes_list` | any | Jobs: job timeline; Application review: Timeline (through the timeline) | via `timeline.read` | — | — |
+| `timeline.read`<br>Read the timeline of a job or an application: notes and attributed events with scope and filters | `GET /jobs/{job_id}/timeline`<br>`GET /applications/{application_id}/timeline` | `timeline_get` | any | Jobs: job timeline; Application review: Timeline | library/Timeline.tsx | structured | 17 |
+| `notes.read`<br>Read one note and its version | `GET /notes/{note_id}` | `note_get` | any | Jobs: job timeline, Edit this note; Application review: Timeline, Edit this note | library/Timeline.tsx | structured | 1 |
+| `notes.create`<br>Add a note on a job or on one of its applications, optionally pinned | `POST /jobs/{job_id}/notes` | `note_add` | any | Jobs: job timeline, Add the note; Application review: Timeline, Add the note; Details, Pinned note | library/Timeline.tsx<br>pages/review/Details.tsx | structured | 4 |
+| `notes.update`<br>Edit a note with version protection | `PATCH /notes/{note_id}` | `note_update` | any | Jobs: job timeline, Edit this note; Application review: Timeline, Edit this note; Details, Pinned note | library/Timeline.tsx<br>pages/review/Details.tsx | structured | 2 |
+| `notes.pin`<br>Pin a note first in its timeline, or unpin it | `POST /notes/{note_id}/pin` | `note_pin` | any | Jobs: job timeline, Pin/Unpin; Application review: Timeline, Pin/Unpin; Details, Pinned note, Unpin | library/Timeline.tsx<br>pages/review/Details.tsx | structured | 3 |
+| `notes.delete`<br>Delete one note | `DELETE /notes/{note_id}` | `note_delete` | any | Jobs: job timeline; Application review: Timeline | library/Timeline.tsx | structured | 1 |
 
 ### Collection
 
@@ -248,8 +252,8 @@ missing from the inventory.
 | `applications.ready`<br>Mark a Preparing application ready to apply, or clear the mark | `POST /applications/{application_id}/ready` | `application_ready` | any | Applications: Mark ready / Not ready in the attempt; Ready badge, filter and queue | pages/review/Details.tsx | structured | 1 |
 | `applications.delete`<br>Delete one attempt and its owned history/files | `DELETE /applications/{application_id}` | `application_delete` | any | Applications: delete attempt | pages/review/Details.tsx | structured | 1 |
 | `applications.bulk`<br>Close, reopen, mark ready, unmark ready or delete selected application attempts | `POST /applications/bulk` | `applications_bulk` | any | Applications: list selection toolbar | pages/applications/BulkBar.tsx<br>pages/applications/CloseNoReply.tsx | structured | 1 |
-| `applications.history`<br>Read immutable lifecycle history | `GET /applications/{application_id}/events` | `application_history` | any | Applications: history | pages/review/Timeline.tsx | structured | 4 |
-| `responses.list`<br>List the employer responses of an application | `GET /applications/{application_id}/responses` | `responses_list` | any | Application review: Timeline, employer responses; Applications: Employer response column | pages/review/Responses.tsx | structured | 4 |
+| `applications.history`<br>Read immutable lifecycle history | `GET /applications/{application_id}/events` | `application_history` | any | Application review: Timeline (through the timeline) | via `timeline.read` | — | — |
+| `responses.list`<br>List the employer responses of an application | `GET /applications/{application_id}/responses` | `responses_list` | any | Application review: Timeline, employer responses; Applications: Employer response column | pages/review/Responses.tsx | structured | 5 |
 | `responses.add`<br>Record an employer response to a sent application | `POST /applications/{application_id}/responses` | `responses_add` | any | Applications: Record response on an Applied, Interview or Offer row; Application review: Timeline, Record a response | pages/applications/Respond.tsx | structured | 1 |
 | `responses.update`<br>Correct an employer response's kind, day or note | `PATCH /responses/{response_id}` | `responses_update` | any | Application review: Timeline, Edit on a response | pages/review/Responses.tsx | structured | 1 |
 | `responses.remove`<br>Delete an employer response recorded by mistake | `DELETE /responses/{response_id}` | `responses_remove` | any | Application review: Timeline, Remove on a response | pages/review/Responses.tsx | structured | 1 |
@@ -287,7 +291,7 @@ missing from the inventory.
 
 | Operation | REST | MCP | Access | Dashboard location | Dashboard code | Editor | E2E |
 |---|---|---|---|---|---|---|---|
-| `events.list`<br>List recorded changes with actor, run and subject | `GET /events` | `events_list` | any | Activity: Timeline; run report | pages/activity/Timeline.tsx<br>pages/jobs/JobTimeline.tsx | structured | 16 |
+| `events.list`<br>List recorded changes with actor, run and subject | `GET /events` | `events_list` | any | Activity: Timeline; run report | pages/activity/Timeline.tsx | structured | 5 |
 | `runs.list`<br>List agent runs by status, workflow, token or start time | `GET /runs` | `runs_list` | any | Today: Since your last visit; Activity: Runs | pages/Today.tsx<br>pages/activity/Runs.tsx<br>pages/jobs/AgentBanner.tsx<br>pages/settings/SkillNotes.tsx<br>pages/settings/Tokens.tsx<br>shell/Shell.tsx | structured | 96 |
 | `runs.read`<br>Read an agent run with its report, questions and changes | `GET /runs/{run_id}` | `runs_get` | any | Activity: run report | pages/activity/RunReport.tsx<br>pages/activity/Timeline.tsx<br>pages/settings/SkillNotes.tsx | structured | 5 |
 | `runs.start`<br>Open an agent run for the calling API token | `POST /runs` | `runs_start` | any | Activity: Runs (read only) | **none** | — | — |

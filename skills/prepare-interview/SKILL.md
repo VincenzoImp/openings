@@ -30,7 +30,9 @@ stored [run report](../openings-workspace/references/run-report.md).
 ## Read the application as sent
 
 Read the job posting, the application's current CV and letter leaves (the versions
-the employer saw), their frozen context, the application note and events, the
+the employer saw), their frozen context, the application's timeline
+(`timeline_get` with `application_id`: its pinned note, other notes and events,
+with its job's), the
 current Profile and the relevant Career entries. Ask the owner for the interview
 format, interviewers and stage when they are unknown and matter.
 
@@ -53,6 +55,8 @@ Use public company information only from sources the owner can verify; cite them
 
 ## Save and report
 
-Save the preparation as a note on the application, so it stays with that attempt.
+Save the preparation as a note on the application (`note_add` with
+`application_id`), so it stays with that attempt. Do not pin it: the pinned note
+is the owner's standing guidance.
 Report the note ID and any open questions for the owner, using the shared
 [run report](../openings-workspace/references/run-report.md).

@@ -218,7 +218,53 @@ export interface Note {
   body: string;
   text?: string;
   created_at: string;
+  updated_at?: string;
   version?: number;
+  job_id?: string;
+  application_id?: string | null;
+  scope?: "job" | "application";
+  author?: Actor;
+  run?: { id: string; workflow: string | null } | null;
+  /** At most one pinned note per job and per application; listed first. */
+  pinned?: boolean;
+  pinned_at?: string | null;
+  /** `upgrade`: the application note the 0.22 upgrade copied. */
+  origin?: "manual" | "upgrade";
+}
+export type TimelineKind = "note" | "event" | "response";
+/** One entry of a job's or an application's timeline: a note or a recorded change. */
+export interface TimelineItem {
+  type: "note" | "event";
+  kind: TimelineKind;
+  id: string;
+  created_at: string;
+  scope: { type: "job" | "application"; id: string };
+  job_id: string;
+  application_id: string | null;
+  actor: Actor;
+  run: { id: string; workflow: string | null } | null;
+  note: {
+    body: string;
+    version: number;
+    updated_at: string;
+    pinned: boolean;
+    pinned_at: string | null;
+    origin: "manual" | "upgrade";
+  } | null;
+  event: {
+    kind: string;
+    payload: Json;
+    subject: { type: string | null; id: string | null };
+  } | null;
+}
+export interface TimelinePage {
+  scope: { type: "job" | "application"; id: string; job_id: string };
+  items: TimelineItem[];
+  total: number;
+  /** Entries of each kind for the other filters. */
+  counts: Record<TimelineKind, number>;
+  limit: number;
+  offset: number;
 }
 export interface Question {
   id: string;
@@ -261,7 +307,10 @@ export interface Application extends Versioned {
   job_id: string;
   status: Stage;
   outcome: string | null;
+  /** @deprecated since 0.22: the text of `pinned_note`; removed in 0.23. */
   note: string;
+  /** The application's pinned note: its standing guidance. */
+  pinned_note?: Note | null;
   questions: Question[];
   answers: Record<string, unknown>;
   job?: Job;

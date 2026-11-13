@@ -35,7 +35,9 @@ mechanics, not personal selection or writing policy.
 - `application_prepare_context` / `POST /contexts` takes `application_id`,
   explicit `template_ids`, optional `knowledge_ids`, `claim_ids`, `note` and
   `idempotency_key`. It freezes job, Profile, the policy sections with their
-  versions, guidance, evidence, claims, templates and selected source-file bytes. Same key/request reuses the context; changed
+  versions, guidance, evidence, claims, templates and selected source-file bytes,
+  and the application's pinned note as `instructions.application_note`, followed
+  by this request's `note`. Same key/request reuses the context; changed
   input with the same key conflicts. Omitted selections use current defaults.
 - A context is a fixed input snapshot. Compare versions and relevant content
   before reusing it. Prepare a new context when different inputs are needed.

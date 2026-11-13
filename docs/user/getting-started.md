@@ -68,7 +68,7 @@ browser, and the theme follows the system until you choose one.
 5. Add [career entries and claims](career.md), templates and writing instructions.
    Follow [Application documents](applications.md) to prepare and review files.
 
-![Jobs to review beside the selected job, with its signals and posting](../images/jobs.png)
+![Jobs to review beside the selected job, with its signals, posting and timeline](../images/jobs.png)
 
 Career data, search settings and files live in SQLite. Configure them in the
 dashboard, REST or MCP. `.env` controls installation settings such as the host

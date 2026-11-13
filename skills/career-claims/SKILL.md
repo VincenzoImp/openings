@@ -35,7 +35,7 @@ weaknesses: do not name a missing requirement, a lack of experience, something
 "new to" the owner, a "transition" or years the owner lacks. Where the record does
 not cover a requirement, lead with the closest demonstrated, transferable work and
 leave the rest unmentioned. Never claim unsupported experience either. Internal
-caveats belong in the application note. Answer a direct form question truthfully.
+caveats belong in a note on the application. Answer a direct form question truthfully.
 
 When maintaining Career records, integrate new information into the
 relevant existing passages, reconciling it with the full history, chronology and

@@ -26,7 +26,9 @@ from ..models import (
     MergeInput,
     NoteInput,
     NotePatch,
+    NotePin,
     PeriodQuery,
+    TimelineQuery,
     TriageInput,
 )
 from ..operations import storage_status
@@ -248,25 +250,80 @@ OPERATIONS = (
         "notes",
         "list",
         "Archive",
-        "List job notes",
+        "List the notes of a job and its applications",
         params=(Param("job_id", str),),
         call=lambda s, job_id: s.list_notes(job_id),
         rest=(Route("GET", "/jobs/{job_id}/notes", "notes"),),
-        tool=Tool("notes_list", READ_ONLY, "Read notes retained with a job."),
+        tool=Tool(
+            "notes_list",
+            READ_ONLY,
+            "Read the notes of a job and of its applications (scope, author, run, pinned), pinned first. timeline_get lists them with the recorded changes.",
+        ),
+    ),
+    Operation(
+        "timeline.read",
+        "timeline",
+        "get",
+        "Archive",
+        "Read the timeline of a job or an application: notes and attributed events with scope and filters",
+        params=(
+            Param("job_id", str | None, None),
+            Param("application_id", str | None, None),
+            query_model(TimelineQuery),
+        ),
+        call=lambda s, job_id, application_id, value: s.timeline(job_id, application_id, value),
+        rest=(
+            Route(
+                "GET",
+                "/jobs/{job_id}/timeline",
+                "job_timeline",
+                params=(Param("job_id", str), query_model(TimelineQuery)),
+                call=lambda s, job_id, value: s.timeline(job_id=job_id, value=value),
+            ),
+            Route(
+                "GET",
+                "/applications/{application_id}/timeline",
+                "application_timeline",
+                params=(Param("application_id", str), query_model(TimelineQuery)),
+                call=lambda s, application_id, value: s.timeline(
+                    application_id=application_id, value=value
+                ),
+            ),
+        ),
+        tool=Tool(
+            "timeline_get",
+            READ_ONLY,
+            "Read the timeline of a job (job_id) or of an application (application_id): its notes and recorded changes in one list, pinned notes first, then newest first. A job's timeline includes its applications' entries; an application's includes its job's. Each entry has type (note or event), kind (note, event or response), scope (job or application), actor (who), run and either note (body, version, pinned, origin) or event (kind, payload of identifiers and field names, subject). Filter by kinds, who (owner, agent, system, unknown), scope, since and until; counts gives the entries of each kind for the other filters. Page with limit and offset.",
+        ),
     ),
     Operation(
         "notes.create",
         "notes",
         "create",
         "Archive",
-        "Add a job note with optional application association",
+        "Add a note on a job or on one of its applications, optionally pinned",
         params=(Param("job_id", str), Param("value", NoteInput)),
         call=lambda s, job_id, value: s.add_note(job_id, value),
         rest=(Route("POST", "/jobs/{job_id}/notes", "note"),),
         tool=Tool(
             "note_add",
             WRITE,
-            "Store a note, optionally associated with a particular application attempt.",
+            "Write a note on a job, or on one of its applications with application_id. The note records you as its author and your open run. pinned=true pins it: it is listed first, and a job and an application each have one pinned note (pinning unpins the previous one). The application's pinned note is its standing guidance, included in new frozen contexts.",
+        ),
+    ),
+    Operation(
+        "notes.pin",
+        "notes",
+        "pin",
+        "Archive",
+        "Pin a note first in its timeline, or unpin it",
+        params=(Param("note_id", str), Param("value", NotePin)),
+        call=lambda s, note_id, value: s.pin_note(note_id, value),
+        rest=(Route("POST", "/notes/{note_id}/pin", "pin_note"),),
+        tool=Tool(
+            "note_pin",
+            WRITE,
+            "Pin a note (pinned=true) or unpin it (pinned=false) with its current version. A job and an application each have at most one pinned note: pinning unpins the note pinned in the same scope. Unpinning keeps the note in the timeline.",
         ),
     ),
     Operation(
@@ -368,7 +425,7 @@ OPERATIONS = (
         tool=Tool(
             "application_create",
             WRITE,
-            "Create a draft attempt, optionally with priority, deadline and employer requirements. This never sends an application or generates documents.",
+            "Create a draft attempt, optionally with priority, deadline and employer requirements. This never sends an application or generates documents. Write standing guidance as the application's pinned note (note_add with application_id and pinned=true); the note field is deprecated and creates that pinned note until 0.23.",
         ),
     ),
     Operation(
@@ -383,7 +440,7 @@ OPERATIONS = (
         tool=Tool(
             "application_get",
             READ_ONLY,
-            "Read a single application, its job, employer requirements, derived readiness, the stored Ready step (ready_at, ready_by) and its employer responses.",
+            "Read a single application, its job, employer requirements, derived readiness, the stored Ready step (ready_at, ready_by), its employer responses and its pinned note (pinned_note; note is its text, deprecated and removed in 0.23). timeline_get lists its notes and changes.",
         ),
     ),
     Operation(
@@ -398,7 +455,7 @@ OPERATIONS = (
         tool=Tool(
             "application_update",
             WRITE,
-            "Record progress, priority, deadline, employer requirements and questions/answers explicitly; editing documents never marks sent. Moving to Interview or Offer, or closing as rejected (or accepted without an offer on record), records the matching employer response dated response_date (today by default) with response_note. Close as no_response (with concluded_on, today by default) only a sent application whose employer did not answer within the no-reply period. Record only what the owner reported. The returned job is the compact summary.",
+            "Record progress, priority, deadline, employer requirements and questions/answers explicitly; editing documents never marks sent. Moving to Interview or Offer, or closing as rejected (or accepted without an offer on record), records the matching employer response dated response_date (today by default) with response_note. Close as no_response (with concluded_on, today by default) only a sent application whose employer did not answer within the no-reply period. Record only what the owner reported. The returned job is the compact summary. The note field is deprecated (removed in 0.23): it edits the pinned note, adds it when there is none, or unpins it when empty; use note_update and note_pin.",
         ),
     ),
     Operation(
@@ -426,7 +483,9 @@ OPERATIONS = (
         call=lambda s, application_id: s.application_events(application_id),
         rest=(Route("GET", "/applications/{application_id}/events", "events"),),
         tool=Tool(
-            "application_history", READ_ONLY, "Read the recorded lifecycle events of an attempt."
+            "application_history",
+            READ_ONLY,
+            "Read the recorded lifecycle events of an attempt. timeline_get lists them with its notes and its job's entries.",
         ),
     ),
 )

@@ -607,6 +607,15 @@ def seed(s: Seeder):
         priority=2,
         deadline=day(12),
     )
+    s.owner(
+        "POST",
+        f"/jobs/{orbit['job_id']}/notes",
+        json={
+            "body": "Mention the scheduling work for clinics; one page for the letter.",
+            "application_id": orbit["id"],
+            "pinned": True,
+        },
+    )
     orbit_context = s.call(
         "POST",
         "/contexts",
@@ -740,6 +749,22 @@ def answers(s: Seeder):
                 "body": "Ask about the on-call rotation in the technical round.",
                 "application_id": app["id"],
             },
+        )
+        # The pinned note: standing guidance, listed first; and a note on the job.
+        s.owner(
+            "POST",
+            f"/jobs/{app['job_id']}/notes",
+            json={
+                "body": "Lead with the claims platform migration; keep salary talk for the "
+                "second round.",
+                "application_id": app["id"],
+                "pinned": True,
+            },
+        )
+        s.call(
+            "POST",
+            f"/jobs/{app['job_id']}/notes",
+            json={"body": "The team page lists four backend engineers and one SRE."},
         )
 
 
