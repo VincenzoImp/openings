@@ -11,8 +11,8 @@ import { AgentStatus } from "./AgentStatus";
 import { MoreSheet, Sidebar, TabBar } from "./Navigation";
 import {
   AddJob,
-  ApplicationDrawer,
   ApplicationsPage,
+  ReviewPage,
   ActivityPage,
   CareerPage,
   CollectionPage,
@@ -44,8 +44,7 @@ import {
   routeOf,
 } from "./routes";
 
-type Overlay =
-  { kind: "add" } | { kind: "job" | "application"; id: string } | null;
+type Overlay = { kind: "add" } | { kind: "job"; id: string } | null;
 const NARROW = "(max-width: 860px)";
 const emptyList = { items: [], total: 0 };
 
@@ -126,21 +125,26 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
     const canonicalise = () => {
       const canonical = canonicalHash(location.hash);
       if (canonical) history.replaceState(null, "", canonical);
+      return Boolean(canonical);
     };
-    canonicalise();
+    // A screen that already read the old address reads the rewritten one.
+    const announce = () => window.dispatchEvent(new PopStateEvent("popstate"));
+    const rewritten = canonicalise();
     lastRoute.current = location.hash;
+    if (rewritten) announce();
     const listener = () => {
       if (location.hash === lastRoute.current) return;
       if (!confirmLeave()) {
         history.replaceState(null, "", lastRoute.current || `#${HOME}`);
         return;
       }
-      canonicalise();
+      const changed = canonicalise();
       lastRoute.current = location.hash;
       setRoute(routeOf(location.hash));
       setOverlay(overlayOf(location.hash));
       setMore(false);
       window.scrollTo(0, 0);
+      if (changed) announce();
     };
     const remember = () => {
       lastRoute.current = location.hash;
@@ -217,30 +221,28 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
     if (routeOf(location.hash) === route)
       main.current?.focus({ preventScroll: true });
   }
-  function openObject(kind: "job" | "application", id: string) {
+  function openJob(id: string) {
     if (!confirmLeave()) return;
     const [page, query = ""] = location.hash.split("?");
     const params = new URLSearchParams(query);
     params.delete("job");
-    params.delete("application");
-    params.set(kind, id);
+    params.set("job", id);
     history.pushState(null, "", `${page || "#" + HOME}?${params}`);
     lastRoute.current = location.hash;
-    setOverlay({ kind, id });
+    setOverlay({ kind: "job", id });
   }
   function closeObject() {
     if (!confirmLeave()) return;
     const [page, query = ""] = location.hash.split("?");
     const params = new URLSearchParams(query);
     params.delete("job");
-    params.delete("application");
-    params.delete("detail");
     history.replaceState(null, "", `${page}${params.size ? "?" + params : ""}`);
     lastRoute.current = location.hash;
     setOverlay(null);
   }
-  const openJob = (id: string) => openObject("job", id);
-  const openApp = (id: string) => openObject("application", id);
+  // An application opens on its own page, the review page.
+  const openApp = (id: string) =>
+    navigate(`review?application=${encodeURIComponent(id)}`);
   const nav = {
     route,
     counts: {
@@ -309,7 +311,9 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
                     onOpen={openJob}
                   />
                 ) : route === "applications" ? (
-                  <ApplicationsPage onOpen={openApp} />
+                  <ApplicationsPage />
+                ) : route === "review" ? (
+                  <ReviewPage onOpenJob={openJob} onOpenApplication={openApp} />
                 ) : route === "collection" ? (
                   <CollectionPage />
                 ) : route === "career" ? (
@@ -365,18 +369,7 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
               key={overlay.id}
               id={overlay.id}
               onClose={closeObject}
-              onApplication={(id) =>
-                navigate("applications", { kind: "application", id })
-              }
-            />
-          </OverlayFrame>
-        )}
-        {overlay?.kind === "application" && (
-          <OverlayFrame name="This application">
-            <ApplicationDrawer
-              key={overlay.id}
-              id={overlay.id}
-              onClose={closeObject}
+              onApplication={openApp}
             />
           </OverlayFrame>
         )}
