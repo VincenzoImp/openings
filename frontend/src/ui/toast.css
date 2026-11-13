@@ -1,0 +1,115 @@
+@layer ui {
+  .ui-toast-region {
+    position: fixed;
+    left: var(--ui-toast-left, calc(var(--sidebar-w) + var(--s-5)));
+    bottom: var(--s-5);
+    z-index: 50;
+    max-width: min(520px, calc(100vw - 32px));
+    pointer-events: none;
+  }
+  .ui-toast-region .ui-toast {
+    pointer-events: auto;
+    animation: ui-toast-in var(--d-slow) var(--ease);
+  }
+  @keyframes ui-toast-in {
+    from {
+      opacity: 0;
+      translate: 0 8px;
+    }
+  }
+  .ui-toast {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-width: 0;
+    min-height: 40px;
+    padding: 6px 6px 6px 14px;
+    border-radius: var(--r-lg);
+    background: var(--primary);
+    color: var(--on-primary);
+    box-shadow: var(--shadow-lg);
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+    letter-spacing: 0;
+  }
+  .ui-toast[data-tone="success"],
+  .ui-toast[data-tone="error"] {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-md);
+  }
+  .ui-toast-icon {
+    opacity: 0.72;
+  }
+  .ui-toast[data-tone="success"] .ui-toast-icon {
+    color: var(--success);
+    opacity: 1;
+  }
+  .ui-toast[data-tone="error"] .ui-toast-icon {
+    color: var(--danger);
+    opacity: 1;
+  }
+  .ui-toast-message {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ui-toast-action,
+  .ui-toast-close {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    height: 28px;
+    padding: 0 var(--s-2);
+    border: 0;
+    border-radius: var(--r-md);
+    background: transparent;
+    color: inherit;
+    font: var(--t-sm);
+    font-weight: var(--w-semibold);
+  }
+  .ui-toast-close {
+    width: 28px;
+    justify-content: center;
+    padding: 0;
+    opacity: 0.65;
+  }
+  .ui-toast-action:hover,
+  .ui-toast-close:hover {
+    background: color-mix(in srgb, currentColor 14%, transparent);
+    opacity: 1;
+  }
+  .ui-toast-action:focus-visible,
+  .ui-toast-close:focus-visible {
+    box-shadow: 0 0 0 2px var(--accent);
+    opacity: 1;
+  }
+  .ui-toast .ui-kbd {
+    background: transparent;
+    border-color: color-mix(in srgb, currentColor 35%, transparent);
+    color: inherit;
+    opacity: 0.75;
+  }
+
+  @media (max-width: 719px) {
+    .ui-toast-region {
+      left: var(--s-3);
+      right: var(--s-3);
+      bottom: calc(
+        var(--bar-bottom) + var(--s-3) + env(safe-area-inset-bottom)
+      );
+      max-width: none;
+    }
+    .ui-toast .ui-kbd {
+      display: none;
+    }
+    .ui-toast-action,
+    .ui-toast-close {
+      height: var(--touch);
+      min-width: var(--touch);
+      justify-content: center;
+    }
+  }
+}

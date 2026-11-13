@@ -1,0 +1,101 @@
+@layer ui {
+  .ui-readedit {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: var(--r-xl);
+    background: var(--bg);
+  }
+  .ui-readedit-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-height: 52px;
+    padding: var(--s-3) var(--s-3) 0 var(--pane-pad);
+  }
+  .ui-readedit-head h2 {
+    flex: 1;
+    min-width: 0;
+    font: var(--t-md);
+    font-weight: var(--w-semibold);
+  }
+  .ui-readedit-read {
+    padding: var(--s-2) var(--pane-pad) var(--pane-pad);
+  }
+  .ui-readedit-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-4);
+    padding: var(--s-2) var(--pane-pad) var(--pane-pad);
+  }
+  .ui-readedit-fields > .ui-field-full {
+    grid-column: 1 / -1;
+  }
+  .ui-readedit-idle {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 var(--s-3) var(--s-3);
+  }
+
+  .ui-savebar {
+    position: sticky;
+    bottom: 0;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    padding: 10px var(--s-3) 10px var(--pane-pad);
+    border-top: 1px solid var(--border);
+    border-radius: 0 0 var(--r-xl) var(--r-xl);
+    background: var(--bg-subtle);
+    animation: ui-savebar-in var(--d-base) var(--ease);
+  }
+  @keyframes ui-savebar-in {
+    from {
+      opacity: 0;
+      translate: 0 4px;
+    }
+  }
+  .ui-savebar-note {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-width: 0;
+    color: var(--text-2);
+    font: var(--t-sm);
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+  .ui-savebar-dot {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--warning);
+  }
+  .ui-savebar-spacer {
+    flex: 1;
+  }
+
+  @container app (max-width: 719px) {
+    .ui-readedit-head {
+      padding-left: var(--s-4);
+    }
+    .ui-readedit-read {
+      padding: var(--s-2) var(--s-4) var(--s-4);
+    }
+    .ui-readedit-fields {
+      grid-template-columns: minmax(0, 1fr);
+      padding: var(--s-2) var(--s-4) var(--s-4);
+    }
+    .ui-savebar {
+      padding: var(--s-2) var(--s-3)
+        calc(var(--s-2) + env(safe-area-inset-bottom)) var(--s-4);
+    }
+    .ui-savebar .ui-btn {
+      height: var(--touch);
+    }
+    .ui-savebar .ui-kbd {
+      display: none;
+    }
+  }
+}
