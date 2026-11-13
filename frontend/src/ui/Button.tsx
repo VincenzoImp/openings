@@ -97,7 +97,10 @@ export const IconButton = forwardRef<
       data-tip-text={shortcut ? `${label}  ${shortcut}` : label}
       {...rest}
     >
-      <Icon icon={icon} size={size === "touch" ? "lg" : size === "sm" ? "sm" : "md"} />
+      <Icon
+        icon={icon}
+        size={size === "touch" ? "lg" : size === "sm" ? "sm" : "md"}
+      />
     </button>
   );
 });

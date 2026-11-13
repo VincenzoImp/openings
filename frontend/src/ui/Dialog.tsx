@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { Button, IconButton } from "./Button";
 import { cx } from "./cx";
@@ -37,6 +37,17 @@ function Modal({
   const ref = useRef<HTMLDialogElement>(null);
   const returnTo = useRef<HTMLElement | null>(null);
   const id = useId();
+  // The content stays for the exit transition, then leaves the document.
+  const [lingering, setLingering] = useState(false);
+  const wasOpen = useRef(open);
+  useEffect(() => {
+    if (wasOpen.current === open) return;
+    wasOpen.current = open;
+    if (open) return setLingering(false);
+    setLingering(true);
+    const timer = setTimeout(() => setLingering(false), 200);
+    return () => clearTimeout(timer);
+  }, [open]);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -80,7 +91,8 @@ function Modal({
         if (dismissible && event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="ui-modal-frame">
+      {(open || lingering) && (
+        <div className="ui-modal-frame">
           <header className="ui-modal-head">
             <h2 id={`${id}-title`}>{title}</h2>
             {kind === "drawer" && (
@@ -103,6 +115,7 @@ function Modal({
           </div>
           {footer && <footer className="ui-modal-foot">{footer}</footer>}
         </div>
+      )}
     </dialog>
   );
 }
@@ -190,7 +203,8 @@ export function DialogPreview({
       <div
         className="ui-modal-frame"
         data-kind="dialog"
-        role="dialog"
+        role="group"
+        aria-roledescription="dialog preview"
         aria-labelledby={`${id}-t`}
       >
         <header className="ui-modal-head">

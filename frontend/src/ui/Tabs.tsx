@@ -29,9 +29,7 @@ function useRovingKeys<T extends string>(
     if (next == null) return;
     event.preventDefault();
     onChange(ids[next]);
-    ref.current
-      ?.querySelectorAll<HTMLElement>("[data-roving]")
-      [next]?.focus();
+    ref.current?.querySelectorAll<HTMLElement>("[data-roving]")[next]?.focus();
   }
   return { ref, onKeyDown };
 }

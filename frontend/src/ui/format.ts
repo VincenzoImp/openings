@@ -32,7 +32,9 @@ function startOfDay(date: Date) {
 }
 /** Whole calendar days from `now` to `date` (negative in the past). */
 function calendarDays(date: Date, now: Date) {
-  return Math.round((startOfDay(date).getTime() - startOfDay(now).getTime()) / DAY);
+  return Math.round(
+    (startOfDay(date).getTime() - startOfDay(now).getTime()) / DAY,
+  );
 }
 
 /** "13 Nov", or "13 Nov 2025" when the year is not the current one. */

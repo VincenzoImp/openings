@@ -160,12 +160,7 @@ export function Sidebar({
           placement="top-start"
           items={accountMenu(account)}
           trigger={(props) => (
-            <button
-              type="button"
-              className="ui-account"
-              aria-label={`Account: ${account.name}`}
-              {...props}
-            >
+            <button type="button" className="ui-account" {...props}>
               <Avatar name={account.name} />
               <span className="ui-account-name">{account.name}</span>
               <Icon icon={ChevronsUpDown} size="sm" />

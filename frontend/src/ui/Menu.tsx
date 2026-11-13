@@ -55,8 +55,9 @@ function place(
     edge = 8;
   const vw = document.documentElement.clientWidth,
     vh = window.innerHeight;
-  let top =
-    placement.startsWith("top") ? anchor.top - height - gap : anchor.bottom + gap;
+  let top = placement.startsWith("top")
+    ? anchor.top - height - gap
+    : anchor.bottom + gap;
   if (top + height > vh - edge && anchor.top - height - gap >= edge)
     top = anchor.top - height - gap;
   if (top < edge && anchor.bottom + gap + height <= vh - edge)
@@ -212,10 +213,7 @@ function MenuItems({
 }
 
 /** Arrow keys, Home, End and typeahead among a menu's items. */
-function menuKeys(
-  event: KeyboardEvent<HTMLElement>,
-  close: () => void,
-) {
+function menuKeys(event: KeyboardEvent<HTMLElement>, close: () => void) {
   const items = [
     ...event.currentTarget.querySelectorAll<HTMLElement>(
       ".ui-menu-item:not([aria-disabled])",

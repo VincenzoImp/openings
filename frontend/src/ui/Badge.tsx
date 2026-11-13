@@ -27,7 +27,13 @@ export function NeedsCount({ value, label }: { value: number; label: string }) {
 }
 
 /** A neutral fact (a skill, a language): at most three per row, then "+N". */
-export function Tag({ icon, children }: { icon?: LucideIcon; children: ReactNode }) {
+export function Tag({
+  icon,
+  children,
+}: {
+  icon?: LucideIcon;
+  children: ReactNode;
+}) {
   return (
     <span className="ui-tag">
       {icon && <Icon icon={icon} size="sm" />}
@@ -55,7 +61,13 @@ export function Tags({ items, max = 3 }: { items: string[]; max?: number }) {
 }
 
 /** A stage as glyph plus text, never a coloured pill. */
-export function Status({ stage, children }: { stage: Stage; children?: ReactNode }) {
+export function Status({
+  stage,
+  children,
+}: {
+  stage: Stage;
+  children?: ReactNode;
+}) {
   return (
     <span className="ui-status">
       <StatusGlyph stage={stage} />
@@ -67,12 +79,26 @@ export function Status({ stage, children }: { stage: Stage; children?: ReactNode
 export type Tone = "warning" | "danger" | "success" | "accent";
 
 /** Text coloured by meaning, such as a deadline: the one signal of a row. */
-export function ToneText({ tone, children }: { tone?: Tone; children: ReactNode }) {
-  return <span className={cx("ui-tone", tone && `ui-tone-${tone}`)}>{children}</span>;
+export function ToneText({
+  tone,
+  children,
+}: {
+  tone?: Tone;
+  children: ReactNode;
+}) {
+  return (
+    <span className={cx("ui-tone", tone && `ui-tone-${tone}`)}>{children}</span>
+  );
 }
 
 /** The unread dot of a list row. */
-export function Dot({ label = "Unread", hidden = false }: { label?: string; hidden?: boolean }) {
+export function Dot({
+  label = "Unread",
+  hidden = false,
+}: {
+  label?: string;
+  hidden?: boolean;
+}) {
   return hidden ? (
     <span className="ui-dot" data-off="" aria-hidden="true" />
   ) : (

@@ -181,9 +181,27 @@ export const APPLICATIONS: DemoApplication[] = [
 ];
 
 export const PROVIDERS = [
-  { name: "Greenhouse", status: "Ready", tone: "success", spacing: 2, day: 142 },
-  { name: "LinkedIn", status: "Waiting", tone: "warning", spacing: 30, day: 18 },
-  { name: "Fjord board", status: "Failed", tone: "danger", spacing: 10, day: 0 },
+  {
+    name: "Greenhouse",
+    status: "Ready",
+    tone: "success",
+    spacing: 2,
+    day: 142,
+  },
+  {
+    name: "LinkedIn",
+    status: "Waiting",
+    tone: "warning",
+    spacing: 30,
+    day: 18,
+  },
+  {
+    name: "Fjord board",
+    status: "Failed",
+    tone: "danger",
+    spacing: 10,
+    day: 0,
+  },
   { name: "Lever", status: "Ready", tone: "success", spacing: 5, day: 1_204 },
 ] as const;
 

@@ -82,6 +82,9 @@
     color: var(--text);
     box-shadow: var(--shadow-sm);
   }
+  .ui-segment:focus-visible {
+    box-shadow: var(--focus-ring);
+  }
   .ui-segment[aria-label] {
     padding: 0 8px;
   }

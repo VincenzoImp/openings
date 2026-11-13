@@ -15,6 +15,7 @@ import {
   Inbox,
   Layers,
   ListFilter,
+  Mail,
   MapPin,
   Monitor,
   Moon,
@@ -165,7 +166,9 @@ const MORE_ITEMS: NavItem[] = [...YOU.items.slice(1), ...WORKSPACE.items];
 
 function jobMeta(job: DemoJob) {
   if (job.closes)
-    return <ToneText tone="warning">Closes {formatDay(job.closes, NOW)}</ToneText>;
+    return (
+      <ToneText tone="warning">Closes {formatDay(job.closes, NOW)}</ToneText>
+    );
   const time = (
     <time dateTime={job.found.toISOString()}>{formatDate(job.found, NOW)}</time>
   );
@@ -276,9 +279,14 @@ function JobsDemo({
           sections={NAV}
           current="jobs"
           account={account}
-          onAdd={() => toast.show({ message: "Add job opens here", tone: "success" })}
+          onAdd={() =>
+            toast.show({ message: "Add job opens here", tone: "success" })
+          }
           onSearch={() =>
-            toast.show({ message: "The command palette opens here", tone: "success" })
+            toast.show({
+              message: "The command palette opens here",
+              tone: "success",
+            })
           }
         />
       }
@@ -287,7 +295,12 @@ function JobsDemo({
           title="Jobs"
           actions={
             <>
-              <IconButton icon={Search} label="Search" size="touch" tooltip="none" />
+              <IconButton
+                icon={Search}
+                label="Search"
+                size="touch"
+                tooltip="none"
+              />
               <Menu
                 label="Filter"
                 items={filterMenu}
@@ -302,7 +315,12 @@ function JobsDemo({
                   />
                 )}
               />
-              <IconButton icon={Plus} label="Add job" size="touch" tooltip="none" />
+              <IconButton
+                icon={Plus}
+                label="Add job"
+                size="touch"
+                tooltip="none"
+              />
             </>
           }
         />
@@ -365,7 +383,9 @@ function JobsDemo({
       </Toolbar>
       <FilterChips
         chips={chips}
-        onRemove={(key) => setChips((list) => list.filter((chip) => chip.key !== key))}
+        onRemove={(key) =>
+          setChips((list) => list.filter((chip) => chip.key !== key))
+        }
         onClear={() => setChips([])}
       />
       <div
@@ -390,10 +410,16 @@ function JobsDemo({
               shortcuts={{ s: shortlist, d: dismiss }}
             >
               {JOB_GROUPS.map((group) => {
-                const jobs = group.jobs.filter((item) => !hidden.includes(item.id));
+                const jobs = group.jobs.filter(
+                  (item) => !hidden.includes(item.id),
+                );
                 if (!jobs.length) return null;
                 return (
-                  <ListGroup key={group.label} label={group.label} count={jobs.length}>
+                  <ListGroup
+                    key={group.label}
+                    label={group.label}
+                    count={jobs.length}
+                  >
                     {jobs.map((item) => (
                       <ListRow
                         key={item.id}
@@ -441,11 +467,20 @@ function JobsDemo({
                     items={rowMenu}
                     placement="bottom-end"
                     trigger={(props) => (
-                      <IconButton {...props} icon={Ellipsis} label="More actions" size="sm" />
+                      <IconButton
+                        {...props}
+                        icon={Ellipsis}
+                        label="More actions"
+                        size="sm"
+                      />
                     )}
                   />
                 </DetailBar>
-                <JobDetail job={job} onShortlist={shortlist} onDismiss={dismiss} />
+                <JobDetail
+                  job={job}
+                  onShortlist={shortlist}
+                  onDismiss={dismiss}
+                />
               </>
             )
           }
@@ -501,7 +536,12 @@ function JobDetail({
         />
       </div>
       <div className="gx-actions">
-        <Button variant="primary" icon={Bookmark} kbd="S" onClick={() => onShortlist(job.id)}>
+        <Button
+          variant="primary"
+          icon={Bookmark}
+          kbd="S"
+          onClick={() => onShortlist(job.id)}
+        >
           Shortlist
         </Button>
         <Button>Start application</Button>
@@ -527,8 +567,8 @@ function JobDetail({
               </>
             }
           >
-            Northstar Labs · Greenhouse · 13 Nov. Same company, place and posting
-            text.
+            Northstar Labs · Greenhouse · 13 Nov. Same company, place and
+            posting text.
           </Callout>
         </div>
       )}
@@ -540,7 +580,11 @@ function JobDetail({
             { label: "Deadline", value: "None given" },
             {
               label: "Signals",
-              value: <Tags items={["Python", "Airflow", "Energy", "Kafka", "dbt", "SQL"]} />,
+              value: (
+                <Tags
+                  items={["Python", "Airflow", "Energy", "Kafka", "dbt", "SQL"]}
+                />
+              ),
             },
           ]}
         />
@@ -555,14 +599,16 @@ function JobDetail({
           <h3>What you will do</h3>
           <ul>
             <li>
-              Own the ingestion pipelines for <mark>smart-meter</mark> and weather
-              feeds.
+              Own the ingestion pipelines for <mark>smart-meter</mark> and
+              weather feeds.
             </li>
             <li>
               Design batch and streaming jobs in <mark>Python</mark> and{" "}
               <mark>Airflow</mark>.
             </li>
-            <li>Keep the warehouse tables forecasters rely on correct and fast.</li>
+            <li>
+              Keep the warehouse tables forecasters rely on correct and fast.
+            </li>
           </ul>
         </Prose>
       </div>
@@ -583,8 +629,18 @@ function ApplicationsPhone({ account }: { account: Account }) {
           title="Applications"
           actions={
             <>
-              <IconButton icon={Search} label="Search applications" size="touch" tooltip="none" />
-              <IconButton icon={ListFilter} label="Filter applications" size="touch" tooltip="none" />
+              <IconButton
+                icon={Search}
+                label="Search applications"
+                size="touch"
+                tooltip="none"
+              />
+              <IconButton
+                icon={ListFilter}
+                label="Filter applications"
+                size="touch"
+                tooltip="none"
+              />
             </>
           }
         />
@@ -610,8 +666,17 @@ function ApplicationsPhone({ account }: { account: Account }) {
           ]}
         />
       </Toolbar>
-      <div id="gx-apps-panel" role="tabpanel" aria-labelledby={`gx-apps-tab-${tab}`} className="gx-scroll">
-        <List label="Applications" activeId={selected} onActiveChange={setSelected}>
+      <div
+        id="gx-apps-panel"
+        role="tabpanel"
+        aria-labelledby={`gx-apps-tab-${tab}`}
+        className="gx-scroll"
+      >
+        <List
+          label="Applications"
+          activeId={selected}
+          onActiveChange={setSelected}
+        >
           <ListRows>
             {APPLICATIONS.map((item) => (
               <ListRow
@@ -624,7 +689,15 @@ function ApplicationsPhone({ account }: { account: Account }) {
                   item.overdue ? (
                     <ToneText tone="danger">Overdue</ToneText>
                   ) : item.deadline ? (
-                    <ToneText tone={item.id === "a1" ? "danger" : item.id === "a2" ? "warning" : undefined}>
+                    <ToneText
+                      tone={
+                        item.id === "a1"
+                          ? "danger"
+                          : item.id === "a2"
+                            ? "warning"
+                            : undefined
+                      }
+                    >
                       {formatDate(item.deadline, NOW)}
                     </ToneText>
                   ) : (
@@ -653,8 +726,18 @@ function PushedPhone() {
           back={{ label: "Back to Jobs", onClick: () => undefined }}
           actions={
             <>
-              <IconButton icon={ExternalLink} label="Open posting" size="touch" tooltip="none" />
-              <IconButton icon={Ellipsis} label="More actions" size="touch" tooltip="none" />
+              <IconButton
+                icon={ExternalLink}
+                label="Open posting"
+                size="touch"
+                tooltip="none"
+              />
+              <IconButton
+                icon={Ellipsis}
+                label="More actions"
+                size="touch"
+                tooltip="none"
+              />
             </>
           }
         />
@@ -686,7 +769,9 @@ function PushedPhone() {
               </p>
               <h3>What you will do</h3>
               <ul>
-                <li>Own the ingestion pipelines for smart-meter and weather feeds.</li>
+                <li>
+                  Own the ingestion pipelines for smart-meter and weather feeds.
+                </li>
                 <li>Design batch and streaming jobs in Python.</li>
               </ul>
             </Prose>
@@ -743,7 +828,10 @@ function Swatches({ theme }: { theme: ThemeMode }) {
     <ul className="gx-swatches">
       {SWATCHES.map((name) => (
         <li key={name} className="gx-swatch">
-          <span className="gx-swatch-fill" style={{ background: `var(${name})` }} />
+          <span
+            className="gx-swatch-fill"
+            style={{ background: `var(${name})` }}
+          />
           <span className="gx-swatch-name">{name.slice(2)}</span>
           <code>{values[name] || " "}</code>
         </li>
@@ -807,7 +895,10 @@ function Scales() {
           ] as const
         ).map(([radius, name]) => (
           <div key={radius}>
-            <i className="gx-radius" style={{ borderRadius: `var(--r-${radius})` }} />
+            <i
+              className="gx-radius"
+              style={{ borderRadius: `var(--r-${radius})` }}
+            />
             <code>{name}</code>
           </div>
         ))}
@@ -828,7 +919,9 @@ function Scales() {
             key={level}
             style={{
               boxShadow:
-                level === "none" ? "inset 0 0 0 1px var(--border)" : `var(--shadow-${level})`,
+                level === "none"
+                  ? "inset 0 0 0 1px var(--border)"
+                  : `var(--shadow-${level})`,
             }}
           >
             {name}
@@ -853,7 +946,11 @@ function Cell({
   wide?: boolean;
 }) {
   return (
-    <section className="gx-cell" data-wide={wide || undefined} aria-label={title}>
+    <section
+      className="gx-cell"
+      data-wide={wide || undefined}
+      aria-label={title}
+    >
       <h3 className="gx-cell-title">
         {title} {note && <span>{note}</span>}
       </h3>
@@ -970,7 +1067,9 @@ function ViewsAndFilters() {
       <div className="gx-chips">
         <FilterChips
           chips={chips}
-          onRemove={(key) => setChips((list) => list.filter((chip) => chip.key !== key))}
+          onRemove={(key) =>
+            setChips((list) => list.filter((chip) => chip.key !== key))
+          }
           onClear={() => setChips([])}
         >
           <button
@@ -993,7 +1092,9 @@ function ViewsAndFilters() {
             variant="ghost"
             icon={Plus}
             onClick={() =>
-              setChips([{ key: "stage", field: "Stage", value: "Ready, Applied" }])
+              setChips([
+                { key: "stage", field: "Stage", value: "Ready, Applied" },
+              ])
             }
           >
             Filter
@@ -1037,13 +1138,21 @@ function Menus() {
     typeof entry === "object" && "id" in entry
       ? {
           ...entry,
-          onSelect: () => toast.show({ message: `${entry.label.replace("…", "")} chosen`, tone: "success" as const }),
+          onSelect: () =>
+            toast.show({
+              message: `${entry.label.replace("…", "")} chosen`,
+              tone: "success" as const,
+            }),
         }
       : entry,
   );
   return (
     <div className="gx-stack">
-      <MenuPreview label="Job actions (preview)" items={MENU} highlight="note" />
+      <MenuPreview
+        label="Job actions (preview)"
+        items={MENU}
+        highlight="note"
+      />
       <div className="gx-row">
         <Menu
           label="Job actions"
@@ -1060,8 +1169,9 @@ function Menus() {
             <IconButton {...props} icon={CircleHelp} label="About signals" />
           )}
         >
-          Signals are labels from the posting text: language, required languages,
-          a possible duplicate. They filter; they never dismiss a job.
+          Signals are labels from the posting text: language, required
+          languages, a possible duplicate. They filter; they never dismiss a
+          job.
         </Popover>
       </div>
     </div>
@@ -1078,7 +1188,11 @@ function Toasts() {
           icon={Bookmark}
           action={{ label: "Undo", run: () => undefined, undo: true }}
         />
-        <ToastView message="Profile saved" tone="success" onClose={() => undefined} />
+        <ToastView
+          message="Profile saved"
+          tone="success"
+          onClose={() => undefined}
+        />
         <ToastView
           message="Could not reach the server"
           tone="error"
@@ -1092,7 +1206,15 @@ function Toasts() {
             toast.show({
               message: "Dismissed “Backend Engineer”",
               icon: EyeOff,
-              action: { label: "Undo", undo: true, run: () => toast.show({ message: "Restored “Backend Engineer”", tone: "success" }) },
+              action: {
+                label: "Undo",
+                undo: true,
+                run: () =>
+                  toast.show({
+                    message: "Restored “Backend Engineer”",
+                    tone: "success",
+                  }),
+              },
             })
           }
         >
@@ -1151,7 +1273,9 @@ function Dialogs() {
         open={confirm}
         title="Delete this job permanently?"
         confirm="Delete job"
-        onConfirm={() => toast.show({ message: "Deleted “Backend Engineer”", tone: "success" })}
+        onConfirm={() =>
+          toast.show({ message: "Deleted “Backend Engineer”", tone: "success" })
+        }
         onClose={() => setConfirm(false)}
       >
         Its posting, notes and timeline are removed. Dismissing keeps it
@@ -1174,7 +1298,10 @@ function Dialogs() {
               onClick={() => {
                 setAdd(false);
                 setPosting("");
-                toast.show({ message: "Added “Data Engineer”", tone: "success" });
+                toast.show({
+                  message: "Added “Data Engineer”",
+                  tone: "success",
+                });
               }}
             >
               Add job
@@ -1182,7 +1309,10 @@ function Dialogs() {
           </>
         }
       >
-        <Field label="Posting address or text" hint="We fetch the text and check for duplicates.">
+        <Field
+          label="Posting address or text"
+          hint="We fetch the text and check for duplicates."
+        >
           <Textarea
             rows={3}
             value={posting}
@@ -1213,7 +1343,10 @@ function Dialogs() {
           <Input defaultValue="Example Grid Services" />
         </Field>
         <Field label="Summary" optional>
-          <Textarea rows={6} defaultValue="Built the meter-data ingestion platform." />
+          <Textarea
+            rows={6}
+            defaultValue="Built the meter-data ingestion platform."
+          />
         </Field>
       </Drawer>
     </div>
@@ -1221,19 +1354,33 @@ function Dialogs() {
 }
 
 function Fields() {
-  const [address, setAddress] = useState("https://jobs.example.com/data-engineer");
+  const [address, setAddress] = useState(
+    "https://jobs.example.com/data-engineer",
+  );
   const [email, setEmail] = useState("alex@example");
   const invalid = !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
   return (
     <div className="gx-stack gx-stack-16">
-      <Field label="Posting address" hint="We fetch the text and check for duplicates.">
-        <Input value={address} onChange={(event) => setAddress(event.target.value)} />
+      <Field
+        label="Posting address"
+        hint="We fetch the text and check for duplicates."
+      >
+        <Input
+          value={address}
+          onChange={(event) => setAddress(event.target.value)}
+        />
       </Field>
       <Field
         label="Email"
-        error={invalid ? "Add the domain, for example alex@example.com" : undefined}
+        error={
+          invalid ? "Add the domain, for example alex@example.com" : undefined
+        }
       >
-        <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+        <Input
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+        />
       </Field>
       <Field label="Stage">
         <Select defaultValue="ready">
@@ -1272,7 +1419,12 @@ function Providers() {
           numeric: true,
           value: (row) => `${row.spacing} s`,
         },
-        { key: "day", label: "24h", numeric: true, value: (row) => formatNumber(row.day) },
+        {
+          key: "day",
+          label: "24h",
+          numeric: true,
+          value: (row) => formatNumber(row.day),
+        },
         { key: "note", label: "Note", value: () => null },
       ]}
     />
@@ -1337,22 +1489,40 @@ function Shortcuts() {
 
 /* -------------------------------------------------------------- read/edit */
 
-type ProfileDraft = Pick<typeof PROFILE, "name" | "location" | "headline" | "email" | "summary">;
-const FIELDS: (keyof ProfileDraft)[] = ["name", "location", "headline", "email", "summary"];
+type ProfileDraft = Pick<
+  typeof PROFILE,
+  "name" | "location" | "headline" | "email" | "summary"
+>;
+const FIELDS: (keyof ProfileDraft)[] = [
+  "name",
+  "location",
+  "headline",
+  "email",
+  "summary",
+];
 
 function ProfileBlock({ startEditing = false }: { startEditing?: boolean }) {
   const toast = useToast();
   const [saved, setSaved] = useState<ProfileDraft>(() => ({ ...PROFILE }));
   const [editing, setEditing] = useState(startEditing);
   const [draft, setDraft] = useState<ProfileDraft>(() =>
-    startEditing ? { ...PROFILE, email: "alex@example", headline: "Data engineer · energy and climate data" , summary: "Six years building data pipelines for utilities and grid operators. I like owning ingestion end to end." } : { ...PROFILE },
+    startEditing
+      ? {
+          ...PROFILE,
+          email: "alex@example",
+          headline: "Data engineer · energy and climate data",
+          summary:
+            "Six years building data pipelines for utilities and grid operators. I like owning ingestion end to end.",
+        }
+      : { ...PROFILE },
   );
   const changes = FIELDS.filter((key) => draft[key] !== saved[key]).length;
   const emailError = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(draft.email)
     ? undefined
     : "Add the domain, for example alex@example.com";
-  const set = (key: keyof ProfileDraft) => (event: { target: { value: string } }) =>
-    setDraft((value) => ({ ...value, [key]: event.target.value }));
+  const set =
+    (key: keyof ProfileDraft) => (event: { target: { value: string } }) =>
+      setDraft((value) => ({ ...value, [key]: event.target.value }));
   return (
     <ReadEdit
       title="Profile"
@@ -1385,7 +1555,7 @@ function ProfileBlock({ startEditing = false }: { startEditing?: boolean }) {
             <MetaLine
               items={[
                 { icon: MapPin, text: saved.location },
-                { icon: Send, text: saved.email },
+                { icon: Mail, text: saved.email },
                 { icon: Globe, text: <a href="#ui">{PROFILE.site}</a> },
               ]}
             />
@@ -1405,7 +1575,11 @@ function ProfileBlock({ startEditing = false }: { startEditing?: boolean }) {
       form={
         <>
           <Field label="Name">
-            <Input value={draft.name} onChange={set("name")} autoComplete="name" />
+            <Input
+              value={draft.name}
+              onChange={set("name")}
+              autoComplete="name"
+            />
           </Field>
           <Field label="Location">
             <Input value={draft.location} onChange={set("location")} />
@@ -1417,7 +1591,11 @@ function ProfileBlock({ startEditing = false }: { startEditing?: boolean }) {
             <Input value={draft.email} onChange={set("email")} type="email" />
           </Field>
           <Field label="Summary" className="ui-field-full">
-            <Textarea value={draft.summary} onChange={set("summary")} rows={3} />
+            <Textarea
+              value={draft.summary}
+              onChange={set("summary")}
+              rows={3}
+            />
           </Field>
         </>
       }
@@ -1450,16 +1628,25 @@ function Section({
 }
 
 function GalleryBody() {
-  const [theme, setTheme] = useState<ThemeMode>(readTheme);
-  useEffect(() => applyTheme(theme, false), [theme]);
+  const [theme, setMode] = useState<ThemeMode>(readTheme);
+  // Applied before the state changes, so children read the new tokens.
+  const setTheme = (mode: ThemeMode) => {
+    applyTheme(mode, false);
+    setMode(mode);
+  };
   const toast = useToast();
   const account: Account = useMemo(
     () => ({
       name: "Alex Morgan",
       theme,
       onTheme: setTheme,
-      onShortcuts: () => toast.show({ message: "The shortcut sheet opens here", tone: "success" }),
-      onSignOut: () => toast.show({ message: "Signed out (not really)", tone: "success" }),
+      onShortcuts: () =>
+        toast.show({
+          message: "The shortcut sheet opens here",
+          tone: "success",
+        }),
+      onSignOut: () =>
+        toast.show({ message: "Signed out (not really)", tone: "success" }),
     }),
     [theme, toast],
   );
@@ -1484,13 +1671,21 @@ function GalleryBody() {
           />
         </header>
 
-        <Section id="shell" title="Shell" note="Sidebar, page header, toolbar, filters, split list and detail.">
+        <Section
+          id="shell"
+          title="Shell"
+          note="Sidebar, page header, toolbar, filters, split list and detail."
+        >
           <div className="gx-frame">
             <JobsDemo account={account} />
           </div>
         </Section>
 
-        <Section id="mobile" title="Mobile" note="Bottom bar, pill tabs, pushed detail with actions in thumb reach.">
+        <Section
+          id="mobile"
+          title="Mobile"
+          note="Bottom bar, pill tabs, pushed detail with actions in thumb reach."
+        >
           <div className="gx-phones">
             <div className="gx-phone">
               <ApplicationsPhone account={account} />
@@ -1501,11 +1696,19 @@ function GalleryBody() {
           </div>
         </Section>
 
-        <Section id="color" title="Colour" note="Neutral grey, one blue accent, three meanings.">
+        <Section
+          id="color"
+          title="Colour"
+          note="Neutral grey, one blue accent, three meanings."
+        >
           <Swatches theme={theme} />
         </Section>
 
-        <Section id="type" title="Type, space, elevation" note="Inter, three weights, tabular numbers.">
+        <Section
+          id="type"
+          title="Type, space, elevation"
+          note="Inter, three weights, tabular numbers."
+        >
           <div className="gx-grid gx-grid-2">
             <div className="gx-cell">
               <TypeScale />
@@ -1516,7 +1719,11 @@ function GalleryBody() {
           </div>
         </Section>
 
-        <Section id="components" title="Components" note="Quiet at rest, explicit on intent.">
+        <Section
+          id="components"
+          title="Components"
+          note="Quiet at rest, explicit on intent."
+        >
           <div className="gx-grid gx-grid-3">
             <Cell title="Buttons" note="one filled per view">
               <Buttons />
@@ -1555,8 +1762,8 @@ function GalleryBody() {
                   </>
                 }
               >
-                Jobs from your sources land here. Add a search, or paste a posting
-                address.
+                Jobs from your sources land here. Add a search, or paste a
+                posting address.
               </EmptyState>
             </Cell>
             <Cell title="Page header" note="title and one action">
@@ -1582,7 +1789,11 @@ function GalleryBody() {
           </div>
         </Section>
 
-        <Section id="readedit" title="Read first, edit on purpose" note="The same profile block in both modes.">
+        <Section
+          id="readedit"
+          title="Read first, edit on purpose"
+          note="The same profile block in both modes."
+        >
           <div className="gx-grid gx-grid-2">
             <ProfileBlock />
             <ProfileBlock startEditing />
