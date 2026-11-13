@@ -11,8 +11,7 @@ import {
 
 // The setup guide (#setup). The browser-test workspace is populated, so the
 // first test answers the reads of a first run itself to show a new workspace;
-// the second works on the real workspace and removes what it adds. The four
-// projects share one server.
+// the second works on the seeded workspace. Each test starts from the seeded workspace (fixtures.ts).
 const cookies: Cookies = ownerSession();
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {
@@ -101,6 +100,9 @@ test("a new workspace opens on the setup guide, which is skipped, continued and 
   const banner = page.locator(".banner", {
     hasText: "Your workspace is not set up yet.",
   });
+  // Let Today finish its reads first: WebKit can drop a click on a link that
+  // a late render replaces.
+  await page.waitForLoadState("networkidle");
   await banner.getByRole("link", { name: "Continue setting up" }).click();
   await expect(page).toHaveURL(/#setup$/);
   // Skipping goes to Today, and the guide no longer opens by itself.

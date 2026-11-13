@@ -332,7 +332,9 @@ def test_actual_requests_and_curl_transports_bound_bodies_and_record_integer_sta
                 pass
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
     server_thread.start()
     try:
         base = f"http://127.0.0.1:{server.server_address[1]}"
