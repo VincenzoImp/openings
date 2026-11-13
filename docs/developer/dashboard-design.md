@@ -150,12 +150,13 @@ agent's text is shown as the agent's, with its name. Stages keep their names;
   mobile navigation contain focus. The review flow has a keyboard-only test.
 - A unit test asserts the contrast of every token pair in the table above.
 
-**Performance**, measured in CI on a synthetic workspace of 5,000 jobs and 500
-applications:
+**Performance**, measured in CI on a synthetic workspace of 25,000 jobs (5,000
+before stage 4) and 500 applications:
 
 | Budget | Target | 0.15.2 |
 |---|---|---|
 | Applications list, 200 rows, time to interactive after navigation | under 300 ms | not measured |
+| Jobs to review, 200 rows with their signals, time to interactive | under 300 ms | not measured |
 | JavaScript for the first screen, compressed | at most 110 kB | 126 kB (one bundle, 440 kB raw) |
 | Any later screen's own JavaScript, compressed | at most 40 kB | part of the one bundle |
 | Stylesheet, compressed | at most 15 kB | 12.4 kB |
@@ -196,10 +197,10 @@ when that issue lands; the table says which parts those are.
 - `frontend/src/shell` holds the navigation (three groups; bottom bar and More
   sheet up to 860 px), the top bar with theme and density, the agent's status
   line, the routes and the screens loaded on demand.
-- The pages written before the design system keep their own stylesheet,
-  `frontend/src/legacy.css`. Its rules apply only inside `.legacy` and its
-  colours come from the tokens. A rebuilt page leaves that wrapper; stage 7
-  deletes the file.
+- The pages written before the design system kept their own stylesheet,
+  `frontend/src/legacy.css`, whose rules applied only inside `.legacy`. Each
+  rebuilt page left that wrapper; stage 4 deleted the file with the last of
+  them.
 - Until its stage, Jobs opens the existing Inbox and Shortlist pages; `#jobs`
   is an alias. Every earlier route works.
 - Checks: `npm run budget` (first screen, each later screen, stylesheet),
@@ -294,6 +295,80 @@ when that issue lands; the table says which parts those are.
   and the `chromium-performance` project (`e2e/performance.spec.ts`): 200 rows
   rendered in under 300 ms on 5000 jobs and 500 applications.
 
+**Stage 4, Jobs.**
+
+- **Jobs** (`pages/Jobs.tsx`, `pages/jobs/`) has the tabs **To review**,
+  **Shortlist**, **Dismissed** and **All**, each a list beside the selected job
+  (`Split`; one pane at a time under 860 px, with a switch back to the list).
+  The address keeps the tab, the filters and the job: `#jobs?section=…&job=…`.
+  A list has a search, a filter (Likely duplicate, No longer listed, Requires a
+  language, Flagged by a rule, Signals pending, Text incomplete) and a sort; All
+  adds **More filters** (company, place, source, work style, dates).
+  Dismissed lists the most recently dismissed first, with chips by who
+  dismissed (a policy rule, an agent, you, other) and a filter by rule. Rows
+  show the signals as tags, with the languages the policy lists as "your
+  languages"; a selection acts in bulk (up to 200 jobs, with the failures
+  listed), and the dismissal dialog takes an optional reason. To review opens
+  with who reviews it: the agent's last review-inbox run, what it changed and
+  the jobs that arrived since (`AgentBanner.tsx`).
+- **The selected job** (`Detail.tsx`) shows its actions (Shortlist, Start
+  application, Return to review, Dismiss…, Restore, or the open application),
+  the signals with the policy rules that matched, the dismissal with who, when
+  and why, **Is this the same vacancy?** for a likely duplicate
+  (`Duplicate.tsx`: the earlier job with confidence and reasons, **Same
+  vacancy: merge** and **Different**), its attempts, the posting and the
+  timeline of changes and notes (`JobTimeline.tsx`). **Details**
+  (`JobMore.tsx`) folds away the maintenance: correct the job (`EditJob.tsx`,
+  metadata in the key/value editor), sources with "No longer listed", possible
+  copies at any confidence and merging with any job (`MergeDialog.tsx`), files,
+  Ask your agent, and Forget. **Add a job** (`AddJob.tsx`) looks the address
+  up first and opens the existing job instead of a copy.
+- **Collection, Yield** (`pages/collection/Yield.tsx`) is the tab the stage 6
+  layout left room for: per source and search, collected, to review,
+  shortlisted, kept rate (withheld below 10), applied, answers and dismissed by
+  whom, over 30 days, 90 days or all time; a notice names a source that collects
+  much and keeps little; **Dismissed by your rules** opens each rule's
+  dismissals in Jobs. Policy shows under each rule how many jobs to review it
+  matches now (`policy/RuleMatches.tsx`).
+- Old addresses are rewritten by the shell (`canonicalHash`): `#inbox`,
+  `#shortlist`, `#inbox?queue=dismissed|all|duplicates`, the old drawer's
+  `detail=` and `?job=` on any other screen open Jobs. Where each capability of
+  the old pages went:
+
+  | Old place | Now |
+  |---|---|
+  | Inbox queue | Jobs, To review |
+  | Shortlist queue | Jobs, Shortlist |
+  | Dismissed and All jobs queues | Jobs, Dismissed (by who, by rule, Restore) and All |
+  | Possible duplicates tab: groups by confidence tier | The Likely duplicate signal filter; **Is this the same vacancy?** in the job; **Details**, **Possible copies and merging** at any confidence; `jobs_duplicates` over REST and MCP |
+  | Filters: search, company, location, source, work style, dates, incomplete text | The list's search and filter (Text incomplete among the signals); **More filters** in All |
+  | Bulk shortlist, dismiss, return, restore, forget | The selection bar of each tab; dismiss takes a reason |
+  | Job drawer, Posting tab | The selected job's posting |
+  | Job drawer, Notes and history | The job's timeline: changes and notes, add, edit, delete |
+  | Job drawer, Files | **Details**, Files |
+  | Job drawer, Edit (raw metadata JSON) | **Details**, Correct the job, metadata in the key/value editor |
+  | Job drawer, Availability field | Removed from the dashboard: `availability` is deprecated, readable and writable over REST and MCP; the No longer listed signal replaces it |
+  | Merge duplicate | **Same vacancy: merge**, or **Details**, Merge with another job |
+  | Forget job | **Details**, Forget, and the selection bar |
+  | Add job | **Add a job**, with the address looked up first |
+  | Start application, open the application | The job's actions |
+  | Ask your agent about a job | **Details**, Ask your agent |
+
+- `design/jobs.css` holds what Jobs adds: the job list and its tags, detail
+  sections, the duplicate decision, choices and the yield table. Jobs was the
+  last page written before the design system: the old Inbox, Shortlist,
+  duplicate and drawer pages, `ui.tsx`, `files.tsx` and `legacy.css` are
+  deleted, and every screen renders in `.screen`.
+- Checks: `frontend/tests/jobs.spec.ts` (a job shortlisted and another
+  dismissed with a reason and restored, by keyboard only; a rule's dismissal
+  named and restored; a duplicate declared different and another merged; a job
+  added by address finds the existing one; bulk actions with a failure; signals
+  and the yield; the pane switch on a phone; notes, start and forget), axe on
+  every tab, the job, the dialogs and the selection bar, the overflow check
+  from 360 to 1600 px, and the `chromium-performance` project: the jobs to
+  review, 200 rows with their signals, interactive in under 300 ms on 25,000
+  jobs.
+
 **Stage 5, Library.**
 
 - **Policy** (`pages/Policy.tsx`, `pages/policy/`) is new: the four sections as
@@ -345,8 +420,8 @@ when that issue lands; the table says which parts those are.
   list (`SourceEditor.tsx`, `SourceFields.tsx`, `Schedule.tsx`): every setting
   has its own control, so `config` is no longer edited as JSON; configuration
   the form has no control for is kept as it is. Preview, run-only limits and
-  bulk configuration keep their behaviour. The prototype's Yield tab waits for
-  #166.
+  bulk configuration keep their behaviour. The Yield tab came with stage 4
+  (#166).
 - **Settings** (`pages/Settings.tsx`, `pages/settings/`) has the tabs **Agent
   access** (tokens with their kinds and the open run of each, revoke after
   asking, the token form with the kind as a switch and the secret shown once,

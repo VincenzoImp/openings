@@ -20,6 +20,7 @@ from openings.operations import restore_database
 from openings.skill_notes import HEADING, MAX_LENGTH
 from openings.workspace import Workspace
 from schema_fixtures import table_names
+from signal_fixtures import make_schema_eleven
 
 ROOT = Path(__file__).resolve().parents[2] / "skills"
 SKILL = "review-inbox"
@@ -215,10 +216,7 @@ def test_the_list_describes_reference_files_and_notes(client, owner):
 
 def schema_eleven(path):
     Database(path)
-    with closing(sqlite3.connect(path)) as conn:
-        conn.execute("DROP TABLE skill_notes")
-        conn.execute("PRAGMA user_version=11")
-        conn.commit()
+    make_schema_eleven(path)
 
 
 def test_a_schema_eleven_workspace_gains_the_table(tmp_path):

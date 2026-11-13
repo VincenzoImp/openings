@@ -193,7 +193,7 @@ function PostingPane({ application }: { application: Application }) {
           Collected {dayTime(job?.created_at)}
         </span>
         {job && (
-          <a className="btn quiet sm" href={`#inbox?job=${job.id}`}>
+          <a className="btn quiet sm" href={`#jobs?job=${job.id}`}>
             Job details
           </a>
         )}

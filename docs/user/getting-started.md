@@ -17,8 +17,8 @@ covers local builds.
 ## Finding your way
 
 The navigation has three groups. **Work** holds Today, Applications, Jobs (the
-Inbox and Shortlist queues, with Dismissed, All jobs and Possible duplicates as
-tabs) and Activity. **Library** holds Career, Policy and Templates. **System** holds
+tabs To review, Shortlist, Dismissed and All, each with the selected job beside
+the list) and Activity. **Library** holds Career, Policy and Templates. **System** holds
 Collection and Settings. The numbers beside Applications and Activity count the
 applications ready to apply and the agent's open questions; the line at the bottom
 names the agent while one of its runs is open.
@@ -54,17 +54,21 @@ browser, and the theme follows the system until you choose one.
 
 1. Open `http://127.0.0.1:8080` and choose an owner password of at least 10 characters.
    For unattended setup, set `OPENINGS_PASSWORD` in `.env` before the first start.
-2. In **Jobs** (it opens on the Inbox), choose **Add job**. Paste a URL or enter the title, company and full
-   posting. If URL extraction cannot obtain the text, paste it yourself.
-3. Open the job to inspect its description, add it to **Shortlist** or choose
-   **Start application**. Starting creates an application in Preparing and removes it from the pending Shortlist;
-   an existing application opens instead. **Dismiss** keeps its identity and history.
+2. In **Jobs** (it opens on **To review**), choose **Add a job**. Paste a URL
+   or enter the title, company and full posting. The address is looked up first:
+   a job already in your workspace is shown instead of a copy. If URL extraction
+   cannot obtain the text, paste it yourself.
+3. Select the job to read its posting and signals beside the list, then choose
+   **Shortlist** or **Start application**. Starting creates an application in
+   Preparing and removes it from the pending Shortlist; an existing application
+   opens instead. **Dismiss…** keeps its identity and history and asks for an
+   optional reason.
 4. In **Collection**, add a saved search or company board, preview it, then enable
    its schedule. New sources start paused.
 5. Add [career entries and claims](career.md), templates and writing instructions.
    Follow [Application documents](applications.md) to prepare and review files.
 
-![Populated job inbox with filters and compact role cards](../images/inbox.png)
+![Jobs to review beside the selected job, with its signals and posting](../images/jobs.png)
 
 Career data, search settings and files live in SQLite. Configure them in the
 dashboard, REST or MCP. `.env` controls installation settings such as the host

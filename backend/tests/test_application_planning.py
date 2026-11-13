@@ -14,6 +14,7 @@ from openings.operations import restore_database
 from openings.workspace import Workspace
 from outcome_fixtures import SCHEMA_ELEVEN_COLUMNS
 from schema_fixtures import SCHEMA_EIGHT_COLUMNS, columns, make_schema_seven
+from signal_fixtures import SCHEMA_TWELVE_COLUMNS
 
 SCHEMA_SEVEN_COLUMNS = ("requirements", "deadline", "priority")
 
@@ -82,6 +83,7 @@ def test_schema_six_upgrade_preserves_records_and_matches_a_new_workspace(tmp_pa
                 *SCHEMA_SEVEN_COLUMNS,
                 *SCHEMA_EIGHT_COLUMNS.get(table, ()),
                 *SCHEMA_ELEVEN_COLUMNS.get(table, ()),
+                *SCHEMA_TWELVE_COLUMNS.get(table, ()),
             )
             names = [row[0] for row in columns(conn, table) if row[0] not in added]
             assert (

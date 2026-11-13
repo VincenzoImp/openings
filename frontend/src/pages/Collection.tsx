@@ -6,11 +6,12 @@ import { Master } from "./collection/Master";
 import { Providers } from "./collection/Providers";
 import { Runs } from "./collection/Runs";
 import { Sources, type Editing } from "./collection/Sources";
+import { SourceYieldView } from "./collection/Yield";
 
-// One file per tab: a tab added later (the yield of each source) is one more
-// entry here and one more file in ./collection.
+// One file per tab: each tab is one entry here and one file in ./collection.
 const TABS = [
   { id: "sources", label: "Sources" },
+  { id: "yield", label: "Yield" },
   { id: "runs", label: "Runs and tasks" },
   { id: "providers", label: "Providers" },
 ];
@@ -65,7 +66,9 @@ export default function CollectionPage() {
         onChange={show}
         items={TABS}
       >
-        {section === "runs" ? (
+        {section === "yield" ? (
+          <SourceYieldView />
+        ) : section === "runs" ? (
           <Runs />
         ) : section === "providers" ? (
           <Providers />

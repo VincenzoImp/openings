@@ -17,16 +17,11 @@ const loaders = {
   templates: () => import("../pages/Templates"),
   settings: () => import("../pages/Settings"),
 };
-const chunkOf: Record<string, keyof typeof loaders> = {
-  inbox: "jobs",
-  shortlist: "jobs",
-};
 
 /** Start loading a screen's code before it is opened. */
 export function preloadScreen(route: string) {
-  const name = chunkOf[route] ?? route;
-  if (name in loaders)
-    void loaders[name as keyof typeof loaders]().catch(() => {
+  if (route in loaders)
+    void loaders[route as keyof typeof loaders]().catch(() => {
       // The screen reports the failure itself when it is opened.
     });
 }
@@ -38,20 +33,12 @@ export const CareerPage = lazy(loaders.career);
 export const PolicyPage = lazy(loaders.policy);
 export const TemplatesPage = lazy(loaders.templates);
 export const SettingsPage = lazy(loaders.settings);
-export const JobsPage = lazy(() =>
-  loaders.jobs().then((module) => ({ default: module.JobsPage })),
-);
-export const JobDrawer = lazy(() =>
-  loaders.jobs().then((module) => ({ default: module.JobDrawer })),
-);
-export const AddJob = lazy(() =>
-  loaders.jobs().then((module) => ({ default: module.AddJob })),
-);
+export const JobsPage = lazy(loaders.jobs);
 export const ApplicationsPage = lazy(loaders.applications);
 export const ReviewPage = lazy(loaders.review);
 
 interface BoundaryProps {
-  /** What failed, for the message: "Applications" or "this job". */
+  /** What failed, for the message: "Applications". */
   name: string;
   children: ReactNode;
 }
@@ -99,32 +86,4 @@ export function Screen({
       </Suspense>
     </ScreenBoundary>
   );
-}
-
-/** The frame of an object opened over a screen (a job or an application). */
-export function Overlay({
-  name,
-  children,
-}: {
-  name: string;
-  children: ReactNode;
-}) {
-  return (
-    <OverlayBoundary name={name}>
-      <Suspense fallback={null}>{children}</Suspense>
-    </OverlayBoundary>
-  );
-}
-class OverlayBoundary extends ScreenBoundary {
-  render() {
-    if (!this.state.failed) return this.props.children;
-    return (
-      <div className="toast error" role="alert">
-        <span className="grow">{this.props.name} could not be loaded. </span>
-        <Button size="sm" onClick={() => location.reload()}>
-          Reload
-        </Button>
-      </div>
-    );
-  }
 }

@@ -318,9 +318,17 @@ def _migrate_10_to_11(conn):
 
 
 def _migrate_11_to_12(conn):
-    from . import skill_notes
+    # Additive. Per-workspace local notes of skills (skill_notes). Ingest signals
+    # (job_signals, derived from each job and computed in the background after the
+    # upgrade: SignalService.backfill), who dismissed each job, when, why and
+    # through which policy rule (jobs.dismissed_*, filled for dismissed jobs from
+    # their last dismissal event) and postings a company board no longer lists
+    # (postings.unlisted_at, from the last complete run of each board). No existing
+    # value changes.
+    from . import job_signals, skill_notes
 
     skill_notes.migrate(conn)
+    job_signals.migrate(conn)
 
 
 # Each step upgrades from its key to the next version; steps chain inside one transaction.

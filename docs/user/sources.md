@@ -24,7 +24,7 @@ The screen has a switch for scheduled collection and three tabs:
 |---|---|---|
 | Saved search | One query and location on selected JobSpy portals | `backend engineer`, `Berlin`, LinkedIn and Indeed |
 | Company | One supported ATS board or RSS/Atom feed | A company's Greenhouse board, filtered to engineering roles |
-| Manual job | The URL or posting you supply | Jobs → Add job |
+| Manual job | The URL or posting you supply | Jobs → Add a job |
 
 Create another saved search for another query or location. Career preferences guide
 your agent’s job review; the query controls what is requested from a portal.
@@ -103,6 +103,14 @@ Automatic results enter the archive only when usable posting text is available.
 Candidates awaiting text stay in collection progress; unavailable text is reported
 there too. A manually added URL can remain **Needs text** until you complete it.
 
+When a company board run reads the whole board (no result or candidate limit was
+reached), a job from that board that still matches the source's filters and was
+not listed again gets the signal **No longer listed**: the posting has probably
+closed. The job shows the date under **Details**, **Sources**; a later run that
+lists it again clears the signal. Saved searches never mark jobs this way,
+because a search sees only part of a job board. A [Policy rule](policy.md) can
+dismiss jobs as they stop being listed.
+
 ## Set the schedule
 
 Choose one schedule mode:
@@ -159,6 +167,30 @@ source settings and run-only limits the run froze. A **Partial** run reports bou
 unavailable descriptions; completion does not imply every matching job was fetched.
 
 ![Saved search form with query, portal selection, role filters and excluded role terms](../images/collection-settings.png)
+
+## Measure what each source yields
+
+**Collection → Yield** counts, for the last 30 or 90 days or all time, what each
+saved search and company board brought: the jobs it **Collected** first, how
+many are still **To review**, **Shortlisted** (kept, including those with an
+application of any outcome), **Applied** to, with employer **Answers** (and
+interviews), and **Dismissed**, split by who dismissed them: a Policy rule, an
+agent or you. Each job counts once, for the source that found it first, so the
+rows add up to the total; jobs you added yourself and jobs of a removed source
+have a row of their own. A search also shows how many of its jobs came from each
+job board.
+
+**Kept** is the share of collected jobs that were shortlisted; below 10
+collected jobs it reads **Too few jobs to judge**. A source that collects many
+jobs and keeps few is named in a notice above the table: narrow its terms or
+places, or pause it, under **Sources**. **Dismissed by your rules** lists each
+rule with the jobs it dismissed and opens them in Jobs.
+
+![Yield by source: collected, kept, applied, answered and dismissed jobs for each saved search and company board](../images/yield.png)
+
+REST `GET /collection/yield?since=&until=&min_sample=` and MCP `collection_yield`
+return the same counts with `likely_duplicates`, `no_longer_listed`,
+`dismissed_by` and `dismissed_by_rule`.
 
 ## Request pacing
 

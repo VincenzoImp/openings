@@ -36,6 +36,7 @@ from schema_fixtures import (
     make_schema_seven,
     table_names,
 )
+from signal_fixtures import SCHEMA_TWELVE_COLUMNS
 
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 AGENT = token_actor("token-agent", "Synthetic agent")
@@ -696,7 +697,11 @@ def test_schema_seven_upgrade_preserves_rows_and_matches_a_new_workspace(tmp_pat
                 continue
             assert sorted(columns(conn, table)) == sorted(columns(reference, table)), table
         for table, rows in before.items():
-            added = SCHEMA_EIGHT_COLUMNS.get(table, ()) + SCHEMA_ELEVEN_COLUMNS.get(table, ())
+            added = (
+                SCHEMA_EIGHT_COLUMNS.get(table, ())
+                + SCHEMA_ELEVEN_COLUMNS.get(table, ())
+                + SCHEMA_TWELVE_COLUMNS.get(table, ())
+            )
             names = [row[0] for row in columns(conn, table) if row[0] not in added]
             assert (
                 conn.execute(f"SELECT {','.join(names)} FROM {table} ORDER BY 1").fetchall() == rows

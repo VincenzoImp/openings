@@ -67,9 +67,10 @@ npm run test:e2e
 ```
 
 The four projects cover Chromium and WebKit at desktop/mobile widths. A fifth,
-`chromium-performance`, starts its own workspace of 5,000 jobs and 500
-applications and fails when the Applications list takes 300 ms or more to show
-200 rows (the median of seven loads). CI runs Chromium at both widths and the
+`chromium-performance`, starts its own workspace of 25,000 jobs (with their
+ingest signals) and 500 applications and fails when the Applications list or
+the jobs to review take 300 ms or more to show 200 rows (the median of seven
+loads). CI runs Chromium at both widths and the
 performance project. Browser binaries are development tools, outside the core.
 
 ### Dashboard budgets
@@ -105,9 +106,7 @@ The browser tests run on the synthetic workspace of
 four projects share one server, so a test that changes data makes its own
 records and reads the numbers it compares from the API.
 
-New screens use the components in `frontend/src/design` and add no global styles.
-`frontend/src/legacy.css` belongs to the pages written before the design system:
-do not add rules to it.
+Screens use the components in `frontend/src/design` and add no global styles.
 
 Each run starts its own server on a free local port, so runs in several checkouts
 or worktrees can overlap. Set `OPENINGS_E2E_PORT` to choose the port, for example

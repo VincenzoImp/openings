@@ -10,15 +10,12 @@ import { lockPageScroll } from "../design";
 import { AgentStatus } from "./AgentStatus";
 import { MoreSheet, Sidebar, TabBar } from "./Navigation";
 import {
-  AddJob,
   ApplicationsPage,
   ReviewPage,
   ActivityPage,
   CareerPage,
   CollectionPage,
-  JobDrawer,
   JobsPage,
-  Overlay as OverlayFrame,
   PolicyPage,
   Screen,
   SettingsPage,
@@ -35,16 +32,8 @@ import {
   type Density,
   type Theme,
 } from "./preferences";
-import {
-  HOME,
-  REBUILT,
-  SCREENS,
-  canonicalHash,
-  overlayOf,
-  routeOf,
-} from "./routes";
+import { HOME, REBUILT, SCREENS, canonicalHash, routeOf } from "./routes";
 
-type Overlay = { kind: "add" } | { kind: "job"; id: string } | null;
 const NARROW = "(max-width: 860px)";
 const emptyList = { items: [], total: 0 };
 
@@ -100,8 +89,7 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
     moreButton = useRef<HTMLButtonElement>(null);
   const lastRoute = useRef(location.hash);
   const [route, setRoute] = useState(() => routeOf(location.hash)),
-    [more, setMore] = useState(false),
-    [overlay, setOverlay] = useState<Overlay>(() => overlayOf(location.hash));
+    [more, setMore] = useState(false);
   const narrow = useNarrow();
   const { theme, density, toggleTheme, toggleDensity } = usePreferences();
   const { pending, refresh, notify } = useWorkspace();
@@ -141,7 +129,6 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
       const changed = canonicalise();
       lastRoute.current = location.hash;
       setRoute(routeOf(location.hash));
-      setOverlay(overlayOf(location.hash));
       setMore(false);
       window.scrollTo(0, 0);
       if (changed) announce();
@@ -198,49 +185,25 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
     if (!narrow) setMore(false);
   }, [narrow]);
 
-  function navigate(target: string, next: Overlay = null) {
+  function navigate(target: string) {
     if (!confirmLeave()) return;
     const [id, query] = target.split("?");
-    history.pushState(
-      null,
-      "",
-      `#${id}${
-        next && next.kind !== "add"
-          ? `?${next.kind}=${encodeURIComponent(next.id)}`
-          : query
-            ? "?" + query
-            : ""
-      }`,
-    );
+    history.pushState(null, "", `#${id}${query ? "?" + query : ""}`);
     lastRoute.current = location.hash;
-    setRoute(routeOf(location.hash));
-    setOverlay(next);
+    const next = routeOf(location.hash);
+    setRoute(next);
     setMore(false);
     window.scrollTo(0, 0);
-    // The same screen again (its link in the navigation): still move focus.
-    if (routeOf(location.hash) === route)
+    // The same screen again (its link in the navigation): still move focus,
+    // and let the screen read its new address.
+    if (next === route) {
       main.current?.focus({ preventScroll: true });
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
   }
-  function openJob(id: string) {
-    if (!confirmLeave()) return;
-    const [page, query = ""] = location.hash.split("?");
-    const params = new URLSearchParams(query);
-    params.delete("job");
-    params.set("job", id);
-    history.pushState(null, "", `${page || "#" + HOME}?${params}`);
-    lastRoute.current = location.hash;
-    setOverlay({ kind: "job", id });
-  }
-  function closeObject() {
-    if (!confirmLeave()) return;
-    const [page, query = ""] = location.hash.split("?");
-    const params = new URLSearchParams(query);
-    params.delete("job");
-    history.replaceState(null, "", `${page}${params.size ? "?" + params : ""}`);
-    lastRoute.current = location.hash;
-    setOverlay(null);
-  }
-  // An application opens on its own page, the review page.
+  // A job is selected in Jobs; an application opens on its review page.
+  const openJob = (id: string) =>
+    navigate(`jobs?job=${encodeURIComponent(id)}`);
   const openApp = (id: string) =>
     navigate(`review?application=${encodeURIComponent(id)}`);
   const nav = {
@@ -292,7 +255,7 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
             ref={main}
             inert={more}
           >
-            {/* The old pages bring their own stylesheet, scoped to .legacy. */}
+            {/* Every screen is built with the design system (stage 4 removed the last old page). */}
             <div className={REBUILT.includes(route) ? "screen" : "legacy"}>
               <Screen route={route}>
                 {route === "today" ? (
@@ -303,13 +266,8 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
                     onOpenJob={openJob}
                     onOpenApplication={openApp}
                   />
-                ) : route === "inbox" || route === "shortlist" ? (
-                  <JobsPage
-                    key={route}
-                    defaultQueue={route}
-                    onAdd={() => setOverlay({ kind: "add" })}
-                    onOpen={openJob}
-                  />
+                ) : route === "jobs" ? (
+                  <JobsPage onOpenJob={openJob} onOpenApplication={openApp} />
                 ) : route === "applications" ? (
                   <ApplicationsPage />
                 ) : route === "review" ? (
@@ -350,26 +308,6 @@ export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
         )}
         {narrow && more && (
           <MoreSheet {...nav} foot={status} onClose={() => setMore(false)} />
-        )}
-      </div>
-      <div className="legacy">
-        {overlay?.kind === "add" && (
-          <OverlayFrame name="The job form">
-            <AddJob
-              onClose={closeObject}
-              onCreated={(id) => navigate("inbox", { kind: "job", id })}
-            />
-          </OverlayFrame>
-        )}
-        {overlay?.kind === "job" && (
-          <OverlayFrame name="This job">
-            <JobDrawer
-              key={overlay.id}
-              id={overlay.id}
-              onClose={closeObject}
-              onApplication={openApp}
-            />
-          </OverlayFrame>
         )}
       </div>
     </>

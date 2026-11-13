@@ -43,6 +43,7 @@ from .common import (
     now,
 )
 from .errors import DomainError, conflict
+from .job_signals import unlist_missing
 from .posting import matches_filters, posting_complete, posting_complete_sql
 from .scheduling import IntervalSchedule, Schedule, next_due, schedule_adapter
 
@@ -1783,15 +1784,25 @@ class DiscoveryService:
             persist()
 
         def store(posting):
+            created = store_locked(posting)
+            if created:
+                # Duplicate and policy rules, outside the lock (see ingest_job).
+                try:
+                    self.workspace.signals.after_ingest(created)
+                except Exception:  # a signal never fails the collection
+                    LOG.exception("Ingest signals failed for a collected job.")
+
+        def store_locked(posting):
             if not matches_filters(posting, source["config"].get("filters") or {}):
-                return
+                return None
+            created = None
             with self.db.lock:
                 if not self._active(task["id"], owner):
                     raise DomainError(409, "task_cancelled", "Collection was cancelled.")
                 posting = normalize_posting({**posting, "source_id": source["id"]})
                 if not posting_complete(posting.get("posting"), posting.get("metadata"), {}):
                     # Incomplete candidates remain in the adapter checkpoint, outside the archive.
-                    return
+                    return None
                 identity = (
                     posting.get("source_key")
                     or posting.get("url")
@@ -1799,7 +1810,7 @@ class DiscoveryService:
                 )
                 first_observation = identity not in observed
                 try:
-                    saved = self.workspace.ingest_job(posting)
+                    saved = self.workspace.ingest_job(posting, defer_signals=True)
                 except (ValidationError, DomainError) as error:
                     if (
                         isinstance(error, DomainError)
@@ -1830,8 +1841,11 @@ class DiscoveryService:
                         result["created"] += int(bool(saved.get("created")))
                         result["existing"] += int(not saved.get("created", False))
                         observed.add(identity)
+                    if saved.get("created"):
+                        created = saved["id"]
                 task["payload"]["observed_identities"] = sorted(observed)
                 persist()
+            return created
 
         source["on_item"] = store
         source["on_checkpoint"] = checkpoint
@@ -1889,6 +1903,13 @@ class DiscoveryService:
             result["continuing"] = True
         else:
             result.pop("continuing", None)
+            if not source.get("candidate_capped") and not source.get("result_capped"):
+                # The whole board was read: what it no longer lists is gone.
+                with self.db.transaction() as connection:
+                    unlisted = unlist_missing(connection, source, result["started_at"], now())
+                if unlisted:
+                    result["unlisted"] = result.get("unlisted", 0) + len(unlisted)
+                    self.workspace.signals.after_unlisted(unlisted)
         return result
 
     def run_task(self, task, owner):

@@ -54,7 +54,11 @@ class JobPatch(Versioned):
     url: str | None = Field(default=None, max_length=4000)
     posting: str | None = Field(default=None, max_length=200_000)
     metadata: dict[str, Any] | None = None
-    availability: Literal["open", "closed", "unknown"] | None = None
+    availability: Literal["open", "closed", "unknown"] | None = Field(
+        default=None,
+        description="Deprecated since 0.21: a manual note that nothing reads. Whether the source still lists the posting is signals.no_longer_listed.",
+        deprecated=True,
+    )
 
     @field_validator("url")
     @classmethod
@@ -62,8 +66,25 @@ class JobPatch(Versioned):
         return JobInput.valid_url(value) if value else value
 
 
+def dismiss_reason():
+    return Field(
+        default=None,
+        max_length=500,
+        description="With dismissed: why, in a short sentence, shown in the Dismissed list (for example 'Junior role; the policy targets senior roles').",
+    )
+
+
 class TriageInput(Versioned):
     triage: Literal["inbox", "saved", "dismissed"]
+    reason: str | None = dismiss_reason()
+
+
+class DistinctInput(Input):
+    other_id: str = Field(
+        min_length=1,
+        max_length=100,
+        description="The job flagged as its likely duplicate that is in fact a different vacancy.",
+    )
 
 
 class MergeInput(Versioned):
@@ -247,6 +268,13 @@ class BulkItem(Versioned):
 class JobBulk(Input):
     action: Literal["saved", "dismissed", "inbox", "forget"]
     items: list[BulkItem] = Field(min_length=1, max_length=200)
+    reason: str | None = dismiss_reason()
+
+    @model_validator(mode="after")
+    def reason_with_dismissal(self):
+        if self.reason and self.action != "dismissed":
+            raise ValueError("A reason goes with the dismissed action only.")
+        return self
 
 
 def unique_items(items, label):
@@ -328,12 +356,47 @@ class JobQuery(Input):
     job_type: str | None = Field(default=None, max_length=100)
     created_since: str | None = None
     created_until: str | None = None
-    sort: Literal["newest", "oldest", "company", "title"] = "newest"
+    signal: (
+        Literal["likely_duplicate", "no_longer_listed", "language_required", "flagged", "pending"]
+        | None
+    ) = Field(
+        default=None,
+        description="Only jobs with this ingest signal: likely_duplicate (flagged as a copy of an earlier job), no_longer_listed (the board stopped listing it), language_required (the posting states a required language), flagged (a flag rule of the policy matched) or pending (signals not computed yet).",
+    )
+    posting_language: str | None = Field(
+        default=None,
+        max_length=40,
+        description="Only postings written in this language (ISO 639-1 code such as de, or a name such as German).",
+    )
+    posting_language_not: str | None = Field(
+        default=None,
+        max_length=40,
+        description="Only postings whose detected language is another one; postings of unknown language are left out.",
+    )
+    requires: str | None = Field(
+        default=None,
+        max_length=40,
+        description="Only postings that state this language as required (alone or as one of alternatives).",
+    )
+    dismissed_by: Literal["rule", "agent", "owner", "other"] | None = Field(
+        default=None,
+        description="Only dismissed jobs, by who dismissed them: a policy rule, an agent token, the owner (dashboard or owner token) or other (the system, or before 0.21 without a record).",
+    )
+    rule_id: str | None = Field(
+        default=None, max_length=100, description="Only jobs dismissed by this policy item's rule."
+    )
+    sort: Literal["newest", "oldest", "company", "title", "dismissed"] = Field(
+        default="newest", description="dismissed: most recently dismissed first."
+    )
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
     include_facets: bool = Field(
         default=False,
         description="Also return up to 200 distinct companies/locations/sources/job types matching the filters.",
+    )
+    include_counts: bool = Field(
+        default=False,
+        description="Also return counts: jobs in each queue (inbox, shortlist, applications, dismissed, all) and dismissed jobs by who dismissed them, for the same search, company, location, source, date and signal filters.",
     )
 
     @field_validator("created_since", "created_until")

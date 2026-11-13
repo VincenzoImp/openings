@@ -71,8 +71,18 @@ the section as it is afterwards; a stale version is `409 conflict` with
   section in the new order. `policy_remove(item_id, expected_version)` deletes.
 - With an agent token an added or changed item has `confirmed: false`.
   `policy_confirm` and `enabled: true` on a rule are the owner's (`403
-  forbidden`). A rule is stored and validated; nothing applies it at collection
-  yet (`signals_applied: false`).
+  forbidden`).
+- A decision `rule` is `{signal, condition: {operator, value}, action}` on
+  `language_required` (`in`/`not_in` a list of languages, by name or code),
+  `posting_language` (`in`/`not_in`), `likely_duplicate` (`at_least` a
+  confidence) or `no_longer_listed` (`is` true). While enabled and confirmed it
+  acts once on each job nobody has reviewed, when the signal arrives: at
+  collection, and for `no_longer_listed` when a board stops listing the posting.
+  `dismiss` dismisses the job as the system, naming the rule in
+  `dismissal.rule`; `flag` records it in `signals.rules`. Jobs the owner adds
+  in the dashboard are never dismissed by a rule. `policy_rule_preview({rule})`
+  counts the jobs waiting in the Inbox a rule would match now, without acting:
+  measure a rule before proposing it.
 
 ## Manage collection and the archive
 
@@ -100,6 +110,24 @@ interval. Let cooldowns expire before retrying.
 Description retrieval is automatic. Candidates awaiting text stay in the run
 checkpoint; only usable automatic postings enter the archive. Inspect pending,
 unavailable and failed results before calling a collection complete.
+
+`collection_yield({since?, until?, min_sample?})` reports, per source and per
+search, what the jobs it first collected became: collected, to review,
+shortlisted, applied, employer responses, dismissed (by rule, agent, owner or
+other, and by rule), likely duplicates and postings no longer listed, with
+searches split by job board. Use it to tune sources (manage-sources).
+
+Every job has `signals` computed at collection without a model: `language`,
+the languages it states as `required` (groups, one of a group suffices) or
+`welcome`, a likely `duplicate` of an earlier job with its confidence, and
+`no_longer_listed` (a company board stopped listing it; `unlisted_at` on the
+observation). `jobs_search` filters by `signal`, `posting_language`,
+`posting_language_not`, `requires`, `dismissed_by` and `rule_id`, and
+`include_counts` returns the size of each queue. A dismissed job has
+`dismissal`: who, when, why (`reason`) and the rule, if one dismissed it.
+`job_distinct(job_id, {other_id})` records that a flagged likely duplicate is a
+different vacancy. The manual `availability` field is deprecated and read by
+nothing.
 
 Use `jobs_search` with `value.queue="inbox"` to review new jobs and
 `job_triage` / `jobs_bulk` to save or dismiss selected versioned jobs. Read full

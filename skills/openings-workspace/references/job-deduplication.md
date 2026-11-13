@@ -51,6 +51,12 @@ re-opened vacancy, which is a new hiring round and never reaches the high tier)
 and `ambiguous` (the record matches two vacancies that differ from each other,
 for example a copy without a requisition ID next to two requisitions).
 
+A job collected after another that it likely repeats carries the same score as
+`signals.duplicate` (`job_id`, `confidence`, `tier`, from the medium tier up),
+computed once when it was collected. After checking, merge a verified
+duplicate with `job_merge`, or record a different vacancy with
+`job_distinct(job_id, {other_id})`: the flag goes and is not computed again.
+
 These are review signals, not identity, and nothing is merged automatically. A
 high tier is a strong suggestion; an identical advertisement reused for two
 openings in different teams still looks like one vacancy. Company and title alone

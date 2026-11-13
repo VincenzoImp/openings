@@ -22,13 +22,15 @@ layout. Your external agent fills it using the selected facts and instructions.
 
 ## Start an application
 
-Review new jobs in **Jobs**, which opens on the **Inbox** queue. Choose **Shortlist** to save an opportunity for
-later, or **Dismiss** to reject it reversibly. Inbox and Shortlist contain only
-jobs without application attempts. Shortlist is your ready-to-prepare queue.
+Review new jobs in **Jobs**, which opens on the **To review** tab. Select a job
+to read it beside the list, then choose **Shortlist** to save it for later, or
+**Dismiss…** to reject it reversibly with an optional reason. To review and
+Shortlist contain only jobs without application attempts. Shortlist is your
+ready-to-prepare queue.
 
 ![Shortlist of selected jobs awaiting application preparation](../images/shortlist.png)
 
-From Shortlist, open a job and choose **Start application**. This creates an
+From Shortlist, select a job and choose **Start application**. This creates an
 application in **Preparing** (`draft` in REST/MCP), removes the job from
 Shortlist and opens the application's page. Saving a job creates no application;
 collecting jobs does not start preparation. The job shows its application stage
@@ -290,7 +292,7 @@ the job with its notes, files and maintenance actions.
 | Action | Result |
 |---|---|
 | Shortlist | Keep an interesting job without starting an application. |
-| Return to inbox | Reconsider a shortlisted job before starting preparation. |
+| Return to review | Reconsider a shortlisted job before starting preparation. |
 | Close application | Record its outcome and retain documents and history. |
 | Dismiss job | Hide it from active review and remember it during later collection. |
 | Delete application | Remove that attempt and its documents/files; keep the job. |
@@ -303,33 +305,34 @@ show "unknown (before 0.17)".
 
 ![The Timeline tab: an employer response, the changes with who made each and a note](../images/application-history.png)
 
-Closing never returns the job to Inbox or Shortlist. To cancel preparation
+Closing never returns the job to To review or Shortlist. To cancel preparation
 without losing documents, close it as **Not pursued**. Deleting the final attempt
 is permanent and deliberately returns a saved job to Shortlist. Other retained
 attempts keep it out of pending queues.
 
-The **Possible duplicates** tab beside Inbox groups records that probably
-describe one vacancy, for example the same posting collected from several job
-boards and the employer's site. Each group shows a confidence and the reasons
-behind it: the same apply link or requisition ID, identical or nearly identical
-text, the same company, role and location, and anything that speaks against it,
-such as a different location, requisition, level or a posting published months
-apart. Company names are compared without legal, corporate and country suffixes.
+A job collected after another that probably describes the same vacancy (the
+same posting from several job boards and the employer's site) carries the
+signal **Likely duplicate** with a confidence; the **Likely duplicate** filter
+of each tab lists them. The job shows **Is this the same vacancy?** with the
+earlier job and the reasons: the same apply link or requisition ID, identical or
+nearly identical text, the same company, role and location, and anything that
+speaks against it, such as a different location, requisition, level or a
+posting published months apart. Company names are compared without legal,
+corporate and country suffixes.
 
-Choose **High confidence** to see only strong matches, **Medium and high** (the
-default) to add probable ones, or **Every candidate** to include records that
-share only a company and role; most of those are different vacancies. The tab
-suggests a record to keep and never merges automatically. Open a job and expand
-**Job details, sources & maintenance** to see its likely duplicates and merge a
-verified copy.
+**Same vacancy: merge** opens the merge dialog; **Different** records that the
+two jobs are separate vacancies, and the signal does not return. Nothing is
+merged automatically. **Details**, **Possible copies and merging** lists every
+other record that may be this vacancy, at any confidence, and merges with any
+job you choose.
 
-![Possible duplicates at high confidence: one vacancy collected from three sources and another from two, with the reasons for each group](../images/duplicates.png)
+![A likely duplicate: the earlier job, the confidence and the reasons, with Same vacancy and Different](../images/duplicates.png)
 
 Dismissing a job preserves its applications. Restore it before preparing new
 documents. If you previously dismissed an applied job just to clear Shortlist,
-find it under Dismissed and choose **Restore job**. REST/MCP can set `triage=saved`
+find it under **Dismissed** and choose **Restore**. REST/MCP can set `triage=saved`
 with its current version. Do this only for known workaround dismissals; the job
-remains in Applications and does not return to Inbox. A later attempt is always
+remains in Applications and does not return to To review. A later attempt is always
 explicit and respects the one-open-application rule.
 
 Scripts and agents can perform the same workflow using the [REST API](api.md)
