@@ -34,14 +34,14 @@ Paste the posting when extraction cannot obtain the complete text.
 
 | Area | Routes under `/api/v1` |
 |---|---|
-| Archive | `GET/POST /jobs`, `GET /jobs/resolve`, `GET /jobs/duplicates`, `POST /jobs/bulk`, `GET/PATCH/DELETE /jobs/{id}`, `POST /jobs/{id}/triage`, `/merge`, `GET/POST /jobs/{id}/notes` |
+| Archive | `GET/POST /jobs`, `GET /jobs/resolve`, `GET /jobs/duplicates`, `POST /jobs/bulk`, `GET/PATCH/DELETE /jobs/{id}`, `POST /jobs/{id}/triage`, `/merge`, `/distinct`, `GET/POST /jobs/{id}/notes` |
 | Notes | `GET/PATCH/DELETE /notes/{id}` plus job-owned list/create routes |
 | Applications | `GET/POST /applications`, `POST /applications/bulk`, `GET/PATCH/DELETE /applications/{id}`, `GET /applications/{id}/events`, `GET /applications/{id}/staleness`, `GET /staleness` |
 | Employer responses | `GET/POST /applications/{id}/responses`, `PATCH/DELETE /responses/{id}`; `GET /insights` |
 | Career | `GET/PATCH /career/profile`, CRUD `/career/knowledge` and `/career/claims`, `POST /career/import/preview` then `/career/import` |
-| Policy | `GET /policy`, `GET /policy/{section}`, `POST /policy/{section}/items`, `POST /policy/{section}/reorder`, `PATCH/DELETE /policy/items/{id}`, `POST /policy/items/{id}/confirm`, `/move` |
+| Policy | `GET /policy`, `GET /policy/{section}`, `POST /policy/{section}/items`, `POST /policy/{section}/reorder`, `PATCH/DELETE /policy/items/{id}`, `POST /policy/items/{id}/confirm`, `/move`, `POST /policy/rules/preview` |
 | Templates/guidance | CRUD `/templates`, `GET/PATCH /instructions` |
-| Collection | `GET/PATCH /collection`, `GET /providers`, `PATCH /providers/{id}`, CRUD `/sources`, `/sources/schemas`, preview/run, `/sources/bulk` and `/collection/runs` |
+| Collection | `GET/PATCH /collection`, `GET /providers`, `PATCH /providers/{id}`, CRUD `/sources`, `/sources/schemas`, preview/run, `/sources/bulk`, `/collection/runs` and `GET /collection/yield` |
 | Tasks | `GET /tasks`, `GET /tasks/{id}`, `POST /tasks/{id}/cancel` or `/retry` |
 | Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `GET /documents/{id}/consistency`, `POST /documents/{id}/review` |
 | Files | `GET /files`, `GET/DELETE /files/{id}`, `GET /files/{id}/content`, `POST /files/uploads`, `POST /files/{id}/download` |
@@ -96,6 +96,65 @@ lists for `validation` errors.
 
 For Shortlist use `{"expected_version":3,"triage":"saved"}`; `inbox` returns a
 job without attempts to review and `dismissed` remembers it outside active review.
+A dismissal takes an optional `reason` (at most 500 characters), as does the
+`dismissed` action of `POST /jobs/bulk`. Every job read carries `dismissal`
+(null unless dismissed): `at`, `by` (the actor), `category` (`rule`, `agent`,
+`owner` or `other`), `rule` (`item_id` and `label` of the Policy rule that
+dismissed it, or null) and `reason`. Restoring a job clears it.
+
+### Ingest signals
+
+Every job carries `signals`, computed without a model when it is collected or
+its title or posting changes:
+
+```json
+{"computed": true, "language": "de", "language_confidence": 0.93,
+ "required": [["de"], ["en", "fr"]], "welcome": ["it"],
+ "duplicate_checked": true,
+ "duplicate": {"job_id": "EARLIER_JOB_ID", "confidence": 0.91, "tier": "high"},
+ "no_longer_listed": false, "unlisted_at": null,
+ "rules": [{"item_id": "POLICY_ITEM_ID", "label": "Languages", "action": "flag"}]}
+```
+
+`language` is the language the posting is written in (ISO 639-1, or null when
+the text is too short or mixed). `required` lists groups of required languages:
+one language of a group is enough, so the example needs German and English or
+French. `welcome` lists languages described as a plus. `duplicate` names an
+earlier job this one likely repeats, from the medium tier up; it is a review
+signal and nothing is merged. `POST /jobs/{id}/distinct` with
+`{"other_id": "EARLIER_JOB_ID"}` records two different vacancies: the flag goes
+and is not computed again for that pair. `no_longer_listed` is set when a full
+run of a company board no longer lists the posting (`unlisted_at`), and cleared
+when the board lists it again. `rules` names the Policy rules that matched.
+`computed: false` marks a job whose signals are still being computed after the
+upgrade to 0.21.
+
+`GET /jobs` filters on them: `signal=likely_duplicate|no_longer_listed|language_required|flagged|pending`,
+`posting_language=de`, `posting_language_not=en`, `requires=de` (codes or names
+such as `German`), `dismissed_by=rule|agent|owner|other`, `rule_id=ITEM_ID` and
+`sort=dismissed` (most recently dismissed first). `include_counts=true` adds
+`counts`: jobs in each queue (`inbox`, `shortlist`, `applications`,
+`dismissed`, `all`) and `dismissed_by`, for the same filters.
+
+The job field `availability` (`open`, `closed` or `unknown`, set by hand) is
+deprecated: it stays readable and writable through `PATCH /jobs/{id}`, nothing
+reads it and the dashboard no longer shows it. Use `signals.no_longer_listed` instead.
+
+A Policy rule acts on these signals: see [Policy](policy.md#rules-on-a-signal).
+`POST /policy/rules/preview` with `{"rule": {"signal": "language_required",
+"condition": {"operator": "not_in", "value": ["English"]}, "action": "dismiss"}}`
+returns `matches`, `inbox` (jobs to review now), `pending` (without signals yet)
+and up to five `examples`, and changes nothing.
+
+`GET /collection/yield?since=2026-08-01&until=&min_sample=10` returns, per
+source (`items`, with `source_id`, `name`, `kind`, `providers` for searches) and
+in `total`: `collected`, `to_review`, `shortlisted`, `applied`, `responded`,
+`interviews`, `offers`, `dismissed`, `dismissed_by` (`rule`, `agent`, `owner`,
+`other`), `dismissed_by_rule`, `likely_duplicates`, `no_longer_listed` and
+`kept_rate` (shortlisted over collected; `null` with `withheld:
+"too_few_collected"` below `min_sample`). Each job counts once, for the source that collected it first and
+by the time it was added; jobs added by hand or by a removed source have a row
+with `source_id: null`.
 
 Creating an application retains saved interest and starts Preparing (`draft`).
 Use `queue=inbox` / `shortlist` for jobs without any application attempts;

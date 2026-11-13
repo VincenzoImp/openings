@@ -100,6 +100,15 @@ skills: discover the tools/resources and their typed input schemas.
    URL or source key without ingesting; `jobs_duplicates` lists candidate copies
    of one vacancy across sources, with a confidence, tier and reasons, for review
    before `job_merge` (`min_confidence` defaults to 0.5; 0 lists every candidate).
+   Each job carries `signals` computed without a model when it was collected:
+   the posting's `language`, `required` language groups and `welcome`
+   languages, a likely `duplicate` of an earlier job with its confidence,
+   `no_longer_listed` for a company-board posting the board stopped listing,
+   and the Policy `rules` that matched. `jobs_search` filters on them (`signal`,
+   `posting_language`, `posting_language_not`, `requires`, `dismissed_by`,
+   `rule_id`). `job_distinct` records that a flagged job is a different vacancy;
+   the flag does not return. Signals are evidence to confirm in the posting,
+   not verdicts.
 3. Inspect `job.application` or use `applications_list` with `value.job_id` to find
    its attempts. Continue the open application, or use `application_create` to
    start Preparing (`draft`) with questions, notes and an idempotency key. Starting removes it from the pending Shortlist queue. A later attempt is possible after the previous one closes.
@@ -196,7 +205,10 @@ Its source settings are frozen at enqueue time. Use `collection_runs_list` and
 cooldowns apply to agent operations as they do to the dashboard. Use
 `providers_list` and `providers_update` for provider enable/pause and request
 interval. Description retrieval is automatic; incomplete candidates stay in the
-run checkpoint until usable text is available.
+run checkpoint until usable text is available. `collection_yield` measures each
+source over a period: the jobs it collected first, kept, applied to, answered
+and dismissed (by a rule, an agent or the owner); the
+[manage-sources skill](../../skills/manage-sources/SKILL.md) uses it.
 
 Prefer a compatible bulk patch when applying the same schedule or acquisition
 settings to several sources. Read per-source failures and retain untouched fields.
@@ -234,7 +246,12 @@ only outcomes the owner reported, never ones you infer from mail or a portal.
 ## State rules
 
 - Job triage uses `inbox` (unreviewed interest), `saved` (saved interest) and `dismissed`.
-  Dismissed is reversible and remembered. `job_forget` permanently removes
+  Dismissed is reversible and remembered. Give a dismissal a short `reason`
+  (`job_triage`, `jobs_bulk`): the owner reads it beside the job. A Policy rule
+  the owner enabled and confirmed dismisses or flags new jobs on their signals
+  by itself; its dismissals name the rule in `dismissal.rule`. Measure a rule
+  you want to propose with `policy_rule_preview`; only the owner enables one.
+  `job_forget` permanently removes
   job-owned history/files and permits rediscovery; include `job_id` and the
   job's current `expected_version`.
 - Each job has at most one non-Closed application. A creation/reopening conflict

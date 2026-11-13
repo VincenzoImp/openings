@@ -21,6 +21,9 @@ flowchart LR
 |---|---|
 | `backend/openings/workspace.py` | Job identities, triage, notes, application attempts and reporting |
 | `backend/openings/duplicates.py`, `duplicate_signals.py` | Read-only duplicate candidates: per-job signals, pair confidence and groups |
+| `backend/openings/language_signals.py` | Deterministic text signals: the posting's language and the languages it requires or welcomes |
+| `backend/openings/job_signals.py` | Ingest signals of each job (stored, backfilled), listing observations, the dismissal record and policy rules applied to new jobs |
+| `backend/openings/source_yield.py` | Yield of each collection source and search, from collected jobs to employer answers |
 | `backend/openings/career.py` | Profile, detailed evidence, claims, templates and instructions |
 | `backend/openings/policy.py` | The owner's policy: four sections of items, section versions, owner confirmation, signal rules |
 | `backend/openings/documents.py` | Frozen contexts, document revisions and scoped file transfers |
@@ -117,9 +120,31 @@ dashboard path, and lists every gap. Read [REST](../user/api.md) and
   rule call `actors.require_owner`. A value is typed (text, number, date,
   boolean, list); `structured` exists only for a value copied by the upgrade and
   cannot be written. A decision rule `{signal, condition, action}` is validated
-  against the registry `policy.SIGNALS`; nothing applies it at ingest yet.
+  against the registry `policy.SIGNALS`; `job_signals.SignalService` applies an
+  enabled, confirmed rule once to a new job when its signal arrives (see Signals).
   Preparing a context freezes the four sections (`payload.policy`), each as its
   own content-addressed part, so a section is stored again only when it changes.
+- **Signals:** `job_signals` holds one row per job: the posting's language and
+  confidence, required language groups (one language of a group suffices) and
+  welcome languages from `language_signals` (weighted function words and phrase
+  cues in English, German, French and Italian; no model), computed in the
+  ingest transaction and again when the title or posting changes
+  (`content_version`, `format`). The likely duplicate (`duplicate_of`,
+  `duplicate_confidence`, from the medium tier up, only against jobs collected
+  earlier) is computed after the ingest transaction from the cached
+  `DuplicateIndex`, which gains each new job in place; `distinct_from` keeps the
+  pairs the owner or an agent declared different. `postings.unlisted_at` is set
+  when an uncapped run of a company board completes without listing a posting
+  whose job matches the source's filters, and cleared when it is seen again.
+  Rules act only on an untouched job (Inbox, no application, no triage change)
+  collected by a source or an agent, never on one the owner added in the
+  dashboard: `dismiss` sets the dismissal record with the rule's item id and
+  label (`jobs.dismissed_*`, also written for every manual dismissal and cleared
+  on restore), `flag` records the rule in `job_signals.rules`. Duplicates are
+  never merged. A restored job keeps its triage event, so a rule never acts on
+  it again. `PolicyService.preview_rule` counts the Inbox jobs a rule would
+  match. `source_yield` attributes each job to the source of its earliest
+  observation and counts its outcome once.
 - **Truth:** approved claims and narrative evidence guide an external agent;
   reference/length validation does not establish factual accuracy. Review outputs.
 - **Career:** entries have structured organizations, nullable partial dates, skill
@@ -186,8 +211,21 @@ memory and releasing SQLite readers before cancellation or thread changes.
 Backups use SQLite's online backup API. A restore preserves
 installation authentication, recent provider request history and later cooldowns.
 
-Workspaces and backups use schema 12 (0.21). Opening schema 11 adds the
-`skill_notes` table (`skill_notes.migrate`); nothing else changes.
+Workspaces and backups use schema 12 (0.21). Opening schema 11 is an additive
+change in one transaction (`_migrate_11_to_12`): it adds the `skill_notes` table
+(`skill_notes.migrate`) and, through `job_signals.migrate`, the `job_signals`
+table, the dismissal record columns of `jobs` (`dismissed_at`, `dismissed_by_*`,
+`dismissed_rule_id`, `dismissed_rule_label`, `dismissed_reason`),
+`postings.unlisted_at` and their indexes. Dismissed jobs get the time and actor
+of their last dismissal event (none when no event exists: they count as
+"other"), and the postings each company board's last complete run did not list
+are marked. No other value changes. The text and duplicate signals of existing
+jobs are computed after the upgrade by `SignalService.backfill` on the warm-up
+thread, in batches of 200 jobs, without applying rules; jobs read
+`computed: false` until then. Measured on a synthetic workspace of 25,000 jobs
+with postings of about 3,000 characters on a laptop: the migration takes 0.3 s,
+the text signals 7 s, the duplicate index 3 s and the duplicate signals 0.5 s;
+a small host takes several times longer, in the background.
 
 Schema 11 (0.20) was an additive change with one table rebuild. Opening schema 10 adds the
 `responses` table (an employer's answer to a sent application: kind, date, note,

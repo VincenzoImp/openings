@@ -20,9 +20,16 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   or selected company boards (Greenhouse, Lever, Ashby, Workday and more) and RSS
   feeds. Role, location and `exclude_titles` filters skip noise before it reaches
   your Inbox. You can also add any job by URL or pasted text.
-- **Triage:** review the Inbox, keep jobs on a Shortlist or dismiss them; dismissed
-  jobs stay remembered. **Possible duplicates** groups one vacancy collected from
-  several sources so you can merge verified copies; bulk actions work on up to 200 jobs.
+- **Triage:** review new jobs beside their posting, keep them on a Shortlist or
+  dismiss them with a reason; dismissed jobs stay remembered and can be restored.
+  Each job arrives with signals computed without a model: the posting's language,
+  the languages it requires, a likely duplicate of an earlier job (merged only
+  when you confirm) and a company-board posting no longer listed. Rules you enable
+  in your Policy dismiss or flag new jobs on those signals; bulk actions work on
+  up to 200 jobs.
+- **Measure sources:** **Yield** counts, per source and search, the jobs it found
+  first and how many were shortlisted, applied to, answered by an employer or
+  dismissed, and by whom.
 - **Decide once:** a **Policy** of short statements holds your rules for
   shortlisting and dismissing, the facts employers ask about and your writing
   rules. Your agent proposes items; they count after you confirm them.

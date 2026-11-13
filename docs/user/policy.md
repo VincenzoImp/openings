@@ -62,12 +62,27 @@ them.
 
 A Decision item may name a collection signal, for example "dismiss postings
 that require a language outside my list". The rule has a switch, **Applied
-automatically**, that is off until you turn it on; only you can turn it on.
+automatically**, that is off until you turn it on; only you can turn it on, and
+the item must also be confirmed.
 
-In this release the rule is stored and checked, and nothing applies it. The
-signals themselves (the posting's language, a required language, a likely
-duplicate, a posting that is no longer listed) arrive in a later release;
-until then your agent follows the statement like any other rule.
+Openings computes the signals of every job when it is collected, without a
+model: the language the posting is written in, the languages it states as
+required or welcome, a likely duplicate of an earlier job, and a company-board
+posting that is no longer listed. An enabled, confirmed rule acts once on each
+new job when its signal arrives, and only on a job nobody has reviewed yet:
+
+- **dismiss** moves the job to **Dismissed**. The dismissal names the rule
+  ("Dismissed by the rule “Languages I work in”"), and **Restore** brings the
+  job back to review; the rule does not dismiss it again;
+- **flag** keeps the job in **To review** and lists the rule among its signals.
+
+A rule never acts on jobs already waiting for review, on jobs you added
+yourself in the dashboard, on shortlisted jobs or on jobs with an application.
+A likely duplicate is only ever flagged or dismissed, never merged.
+
+Below each rule, **It matches N of the M jobs to review now** is a dry run of
+the rule against the jobs waiting for review; nothing changes. **N jobs
+dismissed by it** opens the Dismissed tab of Jobs filtered to that rule.
 
 ## REST and MCP
 
@@ -82,6 +97,7 @@ REST and MCP return the same items as the dashboard.
 | Reorder a section | `POST /policy/{section}/reorder` | `policy_reorder` |
 | Confirm a proposal (owner only) | `POST /policy/items/{item_id}/confirm` | `policy_confirm` |
 | Remove an item | `DELETE /policy/items/{item_id}?expected_version=` | `policy_remove` |
+| Try a rule without saving it | `POST /policy/rules/preview` | `policy_rule_preview` |
 
 `expected_version` is always the version of the item's section; a stale one
 returns `409 conflict` with `details.current_version`. A move also sends
@@ -113,7 +129,7 @@ belongs to Writing items and `rule` to Decision items:
 The signals are `language_required` and `posting_language` (`in`, `not_in`
 with a list), `likely_duplicate` (`at_least` with a number from 0 to 1) and
 `no_longer_listed` (`is` true); the actions are `dismiss` and `flag`.
-`GET /policy` lists them and reports `signals_applied: false`. Setting
+`GET /policy` lists them and reports `signals_applied: true`. Setting
 `enabled: true` needs owner authority.
 
 A synthetic policy to try is in [`examples/policy.json`](../../examples/policy.json).
