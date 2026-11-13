@@ -1,18 +1,32 @@
 """Readable text of a revision's TeX source, derived without a TeX runtime.
 
 A CV or letter revision is its uploaded source and PDF. Review, search and the
-comparison between revisions read the text derived here from the source: the
-document body with comments, layout settings and markup removed, macros the
-source defines expanded, accents composed, and the breaks TeX would make
-(paragraphs, ``\\\\``, items, headings, environments) kept as lines. The same
-input always gives the same text, so the stored text can be checked against
-its source at any time.
+comparison between revisions read the text derived here from the source, as a
+reader sees it in the PDF: the document body, with the macros the source defines
+expanded, the commands of CV and letter classes printed as they print
+(``latex.py``: moderncv entries and title, letter openings and closings, link
+text), comments, settings and markup removed, accents composed, and the breaks
+TeX makes (paragraphs, ``\\\\``, items, headings, environments) kept as lines.
+An unknown command contributes the text of its arguments, not its options. The
+same input always gives the same text, so the stored text can be checked
+against its source at any time.
 """
 
 from __future__ import annotations
 
 import re
 import unicodedata
+
+from .latex import (
+    LINE,
+    PARAGRAPH,
+    Context,
+    collect,
+    document_class,
+    drop_environment_arguments,
+    group_end,
+    render,
+)
 
 TEX_MEDIA_TYPES = {"application/x-tex", "text/x-tex", "application/x-latex", "text/x-latex"}
 IGNORED_TOKENS = {"http", "https", "www", "mailto"}
@@ -45,7 +59,8 @@ _FOLD = str.maketrans(
 _LAYOUT = {
     1: "vspace|hspace|includegraphics|label|ref|pageref|eqref|cite|color|pagecolor|linespread"
     "|usepackage|documentclass|geometry|hypersetup|pagestyle|thispagestyle|newgeometry"
-    "|textcolor|colorbox|raisebox|href|input|include|setmainfont|setsansfont|setmonofont",
+    "|textcolor|colorbox|raisebox|input|include|setmainfont|setsansfont|setmonofont"
+    "|moderncvstyle|moderncvcolor|moderncvicons|hyphenation|setlist|faIcon",
     2: "setlength|addtolength|setcounter|fontsize|rule|multicolumn",
     3: "definecolor",
 }
@@ -56,7 +71,9 @@ _ENVIRONMENT_ARGUMENTS = {
 _OPTIONAL = r"(?:\s*\[[^\]]*\])?"
 _ARGUMENT = r"(?:\s*\{[^{}]*\})"
 # Markers for the breaks kept as lines while the markup is removed.
-_LINE, _PARAGRAPH = "\x01", "\x02"
+_LINE, _PARAGRAPH = LINE, PARAGRAPH
+# A tilde the source prints, kept apart from ~, the unbreakable space.
+TILDE = "\x03"
 _HEADINGS = "part|chapter|section|subsection|subsubsection|paragraph|subparagraph"
 _DEFINE = re.compile(
     r"\\(?:newcommand|renewcommand|providecommand|DeclareRobustCommand)\*?\s*"
@@ -79,7 +96,7 @@ def strip_comments(source: str) -> str:
     return "\n".join(re.sub(r"(?<!\\)%.*$", "", line) for line in source.splitlines())
 
 
-def _strip_markup(text: str) -> str:
+def _strip_markup(text: str, *, readable: bool = False) -> str:
     text = re.sub(
         r"\\(ss|ae|AE|oe|OE|aa|AA|i|j|o|O|l|L)(?![A-Za-z])\s*(?:\{\})?",
         lambda match: _LETTERS[match.group(1)],
@@ -107,7 +124,8 @@ def _strip_markup(text: str) -> str:
     text = re.sub(r"\\(?:begin|end)\s*\{[^{}]*\}" + _OPTIONAL, " ", text)
     for count, names in sorted(_LAYOUT.items(), reverse=True):
         text = re.sub(rf"\\(?:{names})\*?(?![A-Za-z]){_OPTIONAL}{_ARGUMENT}{{{count}}}", " ", text)
-    text = re.sub(r"\\[A-Za-z@]+\*?", " ", text)
+    # A command the reader does not see; in readable text its options go with it.
+    text = re.sub(r"\\[A-Za-z@]+\*?" + (r"(?:\s*\[[^\]]*\])*" if readable else ""), " ", text)
     # Groups only delimit: adjacent arguments read as separate words.
     text = re.sub(r"(?<!\\)\}\s*\{", " ", text)
     text = re.sub(r"(?<!\\)[{}$]", "", text)
@@ -128,20 +146,7 @@ def tokens(text: str, *, markup: bool = True) -> list[str]:
 
 def _group_end(text: str, start: int) -> int:
     """The index after the balanced group opening at ``text[start] == "{"``; -1 if open."""
-    depth, index = 0, start
-    while index < len(text):
-        character = text[index]
-        if character == "\\":
-            index += 2
-            continue
-        if character == "{":
-            depth += 1
-        elif character == "}":
-            depth -= 1
-            if depth == 0:
-                return index + 1
-        index += 1
-    return -1
+    return group_end(text, start)
 
 
 def _definitions(text: str) -> tuple[dict[str, tuple[int, str | None, str]], str]:
@@ -265,6 +270,7 @@ def _breaks(text: str) -> str:
 
 def _tidy(text: str) -> str:
     text = text.replace("---", "—").replace("--", "–").replace("``", "“").replace("''", "”")
+    text = text.replace(TILDE, "~")
     paragraphs = []
     for paragraph in text.split(_PARAGRAPH):
         lines = [" ".join(line.split()) for line in paragraph.split(_LINE)]
@@ -284,10 +290,15 @@ def derive_text(source: str) -> str:
         end = re.search(r"\\end\s*\{document\}", body)
         if end:
             body = body[: end.start()]
-    macros, _ = _definitions(preamble)
+    macros, preamble = _definitions(preamble)
     own, body = _definitions(body)
-    body = _expand(body, {**macros, **own})
-    return _tidy(_strip_markup(_breaks(body)))
+    macros.update(own)
+    context = Context(document_class(text))
+    body = _expand(body, macros)
+    # Personal data set in the preamble is printed where the body asks for it.
+    collect(_expand(preamble, macros) + "\n" + body, context)
+    body = render(drop_environment_arguments(body), context)
+    return _tidy(_strip_markup(_breaks(body), readable=True))
 
 
 def revision_text(sources: list[tuple[str, str]]) -> str | None:

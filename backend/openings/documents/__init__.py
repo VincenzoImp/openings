@@ -4,7 +4,8 @@
 and their staleness), revisions.py (document revisions, review and comparison)
 and files.py (owned files and scoped transfers); sources.py pairs a CV or
 letter revision's .tex source with its PDF, text.py derives readable text from
-the source without a TeX runtime, upgrade.py is the schema 13 step and
+the source without a TeX runtime (latex.py: what class commands print),
+upgrade.py is the schema 13 step and
 models.py holds the inputs.
 """
 
