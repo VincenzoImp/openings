@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.23.0 — 2026-11-14
+
+The end of the redesign: a setup guide for new workspaces, parity enforced in CI, and the deprecated names and fields removed. **Read [Upgrading to 0.23](docs/user/upgrading-0.23.md) before upgrading scripts or agents.**
+
+- **Setup guide:** a new workspace opens on a guide that connects your agent (token and client configuration), shows your record being built (Profile, Policy, searches, entries, claims, templates) with the agent's questions, and lets you fill in the Profile basics, Eligibility facts, the no-reply period and a first search yourself. Skip it, continue it from Today, or open it again from Settings › Workspace.
+- **Breaking: removed what 0.19 to 0.22 deprecated.** The 30 MCP tool names from before 0.22 and the flat list arguments are gone; every MCP tool now refuses an argument it does not take (`422 validation`) instead of ignoring it.
+- **Breaking:** the application `note` field is removed; read `pinned_note` and write guidance with the notes operations.
+- **Breaking:** deletes of notes, document revisions and files require `expected_version` (`422` without it).
+- **Breaking:** the job `availability` field and the Profile `preferences` and `roles` are removed from REST, MCP and the dashboard; use `signals.no_longer_listed` and the policy's Decision items.
+- **Parity in CI:** every operation needs REST, MCP and a dashboard path a browser test uses, or a documented reason; the matrix has no gaps (docs/developer/parity.md).
+- Jobs › All › More filters can filter by the posting's language, a language it is not written in, and a language it requires. Run once and Remove on a single source use that source's own route.
+- The last pieces of the pre-redesign dashboard are removed; old addresses still open where their content moved.
+- Fixed: selects keep the height of the other controls in Safari/WebKit.
+
+**Database schema 14.** A schema 5–13 workspace is upgraded automatically at start in one transaction. A job's manual availability becomes a note on the job (checked byte for byte) before `jobs.availability` is dropped. Each non-empty Profile preferences and roles text must be held by a policy item; a text none holds becomes an unconfirmed Decision item before both fields leave the Profile. No change is recorded, and frozen contexts and every other row are unchanged. Restore accepts schema 14 and upgrades a copy of an older backup. A schema 14 workspace cannot be opened by 0.22 or earlier: back up before upgrading.
+
 ## 0.22.0 — 2026-11-13
 
 The breaking group of the redesign: one timeline, documents that are their source, and one name per operation. **Read [Upgrading to 0.22](docs/user/upgrading-0.22.md) before upgrading scripts or agents.**
