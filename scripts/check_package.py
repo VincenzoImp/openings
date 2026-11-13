@@ -3,11 +3,11 @@
 import argparse
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import zipfile
+from pathlib import Path
 
 
 def main():
@@ -75,6 +75,7 @@ with TestClient(app) as client:
 """
         completed = subprocess.run(
             [sys.executable, "-c", probe],
+            check=False,
             cwd=directory,
             env={**os.environ, "PYTHONPATH": str(target)},
             text=True,
