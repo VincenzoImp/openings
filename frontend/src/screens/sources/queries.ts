@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, call, type Schema } from "../../api/client";
 import { useApiMutation, useVersionedMutation } from "../../query/mutation";
 import { POLL_MS } from "../../query/query";
-import type { CheckView, SourceView } from "./model";
+import type { SourceView } from "./model";
 
 export const sourceKeys = {
   list: ["sources", "list"] as const,
@@ -24,7 +24,7 @@ export function useSources() {
             signal,
           }),
         )
-      ).items as unknown as (SourceView & Schema<"Source">)[],
+      ).items,
     refetchInterval: POLL_MS,
   });
 }
@@ -67,7 +67,7 @@ export function useRecentChecks(enabled: boolean) {
             signal,
           }),
         )
-      ).items as unknown as CheckView[],
+      ).items,
     refetchInterval: POLL_MS,
   });
 }

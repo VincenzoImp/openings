@@ -133,42 +133,17 @@
     font: var(--t-sm);
     font-weight: var(--w-medium);
   }
+  /* A folded section (the posting, notes and history) under a rule. */
   .ap-fold {
     margin-top: var(--s-6);
+    padding-top: var(--s-2);
     border-top: 1px solid var(--border);
   }
-  .ap-fold > summary {
-    display: flex;
-    align-items: center;
-    gap: var(--s-2);
-    min-height: 44px;
-    cursor: pointer;
-    list-style: none;
-  }
-  .ap-fold > summary::-webkit-details-marker {
-    display: none;
-  }
-  .ap-fold > summary::before {
-    content: "";
-    width: 6px;
-    height: 6px;
-    margin: 0 4px 0 2px;
-    border: solid var(--text-3);
-    border-width: 0 1.5px 1.5px 0;
-    rotate: -45deg;
-    transition: rotate var(--d-fast) var(--ease);
-  }
-  .ap-fold[open] > summary::before {
-    rotate: 45deg;
-  }
-  .ap-fold > summary:focus-visible {
-    border-radius: var(--r-md);
-  }
-  .ap-fold-body {
+  .ap-fold > .ui-disclosure-body {
     display: flex;
     flex-direction: column;
     gap: var(--s-5);
-    padding: var(--s-1) 0 var(--s-4);
+    padding-bottom: var(--s-4);
   }
 
   /* Shortlisted */

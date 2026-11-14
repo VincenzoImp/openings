@@ -1,4 +1,5 @@
 import { Button } from "../../ui/Button";
+import { Disclosure } from "../../ui/Disclosure";
 import { ToneText } from "../../ui/Badge";
 import { jobOf } from "../applications/data";
 import { closedSummary, followUpLine } from "../applications/model";
@@ -6,7 +7,6 @@ import { SentDocuments, useCurrentDocuments } from "./Documents";
 import type { PageContext } from "./Page";
 import {
   Answers,
-  Fold,
   HistoryList,
   PinnedNote,
   PostingText,
@@ -53,19 +53,20 @@ export function FollowUp({ context }: { context: PageContext }) {
           <HistoryList app={app} />
         </Section>
         <SentDocuments current={current} />
-        <Fold title="Posting">
+        <Disclosure className="ap-fold" title="Posting">
           <PostingText text={jobOf(app).posting} />
-        </Fold>
+        </Disclosure>
         {(requirements.length > 0 || questions.length > 0) && (
-          <Fold
+          <Disclosure
+            className="ap-fold"
             title="Requirements and answers"
-            count={requirements.length + questions.length}
+            note={requirements.length + questions.length}
           >
             {requirements.length > 0 && (
               <Requirements app={app} editable={false} />
             )}
             <Answers app={app} />
-          </Fold>
+          </Disclosure>
         )}
       </div>
     </>

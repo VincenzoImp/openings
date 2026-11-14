@@ -70,6 +70,7 @@ jobs:
       - run: npm --prefix frontend run build
       - run: npm --prefix frontend run budget
       - run: npm --prefix frontend run format:check
+      - run: npm --prefix frontend run lint
       - run: npm --prefix frontend test
 
   e2e-shard:

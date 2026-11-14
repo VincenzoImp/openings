@@ -34,13 +34,14 @@ export function RecordReply({
   const [note, setNote] = useState("");
   // The form starts afresh for each application.
   const id = application?.id;
+  const { reset } = record;
   useEffect(() => {
     if (!id) return;
     setKind("interview");
     setDate(isoDay(new Date()));
     setNote("");
-    record.reset();
-  }, [id]); // `record` changes on every render.
+    reset();
+  }, [id, reset]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

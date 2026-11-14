@@ -4,7 +4,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, call, type Schema } from "../api/client";
 import { useApiMutation } from "./mutation";
-import { POLL_MS } from "./query";
 
 export type SectionName =
   "looking_for" | "ruled_out" | "facts" | "writing" | "working_with_me";
@@ -23,7 +22,6 @@ export function usePreferences() {
   return useQuery({
     queryKey: preferenceKeys.all,
     queryFn: ({ signal }) => call(api.GET("/api/v1/preferences", { signal })),
-    refetchInterval: POLL_MS,
   });
 }
 
@@ -41,7 +39,6 @@ export function useUnspokenNewJobs(enabled: boolean) {
           signal,
         }),
       ),
-    refetchInterval: POLL_MS,
   });
   const report = query.data?.unspoken_required as
     { count?: number } | null | undefined;

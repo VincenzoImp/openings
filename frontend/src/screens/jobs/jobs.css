@@ -220,37 +220,8 @@
   /* Notes and history */
   .jobs-history {
     margin-top: var(--s-8);
+    padding-top: var(--s-2);
     border-top: 1px solid var(--border);
-  }
-  .jobs-history > summary {
-    display: flex;
-    align-items: center;
-    gap: var(--s-2);
-    width: max-content;
-    min-height: 44px;
-    color: var(--text-2);
-    font: var(--t-sm);
-    font-weight: var(--w-medium);
-    letter-spacing: 0;
-    list-style: none;
-    cursor: pointer;
-  }
-  .jobs-history > summary::-webkit-details-marker {
-    display: none;
-  }
-  .jobs-history > summary:hover {
-    color: var(--text);
-  }
-  .jobs-history > summary:focus-visible {
-    outline: none;
-    border-radius: var(--r-sm);
-    box-shadow: var(--focus-ring);
-  }
-  .jobs-history-chevron {
-    transition: rotate var(--d-fast) var(--ease);
-  }
-  .jobs-history[open] .jobs-history-chevron {
-    rotate: 90deg;
   }
   .jobs-note {
     display: flex;

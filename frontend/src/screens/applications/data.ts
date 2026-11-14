@@ -1,9 +1,9 @@
 // The reads and writes of Applications and the application page, through the
 // generated client. Keys start with the resource (src/query/query.ts); a
 // write names what it touches and those queries are read again.
-import { useEffect } from "react";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api, call, transfer, type Schema } from "../../api/client";
+import type { operations } from "../../api/schema";
 import { useApiMutation, useVersionedMutation } from "../../query/mutation";
 import { POLL_MS, type Resource } from "../../query/query";
 import { isoDay } from "../../ui/format";
@@ -46,73 +46,44 @@ export interface ListParams {
   waiting: boolean;
   sort: SortKey;
 }
-const PAGE = 200;
-/** At most this many rows are read for one list (five pages). */
-const MOST = 1000;
+/** Rows read at a time; Show more reads the next ones. */
+export const PAGE = 200;
+type ListQuery = NonNullable<
+  operations["applications_list"]["parameters"]["query"]
+>;
 
 /**
- * The applications of a stage and search, every page up to MOST, read one
- * page after the other so the first one shows at once. Shortlisted leaves
- * out the Ready ones (the server counts them in Shortlisted).
+ * The first `limit` applications of a stage and search, read again while
+ * the list is open. Shortlisted leaves out the Ready ones (the server counts
+ * them in Shortlisted).
  */
-export function useApplicationList(params: ListParams) {
-  const server: Schema<"ApplicationRow">["stage"] | undefined =
-    params.stage === "all" ? undefined : params.stage;
-  const sort =
-    params.sort === "needs" || params.sort === "deadline"
-      ? "deadline"
-      : params.sort;
-  const query = useInfiniteQuery({
-    queryKey: [
-      "applications",
-      "list",
-      {
-        stage: server,
-        q: params.q,
-        outcome: params.outcome,
-        waiting: params.waiting,
-        sort,
-      },
-    ],
-    initialPageParam: 0,
-    queryFn: ({ pageParam, signal }) =>
-      call(
-        api.GET("/api/v1/applications", {
-          params: {
-            query: {
-              stage: server as never,
-              q: params.q || undefined,
-              outcome: (params.outcome || undefined) as never,
-              needs: params.waiting ? "reply_overdue" : undefined,
-              sort: sort as never,
-              limit: PAGE,
-              offset: pageParam,
-            },
-          },
-          signal,
-        }),
-      ),
-    getNextPageParam: (last, pages) => {
-      const read = pages.reduce((sum, page) => sum + page.items.length, 0);
-      return read < last.total && read < MOST && last.items.length
-        ? read
-        : undefined;
-    },
+export function useApplicationList(params: ListParams, limit = PAGE) {
+  const query: ListQuery = {
+    stage: params.stage === "all" ? undefined : params.stage,
+    q: params.q || undefined,
+    outcome: (params.outcome || undefined) as ListQuery["outcome"],
+    needs: params.waiting ? "reply_overdue" : undefined,
+    sort: params.sort === "needs" ? "deadline" : params.sort,
+    limit,
+  };
+  const list = useQuery({
+    queryKey: ["applications", "list", query],
+    queryFn: ({ signal }) =>
+      call(api.GET("/api/v1/applications", { params: { query }, signal })),
+    placeholderData: keepPreviousData,
     refetchInterval: POLL_MS,
   });
-  const { hasNextPage, isFetchingNextPage, isError, fetchNextPage } = query;
-  useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage && !isError) void fetchNextPage();
-  }, [hasNextPage, isFetchingNextPage, isError, fetchNextPage]);
-  const first = query.data?.pages[0];
-  let items = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const page = list.data;
+  let items = page?.items ?? [];
   if (params.stage === "shortlisted") items = items.filter((app) => !app.ready);
   return {
-    ...query,
+    ...list,
     items,
-    total: first?.total ?? 0,
-    counts: first?.stage_counts ?? {},
-    noReplyDays: first?.no_reply?.days ?? NO_REPLY_DAYS,
+    total: page?.total ?? 0,
+    /** Rows the server has beyond the ones read. */
+    more: Math.max(0, (page?.total ?? 0) - (page?.items.length ?? 0)),
+    counts: page?.stage_counts ?? {},
+    noReplyDays: page?.no_reply?.days ?? NO_REPLY_DAYS,
   };
 }
 

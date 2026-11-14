@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import { queryClient } from "./query/query";
-import { applyStoredTheme } from "./shell/theme";
+import { applyStoredTheme } from "./ui/theme";
 import "./ui/base.css";
 
 applyStoredTheme();

@@ -100,7 +100,11 @@ export function aboutChanges(
 ) {
   const name = about.name.trim();
   const section = lookingFor(preferences.sections);
-  const before = (section?.items ?? []) as unknown as Item[];
+  // The response types a stored line loosely: read its text and scope.
+  const before: Item[] = (section?.items ?? []).map((item) => ({
+    text: itemText(item),
+    scope: (item.scope as Item["scope"]) ?? null,
+  }));
   let items = [...before];
   for (const [prefix, value] of [
     [ROLES, about.roles.trim()],

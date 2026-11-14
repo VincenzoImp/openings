@@ -2,7 +2,6 @@ import { useState, type FormEvent } from "react";
 import {
   Bookmark,
   Building2,
-  ChevronRight,
   Clock,
   Ellipsis,
   ExternalLink,
@@ -18,6 +17,7 @@ import {
 } from "lucide-react";
 import { Status, Tags, ToneText } from "../../ui/Badge";
 import { Button, IconButton } from "../../ui/Button";
+import { Disclosure } from "../../ui/Disclosure";
 import { Checkbox, Field, Textarea } from "../../ui/Field";
 import { formatDate, formatDay, formatFull } from "../../ui/format";
 import { Icon, STAGES, type Stage } from "../../ui/Icon";
@@ -263,14 +263,11 @@ function History({ job }: { job: Job }) {
   }
   const items = timeline.data?.items ?? [];
   return (
-    <details
+    <Disclosure
       className="jobs-history"
-      onToggle={(event) => setOpen(event.currentTarget.open)}
+      title="Notes and history"
+      onToggle={setOpen}
     >
-      <summary>
-        <Icon icon={ChevronRight} size="sm" className="jobs-history-chevron" />
-        Notes and history
-      </summary>
       <form className="jobs-note" onSubmit={submit}>
         <Field label="Add a note">
           <Textarea
@@ -292,7 +289,7 @@ function History({ job }: { job: Job }) {
           )}
         </div>
       </form>
-      {open && timeline.isPending ? (
+      {timeline.isPending ? (
         <SkeletonRows rows={2} />
       ) : (
         <ol className="jobs-timeline" aria-label="History of this job">
@@ -339,7 +336,7 @@ function History({ job }: { job: Job }) {
           })}
         </ol>
       )}
-    </details>
+    </Disclosure>
   );
 }
 

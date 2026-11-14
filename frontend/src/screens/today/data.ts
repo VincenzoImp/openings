@@ -5,31 +5,32 @@ import type { operations } from "../../api/schema";
 import { useApiMutation } from "../../query/mutation";
 import { POLL_MS } from "../../query/query";
 import { isoDay } from "../../ui/format";
-import { type Row } from "./model";
 
 type Query = NonNullable<
   operations["applications_list"]["parameters"]["query"]
 >;
 
-export type Application = Schema<"ApplicationRow"> & Row;
+export type Application = Schema<"ApplicationRow">;
 
-/** A page of applications; keys start with the resource. */
-function useApplications(query: Query) {
+/**
+ * A page of applications; keys start with the resource. Only the short
+ * lists poll; the long ones are read again on focus and after a write.
+ */
+function useApplications(query: Query, poll = false) {
   return useQuery({
     queryKey: ["applications", "list", query],
-    refetchInterval: POLL_MS,
-    queryFn: async ({ signal }) => {
-      const page = await call(
-        api.GET("/api/v1/applications", { params: { query }, signal }),
-      );
-      return { ...page, items: page.items as Application[] };
-    },
+    refetchInterval: poll ? POLL_MS : false,
+    queryFn: ({ signal }) =>
+      call(api.GET("/api/v1/applications", { params: { query }, signal })),
   });
 }
 
 /** Everything Today shows. */
 export function useToday() {
-  const ready = useApplications({ stage: "ready", sort: "deadline", limit: 5 });
+  const ready = useApplications(
+    { stage: "ready", sort: "deadline", limit: 5 },
+    true,
+  );
   const shortlisted = useApplications({
     stage: "shortlisted",
     sort: "deadline",

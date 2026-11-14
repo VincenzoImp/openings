@@ -34,6 +34,7 @@ import {
   placeNew,
   sectionOf,
   type DateDraft,
+  type Dates,
   type Kind,
 } from "./model";
 import { useBlockSave } from "./save";
@@ -116,7 +117,7 @@ export function EntryBlock({
       <EntryForm entry={entry} context={context} kind={entry.kind as Kind} />
     );
   const place = placeOf(entry);
-  const dates = formatDates(entry.dates as never);
+  const dates = formatDates(entry.dates as Partial<Dates> | null);
   // In Education and Other the kind is named, unless the section says it.
   const kind =
     showKind && entry.kind !== "education" ? KINDS[entry.kind as Kind] : "";
@@ -219,7 +220,7 @@ function draftFrom(
     kind: (entry?.kind as Kind) ?? kind,
     title: entry?.title ?? "",
     organization: entry?.organization ?? "",
-    dates: dateDraft(entry?.dates as never),
+    dates: dateDraft(entry?.dates as Partial<Dates> | null),
     location: entry ? placeOf(entry) : "",
     narrative: entry?.narrative ?? "",
     skills: entry?.skills ?? [],
