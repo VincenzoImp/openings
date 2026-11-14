@@ -2,8 +2,10 @@
 // the layer order, Inter, the tokens and the reset before any component CSS.
 import "./base.css";
 
+export * from "./ActionSheet";
 export * from "./Badge";
 export * from "./Button";
+export * from "./CodeView";
 export * from "./cx";
 export * from "./Dialog";
 export * from "./Field";

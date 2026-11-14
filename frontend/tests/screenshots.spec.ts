@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { test, expect, type Page } from "./fixtures";
 import { call, go, ownerSession } from "./session";
@@ -92,6 +93,18 @@ async function emptyWorkspace(page: Page) {
 
 const first = async (page: Page, path: string) =>
   (await call(page, path)).items[0].id as string;
+
+/** The default CV, given the example source so its views have content. */
+async function exampleCv(page: Page) {
+  const cv = (await call(page, "/templates?kind=cv&limit=200")).items.find(
+    (template: { is_default: boolean }) => template.is_default,
+  );
+  await call(page, `/templates/${cv.id}`, "PATCH", {
+    expected_version: cv.version,
+    tex: readFileSync(join(ROOT, "examples/cv.tex"), "utf8"),
+  });
+  return cv.id as string;
+}
 
 const SCREENS: Screen[] = [
   { name: "sign-in", route: "today", signedOut: true },
@@ -243,7 +256,55 @@ const SCREENS: Screen[] = [
     },
   },
   { name: "preferences", route: "preferences", docs: "preferences" },
-  { name: "templates", route: "templates", docs: "templates" },
+  {
+    name: "preferences-editing",
+    route: "preferences",
+    open: async (page) => {
+      const rules = page.getByRole("list", { name: "Writing rules" });
+      await rules.getByRole("listitem").nth(2).focus();
+      await page.keyboard.press("Enter");
+      await expect(
+        page.getByRole("textbox", { name: "Statement" }),
+      ).toBeFocused();
+    },
+  },
+  {
+    name: "preferences-empty",
+    route: async (page) => {
+      for (const section of (await call(page, "/preferences")).sections)
+        await call(page, `/preferences/${section.section}`, "PUT", {
+          expected_version: section.version,
+          items: [],
+        });
+      return "preferences";
+    },
+  },
+  {
+    name: "templates",
+    route: async (page) => `templates?template=${await exampleCv(page)}`,
+    docs: "templates",
+  },
+  {
+    name: "templates-source",
+    route: async (page) =>
+      `templates?template=${await exampleCv(page)}&tab=source`,
+  },
+  {
+    name: "templates-empty",
+    route: async (page) => {
+      // Deleting a default makes another one the default: read again each time.
+      for (;;) {
+        const [template] = (await call(page, "/templates?limit=1")).items;
+        if (!template) break;
+        await call(
+          page,
+          `/templates/${template.id}?expected_version=${template.version}`,
+          "DELETE",
+        );
+      }
+      return "templates";
+    },
+  },
   { name: "sources", route: "sources", docs: "collection" },
   { name: "settings", route: "settings" },
   { name: "skills", route: "settings?section=skills", docs: "skills" },

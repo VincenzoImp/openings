@@ -1,0 +1,222 @@
+@layer screens {
+  /* The list and the detail fill the content's height and scroll apart. */
+  .tpl-screen {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+  .tpl-screen > .ui-split {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+    border-top: 1px solid var(--border);
+    /* The panes scroll; the closed drawer's offset never widens the page. */
+    overflow: hidden;
+  }
+  .tpl-note {
+    margin: var(--s-1) 0 var(--s-4);
+    padding: 0 var(--pane-pad);
+    color: var(--text-3);
+    font: var(--t-sm);
+    letter-spacing: 0;
+  }
+  .tpl-state {
+    padding: var(--s-6) var(--pane-pad);
+  }
+  .tpl-empty {
+    flex: 1;
+    justify-content: center;
+    padding-bottom: var(--s-16);
+  }
+
+  .tpl-default {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    color: var(--text-2);
+    font: var(--t-xs);
+    font-weight: var(--w-medium);
+    white-space: nowrap;
+  }
+  .tpl-default .ui-icon {
+    color: var(--text-3);
+  }
+  .tpl-head .tpl-default {
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+    height: var(--control-h);
+  }
+
+  .tpl-detail.ui-detail-body {
+    max-width: 920px;
+  }
+  .tpl-head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+  }
+  .tpl-title {
+    font: var(--t-2xl);
+    font-weight: var(--w-semibold);
+    letter-spacing: var(--tr-2xl);
+    overflow-wrap: anywhere;
+  }
+  .tpl-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    margin-top: var(--s-2);
+  }
+  .tpl-tabs {
+    margin-top: var(--s-5);
+    border-bottom: 1px solid var(--border);
+  }
+  .tpl-panel {
+    padding-top: var(--s-5);
+    min-width: 0;
+  }
+  .tpl-panel:focus-visible {
+    outline: none;
+  }
+
+  /* A bar above a tab's content: file name, a count, the tab's action. */
+  .tpl-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-1) var(--s-2);
+    min-height: var(--control-h);
+    margin-bottom: var(--s-3);
+  }
+  .tpl-bar-space {
+    flex: 1;
+  }
+  .tpl-file {
+    font: 500 12.5px/18px var(--mono);
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+  .tpl-bar-note {
+    color: var(--text-3);
+    font: var(--t-xs);
+    font-weight: var(--w-regular);
+    font-variant-numeric: tabular-nums;
+  }
+  .tpl-open {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    font: var(--t-sm);
+  }
+
+  .tpl-pdf {
+    display: block;
+    width: 100%;
+    height: max(480px, calc(100dvh - 330px));
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    background: var(--bg-subtle);
+  }
+
+  .tpl-source-edit {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+  }
+  .tpl-source-edit .ui-savebar {
+    margin: 0 calc(-1 * var(--pane-pad));
+    border-radius: 0;
+  }
+  .tpl-idle {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .tpl-guidance,
+  .tpl-others {
+    margin-top: var(--s-6);
+    padding-top: var(--s-4);
+    border-top: 1px solid var(--border);
+  }
+  .tpl-guidance h3,
+  .tpl-others h3 {
+    margin-bottom: var(--s-1-5);
+    font: var(--t-sm);
+    font-weight: var(--w-semibold);
+  }
+  .tpl-guidance p {
+    max-width: var(--measure);
+    color: var(--text-2);
+    font: var(--t-sm);
+    letter-spacing: 0;
+    white-space: pre-line;
+  }
+  .tpl-guidance-note {
+    margin-top: var(--s-2);
+    color: var(--text-3) !important;
+    font: var(--t-xs) !important;
+    font-weight: var(--w-regular) !important;
+  }
+  .tpl-others .ui-props {
+    border: 0;
+    padding: var(--s-2) 0 0;
+  }
+
+  .tpl-limits {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+  }
+  .tpl-limits .ui-props {
+    border: 0;
+    padding: 0;
+  }
+  .tpl-none {
+    color: var(--text-3);
+  }
+
+  .tpl-file-list {
+    margin: 0 calc(-1 * var(--pane-pad));
+    border-top: 1px solid var(--border);
+  }
+  /* On a phone the row's … menu sits where the date is. */
+  .tpl-file-list .ui-row-meta:has(.ui-btn) {
+    position: relative;
+    z-index: 2;
+    pointer-events: auto;
+  }
+  .tpl-file-list .ui-row-lead {
+    color: var(--text-3);
+  }
+
+  @container app (max-width: 719px) {
+    .tpl-note {
+      margin: var(--s-3) 0 var(--s-3);
+      padding: 0 var(--s-4);
+    }
+    .tpl-state {
+      padding: var(--s-4);
+    }
+    .tpl-title {
+      font-size: 20px;
+      line-height: 26px;
+    }
+    .tpl-tabs {
+      margin-top: var(--s-4);
+      border-bottom: 0;
+    }
+    .tpl-panel {
+      padding-top: var(--s-3);
+    }
+    .tpl-file-list {
+      margin: 0 calc(-1 * var(--s-4));
+    }
+    .tpl-source-edit .ui-savebar {
+      margin: 0 calc(-1 * var(--s-4));
+    }
+    .tpl-pdf {
+      height: 70dvh;
+    }
+  }
+}
