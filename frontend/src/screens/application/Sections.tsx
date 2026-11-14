@@ -76,7 +76,8 @@ export function useCopy() {
   return (text: string, what: string) =>
     navigator.clipboard?.writeText(text).then(
       () => toast.show({ message: `Copied ${what}`, tone: "success" }),
-      () => toast.show({ message: "Copying is not allowed here", tone: "error" }),
+      () =>
+        toast.show({ message: "Copying is not allowed here", tone: "error" }),
     );
 }
 
@@ -131,7 +132,10 @@ export function Requirements({
       {items.length > 0 && (
         <ul className="ap-reqs" aria-label="Requirements">
           {items.map((item) => (
-            <li key={item.id} data-blocking={(item.blocking && !item.resolved) || undefined}>
+            <li
+              key={item.id}
+              data-blocking={(item.blocking && !item.resolved) || undefined}
+            >
               {editable ? (
                 <Checkbox
                   label={item.text}
@@ -237,7 +241,13 @@ type Question = { id: string; label: string; required?: boolean };
 const questionsOf = (app: Application) =>
   (app.questions ?? []) as unknown as Question[];
 const answerText = (value: unknown) =>
-  value === true ? "Yes" : value === false ? "No" : value == null ? "" : String(value);
+  value === true
+    ? "Yes"
+    : value === false
+      ? "No"
+      : value == null
+        ? ""
+        : String(value);
 
 /** The answers of the application form: question, answer, copy. */
 export function Answers({ app }: { app: Application }) {
@@ -358,7 +368,9 @@ export function PinnedNote({ app }: { app: Application }) {
 export function HistoryList({ app }: { app: Application }) {
   const timeline = useTimeline(app.id);
   const [all, setAll] = useState(false);
-  const replies = new Map((app.replies ?? []).map((reply) => [reply.id, reply]));
+  const replies = new Map(
+    (app.replies ?? []).map((reply) => [reply.id, reply]),
+  );
   const items = (timeline.data?.items ?? [])
     .filter((item) => item.id !== app.pinned_note?.id)
     .map((item) => {
@@ -393,9 +405,14 @@ export function HistoryList({ app }: { app: Application }) {
               <span className="ap-event-dot" aria-hidden="true" />
               <div className="ap-event-text">
                 <p>{line.text}</p>
-                {line.detail && <p className="ap-event-detail">{line.detail}</p>}
+                {line.detail && (
+                  <p className="ap-event-detail">{line.detail}</p>
+                )}
                 <p className="ap-event-meta">
-                  <time dateTime={item.created_at} title={formatFull(item.created_at)}>
+                  <time
+                    dateTime={item.created_at}
+                    title={formatFull(item.created_at)}
+                  >
                     {formatDate(item.created_at)}
                   </time>
                   {actorPhrase(item.actor) && ` · ${actorPhrase(item.actor)}`}

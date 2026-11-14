@@ -46,7 +46,10 @@ export function useCurrentDocuments(applicationId: string) {
   const cv = useRevision(cvId);
   const letter = useRevision(letterId);
   return {
-    loading: list.isLoading || (!!cvId && cv.isLoading) || (!!letterId && letter.isLoading),
+    loading:
+      list.isLoading ||
+      (!!cvId && cv.isLoading) ||
+      (!!letterId && letter.isLoading),
     revisions: items,
     cv: cvId ? (cv.data ?? null) : null,
     letter: letterId ? (letter.data ?? null) : null,
@@ -103,11 +106,15 @@ export function TextView({
   label: string;
 }) {
   return (
-    <div className="ap-well" data-text="" tabIndex={0} role="group" aria-label={label}>
+    <div
+      className="ap-well"
+      data-text=""
+      tabIndex={0}
+      role="group"
+      aria-label={label}
+    >
       {revision.text ? (
-        <div className="ap-paper">
-          {revision.text}
-        </div>
+        <div className="ap-paper">{revision.text}</div>
       ) : (
         <p className="ap-pdf-missing">No readable text in this version.</p>
       )}
@@ -185,7 +192,10 @@ export function useDocumentUpload(
     // application Ready, and this part of the page gives way to Ready.
     upload.mutateAsync({ applicationId, kind, pdf, source, previous }).then(
       () =>
-        toast.show({ message: `${KIND_LABEL[kind]} uploaded`, tone: "success" }),
+        toast.show({
+          message: `${KIND_LABEL[kind]} uploaded`,
+          tone: "success",
+        }),
       (error) => toast.show({ message: errorText(error), tone: "error" }),
     );
   };
@@ -267,9 +277,9 @@ export function DocumentSlot({
   const name = KIND_LABEL[kind];
   const pdf = pdfOf(revision);
   const source = revision?.files?.find(isTex);
-  const [dialog, setDialog] = useState<"versions" | "changes" | "remove" | null>(
-    null,
-  );
+  const [dialog, setDialog] = useState<
+    "versions" | "changes" | "remove" | null
+  >(null);
   const remove = useDeleteRevision();
   const toast = useToast();
   const history = revisions.filter((item) => item.kind === kind);
@@ -398,7 +408,10 @@ export function DocumentSlot({
             { id: revision.id, version: revision.version },
             {
               onSuccess: () =>
-                toast.show({ message: `${name} version removed`, tone: "success" }),
+                toast.show({
+                  message: `${name} version removed`,
+                  tone: "success",
+                }),
               onError: (error) =>
                 toast.show({ message: errorText(error), tone: "error" }),
             },
@@ -472,7 +485,10 @@ function VersionItem({ id, current }: { id: string; current: boolean }) {
           onClick={() => void downloadFile(pdf)}
         >
           Download
-          <span className="ui-sr"> version {revision.revision_number || 1}</span>
+          <span className="ui-sr">
+            {" "}
+            version {revision.revision_number || 1}
+          </span>
         </Button>
       )}
     </li>

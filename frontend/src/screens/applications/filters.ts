@@ -40,9 +40,7 @@ export function readFilters(query: URLSearchParams): Filters {
     stage: (STAGES.includes(stage) ? stage : "all") as StageFilter,
     q: query.get("q") || "",
     sort: (SORT_KEYS.includes(sort) ? sort : "needs") as SortKey,
-    outcome: OUTCOMES[query.get("outcome") || ""]
-      ? query.get("outcome")!
-      : "",
+    outcome: OUTCOMES[query.get("outcome") || ""] ? query.get("outcome")! : "",
     priority: /^[1-5]$/.test(query.get("priority") || "")
       ? query.get("priority")!
       : "",

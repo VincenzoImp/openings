@@ -4,12 +4,7 @@
 // and the history. No React: tests/applications.test.mjs runs it directly.
 
 export type StageKey =
-  | "shortlisted"
-  | "ready"
-  | "applied"
-  | "interview"
-  | "offer"
-  | "closed";
+  "shortlisted" | "ready" | "applied" | "interview" | "offer" | "closed";
 export type StageFilter = StageKey | "all";
 
 /** The stage chips of the list, in the order of the pipeline. */
@@ -233,7 +228,11 @@ export const SORTS: { id: SortKey; label: string }[] = [
  * The "Needs action" group: 0 Ready, 1 Shortlisted with a deadline, 2 sent
  * past the no-reply period, 3 everything else.
  */
-export function needsRank(app: AppFacts, noReplyDays: number, now = new Date()) {
+export function needsRank(
+  app: AppFacts,
+  noReplyDays: number,
+  now = new Date(),
+) {
   const stage = stageOf(app);
   if (stage === "ready") return 0;
   if (stage === "shortlisted" && app.deadline) return 1;

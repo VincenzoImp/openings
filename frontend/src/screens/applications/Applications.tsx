@@ -12,12 +12,7 @@ import { href, navigate, useRoute } from "../../shell/router";
 import { TopBarActions } from "../../shell/context";
 import { Button, IconButton } from "../../ui/Button";
 import { SearchField } from "../../ui/Field";
-import {
-  List,
-  ListGroup,
-  ListRows,
-  useSelection,
-} from "../../ui/List";
+import { List, ListGroup, ListRows, useSelection } from "../../ui/List";
 import { Menu, type MenuEntry, type MenuGroup } from "../../ui/Menu";
 import { Callout, EmptyState, PageHeader, SkeletonRows } from "../../ui/Page";
 import { FilterChips, Segmented } from "../../ui/Tabs";
@@ -158,7 +153,11 @@ export default function ApplicationsScreen() {
   )?.value ?? "90d") as Period;
   const set = (patch: Partial<Filters>, extra: Record<string, string> = {}) =>
     navigate(
-      href("applications", {}, { ...writeFilters({ ...filters, ...patch }), ...extra }),
+      href(
+        "applications",
+        {},
+        { ...writeFilters({ ...filters, ...patch }), ...extra },
+      ),
       { replace: true },
     );
   useEffect(() => rememberList("#" + route.hash), [route.hash]);
@@ -191,7 +190,9 @@ export default function ApplicationsScreen() {
   );
   const sources = useMemo(
     () =>
-      [...new Set(list.items.map((app) => jobOf(app).source).filter(Boolean))].sort(),
+      [
+        ...new Set(list.items.map((app) => jobOf(app).source).filter(Boolean)),
+      ].sort(),
     [list.items],
   );
 
@@ -396,7 +397,11 @@ export default function ApplicationsScreen() {
         />
       </TopBarActions>
       {filters.stats ? (
-        <div className="ui-toolbar ap-toolbar" role="toolbar" aria-label="Period">
+        <div
+          className="ui-toolbar ap-toolbar"
+          role="toolbar"
+          aria-label="Period"
+        >
           <Segmented
             label="Period"
             value={period}

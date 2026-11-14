@@ -366,7 +366,11 @@ async function sha256(file: File) {
 }
 async function spec(file: File) {
   const digest = await sha256(file);
-  return { name: file.name, size: file.size, ...(digest && { sha256: digest }) };
+  return {
+    name: file.name,
+    size: file.size,
+    ...(digest && { sha256: digest }),
+  };
 }
 const mediaType = (file: File) =>
   /\.(tex|ltx)$/i.test(file.name)
@@ -414,7 +418,13 @@ export interface Upload {
 export function useUpload() {
   return useApiMutation({
     touches: TOUCHES,
-    mutationFn: async ({ applicationId, kind, pdf, source, previous }: Upload) => {
+    mutationFn: async ({
+      applicationId,
+      kind,
+      pdf,
+      source,
+      previous,
+    }: Upload) => {
       if (previous && !previous.complete && !source) {
         const tex = (previous.files ?? []).find((file) =>
           /\.(tex|ltx)$/i.test(file.name),

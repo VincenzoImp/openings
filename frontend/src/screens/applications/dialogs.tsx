@@ -1,7 +1,13 @@
 // The dialogs of an application, shared by the list and the page: Record
 // reply, Close…, Change stage…, the plan (deadline, priority), the required
 // documents and the permanent deletion.
-import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { ApiError } from "../../api/client";
 import { ConflictNotice } from "../../query/ConflictNotice";
 import { Button } from "../../ui/Button";
@@ -156,7 +162,14 @@ export function RecordReplyDialog({
         target &&
         change.run(
           target,
-          { reply: { kind, date, note: note.trim() || undefined, remove: false } },
+          {
+            reply: {
+              kind,
+              date,
+              note: note.trim() || undefined,
+              remove: false,
+            },
+          },
           `Recorded: ${words.toLowerCase()} for "${target.title}"`,
         )
       }
@@ -197,7 +210,9 @@ export function RecordReplyDialog({
 }
 
 /** The outcomes a Close can record for these applications. */
-export function closeOutcomes(targets: Pick<Target, "status" | "applied_at">[]) {
+export function closeOutcomes(
+  targets: Pick<Target, "status" | "applied_at">[],
+) {
   const sent = targets.every((target) => !!target.applied_at);
   const offer = targets.every((target) => target.status === "offer");
   return [
@@ -509,12 +524,7 @@ export function DeleteDialog({
 
 /** Which dialog of an application is open. */
 export type DialogKind =
-  | "reply"
-  | "close"
-  | "stage"
-  | "plan"
-  | "required"
-  | "delete";
+  "reply" | "close" | "stage" | "plan" | "required" | "delete";
 
 /** The dialogs of one application, opened by kind. */
 export function ApplicationDialogs({

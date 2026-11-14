@@ -123,12 +123,14 @@ function Header({
         <li>
           <StatusText app={app} noReplyDays={noReplyDays} />
         </li>
-        {deadline && stageOf(app) !== "shortlisted" && stageOf(app) !== "ready" && (
-          <li>
-            <Icon icon={CalendarDays} size="sm" />
-            <ToneText tone={deadline.tone}>{deadline.text}</ToneText>
-          </li>
-        )}
+        {deadline &&
+          stageOf(app) !== "shortlisted" &&
+          stageOf(app) !== "ready" && (
+            <li>
+              <Icon icon={CalendarDays} size="sm" />
+              <ToneText tone={deadline.tone}>{deadline.text}</ToneText>
+            </li>
+          )}
         {app.priority != null && (
           <li>
             <PriorityGlyph priority={app.priority} />
@@ -175,7 +177,11 @@ function menuOf(
       id: "no-reply",
       label: "Close as no reply",
       onSelect: () =>
-        move({ status: "closed", outcome: "no_response" }, "Closed as no reply", back),
+        move(
+          { status: "closed", outcome: "no_response" },
+          "Closed as no reply",
+          back,
+        ),
     });
     staged.push({
       id: "withdraw",
@@ -188,7 +194,11 @@ function menuOf(
         id: "accept",
         label: "Accept offer",
         onSelect: () =>
-          move({ status: "closed", outcome: "accepted" }, "Offer accepted", back),
+          move(
+            { status: "closed", outcome: "accepted" },
+            "Offer accepted",
+            back,
+          ),
       });
   }
   return [
@@ -196,7 +206,11 @@ function menuOf(
     ...staged,
     ...(extra.length || staged.length ? (["separator"] as const) : []),
     { id: "stage", label: "Change stage…", onSelect: () => open("stage") },
-    { id: "plan", label: "Deadline and priority…", onSelect: () => open("plan") },
+    {
+      id: "plan",
+      label: "Deadline and priority…",
+      onSelect: () => open("plan"),
+    },
     ...(stage === "shortlisted" || stage === "ready"
       ? [
           {
@@ -211,11 +225,10 @@ function menuOf(
           id: "reopen",
           label: "Reopen",
           onSelect: () =>
-            move(
-              { status: reopenStage(app) },
-              "Reopened",
-              { status: "closed", outcome: app.outcome as Patch["outcome"] },
-            ),
+            move({ status: reopenStage(app) }, "Reopened", {
+              status: "closed",
+              outcome: app.outcome as Patch["outcome"],
+            }),
         }
       : { id: "close", label: "Close…", onSelect: () => open("close") },
     "separator",
@@ -304,7 +317,8 @@ export default function ApplicationPage() {
       if (event.key !== "r" || event.metaKey || event.ctrlKey || event.altKey)
         return;
       if (event.defaultPrevented || isTyping(event.target)) return;
-      if (document.querySelector("dialog[open], [popover]:popover-open")) return;
+      if (document.querySelector("dialog[open], [popover]:popover-open"))
+        return;
       event.preventDefault();
       setDialog("reply");
     };
@@ -322,7 +336,10 @@ export default function ApplicationPage() {
       <div className="apg">
         <PageHeader
           title="Application"
-          breadcrumb={[{ label: "Applications", href: listHref() }, { label: "Not found" }]}
+          breadcrumb={[
+            { label: "Applications", href: listHref() },
+            { label: "Not found" },
+          ]}
         />
         <EmptyState
           icon={SearchX}
@@ -368,13 +385,17 @@ export default function ApplicationPage() {
                       { id: changed.id, version: changed.version, patch: undo },
                       {
                         onError: (error) =>
-                          toast.show({ message: errorText(error), tone: "error" }),
+                          toast.show({
+                            message: errorText(error),
+                            tone: "error",
+                          }),
                       },
                     ),
                 }
               : undefined,
           }),
-        onError: (error) => toast.show({ message: errorText(error), tone: "error" }),
+        onError: (error) =>
+          toast.show({ message: errorText(error), tone: "error" }),
       },
     );
   }
@@ -392,7 +413,9 @@ export default function ApplicationPage() {
         version: app!.version,
         patch: {
           status: "applied",
-          ...(day ? { applied_at: new Date(`${day}T12:00:00`).toISOString() } : {}),
+          ...(day
+            ? { applied_at: new Date(`${day}T12:00:00`).toISOString() }
+            : {}),
         },
       },
       {
@@ -438,7 +461,13 @@ export default function ApplicationPage() {
   const stage = stageOf(app);
   const extra: MenuEntry[] =
     stage === "shortlisted"
-      ? [{ id: "applied", label: "Mark applied", onSelect: () => markApplied() }]
+      ? [
+          {
+            id: "applied",
+            label: "Mark applied",
+            onSelect: () => markApplied(),
+          },
+        ]
       : stage === "ready"
         ? [
             {

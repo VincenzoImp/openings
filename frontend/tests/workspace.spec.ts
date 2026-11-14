@@ -241,7 +241,9 @@ test("mobile applications, templates and stats stay usable inside the viewport",
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await go(page, "applications");
-  await expect(page.getByRole("region", { name: "Applications" })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Applications" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("group", { name: "Stage" }).getByRole("button"),
   ).toHaveCount(7);
