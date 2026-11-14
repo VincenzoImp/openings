@@ -19,6 +19,7 @@ import {
 import { FileDialog } from "../../library/Assets";
 import { ConfirmDialog, Pager, fileSize } from "../../library/common";
 import { dayTime } from "../../library/time";
+import { useFresh } from "../../library/useFresh";
 import {
   useDebounce,
   useResource,
@@ -26,7 +27,7 @@ import {
   useWorkspace,
 } from "../../state";
 import {
-  approvalBlock,
+  incompleteReason,
   isPdf,
   isSource,
   isSourceKind,
@@ -52,7 +53,7 @@ function Changes({ document }: { document: Document }) {
     return (
       <p className="caption">
         {text.document ? `Revision ${previous}` : "This revision"} has no
-        source, so there is no text to compare.
+        readable text, so there is nothing to compare.
       </p>
     );
   return (
@@ -88,7 +89,11 @@ function Detail({
   summary: Document;
 }) {
   const { mutate, pending } = useWorkspace();
-  const detail = useResource<Document | null>(`/documents/${summary.id}`, null);
+  // Read again after any change of documents or files, replacing what was shown.
+  const detail = useFresh<Document | null>(`/documents/${summary.id}`, null, [
+    "documents",
+    "files",
+  ]);
   const [opened, setOpened] = useState<WorkspaceFile | null>(null);
   const [revising, setRevising] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -98,10 +103,11 @@ function Detail({
   if (detail.error)
     return <ErrorBanner message={detail.error} retry={detail.reload} />;
   if (!document) return <Loading label="Loading the revision…" />;
-  const approved = document.review_state === "approved";
   const sourceKind = isSourceKind(document.kind);
-  const { source } = sourceAndPdf(document);
-  const blocked = approved ? null : approvalBlock(document);
+  const { source, pdf } = sourceAndPdf(document);
+  // A complete CV or letter (its PDF stored) never changes: a change is a new revision.
+  const complete = sourceKind ? !!pdf : false;
+  const incomplete = incompleteReason(document);
   const claims = document.claim_ids?.length || 0;
   const entries = document.knowledge_ids?.length || 0;
   return (
@@ -119,7 +125,9 @@ function Detail({
           <p className="muted">
             {source
               ? "The source has no readable text."
-              : "No source yet. Add the .tex source the PDF is built from: its text appears here."}
+              : pdf
+                ? "No text could be read from the PDF. The PDF is the document."
+                : "No PDF yet. Upload it, with the .tex source it was built from if you have one."}
           </p>
         )
       ) : typeof document.content?.text === "string" ? (
@@ -127,10 +135,13 @@ function Detail({
       ) : (
         <ValueTree value={document.content || {}} />
       )}
-      {sourceKind && document.text && source && (
+      {sourceKind && document.text && (
         <p className="caption">
-          Text read from <span className="mono">{source.name}</span>, without
-          its layout. The PDF shows the layout.
+          Text read from{" "}
+          <span className="mono">
+            {document.text_from === "pdf" ? pdf?.name : source?.name}
+          </span>
+          , without its layout. The PDF shows the layout.
         </p>
       )}
       {document.note && <p>{document.note}</p>}
@@ -168,15 +179,19 @@ function Detail({
         </details>
       )}
       {comparing && <Changes document={document} />}
-      {blocked && <p className="caption">{blocked}</p>}
+      {incomplete && <p className="caption">{incomplete}</p>}
       <div className="row">
-        {!approved && (
+        {!complete && (
           <>
             <input
               ref={picker}
               type="file"
               hidden
-              aria-label="File to add to the revision"
+              aria-label={
+                sourceKind && !pdf
+                  ? "PDF or source to upload"
+                  : "File to add to the revision"
+              }
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 event.target.value = "";
@@ -201,24 +216,7 @@ function Detail({
               disabled={pending}
               onClick={() => picker.current?.click()}
             >
-              Add a file
-            </Button>
-            <Button
-              size="sm"
-              variant="primary"
-              disabled={pending || !!blocked}
-              onClick={() =>
-                void mutate(
-                  () =>
-                    api(`/documents/${document.id}/review`, "POST", {
-                      review_state: "approved",
-                      expected_version: document.version,
-                    }),
-                  "Revision approved.",
-                )
-              }
-            >
-              Approve this revision
+              {sourceKind && !pdf ? "Upload PDF or .tex" : "Add a file"}
             </Button>
           </>
         )}
@@ -283,12 +281,11 @@ function Detail({
   );
 }
 
-/** Every document revision of the application: find, open, approve, compare, revise, delete. */
+/** Every document revision of the application: find, open, upload, compare, revise, delete. */
 export function Revisions({ application }: { application: Application }) {
   const [filters, setFilters] = useUrlFilters({
     doc_q: "",
     doc_kind: "",
-    doc_review: "",
     doc_offset: "0",
   });
   const q = useDebounce(filters.doc_q);
@@ -301,8 +298,12 @@ export function Revisions({ application }: { application: Application }) {
   });
   if (q) query.set("q", q);
   if (filters.doc_kind) query.set("kind", filters.doc_kind);
-  if (filters.doc_review) query.set("review_state", filters.doc_review);
-  const list = useResource<ListResult<Document>>(`/documents?${query}`, NONE);
+  // The list is read again after every document or file change (a new revision
+  // and its uploads), whatever form is open.
+  const list = useFresh<ListResult<Document>>(`/documents?${query}`, NONE, [
+    "documents",
+    "files",
+  ]);
   const [open, setOpen] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   return (
@@ -333,18 +334,6 @@ export function Revisions({ application }: { application: Application }) {
             </option>
           ))}
         </select>
-        <select
-          className="input"
-          aria-label="Review state"
-          value={filters.doc_review}
-          onChange={(event) =>
-            setFilters({ doc_review: event.target.value, doc_offset: "0" })
-          }
-        >
-          <option value="">Approved or not</option>
-          <option value="draft">Not approved</option>
-          <option value="approved">Approved</option>
-        </select>
         <Button size="sm" icon="plus" onClick={() => setAdding(true)}>
           Add a document
         </Button>
@@ -367,11 +356,11 @@ export function Revisions({ application }: { application: Application }) {
                   {item.file_count ? `${item.file_count} files` : "no file"}
                 </div>
               </div>
-              <Tag
-                tone={item.review_state === "approved" ? "ready" : undefined}
-              >
-                {item.review_state === "approved" ? "Approved" : "Not approved"}
-              </Tag>
+              {isSourceKind(item.kind) && (
+                <Tag tone={item.complete ? "ready" : "attention"}>
+                  {item.complete ? "Complete" : "Without PDF"}
+                </Tag>
+              )}
               <Button
                 size="sm"
                 variant="quiet"
@@ -389,9 +378,9 @@ export function Revisions({ application }: { application: Application }) {
         </ul>
       ) : (
         <p className="muted">
-          {q || filters.doc_kind || filters.doc_review
+          {q || filters.doc_kind
             ? "No revision matches."
-            : "No document yet. Your agent saves the CV and the letter here."}
+            : "No document yet. Upload the CV and the letter here."}
         </p>
       )}
       <Pager

@@ -35,6 +35,35 @@ PLANNED = (
     ("notes with a run", "SELECT count(*) FROM notes WHERE run_id IS NOT NULL"),
     ("skill note versions", "SELECT count(*) FROM skill_notes"),
     ("skills with notes", "SELECT count(DISTINCT skill) FROM skill_notes"),
+    (
+        "answered questions about a job or application (become notes)",
+        (
+            "SELECT count(*) FROM questions WHERE state='answered' AND (job_id IS NOT NULL OR "
+            "application_id IS NOT NULL)"
+        ),
+    ),
+    (
+        "answered questions without a subject or about a Career entry (become facts)",
+        (
+            "SELECT count(*) FROM questions WHERE state='answered' AND job_id IS NULL AND "
+            "application_id IS NULL AND subject_type IS NOT 'job' AND subject_type IS NOT 'application'"
+        ),
+    ),
+    (
+        "requests about a job or application (become notes)",
+        "SELECT count(*) FROM requests WHERE job_id IS NOT NULL OR application_id IS NOT NULL",
+    ),
+    (
+        "jobs dismissed by an agent token",
+        (
+            "SELECT count(*) FROM jobs WHERE dismissed_by_kind='token' AND "
+            "dismissed_by_token_kind='agent'"
+        ),
+    ),
+    (
+        "idempotency keys of runs, questions and requests",
+        "SELECT count(*) FROM idempotency_keys WHERE scope IN ('runs','questions','requests')",
+    ),
     # #213 Preferences
     (
         "policy items with a typed value",
@@ -114,6 +143,13 @@ PLANNED = (
         (
             "SELECT count(*) FROM jobs j WHERE triage='saved' AND NOT EXISTS(SELECT 1 FROM "
             "applications a WHERE a.job_id=j.id AND a.status<>'closed')"
+        ),
+    ),
+    (
+        "CV and letter revisions with a PDF (complete in 0.24)",
+        (
+            "SELECT count(*) FROM documents d WHERE kind IN ('resume','cover_letter') AND "
+            "EXISTS(SELECT 1 FROM files f WHERE f.document_id=d.id AND f.media_type='application/pdf')"
         ),
     ),
     (
@@ -201,8 +237,9 @@ STATES = (
     ("api tokens by kind", "SELECT kind, count(*) FROM api_tokens GROUP BY 1"),
 )
 
-# Ready as 0.24 computes it: a Draft whose current CV and letter revisions both have a
-# PDF and that has no unresolved blocking requirement (#214).
+# Ready as 0.24 computes it right after the upgrade (every application requires CV and
+# letter): a Draft whose current CV and letter revisions both have a PDF and that has
+# no unresolved blocking requirement (#214). "ready" counts both directions.
 _LEAF = (
     "EXISTS(SELECT 1 FROM documents d WHERE d.application_id=a.id AND d.kind='{kind}' AND NOT "
     "EXISTS(SELECT 1 FROM documents c WHERE c.previous_id=d.id) AND EXISTS(SELECT 1 FROM files "
@@ -310,6 +347,29 @@ def rehearse(path):
 
 # Aggregates of the upgraded copy, one block per change of the migration.
 AFTER = (
+    # #209 minimal attribution
+    (
+        "events by actor label kind",
+        (
+            "SELECT CASE WHEN actor LIKE 'agent:%' THEN 'agent' ELSE actor END, count(*) FROM events "
+            "GROUP BY 1"
+        ),
+    ),
+    ("events in a former run's batch", "SELECT count(*) FROM events WHERE batch_id LIKE 'run:%'"),
+    (
+        "notes the upgrade wrote",
+        (
+            "SELECT count(*) FROM notes WHERE author='system' AND (body LIKE 'Question from %' "
+            "OR body LIKE 'Request to the agent (%')"
+        ),
+    ),
+    (
+        "jobs dismissed by kind of actor",
+        (
+            "SELECT CASE WHEN dismissed_by LIKE 'agent:%' THEN 'agent' ELSE dismissed_by END, "
+            "count(*) FROM jobs WHERE triage='dismissed' GROUP BY 1"
+        ),
+    ),
     # #213 Preferences
     (
         "preference statements by section",

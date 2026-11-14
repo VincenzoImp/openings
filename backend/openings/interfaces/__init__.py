@@ -13,7 +13,6 @@ from . import (
     documents,
     events,
     insights,
-    outcomes,
     preferences,
     skills,
     source_yield,
@@ -29,7 +28,6 @@ AREAS = (
     discovery,
     events,
     preferences,
-    outcomes,
     insights,
     source_yield,
 )

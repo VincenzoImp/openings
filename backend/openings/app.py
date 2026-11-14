@@ -43,10 +43,6 @@ from .interfaces.insights import (
     register_api as register_insights_api,
     register_mcp as register_insights_mcp,
 )
-from .interfaces.outcomes import (
-    register_api as register_response_api,
-    register_mcp as register_response_mcp,
-)
 from .interfaces.preferences import (
     register_api as register_preferences_api,
     register_mcp as register_preferences_mcp,
@@ -62,7 +58,6 @@ from .interfaces.source_yield import (
 from .interfaces.system import register_system
 from .limits import REQUEST_LIMIT, BodyLimit
 from .mcp_server import OpeningsMCP
-from .outcomes import ResponseService
 from .preferences import PreferencesService
 from .skills import SkillLibrary
 from .source_yield import YieldService
@@ -88,7 +83,6 @@ def create_app(database=None, start_worker=True):
     discovery = DiscoveryService(workspace)
     events = EventLog(workspace)
     preferences = PreferencesService(workspace)
-    responses = ResponseService(workspace)
     insights = InsightsService(workspace)
     source_yield = YieldService(workspace)
     workspace.discovery = discovery
@@ -108,7 +102,6 @@ def create_app(database=None, start_worker=True):
     register_discovery_mcp(mcp, discovery)
     register_events_mcp(mcp, events)
     register_preferences_mcp(mcp, preferences)
-    register_response_mcp(mcp, responses)
     register_insights_mcp(mcp, insights)
     register_yield_mcp(mcp, source_yield)
     skills = SkillLibrary()
@@ -138,7 +131,7 @@ def create_app(database=None, start_worker=True):
     app.state.career, app.state.documents, app.state.discovery = career, documents, discovery
     app.state.events = events
     app.state.preferences = preferences
-    app.state.responses, app.state.insights = responses, insights
+    app.state.insights = insights
     app.state.source_yield = source_yield
     app.add_middleware(BodyLimit)
     # The client address is the real one only when uvicorn trusts the proxy
@@ -269,7 +262,6 @@ def create_app(database=None, start_worker=True):
     register_discovery_api(router, discovery)
     register_events_api(router, events)
     register_preferences_api(router, preferences)
-    register_response_api(router, responses)
     register_insights_api(router, insights)
     register_yield_api(router, source_yield)
     app.include_router(router)

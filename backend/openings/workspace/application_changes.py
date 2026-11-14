@@ -1,4 +1,4 @@
-"""Application changes: one open attempt per job, stages, responses, Ready and deletion."""
+"""Application changes: one open attempt per job, stages, Mark applied and its undo, deletion."""
 
 import json
 import math
@@ -9,44 +9,61 @@ from ..common import check_version, new_id, now
 from ..db import encode
 from ..errors import DomainError, conflict, missing
 from ..idempotency import fingerprint, remember, replay
-from ..models import ApplicationInput, ApplicationPatch, ApplicationReady
-from ..outcomes import not_sent, record_response, today
+from ..models import ApplicationInput, ApplicationPatch
+from ..outcomes import today
 from ..snapshots import collect_unused
-from .applications import NOT_READY, READINESS_SQL, REQUIREMENT_COUNTS_SQL
+from .readiness import canonical_documents
+
+# Columns stored as JSON text.
+STRUCTURED = {"questions", "answers", "requirements", "required_documents"}
 
 
 class ApplicationChanges:
-    """Creating, progressing, marking ready and deleting applications."""
+    """Creating, progressing and deleting applications."""
 
     def delete_application(self, application_id, expected_version, collect=True):
+        """Delete an application; a shortlisted job left without any returns to New."""
         with self.db.transaction() as connection:
             row = connection.execute(
                 "SELECT * FROM applications WHERE id=?", (application_id,)
             ).fetchone()
             check_version(row, expected_version)
-            owned = "SELECT id FROM documents WHERE application_id=? UNION SELECT id FROM contexts WHERE application_id=?"
-            owned_files = "SELECT id FROM all_files WHERE document_id IN (SELECT id FROM documents WHERE application_id=?) OR context_id IN (SELECT id FROM contexts WHERE application_id=?)"
-            connection.execute(
-                "DELETE FROM transfer_grants WHERE json_extract(payload,'$.owner_id') IN ("
-                + owned
-                + ") OR json_extract(payload,'$.file_id') IN ("
-                + owned_files
-                + ")",
-                (application_id,) * 4,
-            )
-            connection.execute("DELETE FROM applications WHERE id=?", (application_id,))
-            if collect:
-                collect_unused(connection)
-            events.record(
-                connection,
-                "application_deleted",
-                subject=("application", application_id),
-                payload={"application_id": application_id},
-                job_id=row["job_id"],
-            )
+            self.remove_application(connection, row, collect=collect)
+            job = connection.execute(
+                "SELECT * FROM jobs WHERE id=? AND triage='shortlisted' AND NOT EXISTS("
+                "SELECT 1 FROM applications WHERE job_id=jobs.id)",
+                (row["job_id"],),
+            ).fetchone()
+            if job is not None:
+                self._triage(connection, job, "new", current_actor())
         return {"deleted": True, "id": application_id}
 
+    def remove_application(self, connection, row, collect=True):
+        """Delete one application row with its owned records and grants, recording it."""
+        application_id = row["id"]
+        owned = "SELECT id FROM documents WHERE application_id=? UNION SELECT id FROM contexts WHERE application_id=?"
+        owned_files = "SELECT id FROM all_files WHERE document_id IN (SELECT id FROM documents WHERE application_id=?) OR context_id IN (SELECT id FROM contexts WHERE application_id=?)"
+        connection.execute(
+            "DELETE FROM transfer_grants WHERE json_extract(payload,'$.owner_id') IN ("
+            + owned
+            + ") OR json_extract(payload,'$.file_id') IN ("
+            + owned_files
+            + ")",
+            (application_id,) * 4,
+        )
+        connection.execute("DELETE FROM applications WHERE id=?", (application_id,))
+        if collect:
+            collect_unused(connection)
+        events.record(
+            connection,
+            "application_deleted",
+            subject=("application", application_id),
+            payload={"application_id": application_id},
+            job_id=row["job_id"],
+        )
+
     def create_application(self, value):
+        """Start an application in stage Shortlisted; its job becomes shortlisted."""
         value = (
             value if isinstance(value, ApplicationInput) else ApplicationInput.model_validate(value)
         )
@@ -59,38 +76,62 @@ class ApplicationChanges:
             if not job:
                 missing("Job")
             if job["triage"] == "dismissed":
-                conflict("Restore the dismissed job before preparing an application.")
+                conflict("Restore the dismissed job before starting an application.")
             self._check_active_application(c, value.job_id)
             self.validate_answers([q.model_dump() for q in value.questions], {})
-            record_id, stamp = new_id(), now()
-            c.execute(
-                "INSERT INTO applications(id,job_id,questions,priority,deadline,requirements,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                (
-                    record_id,
-                    value.job_id,
-                    encode([q.model_dump() for q in value.questions]),
-                    value.priority,
-                    value.deadline,
-                    encode(
-                        self.normalize_requirements([r.model_dump() for r in value.requirements])
-                    ),
-                    stamp,
-                    stamp,
+            record_id = self.insert_application(
+                c,
+                value.job_id,
+                questions=[q.model_dump() for q in value.questions],
+                priority=value.priority,
+                deadline=value.deadline,
+                requirements=self.normalize_requirements(
+                    [r.model_dump() for r in value.requirements]
                 ),
+                required_documents=value.required_documents,
             )
             remember(c, "applications", value.idempotency_key, digest, record_id)
-            c.execute(
-                "UPDATE jobs SET triage='saved',version=version+1,updated_at=? WHERE id=?",
-                (stamp, value.job_id),
-            )
-            events.record(
-                c,
-                "application_created",
-                payload={"status": "draft"},
-                job_id=value.job_id,
-                application_id=record_id,
-            )
+            if job["triage"] != "shortlisted":
+                self._triage(c, job, "shortlisted", current_actor())
         return self.get_application(record_id)
+
+    def insert_application(
+        self,
+        conn,
+        job_id,
+        *,
+        questions=(),
+        priority=None,
+        deadline=None,
+        requirements=(),
+        required_documents=("cv", "letter"),
+        from_shortlist=False,
+    ):
+        """Insert a Shortlisted application with its creation event; returns its id."""
+        record_id, stamp = new_id(), now()
+        conn.execute(
+            "INSERT INTO applications(id,job_id,questions,priority,deadline,requirements,"
+            "required_documents,from_shortlist,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (
+                record_id,
+                job_id,
+                encode(list(questions)),
+                priority,
+                deadline,
+                encode(list(requirements)),
+                encode(canonical_documents(required_documents)),
+                int(from_shortlist),
+                stamp,
+                stamp,
+            ),
+        )
+        payload = {"status": "shortlisted"}
+        if from_shortlist:
+            payload["by"] = "shortlist"
+        events.record(
+            conn, "application_created", payload=payload, job_id=job_id, application_id=record_id
+        )
+        return record_id
 
     @staticmethod
     def _check_active_application(connection, job_id, excluding=None):
@@ -110,43 +151,18 @@ class ApplicationChanges:
         value = (
             value if isinstance(value, ApplicationPatch) else ApplicationPatch.model_validate(value)
         )
-        changes = value.model_dump(
-            exclude_unset=True, exclude={"expected_version", "response_date", "response_note"}
-        )
+        changes = value.model_dump(exclude_unset=True, exclude={"expected_version", "reply"})
+        reply = value.reply
         with self.db.transaction() as c:
             row = c.execute("SELECT * FROM applications WHERE id=?", (application_id,)).fetchone()
             check_version(row, value.expected_version)
+            moved = self.reply_stage(c, row, reply, changes)
             status = changes.get("status") or row["status"]
             if row["status"] == "closed" and status != "closed":
                 self._check_active_application(c, row["job_id"], excluding=application_id)
-            if status == "closed":
-                outcome = changes.get("outcome", row["outcome"])
-                if not outcome:
-                    raise DomainError(
-                        422, "application_outcome", "Choose an outcome when closing an application."
-                    )
-                changes["outcome"] = outcome
-            else:
-                if changes.get("outcome"):
-                    raise DomainError(
-                        422, "application_outcome", "Close the application to record an outcome."
-                    )
-                changes["outcome"] = None
-            # The day "no reply" was concluded belongs to that outcome only.
-            if changes["outcome"] == "no_response":
-                changes["concluded_on"] = (
-                    changes.get("concluded_on")
-                    or (row["concluded_on"] if row["outcome"] == "no_response" else None)
-                    or today()
-                )
-            elif changes.get("concluded_on"):
-                raise DomainError(
-                    422,
-                    "application_concluded_on",
-                    "concluded_on applies only to an application closed as no_response.",
-                )
-            else:
-                changes["concluded_on"] = None
+            self._check_outcome(row, status, changes)
+            if status == "shortlisted" and row["status"] != "shortlisted":
+                self._undo_applied(c, row, changes)
             questions = (
                 changes.get("questions")
                 if changes.get("questions") is not None
@@ -163,14 +179,18 @@ class ApplicationChanges:
                 changes["requirements"] = self.normalize_requirements(
                     [item.model_dump() for item in value.requirements]
                 )
+            if "required_documents" in changes:
+                changes["required_documents"] = canonical_documents(changes["required_documents"])
             if (
                 (
                     status in {"applied", "interview", "offer"}
                     or (status == "closed" and changes["outcome"] == "accepted")
                 )
+                and status != row["status"]
                 and not row["applied_at"]
                 and "applied_at" not in changes
             ):
+                # Mark applied: the time defaults to now and stays editable.
                 changes["applied_at"] = now()
             sent = changes.get("applied_at", row["applied_at"])
             if changes["outcome"] == "no_response" and not sent:
@@ -179,162 +199,89 @@ class ApplicationChanges:
                     "application_not_sent",
                     "Only an application recorded as sent can be closed as no reply.",
                 )
-            answered = self._stage_responses(c, row, status, changes["outcome"])
-            given = value.response_date is not None or value.response_note is not None
-            if given and not answered:
-                raise DomainError(
-                    422,
-                    "application_response",
-                    "response_date and response_note apply only to a change that records an "
-                    "employer response: moving to Interview or Offer, or closing as rejected or "
-                    "accepted.",
-                )
-            if answered and not sent:
-                # A Draft closed as rejected was never sent: no employer answered it.
-                if given:
-                    raise not_sent()
-                answered = []
             actual = {}
             for key, val in changes.items():
                 if key == "status" and val is None:
                     continue
-                structured = key in {"questions", "answers", "requirements"}
+                structured = key in STRUCTURED
                 previous = json.loads(row[key]) if structured else row[key]
                 if previous != val:
                     actual[key] = encode(val) if structured else val
-            if actual:
+            reply_changed = reply is not None
+            if actual or reply_changed:
                 c.execute(
                     "UPDATE applications SET "
-                    + ",".join(k + "=?" for k in actual)
-                    + ",version=version+1,updated_at=? WHERE id=?",
+                    + "".join(k + "=?," for k in actual)
+                    + "version=version+1,updated_at=? WHERE id=?",
                     (*actual.values(), now(), application_id),
                 )
+            # A reply that moves the stage is one change: its own event names the stage.
+            fields = [key for key in actual if not (moved and key in moved)]
+            if fields:
                 events.record(
                     c,
                     "application_updated",
-                    payload={"from": row["status"], "to": status, "fields": list(actual)},
+                    payload={"from": row["status"], "to": status, "fields": fields},
                     job_id=row["job_id"],
                     application_id=application_id,
                 )
-                # Ready is a judgement on a Preparing attempt without blocking requirements.
-                if status != "draft":
-                    self.clear_ready(c, application_id, "left_preparing")
-                elif "requirements" in actual and any(
-                    item["blocking"] and not item["resolved"] for item in changes["requirements"]
-                ):
-                    self.clear_ready(c, application_id, "blocking_requirement")
-            for kind in answered:
-                record_response(
-                    self,
-                    c,
-                    row,
-                    kind,
-                    value.response_date or today(),
-                    value.response_note or "",
-                )
+            if reply_changed:
+                self.write_reply(c, row, reply, moved and {"from": row["status"], "to": status})
         return self.get_application(application_id, compact_job=True)
 
     @staticmethod
-    def _stage_responses(conn, row, status, outcome):
-        """The employer responses a stage change records.
-
-        Reaching Interview from Preparing or Applied is an interview invitation;
-        reaching Offer from an earlier stage is an offer; closing as rejected is a
-        rejection; closing as accepted is an offer unless one is on record.
-        """
-        before, previous = row["status"], row["outcome"]
-        kinds = []
-        if status == "interview" and before in {"draft", "applied"}:
-            kinds.append("interview")
-        if status == "offer" and before in {"draft", "applied", "interview"}:
-            kinds.append("offer")
-        if status == "closed" and (before, previous) != ("closed", outcome):
-            if outcome == "rejected":
-                kinds.append("rejection")
-            elif (
-                outcome == "accepted"
-                and not conn.execute(
-                    "SELECT 1 FROM responses WHERE application_id=? AND kind='offer'", (row["id"],)
-                ).fetchone()
-            ):
-                kinds.append("offer")
-        return kinds
-
-    def set_ready(self, application_id, value):
-        """Mark a Preparing application ready to apply, or clear the mark.
-
-        Marking is refused while a derived readiness check fails; the error names it.
-        """
-        value = (
-            value if isinstance(value, ApplicationReady) else ApplicationReady.model_validate(value)
-        )
-        with self.db.transaction() as c:
-            row = c.execute(
-                f"SELECT app.*,{READINESS_SQL} AS readiness,{REQUIREMENT_COUNTS_SQL} FROM applications app WHERE app.id=?",
-                (application_id,),
-            ).fetchone()
-            if row is None:
-                missing("Application")
-            check_version(row, value.expected_version)
-            if not value.ready:
-                self.clear_ready(c, application_id, "unmarked")
-            elif row["ready_at"] is None:
-                details = {
-                    "readiness": row["readiness"],
-                    "status": row["status"],
-                    "blocking_requirements": row["blocking_requirements"],
-                    "current_version": row["version"],
-                }
-                if row["status"] != "draft":
-                    raise DomainError(
-                        409,
-                        "application_not_ready",
-                        "Only a Preparing application can be marked ready.",
-                        {"check": "stage", **details},
-                    )
-                if row["readiness"] in NOT_READY:
-                    raise DomainError(
-                        409,
-                        "application_not_ready",
-                        NOT_READY[row["readiness"]],
-                        {"check": row["readiness"], **details},
-                    )
-                stamp = now()
-                c.execute(
-                    "UPDATE applications SET ready_at=?,ready_by_kind=?,ready_by_id=?,ready_by_name=?,ready_by_token_kind=?,version=version+1,updated_at=? WHERE id=?",
-                    (stamp, *current_actor().columns(), stamp, application_id),
+    def _check_outcome(row, status, changes):
+        """An outcome belongs to a Closed application; no_response has its concluded day."""
+        if status == "closed":
+            outcome = changes.get("outcome", row["outcome"])
+            if not outcome:
+                raise DomainError(
+                    422, "application_outcome", "Choose an outcome when closing an application."
                 )
-                events.record(
-                    c,
-                    "application_marked_ready",
-                    job_id=row["job_id"],
-                    application_id=application_id,
+            changes["outcome"] = outcome
+        else:
+            if changes.get("outcome"):
+                raise DomainError(
+                    422, "application_outcome", "Close the application to record an outcome."
                 )
-        return self.get_application(application_id, compact_job=True)
+            changes["outcome"] = None
+        # The day "no reply" was concluded belongs to that outcome only.
+        if changes["outcome"] == "no_response":
+            changes["concluded_on"] = (
+                changes.get("concluded_on")
+                or (row["concluded_on"] if row["outcome"] == "no_response" else None)
+                or today()
+            )
+        elif changes.get("concluded_on"):
+            raise DomainError(
+                422,
+                "application_concluded_on",
+                "concluded_on applies only to an application closed as no_response.",
+            )
+        else:
+            changes["concluded_on"] = None
 
-    def clear_ready(self, conn, application_id, reason):
-        """Clear the stored Ready step once its judgement no longer holds, recording why.
-
-        Every shared service that changes what Ready was judged on calls this in its
-        own transaction. Returns whether the application was ready.
-        """
-        row = conn.execute(
-            "SELECT job_id FROM applications WHERE id=? AND ready_at IS NOT NULL", (application_id,)
-        ).fetchone()
-        if row is None:
-            return False
-        conn.execute(
-            "UPDATE applications SET ready_at=NULL,ready_by_kind=NULL,ready_by_id=NULL,ready_by_name=NULL,ready_by_token_kind=NULL,version=version+1,updated_at=? WHERE id=?",
-            (now(), application_id),
-        )
-        events.record(
-            conn,
-            "application_ready_cleared",
-            payload={"reason": reason, "automatic": reason != "unmarked"},
-            job_id=row["job_id"],
-            application_id=application_id,
-        )
-        return True
+    @staticmethod
+    def _undo_applied(conn, row, changes):
+        """Back to Shortlisted (the undo of Mark applied): only without a reply."""
+        replies = conn.execute(
+            "SELECT count(*) FROM replies WHERE application_id=?", (row["id"],)
+        ).fetchone()[0]
+        if replies:
+            raise DomainError(
+                409,
+                "application_has_replies",
+                "This application has employer replies, so it cannot go back to Shortlisted. "
+                "Remove a reply recorded by mistake first.",
+                {"replies": replies},
+            )
+        if changes.get("applied_at"):
+            raise DomainError(
+                422,
+                "application_applied_at",
+                "A Shortlisted application has not been sent: omit applied_at.",
+            )
+        changes["applied_at"] = None
 
     @staticmethod
     def normalize_requirements(requirements):

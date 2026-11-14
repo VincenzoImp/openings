@@ -4,10 +4,10 @@ import { staleDetail } from "../../library/staleness";
 import { dayTime } from "../../library/time";
 import { reviewHref } from "./links";
 import {
-  awaitsAnswer,
+  awaitsReply,
   documentState,
   planTags,
-  responseLine,
+  replyLine,
   sentLine,
   stageOf,
   stageTag,
@@ -23,7 +23,7 @@ export const HEAD = [
   { name: "Stage" },
   { name: "Plan" },
   { name: "Documents" },
-  { name: "Employer response" },
+  { name: "Employer reply" },
   { name: "Updated" },
   { name: "Action", hidden: true },
 ];
@@ -57,7 +57,7 @@ function Action({
 }) {
   const stage = stageOf(application);
   const name = <span className="sr"> {title}</span>;
-  if (awaitsAnswer(application))
+  if (awaitsReply(application))
     return (
       <Button
         size="sm"
@@ -65,7 +65,7 @@ function Action({
         aria-controls={`respond-${application.id}`}
         onClick={onRespond}
       >
-        Record response{name}
+        Record reply{name}
       </Button>
     );
   if (stage === "ready")
@@ -77,7 +77,7 @@ function Action({
         Review{name}
       </a>
     );
-  if (stage === "preparing" && application.blocking_requirements)
+  if (stage === "shortlisted" && application.blocking_requirements)
     return (
       <a className="btn sm" href={reviewHref(application.id, "requirements")}>
         Decide{name}
@@ -93,7 +93,7 @@ function Action({
   );
 }
 
-/** One application of the list, and under it the form that records a response. */
+/** One application of the list, and under it the form that records a reply. */
 export function Row({
   application,
   selected,
@@ -122,9 +122,10 @@ export function Row({
   const company = application.job?.company || "";
   const tag = stageTag(application);
   const sent = sentLine(application);
-  const response = responseLine(application, days);
+  const response = replyLine(application, days);
   const documents = documentState(application);
-  const stale = application.status === "draft" ? staleDetail(application) : "";
+  const stale =
+    application.status === "shortlisted" ? staleDetail(application) : "";
   return (
     <>
       <GridRow selected={selected}>
@@ -162,7 +163,7 @@ export function Row({
           <Tags items={documents.slice(1)} />
           {stale && <div className="meta">{stale}</div>}
         </Cell>
-        <Cell label="Response">
+        <Cell label="Reply">
           {response.text ? (
             response.badge ? (
               <Tag tone={response.tone}>{response.text}</Tag>

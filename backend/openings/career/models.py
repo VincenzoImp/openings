@@ -230,7 +230,7 @@ RULES_DESCRIPTION = (
 
 class TemplateCreate(Input):
     name: str = Field(min_length=1, max_length=200)
-    kind: Literal["resume", "cover_letter"] = "resume"
+    kind: Literal["cv", "letter"] = "cv"
     tex: str = Field(default="", max_length=1000000)
     guidance: str = Field(default="", max_length=20000)
     rules: dict[str, Any] = Field(default_factory=dict, description=RULES_DESCRIPTION)
@@ -251,7 +251,7 @@ class TemplateCreate(Input):
 class TemplateUpdate(NonNullUpdate):
     expected_version: int = Field(ge=1, strict=True)
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    kind: Literal["resume", "cover_letter"] | None = None
+    kind: Literal["cv", "letter"] | None = None
     tex: str | None = Field(default=None, max_length=1000000)
     guidance: str | None = Field(default=None, max_length=20000)
     rules: dict[str, Any] | None = Field(default=None, description=RULES_DESCRIPTION)

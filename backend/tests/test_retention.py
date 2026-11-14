@@ -9,11 +9,11 @@ from fastapi.testclient import TestClient
 
 from openings import operations, retention
 from openings._vendor.jobspy.model import JobPost
-from openings.events import EventLog
 from openings.app import create_app
 from openings.collectors.catalog import COMPANY_KINDS
 from openings.common import encode
 from openings.discovery import DiscoveryService, SourceCreate
+from openings.events import EventLog
 from openings.operations import (
     RESTORE_MARGIN,
     replace_room,

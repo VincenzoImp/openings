@@ -2,15 +2,15 @@ import { useState, type FormEvent } from "react";
 import {
   api,
   localToday,
-  readinessLabels,
   type Application,
+  type DocumentKind,
   type Stage,
 } from "../../api";
 import { Banner, Button, Field, actorPhrase } from "../../design";
 import { ConfirmDialog } from "../../library/common";
 import { dayTime } from "../../library/time";
 import { useWorkspace } from "../../state";
-import { outcomeLabels, stageLabels } from "../applications/model";
+import { missingText, outcomeLabels, stageLabels } from "../applications/model";
 
 const priorities: Record<number, string> = {
   1: "P1 · highest",
@@ -19,71 +19,18 @@ const priorities: Record<number, string> = {
   4: "P4 · low",
   5: "P5 · lowest",
 };
-const nextStep: Record<string, string> = {
-  blocked: "Resolve the blocking requirements first.",
-  none: "The CV and the letter are not saved yet.",
-  missing_pdf: "A current CV or letter has no PDF yet.",
-  unreviewed: "A current revision is not approved yet.",
-  reviewed: "Every check passes. Mark it ready when you judge it complete.",
-};
-const SENT: Stage[] = ["applied", "interview", "offer"];
-
-/** True when moving from `before` to `stage` with `outcome` records an employer response. */
-function recordsAnswer(app: Application, stage: Stage, outcome: string) {
-  const before = app.status;
-  if (stage === "interview") return before === "draft" || before === "applied";
-  if (stage === "offer")
-    return ["draft", "applied", "interview"].includes(before);
-  if (stage !== "closed" || (before === "closed" && app.outcome === outcome))
-    return false;
-  const sent = !!app.applied_at || SENT.includes(before);
-  if (outcome === "accepted")
-    return sent && !app.responses?.some((item) => item.kind === "offer");
-  return outcome === "rejected" && sent;
-}
-
-/** The stored Ready step of a Preparing application, and the switch that sets it. */
+/** Ready, as computed from the required documents and the blocking requirements. */
 function Ready({ application }: { application: Application }) {
-  const { mutate, pending } = useWorkspace();
-  if (application.status !== "draft") return null;
-  const ready = application.readiness === "ready";
-  const set = (value: boolean) =>
-    void mutate(
-      () =>
-        api(`/applications/${application.id}/ready`, "POST", {
-          expected_version: application.version,
-          ready: value,
-        }),
-      value ? "Marked ready to apply." : "No longer marked ready.",
-    );
+  if (application.status !== "shortlisted") return null;
+  const missing = missingText(application);
   return (
     <Banner
-      tone={ready ? "neutral" : "info"}
-      title={
-        ready
-          ? "Ready to apply"
-          : readinessLabels[application.readiness || "none"]
-      }
-      action={
-        ready ? (
-          <Button size="sm" disabled={pending} onClick={() => set(false)}>
-            Not ready
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            variant="primary"
-            disabled={pending || application.readiness !== "reviewed"}
-            onClick={() => set(true)}
-          >
-            Mark ready
-          </Button>
-        )
-      }
+      tone={application.ready ? "neutral" : "info"}
+      title={application.ready ? "Ready to apply" : "Not ready yet"}
     >
-      {ready
-        ? `Marked ready ${[actorPhrase(application.ready_by), dayTime(application.ready_at)].filter(Boolean).join(", ")}. A new revision, frozen copy or blocking requirement clears it.`
-        : nextStep[application.readiness || "none"]}
+      {application.ready
+        ? "Every required document is uploaded and no blocking requirement is open. Send it, then mark it applied."
+        : `${missing}. Ready follows by itself once each required document has its PDF and every blocking requirement is resolved.`}
     </Banner>
   );
 }
@@ -168,7 +115,7 @@ function PinnedNote({ application }: { application: Application }) {
 }
 
 /**
- * The application's stage and plan, the Ready step, its pinned note, the job
+ * The application's stage and plan, whether it is Ready, its pinned note, the job
  * it belongs to, and its permanent deletion.
  */
 export function Details({
@@ -182,12 +129,14 @@ export function Details({
   const [stage, setStage] = useState<Stage>(application.status);
   const [outcome, setOutcome] = useState(application.outcome || "not_pursued");
   const [removing, setRemoving] = useState(false);
-  const answers = recordsAnswer(application, stage, outcome);
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const text = (name: string) => String(form.get(name) ?? "");
     const applied = text("applied_at");
+    const required = (["cv", "letter"] as DocumentKind[]).filter((kind) =>
+      form.get(`required_${kind}`),
+    );
     await mutate(
       () =>
         api(`/applications/${application.id}`, "PATCH", {
@@ -197,7 +146,7 @@ export function Details({
           ...(stage === "closed" && outcome === "no_response"
             ? { concluded_on: text("concluded_on") || null }
             : {}),
-          ...(answers ? { response_date: text("response_date") || null } : {}),
+          required_documents: required,
           priority: Number(text("priority")) || null,
           deadline: text("deadline") || null,
           // The field shows minutes; an unchanged one keeps the stored time.
@@ -253,19 +202,26 @@ export function Details({
               />
             </Field>
           )}
-          {answers && (
-            <Field
-              label="Day of the employer's answer"
-              hint="The move records the employer's response on this day."
-            >
-              <input
-                type="date"
-                name="response_date"
-                max={localToday()}
-                defaultValue={localToday()}
-              />
-            </Field>
-          )}
+          <fieldset className="field">
+            <legend>Required documents</legend>
+            <div className="row">
+              {(["cv", "letter"] as DocumentKind[]).map((kind) => (
+                <label key={kind} className="toggle">
+                  <input
+                    type="checkbox"
+                    name={`required_${kind}`}
+                    defaultChecked={(
+                      application.required_documents || ["cv", "letter"]
+                    ).includes(kind)}
+                  />
+                  {kind === "cv" ? "CV" : "Letter"}
+                </label>
+              ))}
+            </div>
+            <p className="caption">
+              Ready needs each required document as a PDF.
+            </p>
+          </fieldset>
           <Field label="Priority" hint="Orders the preparation work.">
             <select
               name="priority"
@@ -349,7 +305,7 @@ export function Details({
         >
           <p>
             The application is removed for good with its frozen copies,
-            documents, files, responses and history. The job and its other
+            documents, files, replies and history. The job and its other
             applications stay. To stop and keep everything, close it as Not
             pursued instead.
           </p>

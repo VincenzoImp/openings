@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import {
   api,
-  type ResponseKind,
+  type ReplyKind,
   type TimelineItem,
   type TimelineKind,
   type TimelinePage,
@@ -33,16 +33,15 @@ const NONE: TimelinePage = {
   scope: { type: "job", id: "", job_id: "" },
   items: [],
   total: 0,
-  counts: { note: 0, event: 0, response: 0 },
+  counts: { note: 0, event: 0, reply: 0 },
   limit: PAGE,
   offset: 0,
 };
-// A note, a pin or an employer response changes what the timeline shows.
+// A note, a pin or an employer reply changes what the timeline shows.
 const SCOPES = [
   "jobs",
   "applications",
   "notes",
-  "responses",
   "documents",
   "contexts",
   "files",
@@ -58,9 +57,13 @@ const TITLES: Record<string, string> = {
   application_deleted: "Application deleted",
   application_marked_ready: "Marked ready",
   application_ready_cleared: "No longer marked ready",
-  response_added: "Employer response recorded",
-  response_edited: "Employer response corrected",
-  response_removed: "Employer response removed",
+  application_ready_mark_archived: "Was marked ready (before 0.24)",
+  reply_added: "Employer reply recorded",
+  reply_edited: "Employer reply corrected",
+  reply_removed: "Employer reply removed",
+  response_added: "Employer reply recorded",
+  response_edited: "Employer reply corrected",
+  response_removed: "Employer reply removed",
   note_deleted: "Note deleted",
   note_pinned: "Note pinned",
   note_unpinned: "Note unpinned",
@@ -68,11 +71,11 @@ const TITLES: Record<string, string> = {
   document_reviewed: "Document revision approved",
   context_prepared: "Frozen copy of your record prepared",
 };
-const RESPONSES: Record<ResponseKind, string> = {
+const REPLIES: Record<ReplyKind, string> = {
   rejection: "Rejection",
   interview: "Interview invitation",
   offer: "Offer",
-  other: "Other answer",
+  other: "Other reply",
 };
 
 type Event = NonNullable<TimelineItem["event"]>;
@@ -83,21 +86,20 @@ export function eventTitle(event: Event) {
     const to = event.payload?.to;
     return to === "dismissed"
       ? "Dismissed"
-      : to === "saved"
+      : to === "shortlisted" || to === "saved"
         ? "Shortlisted"
         : event.payload?.from === "dismissed"
           ? "Restored"
-          : "Returned to review";
+          : "Back to New";
   }
   return TITLES[event.kind] || changeLabel(event.kind);
 }
 
-/** The line under a change: the response and its day, the reason, the fields. */
+/** The line under a change: the reply and its day, the reason, the fields. */
 export function eventDetail(event: Event) {
   const payload = event.payload || {};
-  if (event.kind.startsWith("response_") && payload.kind) {
-    const kind =
-      RESPONSES[payload.kind as ResponseKind] || String(payload.kind);
+  if (/^(reply|response)_/.test(event.kind) && payload.kind) {
+    const kind = REPLIES[payload.kind as ReplyKind] || String(payload.kind);
     const day = payload.date
       ? " · " +
         new Date(String(payload.date) + "T12:00:00").toLocaleDateString(
@@ -116,7 +118,7 @@ const KIND_FILTERS: { id: string; label: string; kinds: TimelineKind[] }[] = [
   { id: "", label: "Everything", kinds: [] },
   { id: "note", label: "Notes", kinds: ["note"] },
   { id: "event", label: "Changes", kinds: ["event"] },
-  { id: "response", label: "Responses", kinds: ["response"] },
+  { id: "reply", label: "Replies", kinds: ["reply"] },
 ];
 
 interface Filters {
@@ -174,7 +176,7 @@ export function RecordTimeline({
   );
   const filtered = Object.values(filters).some(Boolean);
   const counts = page.data.counts;
-  const all = counts.note + counts.event + counts.response;
+  const all = counts.note + counts.event + counts.reply;
   const where = applicationId ? "application" : "job";
 
   async function add(event: FormEvent<HTMLFormElement>) {
@@ -418,11 +420,11 @@ function Entry({
   const marked = applicationId
     ? item.scope.type === "job"
     : item.scope.type === "application";
-  // Under the text: the response and scope tags, when and who made it, in
+  // Under the text: the reply and scope tags, when and who made it, in
   // plain words ("Today 09:12 by you"), so a narrow pane keeps the text wide.
   const line = (
     <div className="row entry-line">
-      {item.kind === "response" && <Tag tone="info">Response</Tag>}
+      {item.kind === "reply" && <Tag tone="info">Reply</Tag>}
       {marked && <Tag>{item.scope.type === "job" ? "Job" : "Application"}</Tag>}
       <span className="caption num">{dayTime(item.created_at)}</span>
       <ActorPhrase actor={item.actor} />

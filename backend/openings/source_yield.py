@@ -13,7 +13,7 @@ For the jobs a source collected in the period (by the time the job was added):
 - ``applied``: with an application that was sent (as Insights counts it: a sent
   date, a sent stage or an employer response);
 - ``responded``, ``interviews``, ``offers``: with an employer response, an
-  interview or offer response, an offer response (0.20 ``responses``);
+  interview or offer response, an offer response (``replies``);
 - ``dismissed``: dismissed now, split by who dismissed them (an agent token, the
   owner, other);
 - ``likely_duplicates`` and ``no_longer_listed``: jobs with those ingest signals.
@@ -88,12 +88,12 @@ attempts AS (
  FROM applications GROUP BY job_id),
 answers AS (
  SELECT a.job_id, max(r.kind IN ('interview','offer')) AS interview, max(r.kind = 'offer') AS offer
- FROM responses r JOIN applications a ON a.id = r.application_id GROUP BY a.job_id)
+ FROM replies r JOIN applications a ON a.id = r.application_id GROUP BY a.job_id)
 SELECT f.source_id AS source_id,
  coalesce(json_extract(j.metadata,'$.source'), json_extract(j.metadata,'$.ats'), 'manual') AS provider,
  count(*) AS collected,
- sum(j.triage = 'inbox' AND t.job_id IS NULL) AS to_review,
- sum(j.triage = 'saved' OR t.job_id IS NOT NULL) AS shortlisted,
+ sum(j.triage = 'new' AND t.job_id IS NULL) AS to_review,
+ sum(j.triage = 'shortlisted' OR t.job_id IS NOT NULL) AS shortlisted,
  sum(coalesce(t.sent, 0) OR r.job_id IS NOT NULL) AS applied,
  sum(r.job_id IS NOT NULL) AS responded,
  sum(coalesce(r.interview, 0)) AS interviews,

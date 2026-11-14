@@ -108,7 +108,7 @@ The default run (`uv run pytest -n auto`) skips the `performance` marker.
 `backend/tests/test_performance_budgets.py` builds a synthetic workspace of
 25,000 jobs with their ingest signals, 500 applications, 20 sources and 60 frozen
 contexts in a few seconds, and fails when the median of five reads exceeds its
-budget: the Applications list, the reads of Today, the job inbox (with counts
+budget: the Applications list, the reads of Today, the New jobs list (with counts
 and facets), text search, the overview, the staleness report, insights, source
 yield and the timeline of a busy job and application. The budgets are about six
 times the time measured on a laptop, so a slower CI runner passes and a real
@@ -136,13 +136,12 @@ The dashboard has budgets that CI checks:
   `frontend/src/design/tokens.css` and holds it to WCAG AA.
 - **Keyboard.** `frontend/tests/shell.spec.ts` operates the navigation, the More
   sheet, the theme and the density from the keyboard alone;
-  `frontend/tests/today.spec.ts` answers a question on Today,
-  `frontend/tests/activity.spec.ts` moves through the Activity tabs and opens a
-  run's report, `frontend/tests/applications.spec.ts` goes from Today's
-  Review to Mark applied and records an employer response the same way,
+  `frontend/tests/applications.spec.ts` goes from Today's
+  Review to Mark applied and records an employer reply the same way,
   `frontend/tests/system.spec.ts` moves through the Collection tabs and switches
   scheduled collection, revokes tokens, `frontend/tests/skills.spec.ts`
-  opens a skill and saves its local notes, and `frontend/tests/setup.spec.ts`
+  reaches Settings › Skills, a read-only list of what you can ask your agent,
+  and `frontend/tests/setup.spec.ts`
   moves through the steps of the setup guide.
 
 The browser tests run on the synthetic workspace of

@@ -28,8 +28,8 @@ def test_only_one_open_attempt_survives_concurrent_creation_and_reopening(tmp_pa
     first = next(result for result in results if isinstance(result, dict))
     conflict = next(result for result in results if isinstance(result, DomainError))
     assert conflict.code == "application_in_progress"
-    assert conflict.details == {"application_id": first["id"], "status": "draft"}
-    assert workspace.get_job(job["id"])["triage"] == "saved"
+    assert conflict.details == {"application_id": first["id"], "status": "shortlisted"}
+    assert workspace.get_job(job["id"])["triage"] == "shortlisted"
     with pytest.raises(sqlite3.IntegrityError), workspace.db.transaction() as connection:
         connection.execute(
             "INSERT INTO applications(id,job_id,created_at,updated_at) VALUES('bypass',?,?,?)",
@@ -43,7 +43,7 @@ def test_only_one_open_attempt_survives_concurrent_creation_and_reopening(tmp_pa
     second = workspace.create_application({"job_id": job["id"]})
     with pytest.raises(DomainError) as reopening:
         workspace.update_application(
-            first["id"], {"expected_version": first["version"], "status": "draft"}
+            first["id"], {"expected_version": first["version"], "status": "shortlisted"}
         )
     assert reopening.value.details["application_id"] == second["id"]
     assert workspace.get_application(first["id"])["status"] == "closed"
@@ -67,7 +67,7 @@ def test_summaries_filtering_and_merge_preserve_application_intent(tmp_path):
     assert summary["application_count"] == 2
     attempts = workspace.list_applications(job_id=first["id"], limit=1)
     assert attempts["total"] == 2 and len(attempts["items"]) == 1
-    assert attempts["stage_counts"]["draft"] == attempts["stage_counts"]["closed"] == 1
+    assert attempts["stage_counts"]["shortlisted"] == attempts["stage_counts"]["closed"] == 1
     assert attempts["items"][0]["job_id"] == first["id"]
 
     with pytest.raises(DomainError, match="Close one active application"):
@@ -80,7 +80,8 @@ def test_summaries_filtering_and_merge_preserve_application_intent(tmp_path):
     assert workspace.list_jobs()["total"] == 2
     workspace.delete_application(current["id"], current["version"])
     assert workspace.get_job(first["id"])["application"]["id"] == previous["id"]
-    assert workspace.get_job(first["id"])["triage"] == "saved"
+    # Closing never changes the job's triage.
+    assert workspace.get_job(first["id"])["triage"] == "shortlisted"
     workspace.set_triage(first["id"], "dismissed", workspace.get_job(first["id"])["version"])
     assert (
         workspace.create_application({"job_id": first["id"], "idempotency_key": "first"})["id"]
@@ -189,7 +190,7 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             if transport == "mcp"
             else {"job_id": job["id"]},
         )
-        assert listed["total"] == 1 and listed["stage_counts"]["draft"] == 1
+        assert listed["total"] == 1 and listed["stage_counts"]["shortlisted"] == 1
 
         path = f"/applications/{attempt['id']}"
         attempt = call(
@@ -299,7 +300,8 @@ def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(tm
             },
         )
         retained = client.get(f"/api/v1/jobs/{job['id']}").json()
-        assert retained["triage"] == "saved" and retained["application_count"] == 0
+        # Deleting a job's last application returns it to New.
+        assert retained["triage"] == "new" and retained["application_count"] == 0
         call(
             "jobs_delete",
             "DELETE",

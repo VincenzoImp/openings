@@ -182,7 +182,7 @@ grant for each transfer or retry.
 | Collection is waiting | Read the displayed reason and resume time. Server cooldowns survive restarts and setting changes. |
 | A result has no description | Automatic candidates remain in collection progress until text is available; manually added jobs can be completed under Edit details. |
 | Starting an application returns 409 | Open the existing non-Closed attempt identified in the response. |
-| Upload fails | Exact byte size, 20 MiB limit, grant expiry, safe relative name and draft revision state. |
+| Upload fails | Exact byte size, 20 MiB limit, grant expiry, safe relative name, and a revision still incomplete (a complete one takes no more files). |
 | Edit returns 409 | Reload the current version, then reapply the intended change. |
 | Core cannot create SQLite | Ensure `/data` is writable by UID/GID 10001. |
 

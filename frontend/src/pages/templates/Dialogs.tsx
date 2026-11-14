@@ -3,16 +3,16 @@ import { api, version, type Template } from "../../api";
 import { Button, Dialog, ErrorBanner, Field, Loading } from "../../design";
 import { useResource, useWorkspace } from "../../state";
 
-export const kindLabels = { resume: "CV", cover_letter: "Letter" } as const;
-const EXAMPLES = ["resume.tex", "cover-letter.tex"];
+export const kindLabels = { cv: "CV", letter: "Letter" } as const;
+const EXAMPLES = ["cv.tex", "letter.tex"];
 
 function KindAndDefault({ template }: { template?: Template }) {
   return (
     <>
       <Field label="Document">
         <select name="kind" defaultValue={template?.kind}>
-          <option value="resume">CV</option>
-          <option value="cover_letter">Letter</option>
+          <option value="cv">CV</option>
+          <option value="letter">Letter</option>
         </select>
       </Field>
       <label className="toggle wide">

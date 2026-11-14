@@ -17,7 +17,7 @@ OPERATIONS = (
         rest=(Route("GET", "/insights", "insights_get"),),
         tool=Tool(
             ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False),
-            "Read how employers answered the owner's sent applications: counts and response, interview and offer rates with the median days to the first answer, overall and grouped by role family, seniority, location, source kind, named source and month applied. Only employer responses count; Drafts and attempts closed without being sent are counted under excluded. A rate is null with withheld when fewer than min_sample (default 5) applications were sent: do not read meaning into small groups. no_reply gives the no-reply period and how many Applied applications are past it.",
+            "Read how employers answered the owner's sent applications: counts and response, interview and offer rates with the median days to the first answer, overall and grouped by role family, seniority, location, source kind, named source and month applied. Only employer responses count; Shortlisted applications and attempts closed without being sent are counted under excluded. A rate is null with withheld when fewer than min_sample (default 5) applications were sent: do not read meaning into small groups. no_reply gives the no-reply period and how many Applied applications are past it.",
         ),
     ),
 )

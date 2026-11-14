@@ -12,8 +12,8 @@ CREATE TABLE api_tokens (
 );
 CREATE TABLE jobs (
  id TEXT PRIMARY KEY, title TEXT NOT NULL, company TEXT NOT NULL, location TEXT NOT NULL DEFAULT '',
- url TEXT NOT NULL DEFAULT '', posting TEXT NOT NULL DEFAULT '', triage TEXT NOT NULL DEFAULT 'inbox'
- CHECK(triage IN ('inbox','saved','dismissed')),
+ url TEXT NOT NULL DEFAULT '', posting TEXT NOT NULL DEFAULT '', triage TEXT NOT NULL DEFAULT 'new'
+ CHECK(triage IN ('new','shortlisted','dismissed')),
  metadata TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(metadata)), overrides TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(overrides)),
  content_version INTEGER NOT NULL DEFAULT 1, version INTEGER NOT NULL DEFAULT 1,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
@@ -59,9 +59,12 @@ CREATE TABLE posting_details (
 );
 CREATE INDEX posting_details_job ON posting_details(job_id);
 -- concluded_on is the day an application closed as no_response was concluded.
+-- required_documents lists the document kinds Ready needs (workspace/readiness.py);
+-- from_shortlist marks an application a job's shortlist started, which undoing the
+-- shortlist removes while it is empty.
 CREATE TABLE applications (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
- status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','applied','interview','offer','closed')),
+ status TEXT NOT NULL DEFAULT 'shortlisted' CHECK(status IN ('shortlisted','applied','interview','offer','closed')),
  outcome TEXT CHECK(outcome IS NULL OR outcome IN ('accepted','rejected','not_pursued','no_response')),
  questions TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(questions)),
  answers TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(answers)),
@@ -69,8 +72,10 @@ CREATE TABLE applications (
  priority INTEGER CHECK(priority IS NULL OR priority BETWEEN 1 AND 5),
  deadline TEXT CHECK(deadline IS NULL OR (length(deadline)=10 AND date(deadline)=deadline)),
  requirements TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(requirements) AND json_type(requirements)='array'),
- ready_at TEXT, ready_by_kind TEXT, ready_by_id TEXT, ready_by_name TEXT, ready_by_token_kind TEXT,
- concluded_on TEXT CHECK(concluded_on IS NULL OR (length(concluded_on)=10 AND date(concluded_on)=concluded_on))
+ concluded_on TEXT CHECK(concluded_on IS NULL OR (length(concluded_on)=10 AND date(concluded_on)=concluded_on)),
+ required_documents TEXT NOT NULL DEFAULT '["cv","letter"]'
+  CHECK(required_documents IN ('["cv","letter"]','["cv"]','["letter"]','[]')),
+ from_shortlist INTEGER NOT NULL DEFAULT 0 CHECK(from_shortlist IN (0,1))
 );
 -- One record per change. job_id/application_id keep the owning timeline (and its
 -- deletion); subject_* names the changed record of any type. actor is the actor
@@ -113,7 +118,7 @@ CREATE TABLE claims (
  "group" TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE templates (
- id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('resume','cover_letter')),
+ id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('cv','letter')),
  tex TEXT NOT NULL DEFAULT '', guidance TEXT NOT NULL DEFAULT '', rules TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(rules)),
  is_default INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 1,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
@@ -138,18 +143,20 @@ CREATE TABLE context_inputs (
  -- template contents, compared by staleness.py. Derived from the payload.
  parts TEXT CHECK(parts IS NULL OR json_valid(parts))
 );
--- A document revision. A CV or letter (resume, cover_letter) is its
--- uploaded .tex source and PDF (files): content stays '{}', text is derived from the
--- source (documents/text.py, NULL without one) and legacy_content keeps, read-only,
--- the content such a revision had before 0.22. Form answers and other kinds
--- keep structured content. claim_ids and knowledge_ids are the evidence it cites.
+-- A document revision. A CV or letter (cv, letter) is its PDF and optional .tex
+-- source (files): it is complete once its PDF is stored. content stays '{}'; text is
+-- the readable text, from the source (text_from 'tex', documents/text.py) or else
+-- from the PDF ('pdf', documents/pdf.py), NULL when none could be read;
+-- legacy_content keeps, read-only, the content such a revision had before 0.22.
+-- Form answers and other kinds keep structured content. claim_ids and
+-- knowledge_ids are the evidence it cites.
 CREATE TABLE documents (
  id TEXT PRIMARY KEY, application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
  context_id TEXT REFERENCES contexts(id) ON DELETE CASCADE, kind TEXT NOT NULL,
  title TEXT NOT NULL DEFAULT '', content TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(content)),
  previous_id TEXT REFERENCES documents(id) ON DELETE SET NULL,
- review_state TEXT NOT NULL DEFAULT 'draft', version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL,
- text TEXT, legacy_content TEXT CHECK(legacy_content IS NULL OR json_valid(legacy_content)),
+ version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL,
+ text TEXT, text_from TEXT CHECK(text_from IS NULL OR text_from IN ('tex','pdf')), legacy_content TEXT CHECK(legacy_content IS NULL OR json_valid(legacy_content)),
  note TEXT NOT NULL DEFAULT '',
  claim_ids TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(claim_ids) AND json_type(claim_ids)='array'),
  knowledge_ids TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(knowledge_ids) AND json_type(knowledge_ids)='array')
@@ -166,7 +173,7 @@ CREATE TABLE files (
  document_id TEXT REFERENCES documents(id) ON DELETE CASCADE,
  job_id TEXT REFERENCES jobs(id) ON DELETE CASCADE, created_at TEXT NOT NULL,
  -- The SHA-256 of the source a revision's PDF was built from; NULL for every other
- -- file and for PDFs uploaded before 0.22.
+ -- file, for a PDF-only revision and for PDFs uploaded before 0.22.
  source_sha256 TEXT,
  CHECK((knowledge_id IS NOT NULL)+(template_id IS NOT NULL)+(context_id IS NOT NULL)+
        (document_id IS NOT NULL)+(job_id IS NOT NULL)=1)
@@ -203,7 +210,6 @@ CREATE INDEX applications_job ON applications(job_id,created_at DESC,id DESC);
 CREATE UNIQUE INDEX applications_active_job ON applications(job_id) WHERE status<>'closed';
 CREATE INDEX applications_status ON applications(status,updated_at);
 CREATE INDEX applications_deadline ON applications(deadline);
-CREATE INDEX applications_ready ON applications(ready_at) WHERE ready_at IS NOT NULL;
 CREATE INDEX documents_app ON documents(application_id,created_at);
 CREATE INDEX documents_context ON documents(context_id);
 CREATE INDEX contexts_app ON contexts(application_id,created_at);
@@ -272,8 +278,8 @@ INSERT INTO preference_sections(section,items) VALUES ('writing',json_array(json
  'Use only the supplied career evidence. Never invent qualifications, dates or metrics. '
  || 'Select relevant approved claims or write accurate new wording from detailed evidence. '
  || 'Respect the template and answer limits; make missing facts visible.','scope','all')));
--- Employer responses to sent applications (outcomes.py).
-CREATE TABLE responses (
+-- Employer replies to sent applications (outcomes.py).
+CREATE TABLE replies (
  id TEXT PRIMARY KEY, application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
  kind TEXT NOT NULL CHECK(kind IN ('rejection','interview','offer','other')),
  date TEXT NOT NULL CHECK(length(date)=10 AND date(date)=date),
@@ -282,8 +288,8 @@ CREATE TABLE responses (
  version INTEGER NOT NULL DEFAULT 1,
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
-CREATE INDEX responses_application ON responses(application_id,date);
-CREATE UNIQUE INDEX responses_once ON responses(application_id,kind,date) WHERE kind<>'other';
+CREATE INDEX replies_application ON replies(application_id,date);
+CREATE UNIQUE INDEX replies_once ON replies(application_id,kind,date) WHERE kind<>'other';
 -- Ingest signals of each job (job_signals.py). Derived from the job and
 -- rebuildable, except distinct_from (pairs the owner judged different vacancies).
 CREATE TABLE job_signals (
