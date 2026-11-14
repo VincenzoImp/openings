@@ -176,7 +176,7 @@ test("languages, the hidden new jobs and the no-reply period", async ({
   });
   await expect(filter).toHaveAttribute("href", "#jobs?hide_unspoken=true");
   await expect(filter).toContainText(
-    `would hide ${report.unspoken_required.count} of the ${report.total} new jobs`,
+    `Hides ${report.unspoken_required.count} of your ${report.total} new jobs in Jobs`,
   );
 
   await languages.getByRole("button", { name: "Edit languages" }).click();

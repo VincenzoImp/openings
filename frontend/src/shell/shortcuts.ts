@@ -69,6 +69,7 @@ export const SHEET: { title: string; items: [string[], string][] }[] = [
       [["k"], "Previous"],
       [["↵"], "Open"],
       [["x"], "Select"],
+      [["⇧", "J"], "Select the next one too"],
       [["⇧", "click"], "Select a range"],
       [["Esc"], "Clear the selection"],
       [["⌘", "Z"], "Undo"],
@@ -82,7 +83,6 @@ export const SHEET: { title: string; items: [string[], string][] }[] = [
       [["r"], "Restore a dismissed job"],
       [["e"], "Correct details"],
       [["o"], "Open the posting"],
-      [["z"], "Undo the last decision"],
     ],
   },
 ];

@@ -49,7 +49,19 @@ const WHERE = "Where: ";
 
 const lookingFor = (sections: Section[]) =>
   sections.find((section) => section.section === "looking_for");
-const itemText = (item: Record<string, unknown>) => String(item.text ?? "");
+const itemText = (item: { text?: unknown }) => String(item.text ?? "");
+const written = (text: string) =>
+  text.startsWith(ROLES) || text.startsWith(WHERE);
+
+/**
+ * The lines of What I'm looking for that step 1 did not write: shown beside
+ * its fields, so nothing is asked twice.
+ */
+export function otherLines(preferences: { sections: Section[] }) {
+  return (lookingFor(preferences.sections)?.items ?? [])
+    .map(itemText)
+    .filter((text) => text && !written(text));
+}
 
 /** What step 1 shows first: what the workspace already says. */
 export function aboutFrom(
@@ -88,15 +100,17 @@ export function aboutChanges(
 ) {
   const name = about.name.trim();
   const section = lookingFor(preferences.sections);
-  const before = (section?.items ?? []) as unknown as Item[];
+  // The response types a stored line loosely: read its text and scope.
+  const before: Item[] = (section?.items ?? []).map((item) => ({
+    text: itemText(item),
+    scope: (item.scope as Item["scope"]) ?? null,
+  }));
   let items = [...before];
   for (const [prefix, value] of [
     [ROLES, about.roles.trim()],
     [WHERE, about.where.trim()],
   ] as const) {
-    const index = items.findIndex((item) =>
-      itemText(item as never).startsWith(prefix),
-    );
+    const index = items.findIndex((item) => itemText(item).startsWith(prefix));
     const next = value ? { text: prefix + value } : null;
     if (index >= 0) {
       if (next) items[index] = { ...items[index], ...next };

@@ -33,7 +33,9 @@ AGENT_PAGES = [
     ROOT / "examples" / "operator-workspace" / "AGENTS.md",
 ]
 QUOTED = re.compile(r'"[^"\n]*"')
-LINK = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)\)")
+# A Markdown link or image, or the src/srcset of an HTML image (the README's
+# <picture> of the light and dark hero).
+LINK = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)\)|\b(?:src|srcset)=\"([^\"\s]+)\"")
 # Words of the earlier product that the screen, REST, MCP and docs no longer use.
 RETIRED = ("inbox", "cover_letter", "default_in_cv", "knowledge_", "claims_", "responses_")
 
@@ -49,10 +51,14 @@ def test_the_docs_fit_their_limits():
     assert len((ROOT / "docs/developer/architecture.md").read_text().splitlines()) <= 150
 
 
+def links(page):
+    return [markdown or html for markdown, html in LINK.findall(page.read_text())]
+
+
 def test_every_relative_link_and_image_resolves_and_every_image_is_used():
     missing = []
     for page in [*PAGES, ROOT / "CHANGELOG.md"]:
-        for target in LINK.findall(page.read_text()):
+        for target in links(page):
             if re.match(r"[a-z]+:|#", target):
                 continue
             path = (page.parent / target.split("#")[0]).resolve()
@@ -63,7 +69,7 @@ def test_every_relative_link_and_image_resolves_and_every_image_is_used():
     embedded = {
         (page.parent / target).resolve()
         for page in PAGES
-        for target in LINK.findall(page.read_text())
+        for target in links(page)
         if not re.match(r"[a-z]+:|#", target)
     }
     unused = [
@@ -81,7 +87,7 @@ def test_every_anchor_names_a_heading():
 
     bad = []
     for page in PAGES:
-        for target in LINK.findall(page.read_text()):
+        for target in links(page):
             if re.match(r"[a-z]+:", target) or "#" not in target:
                 continue
             name, anchor = target.split("#", 1)

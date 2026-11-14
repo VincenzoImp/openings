@@ -1,0 +1,56 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[margin=1.7cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+\setlist[itemize]{topsep=2pt,itemsep=1pt}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\begin{document}
+{\LARGE Alex Example}\\[3pt]
+Backend Engineer \hfill Zurich, Switzerland\\
+alex@example.test \textperiodcentered{} +41 44 000 00 00 \hfill
+\href{https://example.test}{example.test} \textperiodcentered{}
+\href{https://code.example.test/alex}{code.example.test/alex}
+
+\section*{Profile}
+Backend engineer with five years of Python APIs and asynchronous workers in
+production. I like services that are measured before they are tuned, deployed
+in small reversible steps and documented well enough that colleagues can run
+them on call.
+
+\section*{Experience}
+\textbf{Backend Engineer --- Example Cloud}, Zurich \hfill Jan 2021 -- present
+\begin{itemize}
+  \item Built the Python APIs and asynchronous workers of a developer platform
+    that internal teams use to provision and monitor their services.
+  \item Added request tracing to the core endpoints and revised the slowest
+    ones, reducing API p95 latency by 20\%.
+  \item Moved long-running jobs from request handlers to a queue of
+    asynchronous workers with retries and idempotent steps.
+  \item Documented the rollout and helped four colleagues operate the services,
+    including a shared on-call rotation.
+\end{itemize}
+
+\section*{Selected project}
+\textbf{Reliable deployment workflow} \hfill 2023
+\begin{itemize}
+  \item Designed a typed deployment workflow with health checks and automatic
+    rollback, in TypeScript on Docker and Linux.
+  \item Reduced the manual deployment procedure from nine steps to three and
+    made release status visible to the whole team.
+\end{itemize}
+
+\section*{Education}
+\textbf{MSc Computer Science --- Example University} \hfill 2018 -- 2020\\
+Thesis on fault-tolerant job queues for web services.
+
+\section*{Also}
+Example community award (2024) for documenting an open-source deployment
+workflow. Coauthor of a workshop note on API reliability (2024).
+
+\section*{Skills and languages}
+Python, SQL, PostgreSQL, REST APIs, asynchronous workers, TypeScript, Docker,
+Linux, tracing and metrics.\\
+Italian (native), English (fluent, C1).
+\end{document}

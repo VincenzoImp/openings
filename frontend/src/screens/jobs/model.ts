@@ -4,7 +4,7 @@
 // React and no requests: tested directly (tests/jobs.test.mjs).
 import type { Schema } from "../../api/client";
 import type { operations } from "../../api/schema";
-import { formatDay } from "../../ui/format.ts";
+import { EMPTY, daysBetween, formatDay, isoDay } from "../../ui/format.ts";
 
 export type JobSummary = Schema<"JobSummary">;
 export type Job = Schema<"Job">;
@@ -57,8 +57,6 @@ export function readView(query: URLSearchParams): View {
   const filters = Object.fromEntries(
     FILTERS.map((key) => [key, query.get(key) ?? ""]),
   ) as Record<FilterKey, string>;
-  // The old signal for incomplete text had its own parameter.
-  if (query.get("complete") === "false") filters.signal = "incomplete";
   const tab: Section =
     section === "dismissed" || section === "all" ? section : "new";
   return {
@@ -216,7 +214,7 @@ export function chipsOf(view: View, now = new Date()): Chip[] {
   add("location", "Location", filters.location);
   add("posting_language", "Written in", languageName(filters.posting_language));
   add("requires", "Requires", languageName(filters.requires));
-  add("signal", "Signal", SIGNALS[filters.signal] || filters.signal);
+  add("signal", "Label", SIGNALS[filters.signal] || filters.signal);
   add("created_since", "Found", foundSince(filters.created_since, now));
   add(
     "dismissed_by",
@@ -246,13 +244,11 @@ export function foundChoices(now = new Date()) {
     { value: day(29), label: "Last 30 days" },
   ];
 }
-const isoDay = (date: Date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 function foundSince(value: string, now: Date) {
   const choice = foundChoices(now).find((item) => item.value === value);
   if (choice) return choice.label;
-  const date = new Date(value + "T00:00:00");
-  return Number.isNaN(date.getTime()) ? value : `Since ${formatDay(date, now)}`;
+  const day = formatDay(value, now);
+  return day === EMPTY ? value : `Since ${day}`;
 }
 
 /**
@@ -358,9 +354,13 @@ export const SIGNAL_TIPS = {
 
 /** Whether a deadline is close enough to show in warning: within 7 days. */
 export function closesSoon(deadline: string, now = new Date()) {
-  const days = (Date.parse(deadline) - now.getTime()) / 86_400_000;
-  return days < 7;
+  const days = daysBetween(now, deadline);
+  return days >= 0 && days < 7;
 }
+
+/** A passed deadline: the posting is closed. */
+export const closed = (deadline: string, now = new Date()) =>
+  daysBetween(now, deadline) < 0;
 
 /* -------------------------------------------------------------- the detail */
 

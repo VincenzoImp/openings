@@ -28,7 +28,7 @@ export function PreviewTab({ template }: { template: Template }) {
             </Button>
           }
         >
-          Compile the source on your machine and upload the PDF to see it here.
+          Upload a sample PDF to see how it looks.
         </EmptyState>
       </>
     );

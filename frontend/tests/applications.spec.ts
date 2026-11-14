@@ -194,14 +194,14 @@ test("a shortlisted page says what is missing once, with one upload each and a r
   const title = unique("Preparing");
   const app = await make(page, title);
   await go(page, `applications/${app.id}`);
-  // "Missing" once (the head), and no row repeats the page's primary upload.
+  // "Missing" once (the head), and each row has its own upload.
   await expect(
     page.getByText(/missing/i).filter({ visible: true }),
   ).toHaveCount(1);
   await expect(visible(page, "Upload CV")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Upload PDF of the CV" }),
-  ).toHaveCount(0);
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Upload PDF of the Letter" }),
   ).toBeVisible();

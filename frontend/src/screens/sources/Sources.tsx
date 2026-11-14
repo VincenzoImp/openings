@@ -133,7 +133,7 @@ export default function SourcesScreen() {
                 run: () =>
                   setEnabled.mutate(
                     {
-                      source: saved as unknown as SourceView,
+                      source: saved,
                       enabled: !enabled,
                     },
                     { onError: failed },
@@ -194,7 +194,7 @@ export default function SourcesScreen() {
                 Add a search
               </Button>
               <Button onClick={() => open({ kind: "company" })}>
-                Add a company page
+                Add a company careers page
               </Button>
             </>
           }

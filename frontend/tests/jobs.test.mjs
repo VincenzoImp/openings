@@ -61,9 +61,8 @@ test("the address gives the tab, the order and the filters, and only differences
   const elsewhere = { ...dismissed, section: "all" };
   assert.equal(model.viewQuery(elsewhere).dismissed_by, undefined);
   assert.equal(model.narrowed(elsewhere), false);
-  // An unknown tab is New; the old incomplete parameter is a signal.
+  // An unknown tab is New.
   assert.equal(view("section=shortlisted").section, "new");
-  assert.equal(view("complete=false").filters.signal, "incomplete");
 });
 
 test("the list request names the tab, the filters and always the languages switch", () => {
@@ -98,7 +97,7 @@ test("active filters read as chips, in words", () => {
     [
       "Source: LinkedIn",
       "Requires: German",
-      "Signal: Possible duplicate",
+      "Label: Possible duplicate",
       "Dismissed by: You",
       "Languages: Only ones I speak",
     ],
@@ -199,6 +198,9 @@ test("the detail says languages, salary, work style and who dismissed in words",
   assert.equal(model.deadlineOf({ deadline: "2026-11-18" }), "2026-11-18");
   assert.equal(model.closesSoon("2026-11-18", now), true);
   assert.equal(model.closesSoon("2026-12-18", now), false);
+  // A passed deadline is closed, not closing soon.
+  assert.equal(model.closesSoon("2025-01-01", now), false);
+  assert.equal(model.closed("2025-01-01", now), true);
 });
 
 test("a duplicate is explained without a score", () => {

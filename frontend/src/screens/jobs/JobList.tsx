@@ -22,6 +22,7 @@ import {
 import {
   SIGNAL_TIPS,
   actorPhrase,
+  closed,
   closesSoon,
   deadlineOf,
   groupRows,
@@ -69,6 +70,8 @@ function Meta({ job, view }: { job: JobSummary; view: View }) {
   const deadline = deadlineOf(job.metadata);
   if (deadline && closesSoon(deadline))
     return <ToneText tone="warning">Closes {formatDay(deadline)}</ToneText>;
+  if (deadline && closed(deadline))
+    return <span>Closed {formatDay(deadline)}</span>;
   const signal = rowSignal(job);
   return (
     <>
@@ -237,7 +240,7 @@ export function JobList({
             · <Kbd>s</Kbd> shortlist · <Kbd>d</Kbd> dismiss
           </>
         ) : null}{" "}
-        · <Kbd>z</Kbd> undo · <Kbd>x</Kbd> select
+        · <Kbd>⌘Z</Kbd> undo · <Kbd>x</Kbd> select
       </p>
     </div>
   );

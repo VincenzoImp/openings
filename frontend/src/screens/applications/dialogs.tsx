@@ -25,11 +25,11 @@ import {
   OUTCOMES,
   REPLY_KINDS,
   isSent,
-  isoDay,
   likelyReply,
   replyEffect,
   type ReplyKind,
 } from "./model";
+import { isoDay } from "../../ui/format";
 
 /** The application a dialog acts on. */
 export interface Target {

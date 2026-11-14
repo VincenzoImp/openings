@@ -40,7 +40,7 @@ reusable sentence under an entry:
 | Education: MSc in Computer Science | Researched reliable stream processing. |
 | Skill: Languages | Python, Go, SQL |
 
-![The Profile read as a CV: header, summary, experience with highlights, skills](../images/career.png)
+![The Profile read as a CV: header, summary, experience with highlights, skills](../images/profile.png)
 
 A highlight is a draft until you **Approve** it (an agent's new highlights show
 **Not approved**); only approved highlights reach an application. A ★ marks

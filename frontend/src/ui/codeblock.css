@@ -1,9 +1,9 @@
 @layer ui {
-  .ui-code {
+  .ui-snippet {
     position: relative;
     min-width: 0;
   }
-  .ui-code pre {
+  .ui-snippet pre {
     margin: 0;
     padding: 10px 44px 10px 12px;
     border: 1px solid var(--border);
@@ -14,21 +14,21 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
-  .ui-code pre:focus-visible {
+  .ui-snippet pre:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
   }
-  .ui-code[data-inline] pre {
+  .ui-snippet[data-inline] pre {
     padding-top: 6px;
     padding-bottom: 6px;
   }
-  .ui-code-copy {
+  .ui-snippet-copy {
     position: absolute;
     top: 6px;
     right: 6px;
     background: var(--bg-subtle);
   }
-  .ui-code[data-inline] .ui-code-copy {
+  .ui-snippet[data-inline] .ui-snippet-copy {
     top: 50%;
     translate: 0 -50%;
   }

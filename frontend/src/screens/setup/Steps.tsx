@@ -28,7 +28,7 @@ import {
 import { CountrySelect } from "../sources/CountrySelect";
 import { countryIn } from "../sources/model";
 import { StepFrame } from "./Frame";
-import { LANGUAGES, aboutFrom, type About } from "./model";
+import { LANGUAGES, aboutFrom, otherLines, type About } from "./model";
 
 type Profile = Schema<"Profile">;
 type Preferences = Schema<"Preferences">;
@@ -61,6 +61,7 @@ export function AboutStep({
   const save = useSaveAbout();
   const set = (patch: Partial<About>) => setAbout({ ...about, ...patch });
   const spoken = new Set(about.languages);
+  const others = otherLines(preferences);
   const offered = [
     ...LANGUAGES,
     ...about.languages
@@ -113,6 +114,16 @@ export function AboutStep({
             onChange={(event) => set({ name: event.target.value })}
           />
         </Field>
+        {others.length > 0 && (
+          <div className="setup-preview">
+            Your Preferences already say:
+            <ul>
+              {others.map((text) => (
+                <li key={text}>{text}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <Field
           label="Roles you're after"
           optional

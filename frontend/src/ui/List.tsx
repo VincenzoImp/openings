@@ -78,7 +78,8 @@ const rowIds = (from: Element | null) =>
  * arrows move the selection, Home and End jump, Enter opens, and letters run
  * the row shortcuts (`s` shortlist, `d` dismiss…) on the selected row. Only
  * the selected row is a Tab stop; its actions follow it. With a `selection`,
- * `x` and ⌘-click pick rows, shift-click picks a range and Esc clears.
+ * `x` and ⌘-click pick rows, Shift+J/K and shift-click pick a range and Esc
+ * clears.
  */
 export function List({
   label,
@@ -119,12 +120,25 @@ export function List({
       selection.clear();
       return;
     }
+    const show = (index: number) => {
+      onActiveChange(ids[index]);
+      rows[index].focus();
+      rows[index].scrollIntoView({ block: "nearest" });
+    };
+    // Shift+J and Shift+K pick the selected row and extend over the next.
+    if ((key === "J" || key === "K") && selection && current >= 0) {
+      event.preventDefault();
+      const to = current + (key === "J" ? 1 : -1);
+      if (!selection.ids.size) selection.toggle(ids[current]);
+      if (to < 0 || to >= ids.length) return;
+      selection.extend(ids, ids[to]);
+      show(to);
+      return;
+    }
     const next = listIndex(key, current, ids.length);
     if (next != null) {
       event.preventDefault();
-      onActiveChange(ids[next]);
-      rows[next].focus();
-      rows[next].scrollIntoView({ block: "nearest" });
+      show(next);
       return;
     }
     const id = ids[current];

@@ -21,7 +21,8 @@ import {
   type Revision,
 } from "../applications/data";
 import { errorText } from "../applications/dialogs";
-import { currentOf, shortDay } from "../applications/model";
+import { formatDay } from "../../ui/format";
+import { currentOf } from "../applications/model";
 
 export type Kind = "cv" | "letter";
 export const KIND_LABEL: Record<Kind, string> = { cv: "CV", letter: "Letter" };
@@ -258,8 +259,8 @@ function DropZone({
 
 /**
  * The row of a required CV or letter, the same height empty or filled, so
- * an upload never moves the page. Empty: what is missing, and Upload PDF
- * (unless the page's primary already is that upload), by button or drop.
+ * an upload never moves the page. Empty: what is missing, and Upload PDF,
+ * by button or drop.
  * Filled: its version, Preview and `…` (Replace, Download, Earlier versions,
  * Show changes, Remove).
  */
@@ -269,15 +270,12 @@ export function DocumentSlot({
   revisions,
   loading,
   uploader,
-  primary = false,
 }: {
   kind: Kind;
   revision: Revision | null;
   revisions: Revision[];
   loading: boolean;
   uploader: ReturnType<typeof useDocumentUpload>;
-  /** The page's primary action uploads this one: no second button here. */
-  primary?: boolean;
 }) {
   const name = KIND_LABEL[kind];
   const pdf = pdfOf(revision);
@@ -359,12 +357,12 @@ export function DocumentSlot({
             </p>
           ) : (
             <p className="ap-slot-meta">
-              {`Version ${revision!.revision_number || 1} · ${shortDay(revision!.created_at)}`}
+              {`Version ${revision!.revision_number || 1} · ${formatDay(revision!.created_at)}`}
               {source ? ` · with ${source.name}` : ""}
             </p>
           )}
         </div>
-        {missing && !primary && (
+        {missing && (
           <Button
             size="sm"
             icon={Upload}
@@ -374,9 +372,6 @@ export function DocumentSlot({
             {uploader.busy ? "Uploading…" : "Upload PDF"}
             <span className="ui-sr"> of the {name}</span>
           </Button>
-        )}
-        {missing && primary && uploader.busy && (
-          <span className="ap-slot-meta">Uploading…</span>
         )}
         {!missing && revision && (
           <>
@@ -520,7 +515,7 @@ function VersionItem({ id, current }: { id: string; current: boolean }) {
         Version {revision.revision_number || 1}
         <span className="ap-muted">
           {" · "}
-          {shortDay(revision.created_at)}
+          {formatDay(revision.created_at)}
           {current ? " · current" : ""}
           {!pdf ? " · no PDF" : ""}
         </span>

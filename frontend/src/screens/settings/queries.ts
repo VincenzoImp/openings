@@ -2,7 +2,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, call, type Schema } from "../../api/client";
 import { useApiMutation } from "../../query/mutation";
-import { POLL_MS } from "../../query/query";
 
 export const settingsKeys = {
   workspace: ["workspace", "info"] as const,
@@ -26,22 +25,14 @@ export function useIsOwner() {
   return (info.data?.actor ?? "owner") === "owner";
 }
 
-export interface TokenRow {
-  id: string;
-  name: string;
-  kind: string;
-  created_at: string;
-  last_used_at?: string | null;
-}
+export type TokenRow = Schema<"TokenRow">;
 
 export function useTokens(enabled = true) {
   return useQuery({
     queryKey: settingsKeys.tokens,
     enabled,
     queryFn: async ({ signal }) =>
-      (await call(api.GET("/api/v1/tokens", { signal })))
-        .items as unknown as TokenRow[],
-    refetchInterval: POLL_MS,
+      (await call(api.GET("/api/v1/tokens", { signal }))).items,
   });
 }
 
@@ -80,34 +71,14 @@ export function useSkills() {
   });
 }
 
-export interface KeptBackup {
-  name: string;
-  kind: "scheduled" | "pre_upgrade";
-  size_bytes: number;
-  created_at: string;
-}
-export interface BackupSchedule {
-  enabled?: boolean;
-  keep?: number;
-  interval_hours?: number;
-  last_at?: string | null;
-  ok?: boolean;
-  last_attempt?: { outcome?: string; error?: string | null } | null;
-}
+export type KeptBackup = Schema<"KeptBackup">;
 
 /** Scheduled backups and copies kept before upgrades. */
 export function useBackups(enabled = true) {
   return useQuery({
     queryKey: settingsKeys.backups,
     enabled,
-    queryFn: async ({ signal }) => {
-      const list = await call(api.GET("/api/v1/backups", { signal }));
-      return {
-        items: list.items as unknown as KeptBackup[],
-        schedule: list.schedule as BackupSchedule,
-      };
-    },
-    refetchInterval: POLL_MS,
+    queryFn: ({ signal }) => call(api.GET("/api/v1/backups", { signal })),
   });
 }
 
@@ -136,7 +107,6 @@ export function useProviders(enabled = true) {
     enabled,
     queryFn: async ({ signal }) =>
       (await call(api.GET("/api/v1/providers", { signal }))).items,
-    refetchInterval: POLL_MS,
   });
 }
 
