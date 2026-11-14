@@ -9,7 +9,7 @@ from ..common import check_version, new_id, now
 from ..db import collect_unused, encode
 from ..errors import DomainError, conflict, missing
 from ..idempotency import fingerprint, remember, replay
-from ..models import ApplicationInput, ApplicationPatch
+from ..models import ApplicationFields, ApplicationInput, ApplicationPatch
 from ..outcomes import today
 from .readiness import canonical_documents
 
@@ -147,14 +147,20 @@ class ApplicationChanges:
             )
 
     def update_application(self, application_id, value):
+        """Change an application. An ``ApplicationPatch`` names its version; the batch
+        tool's ``ApplicationFields`` does not (stage and reply are guarded by rules)."""
         value = (
-            value if isinstance(value, ApplicationPatch) else ApplicationPatch.model_validate(value)
+            value
+            if isinstance(value, ApplicationFields)
+            else ApplicationPatch.model_validate(value)
         )
         changes = value.model_dump(exclude_unset=True, exclude={"expected_version", "reply"})
         reply = value.reply
         with self.db.transaction() as c:
             row = c.execute("SELECT * FROM applications WHERE id=?", (application_id,)).fetchone()
-            check_version(row, value.expected_version)
+            if row is None:
+                missing("Application")
+            check_version(row, getattr(value, "expected_version", None))
             moved = self.reply_stage(c, row, reply, changes)
             status = changes.get("status") or row["status"]
             if row["status"] == "closed" and status != "closed":

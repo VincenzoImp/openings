@@ -21,7 +21,7 @@ class EntryOperations:
         offset: int = 0,
         summary: bool = True,
     ) -> dict:
-        """Search Career entries by q (title, organization, narrative) and kind. summary=true (the default) returns bounded previews and counts; summary=false returns full records. Read knowledge_get for one entry's full narrative and metadata."""
+        """Search Career entries by q (title, organization, narrative) and kind. summary=true (the default) returns bounded previews and counts; summary=false returns full records. Read career_get for one entry's full narrative and metadata."""
         _page(limit, offset)
         where, params = [], []
         if q:
@@ -33,8 +33,8 @@ class EntryOperations:
         clause = " WHERE " + " AND ".join(where) if where else ""
         columns = (
             "id,kind,title,organization,dates,skills,position,version,created_at,updated_at,substr(narrative,1,240) AS narrative_preview,"
-            "(SELECT substr(text,1,240) FROM claims WHERE knowledge_id=knowledge.id ORDER BY position,created_at,id LIMIT 1) AS claim_preview,"
-            "(SELECT COUNT(*) FROM claims WHERE knowledge_id=knowledge.id) AS claim_count,"
+            "(SELECT substr(text,1,240) FROM claims WHERE knowledge_id=knowledge.id ORDER BY position,created_at,id LIMIT 1) AS highlight_preview,"
+            "(SELECT COUNT(*) FROM claims WHERE knowledge_id=knowledge.id) AS highlight_count,"
             "(SELECT COUNT(*) FROM files WHERE knowledge_id=knowledge.id) AS file_count"
             if summary
             else "*"
@@ -58,7 +58,7 @@ class EntryOperations:
         """Read one career evidence record with its full narrative and metadata."""
         row = self.db.one("SELECT * FROM knowledge WHERE id=?", (knowledge_id,))
         if not row:
-            missing("Career knowledge")
+            missing("Career entry")
         return decode_record(row, ["metadata", "dates", "skills"])
 
     def create_knowledge(self, value: KnowledgeCreate) -> dict:
@@ -103,7 +103,7 @@ class EntryOperations:
                 timestamp,
             ),
         )
-        events.record(conn, "knowledge_created", ("knowledge", record_id), {"kind": value.kind})
+        events.record(conn, "career_created", ("career", record_id), {"kind": value.kind})
         remember(conn, "knowledge", value.idempotency_key, digest, record_id)
         return record_id
 
@@ -112,7 +112,7 @@ class EntryOperations:
         data = values(value)
         expected = data.pop("expected_version")
         with self.db.transaction() as conn:
-            row = _get(conn, "knowledge", knowledge_id, "Career knowledge")
+            row = _get(conn, "knowledge", knowledge_id, "Career entry")
             check_version(row, expected)
             previous = decode_record(row, ["metadata", "dates", "skills"])
             merged = {**previous, **data}
@@ -144,8 +144,8 @@ class EntryOperations:
                 )
                 events.record(
                     conn,
-                    "knowledge_updated",
-                    ("knowledge", knowledge_id),
+                    "career_updated",
+                    ("career", knowledge_id),
                     {
                         "fields": [key for key in fields if previous[key] != merged[key]],
                         "version": row["version"] + 1,
@@ -156,10 +156,8 @@ class EntryOperations:
     def delete_knowledge(self, knowledge_id: str, expected_version: int) -> dict:
         """Permanently delete a career record and its reusable claims/live assets; document revisions are unchanged."""
         with self.db.transaction() as conn:
-            check_version(
-                _get(conn, "knowledge", knowledge_id, "Career knowledge"), expected_version
-            )
+            check_version(_get(conn, "knowledge", knowledge_id, "Career entry"), expected_version)
             conn.execute("DELETE FROM knowledge WHERE id=?", (knowledge_id,))
-            events.record(conn, "knowledge_deleted", ("knowledge", knowledge_id))
+            events.record(conn, "career_deleted", ("career", knowledge_id))
         self.db.collect_blobs()
         return {"deleted": True, "id": knowledge_id}

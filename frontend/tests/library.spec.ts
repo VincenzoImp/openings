@@ -413,7 +413,7 @@ test("a career entry with claims, the star, files and import is managed end to e
   // No role, group or order on the row.
   await expect(claim.locator("select, input")).toHaveCount(0);
   const read = async () =>
-    (await call(page, `/career/claims?summary=false&knowledge_id=${entry.id}`))
+    (await call(page, `/career/claims?summary=false&career_id=${entry.id}`))
       .items[0];
   let stored = await read();
   expect([stored.approved, stored.always_include]).toEqual([true, true]);

@@ -289,11 +289,17 @@ TABLES = (
     Table("posting_details"),
     Table("applications", columns={"status": STATUS_214}),
     # #209: runs are archived; the changes of one run keep one batch.
+    # #218: career entries and highlights keep the words of 0.24 in the change log.
     Table(
         "events",
         columns={
             "actor": _label("actor"),
             "batch_id": "CASE WHEN o.run_id IS NULL THEN NULL ELSE 'run:'||o.run_id END",
+            "kind": "CASE WHEN o.kind LIKE 'knowledge!_%' ESCAPE '!' THEN 'career'||substr(o.kind,10) "
+            "WHEN o.kind LIKE 'claim!_%' ESCAPE '!' THEN 'highlight'||substr(o.kind,6) "
+            "ELSE o.kind END",
+            "subject_type": "CASE o.subject_type WHEN 'knowledge' THEN 'career' "
+            "WHEN 'claim' THEN 'highlight' ELSE o.subject_type END",
         },
     ),
     Table("notes", columns={"author": _label("author")}),

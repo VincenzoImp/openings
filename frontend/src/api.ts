@@ -309,12 +309,12 @@ export interface Knowledge extends Versioned {
   title: string;
   narrative: string;
   narrative_preview?: string;
-  claim_preview?: string;
+  highlight_preview?: string;
   organization: string;
   dates: CareerDates | null;
   skills: string[];
   position: number;
-  claim_count?: number;
+  highlight_count?: number;
   file_count?: number;
   metadata: Json;
 }
@@ -332,11 +332,11 @@ export const knowledgeKinds = {
 } as const;
 export type KnowledgeKind = keyof typeof knowledgeKinds;
 export interface Claim extends Versioned {
-  knowledge_id: string;
+  career_id: string;
   text: string;
   text_preview?: string;
-  knowledge_title?: string;
-  knowledge_organization?: string;
+  career_title?: string;
+  career_organization?: string;
   position: number;
   approved: boolean;
   /** In the CV unless the job gives a reason to leave it out. */
@@ -410,8 +410,8 @@ export interface Document extends Versioned {
   /** The SHA-256 of the revision's source, which its PDF names. */
   source_sha256?: string | null;
   note?: string;
-  claim_ids?: string[];
-  knowledge_ids?: string[];
+  highlight_ids?: string[];
+  career_ids?: string[];
   previous_id?: string;
   revision_number?: number;
   files?: WorkspaceFile[];
@@ -506,7 +506,7 @@ export const tokenKinds: Record<TokenKind, string> = {
  * null when it was written before attribution was recorded.
  */
 export type Actor = string | null;
-/** One recorded change (`/events`). */
+/** One recorded change (`/changes`). */
 export interface Activity {
   id?: string;
   kind?: string;

@@ -43,6 +43,7 @@ class TransferGrant(Out):
     url: str
     method: str
     headers: dict[str, str]
+    curl: str | None = Field(default=None, description="The same request as a shell line.")
 
 
 class FileGrant(TransferGrant):
@@ -59,7 +60,7 @@ class OperationGrant(TransferGrant):
 
 class BatchItem(Out):
     index: int = Field(description="The item's position in the request.")
-    id: str
+    id: str | None = Field(default=None, description="The record; none for a failed create.")
     ok: bool
     version: int | None = Field(default=None, description="The record's version after a change.")
     result: Json | None = None
@@ -70,7 +71,7 @@ class BatchResult(Out):
     """One result per selected item; each item succeeds or fails on its own."""
 
     batch_id: str | None = Field(
-        default=None, description="The batch of the recorded changes (events_list batch_id)."
+        default=None, description="The batch of the recorded changes (changes_list batch_id)."
     )
     items: list[BatchItem]
     total: int
@@ -101,6 +102,22 @@ class WorkspaceInfo(Out):
     actor: str = Field(description="owner, agent:<token name> or system: the label of changes.")
     storage: Storage
     workflow: str
+
+
+class WorkspaceContext(Out):
+    """workspace_context: what to know before deciding or writing."""
+
+    workspace: Json
+    counts: dict[str, int]
+    settings: Json
+    profile: Json
+    preferences: Json
+    career: list[Json]
+    templates: list[Json]
+    skills: list[Json]
+    feedback: list[Json] = Field(
+        default=[], description="The owner's corrections of agent work since the previous read."
+    )
 
 
 class Event(Out):
@@ -241,6 +258,11 @@ class ResolvedJobs(Out):
     identity_conflict: bool = False
 
 
+class JobBatch(Out):
+    items: list[Job]
+    missing: list[str] = Field(default=[], description="Requested ids that do not exist.")
+
+
 class DuplicateGroup(Out):
     reference_id: str
     job_ids: list[str]
@@ -364,6 +386,11 @@ class ApplicationChange(Application):
     """The application after a change; its job is the compact summary."""
 
 
+class ApplicationBatch(Out):
+    items: list[Application]
+    missing: list[str] = Field(default=[], description="Requested ids that do not exist.")
+
+
 class NoReply(Out):
     days: int
     source: str
@@ -419,8 +446,8 @@ class Document(Record):
     text_from: str | None = Field(default=None, description="tex or pdf")
     source_sha256: str | None = None
     content: Json | None = None
-    claim_ids: list[str] = []
-    knowledge_ids: list[str] = []
+    highlight_ids: list[str] = []
+    career_ids: list[str] = []
     note: str = ""
     files: list[WorkspaceFile] = []
     file_count: int | None = None
@@ -451,6 +478,12 @@ class Comparison(Out):
     text: Json
 
 
+class DocumentDetail(Document):
+    comparison: Comparison | None = Field(
+        default=None, description="With compare_to: the line diff against that revision."
+    )
+
+
 # Career
 
 
@@ -466,7 +499,7 @@ class Profile(Out):
     version: int
 
 
-class Knowledge(Record):
+class CareerEntry(Record):
     kind: str
     title: str
     organization: str
@@ -476,18 +509,26 @@ class Knowledge(Record):
     skills: list[str] = []
     metadata: Json | None = None
     position: int
-    claim_count: int | None = None
+    highlight_count: int | None = None
+    highlight_preview: str | None = None
     file_count: int | None = None
     created_at: str
     updated_at: str
 
 
-class KnowledgePage(Page):
-    items: list[Knowledge]
+class CareerPage(Page):
+    items: list[CareerEntry]
 
 
-class Claim(Record):
-    knowledge_id: str
+class CareerBatch(Out):
+    items: list[CareerEntry] = Field(description="Full entries with highlights and files.")
+    missing: list[str] = []
+
+
+class Highlight(Record):
+    career_id: str
+    career_title: str | None = None
+    career_organization: str | None = None
     text: str | None = None
     text_preview: str | None = None
     approved: bool
@@ -498,8 +539,8 @@ class Claim(Record):
     updated_at: str
 
 
-class ClaimPage(Page):
-    items: list[Claim]
+class HighlightPage(Page):
+    items: list[Highlight]
 
 
 class Template(Record):
@@ -510,6 +551,7 @@ class Template(Record):
     guidance: str | None = None
     rules: Json | None = None
     file_count: int | None = None
+    files: list[WorkspaceFile] = []
     created_at: str
     updated_at: str
 
@@ -519,13 +561,13 @@ class TemplatePage(Page):
 
 
 class ImportPreviewResult(Out):
-    knowledge: list[Json]
+    entries: list[Json]
     warnings: list[Any] = []
     profile: Json | None = None
 
 
 class ImportResult(Out):
-    items: list[Knowledge]
+    items: list[CareerEntry]
     total: int
     profile: Profile | None = None
 
@@ -561,6 +603,13 @@ class Preferences(Out):
 class Collection(Out):
     enabled: bool
     version: int
+    sources_failing: int | None = None
+    kinds: Json | None = None
+    providers: list[Json] | None = None
+    fetches: Json | None = None
+    results: BatchResult | None = Field(
+        default=None, description="collection_update: one result per provider, cancel, retry."
+    )
     source_count: int
     enabled_sources: int
     queued_tasks: int
@@ -646,6 +695,10 @@ class Source(Record):
 
 class SourcePage(Page):
     items: list[Source]
+
+
+class SourceDetail(Source):
+    recent_runs: list[Json] = Field(default=[], description="The latest checks, newest first.")
 
 
 class SourcePreviewResult(Out):

@@ -1,18 +1,17 @@
-"""Career categories behave the same through REST and MCP, and revisions cite them."""
+"""Career categories survive import, filtering and citation."""
 
 import json
 
-import pytest
 from fastapi.testclient import TestClient
 
 from openings.app import create_app
 
 
-@pytest.mark.parametrize("transport", ["rest", "mcp"])
-def test_awards_and_publications_survive_import_filtering_and_citation(tmp_path, transport):
-    app = create_app(tmp_path / f"categories-{transport}.sqlite", start_worker=False)
+def test_awards_and_publications_survive_import_filtering_and_citation(tmp_path):
+    """The one-record career routes the dashboard uses, and the owner's import (REST only)."""
+    app = create_app(tmp_path / "categories.sqlite", start_worker=False)
     app.state.auth.setup("synthetic-password")
-    token = app.state.auth.create_token("Synthetic category client")["token"]
+    token = app.state.auth.create_token("Synthetic category client", "owner")["token"]
     headers = {
         "Authorization": "Bearer " + token,
         "Accept": "application/json, text/event-stream",
@@ -20,34 +19,18 @@ def test_awards_and_publications_survive_import_filtering_and_citation(tmp_path,
     with TestClient(app, base_url="http://localhost:8080", headers=headers) as client:
 
         def call(tool, method, path, arguments):
-            if transport == "rest":
-                # REST names the identifiers in the path and the rest in the body or query.
-                body = {
-                    k: v
-                    for k, v in arguments.items()
-                    if not (k.endswith("_id") and f"/{v}" in path)
-                }
-                response = client.request(
-                    method,
-                    "/api/v1" + path,
-                    params=body if method == "GET" else None,
-                    json=body if method != "GET" else None,
-                )
-                response.raise_for_status()
-                return response.json()
-            response = client.post(
-                "/mcp",
-                json={
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "method": "tools/call",
-                    "params": {"name": tool, "arguments": arguments},
-                },
+            # REST names the identifiers in the path and the rest in the body or query.
+            body = {
+                k: v for k, v in arguments.items() if not (k.endswith("_id") and f"/{v}" in path)
+            }
+            response = client.request(
+                method,
+                "/api/v1" + path,
+                params=body if method == "GET" else None,
+                json=body if method != "GET" else None,
             )
             response.raise_for_status()
-            result = response.json()["result"]
-            assert not result.get("isError"), result
-            return result.get("structuredContent") or json.loads(result["content"][0]["text"])
+            return response.json()
 
         entries = [
             {
@@ -67,14 +50,14 @@ def test_awards_and_publications_survive_import_filtering_and_citation(tmp_path,
             "/career/import/preview",
             {"text": json.dumps(entries)},
         )
-        assert [row["kind"] for row in preview["knowledge"]] == ["award", "publication"]
+        assert [row["kind"] for row in preview["entries"]] == ["award", "publication"]
         before_import = call("knowledge_list", "GET", "/career/knowledge", {})
         assert before_import["total"] == 2
         imported = call(
             "career_import",
             "POST",
             "/career/import",
-            {"knowledge": preview["knowledge"]},
+            {"entries": preview["entries"]},
         )
         assert imported["total"] == 2
         for entry, record in zip(entries, created):
@@ -90,7 +73,7 @@ def test_awards_and_publications_survive_import_filtering_and_citation(tmp_path,
                 "knowledge_get",
                 "GET",
                 f"/career/knowledge/{record['id']}",
-                {"knowledge_id": record["id"]},
+                {"career_id": record["id"]},
             )
             assert all(read[key] == value for key, value in entry.items())
 
@@ -110,10 +93,10 @@ def test_awards_and_publications_survive_import_filtering_and_citation(tmp_path,
                 "application_id": application["id"],
                 "kind": "other",
                 "content": {"text": "Synthetic notes."},
-                "knowledge_ids": cited,
+                "career_ids": cited,
             },
         )
-        assert document["knowledge_ids"] == cited
+        assert document["career_ids"] == cited
 
         award = created[0]
         changed = call(
@@ -121,7 +104,7 @@ def test_awards_and_publications_survive_import_filtering_and_citation(tmp_path,
             "PATCH",
             f"/career/knowledge/{award['id']}",
             {
-                "knowledge_id": award["id"],
+                "career_id": award["id"],
                 "expected_version": award["version"],
                 "kind": "publication",
                 "narrative": "Revised live evidence.",
@@ -135,19 +118,7 @@ def test_awards_and_publications_survive_import_filtering_and_citation(tmp_path,
             f"/documents/{document['id']}",
             {"document_id": document["id"]},
         )
-        assert saved["knowledge_ids"] == cited
+        assert saved["career_ids"] == cited
 
         invalid = {"kind": "unsupported", "title": "Invalid category"}
-        if transport == "rest":
-            assert client.post("/api/v1/career/knowledge", json=invalid).status_code == 422
-        else:
-            response = client.post(
-                "/mcp",
-                json={
-                    "jsonrpc": "2.0",
-                    "id": 2,
-                    "method": "tools/call",
-                    "params": {"name": "knowledge_create", "arguments": {"value": invalid}},
-                },
-            )
-            assert response.json()["result"]["isError"]
+        assert client.post("/api/v1/career/knowledge", json=invalid).status_code == 422
