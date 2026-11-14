@@ -11,8 +11,6 @@ phrase of the owner may use an earlier word.
 import re
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parents[2]
 USER_DOCS = sorted((ROOT / "docs" / "user").glob("*.md"))
 PAGES = [
@@ -109,7 +107,6 @@ def test_one_vocabulary_and_the_mcp_endpoint_with_its_slash():
     assert not vocabulary(PAGES), vocabulary(PAGES)
 
 
-@pytest.mark.xfail(reason="the skills still say inbox; remove this mark with that fix")
 def test_agents_read_the_same_vocabulary():
     found = vocabulary(AGENT_PAGES, lambda page: QUOTED.sub("", page.read_text()))
     assert not found, found
