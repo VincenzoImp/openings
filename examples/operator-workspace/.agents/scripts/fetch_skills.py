@@ -3,7 +3,8 @@
 
 Usage: python3 .agents/scripts/fetch_skills.py
 
-Agents connected over MCP can already read skills with skills_list/skills_get.
+Agents connected over MCP can already read skills with skills_get, the prompts
+or the openings://skills/<name> resources.
 This copy serves clients that load Agent Skills from disk, and always matches
 the server version. Needs OPENINGS_URL and OPENINGS_TOKEN (launch.py sets the
 URL); OPENINGS_CA_FILE is used for a private certificate authority.
