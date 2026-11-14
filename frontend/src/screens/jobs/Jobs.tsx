@@ -488,6 +488,10 @@ export default function Jobs() {
     }
     if (undone) return;
     if (failed.length) return;
+    // Answers can arrive out of order (a shortlist takes longer than a
+    // dismissal): only the latest decision says what was done, so an earlier
+    // one landing late never replaces its toast. Its Undo stays on z and ⌘Z.
+    if (entry.id !== counter.current) return;
     toast.show({
       message: `${DONE[to]} ${what}`,
       icon:

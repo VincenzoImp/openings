@@ -115,8 +115,13 @@ test("Account: theme, setup guide, sign out and a checked password", async ({
 test("API & agents: three steps, an Agent token by default, copy, revoke", async ({
   page,
   context,
+  browserName,
 }) => {
-  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  // WebKit has no clipboard permissions to grant; it checks the toast only.
+  const clipboard = browserName === "chromium";
+  if (clipboard) {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  }
   await go(page, "settings?section=agents");
   await expect(page.locator(".set-step-title")).toContainText([
     "Create a token",
@@ -169,9 +174,11 @@ test("API & agents: three steps, an Agent token by default, copy, revoke", async
   await expect(snippet).toContainText("bearer_token_env_var");
   await page.getByRole("button", { name: "Copy mcp configuration" }).click();
   await expect(toast(page)).toContainText("Configuration copied");
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
-    "[mcp_servers.openings]",
-  );
+  if (clipboard) {
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
+      "[mcp_servers.openings]",
+    );
+  }
   const fits = await snippet.evaluate(
     (element) => element.scrollWidth <= element.clientWidth + 1,
   );
