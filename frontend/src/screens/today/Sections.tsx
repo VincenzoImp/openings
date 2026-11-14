@@ -268,7 +268,7 @@ export function Waiting({ rows, days }: { rows: Application[]; days: number }) {
       });
       return;
     }
-    const closed = result.items.filter((item) => item.ok);
+    const closed = result.items.filter((item) => item.ok && item.id);
     if (result.failed)
       return toast.show({
         message: `${closed.length} closed; ${result.failed} could not be closed.`,
@@ -285,7 +285,7 @@ export function Waiting({ rows, days }: { rows: Application[]; days: number }) {
               action: "reopen",
               status: "applied",
               items: closed.map((item) => ({
-                id: item.id,
+                id: String(item.id),
                 expected_version: item.version ?? 0,
               })),
             })

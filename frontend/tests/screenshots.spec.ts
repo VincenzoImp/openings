@@ -47,6 +47,14 @@ async function emptyWorkspace(page: Page) {
         items: [],
       })),
     }),
+    "workspace/context": (body) => ({
+      ...body,
+      profile: { ...body.profile, name: "" },
+      preferences: {},
+      career: [],
+      templates: [],
+      counts: { ...body.counts, jobs: 0, sources: 0 },
+    }),
   };
   for (const [path, edit] of Object.entries(change))
     await page.route(`**/api/v1/${path}`, async (route) => {

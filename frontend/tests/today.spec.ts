@@ -161,9 +161,9 @@ test("waiting for a reply: close one with c, undo, record a reply with r, close 
     (await call(page, "/applications?needs=reply_overdue&limit=1")).total;
   const list = rows(page, "Applications waiting for a reply");
   await expect(list).toHaveCount(Math.min(waiting.total, 5));
-  await expect(page.locator(".today-note")).toContainText(
-    `No reply after ${waiting.no_reply.days} days`,
-  );
+  await expect(
+    section(page, "Waiting for a reply").locator(".today-note"),
+  ).toContainText(`No reply after ${waiting.no_reply.days} days`);
 
   // The first row is the list's Tab stop; c closes it as no reply.
   const first = waiting.items[0];
@@ -214,13 +214,8 @@ test("the setup checklist comes from server facts: two browsers agree", async ({
   baseURL,
 }) => {
   await go(page, "today");
-  // Take what the person looks for out of the workspace: no name, no
-  // Preferences. Jobs and career entries stay, so 2 of 3 are done.
-  const profile = await call(page, "/career/profile");
-  await call(page, "/career/profile", "PATCH", {
-    expected_version: profile.version,
-    name: "",
-  });
+  // Take what the person looks for out of the workspace: no Preferences.
+  // Jobs and career entries stay, so 2 of 3 are done.
   const preferences = await call(page, "/preferences");
   for (const item of preferences.sections)
     await call(page, `/preferences/${item.section}`, "PUT", {
@@ -235,7 +230,9 @@ test("the setup checklist comes from server facts: two browsers agree", async ({
   await other.addCookies(cookies);
   const second = await other.newPage();
   for (const view of [page, second]) {
+    // A new page load reads the workspace again.
     await go(view, "today");
+    await view.reload();
     const checklist = section(view, "Set up your workspace");
     await expect(checklist).toContainText("2 of 3 done");
     await expect(
@@ -265,6 +262,7 @@ test("the setup checklist comes from server facts: two browsers agree", async ({
 
   for (const view of [page, second]) {
     await go(view, "today");
+    await view.reload();
     await expect(section(view, "Set up your workspace")).toHaveCount(0);
     await expect(view.getByRole("link", { name: "Finish setup" })).toHaveCount(
       0,

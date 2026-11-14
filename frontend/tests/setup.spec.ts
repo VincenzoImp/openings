@@ -82,7 +82,7 @@ test("first run: about you, a search and a job, a CV and the example template, t
   await expect(page.getByLabel("Location")).toHaveValue("Zurich or remote");
   await page.getByLabel("Country").fill("switzerland");
   await page.getByRole("button", { name: "Save search" }).click();
-  await expect(page.getByRole("status")).toContainText(
+  await expect(page.locator(".setup-done")).toContainText(
     `Saved the search “${roles} in Zurich or remote”.`,
   );
   const source = (
@@ -97,7 +97,10 @@ test("first run: about you, a search and a job, a CV and the example template, t
   });
   const link = `https://jobs.example.test/${Date.now()}`;
   await page.getByLabel("Posting address").fill(link);
-  await page.getByRole("button", { name: "Add job" }).click();
+  await page
+    .locator("#content")
+    .getByRole("button", { name: "Add job" })
+    .click();
   await expect(page.getByText(/^Added “/)).toBeVisible();
   expect(
     (await call(page, `/jobs/resolve?url=${encodeURIComponent(link)}`)).items,
