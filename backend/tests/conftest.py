@@ -40,7 +40,6 @@ from openings.auth import COOKIE, Auth
 from openings.discovery import DiscoveryService
 from openings.workspace import Workspace
 
-
 PASSWORD = "synthetic-password"
 BASE_URL = "http://localhost:8080"
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
