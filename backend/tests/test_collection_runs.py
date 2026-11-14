@@ -1,4 +1,4 @@
-"""Complete collection workflows across saved settings, resumable tasks."""
+"""Collection runs: saved settings, schedules, resumable tasks, refreshes and failures."""
 
 import json
 from datetime import UTC, datetime
@@ -11,22 +11,12 @@ from openings.collectors.policy import ProviderDeferred
 from openings.common import encode, now
 from openings.discovery import (
     CollectionWrite,
-    DiscoveryService,
     SourceBulk,
     SourceCreate,
     SourcePatch,
 )
 from openings.errors import DomainError
 from openings.scheduling import next_due, schedule_adapter
-from openings.workspace import Workspace
-
-
-@pytest.fixture
-def collection(tmp_path):
-    workspace = Workspace(tmp_path / "collection.sqlite")
-    service = DiscoveryService(workspace)
-    workspace.discovery = service
-    return workspace, service
 
 
 def make_source(service, **changes):
@@ -45,23 +35,20 @@ def run_next(service):
 
 
 def test_daily_slots_coalesce_and_handle_clock_changes():
-    schedule = {"kind": "daily", "times": ["05:00", "13:00", "21:00"], "timezone": "Europe/Paris"}
-    now = datetime(2026, 10, 30, 20, 10, tzinfo=UTC)
-    assert (
-        next_due(schedule, "2026-10-29T04:00:00+00:00", now).isoformat()
-        == "2026-10-30T20:00:00+00:00"
-    )
-    assert (
-        next_due(schedule, "2026-10-30T20:00:00+00:00", now).isoformat()
-        == "2026-10-31T04:00:00+00:00"
-    )
+    paris = {"kind": "daily", "times": ["05:00", "13:00", "21:00"], "timezone": "Europe/Paris"}
     spring = {"kind": "daily", "times": ["02:30"], "timezone": "Europe/Paris"}
-    assert (
-        next_due(
-            spring, "2026-03-28T01:30:00+00:00", datetime(2026, 3, 29, 2, tzinfo=UTC)
-        ).isoformat()
-        == "2026-03-29T01:30:00+00:00"
-    )
+    autumn = {"kind": "daily", "times": ["02:30"], "timezone": "Europe/Zurich"}
+    for schedule, previous, current, due in (
+        # Missed slots coalesce into the latest one; the next is the following slot.
+        (paris, "2026-10-29T04:00:00+00:00", (2026, 10, 30, 20, 10), "2026-10-30T20:00:00"),
+        (paris, "2026-10-30T20:00:00+00:00", (2026, 10, 30, 20, 10), "2026-10-31T04:00:00"),
+        # A slot inside the skipped spring hour runs at the shifted time.
+        (spring, "2026-03-28T01:30:00+00:00", (2026, 3, 29, 2, 0), "2026-03-29T01:30:00"),
+        # The repeated autumn hour does not run the slot twice.
+        (autumn, "2026-10-25T00:30:00+00:00", (2026, 10, 25, 1, 45), "2026-10-26T01:30:00"),
+    ):
+        expected = due + "+00:00"
+        assert next_due(schedule, previous, datetime(*current, tzinfo=UTC)).isoformat() == expected
     with pytest.raises(ValidationError):
         schedule_adapter.validate_python({"kind": "interval", "minutes": 60, "timezone": "UTC"})
 
@@ -361,17 +348,14 @@ def test_explicit_retry_preserves_progress_and_renews_error_allowance(collection
     assert service.get_task(queued["id"])["result"]["failure_attempts"] == 1
 
 
-def test_partial_refresh_keeps_complete_body_and_records_the_observation(collection):
+def test_a_partial_refresh_keeps_a_complete_body_and_records_the_observation(collection):
     workspace, _ = collection
+    source = {"title": "Engineer", "company": "Example"}
     for number, preview in enumerate(["", "Python and SQL preview"]):
-        source = {
-            "url": f"https://example.org/job/{number}",
-            "title": "Engineer",
-            "company": "Example",
-        }
+        posting = {**source, "url": f"https://example.org/job/{number}"}
         original = workspace.ingest_job(
             {
-                **source,
+                **posting,
                 "posting": "Build APIs and maintain production data systems.",
                 "metadata": {"description_complete": True, "description_status": "complete"},
             }
@@ -379,7 +363,7 @@ def test_partial_refresh_keeps_complete_body_and_records_the_observation(collect
         first = workspace.db.one("SELECT * FROM postings WHERE job_id=?", (original["id"],))
         refreshed = workspace.ingest_job(
             {
-                **source,
+                **posting,
                 "posting": preview,
                 "metadata": {"description_complete": False, "description_status": "pending"},
             }
@@ -392,6 +376,67 @@ def test_partial_refresh_keeps_complete_body_and_records_the_observation(collect
         assert observation["id"] == first["id"] and observation["payload"] == "{}"
         assert observation["content_hash"] != first["content_hash"]
         assert observation["last_seen_at"] > first["last_seen_at"]
-        assert (
-            workspace.db.one("SELECT count(*) n FROM events WHERE kind='job_refreshed'")["n"] == 0
-        )
+    assert workspace.db.one("SELECT count(*) n FROM events WHERE kind='job_refreshed'")["n"] == 0
+
+    # A preview the owner completed by hand stays complete when the source sends it again.
+    preview = {**source, "url": "https://example.test/jobs/preview", "posting": "Python, SQL"}
+    preview = workspace.ingest_job({**preview, "metadata": {"description_complete": False}})
+    assert not preview["complete"]
+    completed = workspace.update_job(
+        preview["id"], {"expected_version": preview["version"], "posting": "Build SQL services."}
+    )
+    refreshed = workspace.ingest_job(
+        {
+            **source,
+            "url": "https://example.test/jobs/preview",
+            "posting": "New source preview",
+            "metadata": {"description_complete": False},
+        }
+    )
+    assert completed["complete"] and refreshed["complete"]
+    assert refreshed["posting"] == "Build SQL services."
+    assert refreshed["metadata"]["description_complete"] is False
+    assert workspace.list_jobs(complete=False)["total"] == 0
+
+
+def test_a_failing_source_leaves_the_others_running(collection, monkeypatch):
+    workspace, service = collection
+    first = service.create_source(
+        SourceCreate(name="Failing", kind="ashby", config={"board": "bad"})
+    )
+    second = service.create_source(
+        SourceCreate(name="Working", kind="ashby", config={"board": "good"})
+    )
+
+    def feed(source):
+        if source["id"] == first["id"]:
+            raise DomainError(502, "source_http", "The source returned HTTP 503.")
+        return [
+            {
+                "title": "API Engineer",
+                "company": "Working",
+                "posting": "Build reliable APIs.",
+                "url": "https://jobs.ashbyhq.com/good/example",
+                "source_key": "ashby:good:example",
+            }
+        ]
+
+    patch_discovery(monkeypatch, "fetch_postings", feed)
+    service.queue_collection(first["id"])
+    service.queue_collection(second["id"])
+    run_next(service)
+    run_next(service)
+    assert service.get_source(first["id"])["last_run"]["tasks"][0]["error"]
+    assert service.get_source(second["id"])["last_error"] is None
+    assert workspace.list_jobs()["total"] == 1
+
+
+def test_cancel_between_claim_and_collection_does_not_touch_source(collection, monkeypatch):
+    _, service = collection
+    source = make_source(service)
+    service.queue_collection(source["id"])
+    task = service.claim_task("worker")
+    service.cancel_task(task["id"])
+    patch_discovery(monkeypatch, "fetch_postings", lambda source: pytest.fail("Cancelled fetch"))
+    service.run_task(task, "worker")
+    assert service.get_source(source["id"])["last_run_at"] is None

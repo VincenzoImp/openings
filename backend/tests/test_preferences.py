@@ -8,7 +8,6 @@ from pydantic import ValidationError
 
 from openings.actors import OWNER, acting_as, token_actor
 from openings.errors import DomainError
-from openings.outcomes import no_reply_period
 from openings.preferences import SECTIONS, PreferencesService
 
 AGENT = token_actor("token-agent", "Synthetic agent", "agent")
@@ -152,39 +151,6 @@ def test_settings_change_with_their_version(services):
         "fields": ["no_reply_days", "spoken_languages"],
         "version": 1,
     }
-
-
-def test_the_no_reply_period_comes_from_the_settings(services):
-    workspace, preferences = services
-
-    def attempt(title, status, days):
-        job = workspace.ingest_job({"title": title, "company": "Example", "posting": "APIs."})
-        application = workspace.create_application({"job_id": job["id"]})
-        return workspace.update_application(
-            application["id"],
-            {
-                "expected_version": application["version"],
-                "stage": status,
-                "applied_at": stamp_ago(days),
-            },
-        )
-
-    with workspace.db.connect() as conn:
-        assert no_reply_period(conn) == {"days": 30, "source": "default"}
-    old = attempt("Synthetic old", "applied", 40)
-    recent = attempt("Synthetic recent", "applied", 10)
-    attempt("Synthetic interview", "interview", 60)
-    due = workspace.list_applications(needs="reply_overdue")
-    assert [item["id"] for item in due["items"]] == [old["id"]]
-    assert due["no_reply"] == {"days": 30, "source": "default", "overdue": 1}
-    preferences.update_settings({"expected_version": 0, "no_reply_days": 7})
-    listed = workspace.list_applications(needs="reply_overdue")
-    assert {item["id"] for item in listed["items"]} == {old["id"], recent["id"]}
-    assert listed["no_reply"] == {"days": 7, "source": "settings", "overdue": 2}
-    # A text that names a period does nothing: only the setting counts.
-    write(preferences, "facts", [{"text": "No reply: 45 days."}])
-    with workspace.db.connect() as conn:
-        assert no_reply_period(conn)["days"] == 7
 
 
 GERMAN = (

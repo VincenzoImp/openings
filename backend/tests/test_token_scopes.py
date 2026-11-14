@@ -1,18 +1,18 @@
 """Scoped API tokens: an agent token has no owner authority; owner tokens keep full access."""
 
 import hashlib
-import json
 import sqlite3
 
 import pytest
 from fastapi.testclient import TestClient
 
+from conftest import McpClient
 from openings.actors import OWNER, acting_as, current_actor, token_actor
+from openings.app import create_app
 from openings.auth import Auth
 from openings.errors import DomainError
 
 PASSWORD = "synthetic-password"
-MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 FORBIDDEN = {"token_kind": "agent", "required": "owner"}
 
 
@@ -28,22 +28,7 @@ def bearer(token):
 
 
 def tool(client, token, name, arguments=None):
-    """Call an MCP tool over the HTTP endpoint; returns (value, error)."""
-    response = client.post(
-        "/mcp",
-        headers={**MCP_HEADERS, **bearer(token)},
-        json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {"name": name, "arguments": arguments or {}},
-        },
-    )
-    assert response.status_code == 200, response.text
-    result = response.json()["result"]
-    if result.get("isError"):
-        return None, json.loads(result["content"][0]["text"])["error"]
-    return result.get("structuredContent") or json.loads(result["content"][0]["text"]), None
+    return McpClient(client, {"headers": bearer(token)}).call(name, arguments)
 
 
 def refused_over_rest(response):
@@ -215,3 +200,17 @@ def test_the_owner_session_and_the_system_are_never_refused(workspace):
     with pytest.raises(DomainError) as invalid:
         auth.create_token("Invalid", "admin")
     assert invalid.value.code == "token_kind"
+
+
+def test_a_session_write_needs_its_csrf_header_and_a_revoked_token_is_refused(tmp_path):
+    app = create_app(tmp_path / "auth.sqlite", start_worker=False)
+    with TestClient(app) as client:
+        assert client.get("/api/v1/jobs").status_code == 401
+        setup = client.post("/api/v1/auth/setup", json={"password": PASSWORD})
+        assert setup.status_code == 200
+        assert client.post("/api/v1/jobs", json={"posting": "Text"}).status_code == 403
+        client.headers["X-CSRF-Token"] = setup.json()["csrf_token"]
+        token = client.post("/api/v1/tokens", json={"name": "test"}).json()
+        client.delete("/api/v1/tokens/" + token["id"])
+        client.cookies.clear()
+        assert client.get("/api/v1/jobs", headers=bearer(token)).status_code == 401

@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 
+from doubles import Lane
 from openings import operations, retention
 from openings._vendor.jobspy.model import JobPost
 from openings.collectors.catalog import COMPANY_KINDS
@@ -257,17 +258,6 @@ def test_pruning_is_bounded_and_keeps_records_of_agent_changes(collected, monkey
     assert retention.retention_days() == 90
     monkeypatch.setenv("OPENINGS_RETENTION_DAYS", "30")
     assert prune(workspace.db)["runs"] == 1
-
-
-class Lane:
-    def __init__(self, cycles):
-        self.cycles = cycles
-
-    def is_set(self):
-        return self.cycles <= 0
-
-    def wait(self, seconds):
-        self.cycles -= 1
 
 
 def test_the_worker_prunes_at_start_and_then_at_a_slow_pace(collected, monkeypatch):
