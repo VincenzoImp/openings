@@ -1,54 +1,55 @@
 # Configuration
 
-Openings reads a few environment variables at start. With Docker Compose, set
-them in `.env` next to `docker-compose.yml` (see [`.env.example`](../../.env.example))
+Openings reads a few environment variables at start. With Docker Compose, set them
+in `.env` next to `docker-compose.yml` (see [`.env.example`](../../.env.example))
 and recreate the container with `docker compose up -d`; a restart alone keeps the
-old values. Run from source, export them before `uv run openings`, or pass the
-matching command-line option where one exists.
+old values. From source, export them before `uv run openings`, or use the matching
+command-line option where one exists.
 
-Every other setting lives in the workspace and is changed in the dashboard or
-through REST and MCP: collection sources, provider request spacing, Preferences,
-tokens and the owner password.
+Every other setting lives in the workspace and is changed in the dashboard, REST or
+MCP: sources, provider request spacing, Preferences, tokens and the owner password.
 
-## Server settings
+## Server
 
-| Variable | Default | What it does | Read by |
-|---|---|---|---|
-| `OPENINGS_PUBLIC_URL` | unset (Compose: `http://127.0.0.1:8080`) | The origin browsers and agents use. The MCP endpoint accepts this host besides `localhost`, `127.0.0.1` and `[::1]`; session cookies are marked secure when it starts with `https://`; `GET /workspace` and `workspace_info` report it as the origin. | `app.py`, `interfaces/core.py`, `interfaces/system.py` |
-| `OPENINGS_PASSWORD` | unset | First-run owner password, at least 10 characters. Used only while no owner password exists; changing it later does not reset the owner. | `auth.py` |
-| `OPENINGS_TRUSTED_PROXIES` | empty: trust no proxy | Comma-separated IP addresses or CIDR ranges of reverse proxies whose `X-Forwarded-For` and `X-Forwarded-Proto` are trusted. Each client behind a trusted proxy gets its own sign-in limit. An invalid entry stops the start with an error. Option `--trusted-proxies`. | `__main__.py` |
-| `OPENINGS_RETENTION_DAYS` | `90` | Days finished collection runs and tasks are kept; `0` keeps everything. The 20 most recent finished runs of every source always stay. A value that is not a number falls back to 90 with a warning. | `retention.py` |
-| `OPENINGS_MAX_RESTORE_MB` | unset | An upper bound, in MiB, on the backup a restore accepts. The limit otherwise follows the free space on the data volume (see [Operations](operations.md)); this setting can only lower it. | `operations.py` |
-| `OPENINGS_BACKUP_DIR` | `<data dir>/backups` (the folder of the workspace file; `/data/backups` in the image) | Where the daily backups are written. Created with mode 0700 when missing; keep it on a volume the container can write. | `backups.py` |
-| `OPENINGS_BACKUP_KEEP` | `3` | How many daily backups are kept; older ones are deleted after a new one is verified. `0` turns daily backups off. A value that is not a number falls back to 3 with a warning. See [Backups](operations.md#backups). | `backups.py` |
-| `OPENINGS_COMPACT_MIN_MB` | `32` | At start, the database file is rewritten without its free pages when at least a quarter of the file and this many MiB are free. A very large value disables it. | `compaction.py` |
+| Variable | Default | What it does |
+|---|---|---|
+| `OPENINGS_PUBLIC_URL` | unset (Compose: `http://127.0.0.1:8080`) | The origin browsers and agents use. MCP accepts this host besides `localhost`; file-transfer links in `curl` lines start with it; cookies are secure when it starts with `https://`. |
+| `OPENINGS_PASSWORD` | unset | First-run owner password, at least 10 characters. Used only while no owner password exists. |
+| `OPENINGS_TRUSTED_PROXIES` | empty: trust none | Comma-separated IPs or CIDR ranges of reverse proxies whose `X-Forwarded-For` and `X-Forwarded-Proto` are trusted. An invalid entry stops the start. Option `--trusted-proxies`. |
+| `OPENINGS_RETENTION_DAYS` | `90` | Days finished collection runs and tasks are kept; `0` keeps all. The 20 newest runs of every source always stay. |
+| `OPENINGS_BACKUP_DIR` | `<data dir>/backups` (`/data/backups`) | Where daily backups go. Created with mode 0700. |
+| `OPENINGS_BACKUP_KEEP` | `3` | Daily backups kept; `0` turns them off. |
+| `OPENINGS_MAX_RESTORE_MB` | unset | An upper bound on the backup a restore accepts. The limit otherwise follows free space; this can only lower it. |
+| `OPENINGS_COMPACT_MIN_MB` | `32` | At start, the database is rewritten without free pages when at least a quarter of it and this many MiB are free. A very large value disables it. |
 
-## Process and paths
-
-The container image sets these; change them only when running from source or
-building your own image.
-
-| Variable | Default from source | Image value | What it does | Read by |
-|---|---|---|---|---|
-| `OPENINGS_HOST` | `127.0.0.1` | `0.0.0.0` | Address the server listens on. Option `--host`. | `__main__.py` |
-| `OPENINGS_PORT` | `8080` | `8080` | Port the server listens on (inside the container). Option `--port`. | `__main__.py` |
-| `OPENINGS_DATABASE` | `data/openings.sqlite` | `/data/openings.sqlite` | The workspace file. Option `--database`. | `__main__.py`, `app.py` |
-| `OPENINGS_FRONTEND` | `frontend/dist` of the checkout | `/app/frontend` | The built dashboard. Without it the server answers with a short JSON notice. | `app.py` |
-| `OPENINGS_EXAMPLES` | `examples` of the checkout | `/app/examples` | Synthetic example files served at `/api/v1/examples`. | `interfaces/system.py` |
-| `OPENINGS_SKILLS` | `skills` of the checkout | `/app/skills` | The shipped workflow skills. | `skills.py` |
+A retention or backup count that is not a number falls back to its default with a warning.
 
 ## Docker Compose only
 
 | Variable | Default | What it does |
 |---|---|---|
-| `OPENINGS_BIND` | `127.0.0.1` | Host address the container port is published on; `0.0.0.0` exposes it on the network. |
-| `OPENINGS_PORT` | `8080` | Host port; the container still listens on 8080. Update `OPENINGS_PUBLIC_URL` to match. |
-| `OPENINGS_IMAGE` | the released image | Image to run, for a private mirror or a local build. |
+| `OPENINGS_BIND` | `127.0.0.1` | Host address the port is published on; `0.0.0.0` exposes it to the network. |
+| `OPENINGS_PORT` | `8080` | Host port; the container listens on 8080. Update `OPENINGS_PUBLIC_URL` to match. |
+| `OPENINGS_IMAGE` | the released image | The image to run, for a mirror or a local build. |
 
-## Clients and tests
+## Process and paths
 
-The server does not read these. The guides use `OPENINGS_URL` and
-`OPENINGS_TOKEN` in REST examples and agent environments, and `OPENINGS_CA_FILE`
-for a private certificate authority. The browser tests' synthetic server reads
-`OPENINGS_E2E_PORT`, `OPENINGS_E2E_JOBS` and `OPENINGS_E2E_APPLICATIONS` (see
-[Contributing](../../CONTRIBUTING.md)).
+The image sets these; change them only when running from source or building your
+own image.
+
+| Variable | From source | In the image | What it does |
+|---|---|---|---|
+| `OPENINGS_HOST` | `127.0.0.1` | `0.0.0.0` | Listen address. Option `--host`. |
+| `OPENINGS_PORT` | `8080` | `8080` | Listen port inside the container. Option `--port`. |
+| `OPENINGS_DATABASE` | `data/openings.sqlite` | `/data/openings.sqlite` | The workspace file. Option `--database`. |
+| `OPENINGS_FRONTEND` | `frontend/dist` | `/app/frontend` | The built dashboard. |
+| `OPENINGS_EXAMPLES` | `examples` | `/app/examples` | Synthetic example files served at `/api/v1/examples`. |
+| `OPENINGS_SKILLS` | `skills` | `/app/skills` | The skills served to agents. |
+
+## Clients
+
+The server does not read these. Your scripts and agent use `OPENINGS_URL` and
+`OPENINGS_TOKEN` (see [REST API](api.md) and [Work with an agent](agents.md)), and
+`OPENINGS_CA_FILE` names a private certificate authority for the operator workspace
+launcher. The browser tests' server reads `OPENINGS_E2E_PORT`, `OPENINGS_E2E_JOBS`
+and `OPENINGS_E2E_APPLICATIONS`.

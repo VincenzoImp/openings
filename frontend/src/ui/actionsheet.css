@@ -1,0 +1,56 @@
+@layer ui {
+  /* A phone's menu: a sheet from the bottom edge, inside the safe area. */
+  .ui-sheet {
+    width: 100vw;
+    max-width: 100vw;
+    max-height: 80dvh;
+    margin: auto 0 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-lg);
+    translate: 0 0;
+    transition:
+      translate var(--d-slow) var(--ease),
+      overlay var(--d-slow) allow-discrete,
+      display var(--d-slow) allow-discrete;
+  }
+  .ui-sheet:not([open]) {
+    translate: 0 100%;
+    transition-duration: var(--d-exit);
+  }
+  @starting-style {
+    .ui-sheet[open] {
+      translate: 0 100%;
+    }
+  }
+  .ui-sheet::backdrop {
+    background: var(--backdrop);
+  }
+  .ui-sheet-menu {
+    display: flex;
+    flex-direction: column;
+    padding: var(--s-2) var(--s-2)
+      calc(var(--s-2) + env(safe-area-inset-bottom));
+  }
+  .ui-sheet-grip {
+    align-self: center;
+    width: 36px;
+    height: 4px;
+    margin: 0 0 var(--s-2);
+    border-radius: var(--r-full);
+    background: var(--border-strong);
+  }
+  .ui-sheet .ui-menu-item {
+    height: var(--touch);
+    font-size: 15px;
+  }
+  .ui-sheet-cancel {
+    justify-content: center;
+  }
+  .ui-sheet-cancel .ui-menu-label {
+    flex: none;
+  }
+}

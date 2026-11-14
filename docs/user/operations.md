@@ -1,112 +1,21 @@
-# Backup and operations
+# Operations
 
-## Portable backup
+## Install and update
 
-Use **Settings › Data → Download backup**, authenticated `GET /api/v1/backup`, or the MCP
-`workspace_backup` download grant. These create a consistent SQLite snapshot while
-the service runs, including PDF/source bytes, templates, career data, job history
-and settings.
+The single `openings` container has a Compose budget of 0.5 CPU and 512 MiB; leave
+room for the host. The `workspace` volume holds `/data/openings.sqlite`, its
+journals and every uploaded file. The core runs as UID/GID 10001, so a
+bind-mounted `/data` must be writable by it; the default named volume is.
 
-```bash
-curl --fail "$OPENINGS_URL/api/v1/backup" \
-  -H "Authorization: Bearer $OPENINGS_TOKEN" \
-  --output openings-backup.sqlite
-```
-
-Keep backups private: they contain personal information and stored credentials.
-A backup downloaded with an agent token omits the owner password hash, the
-session secret and the API tokens, and restores like any other backup. To start
-a server directly on such a file, set the owner password again.
-The database is not encrypted. A JSON export is useful for reading records, but
-omits binary file contents and is not a restorable backup. Download it with
-**Export records** in the same tab, `GET /api/v1/export`, or the scoped `workspace_export` MCP grant. Use the
-backup action to capture changes from an active WAL journal consistently.
-
-## Backups
-
-The server keeps its own copies of the workspace on the data volume, without a
-cron job or any setup:
-
-- **Daily backups.** About once a day the worker writes
-  `openings-<UTC time>.sqlite` into `OPENINGS_BACKUP_DIR` (default: a `backups`
-  folder beside the workspace file, `/data/backups` in the container). Each copy
-  is the whole workspace, written with `VACUUM INTO` under a temporary name,
-  checked with `quick_check`, made readable by the server user only (0600) and
-  then renamed into place. The newest `OPENINGS_BACKUP_KEEP` (default 3) are kept;
-  `0` turns daily backups off. When the volume has less than 1.2 times the
-  database size free, the backup is skipped with a warning in the log and tried
-  again on the next cycle.
-- **Copies before an upgrade.** An upgrade never changes the workspace file in
-  place without a copy. The 0.24 upgrade writes a new file and keeps the original,
-  unchanged, as `openings.pre-0.24.sqlite` ([Upgrade the workspace
-  format](#upgrade-the-workspace-format)); it is never deleted automatically. A
-  release that upgrades a file in place first writes
-  `openings.pre-schema<old>-<UTC time>.sqlite` beside the workspace, verified the
-  same way as a daily backup, and keeps the two most recent. When the volume lacks
-  the room either needs, the server does not start and says how much space it
-  needs; the workspace file is not touched.
-
-**Settings › Data → Automatic backups** (owner only) shows when the
-last daily backup was written and how many are kept, lists every copy with
-Download, and lets you delete a copy taken before an upgrade once you no longer
-need to go back (daily backups rotate by themselves). Over REST, as the owner or
-with an owner token: `GET /api/v1/backups`, `GET /api/v1/backups/{name}` and
-`DELETE /api/v1/backups/{name}` (pre-upgrade copies only). These copies include
-the password hash, the session secret and the token hashes, so an agent token is
-refused and no MCP tool reaches them. `GET /health` reports the age of the
-newest daily backup (`backup.last_at`, `age_hours`, `ok`) and the worker's
-heartbeat (`worker.heartbeat_age_seconds`); it answers 503 when the worker has
-stopped cycling, so the container healthcheck fails.
-
-To restore a daily backup, download it and restore it under **Restore** below.
-
-These copies live on the same disk as the workspace. Copying them to another
-machine is your job; for example, from the Docker host:
+To update, read the [changelog](../../CHANGELOG.md), back up, then:
 
 ```bash
-# Copy new backups of the named volume to another machine (older ones stay there).
-rsync -a "$(docker volume inspect openings_workspace --format '{{ .Mountpoint }}')/backups/" \
-  backup-host:openings-backups/
-# Or keep versioned, encrypted copies with restic.
-restic -r sftp:backup-host:openings-restic backup \
-  "$(docker volume inspect openings_workspace --format '{{ .Mountpoint }}')/backups"
+git pull
+docker compose pull
+docker compose up -d --no-build
 ```
 
-## Restore or move hosts
-
-On the destination host, install the same Openings release and set its owner
-password. Restore under **Settings › Data** (marked Owner only:
-choose the file and type RESTORE to confirm) or `POST /api/v1/backup/restore` with the raw
-SQLite body, as the owner or with an owner token; an agent token is refused.
-Restore accepts the current database format and checks integrity and
-foreign keys before replacement. It preserves the destination installation's owner credentials/API tokens, clears
-pending transfer grants and recovers interrupted tasks. Provider policy settings are
-restored, while recent request history and later cooldowns already recorded on
-the destination are retained. Reload the dashboard.
-
-```bash
-curl --fail "$OPENINGS_URL/api/v1/backup/restore" \
-  -H "Authorization: Bearer $OPENINGS_TOKEN" \
-  -H 'Content-Type: application/vnd.sqlite3' \
-  --data-binary @openings-backup.sqlite
-```
-
-The restore limit follows the free space on the data volume, because the upload,
-the upgraded copy of an earlier-format backup and the rollback copy of the current
-database are written beside the database, and the restored pages pass through its
-write-ahead log. Restoring a backup of *B* bytes over a database of *D* bytes
-needs 3 × *B* + *D* + 64 MiB free, plus *B* − *D* when the backup is the larger
-one: about four times the size when you restore a workspace over itself. A larger
-upload is refused before it is written, with `413 backup_size` and the backup
-size, the free space and the space needed in the error details; the room is
-checked again before the database is replaced. **Settings › Data** and
-`GET /api/v1/workspace` (`workspace_info`) show the database size, the free space
-and the largest backup that fits now (`storage`). `OPENINGS_MAX_RESTORE_MB` is an
-optional upper bound, unset by default; it can only lower the limit. Copies left
-by a crash are removed at the next start.
-Enabled sources come from the restored workspace; inspect them when moving hosts. `.env` remains host-local.
-
-## Service lifecycle
+Compose pins the release in `docker-compose.yml`. Other commands:
 
 ```bash
 docker compose ps
@@ -115,146 +24,142 @@ docker compose restart openings
 docker compose down
 ```
 
-`down` keeps named volumes. **`down --volumes` deletes the workspace**, including
-all uploaded documents; use it only when intentionally discarding the installation.
-To change installation environment settings, use `docker compose up -d` so the
-container is recreated. Editing `OPENINGS_PASSWORD` does not reset an existing owner.
-[Configuration](configuration.md) lists every setting with its default.
+`down` keeps the volume. **`down --volumes` deletes the workspace**, including every
+document. To change `.env`, run `docker compose up -d` so the container is
+recreated; `OPENINGS_PASSWORD` never resets an existing owner. See
+[Configuration](configuration.md).
 
-Tasks show collection failures, cancellation and explicit retry. Source failures
-do not discard acquired jobs. The global scheduled collection
-switch preserves source settings and prevents new scheduled runs. Queued/current
-runs continue until stopped; manual runs share provider spacing and cooldowns.
+## Reach it from other devices
 
-## Retention
+Set the address clients can reach in `.env`, then `docker compose up -d --no-build`:
 
-Finished collection runs and their tasks are removed 90 days after they were
-created; set `OPENINGS_RETENTION_DAYS` to another number of days, or to `0` to
-keep everything. The 20 most recent finished runs of every source stay whatever
-their age, so each source keeps its last run and its run history. Queued and
-running work, including the progress stored with it, is never removed. The
-change-log entries of a removed run or task (queued, cancelled, retried) go with
-it unless an agent made them. Job and application history is never
-pruned. The worker does this at start and every six hours, in small batches;
-Settings → Workspace, Retention shows the period in use; Collection → Runs and
-tasks lists what is kept.
+```dotenv
+OPENINGS_BIND=0.0.0.0
+OPENINGS_PORT=8080
+OPENINGS_PUBLIC_URL=http://openings.example:8080
+```
 
-A source refresh that only sees a posting again is recorded on the posting
-(`last_seen_at` in the job's sources), not as an event. When a refresh changes
-the title, company, location or posting text, the job gets one `job_refreshed`
-event that names the changed fields. A posting keeps its source key and the
-employer's apply link a job board reported; the provider's full response is not
-stored.
+`OPENINGS_PUBLIC_URL` controls MCP host checks and the file-transfer links agents
+use; it must match the origin clients use. Set the owner password first, and use
+HTTPS through a trusted reverse proxy on any untrusted network. Behind a proxy, set
+`OPENINGS_TRUSTED_PROXIES` to its address as the container sees it, so sign-in
+limits and secure cookies use each browser's real address. Without it every client
+shares the proxy's limit.
 
-## Access controls
+Sign-in allows 10 attempts per client address per minute; after more than 10
+failures across all clients within 15 minutes, attempts are spaced out until a
+sign-in succeeds. API and MCP tokens are not affected.
 
-Settings supports named API tokens of two kinds, independent token revocation and
-owner password changes; the parts that need owner authority (tokens, restore,
-the password, the automatic backups) are marked **Owner only**. An **agent** token cannot change the password, manage
-tokens or restore a backup; an **owner** token
-has full access ([token kinds](agents.md#token-kinds)). Tokens created before
-version 0.17 are owner tokens. A password change rotates browser sessions and
-retains existing API tokens; log in again after changing it in the dashboard.
-Revoking the token used by an agent ends that token’s access on its next request.
+## Backups
 
-Sign-in and setup allow 10 attempts per client address per minute. After more
-than 10 failed sign-ins across all clients within 15 minutes, sign-in attempts
-are spaced globally (1 s, doubling up to 5 s per attempt) until a successful
-sign-in; an attempt that would wait more than 30 s returns 429 with
-`Retry-After`. API/MCP tokens are not affected. Behind a reverse proxy, set
-`OPENINGS_TRUSTED_PROXIES` to the proxy's address as the container sees it (see
-[LAN access](getting-started.md#lan-access)); otherwise every client shares the
-proxy's limit. To find it, check the client address of proxied requests in
-`docker compose logs openings`.
+The database is not encrypted and backups hold personal data: keep them private.
 
-Operational grants from `workspace_backup` and `workspace_export` (MCP, or
-`POST /api/v1/backup/grant` and `POST /api/v1/export/grant`) expire after 120
-seconds and work once; request a new grant for each transfer or retry.
+**Download backup** under **Settings › Data**, or:
+
+```bash
+curl --fail "$OPENINGS_URL/api/v1/backup" \
+  -H "Authorization: Bearer $OPENINGS_TOKEN" --output openings-backup.sqlite
+```
+
+It is one consistent SQLite file with all documents and settings, taken while the
+service runs. A backup taken with an agent token leaves out the password hash,
+session secret and tokens. **Export records** gives JSON for reading; it has no
+file bytes and cannot be restored.
+
+**Automatic backups.** About once a day the server writes
+`openings-<UTC time>.sqlite` into `OPENINGS_BACKUP_DIR` (`/data/backups`), checked
+and readable only by the server user. The newest `OPENINGS_BACKUP_KEEP` (3) stay;
+`0` turns them off. With less than 1.2 times the database size free, a backup is
+skipped with a warning. **Settings › Data › Automatic backups** (owner
+only) lists them with **Download**. Over REST: `GET /api/v1/backups`,
+`GET /api/v1/backups/{name}` and `DELETE /api/v1/backups/{name}`, for owners only.
+`GET /health` reports the newest backup's age and the worker's heartbeat, and
+answers 503 if the worker stopped.
+
+These copies sit on the same disk. Copy them elsewhere yourself, for example:
+
+```bash
+rsync -a "$(docker volume inspect openings_workspace --format '{{ .Mountpoint }}')/backups/" \
+  backup-host:openings-backups/
+```
+
+## Restore or move hosts
+
+Install the same release on the destination and set its owner password. Under
+**Settings › Data** (owner only), choose **Restore from backup…** and the file,
+or send it with an owner token:
+
+```bash
+curl --fail "$OPENINGS_URL/api/v1/backup/restore" \
+  -H "Authorization: Bearer $OPENINGS_TOKEN" \
+  -H 'Content-Type: application/vnd.sqlite3' --data-binary @openings-backup.sqlite
+```
+
+Restore checks integrity, keeps the destination's owner credentials and tokens,
+and clears pending transfer grants. `.env` stays host-local. Check the enabled
+sources after moving. The restore limit follows the free space of the data volume
+(about four times the backup's size when restoring over itself); Settings shows it,
+and a larger upload is refused with `413 backup_size`.
+
+## Upgrades
+
+A release opens a workspace of its own format or of the **previous format only**
+and upgrades the latter at start. An older one is refused with the release to open
+it with first; a newer one is refused too. Back up before upgrading.
+
+The upgrade builds a new file with the data copied in, so an upgraded workspace has
+exactly the layout of a new one. It needs free space of 2.2 times the database; if
+there is not enough, the server does not start and changes nothing. The original is
+kept byte for byte as `openings.pre-0.24.sqlite` and is never deleted automatically;
+delete it under **Automatic backups** when you no longer need to go back. Records
+and fields the release no longer keeps are written to
+`openings.pre-0.24-archive.json` beside the database, readable only by the owner of
+the file. If a check fails, the start stops with the reason and the original is
+untouched.
+
+**Roll back** with the copy:
+
+```bash
+docker compose down
+cd "$(docker volume inspect openings_workspace --format '{{ .Mountpoint }}')"
+mv openings.sqlite openings.failed-upgrade.sqlite
+rm -f openings.sqlite-wal openings.sqlite-shm
+cp -p openings.pre-0.24.sqlite openings.sqlite
+# Set OPENINGS_IMAGE in .env to the previous release, then:
+docker compose up -d
+```
+
+Changes made after the upgrade are not in the copy.
+
+## Storage and retention
+
+Finished collection runs and their tasks are removed after 90 days
+(`OPENINGS_RETENTION_DAYS`; `0` keeps all); the 20 newest runs of every source
+stay. Job and application history is never pruned. A refresh that only sees a
+posting again records nothing. At start, a database with a quarter of its size
+and `OPENINGS_COMPACT_MIN_MB` free is rewritten without the free space; this needs
+about twice the new size free and may take a while once. **Settings › Data**
+shows the size, free space and retention.
+
+## Security
+
+- Set `OPENINGS_PASSWORD`, or choose the password in the dashboard, before binding
+  beyond localhost.
+- Revoke a token in Settings to end its access on its next request. Changing the
+  password signs out browsers and keeps tokens.
+- Transfer grants for backups and exports work once and expire after 120 seconds.
+- Report vulnerabilities as described in [SECURITY.md](../../SECURITY.md).
 
 ## Troubleshooting
 
 | Symptom | Check |
 |---|---|
-| Sign-in returns 429 for everyone behind a proxy | Set `OPENINGS_TRUSTED_PROXIES` to the proxy address and recreate the container. |
-| A backup/export grant returns `transfer_used` | Grants are single-use; request a new one. |
-| MCP rejects a host or download points to the wrong machine | Set `OPENINGS_PUBLIC_URL` to the client's reachable origin and recreate the container. |
-| URL import has incomplete text | Paste the full posting; login/JavaScript pages may not expose readable HTML. |
-| Collection is waiting | Read the displayed reason and resume time. Server cooldowns survive restarts and setting changes. |
-| A result has no description | Automatic candidates remain in collection progress until text is available; manually added jobs can be completed under Edit details. |
-| Starting an application returns 409 | Open the existing non-Closed attempt identified in the response. |
-| Upload fails | Exact byte size, 20 MiB limit, grant expiry, safe relative name, and a revision still incomplete (a complete one takes no more files). |
-| Edit returns 409 | Reload the current version, then reapply the intended change. |
-| Core cannot create SQLite | Ensure `/data` is writable by UID/GID 10001. |
-
-For development commands and release gates, see [Contributing](../../CONTRIBUTING.md).
-
-## Roll back an upgrade
-
-When a release that upgraded the workspace format misbehaves, go back to the
-previous image with the copy it kept:
-
-```bash
-docker compose down
-# The container's volume, e.g. /var/lib/docker/volumes/openings_workspace/_data
-cd "$(docker volume inspect openings_workspace --format '{{ .Mountpoint }}')"
-mv openings.sqlite openings.failed-upgrade.sqlite
-rm -f openings.sqlite-wal openings.sqlite-shm
-cp -p openings.pre-0.24.sqlite openings.sqlite  # or openings.pre-schema<old>-<UTC time>.sqlite
-# Pin the previous release, e.g. OPENINGS_IMAGE=docker.io/vincenzoimp/openings:<previous>
-docker compose up -d
-```
-
-Changes made after the upgrade are not in the copy. An earlier release cannot
-open a workspace upgraded by a later one, so the copy is the only way back.
-
-## Upgrade the workspace format
-
-A release opens a workspace of its own schema or of the **previous schema only**
-and upgrades the latter on start. A workspace written by an older release must
-first be opened once with the release named in the error message (for example:
-"This workspace was written by Openings older than 0.23. Open it once with the
-0.23 image, then start this version."), then with the new one. A workspace
-written by a newer release is refused. Release history is in
-[CHANGELOG.md](../../CHANGELOG.md).
-
-The 0.24 upgrade (schema 14 to 15) builds a new workspace file and copies the data
-in, so an upgraded workspace has exactly the layout of a new one:
-
-1. It needs free space of 2.2 times the database plus the archive below; without
-   it the server does not start, names the space it needs and changes nothing.
-2. It writes `openings.sqlite.next` from the new layout and copies every record
-   into it in one transaction.
-3. Records and fields 0.24 no longer keeps are written to
-   `openings.pre-0.24-archive.json` beside the workspace (owner-readable only,
-   0600): a JSON file with `format`, `from_schema`, `counts` and one section per
-   removed table or field. Fields that leave the schema are kept there by record
-   id under `dropped_columns`, and stored text that was not valid JSON under
-   `repaired_json` (the record keeps an empty value). Prepared document
-   contexts go there too, with their parts and the metadata of their files, and
-   so does the content CV and letter revisions stored before 0.22; the bytes of
-   files only those contexts used stay in `openings.pre-0.24.sqlite`.
-4. It checks the new file (integrity, references between records, the number of
-   rows of every table, applications that are not Closed, the bytes of stored
-   files, the archive read back). If any check fails, the new file and the archive
-   are removed and the server does not start, with the reason.
-5. The original file becomes `openings.pre-0.24.sqlite`, byte for byte as it was,
-   and the new file takes its name. The log names both files.
-
-If the process stops during the upgrade, the next start either finishes the last
-step or removes `openings.sqlite.next` and runs the upgrade again; the original
-is never written. `openings.pre-0.24.sqlite` stays until you delete it in
-**Settings › Data → Automatic backups**. To go back, follow [Roll
-back an upgrade](#roll-back-an-upgrade) with that file and the 0.23 image;
-changes made after the upgrade are not in it. Restoring a 0.23 backup into 0.24
-upgrades a copy the same way: the uploaded file is not changed and the archive is
-written beside the workspace as `openings.pre-0.24-archive-restored-<UTC
-time>.json`.
-
-After an upgrade that frees space, the start takes longer once: the database file
-is rewritten without the freed space (seconds on an SSD, longer on slow storage).
-This needs free space on the data volume of about twice the database's new size
-plus 64 MiB. Without it the step is skipped with a log message, the file keeps its
-size and the freed space is reused by later writes; the next start tries again.
-The same rewrite runs at any start when at least a quarter of the file and
-`OPENINGS_COMPACT_MIN_MB` (default 32) are free, for example after forgetting many
-jobs. An interruption leaves the previous file intact.
+| Sign-in returns 429 for everyone behind a proxy | Set `OPENINGS_TRUSTED_PROXIES` and recreate the container. |
+| A grant returns `transfer_used` | Grants work once; request a new one. |
+| MCP rejects the host, or links point to the wrong machine | Set `OPENINGS_PUBLIC_URL` to the origin clients use. |
+| A job has incomplete text | Paste the posting under Details, Correct the job. |
+| Collection is waiting | Read the reason and resume time; provider cooldowns survive restarts. |
+| Starting an application returns 409 | Open the existing open attempt named in the error. |
+| An upload fails | Check the size (20 MiB), the grant's age and that the revision is still incomplete. |
+| An edit returns 409 | Reload, then apply your change again. |
+| The core cannot create SQLite | Make `/data` writable by UID/GID 10001. |
