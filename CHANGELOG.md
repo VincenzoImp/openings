@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.25.0 — 2026-11-14
+
+A stable Openings: a full review of the code, the interfaces, the dashboard, the tests and the docs, with every finding fixed. No schema change; your data is untouched. **REST and MCP change: update scripts and agent prompts that use the names below.**
+
+**REST and MCP (breaking)**
+
+- Career routes use the screen words: `/api/v1/career/entries` replaces `/career/knowledge`, `/api/v1/career/highlights` replaces `/career/claims`, and the highlights batch is `POST /career/highlights/batch`.
+- Applications say `stage` everywhere, in inputs and results (no `status` holding a stage). `jobs_list` takes `dismissed_since` instead of `since`.
+- The 0.23 names and their hints are gone; removed routes answer 404. REST-only routes that neither the dashboard nor an agent used are removed.
+- `applications_update` needs the item's `expected_version` to change fields other than stage, outcome and replies, so an agent can no longer overwrite what you just edited.
+- Upload and download links work once; a reused link answers 401 `transfer_used`.
+- A CV or letter revision needs its `pdf`, and a `source_file` its `sha256`. An upload sent as `Application/PDF` must be a real PDF.
+- `jobs_create` returns `needs_text` when the posting could not be read. Revoking an unknown token answers 404. MCP refusals are `rest_only` (with the tools to `use`) and `unknown_tool`.
+- `workspace_context` returns Preference items as `{text}` in every section and lists skills with their agent-facing description. Responses for tokens, backups, providers, run tasks and form questions are typed in OpenAPI.
+- A provider paused by a server can be resumed: `clear_cooldown` on the provider update.
+
+**Fixes**
+
+- Changing the password asks for the current one.
+- Reopening a Closed application refuses a dismissed job and shortlists a New one.
+- A server's `Retry-After` pauses a provider for at most a day.
+- A saved source whose settings no longer validate shows its error and no longer stops the other sources from running; saving a source with an empty schedule works.
+- A failed or skipped scheduled backup waits an hour before trying again.
+- Restore keeps what each agent token has already read, so agents don't get old corrections again.
+- Dashboard: row menus work with the mouse; Today and Setup show load errors instead of loading forever; past deadlines read "Closed <date>" and dates are right in every time zone; CV PDF and Letter PDF download separately; deleted records are not read again; "1 application"; clearer server errors; no uncaught errors in Safari when you leave a page.
+
+**Dashboard**
+
+- Profile shows Edit at rest, every document row has an upload button, screens share one alignment, Setup shows the Preferences lines you already have, copies before upgrades name their version and have a visible Delete, and ⌘Z is the one undo key shown.
+- Shift+J/K extend the selection in Applications too. Applications loads a page at a time with **Show more**, and lists refresh less often.
+- Words: **Label** (was Signal), **Most urgent first**.
+
+**Project**
+
+- Install with `docker compose up -d`; the compose file no longer builds (contributors use `docker build`). The image no longer ships the design-system gallery.
+- New README, docs that match the screens and the API (every example command checked), real demo screenshots, and maintainer notes in `docs/developer/maintaining.md`.
+- A leaner test suite with guards for the architecture rules, a failed restore and every dashboard operation; leaked database connections fail the tests.
+- Collections write their progress more cheaply on long runs.
+
 ## 0.24.2 — 2026-11-14
 
 Security fix. No schema change.

@@ -2,7 +2,7 @@ name: openings
 
 services:
   openings:
-    image: ${OPENINGS_IMAGE:-docker.io/vincenzoimp/openings:0.24.2}
+    image: ${OPENINGS_IMAGE:-docker.io/vincenzoimp/openings:0.25.0}
     init: true
     restart: unless-stopped
     ports:
