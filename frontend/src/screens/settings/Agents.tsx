@@ -375,7 +375,7 @@ function AskList() {
   if (skills.isError)
     return (
       <LoadError
-        what="the list"
+        what="what you can ask your agent"
         error={skills.error}
         retry={() => void skills.refetch()}
       />

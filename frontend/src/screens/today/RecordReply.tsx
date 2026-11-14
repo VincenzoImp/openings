@@ -4,7 +4,8 @@ import { Dialog } from "../../ui/Dialog";
 import { Field, Input, Select, Textarea } from "../../ui/Field";
 import { useToast } from "../../ui/Toast";
 import { useRecordReply, type Application, type ReplyKind } from "./data";
-import { localDay, roleOf } from "./model";
+import { isoDay } from "../../ui/format";
+import { roleOf } from "./model";
 
 const KINDS: { value: ReplyKind; label: string }[] = [
   { value: "interview", label: "Interview invitation" },
@@ -27,7 +28,7 @@ export function RecordReply({
 }) {
   const record = useRecordReply();
   const toast = useToast();
-  const today = localDay(new Date());
+  const today = isoDay(new Date());
   const [kind, setKind] = useState<ReplyKind>("interview");
   const [date, setDate] = useState(today);
   const [note, setNote] = useState("");
@@ -36,7 +37,7 @@ export function RecordReply({
   useEffect(() => {
     if (!id) return;
     setKind("interview");
-    setDate(localDay(new Date()));
+    setDate(isoDay(new Date()));
     setNote("");
     record.reset();
   }, [id]); // `record` changes on every render.

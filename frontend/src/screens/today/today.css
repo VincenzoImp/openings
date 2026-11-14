@@ -1,5 +1,4 @@
-/* Today: one centred column (at most 760 px) of sections, the stage strip
-   last. */
+/* Today: one reading column of sections, the stage strip last. */
 @layer screens {
   .today,
   .today-main {
@@ -10,8 +9,7 @@
   }
   .today {
     width: 100%;
-    max-width: calc(760px + 2 * var(--pane-pad));
-    margin: 0 auto;
+    max-width: calc(var(--content) + 2 * var(--pane-pad));
     padding: var(--s-8) var(--pane-pad) var(--s-16);
   }
 
@@ -102,11 +100,21 @@
   .today-list .ui-row[data-selected]:not(:focus-within):hover {
     background: var(--hover);
   }
-  .today-list .ui-row[data-selected]:not(:hover, :focus-within) .ui-row-meta {
+  .today-list
+    .ui-row[data-selected]:not(
+      :hover,
+      :focus-within,
+      :has([aria-expanded="true"])
+    )
+    .ui-row-meta {
     display: flex;
   }
   .today-list
-    .ui-row[data-selected]:not(:hover, :focus-within)
+    .ui-row[data-selected]:not(
+      :hover,
+      :focus-within,
+      :has([aria-expanded="true"])
+    )
     .ui-row-actions {
     display: none;
   }

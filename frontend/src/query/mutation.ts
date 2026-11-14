@@ -3,7 +3,11 @@
 // newer version keeps the person's draft and says so: the form shows
 // "Changed elsewhere" with Reload and Keep editing (ConflictNotice).
 import { useCallback, useState } from "react";
-import { useMutation, type UseMutationOptions } from "@tanstack/react-query";
+import {
+  useMutation,
+  type QueryKey,
+  type UseMutationOptions,
+} from "@tanstack/react-query";
 import { ApiError } from "../api/client";
 import { invalidate, type Resource } from "./query";
 
@@ -14,18 +18,22 @@ type Options<Data, Vars> = Omit<
   mutationFn: (vars: Vars) => Promise<Data>;
   /** The resources this write changes; their queries are read again. */
   touches: readonly Resource[];
+  /** The reads of the record a delete removes: never read again. */
+  drops?: (vars: Vars) => readonly QueryKey[];
 };
 
 /** A write through the generated client that refreshes what it changed. */
 export function useApiMutation<Data, Vars = void>({
   touches,
+  drops,
   onSettled,
   ...options
 }: Options<Data, Vars>) {
   return useMutation<Data, Error, Vars>({
     ...options,
     onSettled: async (...args) => {
-      await invalidate(touches);
+      const [, error, vars] = args;
+      await invalidate(touches, !error && drops ? drops(vars) : []);
       await onSettled?.(...args);
     },
   });

@@ -81,13 +81,12 @@
   .ap-body[data-view="stats"] {
     padding: var(--s-6) var(--pane-pad) var(--s-12);
   }
-  /* Stats read in one centred column, as Today does. */
+  /* Stats read in one column, as Today does. */
   .ap-stats {
     display: flex;
     flex-direction: column;
     gap: var(--s-10);
-    max-width: 760px;
-    margin: 0 auto;
+    max-width: var(--content);
   }
   .ap-funnel-note {
     margin-top: var(--s-1);
@@ -237,13 +236,13 @@
   }
   .ap-body
     .ui-list:not(:focus-within)
-    .ui-row[data-selected]:not(:hover)
+    .ui-row[data-selected]:not(:hover, :has([aria-expanded="true"]))
     .ui-row-actions {
     display: none;
   }
   .ap-body
     .ui-list:not(:focus-within)
-    .ui-row[data-selected]:not(:hover)
+    .ui-row[data-selected]:not(:hover, :has([aria-expanded="true"]))
     .ui-row-meta {
     display: flex;
   }

@@ -71,7 +71,6 @@ export function Preparing({ context }: { context: PageContext }) {
                   <DocumentSlot
                     key={kind}
                     kind={kind}
-                    primary={kind === first}
                     revision={current[kind]}
                     revisions={current.revisions}
                     loading={current.loading}

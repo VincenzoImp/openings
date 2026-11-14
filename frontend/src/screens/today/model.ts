@@ -1,5 +1,6 @@
-// What Today shows, derived from application rows and counts. No React and
-// no imports: tested directly (tests/today.test.mjs).
+// What Today shows, derived from application rows and counts. No React:
+// tested directly (tests/today.test.mjs).
+import { daysBetween } from "../../ui/format.ts";
 
 /** The fields of an application row Today reads. */
 export interface Row {
@@ -16,30 +17,14 @@ export interface Row {
   job: { title?: unknown; company?: unknown };
 }
 
-const DAY = 86_400_000;
-
-/** A local calendar day as YYYY-MM-DD. */
-export function localDay(date: Date) {
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-/** Whole days from today to a YYYY-MM-DD day (negative when past). */
-export function daysUntil(day: string, now = new Date()) {
-  const [year, month, date] = day.slice(0, 10).split("-").map(Number);
-  const target = new Date(year, month - 1, date).getTime();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.round((target - today.getTime()) / DAY);
-}
-
 /** Whether a deadline falls in the next seven days (today included). */
 export const dueThisWeek = (
   deadline: string | null | undefined,
   now = new Date(),
 ) =>
   Boolean(deadline) &&
-  daysUntil(deadline!, now) >= 0 &&
-  daysUntil(deadline!, now) <= 7;
+  daysBetween(now, deadline!) >= 0 &&
+  daysBetween(now, deadline!) <= 7;
 
 const count = (n: number, one: string, many = `${one}s`) =>
   `${n} ${n === 1 ? one : many}`;
@@ -108,7 +93,7 @@ export function needsAttention<T extends Row>(
   now = new Date(),
 ) {
   const due = shortlisted.filter(
-    (row) => !row.ready && row.deadline && daysUntil(row.deadline, now) <= 7,
+    (row) => !row.ready && row.deadline && daysBetween(now, row.deadline) <= 7,
   );
   const open = shortlisted.filter(
     (row) => row.ready && row.open_requirements > 0,
@@ -118,7 +103,7 @@ export function needsAttention<T extends Row>(
 
 /** Whole days since an application was sent. */
 export const daysSince = (moment: string, now = new Date()) =>
-  Math.max(0, -daysUntil(localDay(new Date(moment)), now));
+  Math.max(0, daysBetween(moment, now));
 
 /** "Data Engineer" and "Northstar Labs", with a fallback title. */
 export function roleOf(row: Pick<Row, "job">) {

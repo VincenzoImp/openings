@@ -70,7 +70,7 @@ test("a dragged line lands where the pointer passed the middles", () => {
   );
   assert.equal(
     preferences.hiddenLine(4, 31),
-    "would hide 4 of the 31 new jobs",
+    "Hides 4 of your 31 new jobs in Jobs",
   );
   // Every section shows two examples while it is empty.
   for (const section of preferences.SECTIONS)

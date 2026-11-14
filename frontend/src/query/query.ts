@@ -5,7 +5,12 @@
 // A mutation names the resources it touches and invalidates them by that
 // prefix (`touches: ["jobs", "applications"]`). Polling and refetch on focus
 // keep data fresh; there is no Refresh button.
-import { QueryClient } from "@tanstack/react-query";
+import {
+  QueryClient,
+  partialMatchKey,
+  type Query,
+  type QueryKey,
+} from "@tanstack/react-query";
 import { ApiError } from "../api/client";
 
 /** A REST resource: the first segment of its path under /api/v1. */
@@ -46,11 +51,26 @@ export const queryClient = new QueryClient({
   },
 });
 
-/** Read again every query of these resources that is on screen. */
-export function invalidate(resources: readonly Resource[]) {
+/**
+ * Read again every query of these resources that is on screen, except the
+ * reads of a record just deleted (`drops`): those are removed, not read
+ * again, since they could only answer 404.
+ */
+export function invalidate(
+  resources: readonly Resource[],
+  drops: readonly QueryKey[] = [],
+) {
+  const dropped = (query: Query) =>
+    drops.some((key) => partialMatchKey(query.queryKey, key));
   return Promise.all(
     resources.map((resource) =>
-      queryClient.invalidateQueries({ queryKey: [resource] }),
+      queryClient.invalidateQueries({
+        queryKey: [resource],
+        predicate: (query) => !dropped(query),
+      }),
     ),
-  );
+  ).then(() => {
+    for (const queryKey of drops)
+      queryClient.removeQueries({ queryKey, type: "inactive" });
+  });
 }

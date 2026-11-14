@@ -497,6 +497,13 @@
   .apg-check-part {
     grid-column: 1 / -1;
   }
+  /* On a phone the check is a tab of its own: say when it has nothing. */
+  .apg-check-none {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--text-2);
+    font: var(--t-sm);
+  }
   .apg-panes {
     display: grid;
     grid-template-columns: repeat(var(--panes, 3), minmax(0, 1fr));
@@ -541,7 +548,7 @@
 
   /* Sent stages */
   .apg-follow {
-    max-width: 820px;
+    max-width: calc(var(--content) + 2 * var(--pane-pad));
     padding: var(--s-5) var(--pane-pad) 0;
   }
   .apg-statusline {

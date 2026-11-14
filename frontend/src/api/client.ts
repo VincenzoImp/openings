@@ -29,7 +29,12 @@ export class ApiError extends Error {
   code: string;
   details: unknown;
   constructor(body: Partial<ErrorBody>, status: number) {
-    super(body.message || `Request failed (${status})`);
+    super(
+      body.message ||
+        (status >= 500
+          ? "Something went wrong on the server; nothing was saved. Try again."
+          : `Request failed (${status})`),
+    );
     this.status = body.status ?? status;
     this.code = body.code || "request_failed";
     this.details = body.details ?? null;

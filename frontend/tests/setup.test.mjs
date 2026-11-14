@@ -73,6 +73,13 @@ test("About you reads what the workspace already says", () => {
       languages: ["en", "de"],
     },
   );
+  // The lines it did not write are shown beside its fields.
+  assert.deepEqual(
+    model.otherLines(
+      workspace([{ text: "Small teams" }, { text: "Roles: data engineer" }]),
+    ),
+    ["Small teams"],
+  );
   assert.equal(model.stepOf("cv"), "cv");
   assert.equal(model.stepOf("record"), "about");
   assert.equal(model.stepOf(null), "about");

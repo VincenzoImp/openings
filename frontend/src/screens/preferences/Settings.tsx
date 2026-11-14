@@ -133,8 +133,9 @@ export function Languages({ settings }: { settings: Settings }) {
               Hide new jobs that require another language
             </span>
             <span className="pref-filter-note">
-              A filter in Jobs
-              {effect ? ` · ${hiddenLine(effect.hidden, effect.total)}` : ""}
+              {effect
+                ? hiddenLine(effect.hidden, effect.total)
+                : "A filter in Jobs"}
             </span>
           </span>
           <Icon icon={ArrowRight} className="pref-filter-go" />

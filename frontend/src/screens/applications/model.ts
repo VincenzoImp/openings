@@ -1,25 +1,13 @@
 // What Applications and the application page say about an application, in
-// words: its stage, its one status phrase, the "Needs action" order, the bulk
+// words: its stage, its one status phrase, the "Most urgent first" order, the bulk
 // actions valid for a selection, what is missing before Ready, the send queue
 // and the history. No React: tests/applications.test.mjs runs it directly.
-import { plural } from "../../ui/format.ts";
-import {
-  dayOf,
-  daysBetween,
-  deadlinePhrase,
-  deadlineLabel,
-  shortDay,
-  toned,
-  type Phrase,
-} from "./days.ts";
+import { daysBetween, formatDay, plural } from "../../ui/format.ts";
+import { deadlinePhrase, deadlineLabel, toned, type Phrase } from "./days.ts";
 
 export {
-  dayOf,
-  daysBetween,
   deadlineLabel,
   deadlinePhrase,
-  isoDay,
-  shortDay,
   type Phrase,
   type Tone,
 } from "./days.ts";
@@ -144,12 +132,12 @@ export function statusPhrase(
   if (stage === "interview" || stage === "offer")
     return {
       text: `${stage === "offer" ? "Offer" : "Interview"}${
-        reply ? " " + shortDay(reply, now) : ""
+        reply ? " " + formatDay(reply, now) : ""
       }`,
     };
   if (!app.applied_at) return { text: "Applied" };
-  const sent = `Applied ${shortDay(app.applied_at, now)}`;
-  if (reply) return { text: `${sent} · replied ${shortDay(reply, now)}` };
+  const sent = `Applied ${formatDay(app.applied_at, now)}`;
+  if (reply) return { text: `${sent} · replied ${formatDay(reply, now)}` };
   const waited = daysBetween(app.applied_at, now);
   if (waited <= 0) return { text: "Applied today" };
   return toned(
@@ -170,14 +158,14 @@ export function overdue(app: AppFacts, noReplyDays: number, now = new Date()) {
 
 export type SortKey = "needs" | "deadline" | "updated" | "applied";
 export const SORTS: { id: SortKey; label: string }[] = [
-  { id: "needs", label: "Needs action" },
+  { id: "needs", label: "Most urgent first" },
   { id: "deadline", label: "Deadline" },
   { id: "updated", label: "Last change" },
   { id: "applied", label: "Applied date" },
 ];
 
 /**
- * The "Needs action" group: 0 Ready, 1 Shortlisted with a deadline, 2 sent
+ * The "Most urgent first" order: 0 Ready, 1 Shortlisted with a deadline, 2 sent
  * past the no-reply period, 3 everything else.
  */
 export function needsRank(
@@ -204,7 +192,7 @@ const byDeadline = (a: AppFacts, b: AppFacts) =>
 const byUpdated = (a: AppFacts, b: AppFacts) =>
   b.updated_at.localeCompare(a.updated_at);
 
-/** The rows in the chosen order; "Needs action" groups them by `needsRank`. */
+/** The rows in the chosen order; "Most urgent first" groups them by `needsRank`. */
 export function sortApplications<T extends AppFacts>(
   items: T[],
   sort: SortKey,
@@ -353,18 +341,20 @@ export function followUpLine(
 ): Phrase {
   const reply = replyDate(app);
   const kind = String(app.last_reply?.kind ?? "");
-  const sent = app.applied_at ? `Applied ${shortDay(app.applied_at, now)}` : "";
+  const sent = app.applied_at
+    ? `Applied ${formatDay(app.applied_at, now)}`
+    : "";
   if (app.stage === "interview")
     return {
       text: reply
-        ? `Interview invitation ${shortDay(reply, now)}`
+        ? `Interview invitation ${formatDay(reply, now)}`
         : sent || "Interview",
     };
   if (app.stage === "offer")
-    return { text: reply ? `Offer ${shortDay(reply, now)}` : sent || "Offer" };
+    return { text: reply ? `Offer ${formatDay(reply, now)}` : sent || "Offer" };
   if (reply)
     return {
-      text: `${sent ? sent + " · " : ""}${REPLY_WORDS[kind] ?? "Reply"} ${shortDay(reply, now)}`,
+      text: `${sent ? sent + " · " : ""}${REPLY_WORDS[kind] ?? "Reply"} ${formatDay(reply, now)}`,
     };
   if (!app.applied_at) return { text: "Applied" };
   const waited = daysBetween(app.applied_at, now);
@@ -387,12 +377,12 @@ export function closedSummary(
   const after = interviewed ? " after interview" : "";
   switch (app.outcome) {
     case "rejected":
-      return `Rejected${last ? " on " + shortDay(last, now) : ""}${after}`;
+      return `Rejected${last ? " on " + formatDay(last, now) : ""}${after}`;
     case "accepted":
-      return `Offer accepted${last ? " · offer of " + shortDay(last, now) : ""}`;
+      return `Offer accepted${last ? " · offer of " + formatDay(last, now) : ""}`;
     case "no_response":
       return `No reply${
-        app.concluded_on ? " · closed " + shortDay(app.concluded_on, now) : ""
+        app.concluded_on ? " · closed " + formatDay(app.concluded_on, now) : ""
       }${
         app.applied_at && app.concluded_on
           ? `, ${plural(daysBetween(app.applied_at, app.concluded_on), "day")} after sending`
@@ -449,7 +439,7 @@ export function historyLine(
     to = String(payload.to ?? "");
   if (entry.kind === "reply" || kind.startsWith("reply_")) {
     const words = reply
-      ? `${REPLY_WORDS[reply.kind] ?? "Reply"} · ${shortDay(reply.date, now)}`
+      ? `${REPLY_WORDS[reply.kind] ?? "Reply"} · ${formatDay(reply.date, now)}`
       : "Reply";
     if (kind === "reply_removed") return { text: "Reply removed", main: false };
     if (kind === "reply_edited")

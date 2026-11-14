@@ -1,9 +1,9 @@
 // The list's state in its address: `#applications?stage=ready&sort=deadline`.
 // Filters the server reads (search, outcome, waiting) and the ones applied to
 // the rows read (priority, deadline, source). No React: tested directly.
+import { daysBetween } from "../../ui/format.ts";
 import {
   OUTCOMES,
-  daysBetween,
   type AppFacts,
   type SortKey,
   type StageFilter,

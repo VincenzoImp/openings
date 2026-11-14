@@ -36,6 +36,7 @@ import { href } from "../../shell/router";
 import { useAddNote, useDuplicate, useJob, useTimeline } from "./data";
 import {
   actorPhrase,
+  closed,
   closesSoon,
   deadlineOf,
   eventTitle,
@@ -547,16 +548,18 @@ export function JobDetail({
               { label: "Salary", value: salaryText(job.metadata) },
               {
                 label: "Deadline",
-                value: deadline ? (
+                value: !deadline ? null : closed(deadline) ? (
+                  `Closed ${formatDay(deadline)}`
+                ) : (
                   <ToneText tone={closesSoon(deadline) ? "warning" : undefined}>
                     {formatDay(deadline)}
                   </ToneText>
-                ) : null,
+                ),
               },
               { label: "Work style", value: workStyle(job.metadata) },
               { label: "Job type", value: jobTypeText(job.job_type) },
               {
-                label: "Signals",
+                label: "Labels",
                 value: tags.length ? <Tags items={tags} /> : null,
               },
             ]}
