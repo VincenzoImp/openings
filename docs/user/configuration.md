@@ -13,7 +13,7 @@ MCP: sources, provider request spacing, Preferences, tokens and the owner passwo
 
 | Variable | Default | What it does |
 |---|---|---|
-| `OPENINGS_PUBLIC_URL` | unset (Compose: `http://127.0.0.1:8080`) | The origin browsers and agents use. MCP accepts this host besides `localhost`; file-transfer links in `curl` lines start with it; cookies are secure when it starts with `https://`. |
+| `OPENINGS_PUBLIC_URL` | unset (Compose: `http://127.0.0.1:8080`) | The origin browsers and agents use. MCP accepts this host besides `localhost`; file-transfer grants and their `curl` lines start with it; cookies are secure when it starts with `https://`. |
 | `OPENINGS_PASSWORD` | unset | First-run owner password, at least 10 characters. Used only while no owner password exists. |
 | `OPENINGS_TRUSTED_PROXIES` | empty: trust none | Comma-separated IPs or CIDR ranges of reverse proxies whose `X-Forwarded-For` and `X-Forwarded-Proto` are trusted. An invalid entry stops the start. Option `--trusted-proxies`. |
 | `OPENINGS_RETENTION_DAYS` | `90` | Days finished collection runs and tasks are kept; `0` keeps all. The 20 newest runs of every source always stay. |

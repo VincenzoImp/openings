@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Upload and download grants carry an absolute `url` on the public origin (`OPENINGS_PUBLIC_URL`, else the origin the request reached), so an agent uploads with the returned URL alone.
+- Text read from a TeX source leaves out the lengths and glue of spacing commands (such as `0pt plus .4pt`), and text from a TeX source or a PDF writes ligatures (ﬁ, ﬂ, ﬀ) as plain letters. Revisions stored earlier keep their text.
+- The example CV and letter templates guard their pdfTeX-only lines with `\ifpdftex`, so they compile with pdflatex and Tectonic alike, and pdflatex PDFs get searchable ligatures.
+
 ## 0.24.0 — 2026-11-14
 
 A simpler Openings: a dashboard for you, a small sharp interface for your agent, and a new design. **This release changes stored data, REST and MCP; read the upgrade notes below before starting it.**

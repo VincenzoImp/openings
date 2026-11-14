@@ -121,7 +121,9 @@ export async function download(path: string, init: RequestInit = {}) {
 
 /** Send or fetch bytes with a grant (files_reserve_upload, a revision's uploads). */
 export async function transfer(grant: Grant, body?: Blob) {
-  const response = await fetch(grant.url, {
+  // Grants carry the public origin for agents; the dashboard keeps its own origin.
+  const url = new URL(grant.url, location.origin);
+  const response = await fetch(url.pathname + url.search, {
     method: grant.method,
     headers: grant.headers,
     body,

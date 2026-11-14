@@ -30,8 +30,8 @@ def documents_list(ws: WS, query: Q[DocumentQuery]) -> DocumentPage:
 def documents_create(ws: WS, body: DocumentCreate) -> NewDocument:
     """Create a CV, letter or answers revision of an application.
 
-    CV/letter: pdf {name, size}, optional TeX source; PUT the PDF to uploads.pdf (curl line
-    given). Complete once its PDF is stored. Never sends.
+    CV/letter: pdf {name, size}, optional TeX source; PUT the PDF to uploads.pdf's absolute
+    url (curl line given). Complete once its PDF is stored. Never sends.
     """
     document = ws.documents.create_document(body)
     names = {"pdf": body.pdf.name if body.pdf else "", "source": "source.tex"}
@@ -78,8 +78,8 @@ def files_list(ws: WS, query: Q[FileQuery]) -> FilePage:
 def files_upload(ws: WS, body: UploadReservation) -> FileGrant:
     """Reserve an upload for a career, template, job or revision file.
 
-    Returns a one-shot grant: PUT the exact bytes to its url with its headers (curl line
-    given). sha256 is checked when given.
+    Returns a one-shot grant: PUT the exact bytes to its absolute url with its headers (curl
+    line given). sha256 is checked when given.
     """
     return with_curl(ws.documents.reserve_upload(body), body.name)
 
