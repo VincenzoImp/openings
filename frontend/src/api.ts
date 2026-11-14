@@ -303,10 +303,6 @@ export interface Application extends Versioned {
     revisions: number;
     complete: number;
   }[];
-  stale_inputs?: StaleInput[];
-  /** The first changes since the current revisions were written. */
-  stale_changes?: StaleChange[];
-  stale_changes_total?: number;
   /** The day an application closed as no_response was concluded. */
   concluded_on?: string | null;
   replies?: Reply[];
@@ -316,46 +312,6 @@ export interface Application extends Versioned {
     date: string;
     count: number;
   } | null;
-}
-export type StaleInput =
-  "profile" | "preferences" | "template" | "knowledge" | "claim";
-export interface StaleChange {
-  input: StaleInput;
-  /** A Profile part (null: the whole Profile), `<section>:<hash>` of a statement, or a record. */
-  id: string | null;
-  label: string;
-  state:
-    | "changed"
-    | "deleted"
-    | "unapproved"
-    | "added"
-    | "removed"
-    | "unconfirmed"
-    | "confirmed";
-  frozen_version: number | null;
-  current_version: number | null;
-  /** A statement's Preferences section. */
-  section?: PreferenceSectionName;
-}
-export interface Staleness {
-  application_id: string;
-  stale: boolean;
-  inputs: StaleInput[];
-  changes: StaleChange[];
-  documents: {
-    document_id: string;
-    kind: string;
-    title: string;
-    context_id: string | null;
-    context_created_at: string | null;
-    status: "current" | "stale" | "no_context";
-    /** How the frozen copy was compared; null without one. */
-    comparison: {
-      profile: "parts" | "whole";
-      preferences: "items" | "not_frozen";
-    } | null;
-    changes: StaleChange[];
-  }[];
 }
 /** Two revisions' text compared line by line (`/documents/{id}/comparison`). */
 export interface Comparison {
@@ -485,7 +441,6 @@ export interface Preferences {
 }
 export interface Document extends Versioned {
   application_id: string;
-  context_id: string | null;
   kind: string;
   title: string;
   /** Structured content of form answers and other kinds; a CV or letter has none. */
@@ -496,8 +451,6 @@ export interface Document extends Versioned {
   text_from?: "tex" | "pdf" | null;
   /** A CV or letter is complete once its PDF is stored; other kinds always are. */
   complete?: boolean;
-  /** Content a CV or letter stored before 0.22, read-only. */
-  legacy_content?: Json | null;
   /** The SHA-256 of the revision's source, which its PDF names. */
   source_sha256?: string | null;
   note?: string;

@@ -116,11 +116,11 @@ skills: discover the tools/resources and their typed input schemas.
    job's notes and changes with `timeline_get`; the pinned notes come first and
    hold the owner's standing guidance. Write findings as notes (`notes_create`, with
    `application_id` for one application). A later attempt is possible after the previous one closes.
-4. Call `contexts_create` with the application, selected templates,
-   optional evidence/claim filters and an idempotency key. Read the returned
-   payload or its `openings://contexts/{id}` resource. Follow the frozen
-   Preferences (writing rules and facts), template guidance and application
-   instructions. Snapshot assets retain their exact bytes.
+4. Read the live records the documents use: `applications_get` (with its
+   `pinned_note`), `jobs_get`, `profile_get`, `knowledge_list`, `claims_list`,
+   `templates_list`/`templates_get` and `preferences_get`. Follow the writing
+   rules and facts in Preferences, the template guidance and the pinned note.
+   Download template assets with `files_reserve_download`.
 5. Write the CV, letter and answers externally. Compile LaTeX on the agent's
    computer with its own tools; Openings does not execute TeX or provide a model.
    Check the content and the PDF before uploading it.
@@ -140,13 +140,9 @@ skills: discover the tools/resources and their typed input schemas.
    each of its `required_documents` has a current complete revision and no
    blocking requirement is open; `applications_get` returns `ready` and
    `missing`. No separate sign-off of a document exists.
-8. After a Profile, Preferences, template or Career change,
-   `staleness_list` lists Shortlisted applications whose current revisions were
-   built on older inputs and `staleness_get` explains one, naming each
-   changed part (for example the Profile `summary` or a Facts about me
-   statement added or removed). Profile metadata and the sections other than
-   facts and writing never make an application stale. Contexts stay frozen: refresh by
-   preparing a new context and new revisions. The owner submits
+8. A revision never changes: after a Profile, Preferences, template or Career
+   change, replace a document with a new revision (`documents_create` with
+   `previous_id`) when it should use the change. The owner submits
    applications and records Applied. Portals and sending are outside Openings.
 
 Check the discovered input schemas. Every tool is named `<resource>_<verb>`
@@ -168,12 +164,12 @@ A write wraps its body in `value`. For example:
 
 ```json
 {
-  "name": "contexts_create",
+  "name": "notes_create",
   "arguments": {
+    "job_id": "JOB_ID",
     "value": {
-      "application_id": "APPLICATION_ID",
-      "template_id": "TEMPLATE_ID",
-      "idempotency_key": "prepare-attempt-1"
+      "body": "Asked the owner about relocation.",
+      "idempotency_key": "note-attempt-1"
     }
   }
 }

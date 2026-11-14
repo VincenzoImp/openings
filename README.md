@@ -34,8 +34,8 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   for, what you rule out, the facts employers ask about, your writing rules and
   how the agent should work with you. Your agent reads and applies them.
 - **Prepare:** store your Profile, Career entries, approved claims with typed
-  selection fields, LaTeX templates with guidance and typed limits. Each application freezes the exact context its CV,
-  letter and form answers were written from. A CV or letter revision is a PDF,
+  selection fields, LaTeX templates with guidance and typed limits. A CV or
+  letter revision records the claims and Career entries it cites and is a PDF,
   with the `.tex` source it was built from when there is one, so no LaTeX is
   needed; Openings reads its text from the source, or else from the PDF, for
   search and comparison between revisions, without running TeX.
@@ -48,10 +48,8 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   review page shows the posting, CV and letter side by side with the open
   requirements, and says what is missing otherwise; download the PDFs, apply on
   the employer's site and **Mark applied**.
-- **Stay consistent:** applications built on older inputs are flagged after a
-  change to a part their documents use (Profile header and summary, facts and
-  writing rules in Preferences, templates, Career), naming the part, and a PDF built from another
-  source than its revision's is refused.
+- **Stay consistent:** each revision records the claims and Career entries it
+  cites, and a PDF built from another source than its revision's is refused.
 - **Track:** follow applications through Shortlisted, Ready, Applied, Interview,
   Offer and Closed as a list or a board. **Record reply** stores the employer's
   interview, offer or rejection with its date and moves the stage with it; close

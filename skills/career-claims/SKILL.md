@@ -73,7 +73,7 @@ Skills selection: the Writing rules of Preferences (`writing`, scope `all`, or
 claims with `default_in_cv`, prefer `role: core` over `supporting`, take a
 `bench` claim only when the job calls for it, and avoid two claims of one
 `group` saying the same thing. Use approved claims when they make the case well. When the
-rules allow it, write new wording from the relevant frozen Career evidence.
+rules allow it, write new wording from the relevant Career evidence.
 Keep each contribution under its correct role and period. A related project can
 clarify that role only where the relationship and contribution are recorded.
 

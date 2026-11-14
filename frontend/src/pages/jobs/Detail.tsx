@@ -74,7 +74,6 @@ const WORK: Record<string, string> = {
   started_separately: "it was started on its own",
   stage: "it moved past Shortlisted",
   documents: "documents",
-  contexts: "frozen copies of your record",
   notes: "notes",
   replies: "employer replies",
   requirements: "requirements",

@@ -42,7 +42,6 @@ from openings.actors import OWNER, acting_as
 from openings.app import create_app
 from openings.auth import COOKIE
 from openings.career import ClaimCreate, KnowledgeCreate, ProfileUpdate, TemplateCreate
-from openings.documents import ContextCreate
 from today_fixtures import seed_today
 
 RESET_PATH = "/__e2e__/reset"
@@ -290,8 +289,6 @@ def seed(path, jobs=60, applications=53):
                         **({"outcome": "rejected"} if stage == "closed" else {}),
                     },
                 )
-            if index == 0:
-                app.state.documents.prepare_context(ContextCreate(application_id=application["id"]))
         elif index < applications + 3:
             workspace.set_triage(job["id"], "shortlisted", job["version"])
     # One daily backup, and copies kept before earlier upgrades for the

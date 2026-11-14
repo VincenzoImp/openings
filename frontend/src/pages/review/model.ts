@@ -139,6 +139,8 @@ export function tabOf(value: string) {
     answers: "answers",
     details: "details",
     posting: "answers",
+    // The Inputs tab is gone; its old links open the documents.
+    inputs: "documents",
   };
   return TABS.includes(value) ? value : old[value] || "answers";
 }
@@ -146,7 +148,6 @@ export const TABS = [
   "answers",
   "requirements",
   "timeline",
-  "inputs",
   "documents",
   "details",
 ];

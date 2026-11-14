@@ -58,6 +58,15 @@ REMOVED_TOOLS = {
     "instructions_get": "Removed in 0.24: general instructions are Writing rules in Preferences (preferences_get, section writing).",
     "instructions_update": "Removed in 0.24: general instructions are Writing rules in Preferences (preferences_update, section writing).",
 }
+# #215: frozen contexts and staleness.
+_CONTEXTS = "Removed in 0.24 with frozen contexts: read the live records instead (applications_get, jobs_get, profile_get, knowledge_list, claims_list, templates_list, preferences_get) and cite claim_ids and knowledge_ids in documents_create."
+REMOVED_TOOLS |= {
+    "contexts_create": _CONTEXTS,
+    "contexts_get": _CONTEXTS,
+    "contexts_list": _CONTEXTS,
+    "staleness_get": "Removed in 0.24: documents are no longer compared with changed inputs. Read the application's revisions with documents_list and replace one with documents_create (previous_id).",
+    "staleness_list": "Removed in 0.24: documents are no longer compared with changed inputs. List applications with applications_list and their revisions with documents_list.",
+}
 
 
 class OpeningsMCP(MCPServer):

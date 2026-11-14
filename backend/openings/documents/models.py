@@ -1,4 +1,4 @@
-"""Typed inputs of contexts, document revisions and file uploads."""
+"""Typed inputs of document revisions and file uploads."""
 
 from __future__ import annotations
 
@@ -10,31 +10,18 @@ from pydantic import Field, field_validator, model_validator
 
 from ..career.models import Input
 
-OwnerType = Literal["knowledge", "template", "document", "context", "job"]
+OwnerType = Literal["knowledge", "template", "document", "job"]
 
 
-OWNER_COLUMNS = {
-    name: f"{name}_id" for name in ["knowledge", "template", "document", "context", "job"]
-}
+OWNER_COLUMNS = {name: f"{name}_id" for name in ["knowledge", "template", "document", "job"]}
 
 
 OWNER_TABLES = {
     "knowledge": "knowledge",
     "template": "templates",
     "document": "documents",
-    "context": "contexts",
     "job": "jobs",
 }
-
-
-class ContextCreate(Input):
-    application_id: str
-    template_id: str | None = None
-    template_ids: list[str] = Field(default_factory=list, max_length=20)
-    knowledge_ids: list[str] | None = Field(default=None, max_length=500)
-    claim_ids: list[str] | None = Field(default=None, max_length=1000)
-    note: str = Field(default="", max_length=20000)
-    idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 DocumentKind = Literal["cv", "letter", "answers", "other"]
@@ -84,7 +71,6 @@ class DocumentCreate(Input):
         max_length=200,
         description="Retrying with the same key and request returns the record the first request created.",
     )
-    context_id: str | None = None
     kind: DocumentKind = "cv"
     title: str = Field(default="", max_length=300)
     content: dict[str, Any] | None = Field(
@@ -106,12 +92,12 @@ class DocumentCreate(Input):
     claim_ids: list[str] = Field(
         default_factory=list,
         max_length=1000,
-        description="Claims the revision uses, from its frozen context when it has one.",
+        description="Approved claims the revision uses.",
     )
     knowledge_ids: list[str] = Field(
         default_factory=list,
         max_length=500,
-        description="Career entries the revision uses, from its frozen context when it has one.",
+        description="Career entries the revision uses.",
     )
     note: str = Field(default="", max_length=5000, description="An optional note on the revision.")
     previous_id: str | None = None
@@ -154,18 +140,7 @@ class DocumentCreate(Input):
         return self
 
 
-StalenessStage = Literal["shortlisted", "applied", "interview", "offer", "closed", "all"]
-
-
 # The filters, page and detail of each list: MCP's value, REST's query string.
-class ContextQuery(Input):
-    application_id: str = ""
-    limit: int = 100
-    offset: int = 0
-    summary: bool = True
-    q: str = ""
-
-
 class DocumentQuery(Input):
     application_id: str = ""
     kind: str = ""
@@ -184,13 +159,6 @@ class FileQuery(Input):
     q: str = ""
     media_type: str = ""
     application_id: str = ""
-
-
-class StalenessQuery(Input):
-    status: StalenessStage = "shortlisted"
-    stale_only: bool = True
-    limit: int = 50
-    offset: int = 0
 
 
 class UploadReservation(Input):

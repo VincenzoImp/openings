@@ -1,6 +1,6 @@
 ---
 name: prepare-shortlist
-description: Prepare the job-specific CV and letter of Openings Shortlisted applications, using current evidence and frozen template rules, with resumable document and PDF checks until each is Ready and the owner applies manually.
+description: Prepare the job-specific CV and letter of Openings Shortlisted applications, using current evidence and template rules, with resumable document and PDF checks until each is Ready and the owner applies manually.
 compatibility: Requires access to the Openings MCP server or REST API, as described in the openings-workspace skill.
 ---
 
@@ -51,10 +51,8 @@ For each job, read the full posting, the current Profile, the Preferences
 evidence and both selected templates with their guidance. Check its
 application attempts and read the job's timeline (`timeline_get` with `job_id`):
 the pinned notes first, which are the owner's standing guidance for the job and
-for each application; a context freezes the application's pinned note as its
-`application_note`. A prepared context freezes the Preferences sections with
-their versions (`payload.preferences`): write from that copy and follow the
-`writing` rules whose scope is `all` or matches the document (`cv`, `letter`).
+for each application; `applications_get` returns the application's pinned
+note as `pinned_note`. Follow the `writing` rules whose scope is `all` or matches the document (`cv`, `letter`).
 Resume the intended open Shortlisted application or the attempt returned by a
 concurrent-creation conflict. Use an idempotency key for retryable creation. Do
 not reset other stages or start another attempt after Closed without the
@@ -87,29 +85,30 @@ known closing date as the application `deadline` and the agreed order as
 only a CV (or only a letter), set the application's `required_documents` with
 `applications_update`; it defaults to both.
 
-Before freezing inputs for a job, run the
+Before writing documents for a job, run the
 [employer requirements preflight](../openings-workspace/references/employer-requirements.md).
 A blocking requirement, such as a ban on AI-written applications or a mandatory
 item that Career evidence cannot supply, stops document work for that job; record
 it as a blocking entry in the application `requirements` and report it. Expired postings are reported, not prepared.
 
-## Freeze and compose
+## Read and compose
 
 Use Career claims' strongest-supported-account method to connect the relevant
-experience and linked Projects to the role's needs before freezing inputs. Check
+experience and linked Projects to the role's needs before writing. Check
 existing evidence before asking for facts; ask targeted questions when they can
-materially improve the application. Carry newly confirmed facts into the frozen
-inputs through the supported context mechanism and authorized Career maintenance.
+materially improve the application. Carry newly confirmed facts into the
+records through authorized Career maintenance or Preferences.
 
-Prepare a context with explicit CV/CL template IDs and the evidence/claims the
-documents need. Use a consistent key for retries of the same request. Read the
-returned frozen Preferences, guidance, content and assets. Compare relevant inputs before
-reusing a context; prepare a deliberate new context if different inputs are needed.
+Read the live records the documents use: `applications_get` (with its
+`pinned_note`), `jobs_get`, `profile_get`, `preferences_get`, the Career entries
+and claims (`knowledge_list`, `claims_list`) and the CV/CL templates
+(`templates_get`) with their guidance and assets. Note the `claim_ids` and
+`knowledge_ids` the documents use; `documents_create` cites them.
 
 Start the CV from MASTER. Keep an effective unchanged CV when appropriate.
-Apply only the fixed-section, Skills and role-wording permissions in the frozen
-rules. New wording from allowed evidence stays in this application's copy and
-uses its evidence links; it does not create an official bank claim.
+Apply only the fixed-section, Skills and role-wording permissions in the
+Writing rules and template guidance. New wording from allowed evidence stays in
+this application's copy and uses its evidence links; it does not create an official bank claim.
 
 Write a letter for the actual role and company, with supported reasons and
 relevant examples. Present the strongest truthful case and never volunteer gaps
@@ -127,9 +126,9 @@ Inspect full PDFs and extracted text, fixed content, required terms, line/page
 geometry, links, factual scope and employer requirements. Use the template's
 checker where supplied; it does not replace factual or visual review.
 
-Find the intended current document leaf for each kind. When resuming, check
-`staleness_get`: a leaf built on older inputs is refreshed with a new
-context and new revisions when the change matters. Reuse matching work;
+Find the intended current document leaf for each kind. When resuming, compare
+it with the current records: refresh a leaf with a new revision when a later
+change to the Profile, Preferences, a template or cited evidence matters. Reuse matching work;
 complete missing steps on a compatible incomplete revision. Save changed output
 as the appropriate new revision. A complete parent does not supply files to a
 new child. Resolve concurrent branches explicitly.
@@ -165,8 +164,7 @@ open and the form questions without an answer. From there the owner downloads
 the PDFs, submits on the company site and chooses **Mark applied**. Point the
 owner to that page when you report a Ready application. A new incomplete
 revision or a new blocking requirement makes it not Ready again until the work
-is finished. Do not finish a document while a question about it is open or its
-inputs are stale in a way that matters.
+is finished. Do not finish a document while a question about it is open.
 
 If a tool, source, upload or check fails, keep the actual revision incomplete.
 Record the precise failed step and continue independent jobs where possible.

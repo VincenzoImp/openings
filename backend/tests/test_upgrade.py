@@ -27,6 +27,14 @@ FIXTURE = Path(__file__).with_name("fixtures") / f"workspace-{SCHEMA_VERSION - 1
 # Tables 0.24 removes (archived whole) and adds (filled by the upgrade's folds).
 REMOVED_TABLES = {"policy_sections", "policy_items"}  # #213
 ADDED_TABLES = {"preference_sections"}  # #213
+# #215
+REMOVED_TABLES |= {
+    "contexts",
+    "context_inputs",
+    "context_parts",
+    "snapshot_parts",
+    "snapshot_list_items",
+}
 
 
 class Killed(BaseException):
@@ -110,12 +118,33 @@ def created_by_upgrade(pre_upgrade):
     return created
 
 
+# #215: context files and the blobs only they referenced are not copied.
+CONTEXT_ONLY_BLOBS = (
+    "SELECT count(*) FROM blobs b WHERE (EXISTS(SELECT 1 FROM snapshot_parts p WHERE "
+    "p.blob=b.sha256) OR EXISTS(SELECT 1 FROM files f WHERE f.sha256=b.sha256 AND f.context_id "
+    "IS NOT NULL)) AND NOT EXISTS(SELECT 1 FROM files f WHERE f.sha256=b.sha256 AND "
+    "f.context_id IS NULL)"
+)
+
+
+def left_out_by_upgrade(pre_upgrade):
+    """Rows of kept tables the upgrade does not copy, per schema-15 table."""
+    return {
+        "files": query(pre_upgrade, "SELECT count(*) FROM files WHERE context_id IS NOT NULL")[0][
+            0
+        ],
+        "blobs": query(pre_upgrade, CONTEXT_ONLY_BLOBS)[0][0],
+    }
+
+
 def expected_counts(original, pre_upgrade):
     """The row counts of the upgraded file: the original's, renamed, plus folded rows."""
     renamed = {old: new for new, old in RENAMED.items()}
     expected = {renamed.get(name, name): number for name, number in original.items()}
     for name, number in created_by_upgrade(pre_upgrade).items():
         expected[name] += number
+    for name, number in left_out_by_upgrade(pre_upgrade).items():
+        expected[name] -= number
     return expected
 
 
@@ -159,7 +188,7 @@ def test_generic_changes_keep_every_value(upgraded):
         ("jobs", "id,title,company,posting,version,created_at"),
         ("applications", "id,job_id,outcome,version,questions,answers,requirements"),
         ("events", "id,job_id,application_id,kind,payload,actor_kind,actor_name,run_id"),
-        ("documents", "id,previous_id,text,legacy_content,claim_ids"),
+        ("documents", "id,previous_id,text,claim_ids"),
         ("blobs", "sha256,content,size"),
     ):
         sql = f"SELECT rowid,{columns} FROM {table} ORDER BY rowid"
@@ -458,6 +487,120 @@ def test_a_workspace_without_policy_items_keeps_the_default_writing_rule(tmp_pat
     assert query(path, "SELECT count(*) FROM settings WHERE key='workspace'") == [(0,)]
 
 
+# #215 Frozen contexts, snapshots and staleness.
+
+CONTEXT_OBJECTS = (
+    "SELECT name FROM sqlite_master WHERE name LIKE '%context%' OR name LIKE 'snapshot%' "
+    "OR name='all_files'"
+)
+
+
+def test_no_context_object_remains_and_documents_keep_their_files(upgraded):
+    path, pre_upgrade = upgraded[:2]
+    assert query(path, CONTEXT_OBJECTS) == []
+    for table in ("documents", "files"):
+        columns = {row[1] for row in query(path, f"PRAGMA table_info({table})")}
+        assert not {"context_id", "legacy_content"} & columns
+    # Every revision keeps its files, hashes, text, cited ids and revision chain.
+    revisions = (
+        "SELECT d.id,d.previous_id,d.kind,d.text,d.claim_ids,d.knowledge_ids,f.id,f.sha256,"
+        "f.name,f.size,b.size FROM documents d LEFT JOIN files f ON f.document_id=d.id "
+        "LEFT JOIN blobs b ON b.sha256=f.sha256 ORDER BY d.id,f.id"
+    )
+    kinds = {"resume": "cv", "cover_letter": "letter"}
+    assert query(path, revisions) == [
+        (*row[:2], kinds.get(row[2], row[2]), *row[3:]) for row in query(pre_upgrade, revisions)
+    ]
+    assert query(pre_upgrade, "SELECT count(*) FROM documents WHERE context_id IS NOT NULL")[0][0]
+
+
+def test_the_archive_keeps_contexts_by_part_hash(upgraded):
+    pre_upgrade, archive_path = upgraded[1:3]
+    archive = json.loads(archive_path.read_text())
+    contexts = {row["id"]: row for row in archive["contexts"]}
+    assert set(contexts) == {row[0] for row in query(pre_upgrade, "SELECT id FROM contexts")}
+    parts = {(row["kind"], row["hash"]): row for row in archive["snapshot_parts"]}
+    # Each part once, by hash; the archive holds no expanded payload.
+    assert (
+        len(parts)
+        == len(archive["snapshot_parts"])
+        == query(pre_upgrade, "SELECT count(*) FROM snapshot_parts")[0][0]
+    )
+
+    def payload(context):
+        """The context's payload text, rebuilt from the archive alone."""
+        literals, out = json.loads(context["frame"]), []
+        references = [ref for ref in json.loads(context["parts"]) if ref["position"] >= 0]
+        out.append(literals[0])
+        for reference, literal in zip(references, literals[1:], strict=True):
+            part = parts[(reference["kind"], reference["hash"])]
+            if part["kind"] == "list":
+                text = ",".join(parts[("text", h)]["content"] for h in json.loads(part["items"]))
+            elif part["kind"] == "asset":
+                file_id = reference["file_id"]
+                text = (
+                    f'{{"id":"{file_id}",{part["content"][1:-1]},'
+                    f'"url":"/api/v1/files/{file_id}/content"}}'
+                )
+            else:
+                text = part["content"]
+            out.append(text + literal)
+        return "".join(out)
+
+    for context in contexts.values():
+        rebuilt = payload(context)
+        assert hashlib.sha256(rebuilt.encode()).hexdigest() == context["signature"]
+    files = query(
+        pre_upgrade,
+        "SELECT context_id,file_id FROM context_parts WHERE file_id IS NOT NULL ORDER BY 1,2",
+    )
+    assert files
+    assert [(row["context_id"], row["id"]) for row in archive["context_files"]] == files
+    assert all(row["sha256"] and row["size"] for row in archive["context_files"])
+    assert archive["legacy_content"] == dict(
+        query(
+            pre_upgrade, "SELECT id,legacy_content FROM documents WHERE legacy_content IS NOT NULL"
+        )
+    )
+    assert archive["dropped_columns"]["documents.context_id"]
+    assert "documents.legacy_content" not in archive["dropped_columns"]
+    assert "dropped_tables" not in archive
+
+
+def test_bytes_only_contexts_referenced_are_left_in_the_pre_upgrade_copy(tmp_path, caplog):
+    # Without the template's own files, its frozen copies are the only references.
+    path = load_fixture(
+        tmp_path / "openings.sqlite",
+        "DELETE FROM files WHERE sha256 IN (SELECT blob FROM snapshot_parts) "
+        "AND template_id IS NOT NULL;"
+        "INSERT INTO blobs(sha256,content,size) VALUES('f'||hex(randomblob(31)),x'00ff',2);"
+        "INSERT INTO files(id,sha256,name,size,context_id,created_at) SELECT 'legacy-file',"
+        "sha256,'old.bin',2,(SELECT min(id) FROM contexts),'2026-01-01' FROM blobs WHERE size=2;",
+    )
+    only = query(path, CONTEXT_ONLY_BLOBS)[0][0]
+    dropped = query(
+        path,
+        "SELECT total(size) FROM blobs b WHERE " + CONTEXT_ONLY_BLOBS.split(" WHERE ", 1)[1],
+    )[0][0]
+    before = query(path, "SELECT total(length(content)) FROM blobs")[0][0]
+    assert only >= 2 and dropped > 2
+    with caplog.at_level("WARNING", logger=m15.LOG.name):
+        Database(path)
+    pre_upgrade = m15.files(path).pre_upgrade
+    after = query(path, "SELECT total(length(content)) FROM blobs")[0][0]
+    assert after == before - dropped
+    assert query(
+        path,
+        "SELECT count(*) FROM blobs b WHERE NOT EXISTS(SELECT 1 FROM files f "
+        "WHERE f.sha256=b.sha256)",
+    ) == [(0,)]
+    assert f"leaves out {int(dropped)} bytes" in caplog.text
+    archive = json.loads(m15.files(path).archive.read_text())
+    legacy = [row for row in archive["context_files"] if row["id"] == "legacy-file"]
+    assert legacy and legacy[0]["name"] == "old.bin"
+    assert query(pre_upgrade, "SELECT total(length(content)) FROM blobs")[0][0] == before
+
+
 # Archive.
 
 
@@ -473,7 +616,6 @@ def test_the_archive_holds_every_dropped_value_with_the_counts_of_its_source(upg
     dropped = archive["dropped_columns"]
     for table, column, condition in (
         ("applications", "idempotency_key", "idempotency_key IS NOT NULL"),
-        ("contexts", "idempotency_key", "idempotency_key IS NOT NULL"),
         ("responses", "estimated", "estimated<>0"),
         ("responses", "origin", "origin<>'manual'"),
         ("notes", "origin", "origin<>'manual'"),

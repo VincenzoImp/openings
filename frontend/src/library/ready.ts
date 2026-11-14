@@ -5,7 +5,6 @@ const clearedReasons: Record<string, string> = {
   unmarked: "The mark was removed",
   document_created: "A new document revision was saved",
   document_deleted: "A document revision was deleted",
-  context_prepared: "A new context was prepared",
   file_uploaded: "A file was added to a current revision",
   blocking_requirement: "A blocking requirement is unresolved",
   left_preparing: "The application was sent or closed",

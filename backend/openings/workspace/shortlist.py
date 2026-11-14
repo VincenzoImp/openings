@@ -33,7 +33,6 @@ class Shortlist:
             work.append("stage")
         for name, sql in (
             ("documents", "SELECT count(*) FROM documents WHERE application_id=?"),
-            ("contexts", "SELECT count(*) FROM contexts WHERE application_id=?"),
             ("notes", "SELECT count(*) FROM notes WHERE application_id=?"),
             ("replies", "SELECT count(*) FROM replies WHERE application_id=?"),
             (

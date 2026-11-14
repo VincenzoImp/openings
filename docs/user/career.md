@@ -90,11 +90,11 @@ typed in the same way; skills read them instead of metadata.
 
 A single date uses `{"kind":"single","start":"2025"}`. Send `dates: null`
 to clear dates in a versioned update. Omit unchanged fields. Claims also expose
-`position`; approved claims are eligible for application preparation contexts.
+`position`; approved claims can be cited by document revisions.
 
-Prepared application contexts freeze the selected entries, claims, dates and
-ordering. Later edits affect future contexts. Review generated wording and files
-before recording a submission.
+A document revision records the claims and Career entries it cites. Later edits
+affect new revisions; existing revisions never change. Review generated wording
+and files before recording a submission.
 
 Target roles and what you rule out are statements in [Preferences](preferences.md).
 

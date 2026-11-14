@@ -1,4 +1,4 @@
-"""Typed career headers preserve precision, optional content and agent context."""
+"""Typed career headers preserve precision and optional content."""
 
 import json
 
@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from openings.app import create_app
-from openings.career import CareerDates, ClaimCreate, ClaimUpdate, KnowledgeCreate, TemplateCreate
+from openings.career import CareerDates, ClaimCreate, ClaimUpdate, KnowledgeCreate
 
 
 @pytest.mark.parametrize(
@@ -78,7 +78,7 @@ def test_summary_claim_preview_is_ordered_bounded_and_independent_of_description
 
 
 @pytest.mark.parametrize("transport", ["rest", "mcp"])
-def test_complete_entry_workflow_headers_order_and_frozen_context(tmp_path, transport):
+def test_complete_entry_workflow_headers_and_order(tmp_path, transport):
     app = create_app(tmp_path / "headers.sqlite", start_worker=False)
     app.state.auth.setup("synthetic-password")
     token = app.state.auth.create_token("Synthetic Career client")["token"]
@@ -183,24 +183,6 @@ def test_complete_entry_workflow_headers_order_and_frozen_context(tmp_path, tran
         assert [row["id"] for row in rows] == [c2["id"], c1["id"]]
         assert rows[0]["knowledge_organization"] == "Example Cloud"
 
-        app.state.career.create_template(TemplateCreate(name="CV", tex="Synthetic template"))
-        job = app.state.workspace.ingest_job(
-            {"title": "Engineer", "company": "Example", "posting": "Build APIs."}
-        )
-        application = app.state.workspace.create_application({"job_id": job["id"]})
-        frozen = call(
-            "contexts_create",
-            "POST",
-            "/contexts",
-            {
-                "value": {
-                    "application_id": application["id"],
-                }
-            },
-        )
-        saved = next(row for row in frozen["payload"]["knowledge"] if row["id"] == first["id"])
-        assert saved["dates"] == first["dates"] and saved["skills"] == ["Python"]
-        assert [row["id"] for row in frozen["payload"]["claims"]] == [c2["id"], c1["id"]]
         changed = call(
             "knowledge_update",
             "PATCH",
@@ -219,7 +201,6 @@ def test_complete_entry_workflow_headers_order_and_frozen_context(tmp_path, tran
         assert (
             changed["dates"] is None and changed["skills"] == [] and changed["organization"] == ""
         )
-        assert saved["dates"]["start"] == "2024-08"
         ordered = call("knowledge_list", "GET", "/career/knowledge", {})["items"]
         assert [row["id"] for row in ordered] == [second["id"], first["id"]]
         imported = call(

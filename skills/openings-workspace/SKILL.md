@@ -90,17 +90,18 @@ Follow Career claims' integrated-account method: reconcile new information with
 the existing history in the relevant passages, and keep provenance in metadata
 instead of dated narrative appendices.
 
-## Frozen inputs and document wording
+## Inputs and document wording
 
-Prepare an application context with the intended job, templates, Career entries
-and claims. Read its returned frozen payload and assets before generation.
-Use the document permissions in the frozen Writing rules and template guidance.
+Read the live records before generation: `applications_get` (with its
+`pinned_note`), `jobs_get`, `profile_get`, `knowledge_list`, `claims_list`,
+`templates_list`/`templates_get` with their assets and `preferences_get`. Use
+the document permissions in the Writing rules and template guidance.
 
 A revision names the evidence it uses: `claim_ids` for approved claims it reuses
-and `knowledge_ids` for the frozen Career entries behind new wording, which
+and `knowledge_ids` for the Career entries behind new wording, which
 needs no claim ID. Do not invent a claim ID or cite a different sentence as an
-exact reused claim. The service checks cited IDs against the frozen context,
-not whether the prose follows from the evidence; factual and editorial checks
+exact reused claim. The service checks that cited claims are approved and
+cited entries exist, not whether the prose follows from the evidence; factual and editorial checks
 remain the agent's work.
 
 Save changed output as a document revision linked with `previous_id` when needed.
@@ -117,7 +118,7 @@ file and its bytes; do not place binary data in a JSON argument.
 
 Compile changed sources externally. Check the complete PDF, extracted text,
 page count, links and template rules. A PDF header or successful upload does not
-prove a valid document. For a suitable unchanged PDF, verify its source/context
+prove a valid document. For a suitable unchanged PDF, verify its source
 compatibility and quality before reuse. If compilation or validation is not
 available, keep the task incomplete and report the missing capability.
 
@@ -129,9 +130,8 @@ the PDF names its SHA-256 (`source_sha256`): a PDF naming another source is
 refused with `source_mismatch`, a second source or PDF with `source_exists` or
 `pdf_exists`. The server derives the revision's `text` from the source without
 a TeX runtime (`text_from: tex`), or extracts it from the PDF when there is no
-source (`text_from: pdf`); read it to check what the owner reads. Content saved
-on a CV or letter before 0.22 is kept read-only as `legacy_content`. Form
-answers keep structured `content`.
+source (`text_from: pdf`); read it to check what the owner reads. Form answers
+keep structured `content`.
 
 A revision is incomplete until its PDF is stored, then complete and immutable;
 only complete revisions count toward Ready. Nothing else signs a document off: run
