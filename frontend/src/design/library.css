@@ -450,3 +450,9 @@ img.frame {
   flex-wrap: wrap;
   gap: var(--s2);
 }
+/* A timeline's entries (library/Timeline.tsx). */
+.list.compact > li {
+  min-height: 0;
+  padding: var(--s2) 0;
+  gap: var(--s3);
+}

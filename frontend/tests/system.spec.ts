@@ -437,9 +437,10 @@ test("Settings creates an agent token that is refused owner operations", async (
   });
   expect([status < 300, code]).toEqual([true, null]);
   await go(page, `jobs?section=all&job=${job.id}`);
+  await page.getByText("Notes and history").click();
   await expect(
     page
-      .getByRole("list", { name: "Timeline of this job" })
+      .getByRole("list", { name: "History of this job" })
       .getByRole("listitem")
       .filter({ hasText: `Noted by ${name}.` }),
   ).toContainText(`by ${name}`);
