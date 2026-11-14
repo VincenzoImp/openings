@@ -11,12 +11,16 @@ workspace:
         serves a private copy of SNAPSHOT's directory and prints
         "Synthetic workspace at http://127.0.0.1:<port>" once it listens.
 
+With --demo either step seeds instead the curated workspace of one fictional
+person's job search (demo_workspace.py) for the screenshots, and with --empty a
+first run: only the owner password is set.
+
 Without --snapshot the server seeds a temporary workspace first. Only this
 server answers `POST /__e2e__/reset`, which restores its copy (the database and
 the backup files beside it) to the snapshot between tests; the product
 application has no such route.
 
-$OPENINGS_E2E_JOBS and $OPENINGS_E2E_APPLICATIONS set the size of the workspace
+$OPENINGS_E2E_JOBS and $OPENINGS_E2E_APPLICATIONS set the size of the default workspace
 (60 jobs and 53 applications by default). Above 500 jobs they are written in
 bulk (large_fixtures.py), so 5,000 jobs and 500 applications take seconds.
 """
@@ -35,6 +39,7 @@ from pathlib import Path
 import uvicorn
 from fastapi.testclient import TestClient
 
+from demo_workspace import seed_demo
 from jobs_fixtures import seed_jobs
 from large_fixtures import seed_large
 from openings import backups
@@ -211,6 +216,25 @@ def seed_library(app, agent):
         )
 
 
+# What a search needs to open in the source editor with its fields filled in.
+SEARCHES = {
+    "Python engineer Zurich": {"query": "python engineer", "location": "Zurich"},
+    "Data engineer remote Europe": {"query": "data engineer", "location": "Remote"},
+}
+
+
+def complete_searches(workspace):
+    """Give the seeded searches their keywords, place and country, as the editor saves them."""
+    with workspace.db.transaction() as conn:
+        for name, fields in SEARCHES.items():
+            row = conn.execute("SELECT id,config FROM sources WHERE name=?", (name,)).fetchone()
+            config = {**json.loads(row["config"]), **fields, "country": "switzerland"}
+            conn.execute(
+                "UPDATE sources SET config=?,schedule=? WHERE id=?",
+                (json.dumps(config), json.dumps({"kind": "interval"}), row["id"]),
+            )
+
+
 def seed(path, jobs=60, applications=53):
     """Build the synthetic workspace at `path`; return the owner's session cookie.
 
@@ -247,6 +271,7 @@ def seed(path, jobs=60, applications=53):
         # Before the numbered jobs, so those stay the newest records of every list.
         seed_today(app, client, lambda agent: seed_library(app, agent))
         seed_jobs(app)
+        complete_searches(workspace)
         cookie = client.post("/api/v1/auth/login", json={"password": PASSWORD}).cookies[COOKIE]
     # A large workspace (the performance budget) is written in one transaction.
     if jobs > LARGE:
@@ -303,6 +328,22 @@ def seed(path, jobs=60, applications=53):
     return f"{COOKIE}={cookie}"
 
 
+def seed_other(path, demo):
+    """Build the demo workspace (``demo``) or a first run at `path`; return the session cookie."""
+    app = create_app(path, start_worker=False)
+    with TestClient(app) as client:
+        client.post("/api/v1/auth/setup", json={"password": PASSWORD})
+        if demo:
+            seed_demo(app, client)
+        cookie = client.post("/api/v1/auth/login", json={"password": PASSWORD}).cookies[COOKIE]
+    if demo:
+        workspace = app.state.workspace
+        backups.run_backup(workspace.db, backups.backup_dir(workspace.db), 3)
+    with closing(sqlite3.connect(path)) as conn:
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    return f"{COOKIE}={cookie}"
+
+
 def serve(snapshot, directory, port=0):
     """Serve a private copy of `snapshot` and its side files from `directory` until interrupted."""
     live = Path(directory) / "live" / snapshot.name
@@ -327,6 +368,9 @@ def main():
     parser.add_argument("--seed", type=Path, help="build the workspace into this file and exit")
     parser.add_argument("--snapshot", type=Path, help="serve a copy of this seeded workspace")
     parser.add_argument("--port", type=int, default=int(os.environ.get("OPENINGS_E2E_PORT") or 0))
+    kind = parser.add_mutually_exclusive_group()
+    kind.add_argument("--demo", action="store_true", help="seed the curated demo workspace")
+    kind.add_argument("--empty", action="store_true", help="seed a first run: only a password")
     args = parser.parse_args()
     # The default workspace is small; a performance check sets a large one, for
     # example OPENINGS_E2E_JOBS=5000 OPENINGS_E2E_APPLICATIONS=500.
@@ -334,15 +378,21 @@ def main():
         int(os.environ.get("OPENINGS_E2E_JOBS") or 60),
         int(os.environ.get("OPENINGS_E2E_APPLICATIONS") or 53),
     )
+
+    def build(path):
+        if args.demo or args.empty:
+            return seed_other(path, args.demo)
+        return seed(path, *size)
+
     if args.seed:
-        print(json.dumps({"session": seed(args.seed.resolve(), *size)}), flush=True)
+        print(json.dumps({"session": build(args.seed.resolve())}), flush=True)
         return
     with tempfile.TemporaryDirectory(prefix="openings-dashboard-") as directory:
         snapshot = args.snapshot and args.snapshot.resolve()
         if snapshot is None:
             snapshot = Path(directory) / "seed" / "snapshot.sqlite"
             snapshot.parent.mkdir()
-            seed(snapshot, *size)
+            build(snapshot)
         serve(snapshot, directory, args.port)
 
 
