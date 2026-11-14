@@ -629,7 +629,7 @@ wheels = [
 
 [[package]]
 name = "openings"
-version = "0.24.0"
+version = "0.24.1"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
