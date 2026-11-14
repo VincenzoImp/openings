@@ -2,6 +2,7 @@
 
 import hashlib
 import sqlite3
+from contextlib import closing
 
 import pytest
 from fastapi.testclient import TestClient
@@ -105,7 +106,7 @@ def test_an_agent_backup_carries_no_installation_credentials(app, client, tmp_pa
         assert not any(needle in response.content for needle in needles)
         copy = tmp_path / "agent-backup.sqlite"
         copy.write_bytes(response.content)
-        with sqlite3.connect(copy) as conn:
+        with closing(sqlite3.connect(copy)) as conn:
             assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
             assert conn.execute("SELECT count(*) FROM api_tokens").fetchone()[0] == 0
             assert not conn.execute("SELECT 1 FROM settings WHERE key='auth'").fetchall()

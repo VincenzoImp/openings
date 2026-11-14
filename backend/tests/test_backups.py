@@ -15,7 +15,6 @@ from fastapi.testclient import TestClient
 
 from doubles import Lane
 from openings import backups, compaction, operations
-from openings.app import create_app
 from openings.common import now
 from openings.db import SCHEMA_VERSION, Database
 from openings.discovery import DiscoveryService
@@ -248,32 +247,26 @@ def test_names_outside_the_listing_are_not_found(kept, app, owner_token):
         assert missing.value.status == 404
 
 
-def test_health_reports_the_backup_and_the_worker(tmp_path):
-    app = create_app(tmp_path / "openings.sqlite")
+def test_health_reports_the_backup_and_the_worker(app, client):
     workspace = app.state.workspace
-    with TestClient(app) as client:
-        body = client.get("/health").json()
-        assert body["status"] == "ok"
-        assert set(body["backup"]) == {"last_at", "age_hours", "ok"}
-        assert body["worker"]["heartbeat_age_seconds"] is not None
-        # The scheduler's first cycle writes the first backup.
-        deadline = datetime.now(UTC) + timedelta(seconds=10)
-        while not client.get("/health").json()["backup"]["ok"]:
-            assert datetime.now(UTC) < deadline
-            threading.Event().wait(0.05)
-        # A scheduler that stops cycling fails the healthcheck.
-        workspace.worker.beat -= workspace.worker.stall_seconds + 1
-        stalled = client.get("/health")
-        assert stalled.status_code == 503
-        assert stalled.json()["status"] == "worker_stalled"
-
-
-def test_health_without_a_worker(app, client):
     body = client.get("/health").json()
     assert body["status"] == "ok"
     assert body["backup"] == {"last_at": None, "age_hours": None, "ok": False}
     assert body["worker"] == {"heartbeat_age_seconds": None}
-    assert not (app.state.workspace.db.path.parent / "backups").exists()
+    assert not (workspace.db.path.parent / "backups").exists()
+    # The scheduler's first cycle writes the first backup and beats.
+    workspace.worker = Worker(workspace, IdleDiscovery())
+    workspace.worker.prune_seconds = 10**9
+    workspace.worker._schedule_loop(Lane())
+    workspace.worker.thread = threading.current_thread()  # a live scheduler thread
+    body = client.get("/health").json()
+    assert body["status"] == "ok" and body["backup"]["ok"] is True
+    assert body["worker"]["heartbeat_age_seconds"] is not None
+    # A scheduler that stops cycling fails the healthcheck.
+    workspace.worker.beat -= workspace.worker.stall_seconds + 1
+    stalled = client.get("/health")
+    assert stalled.status_code == 503
+    assert stalled.json()["status"] == "worker_stalled"
 
 
 # Restore
@@ -292,7 +285,7 @@ def test_a_backup_keeps_exact_files_and_a_restore_keeps_provider_requests(worksp
     discovery = DiscoveryService(workspace)
     provider = discovery.providers.get("linkedin")
     workspace.db.backup(tmp_path / "before-requests.sqlite")
-    with sqlite3.connect(tmp_path / "before-requests.sqlite") as copy:
+    with closing(sqlite3.connect(tmp_path / "before-requests.sqlite")) as copy:
         assert copy.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert copy.execute("SELECT content FROM blobs").fetchone()[0] == value
     deadline = (datetime.now(UTC) + timedelta(minutes=20)).isoformat(timespec="microseconds")

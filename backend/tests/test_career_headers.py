@@ -7,11 +7,14 @@ from pydantic import ValidationError
 
 from openings.career import (
     CareerDates,
+    CareerImport,
     CareerService,
     EntryCreate,
     HighlightCreate,
     HighlightUpdate,
+    ImportPreview,
 )
+from openings.errors import DomainError
 
 VALID_DATES = [
     {"kind": "single", "start": "2025"},
@@ -233,3 +236,46 @@ def test_awards_and_publications_survive_import_filtering_and_citation(client, c
     assert call("GET", f"/documents/{document['id']}")["career_ids"] == cited
     invalid = {"kind": "unsupported", "title": "Invalid category"}
     assert client.post("/api/v1/career/entries", json=invalid).status_code == 422
+
+
+def test_an_import_preview_reads_text_entries_or_a_profile_and_changes_nothing(workspace):
+    career = CareerService(workspace)
+    entry = {"kind": "project", "title": "Synthetic project"}
+    version = career.get_profile()["version"]
+
+    def preview(text):
+        return career.preview_import(ImportPreview(text=text, title="Synthetic notes"))
+
+    plain = preview("Led a synthetic migration.")
+    assert [(item["kind"], item["title"], item["narrative"]) for item in plain["entries"]] == [
+        ("other", "Synthetic notes", "Led a synthetic migration.")
+    ]
+    assert plain["warnings"] and "profile" not in plain
+    for text in (json.dumps([entry]), json.dumps(entry), json.dumps({"entries": [entry]})):
+        read = preview(text)
+        assert [item["title"] for item in read["entries"]] == ["Synthetic project"], text
+        assert read["warnings"] == [], text
+    profile = preview(json.dumps({"headline": "Synthetic engineer"}))
+    assert profile["profile"] == {"headline": "Synthetic engineer"}
+    assert profile["entries"] == [] and profile["expected_profile_version"] == version
+    both = preview(json.dumps({"profile": {"name": "Alex"}, "entries": [entry], "notes": "x"}))
+    assert both["profile"] == {"name": "Alex"} and len(both["entries"]) == 1
+    assert len(both["warnings"]) == 2 and "'notes'" in both["warnings"][0]
+    for text, code in (
+        ("42", "import_format"),
+        (json.dumps({"entries": "x"}), "import_format"),
+        (json.dumps({"profile": "x"}), "import_format"),
+        (json.dumps([{"kind": "unsupported", "title": "X"}]), "import_validation"),
+    ):
+        with pytest.raises(DomainError) as refused:
+            preview(text)
+        assert refused.value.code == code, text
+    assert career.list_entries()["total"] == 0 and career.get_profile()["version"] == version
+    # The profile of a preview applies only with the version it showed.
+    with pytest.raises(DomainError) as unconfirmed:
+        career.import_entries(CareerImport(profile={"headline": "Synthetic engineer"}))
+    assert unconfirmed.value.code == "profile_version"
+    applied = career.import_entries(
+        CareerImport(profile=profile["profile"], expected_profile_version=version, entries=[entry])
+    )
+    assert applied["profile"]["headline"] == "Synthetic engineer" and len(applied["items"]) == 1
