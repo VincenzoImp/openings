@@ -38,6 +38,9 @@ curl --fail "$OPENINGS_URL/api/v1/jobs" \
   --data '{"title":"Backend engineer","company":"Example Co","posting":"Build Python APIs."}'
 ```
 
+A job still without its posting text, such as a page that could not be read,
+answers `"needs_text": true`: send the posting with `PATCH /jobs/{job_id}`.
+
 ## Lists and summaries
 
 A paged list takes `limit` and `offset` and returns `items`, `total`, `limit` and
@@ -80,6 +83,10 @@ text. Common codes:
 | 422 | `validation` | Invalid fields; `details` lists them |
 
 Others name a specific rule, for example `application_not_sent` or `reply_exists`.
+A transfer grant answers `401` with `transfer_token`, `transfer_expired` or
+`transfer_used`. Over MCP, a tool that does not exist fails with `404`: `rest_only`
+(the REST-only operation's tools are in `details.use`), `owner_only` or
+`unknown_tool`. An argument a tool does not take is refused with `validation`.
 
 ## Batches
 
@@ -88,7 +95,7 @@ is no transaction across items. A call returns one `BatchResult`:
 
 ```json
 {"batch_id": "b_...", "total": 2, "succeeded": 1, "failed": 1,
- "items": [{"index": 0, "ok": true, "id": "...", "version": 5},
+ "items": [{"index": 0, "ok": true, "id": "...", "version": 5, "result": {...}},
            {"index": 1, "ok": false, "error": {"code": "conflict", "status": 409, "message": "..."}}]}
 ```
 
@@ -97,6 +104,8 @@ it did not find. Each batch operation states its item limit in OpenAPI (for
 example 200 jobs to triage). Every change one call writes shares its `batch_id`,
 which `GET /changes` can filter on. Triage, stage changes and replies take no
 version: they are reversible and guarded by rules, and a conflict names the rule.
+Any other field of `PATCH /applications/batch` (priority, deadline, documents,
+requirements, questions, answers) needs the item's `expected_version`.
 
 ## Upload a PDF
 
@@ -104,14 +113,14 @@ MCP and JSON carry no file bytes, so a file goes up in two steps:
 
 1. Create the record that owns it. `POST /documents` with `kind` (`cv` or
    `letter`), `application_id`, the `career_ids` and `highlight_ids` it uses and
-   `pdf: {name, size}`, and optionally the TeX source inline as `source` (up to 256
-   KB) or as `source_file`. `POST /files/uploads` does the same for a career,
-   template or job file. The result has `uploads`, one grant per file, each with an
-   absolute `url`, `headers` and a ready `curl` line.
+   `pdf: {name, size}` (required), and optionally the TeX source inline as `source`
+   (up to 256 KB) or as `source_file: {name, size, sha256}`. `POST /files/uploads`
+   does the same for a career, template or job file. The result has `uploads`, one
+   grant per file, each with an absolute `url`, `headers` and a ready `curl` line.
 2. `PUT` the exact bytes to the grant's `url` with its headers (`X-Transfer-Token`;
-   no bearer token). When `uploads` has a source grant too, send the source first.
-   With a source, the PDF's request names its SHA-256, and a PDF built from another
-   source is refused.
+   no bearer token). When `uploads` has a source grant too, send the source first:
+   the PDF's grant names that source's SHA-256, and a source with other bytes is
+   refused.
 
 ```bash
 # 1. A CV revision for an application; the answer holds uploads.pdf.
@@ -125,10 +134,10 @@ curl -fsS "$OPENINGS_URL/api/v1/documents/d_01" -H "Authorization: Bearer $OPENI
 ```
 
 An upload grant accepts one file and expires after ten minutes; sending the same
-bytes again is safe, and other bytes are refused. Files are limited to 20 MiB. The
-revision is complete when its PDF is stored, and a complete revision never changes.
-A download works the same way: `POST /files/{id}/download` returns a link to `GET`,
-which works once.
+bytes again is safe, and other bytes are refused with `transfer_used`. Files are
+limited to 20 MiB. The revision is complete when its PDF is stored, and a complete
+revision never changes. A download works the same way: `POST /files/{id}/download`
+returns a grant to `GET` with its header; it works once, within ten minutes.
 
 The origin of the grant's `url` and `curl` line is `OPENINGS_PUBLIC_URL` (else the origin
 the request reached), so it must be reachable from the machine that runs it.
