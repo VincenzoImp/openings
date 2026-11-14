@@ -54,6 +54,10 @@ class JobChanges:
         company = value.company.strip() or (urlsplit(url).hostname or "Unknown company")
         data.update(title=title, company=company, url=url)
         with self.db.transaction() as c:
+            # Again under the write lock: a concurrent first use may have just finished.
+            replayed = replay(c, "jobs", value.idempotency_key, digest)
+            if replayed:
+                return {**self.get_job(replayed), "created": False}
             placeholders = ",".join("?" for _ in aliases) or "NULL"
             matches = c.execute(
                 f"SELECT DISTINCT jobs.* FROM jobs JOIN job_identities i ON i.job_id=jobs.id WHERE i.identity IN ({placeholders})",

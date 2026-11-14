@@ -62,6 +62,15 @@ def test_resolve_matches_identities_without_ingesting_and_reports_conflicts(work
     assert result["identity_conflict"]
 
 
+def test_a_concurrent_retry_of_an_ingest_gives_the_same_job(workspace, monkeypatch):
+    posting = {"title": "Synthetic engineer", "posting": BODY, "idempotency_key": "ingest-1"}
+    first = workspace.ingest_job(posting)
+    # The check before the write saw no key: another request was still writing it.
+    monkeypatch.setattr(workspace, "replayed_job", lambda *_: None)
+    again = workspace.ingest_job(posting)
+    assert (again["id"], again["created"]) == (first["id"], False)
+
+
 def test_normalization_signals():
     assert normalize_title("Senior Backend Engineer (m/w/d)") == "senior backend engineer"
     assert normalize_title("Senior  Backend-Engineer [f/m/x]") == "senior backend engineer"
