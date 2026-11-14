@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   api,
   newId,
@@ -6,8 +6,6 @@ import {
   type BulkResult,
   type JobCounts,
   type JobList,
-  type ListResult,
-  type OwnerQuestion,
 } from "../../api";
 import {
   Banner,
@@ -82,15 +80,6 @@ export function Queue({
   const query = listQuery({ ...filters, q }, LIMIT);
   if (section === "all") query.set("include_facets", "true");
   const list = useFresh<JobList>(`/jobs?${query}`, NONE, JOB_SCOPES);
-  const questions = useFresh<ListResult<OwnerQuestion>>(
-    "/questions?state=open&subject_type=job&limit=200",
-    { items: [], total: 0 },
-    ["questions"],
-  );
-  const asked = useMemo(
-    () => new Set(questions.data.items.map((item) => item.subject?.id || "")),
-    [questions.data],
-  );
   const [selection, setSelection] = useState<Record<string, number>>({});
   const [failures, setFailures] = useState<string[]>([]);
   const offset = Number(filters.offset) || 0;
@@ -372,7 +361,7 @@ export function Queue({
             : section === "review"
               ? "New jobs from your searches and company boards arrive here. Your agent reviews them against your preferences."
               : section === "shortlist"
-                ? "Shortlist the jobs you want to pursue. Your agent starts a Draft for each in its next prepare-shortlist run."
+                ? "Shortlist the jobs you want to pursue, then start an application for each, or ask your agent to prepare them."
                 : section === "dismissed"
                   ? "Dismissed jobs stay remembered here, so they are not collected again, and can be restored."
                   : "Add a posting by its address, or set up a saved search in Collection."}
@@ -387,7 +376,6 @@ export function Queue({
               selected={selection[job.id] !== undefined}
               current={job.id === selected}
               disabled={count >= 200}
-              asked={asked.has(job.id)}
               own={own}
               busy={pending}
               onSelect={onSelect}

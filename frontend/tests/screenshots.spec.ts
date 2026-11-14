@@ -50,6 +50,7 @@ const SCREENS: Screen[] = [
     route: "jobs?section=shortlist",
     docs: "shortlist",
   },
+  { name: "jobs-dismissed", route: "jobs?section=dismissed" },
   { name: "jobs-empty", route: "jobs?q=no%20job%20has%20this%20title" },
   {
     name: "jobs-add-dialog",
@@ -63,7 +64,6 @@ const SCREENS: Screen[] = [
   { name: "preferences", route: "preferences", docs: "preferences" },
   { name: "templates", route: "templates", docs: "templates" },
   { name: "collection", route: "collection", docs: "collection" },
-  { name: "activity", route: "activity" },
   { name: "settings", route: "settings" },
   { name: "skills", route: "settings?section=skills", docs: "skills" },
   { name: "backup", route: "settings?section=backup" },

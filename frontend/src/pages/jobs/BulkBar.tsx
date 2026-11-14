@@ -59,7 +59,9 @@ export function BulkBar({
         ? "Jobs forgotten."
         : action === "dismissed"
           ? "Jobs dismissed. Each one can be restored."
-          : "Jobs updated.",
+          : action === "inbox" && section === "dismissed"
+            ? "Jobs restored to the jobs to review."
+            : "Jobs updated.",
     );
     if (ok && result) onResult(result);
     setDialog(null);

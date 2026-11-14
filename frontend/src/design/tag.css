@@ -55,35 +55,3 @@
   background: none;
   color: var(--ink-2);
 }
-
-/* Who did it: owner, agent (token name), system or unknown */
-.actor {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--t-xs);
-  font-weight: 600;
-  color: var(--ink-2);
-}
-.actor::before {
-  content: "";
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--ink-3);
-}
-.actor.agent {
-  color: var(--agent);
-}
-.actor.agent::before {
-  background: var(--agent);
-  border-radius: 2px;
-}
-.actor.owner::before {
-  background: var(--accent);
-}
-.actor.unknown::before {
-  background: none;
-  box-shadow: inset 0 0 0 1.5px var(--ink-3);
-}

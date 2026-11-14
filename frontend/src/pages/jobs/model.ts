@@ -1,6 +1,7 @@
 // What the Jobs screen shows about a job, in words: its tab, its signals, who
 // dismissed it and where it came from. No React: tested directly.
 import type { DismissedBy, Job, JobCounts } from "../../api";
+import { actorPhrase } from "../../design/actor.ts";
 import { dayTime } from "../../library/time.ts";
 
 /** Changes to these REST resources read the jobs again (useFresh scopes). */
@@ -88,9 +89,9 @@ export const SORTS: Record<string, string> = {
 };
 export const DISMISSED_BY: { id: "" | DismissedBy; label: string }[] = [
   { id: "", label: "All" },
-  { id: "agent", label: "By an agent" },
+  { id: "agent", label: "By agent" },
   { id: "owner", label: "By you" },
-  { id: "other", label: "Other" },
+  { id: "system", label: "By job sources" },
 ];
 
 /** The order a tab lists its jobs in when none is chosen. */
@@ -230,26 +231,19 @@ export function signalTags(
   return tags;
 }
 
-/** Who dismissed a job, in words: "You", the token's name or "System". */
+/** Who dismissed a job, in plain words: "Dismissed by you", "Dismissed by <token name>". */
 export function dismissedBy(job: Job) {
-  const dismissal = job.dismissal;
-  if (!dismissal) return "";
-  if (dismissal.category === "owner") return "You";
-  if (dismissal.by.kind === "token") return dismissal.by.name || "An API token";
-  if (dismissal.by.kind === "system") return "System";
-  return "Not recorded";
+  if (!job.dismissal) return "";
+  return ["Dismissed", actorPhrase(job.dismissal.by)].filter(Boolean).join(" ");
 }
 
-/** One line on a dismissal: who, when and why. */
+/** One line on a dismissal: who and when; the reason is shown under it. */
 export function dismissalLine(job: Job, now = new Date()) {
   const dismissal = job.dismissal;
   if (!dismissal) return "";
   const when = dismissal.at ? dayTime(dismissal.at, now) : "";
-  return [`Dismissed by ${lowerYou(dismissedBy(job))}`, when]
-    .filter(Boolean)
-    .join(" · ");
+  return [dismissedBy(job), when].filter(Boolean).join(" · ");
 }
-const lowerYou = (text: string) => (text === "You" ? "you" : text);
 
 const PROVIDERS: Record<string, string> = {
   linkedin: "LinkedIn",

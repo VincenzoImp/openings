@@ -1143,6 +1143,7 @@ test("the timeline records responses, notes and who made each change", async ({
   const stamp = unique("Timeline");
   const agent = await call(page, "/tokens", "POST", {
     name: `Synthetic agent ${stamp}`,
+    kind: "agent",
   });
   const application = await make(page, stamp, { status: "applied" });
   await page.evaluate(
@@ -1165,10 +1166,13 @@ test("the timeline records responses, notes and who made each change", async ({
   const history = page.getByRole("list", {
     name: "Timeline of this application",
   });
+  // One plain phrase per entry: the agent by its token name (kept after the
+  // token is revoked), the owner as "you"; no coloured chips.
   await expect(history.getByRole("listitem").first()).toContainText(
-    `Synthetic agent ${stamp}`,
+    `by Synthetic agent ${stamp}`,
   );
-  await expect(history).toContainText("Owner (dashboard)");
+  await expect(history).toContainText("by you");
+  await expect(history.locator(".actor")).toHaveCount(0);
 
   // An employer response: recorded, its day corrected, then removed.
   await page.getByRole("button", { name: "Record a response" }).click();
@@ -1229,20 +1233,14 @@ test("the timeline records responses, notes and who made each change", async ({
   await fitsViewport(page);
 });
 
-test("the agent is asked from the review page and the application is deleted", async ({
+test("an application is stopped as Not pursued and then deleted", async ({
   page,
 }) => {
-  const application = await make(page, unique("Ask and delete"));
+  const application = await make(page, unique("Stop and delete"));
   await go(page, `review?application=${application.id}&tab=details`);
   await settled(page);
-  await page
-    .getByLabel("A request about this application")
-    .fill("Rewrite the letter with more on data pipelines.");
-  await page.getByRole("button", { name: "Send the request" }).click();
-  const request = page.getByRole("article", { name: /Rewrite the letter/ });
-  await expect(request).toContainText("Waiting for your agent");
-  await request.getByRole("button", { name: "Withdraw" }).click();
-  await expect(request).toContainText("Withdrawn");
+  // Nothing on the page writes a request for the agent.
+  await expect(page.getByText("Ask your agent")).toHaveCount(0);
   // Stop it as Not pursued, then delete it for good.
   await page
     .getByRole("form", { name: "Stage and plan" })

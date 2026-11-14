@@ -47,7 +47,6 @@ export function JobRow({
   selected,
   current,
   disabled,
-  asked,
   own,
   busy,
   onSelect,
@@ -62,8 +61,6 @@ export function JobRow({
   current: boolean;
   /** The selection is full. */
   disabled: boolean;
-  /** The agent waits for the owner's answer to a question about it. */
-  asked: boolean;
   own: Set<string> | null;
   busy: boolean;
   onSelect: (id: string) => void;
@@ -80,9 +77,6 @@ export function JobRow({
   const tags = [
     ...(section === "all" ? [placeTag(job)] : []),
     ...signalTags(job, { own }),
-    ...(asked
-      ? [{ text: "Waits for your answer", tone: "agent" as const }]
-      : []),
   ];
   return (
     <li

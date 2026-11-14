@@ -6,7 +6,6 @@ import { preloadScreen } from "./Screens";
 
 export interface NavCounts {
   ready: number;
-  questions: number;
   inbox: number;
 }
 interface NavProps {
@@ -24,14 +23,6 @@ function NavCount({ item, counts }: { item: Destination; counts: NavCounts }) {
       <Count
         value={counts.ready}
         label={plural(counts.ready, "application", "applications") + " ready"}
-      />
-    );
-  if (item.count === "questions" && counts.questions > 0)
-    return (
-      <Count
-        value={counts.questions}
-        className="navbadge"
-        label={plural(counts.questions, "open question", "open questions")}
       />
     );
   // The review queue informs; it does not ask the owner to act.
@@ -81,7 +72,7 @@ function NavLink({
 }
 
 /** Wide screens: every destination, in its group. */
-export function Sidebar(props: NavProps & { foot?: React.ReactNode }) {
+export function Sidebar(props: NavProps) {
   return (
     <aside className="sidebar">
       <a
@@ -104,7 +95,6 @@ export function Sidebar(props: NavProps & { foot?: React.ReactNode }) {
           </div>
         ))}
       </nav>
-      {props.foot}
     </aside>
   );
 }
@@ -152,9 +142,8 @@ export function TabBar({
  */
 export function MoreSheet({
   onClose,
-  foot,
   ...props
-}: NavProps & { onClose: () => void; foot?: React.ReactNode }) {
+}: NavProps & { onClose: () => void }) {
   const sheet = useRef<HTMLDivElement>(null);
   useEffect(() => {
     sheet.current?.querySelector<HTMLElement>("a")?.focus();
@@ -200,7 +189,6 @@ export function MoreSheet({
             ) : null;
           })}
         </nav>
-        {foot}
       </div>
     </>
   );
