@@ -145,7 +145,7 @@ def test_undoing_a_shortlist_with_work_is_refused(workspace):
             )
         elif work in {"applied", "reply"}:
             applied = workspace.update_application(
-                application["id"], {"expected_version": version, "status": "applied"}
+                application["id"], {"expected_version": version, "stage": "applied"}
             )
             if work == "reply":
                 workspace.update_application(
@@ -171,7 +171,7 @@ def test_closing_never_changes_triage_and_a_closed_application_is_kept(workspace
     application = workspace.get_application(job["application"]["id"])
     workspace.update_application(
         application["id"],
-        {"expected_version": application["version"], "status": "closed", "outcome": "not_pursued"},
+        {"expected_version": application["version"], "stage": "closed", "outcome": "not_pursued"},
     )
     job = workspace.get_job(job["id"])
     assert job["triage"] == "shortlisted"
@@ -186,15 +186,15 @@ def test_reopening_a_closed_application_follows_the_rules_of_a_start(workspace):
         job["application"]["id"],
         {
             "expected_version": workspace.get_application(job["application"]["id"])["version"],
-            "status": "closed",
+            "stage": "closed",
             "outcome": "not_pursued",
         },
     )
     job = workspace.set_triage(job["id"], "dismissed", workspace.get_job(job["id"])["version"])
-    reopen = {"expected_version": application["version"], "status": "shortlisted"}
+    reopen = {"expected_version": application["version"], "stage": "shortlisted"}
     with pytest.raises(DomainError, match="Restore the dismissed job"):
         workspace.update_application(application["id"], reopen)
-    assert workspace.get_application(application["id"])["status"] == "closed"
+    assert workspace.get_application(application["id"])["stage"] == "closed"
     # Restored to New, reopening shortlists the job again.
     workspace.set_triage(job["id"], "new", workspace.get_job(job["id"])["version"])
     workspace.update_application(application["id"], reopen)

@@ -19,7 +19,6 @@ from ..events import EventQuery
 from ..models import (
     ApplicationBulk,
     ApplicationIds,
-    ApplicationInput,
     ApplicationPatch,
     ApplicationQuery,
     ApplicationsCreate,
@@ -37,9 +36,7 @@ from ..models import (
     MergeInput,
     NoteInput,
     NotePatch,
-    NotePin,
     TimelineQuery,
-    TriageInput,
 )
 from ..operations import storage_status
 from ..responses import (
@@ -56,7 +53,6 @@ from ..responses import (
     JobPage,
     JobSummary,
     Note,
-    NoteList,
     ResolvedJobs,
     Skill,
     SkillList,
@@ -158,7 +154,8 @@ def stats_get(ws: WS, query: Q[StatsQuery]) -> Stats:
 def skills_get(ws: WS, name: str = "", path: str = SKILL_FILE) -> Skill | SkillList:
     """Read a skill, or without name the list of skills.
 
-    A skill is the method for one kind of work; path reads one of its reference files.
+    A skill is the method for one kind of work; path reads one of its files (or
+    ../<skill>/<file>).
     """
     if not name:
         return list_skills(ws.skills)
@@ -173,7 +170,8 @@ def jobs_list(ws: WS, query: Q[JobQuery]) -> JobPage:
     """Search job summaries.
 
     Filter by triage, q, url, signal, requires, posting_language, hide_unspoken_required,
-    dismissed_by, batch_id; include_counts adds totals. jobs_get has the posting.
+    dismissed_by, dismissed_since, batch_id; include_counts adds totals. jobs_get has the
+    posting.
     """
     return ws.list_jobs(**query.model_dump())
 
@@ -201,18 +199,17 @@ def jobs_triage(ws: WS, body: JobTriage) -> BatchResult:
 async def jobs_create(ws: WS, body: JobInput) -> Job:
     """Add a job from a URL, pasted text or fields.
 
-    A URL is read through the provider gate. A known job is returned (created false); a
-    retry with the same idempotency_key returns the same job.
+    A URL is read through the provider gate; needs_text means paste the posting with
+    jobs_update. A known job is returned (created false).
     """
     from ..fetching import complete_input
     from ..idempotency import fingerprint
 
     digest = fingerprint(body)
-    replayed = ws.replayed_job(body.idempotency_key, digest)
-    if replayed:
-        return replayed
-    body = await complete_input(body, ws.discovery)
-    return ws.ingest_job(body, digest=digest)
+    job = ws.replayed_job(body.idempotency_key, digest)
+    if job is None:
+        job = ws.ingest_job(await complete_input(body, ws.discovery), digest=digest)
+    return job | {"needs_text": not job["complete"]}
 
 
 @operation("GET /jobs/resolve", tags=["jobs"], mcp="jobs_list")
@@ -233,7 +230,7 @@ def jobs_duplicates(ws: WS, query: Q[DuplicateQuery]) -> DuplicatePage:
     return ws.duplicate_jobs(query)
 
 
-@operation("POST /jobs/bulk", access=DESTRUCTIVE, tags=["jobs"], mcp="jobs_triage")
+@operation("POST /jobs/bulk", access=DESTRUCTIVE, tags=["jobs"], mcp=("jobs_triage", "jobs_delete"))
 def jobs_bulk(ws: WS, body: JobBulk) -> BatchResult:
     """Shortlist, dismiss, restore or forget selected jobs.
 
@@ -265,12 +262,6 @@ def jobs_link(ws: WS, job_id: str, body: LinkInput) -> JobSummary:
     notes); different clears the flag for good. Returns the job that remains.
     """
     return ws.link_jobs(job_id, body)
-
-
-@operation("POST /jobs/{job_id}/triage", access=WRITE, tags=["jobs"], mcp="jobs_triage")
-def jobs_triage_one(ws: WS, job_id: str, body: TriageInput) -> JobSummary:
-    """Shortlist, dismiss or return one job to review, with its version."""
-    return ws.set_triage(job_id, body.triage, body.expected_version, body.reason)
 
 
 @operation("POST /jobs/{job_id}/distinct", access=WRITE, tags=["jobs"], mcp="jobs_link")
@@ -313,12 +304,6 @@ def timeline_get(
 # Notes
 
 
-@operation("GET /jobs/{job_id}/notes", tags=["notes"], mcp="jobs_get")
-def notes_list(ws: WS, job_id: str) -> NoteList:
-    """List the notes of a job and its applications."""
-    return ws.list_notes(job_id)
-
-
 @operation("POST /jobs/{job_id}/notes", access=WRITE, tags=["notes"])
 def notes_create(ws: WS, job_id: str, body: NoteInput) -> Note:
     """Add a note to a job, or to its application (application_id).
@@ -329,22 +314,10 @@ def notes_create(ws: WS, job_id: str, body: NoteInput) -> Note:
     return ws.add_note(job_id, body)
 
 
-@operation("GET /notes/{note_id}", tags=["notes"], mcp="jobs_get")
-def notes_get(ws: WS, note_id: str) -> Note:
-    """Read a note and its version."""
-    return ws.get_note(note_id)
-
-
 @operation("PATCH /notes/{note_id}", access=WRITE, tags=["notes"])
 def notes_update(ws: WS, note_id: str, body: NotePatch) -> Note:
     """Edit a note's body, pin or unpin it, with its version."""
     return ws.update_note(note_id, body)
-
-
-@operation("POST /notes/{note_id}/pin", access=WRITE, tags=["notes"], mcp="notes_update")
-def notes_pin(ws: WS, note_id: str, body: NotePin) -> Note:
-    """Pin or unpin a note, with its version."""
-    return ws.pin_note(note_id, body)
 
 
 @operation("DELETE /notes/{note_id}", access=DESTRUCTIVE, tags=["notes"])
@@ -391,22 +364,16 @@ def applications_update(ws: WS, body: ApplicationsUpdate) -> BatchResult:
     """Update up to 200 applications: stage, outcome, reply, fields.
 
     A reply moves the stage. Set stage applied only when the owner says they applied.
-    Ready is computed. Each item has its own result.
+    Other fields need expected_version. Each item has its own result.
     """
     return ws.update_applications(body)
-
-
-@operation("POST /applications", access=WRITE, tags=["applications"], mcp="applications_create")
-def applications_start(ws: WS, body: ApplicationInput) -> ApplicationChange:
-    """Start one application in stage Shortlisted; shortlists its job."""
-    return ws.create_application(body)
 
 
 @operation(
     "POST /applications/bulk",
     access=DESTRUCTIVE,
     tags=["applications"],
-    mcp="applications_update",
+    mcp=("applications_update", "applications_delete"),
 )
 def applications_bulk(ws: WS, body: ApplicationBulk) -> BatchResult:
     """Close, reopen or delete selected applications.
@@ -431,7 +398,7 @@ def applications_read(ws: WS, application_id: str) -> Application:
 def applications_change(ws: WS, application_id: str, body: ApplicationPatch) -> ApplicationChange:
     """Update one application, with its version.
 
-    Stage (status), reply, outcome, priority, deadline, documents, requirements, answers.
+    Stage, reply, outcome, priority, deadline, documents, requirements, answers.
     """
     return ws.update_application(application_id, body)
 

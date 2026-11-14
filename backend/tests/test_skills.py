@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 
 from openings.errors import DomainError
-from openings.removed import TOOLS as REMOVED_TOOLS
 from openings.skills import SkillLibrary
 
 ROOT = Path(__file__).resolve().parents[2] / "skills"
@@ -75,7 +74,7 @@ def test_every_workflow_reads_the_core_skill_and_reports_back():
         assert limit in core
 
 
-def test_skills_name_only_live_tools_and_no_removed_ones(mcp):
+def test_skills_name_only_live_tools_and_no_removed_concepts(mcp):
     live = {tool["name"] for tool in mcp.rpc("tools/list")["tools"]}
     for path in files():
         text = path.read_text()
@@ -83,14 +82,23 @@ def test_skills_name_only_live_tools_and_no_removed_ones(mcp):
             # Shell commands in backticks are not tools.
             if "_" in name and name not in {"pdflatex", "pdftotext"}:
                 assert name in live, (path.name, name)
-        for name in REMOVED_TOOLS:
-            assert not re.search(rf"\b{name}\b", text), (path.relative_to(ROOT), name)
         found = REMOVED_CONCEPTS.search(text)
         assert not found, (path.relative_to(ROOT), found and found.group(0))
 
 
 def test_library_rejects_paths_outside_a_skill_and_unknown_skills():
-    for path in ("../triage-jobs/SKILL.md", "/etc/passwd", "references/missing.md", "SKILL.txt"):
+    library = SkillLibrary(ROOT)
+    # A link to another skill's file reads that skill's file.
+    linked = library.read("maintain-career", "../prepare-applications/references/writing.md")
+    assert (linked["name"], linked["path"]) == ("prepare-applications", "references/writing.md")
+    for path in (
+        "../../skills/openings/SKILL.md",
+        "../missing/SKILL.md",
+        "../openings/../../README.md",
+        "/etc/passwd",
+        "references/missing.md",
+        "SKILL.txt",
+    ):
         with pytest.raises(DomainError):
             SkillLibrary(ROOT).read("prepare-applications", path)
     with pytest.raises(DomainError):

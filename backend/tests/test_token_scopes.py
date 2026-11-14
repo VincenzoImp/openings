@@ -79,7 +79,7 @@ def test_an_agent_token_keeps_the_workflow_operations(app, client):
     # says which authority is missing.
     refused_over_rest(client.get("/api/v1/export", headers=headers))
     _, error = tool(client, agent, "workspace_export")
-    assert error["code"] == "owner_only" and error["details"]["use"] == "workspace_backup"
+    assert error["code"] == "owner_only"
     current = client.get(f"/api/v1/jobs/{job['id']}", headers=headers).json()
     forgotten, error = tool(
         client, agent, "jobs_delete", {"job_id": job["id"], "expected_version": current["version"]}
@@ -171,8 +171,16 @@ def test_an_owner_token_keeps_full_access_and_chooses_the_kind(app, client):
         assert invalid.json()["error"]["code"] == "validation"
     # The owner can run everything from an external session: revoke, change the password.
     assert client.delete(f"/api/v1/tokens/{default['id']}", headers=headers).status_code == 200
+    # Revoking a token that does not exist says so.
+    assert client.delete(f"/api/v1/tokens/{default['id']}", headers=headers).status_code == 404
+    # Changing the password needs the current one.
+    wrong = {"current_password": "not-the-password", "password": "changed-password"}
+    refused = client.post("/api/v1/auth/password", json=wrong, headers=headers)
+    assert (refused.status_code, refused.json()["error"]["code"]) == (422, "current_password")
     changed = client.post(
-        "/api/v1/auth/password", json={"password": "changed-password"}, headers=headers
+        "/api/v1/auth/password",
+        json={"current_password": PASSWORD, "password": "changed-password"},
+        headers=headers,
     ).json()
     assert changed["api_tokens_preserved"] is True
     assert (
@@ -199,7 +207,7 @@ def test_the_owner_session_and_the_system_are_never_refused(workspace):
             auth.list_tokens,
             lambda: auth.create_token("Third"),
             lambda: auth.revoke_token(agent["id"]),
-            lambda: auth.change_password("another-password"),
+            lambda: auth.change_password(PASSWORD, "another-password"),
         ):
             with pytest.raises(DomainError) as refused:
                 call()

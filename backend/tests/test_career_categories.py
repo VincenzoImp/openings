@@ -27,7 +27,7 @@ def test_awards_and_publications_survive_import_filtering_and_citation(client):
         }
         for kind in ("award", "publication")
     ]
-    created = [call("knowledge_create", "POST", "/career/knowledge", entry) for entry in entries]
+    created = [call("career_create", "POST", "/career/entries", entry) for entry in entries]
     preview = call(
         "career_preview_import",
         "POST",
@@ -35,7 +35,7 @@ def test_awards_and_publications_survive_import_filtering_and_citation(client):
         {"text": json.dumps(entries)},
     )
     assert [row["kind"] for row in preview["entries"]] == ["award", "publication"]
-    before_import = call("knowledge_list", "GET", "/career/knowledge", {})
+    before_import = call("career_list", "GET", "/career/entries", {})
     assert before_import["total"] == 2
     imported = call(
         "career_import",
@@ -46,19 +46,14 @@ def test_awards_and_publications_survive_import_filtering_and_citation(client):
     assert imported["total"] == 2
     for entry, record in zip(entries, created):
         listed = call(
-            "knowledge_list",
+            "career_list",
             "GET",
-            "/career/knowledge",
+            "/career/entries",
             {"kind": entry["kind"], "summary": True},
         )
         assert listed["total"] == 2
         assert {row["kind"] for row in listed["items"]} == {entry["kind"]}
-        read = call(
-            "knowledge_get",
-            "GET",
-            f"/career/knowledge/{record['id']}",
-            {"career_id": record["id"]},
-        )
+        read = call("career_get", "GET", "/career/batch", {"ids": [record["id"]]})["items"][0]
         assert all(read[key] == value for key, value in entry.items())
 
     job = call(
@@ -67,7 +62,10 @@ def test_awards_and_publications_survive_import_filtering_and_citation(client):
         "/jobs",
         {"title": "Engineer", "company": "Example", "posting": "Build APIs."},
     )
-    application = call("applications_create", "POST", "/applications", {"job_id": job["id"]})
+    started = call(
+        "applications_create", "POST", "/applications/batch", {"items": [{"job_id": job["id"]}]}
+    )
+    application = started["items"][0]["result"]
     cited = [record["id"] for record in created + imported["items"]]
     document = call(
         "documents_create",
@@ -84,9 +82,9 @@ def test_awards_and_publications_survive_import_filtering_and_citation(client):
 
     award = created[0]
     changed = call(
-        "knowledge_update",
+        "career_update",
         "PATCH",
-        f"/career/knowledge/{award['id']}",
+        f"/career/entries/{award['id']}",
         {
             "career_id": award["id"],
             "expected_version": award["version"],
@@ -105,4 +103,4 @@ def test_awards_and_publications_survive_import_filtering_and_citation(client):
     assert saved["career_ids"] == cited
 
     invalid = {"kind": "unsupported", "title": "Invalid category"}
-    assert client.post("/api/v1/career/knowledge", json=invalid).status_code == 422
+    assert client.post("/api/v1/career/entries", json=invalid).status_code == 422

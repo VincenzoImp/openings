@@ -46,6 +46,7 @@ class ApplicationReads:
             row["last_reply"] = last_replies(connection, [application_id])[application_id]
             pinned = self.pinned_application_notes(connection, [application_id])[application_id]
         row["pinned_note"] = pinned
+        row["stage"] = row.pop("status")
         return row
 
     @staticmethod
@@ -190,6 +191,7 @@ class ApplicationReads:
             item["job"] = self._compact_job(raw)
             item["preparation"] = preparation[item["id"]]
             item["last_reply"] = answers[item["id"]]
+            item["stage"] = item.pop("status")
             items.append(item)
         return {
             "items": items,

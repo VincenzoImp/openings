@@ -14,7 +14,6 @@ from ..responses import (
     FileGrant,
     FilePage,
     NewDocument,
-    WorkspaceFile,
 )
 from .core import Version, with_curl
 from .operation import DESTRUCTIVE, READ, WRITE, WS, Q, operation
@@ -82,12 +81,6 @@ def files_upload(ws: WS, body: UploadReservation) -> FileGrant:
     line given). sha256 is checked when given.
     """
     return with_curl(ws.documents.reserve_upload(body), body.name)
-
-
-@operation("GET /files/{file_id}", tags=["files"], mcp="files_download")
-def files_get(ws: WS, file_id: str) -> WorkspaceFile:
-    """Read file metadata and its content URL."""
-    return ws.documents.get_file(file_id)
 
 
 @operation("POST /files/{file_id}/download", access=READ, tags=["files"])

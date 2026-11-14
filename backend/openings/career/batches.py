@@ -15,11 +15,11 @@ from ..errors import DomainError, invalid
 from .models import (
     CareerRead,
     CareerSave,
-    ClaimCreate,
-    ClaimUpdate,
+    EntryCreate,
+    EntryUpdate,
+    HighlightCreate,
     HighlightsSave,
-    KnowledgeCreate,
-    KnowledgeUpdate,
+    HighlightUpdate,
     TemplateCreate,
     TemplateSave,
     TemplateUpdate,
@@ -67,21 +67,21 @@ class CareerBatches:
         if value.ids:
             identifiers, unknown = list(dict.fromkeys(value.ids)), []
         else:
-            page = self.list_knowledge(q=value.q, kind=value.kind, limit=50, summary=True)
+            page = self.list_entries(q=value.q, kind=value.kind, limit=50, summary=True)
             identifiers, unknown = [item["id"] for item in page["items"]], []
         items = []
         files = self.workspace.documents
         for identifier in identifiers:
             try:
-                entry = self.get_knowledge(identifier)
+                entry = self.get_entry(identifier)
             except DomainError as error:
                 if error.status != 404:
                     raise
                 unknown.append(identifier)
                 continue
-            entry["highlights"] = self.list_claims(career_id=identifier, limit=200, summary=False)[
-                "items"
-            ]
+            entry["highlights"] = self.list_highlights(
+                career_id=identifier, limit=200, summary=False
+            )["items"]
             for highlight in entry["highlights"]:
                 highlight.pop("career_id", None)
             entry["files"] = files.list_files(owner_type="career", owner_id=identifier)["items"]
@@ -93,9 +93,9 @@ class CareerBatches:
             identifier, data = _split(item, "career_id")
             _version_required(identifier, item.expected_version, "career entry")
             if identifier is None:
-                record = self.create_knowledge(KnowledgeCreate.model_validate(data))
+                record = self.create_entry(EntryCreate.model_validate(data))
             else:
-                record = self.update_knowledge(identifier, KnowledgeUpdate.model_validate(data))
+                record = self.update_entry(identifier, EntryUpdate.model_validate(data))
             return _echo(record, "title")
 
         return run_items(self.db, value.items, lambda item: item.career_id, apply)
@@ -105,9 +105,9 @@ class CareerBatches:
             identifier, data = _split(item, "highlight_id")
             _version_required(identifier, item.expected_version, "highlight")
             if identifier is None:
-                record = self.create_claim(ClaimCreate.model_validate(data))
+                record = self.create_highlight(HighlightCreate.model_validate(data))
             else:
-                record = self.update_claim(identifier, ClaimUpdate.model_validate(data))
+                record = self.update_highlight(identifier, HighlightUpdate.model_validate(data))
             return _echo(record, "career_id", "approved", "always_include")
 
         return run_items(self.db, value.items, lambda item: item.highlight_id, apply)

@@ -156,24 +156,30 @@ async def test_export_disconnect_closes_snapshot(spec_version, snapshots):
 
 @pytest.mark.asyncio
 async def test_export_preserves_nullable_career_dates_and_scoped_mcp_download(app, client):
-    from openings.career import ClaimCreate, KnowledgeCreate, TemplateCreate
+    from openings.career import EntryCreate, HighlightCreate, TemplateCreate
 
     career, workspace, documents = app.state.career, app.state.workspace, app.state.documents
-    undated = career.create_knowledge(
-        KnowledgeCreate(title="Undated project", kind="project", skills=["Python"])
+    undated = career.create_entry(
+        EntryCreate(title="Undated project", kind="project", skills=["Python"])
     )
-    career.create_knowledge(
-        KnowledgeCreate(
+    career.create_entry(
+        EntryCreate(
             title="Dated project", kind="project", dates={"kind": "single", "start": "2025"}
         )
     )
-    claim = career.create_claim(
-        ClaimCreate(career_id=undated["id"], text="Synthetic claim", approved=True)
+    claim = career.create_highlight(
+        HighlightCreate(career_id=undated["id"], text="Synthetic claim", approved=True)
     )
     career.create_template(TemplateCreate(name="Synthetic CV", tex="Example", is_default=True))
     job = workspace.ingest_job({"title": "Synthetic role", "posting": "Build reliable services."})
     application = workspace.create_application({"job_id": job["id"]})
-    documents.create_document({"application_id": application["id"], "career_ids": [undated["id"]]})
+    documents.create_document(
+        {
+            "application_id": application["id"],
+            "career_ids": [undated["id"]],
+            "pdf": {"name": "cv.pdf", "size": 1},
+        }
+    )
     archive = client.get("/api/v1/export").json()
     # The owner's export grant (workspace_export, owner only).
     ticket = grant(app.state.workspace, "export")

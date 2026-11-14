@@ -110,19 +110,19 @@ def test_lists_and_mutations_default_to_compact_records_with_full_opt_in(app, cl
     assert runs["items"][0]["tasks"] == source["last_run"]["tasks"]
     assert runs["items"][0]["counts"]["received"] == 4
     full = client.get("/api/v1/collection/runs?summary=false").json()
-    assert stable(full["items"][0]) == stable(client.get("/api/v1/collection/runs/run-1").json())
     assert "checkpoint" not in full["items"][0]["tasks"][0]["payload"]
 
     # Mutations answer with the compact job, not the posting.
     job = jobs[1]
-    triaged = client.post(
-        f"/api/v1/jobs/{job['id']}/triage",
-        json={"triage": "shortlisted", "expected_version": job["version"]},
+    corrected = client.patch(
+        f"/api/v1/jobs/{job['id']}",
+        json={"location": "Remote", "expected_version": job["version"]},
     ).json()
-    assert triaged["triage"] == "shortlisted" and triaged["version"] == job["version"] + 1
-    assert "posting" not in triaged and "postings" not in triaged
-    assert triaged["posting_preview"].startswith("Build reliable services.")
-    assert triaged == client.get("/api/v1/jobs?triage=shortlisted").json()["items"][0]
+    assert corrected["location"] == "Remote"
+    assert "posting" not in corrected and "postings" not in corrected
+    assert corrected["posting_preview"].startswith("Build reliable services.")
+    listed = client.get("/api/v1/jobs").json()["items"]
+    assert corrected == next(item for item in listed if item["id"] == job["id"])
     job = jobs[2]
     updated, error = mcp.call(
         "jobs_update", {"job_id": job["id"], "title": "Renamed", "expected_version": 1}

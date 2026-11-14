@@ -38,6 +38,20 @@ def check_version(row, expected):
         conflict(details=details)
 
 
+def get_row(conn, table, record_id, label):
+    """The row of ``table`` with ``record_id`` as a dict; 404 ``label`` not found otherwise."""
+    # Table names are fixed internally, never client-controlled.
+    row = conn.execute(f"SELECT * FROM {table} WHERE id=?", (record_id,)).fetchone()
+    if row is None:
+        missing(label)
+    return dict(row)
+
+
+def check_page(limit, offset):
+    if not 1 <= limit <= 200 or offset < 0:
+        raise DomainError(422, "pagination", "Limit must be 1–200 and offset must be nonnegative.")
+
+
 def error_body(error):
     return {
         "code": error.code,
@@ -102,10 +116,12 @@ def _version(result):
 __all__ = [
     "DomainError",
     "batch_result",
+    "check_page",
     "check_version",
     "conflict",
     "decode_record",
     "encode",
+    "get_row",
     "missing",
     "new_id",
     "now",

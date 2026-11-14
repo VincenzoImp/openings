@@ -40,7 +40,10 @@ def test_the_start_read_summarises_the_workspace(app, mcp):
         "writing",
         "working_with_me",
     }
-    assert context["preferences"]["facts"]["items"][0] == "EU citizen with a Swiss B permit."
+    # Every section's items have the shape preferences_update takes.
+    assert context["preferences"]["facts"]["items"][0] == {
+        "text": "EU citizen with a Swiss B permit."
+    }
     assert context["preferences"]["writing"]["items"][0] == {
         "text": "At most two pages.",
         "scope": "cv",
@@ -84,7 +87,7 @@ def test_feedback_lists_the_owners_corrections_of_agent_work_once(app, mcp):
         workspace.set_triage(job["id"], "new", job["version"])
         application = workspace.get_application(application_id)
         workspace.update_application(
-            application_id, {"expected_version": application["version"], "status": "applied"}
+            application_id, {"expected_version": application["version"], "stage": "applied"}
         )
         app.state.preferences.update_preferences(
             "ruled_out", {"expected_version": 0, "items": [{"text": "German-only roles."}]}

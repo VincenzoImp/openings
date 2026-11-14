@@ -1,4 +1,4 @@
-"""Operations of the career record: profile, entries, highlights, templates and import.
+"""Operations of the Profile, career entries, highlights, templates and the career import.
 
 An agent reads the profile, a career summary and the templates in workspace_context,
 whole entries with career_get, and writes in batches (career_save, highlights_save).
@@ -8,11 +8,11 @@ is the owner's (an agent reads a CV itself and saves what it finds).
 
 from ..career import (
     CareerImport,
-    ClaimCreate,
-    ClaimUpdate,
+    EntryCreate,
+    EntryUpdate,
+    HighlightCreate,
+    HighlightUpdate,
     ImportPreview,
-    KnowledgeCreate,
-    KnowledgeUpdate,
     ProfileUpdate,
     TemplateCreate,
     TemplateUpdate,
@@ -20,9 +20,9 @@ from ..career import (
 from ..career.models import (
     CareerRead,
     CareerSave,
-    ClaimQuery,
+    EntryQuery,
+    HighlightQuery,
     HighlightsSave,
-    KnowledgeQuery,
     TemplateQuery,
     TemplateSave,
 )
@@ -78,40 +78,34 @@ def career_save(ws: WS, body: CareerSave) -> BatchResult:
     return ws.career.save_career(body)
 
 
-@operation("GET /career/knowledge", tags=["career"], mcp="career_get")
-def career_list(ws: WS, query: Q[KnowledgeQuery]) -> CareerPage:
+@operation("GET /career/entries", tags=["career"], mcp="career_get")
+def career_list(ws: WS, query: Q[EntryQuery]) -> CareerPage:
     """Search career entries by q and kind; summary=false returns full records."""
-    return ws.career.list_knowledge(**query.model_dump())
+    return ws.career.list_entries(**query.model_dump())
 
 
-@operation("POST /career/knowledge", access=WRITE, status=201, tags=["career"], mcp="career_save")
-def career_create(ws: WS, body: KnowledgeCreate) -> CareerEntry:
+@operation("POST /career/entries", access=WRITE, status=201, tags=["career"], mcp="career_save")
+def career_create(ws: WS, body: EntryCreate) -> CareerEntry:
     """Add a career entry."""
-    return ws.career.create_knowledge(body)
+    return ws.career.create_entry(body)
 
 
-@operation("GET /career/knowledge/{career_id}", tags=["career"], mcp="career_get")
-def career_read(ws: WS, career_id: str) -> CareerEntry:
-    """Read a career entry with its full narrative and metadata."""
-    return ws.career.get_knowledge(career_id)
-
-
-@operation("PATCH /career/knowledge/{career_id}", access=WRITE, tags=["career"], mcp="career_save")
-def career_update(ws: WS, career_id: str, body: KnowledgeUpdate) -> CareerEntry:
+@operation("PATCH /career/entries/{career_id}", access=WRITE, tags=["career"], mcp="career_save")
+def career_update(ws: WS, career_id: str, body: EntryUpdate) -> CareerEntry:
     """Edit a career entry, with its version; dates=null clears the dates."""
-    return ws.career.update_knowledge(career_id, body)
+    return ws.career.update_entry(career_id, body)
 
 
-@operation("DELETE /career/knowledge/{career_id}", access=DESTRUCTIVE, tags=["career"])
+@operation("DELETE /career/entries/{career_id}", access=DESTRUCTIVE, tags=["career"])
 def career_delete(ws: WS, career_id: str, expected_version: Version) -> Deleted:
     """Delete a career entry permanently, with its highlights and files.
 
     Only on the owner's explicit request; document revisions are unchanged.
     """
-    return ws.career.delete_knowledge(career_id, expected_version)
+    return ws.career.delete_entry(career_id, expected_version)
 
 
-@operation("POST /career/highlights", access=WRITE, tags=["highlights"])
+@operation("POST /career/highlights/batch", access=WRITE, tags=["highlights"])
 def highlights_save(ws: WS, body: HighlightsSave) -> BatchResult:
     """Add, update or approve up to 100 highlights.
 
@@ -121,44 +115,38 @@ def highlights_save(ws: WS, body: HighlightsSave) -> BatchResult:
     return ws.career.save_highlights(body)
 
 
-@operation("GET /career/claims", tags=["highlights"], mcp="career_get")
-def highlights_list(ws: WS, query: Q[ClaimQuery]) -> HighlightPage:
+@operation("GET /career/highlights", tags=["highlights"], mcp="career_get")
+def highlights_list(ws: WS, query: Q[HighlightQuery]) -> HighlightPage:
     """Search highlights by entry (career_id), approval or text (q)."""
-    return ws.career.list_claims(**query.model_dump())
+    return ws.career.list_highlights(**query.model_dump())
 
 
 @operation(
-    "POST /career/claims", access=WRITE, status=201, tags=["highlights"], mcp="highlights_save"
+    "POST /career/highlights", access=WRITE, status=201, tags=["highlights"], mcp="highlights_save"
 )
-def highlights_create(ws: WS, body: ClaimCreate) -> Highlight:
+def highlights_create(ws: WS, body: HighlightCreate) -> Highlight:
     """Add a highlight; not approved by default."""
-    return ws.career.create_claim(body)
-
-
-@operation("GET /career/claims/{highlight_id}", tags=["highlights"], mcp="career_get")
-def highlights_read(ws: WS, highlight_id: str) -> Highlight:
-    """Read a highlight and its entry id."""
-    return ws.career.get_claim(highlight_id)
+    return ws.career.create_highlight(body)
 
 
 @operation(
-    "PATCH /career/claims/{highlight_id}",
+    "PATCH /career/highlights/{highlight_id}",
     access=WRITE,
     tags=["highlights"],
     mcp="highlights_save",
 )
-def highlights_update(ws: WS, highlight_id: str, body: ClaimUpdate) -> Highlight:
+def highlights_update(ws: WS, highlight_id: str, body: HighlightUpdate) -> Highlight:
     """Edit or approve a highlight, with its version."""
-    return ws.career.update_claim(highlight_id, body)
+    return ws.career.update_highlight(highlight_id, body)
 
 
-@operation("DELETE /career/claims/{highlight_id}", access=DESTRUCTIVE, tags=["highlights"])
+@operation("DELETE /career/highlights/{highlight_id}", access=DESTRUCTIVE, tags=["highlights"])
 def highlights_delete(ws: WS, highlight_id: str, expected_version: Version) -> Deleted:
     """Delete a highlight permanently.
 
     With its version; document revisions keep the ids they cite.
     """
-    return ws.career.delete_claim(highlight_id, expected_version)
+    return ws.career.delete_highlight(highlight_id, expected_version)
 
 
 @operation("GET /templates", tags=["templates"], mcp="workspace_context")
@@ -223,4 +211,4 @@ def career_import(ws: WS, body: CareerImport) -> ImportResult:
 
     Appends the entries and, with the profile's version, applies the profile fields.
     """
-    return ws.career.import_knowledge(body)
+    return ws.career.import_entries(body)

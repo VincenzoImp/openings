@@ -73,19 +73,19 @@ class BulkChanges:
                     409,
                     "application_open",
                     "Only a Closed application can be reopened.",
-                    {"status": row["status"]},
+                    {"stage": row["status"]},
                 )
             patch = (
-                {"status": "closed", "outcome": value.outcome}
+                {"stage": "closed", "outcome": value.outcome}
                 if value.action == "close"
-                else {"status": value.status}
+                else {"stage": value.stage}
             )
             updated = self.update_application(
                 item.id, ApplicationPatch(expected_version=item.expected_version, **patch)
             )
             return {
                 "job_id": updated["job_id"],
-                "status": updated["status"],
+                "stage": updated["stage"],
                 "outcome": updated["outcome"],
                 "version": updated["version"],
             }

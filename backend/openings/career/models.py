@@ -1,4 +1,4 @@
-"""Typed inputs of the Profile, Career entries, claims, templates and imports, with defaults."""
+"""Typed inputs of the Profile, career entries, highlights, templates and imports, with defaults."""
 
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ class ProfileUpdate(NonNullUpdate):
     )
 
 
-KnowledgeKind = Literal[
+EntryKind = Literal[
     "experience",
     "project",
     "course",
@@ -107,7 +107,7 @@ class CareerDates(Input):
         return self
 
 
-class KnowledgeFields(Input):
+class EntryFields(Input):
     @field_validator("title", "organization", check_fields=False)
     @classmethod
     def clean_header(cls, value, info: ValidationInfo):
@@ -140,8 +140,8 @@ class KnowledgeFields(Input):
         return result
 
 
-class KnowledgeCreate(KnowledgeFields):
-    kind: KnowledgeKind = "experience"
+class EntryCreate(EntryFields):
+    kind: EntryKind = "experience"
     title: str = Field(min_length=1, max_length=300)
     organization: str = Field(default="", max_length=300)
     dates: CareerDates | None = None
@@ -157,9 +157,9 @@ class KnowledgeCreate(KnowledgeFields):
     )
 
 
-class KnowledgeUpdate(KnowledgeFields, NonNullUpdate):
+class EntryUpdate(EntryFields, NonNullUpdate):
     expected_version: int = Field(ge=1, strict=True)
-    kind: KnowledgeKind | None = None
+    kind: EntryKind | None = None
     title: str | None = Field(default=None, min_length=1, max_length=300)
     organization: str | None = Field(default=None, max_length=300)
     dates: CareerDates | None = None
@@ -169,7 +169,7 @@ class KnowledgeUpdate(KnowledgeFields, NonNullUpdate):
     metadata: dict[str, Any] | None = None
 
 
-class ClaimCreate(Input):
+class HighlightCreate(Input):
     career_id: str = Field(description="The career entry it belongs to.")
     idempotency_key: str | None = Field(
         default=None,
@@ -190,7 +190,7 @@ class ClaimCreate(Input):
     )
 
 
-class ClaimUpdate(NonNullUpdate):
+class HighlightUpdate(NonNullUpdate):
     expected_version: int = Field(ge=1, strict=True)
     career_id: str | None = None
     text: str | None = Field(default=None, min_length=1, max_length=5000)
@@ -247,13 +247,13 @@ class ImportPreview(Input):
 
 
 class CareerImport(Input):
-    entries: list[KnowledgeCreate] = Field(default_factory=list, max_length=200)
+    entries: list[EntryCreate] = Field(default_factory=list, max_length=200)
     profile: dict[str, Any] | None = None
     expected_profile_version: int | None = Field(default=None, ge=0, strict=True)
 
 
 # The filters, page and detail of each list: MCP's value, REST's query string.
-class KnowledgeQuery(Input):
+class EntryQuery(Input):
     q: str = ""
     kind: str = ""
     limit: int = 100
@@ -261,7 +261,7 @@ class KnowledgeQuery(Input):
     summary: bool = True
 
 
-class ClaimQuery(Input):
+class HighlightQuery(Input):
     career_id: str = ""
     approved: bool | None = None
     limit: int = 100
@@ -292,7 +292,7 @@ class CareerRead(Input):
 class CareerItem(Input):
     career_id: str | None = Field(default=None, description="Update this entry; omit to add one.")
     expected_version: int | None = Field(default=None, ge=1, description="Required to update.")
-    kind: KnowledgeKind | None = None
+    kind: EntryKind | None = None
     title: str | None = Field(default=None, max_length=300)
     organization: str | None = Field(default=None, max_length=300)
     dates: CareerDates | None = None

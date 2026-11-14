@@ -8,7 +8,7 @@ phrase.
 
 import os
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from .errors import DomainError
 
@@ -78,6 +78,10 @@ class SkillLibrary:
         return items
 
     def read(self, name: str, path: str = SKILL_FILE):
+        # A skill links another skill's file as ``../<skill>/<path>``.
+        parts = PurePosixPath(path).parts
+        if len(parts) > 2 and parts[0] == "..":
+            name, path = parts[1], str(PurePosixPath(*parts[2:]))
         root = (self.directory / name).resolve()
         target = (root / path).resolve()
         if (

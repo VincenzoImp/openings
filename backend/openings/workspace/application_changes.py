@@ -143,7 +143,7 @@ class ApplicationChanges:
                 409,
                 "application_in_progress",
                 f"This job already has an active application ({active['id']}). Continue it or close it before starting another.",
-                {"application_id": active["id"], "status": active["status"]},
+                {"application_id": active["id"], "stage": active["status"]},
             )
 
     def update_application(self, application_id, value):
@@ -155,6 +155,8 @@ class ApplicationChanges:
             else ApplicationPatch.model_validate(value)
         )
         changes = value.model_dump(exclude_unset=True, exclude={"expected_version", "reply"})
+        if "stage" in changes:  # stored in the column status
+            changes["status"] = changes.pop("stage")
         reply = value.reply
         with self.db.transaction() as c:
             row = c.execute("SELECT * FROM applications WHERE id=?", (application_id,)).fetchone()

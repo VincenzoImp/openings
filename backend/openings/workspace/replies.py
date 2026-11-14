@@ -39,7 +39,7 @@ class ReplyChanges:
             raise DomainError(
                 422,
                 "reply_stage",
-                "Recording a reply sets the stage itself: omit status, outcome and concluded_on.",
+                "Recording a reply sets the stage itself: omit stage, outcome and concluded_on.",
             )
         target = stage_after_reply(row["status"], row["outcome"], reply.kind)
         if target is None:
