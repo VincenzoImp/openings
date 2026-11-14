@@ -4,18 +4,10 @@ import {
   careerEntryLabel,
   knowledgeKinds,
   version,
-  type Json,
   type Knowledge,
   type KnowledgeKind,
 } from "../../api";
-import {
-  Button,
-  EmptyState,
-  ErrorBanner,
-  Field,
-  KeyValueEditor,
-  Loading,
-} from "../../design";
+import { Button, EmptyState, ErrorBanner, Field, Loading } from "../../design";
 import { Assets } from "../../library/Assets";
 import { ConfirmDialog } from "../../library/common";
 import { useEditorRecord, useResource, useWorkspace } from "../../state";
@@ -33,9 +25,7 @@ const fieldNames: Partial<Record<KnowledgeKind, [string, string]>> = {
   skill: ["Group title", "Organization"],
   language: ["Language or group", "Organization"],
 };
-const RESERVED = ["organization", "dates", "skills", "position"];
-
-/** The detail panel: one entry with its fields, claims, files and details. */
+/** The detail panel: one entry with its fields, claims and files. */
 export function EntryEditor({
   id,
   onSaved,
@@ -92,19 +82,14 @@ function EntryForm({
   onSaved: (entry: Knowledge) => void;
   onRemoved: () => void;
 }) {
-  const { mutate, pending, notify } = useWorkspace();
+  const { mutate, pending } = useWorkspace();
   const [kind, setKind] = useState<KnowledgeKind>(record?.kind || "experience");
   const [dates, setDates] = useState(() => dateState(record?.dates));
   const [skills, setSkills] = useState(record?.skills || []);
-  const [details, setDetails] = useState<{
-    value: Json;
-    problem: string | null;
-  }>({ value: record?.metadata || {}, problem: null });
   const [removing, setRemoving] = useState(false);
   const names = fieldNames[kind] || ["Title", "Organization"];
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (details.problem) return notify(details.problem, true);
     const form = new FormData(event.currentTarget);
     const position = String(form.get("position") || "");
     const body = {
@@ -115,7 +100,6 @@ function EntryForm({
       dates: datesOf(dates),
       skills,
       ...(position ? { position: Number(position) } : {}),
-      metadata: details.value,
     };
     let saved: Knowledge | undefined;
     const ok = await mutate(async () => {
@@ -206,18 +190,6 @@ function EntryForm({
             defaultValue={record?.narrative}
           />
         </Field>
-        <fieldset className="field wide">
-          <legend>Other details</legend>
-          <p className="caption">
-            Free-form values the product does not act on.
-          </p>
-          <KeyValueEditor
-            label="Other details of the entry as keys and values"
-            value={record?.metadata || {}}
-            reserved={RESERVED}
-            onChange={(value, problem) => setDetails({ value, problem })}
-          />
-        </fieldset>
       </form>
       {record ? (
         <>

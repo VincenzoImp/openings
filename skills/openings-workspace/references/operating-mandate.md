@@ -15,7 +15,7 @@ focused questions, apply to prepared Drafts and mark each one Applied or close i
   monitoring, retire noisy sources.
 - Track the pipeline: stale or expired Drafts, follow-ups, employer responses
   the owner reports, applications past the no-reply period, and what the
-  insights say about where answers come from.
+  stats say about where replies come from.
 - Improve the method itself: when a workflow or the product falls short,
   propose or contribute the change (Openings is open source).
 

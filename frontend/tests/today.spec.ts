@@ -228,11 +228,11 @@ test("Today answers the owner's three questions with the workspace's own numbers
   await expect(dialog.getByRole("listitem")).toHaveCount(waiting.total);
   await dialog.getByRole("button", { name: "Keep them open" }).click();
   await expect(dialog).toHaveCount(0);
-  // The progress of sent applications moved to Applications, Insights.
+  // The numbers of sent applications are in Applications, Stats.
   await expect(card(page, "Progress")).toHaveCount(0);
-  await expect(wait.getByRole("link", { name: "Insights" })).toHaveAttribute(
+  await expect(wait.getByRole("link", { name: "Stats" })).toHaveAttribute(
     "href",
-    "#applications?section=insights",
+    "#applications?section=stats",
   );
   await fitsViewport(page);
 
@@ -396,24 +396,10 @@ test("every card of Today has its empty, loading and error state", async ({
   page,
 }) => {
   const empty = { items: [], total: 0, stage_counts: {}, ready_count: 0 };
-  const overview = {
-    sent: 0,
-    interviews: 0,
-    offers: 0,
-    active: 0,
-    drafts: 0,
-    inbox: 0,
-    incomplete: 0,
-    funnel: [],
-    activity: [],
-  };
   // An empty workspace: every list answers with nothing.
   await page.route(
-    /\/api\/v1\/(applications|questions|runs|collection\/runs|overview)(\?|$)/,
-    (route) =>
-      route.fulfill({
-        json: route.request().url().includes("/overview") ? overview : empty,
-      }),
+    /\/api\/v1\/(applications|questions|runs|collection\/runs|jobs)(\?|$)/,
+    (route) => route.fulfill({ json: empty }),
   );
   await go(page, "today");
   await settled(page);

@@ -66,7 +66,7 @@ test("an actor chip names the agent's token and keeps the agent colour for agent
   );
 });
 
-test("every shipped hash route still opens its screen, and design names are aliases", () => {
+test("every screen has one hash route; an unknown route opens Today", () => {
   for (const route of [
     "today",
     "activity",
@@ -81,46 +81,17 @@ test("every shipped hash route still opens its screen, and design names are alia
     assert.equal(routes.routeOf("#" + route), route);
   assert.equal(routes.routeOf(""), "today");
   assert.equal(routes.routeOf("#no-such-page"), "today");
-  // Inbox and Shortlist were screens before Jobs; their links open its tabs.
-  assert.equal(routes.routeOf("#inbox"), "jobs");
-  assert.equal(routes.routeOf("#shortlist"), "jobs");
-  assert.equal(routes.routeOf("#inbox?queue=duplicates"), "jobs");
-  assert.equal(routes.canonicalHash("#inbox"), "#jobs");
-  assert.equal(routes.canonicalHash("#inbox?q=python"), "#jobs?q=python");
-  assert.equal(routes.canonicalHash("#shortlist"), "#jobs?section=shortlist");
-  assert.equal(
-    routes.canonicalHash("#inbox?queue=dismissed"),
-    "#jobs?section=dismissed",
-  );
-  assert.equal(
-    routes.canonicalHash("#inbox?queue=all&complete=false"),
-    "#jobs?complete=false&section=all",
-  );
-  assert.equal(
-    routes.canonicalHash("#inbox?queue=duplicates"),
-    "#jobs?signal=likely_duplicate",
-  );
-  assert.equal(
-    routes.canonicalHash("#jobs?queue=shortlist"),
-    "#jobs?section=shortlist",
-  );
-  assert.equal(routes.canonicalHash("#jobs?q=python"), null);
-  // Overview was the first screen before Today; its links open Today.
-  assert.equal(routes.routeOf("#overview"), "today");
-  assert.equal(routes.routeOf("#overview?since=2026-01-01"), "today");
-  assert.equal(routes.canonicalHash("#overview"), "#today");
-  // Overview's period is the Progress of Applications, Insights.
-  assert.equal(
-    routes.canonicalHash("#overview?since=2026-01-01"),
-    "#applications?since=2026-01-01&section=insights",
-  );
-  assert.equal(routes.canonicalHash("#career?section=knowledge"), null);
+  // Names of earlier versions are not kept: they open Today.
+  for (const old of ["overview", "inbox", "shortlist", "skills", "onboarding"])
+    assert.equal(routes.routeOf("#" + old), "today");
+  assert.equal(routes.canonicalHash, undefined);
+  assert.equal(routes.ALIASES, undefined);
   // The review page belongs to Applications.
   assert.equal(routes.routeOf("#review?application=x1"), "review");
   assert.equal(routes.destinationOf("review").item.label, "Applications");
 });
 
-test("navigation has three groups, and the old job queues belong to Jobs", () => {
+test("navigation has three groups", () => {
   assert.deepEqual(
     routes.NAV.map((group) => [
       group.group,
@@ -132,10 +103,6 @@ test("navigation has three groups, and the old job queues belong to Jobs", () =>
       ["System", ["Collection", "Settings"]],
     ],
   );
-  assert.equal(
-    routes.destinationOf(routes.routeOf("#shortlist")).item.label,
-    "Jobs",
-  );
   assert.equal(routes.destinationOf("jobs").group, "Work");
   assert.equal(routes.destinationOf("settings").group, "System");
   assert.equal(routes.TAB_BAR.length, 4);
@@ -146,42 +113,7 @@ test("navigation has three groups, and the old job queues belong to Jobs", () =>
   assert.equal(routes.destinationOf("setup"), null);
 });
 
-test("a job opens in Jobs; an application opens its review page", () => {
-  // The old drawer's address, with its tab, from any screen.
-  assert.equal(routes.canonicalHash("#today?job=abc"), "#jobs?job=abc");
-  assert.equal(
-    routes.canonicalHash("#applications?view=list&job=abc"),
-    "#jobs?job=abc",
-  );
-  assert.equal(
-    routes.canonicalHash("#inbox?job=abc&detail=notes"),
-    "#jobs?job=abc",
-  );
-  assert.equal(
-    routes.canonicalHash("#jobs?job=abc&detail=files"),
-    "#jobs?job=abc",
-  );
-  assert.equal(routes.canonicalHash("#jobs?section=all&job=abc"), null);
-  // The old drawer's address, with its tab, from any screen.
-  assert.equal(
-    routes.canonicalHash("#applications?application=x1&detail=requirements"),
-    "#review?application=x1&tab=requirements",
-  );
-  assert.equal(
-    routes.canonicalHash("#today?application=x1&detail=posting"),
-    "#review?application=x1&pane=posting",
-  );
-  assert.equal(
-    routes.canonicalHash("#activity?application=x1"),
-    "#review?application=x1",
-  );
-  assert.equal(
-    routes.canonicalHash("#review?application=x1&tab=answers"),
-    null,
-  );
-});
-
-test("the stored theme and density win; otherwise the system theme and comfortable rows", () => {
+test("the stored theme wins; otherwise the system theme", () => {
   const store = (values) => ({
     getItem: (key) => values[key] ?? null,
     setItem() {},
@@ -196,11 +128,6 @@ test("the stored theme and density win; otherwise the system theme and comfortab
     preferences.initialTheme(store({ "openings-theme": "sepia" }), false),
     "light",
   );
-  assert.equal(preferences.initialDensity(store({})), "comfortable");
-  assert.equal(
-    preferences.initialDensity(store({ "openings-density": "compact" })),
-    "compact",
-  );
   const broken = {
     getItem() {
       throw Error("blocked");
@@ -208,7 +135,7 @@ test("the stored theme and density win; otherwise the system theme and comfortab
     setItem() {},
   };
   assert.equal(preferences.initialTheme(broken, true), "dark");
-  assert.equal(preferences.initialDensity(null), "comfortable");
+  assert.equal(preferences.initialDensity, undefined);
 });
 
 test("free-form values become typed rows and come back unchanged", async () => {

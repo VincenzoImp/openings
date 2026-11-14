@@ -24,7 +24,7 @@ def add(workspace, title):
 def test_queues_follow_full_history_and_explicit_deletion(tmp_path):
     ws = Workspace(tmp_path / "queues.sqlite")
     job = add(ws, "Backend engineer")
-    assert ws.list_jobs(queue="inbox")["total"] == ws.overview()["inbox"] == 1
+    assert ws.list_jobs(queue="inbox")["total"] == 1
     job = ws.set_triage(job["id"], "saved", job["version"])
     assert ws.list_jobs(queue="inbox")["total"] == 0
     assert ws.list_jobs(queue="shortlist")["total"] == 1

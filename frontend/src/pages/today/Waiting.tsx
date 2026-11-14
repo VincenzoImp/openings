@@ -3,7 +3,7 @@ import { Card, EmptyState } from "../../design";
 import { Loaded, plural } from "../../library/common";
 import type { Fresh } from "../../library/useFresh";
 import { CloseNoReply } from "../applications/CloseNoReply";
-import { INSIGHTS } from "../applications/links";
+import { STATS } from "../applications/links";
 
 /** Applications sent long ago without a recorded reply: record one, or close them as no reply. */
 export function Waiting({
@@ -23,8 +23,8 @@ export function Waiting({
       title="Waiting for a reply"
       count={applied}
       actions={
-        <a className="btn quiet sm" href={INSIGHTS}>
-          Insights
+        <a className="btn quiet sm" href={STATS}>
+          Stats
         </a>
       }
     >

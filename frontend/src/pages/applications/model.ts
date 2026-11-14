@@ -63,7 +63,6 @@ export const DEFAULTS = {
   applied_since: "",
   applied_until: "",
   waiting: "",
-  view: "list",
   offset: "0",
 };
 export type Filters = typeof DEFAULTS;
@@ -222,7 +221,7 @@ export function responseLine(
       return {
         text: app.applied_at
           ? "Not pursued"
-          : "Not pursued · not counted in Insights",
+          : "Not pursued · not counted in Stats",
         quiet: true,
       };
     if (last)

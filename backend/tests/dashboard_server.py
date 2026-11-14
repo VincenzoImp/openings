@@ -165,20 +165,18 @@ def seed_library(app, agent):
             )
         )
         if kind == "experience":
-            for text, approved, in_cv, role, group in (
-                ("Built Python pipelines that process 40 million measurements a day.", 1, 1, 0, 0),
-                ("Moved reporting queries to PostgreSQL and cut their time by 70%.", 1, 1, 1, 1),
-                ("Introduced on-call handbooks used by all three platform teams.", 1, 0, 1, 2),
-                ("Led the migration of 14 pipelines to a new scheduler.", 0, 0, 2, 2),
+            for text, approved, always in (
+                ("Built Python pipelines that process 40 million measurements a day.", 1, 1),
+                ("Moved reporting queries to PostgreSQL and cut their time by 70%.", 1, 1),
+                ("Introduced on-call handbooks used by all three platform teams.", 1, 0),
+                ("Led the migration of 14 pipelines to a new scheduler.", 0, 0),
             ):
                 career.create_claim(
                     ClaimCreate(
                         knowledge_id=entry["id"],
                         text=text,
                         approved=bool(approved),
-                        default_in_cv=bool(in_cv),
-                        role=("core", "supporting", "bench")[role],
-                        group=("Scale", "Impact", "Leadership")[group],
+                        always_include=bool(always),
                     )
                 )
     career.create_template(

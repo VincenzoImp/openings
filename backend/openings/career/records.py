@@ -14,7 +14,7 @@ def _claim(row, *, full=True):
     """A claim row as returned by reads."""
     row = decode_record(row, ["metadata"]) if full else dict(row)
     row["approved"] = bool(row["approved"])
-    row["default_in_cv"] = bool(row["default_in_cv"])
+    row["always_include"] = bool(row["always_include"])
     return row
 
 

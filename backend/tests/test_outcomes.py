@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from openings.actors import acting_as, token_actor
 from openings.errors import DomainError
 from openings.outcomes import ResponseService, today
+from openings.stats import StatsQuery, StatsService
 
 
 def days_ago(days):
@@ -226,9 +227,7 @@ def test_no_reply_closes_only_sent_applications_with_the_day_it_was_concluded(wo
     listed = workspace.list_applications(outcome="no_response")
     assert [item["id"] for item in listed["items"]] == [bulk["id"]]
     assert listed["items"][0]["concluded_on"] == today()
-    # The funnel counts the new outcome.
-    funnel = workspace.overview()["funnel"]
-    assert funnel[0]["outcomes"]["no_response"] == 1
+    assert StatsService(workspace).stats(StatsQuery(period="all"))["applied"] == 2
 
 
 def test_ready_filter_separates_preparing_from_ready(workspace):

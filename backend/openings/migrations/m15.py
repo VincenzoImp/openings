@@ -143,7 +143,8 @@ TABLES = (
     Table("events"),
     Table("notes"),
     Table("knowledge"),
-    Table("claims"),
+    # #211: default_in_cv becomes always_include; role and group fold into metadata.
+    Table("claims", columns={"always_include": "o.default_in_cv"}),
     # #213: rule statements leave the template for Writing rules; the rest stays.
     Table(
         "templates",
@@ -464,10 +465,59 @@ def fold_preferences(conn):
 
 # --- end #213 ------------------------------------------------------------------------
 
+# --- #211 Trim secondary features ----------------------------------------------------
+#
+# ``claims.default_in_cv`` is copied to ``always_include`` unchanged. ``claims.role``
+# and ``claims."group"`` leave the schema: a value other than the default
+# (``supporting``, empty) is written into the claim's metadata under ``role`` and
+# ``group`` unless the metadata already has that key (or is not an object); every
+# such value is archived under ``claim_fields``, with ``conflict`` set when one could
+# not be written. ``job_signals.welcome`` leaves the schema; non-empty values are
+# archived under ``job_signals_welcome``. The other signals are copied unchanged.
+
+TRIM_SECTIONS = (
+    Section(
+        "claim_fields",
+        'SELECT o.id,o.role,o."group",o.default_in_cv,CASE WHEN json_valid(o.metadata) AND '
+        "json_type(o.metadata)='object' THEN (o.role<>'supporting' AND "
+        "json_type(o.metadata,'$.role') IS NOT NULL) OR (o.\"group\"<>'' AND "
+        "json_type(o.metadata,'$.group') IS NOT NULL) ELSE 1 END AS conflict "
+        "FROM old.claims AS o WHERE o.role<>'supporting' OR o.\"group\"<>'' ORDER BY o.id",
+    ),
+    Section(
+        "job_signals_welcome",
+        "SELECT job_id,welcome FROM old.job_signals WHERE welcome<>'[]' ORDER BY job_id",
+    ),
+)
+SECTIONS = (*SECTIONS, *TRIM_SECTIONS)
+NOT_ARCHIVED = {
+    **NOT_ARCHIVED,
+    "claims.default_in_cv": "copied to claims.always_include",
+    "claims.role": "folded into claims.metadata and archived in claim_fields",
+    "claims.group": "folded into claims.metadata and archived in claim_fields",
+    "job_signals.welcome": "archived in job_signals_welcome",
+}
+
+
+def fold_claim_fields(conn):
+    """Write each claim's non-default role and group into its metadata (no new rows)."""
+    for column, default in (("role", "supporting"), ("group", "")):
+        conn.execute(
+            f"UPDATE main.claims SET metadata=json_set(metadata,'$.{column}',"
+            f'(SELECT o."{column}" FROM old.claims AS o WHERE o.id=main.claims.id)) '
+            f"WHERE json_type(metadata)='object' AND json_type(metadata,'$.{column}') IS NULL "
+            f'AND id IN (SELECT o.id FROM old.claims AS o WHERE o."{column}"<>?)',
+            (default,),
+        )
+    return {}
+
+
+# --- end #211 ------------------------------------------------------------------------
+
 # Functions run after the copy in the same transaction, in order. Each takes the
 # connection (schema 15 as ``main``, schema 14 as ``old``) and returns the number
 # of rows it created per schema-15 table, which the row-count check adds.
-FOLDS = (fold_preferences,)
+FOLDS = (fold_preferences, fold_claim_fields)
 
 # Values the upgrade must keep: (what, query over schema 15, query over schema 14).
 INVARIANTS = (
@@ -480,6 +530,11 @@ INVARIANTS = (
         "dismissed jobs (#213 keeps rule dismissals)",
         "SELECT count(*) FROM main.jobs WHERE triage='dismissed'",
         "SELECT count(*) FROM old.jobs WHERE triage='dismissed'",
+    ),
+    (
+        "claims always included (#211)",
+        "SELECT count(*) FROM main.claims WHERE always_include=1",
+        "SELECT count(*) FROM old.claims WHERE default_in_cv=1",
     ),
     (
         "bytes of stored files",

@@ -28,7 +28,7 @@ export function NextStep({ applications }: { applications: number }) {
           </li>
           <li>
             <strong>You record the employer's answer.</strong> After a few weeks
-            Insights shows which roles and sources answer.
+            Stats shows how often employers reply.
           </li>
         </ol>
         {applications ? (

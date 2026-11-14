@@ -1,23 +1,14 @@
 import { useState } from "react";
-import {
-  api,
-  date,
-  type DuplicateGroup,
-  type Job,
-  type ListResult,
-} from "../../api";
+import { api, date, type Job } from "../../api";
 import { Button, Tag } from "../../design";
 import { Assets } from "../../library/Assets";
 import { ConfirmDialog } from "../../library/common";
 import { dayTime } from "../../library/time";
-import { useFresh } from "../../library/useFresh";
 import { useWorkspace } from "../../state";
 import type { Links } from "../activity/records";
 import { AskAgent } from "../review/AskAgent";
-import { reasonsLine } from "./Duplicate";
 import { EditJob } from "./EditJob";
-import { MergeDialog, type Candidate } from "./MergeDialog";
-import { JOB_SCOPES, placeTag } from "./model";
+import { MergeDialog } from "./MergeDialog";
 
 const KINDS: Record<string, string> = { jobspy: "Search", rss: "Feed" };
 
@@ -66,88 +57,10 @@ function Sources({ job }: { job: Job }) {
   );
 }
 
-/** Other records that may be this vacancy, each with a merge, and a merge with any job. */
-function Copies({
-  job,
-  onOpenJob,
-}: {
-  job: Job;
-  onOpenJob: (id: string) => void;
-}) {
-  const [target, setTarget] = useState<Candidate | null | undefined>(undefined);
-  const group = useFresh<ListResult<DuplicateGroup>>(
-    `/jobs/duplicates?job_id=${encodeURIComponent(job.id)}&limit=1`,
-    { items: [], total: 0 },
-    JOB_SCOPES,
-  );
-  const members = group.data.items[0];
-  const others = members?.items.filter((item) => item.id !== job.id) || [];
-  return (
-    <div className="stack">
-      {others.length > 0 ? (
-        <ul
-          className="list compact"
-          aria-label="Possible copies of this vacancy"
-        >
-          {others.map((item) => (
-            <li key={item.id}>
-              <div className="grow">
-                <a
-                  className="title"
-                  href={`#jobs?job=${item.id}`}
-                  onClick={(event) => {
-                    if (event.button !== 0 || event.metaKey || event.ctrlKey)
-                      return;
-                    event.preventDefault();
-                    onOpenJob(item.id);
-                  }}
-                >
-                  {item.title}
-                </a>
-                <div className="meta">
-                  {[item.company, item.location].filter(Boolean).join(" · ")}
-                </div>
-                <div className="caption">
-                  {reasonsLine(
-                    item.reasons || members.reasons,
-                    item.similarity,
-                  )}
-                </div>
-              </div>
-              <Tag tone={placeTag(item).tone}>{placeTag(item).text}</Tag>
-              <Button size="sm" onClick={() => setTarget(item)}>
-                Merge…<span className="sr"> {item.title}</span>
-              </Button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="muted">No other record looks like this vacancy.</p>
-      )}
-      <div className="row">
-        <Button size="sm" variant="quiet" onClick={() => setTarget(null)}>
-          Merge with another job…
-        </Button>
-      </div>
-      {target !== undefined && (
-        <MergeDialog
-          job={job}
-          target={target}
-          onClose={() => setTarget(undefined)}
-          onMerged={(kept) => {
-            setTarget(undefined);
-            onOpenJob(kept);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
 /**
  * What is kept with the job and changed less often: its details, the sources
- * that saw it, possible copies, files, requests for the agent, and forgetting
- * it for good.
+ * that saw it, a merge with another job, files, requests for the agent, and
+ * forgetting it for good.
  */
 export function JobMore({
   job,
@@ -156,6 +69,7 @@ export function JobMore({
 }: Links & { job: Job; onGone: () => void }) {
   const { mutate } = useWorkspace();
   const [forgetting, setForgetting] = useState(false);
+  const [merging, setMerging] = useState(false);
   return (
     <section className="detail-section more" aria-labelledby="more-title">
       <h3 id="more-title">Details</h3>
@@ -166,10 +80,6 @@ export function JobMore({
       <details>
         <summary>Sources ({job.postings?.length || 0})</summary>
         <Sources job={job} />
-      </details>
-      <details>
-        <summary>Possible copies and merging</summary>
-        <Copies job={job} onOpenJob={links.onOpenJob} />
       </details>
       <details>
         <summary>Files</summary>
@@ -187,6 +97,9 @@ export function JobMore({
         <AskAgent subjectType="job" subjectId={job.id} {...links} />
       </details>
       <div className="row">
+        <Button size="sm" variant="quiet" onClick={() => setMerging(true)}>
+          Merge with another job…
+        </Button>
         <Button
           size="sm"
           variant="quiet danger"
@@ -195,6 +108,17 @@ export function JobMore({
           Forget this job permanently
         </Button>
       </div>
+      {merging && (
+        <MergeDialog
+          job={job}
+          target={null}
+          onClose={() => setMerging(false)}
+          onMerged={(kept) => {
+            setMerging(false);
+            links.onOpenJob(kept);
+          }}
+        />
+      )}
       {forgetting && (
         <ConfirmDialog
           title="Forget this job?"

@@ -18,9 +18,8 @@ const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 const SCREENS = [
   "today",
   "applications",
-  "applications?view=board",
   "applications?stage=applied",
-  "applications?section=insights",
+  "applications?section=stats",
   "jobs",
   "jobs?section=shortlist",
   "jobs?section=dismissed",
@@ -39,7 +38,6 @@ const SCREENS = [
   "templates?section=assets",
   "templates?section=preview",
   "collection",
-  "collection?section=yield",
   "collection?section=runs",
   "collection?section=runs&view=tasks",
   "collection?section=providers",
@@ -243,7 +241,7 @@ for (const theme of ["light", "dark"]) {
       expect(await findings(page, "dismiss")).toEqual([]);
       await page.keyboard.press("Escape");
       await page
-        .getByRole("button", { name: "Same vacancy: merge", exact: true })
+        .getByRole("button", { name: "Merge into one job", exact: true })
         .click();
       await expect(page.locator("dialog[open]")).toBeVisible();
       expect(await findings(page, "merge")).toEqual([]);

@@ -6,7 +6,6 @@ const { respondPlan, likelyChoice } =
   await import("../src/pages/applications/recording.ts");
 const review = await import("../src/pages/review/model.ts");
 const staleness = await import("../src/library/staleness.ts");
-const routes = await import("../src/shell/routes.ts");
 
 const now = new Date(2026, 10, 13, 10, 0);
 const app = (fields) => ({
@@ -59,26 +58,6 @@ test("Ready is a stage of its own: Preparing counts only the others", () => {
       .toString(),
     "q=Data&no_reply_due=true&sort=updated&limit=50&offset=100",
   );
-});
-
-test("addresses of the old Applications page open the stage they meant", () => {
-  const hash = routes.canonicalHash;
-  assert.equal(
-    hash("#applications?status=draft&view=list"),
-    "#applications?view=list&stage=preparing",
-  );
-  assert.equal(
-    hash("#applications?status=applied&applied_until=2026-10-01"),
-    "#applications?applied_until=2026-10-01&stage=applied",
-  );
-  assert.equal(
-    hash("#applications?readiness=ready&sort=ready"),
-    "#applications?sort=ready&stage=ready",
-  );
-  // A readiness filter inside another stage stays a filter.
-  assert.equal(hash("#applications?stage=all&readiness=blocked"), null);
-  assert.equal(hash("#applications?stage=applied"), null);
-  assert.equal(routes.routeOf("#applications?application=a1"), "review");
 });
 
 test("the employer's answer, or the wait, in words", () => {
@@ -139,7 +118,7 @@ test("the employer's answer, or the wait, in words", () => {
       30,
       now,
     ),
-    { text: "Not pursued · not counted in Insights", quiet: true },
+    { text: "Not pursued · not counted in Stats", quiet: true },
   );
   assert.equal(model.responseLine(app({}), 30, now).text, "");
 });

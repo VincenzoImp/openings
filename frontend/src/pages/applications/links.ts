@@ -11,4 +11,4 @@ export const READY_QUEUE = "#applications?stage=ready&sort=deadline";
 export const stageHref = (stage: string) =>
   stage === "all" ? "#applications" : `#applications?stage=${stage}`;
 
-export const INSIGHTS = "#applications?section=insights";
+export const STATS = "#applications?section=stats";

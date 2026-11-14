@@ -169,13 +169,6 @@ class KnowledgeUpdate(KnowledgeFields, NonNullUpdate):
     metadata: dict[str, Any] | None = None
 
 
-# How strongly a claim is preferred when a CV is assembled: core claims carry the
-# account, supporting claims are used when the job calls for them, bench claims are
-# kept in reserve.
-ClaimRole = Literal["core", "supporting", "bench"]
-CLAIM_FIELDS = ("default_in_cv", "role", "group")
-
-
 class ClaimCreate(Input):
     knowledge_id: str
     idempotency_key: str | None = Field(
@@ -187,22 +180,14 @@ class ClaimCreate(Input):
     text: str = Field(min_length=1, max_length=5000)
     approved: bool = False
     position: int | None = Field(default=None, ge=0, strict=True)
-    default_in_cv: bool = Field(
-        default=False, description="In the CV unless the job gives a reason to leave it out."
+    always_include: bool = Field(
+        default=False,
+        description="Always include in the CV unless the job gives a reason to leave it out (★ in the dashboard).",
     )
-    role: ClaimRole = Field(
-        default="supporting",
-        description="core carries the account, supporting is used when the job calls for it, bench is kept in reserve.",
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Free-form values the product does not act on, such as an agent's own selection hints.",
     )
-    group: str = Field(
-        default="", max_length=100, description="A free short name for claims that belong together."
-    )
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-    @field_validator("group")
-    @classmethod
-    def trimmed_group(cls, value):
-        return value.strip()
 
 
 class ClaimUpdate(NonNullUpdate):
@@ -211,15 +196,8 @@ class ClaimUpdate(NonNullUpdate):
     text: str | None = Field(default=None, min_length=1, max_length=5000)
     approved: bool | None = None
     position: int | None = Field(default=None, ge=0, strict=True)
-    default_in_cv: bool | None = None
-    role: ClaimRole | None = None
-    group: str | None = Field(default=None, max_length=100)
+    always_include: bool | None = None
     metadata: dict[str, Any] | None = None
-
-    @field_validator("group")
-    @classmethod
-    def trimmed_group(cls, value):
-        return value.strip() if value is not None else value
 
 
 RULES_DESCRIPTION = (
