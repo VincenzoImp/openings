@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 // Node strips the types of these modules; none of them uses React.
-const model = await import("../src/pages/profile/model.ts");
-const { parseCv, readDates } = await import("../src/pages/profile/parse.ts");
+const model = await import("../src/screens/profile/model.ts");
+const { parseCv, readDates } = await import("../src/screens/profile/parse.ts");
 
 test("dates read as a CV writes them", () => {
   assert.equal(

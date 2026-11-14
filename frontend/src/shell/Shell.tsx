@@ -7,7 +7,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { Plus, Search } from "lucide-react";
+import { ListChecks, Plus, Search } from "lucide-react";
+import { useSetup } from "../query/setup";
 import { useAccountName, useNeedsCounts } from "../query/shell";
 import { confirmLeave, useFormProtection } from "../state";
 // The design system's modules, not its index: the first screen loads only
@@ -29,7 +30,6 @@ import { BOTTOM, NAV, NEEDS_LABEL, type NavDef } from "./nav";
 import { addLeaveGuard, href, navigate, useRoute } from "./router";
 import { ROUTES } from "./routes";
 import { Screen, preload } from "./Screens";
-import { markSetup, readNewWorkspace, setupMark } from "./setup";
 import { CHORD_MS, readKey, type ShellAction } from "./shortcuts";
 import { useTheme } from "./theme";
 import "./shell.css";
@@ -59,6 +59,7 @@ export function Shell({ onSignOut }: { onSignOut: () => void }) {
   const route = useRoute();
   const counts = useNeedsCounts();
   const name = useAccountName();
+  const setup = useSetup();
   const [theme, setTheme] = useTheme();
   const [overlay, setOverlay] = useState<Overlay>(null);
   // Once opened, an overlay stays mounted, so it can close with its exit.
@@ -104,21 +105,6 @@ export function Shell({ onSignOut }: { onSignOut: () => void }) {
     content.current?.scrollTo(0, 0);
     content.current?.focus({ preventScroll: true });
   }, [screenKey]);
-
-  // A workspace nobody has set up opens on the setup guide instead of Today,
-  // once per browser (shell/setup.ts), while nothing waits in Jobs.
-  const landing = useRef(route.id === "today");
-  useEffect(() => {
-    if (!landing.current || !counts.loaded) return;
-    landing.current = false;
-    if (setupMark() || counts.newJobs || counts.readyApplications) return;
-    void readNewWorkspace().then((fresh) => {
-      if (!fresh) return markSetup("seen");
-      markSetup("started");
-      if (location.hash.replace(/^#/, "") === "today")
-        navigate(href("setup"), { replace: true });
-    });
-  }, [counts.loaded, counts.newJobs, counts.readyApplications]);
 
   // The global keyboard. A screen's own keys come first (defaultPrevented);
   // nothing fires while a dialog is open or a field has focus, except ⌘K.
@@ -171,9 +157,20 @@ export function Shell({ onSignOut }: { onSignOut: () => void }) {
     needs: nav.needs ? counts[nav.needs] : undefined,
     needsLabel: nav.needs ? NEEDS_LABEL[nav.needs] : undefined,
   });
-  const sections = NAV.map((section) => ({
+  // Until server facts say setup is done, the last group offers to finish it.
+  const finish: NavDef = {
+    id: "setup",
+    label: "Finish setup",
+    icon: ListChecks,
+  };
+  const sections = NAV.map((section, index) => ({
     label: section.label,
-    items: section.items.map(item),
+    items: [
+      ...section.items,
+      ...(index === NAV.length - 1 && setup.loaded && !setup.finished
+        ? [finish]
+        : []),
+    ].map(item),
   }));
   const all = sections.flatMap((section) => section.items);
   const bottom = all.filter((nav) => BOTTOM.includes(nav.id as never));

@@ -18,30 +18,24 @@ covers local builds.
 
 Open `http://127.0.0.1:8080` and choose an owner password of at least 10
 characters (or set `OPENINGS_PASSWORD` in `.env` before the first start). A new
-workspace opens on the **setup guide** instead of Today. It has three steps, and
-every state in it is read from the workspace, so it shows what is done whoever
-did it:
+installation then opens the **setup guide**, four short steps about you:
 
-1. **Connect your agent.** Create an agent token, copy it once, and add the
-   configuration for Claude Code, Codex or another MCP client (the same as
-   Settings, **Agent access**). Then tell your agent "Set up my Openings
-   workspace." The step says whether the agent has called yet, and updates by
-   itself.
-2. **Your record.** What the agent builds with you: the Profile, Preferences,
-   the first searches, Career entries, claims and templates, each done, in
-   progress or not started. You can fill in the
-   first three yourself under their row: your name, headline, place and email;
-   the facts employers ask about (such as a work authorization) and how many
-   days without an answer make an application unanswered (the no-reply period
-   in Preferences, 30 days until you set it); and a first saved search.
-3. **First applications.** How every day works once the record is complete.
+1. **About you.** Your name, the roles you are after and where (saved as
+   statements under Preferences, *What I'm looking for*), and the languages you
+   speak. Only the name is required.
+2. **Find jobs.** A saved search, prefilled from step 1, that you can **Test**
+   before you save it; or one job added by its link.
+3. **Your CV.** Paste your CV text and add the career entries read from it, or
+   start from the example CV template.
+4. **Done.** How every day works, and connecting an AI agent, which is
+   optional: Openings has no AI of its own.
 
-**Skip for now** goes to Today. Until you finish or skip the guide, Today offers
-to continue it; Settings, **Workspace**, **Open the setup guide** opens it at any
-time. The browser remembers whether you skipped it; nothing about the guide is
-stored in the workspace.
+Find jobs and Your CV can be skipped. Until the workspace has a name and what
+you look for, a job or a source, and a career entry or template, Today shows a
+three-item **setup checklist** and the sidebar a **Finish setup** link. Both
+are read from the workspace, so every browser shows the same state.
 
-![The setup guide: the record the agent builds, with the Profile and Preferences basics](../images/setup.png)
+![The setup guide: About you, the first of four steps](../images/setup.png)
 
 ## Finding your way
 
@@ -52,18 +46,21 @@ is shown). **Library** holds Career, Preferences and Templates. **System** holds
 Collection and Settings. The number beside Applications counts the
 applications ready to apply.
 
-**Today** is the first screen. A sentence counts what waits for you, and the
-cards below show:
+**Today** is the first screen: a greeting with one line of counts, then
 
-- **Ready to apply:** the Shortlisted applications whose required documents are
-  complete and that no requirement blocks, closest deadline first, then
-  priority. **Review** opens the application's review page, where
-  you check the CV and letter beside the posting and mark it applied.
-- **The pipeline:** Shortlisted, Ready, Applied, Interview, Offer, each a link
-  to its list, and the applications **waiting for a reply** longer than the
-  no-reply period set in Preferences (30 days unless you change it), with
-  **Record replies** to open them and **Close as no reply**, one by one or all
-  together. Nothing closes by itself.
+- **Ready to apply:** the Ready applications, closest deadline first, with the
+  priority as a glyph and the deadline in colour when it is near.
+  **Start applying** opens the first one.
+- **Needs attention:** Shortlisted applications due within a week that are not
+  Ready, and Ready ones with an open requirement, each naming what is missing.
+- **Waiting for a reply:** applications sent longer ago than the no-reply period
+  (Preferences, 30 days unless you change it). On a row, **Record reply** (`r`)
+  or **Close as no reply** (`c`); **Close all as no reply** closes them
+  together. Closing is undone from the toast. Nothing closes by itself.
+- **New jobs:** how many, the newest three and **Go through them**.
+- The count of applications in each stage, each a link to its list.
+
+When nothing needs you, Today says so.
 
 You talk to your agent in its own chat; **Settings › Skills** lists what you can
 ask it. How your applications fare is under **Applications**, **Stats**.

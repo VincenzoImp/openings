@@ -4,12 +4,12 @@
 // Desktop has an "On this page" rail; a phone has a Jump to menu.
 import { useState, type ReactNode } from "react";
 import { List, Plus, RotateCw, Upload, UserRound } from "lucide-react";
-import { Button, IconButton } from "../ui/Button";
-import { Menu } from "../ui/Menu";
-import { EmptyState, PageHeader, Skeleton } from "../ui/Page";
-import { Tag } from "../ui/Badge";
-import { TopBarActions } from "../shell/context";
-import { EditingProvider, useEditing } from "./profile/Block";
+import { Button, IconButton } from "../../ui/Button";
+import { Menu } from "../../ui/Menu";
+import { EmptyState, PageHeader, Skeleton } from "../../ui/Page";
+import { Tag } from "../../ui/Badge";
+import { TopBarActions } from "../../shell/context";
+import { EditingProvider, useEditing } from "./Block";
 import {
   useEntries,
   useEntryFiles,
@@ -18,12 +18,12 @@ import {
   type Entry,
   type EntryFile,
   type Highlight,
-} from "./profile/data";
-import { EntryBlock, EntryForm } from "./profile/Entry";
-import { HeaderBlock, SummaryBlock } from "./profile/Header";
-import { ImportDialog } from "./profile/ImportDialog";
-import { SECTIONS, allSkills, sectionOf } from "./profile/model";
-import "./profile/profile.css";
+} from "./data";
+import { EntryBlock, EntryForm } from "./Entry";
+import { HeaderBlock, SummaryBlock } from "./Header";
+import { ImportDialog } from "./ImportDialog";
+import { SECTIONS, allSkills, sectionOf } from "./model";
+import "./profile.css";
 
 const SHOWN = 8;
 

@@ -26,9 +26,11 @@ const BUDGET = {
   // A rebuilt screen brings its own design-system modules while the old
   // library it no longer uses stays loaded for the others (Profile, #225).
   all: 215 * KB, // 160 kB once #228 deletes the old screens' code
-  css: 20 * KB,
+  // The shared ui stylesheets are split per screen chunk while the old
+  // stylesheet stays loaded: 20 kB, lowered again in #228.
+  css: 24 * KB,
 };
-const HOME = "src/pages/Today.tsx";
+const HOME = "src/screens/today/Today.tsx";
 
 const dist = new URL("../dist/", import.meta.url);
 let manifest;
