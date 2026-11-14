@@ -3,7 +3,7 @@ import { test, expect, type Page } from "./fixtures";
 import {
   call,
   go,
-  isNarrow,
+  isPhone,
   ownerSession,
   syntheticTex,
   upload,
@@ -26,18 +26,18 @@ const SCREENS = [
   "jobs?section=dismissed&dismissed_by=agent",
   "jobs?section=all",
   "jobs?signal=likely_duplicate",
-  "career",
-  "career?section=knowledge",
-  "career?section=claims",
+  "profile",
+  "profile?section=knowledge",
+  "profile?section=claims",
   "preferences",
   "templates",
   "templates?section=rules",
   "templates?section=assets",
   "templates?section=preview",
-  "collection",
-  "collection?section=runs",
-  "collection?section=runs&view=tasks",
-  "collection?section=providers",
+  "sources",
+  "sources?section=runs",
+  "sources?section=runs&view=tasks",
+  "sources?section=providers",
   "settings",
   "settings?section=skills",
   "settings?section=backup",
@@ -50,6 +50,17 @@ const SCREENS = [
 const cookies: Cookies = ownerSession();
 
 async function findings(page: Page, key: string) {
+  // A menu or dialog that is still fading in would be measured half blended.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter(
+          (animation) => animation.effect?.getTiming().iterations !== Infinity,
+        )
+        .map((animation) => animation.finished.catch(() => undefined)),
+    ),
+  );
   const { violations } = await new AxeBuilder({ page })
     .withTags(TAGS)
     .analyze();
@@ -59,8 +70,8 @@ async function findings(page: Page, key: string) {
       continue;
     for (const node of violation.nodes) {
       const target = node.target.join(" ");
-      // On a phone the fixed bottom bar, and the sticky top bar, cover whatever
-      // reaches the edge of the viewport, which axe reads as a small target.
+      // On a phone a fixed action bar covers whatever reaches the edge of the
+      // content, which axe reads as a small target.
       // Scroll the target to the middle and check its size and spacing again.
       const covered =
         violation.id === "target-size" &&
@@ -80,17 +91,20 @@ async function visibleTargetFits(page: Page, target: string) {
   const covered = await element
     .evaluate((el) => {
       const box = el.getBoundingClientRect();
-      const fixed = ".tabbar, .sticky-actions, .topbar";
+      const fixed = ".ui-bottombar, .sticky-actions, .ui-topbar";
       const rects = (selector: string) =>
         [...document.querySelectorAll(selector)]
           .map((bar) => bar.getBoundingClientRect())
           .filter((rect) => rect.height > 0);
       const bottom = Math.min(
         window.innerHeight,
-        ...rects(".tabbar, .sticky-actions").map((rect) => rect.top),
+        ...rects(".ui-bottombar, .sticky-actions").map((rect) => rect.top),
       );
-      // The sticky top bar covers whatever scrolled under it.
-      const top = Math.max(0, ...rects(".topbar").map((rect) => rect.bottom));
+      // The phone's top bar sits above the content.
+      const top = Math.max(
+        0,
+        ...rects(".ui-topbar").map((rect) => rect.bottom),
+      );
       return (box.bottom > bottom || box.top < top) && !el.closest(fixed);
     })
     .catch(() => false);
@@ -100,7 +114,7 @@ async function visibleTargetFits(page: Page, target: string) {
     .include(target)
     .withRules(["target-size"])
     .analyze();
-  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.evaluate(() => document.getElementById("content")?.scrollTo(0, 0));
   return violations.length === 0;
 }
 
@@ -208,7 +222,9 @@ for (const theme of ["light", "dark"]) {
       expect(await findings(page, "merge")).toEqual([]);
       await page.keyboard.press("Escape");
       await page.getByRole("button", { name: "Add a job" }).click();
-      await expect(page.locator("dialog[open] input[name=url]")).toBeVisible();
+      await expect(
+        page.locator("dialog[open] textarea[name=posting]"),
+      ).toBeVisible();
       expect(await findings(page, "add-job")).toEqual([]);
       await page.keyboard.press("Escape");
       // Selected rows with the bulk actions.
@@ -244,12 +260,12 @@ for (const theme of ["light", "dark"]) {
         [ready.id, "details"],
         [sent.id, "timeline"],
       ]) {
-        await go(page, `review?application=${id}&tab=${tab}`);
+        await go(page, `applications/${id}?tab=${tab}`);
         await settled(page);
         expect(await findings(page, `review-${tab}`)).toEqual([]);
       }
       // The pane switch on a phone, and the documents in a revision.
-      await go(page, `review?application=${ready.id}&tab=documents`);
+      await go(page, `applications/${ready.id}?tab=documents`);
       await settled(page);
       await page
         .getByRole("list", { name: "Document revisions" })
@@ -285,7 +301,7 @@ for (const theme of ["light", "dark"]) {
           "application/x-tex",
         );
       }
-      await go(page, `review?application=${application.id}&tab=documents`);
+      await go(page, `applications/${application.id}?tab=documents`);
       await settled(page);
       await page
         .getByRole("list", { name: "Document revisions" })
@@ -316,15 +332,48 @@ for (const theme of ["light", "dark"]) {
       expect(await findings(page, "bulk")).toEqual([]);
     });
 
-    test("the More sheet has no serious accessibility finding", async ({
+    test("the shell: the More menu, the account menu, the palette, Add job and the shortcuts have no serious accessibility finding", async ({
       page,
     }) => {
-      test.skip(!isNarrow(page), "The More sheet exists on narrow screens.");
       await page.context().addCookies(cookies);
       await go(page, "templates");
-      await page.getByRole("button", { name: "More", exact: true }).click();
-      await expect(page.locator("#more-sheet")).toBeVisible();
-      expect(await findings(page, "more")).toEqual([]);
+      await settled(page);
+      expect(await findings(page, "shell")).toEqual([]);
+      const navigation = page
+        .getByRole("navigation", { name: "Main" })
+        .filter({ visible: true });
+      if (isPhone(page)) {
+        await navigation.getByRole("button", { name: "More" }).click();
+        await expect(page.getByRole("menu", { name: "More" })).toBeVisible();
+        expect(await findings(page, "more")).toEqual([]);
+      } else {
+        await navigation
+          .getByRole("button", { name: /Alex Morgan|You/ })
+          .click();
+        await expect(page.getByRole("menu", { name: "Account" })).toBeVisible();
+        expect(await findings(page, "account")).toEqual([]);
+      }
+      await page.keyboard.press("Escape");
+      // The palette with results of both kinds.
+      await page.keyboard.press("/");
+      const palette = page.getByRole("dialog", { name: "Search and commands" });
+      await palette.getByRole("combobox").fill("engineer");
+      await expect(
+        palette.getByRole("group", { name: "Jobs" }).getByRole("option"),
+      ).not.toHaveCount(0);
+      expect(await findings(page, "palette")).toEqual([]);
+      await page.keyboard.press("Escape");
+      await page.keyboard.press("n");
+      const add = page.getByRole("dialog", { name: "Add a job" });
+      await add.getByText("More details").click();
+      await expect(add.getByLabel("Company")).toBeVisible();
+      expect(await findings(page, "add-job-details")).toEqual([]);
+      await page.keyboard.press("Escape");
+      await page.keyboard.press("?");
+      await expect(
+        page.getByRole("dialog", { name: "Keyboard shortcuts" }),
+      ).toBeVisible();
+      expect(await findings(page, "shortcuts")).toEqual([]);
     });
   });
 }

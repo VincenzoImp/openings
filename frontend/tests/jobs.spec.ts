@@ -280,24 +280,25 @@ test("adding a job by its address finds the one already in the workspace", async
   const url = `https://jobs.example.test/known/${Date.now()}`;
   const known = await job(page, unique("Known role"), { url });
   await go(page, "jobs");
+  // The Jobs screen's button opens the shell's Add job dialog.
   await page.getByRole("button", { name: "Add a job" }).click();
-  await dialog(page).getByLabel("Address of the posting").fill(url);
-  await dialog(page).getByLabel("Role").focus();
-  await expect(dialog(page).locator(".banner")).toContainText(
-    "Already in your workspace",
-  );
+  const field = dialog(page).getByLabel("Address or posting text");
+  await field.fill(url);
+  await field.blur();
+  await expect(dialog(page)).toContainText("Already in your workspace");
   await dialog(page).getByRole("button", { name: "Open it" }).click();
   await expect(page.locator("#job-title")).toHaveText(known.title);
   // A new posting, pasted: it opens beside the list.
   const title = unique("Pasted role");
   await page.getByRole("button", { name: "Add a job" }).click();
+  await field.fill("Build reliable services with a small team in Zurich.");
+  await dialog(page).getByText("More details").click();
   await dialog(page).getByLabel("Role").fill(title);
   await dialog(page).getByLabel("Company").fill("Northwind Data");
-  await dialog(page)
-    .getByLabel("Posting text")
-    .fill("Build reliable services with a small team in Zurich.");
-  await dialog(page).getByRole("button", { name: "Add the job" }).click();
-  await expect(toast(page)).toContainText("Job added");
+  await dialog(page).getByRole("button", { name: "Add job" }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: `Added “${title}”` }),
+  ).toBeVisible();
   await expect(page.locator("#job-title")).toHaveText(title);
   await expect(page.locator("dialog[open]")).toHaveCount(0);
 });
@@ -425,7 +426,7 @@ test("signals filter the list and Collection counts what each source found", asy
     String(counts.new),
   );
   // Collection: each source says what its jobs became, without zeros.
-  await go(page, "collection");
+  await go(page, "sources");
   await settled(page);
   const sources = (await call(page, "/sources?summary=false")).items as {
     name: string;
@@ -509,8 +510,8 @@ test("a note is edited, an application started and a job forgotten from its page
   await actions(page)
     .getByRole("link", { name: "Open the application", exact: true })
     .click();
-  await expect(page).toHaveURL(/#review\?application=/);
-  await expect(page.locator(".main h1")).toHaveText(kept.title);
+  await expect(page).toHaveURL(/#applications\//);
+  await expect(page.locator("h1:visible")).toHaveText(kept.title);
   // Forgetting asks first and removes the job for good.
   await go(page, `jobs?section=all&job=${gone.id}`);
   await settled(page);

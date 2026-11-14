@@ -326,7 +326,7 @@ test("the profile is saved with typed fields and keeps its metadata", async ({
 }) => {
   const headline = unique("Engineer");
   const before = await call(page, "/career/profile");
-  await go(page, "career");
+  await go(page, "profile");
   const profile = page.getByRole("form", { name: "Profile" });
   await profile.getByLabel("Headline").fill(headline);
   // Target roles and preferences are Preferences statements, not Profile fields.
@@ -349,7 +349,7 @@ test("a career entry with claims, the star, files and import is managed end to e
   page,
 }) => {
   const title = unique("Staff engineer");
-  await go(page, "career?section=knowledge");
+  await go(page, "profile?section=knowledge");
   await page
     .getByRole("button", { name: "Add an entry", exact: true })
     .first()
@@ -662,13 +662,13 @@ test("links of earlier versions open the rebuilt screens", async ({ page }) => {
     "aria-selected",
     "true",
   );
-  await go(page, "career?section=claims&q=claim 07");
+  await go(page, "profile?section=claims&q=claim 07");
   await expect(page.getByRole("tab", { name: "All claims" })).toHaveAttribute(
     "aria-selected",
     "true",
   );
   await expect(page.locator(".claims .claim")).toHaveCount(1);
-  await go(page, "career?section=knowledge&q=project 07");
+  await go(page, "profile?section=knowledge&q=project 07");
   if (isNarrow(page))
     await page
       .getByRole("button", { name: /^Open Synthetic project 07/ })

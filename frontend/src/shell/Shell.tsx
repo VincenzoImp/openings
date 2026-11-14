@@ -1,282 +1,279 @@
-import { useEffect, useRef, useState } from "react";
-import type { ListResult } from "../api";
 import {
-  confirmLeave,
-  useFormProtection,
-  useResource,
-  useWorkspace,
-} from "../state";
-import { lockPageScroll } from "../design";
-import { MoreSheet, Sidebar, TabBar } from "./Navigation";
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Plus, Search } from "lucide-react";
+import { useAccountName, useNeedsCounts } from "../data/shell";
+import { confirmLeave, useFormProtection } from "../state";
+// The design system's modules, not its index: the first screen loads only
+// the primitives the shell draws (each module brings its own stylesheet).
+import { IconButton } from "../ui/Button";
+import { isModKey, plainKey } from "../ui/keys";
 import {
-  ApplicationsPage,
-  ReviewPage,
-  CareerPage,
-  CollectionPage,
-  JobsPage,
-  PreferencesPage,
-  Screen,
-  SettingsPage,
-  SetupPage,
-  TemplatesPage,
-  TodayPage,
-} from "./Screens";
+  AppFrame,
+  BottomBar,
+  MobileTopBar,
+  Sidebar,
+  moreMenu,
+  type Account,
+  type NavItem,
+} from "../ui/Shell";
+import { ToastProvider } from "../ui/Toast";
+import { ShellContext, type ShellApi } from "./context";
+import { BOTTOM, NAV, NEEDS_LABEL, type NavDef } from "./nav";
+import { addLeaveGuard, href, navigate, useRoute } from "./router";
+import { ROUTES } from "./routes";
+import { Screen, preload } from "./Screens";
 import { markSetup, readNewWorkspace, setupMark } from "./setup";
-import { TopBar } from "./TopBar";
-import { THEME_KEY, applyTheme, initialTheme, type Theme } from "./preferences";
-import { HOME, SCREENS, routeOf } from "./routes";
+import { CHORD_MS, readKey, type ShellAction } from "./shortcuts";
+import { useTheme } from "./theme";
+import "./shell.css";
 
-const NARROW = "(max-width: 860px)";
-const emptyList = { items: [], total: 0 };
+type Overlay = "palette" | "add" | "help" | null;
 
-function useNarrow() {
-  const [narrow, setNarrow] = useState(() => matchMedia(NARROW).matches);
-  useEffect(() => {
-    const media = matchMedia(NARROW);
-    const change = () => setNarrow(media.matches);
-    media.addEventListener("change", change);
-    return () => media.removeEventListener("change", change);
-  }, []);
-  return narrow;
-}
+// The overlays load when first opened; the first screen stays small.
+const Palette = lazy(() =>
+  import("./Palette").then((module) => ({ default: module.Palette })),
+);
+const AddJob = lazy(() =>
+  import("./AddJob").then((module) => ({ default: module.AddJob })),
+);
+const ShortcutSheet = lazy(() =>
+  import("./ShortcutSheet").then((module) => ({
+    default: module.ShortcutSheet,
+  })),
+);
 
-/** The theme as the owner chose it; it follows the system until then. */
-function usePreferences() {
-  const [theme, setTheme] = useState<Theme>(initialTheme);
-  useEffect(() => {
-    const media = matchMedia("(prefers-color-scheme: dark)");
-    const follow = () => {
-      let stored: string | null = null;
-      try {
-        stored = localStorage.getItem(THEME_KEY);
-      } catch {}
-      if (stored) return;
-      const next = media.matches ? "dark" : "light";
-      applyTheme(next, false);
-      setTheme(next);
-    };
-    media.addEventListener("change", follow);
-    return () => media.removeEventListener("change", follow);
-  }, []);
-  return {
-    theme,
-    toggleTheme: () => {
-      const next = theme === "light" ? "dark" : "light";
-      applyTheme(next);
-      setTheme(next);
-    },
-  };
-}
-
-export function Shell({ onLogout }: { onLogout: () => Promise<void> }) {
+/**
+ * The application shell: the sidebar on wide screens, the top and bottom
+ * bars on phones, the routed screen, the ⌘K palette, the Add job dialog, the
+ * shortcut sheet and the global keyboard.
+ */
+export function Shell({ onSignOut }: { onSignOut: () => void }) {
   useFormProtection();
-  const main = useRef<HTMLElement>(null),
-    moreButton = useRef<HTMLButtonElement>(null);
-  const lastRoute = useRef(location.hash);
-  const [route, setRoute] = useState(() => routeOf(location.hash)),
-    [more, setMore] = useState(false);
-  const narrow = useNarrow();
-  const { theme, toggleTheme } = usePreferences();
-  const { pending, refresh, notify } = useWorkspace();
-  const inbox = useResource<ListResult<never>>(
-      "/jobs?triage=new&limit=1",
-      emptyList,
-    ),
-    applications = useResource<ListResult<never>>(
-      "/applications?limit=1",
-      emptyList,
-    );
+  const route = useRoute();
+  const counts = useNeedsCounts();
+  const name = useAccountName();
+  const [theme, setTheme] = useTheme();
+  const [overlay, setOverlay] = useState<Overlay>(null);
+  // Once opened, an overlay stays mounted, so it can close with its exit.
+  const [used, setUsed] = useState<Set<Overlay>>(() => new Set());
+  useEffect(() => {
+    if (overlay && !used.has(overlay))
+      setUsed((before) => new Set(before).add(overlay));
+  }, [overlay, used]);
+  const [title, setTitle] = useState<string | null>(null);
+  const [actionsSlot, setActionsSlot] = useState<HTMLElement | null>(null);
+  const content = useRef<HTMLElement | null>(null);
 
+  // Unsaved edits of the old screens ask before leaving (#228 replaces this
+  // with the screens' own in-app dialog).
+  useEffect(() => addLeaveGuard(() => confirmLeave()), []);
+
+  const close = useCallback(() => setOverlay(null), []);
+  const shell = useMemo<ShellApi>(
+    () => ({
+      addJob: () => setOverlay("add"),
+      search: () => setOverlay("palette"),
+      signOut: onSignOut,
+      setTitle,
+      actionsSlot,
+    }),
+    [onSignOut, actionsSlot],
+  );
+
+  // The title of the page and of the document.
+  const shown = title ?? route.def.title;
   useEffect(() => {
-    lastRoute.current = location.hash;
-    const listener = () => {
-      if (location.hash === lastRoute.current) return;
-      if (!confirmLeave()) {
-        history.replaceState(null, "", lastRoute.current || `#${HOME}`);
-        return;
-      }
-      lastRoute.current = location.hash;
-      setRoute(routeOf(location.hash));
-      setMore(false);
-      window.scrollTo(0, 0);
-    };
-    const remember = () => {
-      lastRoute.current = location.hash;
-    };
-    window.addEventListener("openings:url", remember);
-    window.addEventListener("hashchange", listener);
-    window.addEventListener("popstate", listener);
-    return () => {
-      window.removeEventListener("openings:url", remember);
-      window.removeEventListener("hashchange", listener);
-      window.removeEventListener("popstate", listener);
-    };
-  }, []);
+    document.title = `${shown} · Openings`;
+  }, [shown]);
+
+  // A new screen starts at the top, with focus on its content, so reading
+  // continues there instead of at the top of the navigation.
+  const screenKey = `${route.id}:${route.params.id ?? ""}`;
+  const previous = useRef(screenKey);
   useEffect(() => {
-    document.title = `${SCREENS[route] || "Workspace"} · Openings`;
-  }, [route]);
-  // On a new screen, focus moves to its content, so a keyboard or screen
-  // reader continues there instead of at the top of the navigation.
-  const visited = useRef(route);
-  useEffect(() => {
-    if (visited.current === route) return;
-    visited.current = route;
-    main.current?.focus({ preventScroll: true });
-  }, [route]);
-  // The More sheet: Escape closes it, the page behind it does not scroll, and
-  // it closes by itself when the window becomes wide.
-  useEffect(() => {
-    if (!more) return;
-    const unlock = lockPageScroll();
-    const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMore(false);
-    };
-    document.addEventListener("keydown", close);
-    const button = moreButton.current;
-    return () => {
-      unlock();
-      document.removeEventListener("keydown", close);
-      // Focus returns to More unless a destination took it (a new screen).
-      if (
-        button?.isConnected &&
-        (document.activeElement === document.body ||
-          !document.activeElement?.isConnected)
-      )
-        button.focus({ preventScroll: true });
-    };
-  }, [more]);
-  useEffect(() => {
-    if (!narrow) setMore(false);
-  }, [narrow]);
+    if (previous.current === screenKey) return;
+    previous.current = screenKey;
+    content.current = document.getElementById("content");
+    content.current?.scrollTo(0, 0);
+    content.current?.focus({ preventScroll: true });
+  }, [screenKey]);
+
   // A workspace nobody has set up opens on the setup guide instead of Today,
-  // once per browser (shell/setup.ts). Only a visit to the home screen counts,
-  // and only while nothing waits in Jobs or Applications.
-  const landing = useRef(/^#?(today)?$/.test(location.hash));
+  // once per browser (shell/setup.ts), while nothing waits in Jobs.
+  const landing = useRef(route.id === "today");
   useEffect(() => {
-    if (!landing.current || inbox.loading || applications.loading) return;
+    if (!landing.current || !counts.loaded) return;
     landing.current = false;
-    if (setupMark() || inbox.data.total || applications.data.total) return;
+    if (setupMark() || counts.newJobs || counts.readyApplications) return;
     void readNewWorkspace().then((fresh) => {
       if (!fresh) return markSetup("seen");
       markSetup("started");
-      if (routeOf(location.hash) !== HOME) return;
-      history.replaceState(null, "", "#setup");
-      lastRoute.current = location.hash;
-      setRoute("setup");
+      if (location.hash.replace(/^#/, "") === "today")
+        navigate(href("setup"), { replace: true });
     });
-  }, [inbox.loading, applications.loading]);
+  }, [counts.loaded, counts.newJobs, counts.readyApplications]);
 
-  function navigate(target: string) {
-    if (!confirmLeave()) return;
-    const [id, query] = target.split("?");
-    history.pushState(null, "", `#${id}${query ? "?" + query : ""}`);
-    lastRoute.current = location.hash;
-    const next = routeOf(location.hash);
-    setRoute(next);
-    setMore(false);
-    window.scrollTo(0, 0);
-    // The same screen again (its link in the navigation): still move focus,
-    // and let the screen read its new address.
-    if (next === route) {
-      main.current?.focus({ preventScroll: true });
-      window.dispatchEvent(new PopStateEvent("popstate"));
-    }
-  }
-  // A job is selected in Jobs; an application opens on its review page.
-  const openJob = (id: string) =>
-    navigate(`jobs?job=${encodeURIComponent(id)}`);
-  const openApp = (id: string) =>
-    navigate(`review?application=${encodeURIComponent(id)}`);
-  const nav = {
-    route,
-    counts: {
-      ready: applications.data.stage_counts?.ready ?? 0,
-      new: inbox.data.total,
-    },
-    onNavigate: (id: string) => navigate(id),
+  // The global keyboard. A screen's own keys come first (defaultPrevented);
+  // nothing fires while a dialog is open or a field has focus, except ⌘K.
+  const pending = useRef<{ key: string; at: number } | null>(null);
+  useEffect(() => {
+    const run = (action: ShellAction) => {
+      if (action.kind === "go") navigate(href(action.route));
+      else if (action.kind === "add-job") setOverlay("add");
+      else if (action.kind === "search") setOverlay("palette");
+      else setOverlay("help");
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === "k" && isModKey(event)) {
+        event.preventDefault();
+        setOverlay((open) => (open === "palette" ? null : "palette"));
+        return;
+      }
+      if (event.defaultPrevented || document.querySelector("dialog[open]"))
+        return;
+      const key = plainKey(event);
+      if (!key) return;
+      const chord =
+        pending.current && Date.now() - pending.current.at < CHORD_MS
+          ? pending.current.key
+          : null;
+      const next = readKey(key, chord);
+      pending.current = next.pending
+        ? { key: next.pending, at: Date.now() }
+        : null;
+      if (!next.action) return;
+      event.preventDefault();
+      run(next.action);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  const account: Account = {
+    name,
+    theme,
+    onTheme: setTheme,
+    onShortcuts: () => setOverlay("help"),
+    onSignOut,
   };
+  const item = (nav: NavDef): NavItem => ({
+    id: nav.id,
+    label: nav.label,
+    icon: nav.icon,
+    href: href(nav.id),
+    needs: nav.needs ? counts[nav.needs] : undefined,
+    needsLabel: nav.needs ? NEEDS_LABEL[nav.needs] : undefined,
+  });
+  const sections = NAV.map((section) => ({
+    label: section.label,
+    items: section.items.map(item),
+  }));
+  const all = sections.flatMap((section) => section.items);
+  const bottom = all.filter((nav) => BOTTOM.includes(nav.id as never));
+  const rest = all.filter((nav) => !BOTTOM.includes(nav.id as never));
+  const parent = route.def.parent ? ROUTES[route.def.parent] : null;
+
   return (
-    <>
-      <a
-        className="skip-link"
-        href="#content"
-        onClick={(event) => {
-          // The hash is the route: move focus without changing it.
-          event.preventDefault();
-          main.current?.focus();
-          main.current?.scrollIntoView();
-        }}
-      >
-        Skip to content
-      </a>
-      <div className="app">
-        {!narrow && <Sidebar {...nav} />}
-        <div className="main">
-          <TopBar
-            route={route}
-            saving={pending}
-            onRefresh={refresh}
-            theme={theme}
-            onTheme={toggleTheme}
-            inert={more}
-          />
-          <main
-            id="content"
-            className="page"
-            tabIndex={-1}
-            ref={main}
-            inert={more}
-          >
-            <div className="screen">
-              <Screen route={route}>
-                {route === "today" ? (
-                  <TodayPage />
-                ) : route === "jobs" ? (
-                  <JobsPage onOpenJob={openJob} onOpenApplication={openApp} />
-                ) : route === "applications" ? (
-                  <ApplicationsPage />
-                ) : route === "review" ? (
-                  <ReviewPage />
-                ) : route === "collection" ? (
-                  <CollectionPage />
-                ) : route === "career" ? (
-                  <CareerPage />
-                ) : route === "preferences" ? (
-                  <PreferencesPage />
-                ) : route === "templates" ? (
-                  <TemplatesPage />
-                ) : route === "setup" ? (
-                  <SetupPage />
-                ) : (
-                  <SettingsPage
-                    onLogout={() =>
-                      onLogout().catch((e) =>
-                        notify(
-                          e instanceof Error
-                            ? e.message
-                            : "Unable to sign out.",
-                          true,
-                        ),
-                      )
-                    }
-                  />
-                )}
-              </Screen>
+    <ShellContext.Provider value={shell}>
+      <ToastProvider>
+        <a
+          className="shell-skip"
+          href="#content"
+          onClick={(event) => {
+            // The hash is the route: move focus without changing it.
+            event.preventDefault();
+            document.getElementById("content")?.focus();
+          }}
+        >
+          Skip to content
+        </a>
+        <AppFrame
+          className="shell"
+          sidebar={
+            <div
+              className="shell-side"
+              onPointerOver={(event) => {
+                const link = (event.target as HTMLElement).closest("a");
+                const id = link?.getAttribute("href")?.slice(1);
+                if (id && id in ROUTES) preload(id as keyof typeof ROUTES);
+              }}
+            >
+              <Sidebar
+                sections={sections}
+                current={route.def.nav}
+                onAdd={() => setOverlay("add")}
+                onSearch={() => setOverlay("palette")}
+                account={account}
+              />
             </div>
-          </main>
-        </div>
-        {narrow && (
-          <TabBar
-            {...nav}
-            moreOpen={more}
-            moreButton={moreButton}
-            onMore={setMore}
-          />
-        )}
-        {narrow && more && (
-          <MoreSheet {...nav} onClose={() => setMore(false)} />
-        )}
-      </div>
-    </>
+          }
+          topBar={
+            <MobileTopBar
+              title={shown}
+              back={
+                parent
+                  ? { label: `Back to ${parent.title}`, href: href(parent.id) }
+                  : undefined
+              }
+              actions={
+                <>
+                  <span className="shell-slot" ref={setActionsSlot} />
+                  <span className="shell-defaults">
+                    <IconButton
+                      icon={Search}
+                      label="Search"
+                      size="touch"
+                      tooltip="none"
+                      onClick={() => setOverlay("palette")}
+                    />
+                    <IconButton
+                      icon={Plus}
+                      label="Add job"
+                      size="touch"
+                      tooltip="none"
+                      onClick={() => setOverlay("add")}
+                    />
+                  </span>
+                </>
+              }
+            />
+          }
+          bottomBar={
+            <BottomBar
+              items={bottom}
+              current={route.def.nav}
+              more={moreMenu(rest, account)}
+            />
+          }
+        >
+          <Screen key={screenKey} id={route.id} />
+        </AppFrame>
+        <Suspense fallback={null}>
+          {(used.has("palette") || overlay === "palette") && (
+            <Palette
+              open={overlay === "palette"}
+              onClose={close}
+              onAddJob={() => setOverlay("add")}
+              onShortcuts={() => setOverlay("help")}
+              onTheme={setTheme}
+              onSignOut={onSignOut}
+            />
+          )}
+          {(used.has("add") || overlay === "add") && (
+            <AddJob open={overlay === "add"} onClose={close} />
+          )}
+          {(used.has("help") || overlay === "help") && (
+            <ShortcutSheet open={overlay === "help"} onClose={close} />
+          )}
+        </Suspense>
+      </ToastProvider>
+    </ShellContext.Provider>
   );
 }

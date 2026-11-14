@@ -51,14 +51,14 @@
 .empty .title {
   margin: 0 0 var(--s1);
   color: var(--ink);
-  font: 600 var(--t-lg) / 1.4 var(--sans);
+  font: 600 var(--fs-lg) / 1.4 var(--sans);
   letter-spacing: 0;
 }
 .empty p {
   max-width: 60ch;
   margin: 0 auto;
   color: var(--ink-2);
-  font-size: var(--t-md);
+  font-size: var(--fs-md);
 }
 .empty .row {
   justify-content: center;
@@ -114,7 +114,7 @@
 }
 .toast .toast-action {
   padding: 0 var(--s2);
-  font: 600 var(--t-md) / 1 var(--sans);
+  font: 600 var(--fs-md) / 1 var(--sans);
   text-decoration: underline;
   text-underline-offset: 3px;
 }

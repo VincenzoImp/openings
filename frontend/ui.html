@@ -6,6 +6,12 @@
     <meta name="color-scheme" content="light dark" />
     <meta name="robots" content="noindex" />
     <title>Openings design system</title>
+    <!-- The cascade layers in their order, before any stylesheet: the build
+         splits the CSS per chunk, and the first mention of a layer fixes its
+         place. -->
+    <style>
+      @layer reset, tokens, legacy, ui, screens;
+    </style>
   </head>
   <body>
     <div id="root"></div>

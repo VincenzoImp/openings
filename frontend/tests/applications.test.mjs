@@ -5,7 +5,6 @@ const model = await import("../src/pages/applications/model.ts");
 const { replyPlan, likelyChoice } =
   await import("../src/pages/applications/recording.ts");
 const review = await import("../src/pages/review/model.ts");
-const routes = await import("../src/shell/routes.ts");
 
 const now = new Date(2026, 10, 13, 10, 0);
 const app = (fields) => ({
