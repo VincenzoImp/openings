@@ -536,7 +536,7 @@ def test_long_preference_texts_become_several_items_within_the_limit(tmp_path):
         f"UPDATE policy_items SET note='{note}' WHERE label='Work authorization';",
     )
     # Before the upgrade: two texts are too long, and they split into five items.
-    with closing(sqlite3.connect(":memory:")) as conn:
+    with closing(sqlite3.connect("file::memory:", uri=True)) as conn:
         conn.executescript(m15.SCHEMA_SQL.read_text())
         conn.execute("ATTACH DATABASE ? AS old", (path.resolve().as_uri() + "?mode=ro",))
         statements = m15.preference_statements(conn)[0].values()
