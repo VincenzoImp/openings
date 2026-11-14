@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useAddJob, useKnownJob } from "../data/shell";
+import { useAddJob, useKnownJob } from "../query/shell";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { Field, Input, Textarea } from "../ui/Field";
