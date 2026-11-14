@@ -197,7 +197,7 @@ def _restore_current(workspace, source_path):
             )
         with workspace.db.connect() as live:
             tables = live.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'jobs_fts%' AND name NOT LIKE 'sqlite_%' AND name<>'context_inputs'"
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'jobs_fts%' AND name NOT LIKE 'sqlite_%'"
             ).fetchall()
             for table in tables:
                 name = table[0]

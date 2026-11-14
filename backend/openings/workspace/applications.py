@@ -4,7 +4,6 @@ from ..db import decode_record
 from ..errors import DomainError, missing
 from ..models import OUTCOMES
 from ..outcomes import last_replies, no_reply_cutoff, no_reply_period, replies_of
-from ..staleness import application_staleness, stale_summary
 from .readiness import MISSING_DOCUMENTS_SQL, READY_SQL, readiness
 
 STAGES = ("shortlisted", "applied", "interview", "offer", "closed")
@@ -43,9 +42,6 @@ class ApplicationReads:
             row["preparation"] = self._application_preparation(connection, [application_id])[
                 application_id
             ]
-            row.update(
-                stale_summary(application_staleness(connection, [application_id])[application_id])
-            )
             row["replies"] = replies_of(connection, [application_id])[application_id]
             row["last_reply"] = last_replies(connection, [application_id])[application_id]
             pinned = self.pinned_application_notes(connection, [application_id])[application_id]
@@ -179,7 +175,6 @@ class ApplicationReads:
             identifiers = [row["id"] for row in rows]
             ready = readiness(connection, rows)
             preparation = self._application_preparation(connection, identifiers)
-            staleness = application_staleness(connection, identifiers)
             answers = last_replies(connection, identifiers)
             no_reply["overdue"] = connection.execute(
                 "SELECT count(*) FROM applications app WHERE " + REPLY_OVERDUE_SQL, (cutoff,)
@@ -194,7 +189,6 @@ class ApplicationReads:
             item.update(ready[item["id"]])
             item["job"] = self._compact_job(raw)
             item["preparation"] = preparation[item["id"]]
-            item.update(stale_summary(staleness[item["id"]]))
             item["last_reply"] = answers[item["id"]]
             items.append(item)
         return {

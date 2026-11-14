@@ -1,7 +1,7 @@
 # Applications
 
-An application holds its notes, form questions, answers, prepared contexts,
-document revisions, progress and the employer's answers. A job can have one open
+An application holds its notes, form questions, answers, document
+revisions, progress and the employer's answers. A job can have one open
 application at a time and retain earlier closed attempts.
 
 ## Prepare the library
@@ -97,14 +97,13 @@ an answer. The actions end the task:
   **All sent** and links back to Today.
 - **Not pursuing** closes it as Not pursued; its documents and history stay.
 
-Below, six tabs hold the rest:
+Below, five tabs hold the rest:
 
 | Tab | What it holds |
 |---|---|
 | **Answers** | One control per form question, with the live answers; **Copy all**; add, edit and remove questions. |
 | **Requirements** | The employer's conditions, each blocking or not and resolved or not, with your note. |
 | **Timeline** | The employer's replies, then one list of the notes and changes of the application and of its job, the pinned notes first, with filters. |
-| **Inputs** | The frozen copies of your record the documents were written from, their files, and what changed since. |
 | **Documents** | Every document revision: open, revise, add files to an incomplete one, delete. |
 | **Details** | Stage and outcome, priority, deadline, the time sent, the required documents and whether it is Ready, the pinned note, requests for your agent, the job and deletion. |
 
@@ -113,17 +112,9 @@ page on the matching tab.
 
 ## Write, compile and upload
 
-Under **Inputs**, **Prepare a frozen copy** freezes the posting, profile, Preferences,
-approved claims, questions, templates with their guidance and exact asset bytes for
-your agent, and downloads it. The chooser supports search and selecting or
-clearing matching entries, claims and templates. Claims follow their owning
-entries: excluding an entry also excludes its claims. Omitted entry/claim
-selections use all eligible material; an explicitly empty selection includes
-none. An empty template selection uses your defaults. Later edits affect newly
-prepared copies; existing documents keep the material used to write them.
-
 Connect an [external agent through MCP](agents.md), or work manually. Ask it to
-read the prepared context, write the CV, letter and answers, compile LaTeX
+read the application with its pinned note, the posting, your Profile, Career,
+claims, templates and Preferences, write the CV, letter and answers, compile LaTeX
 on its computer, and upload the PDF with the source it was built from as a
 document revision. It uses its own model access and tools.
 
@@ -138,10 +129,9 @@ another source is refused. Form answers keep their fields.
 
 For manual work, choose **Add a document** under **Documents**, or **Upload
 PDF** in the CV or letter slot of the review page: for a CV or a letter, its
-title, the frozen copy it was written from, its PDF and optionally its `.tex`
-source; for form answers or another document, its text. Form answers have both
-an archived document revision and live application answers; update the live
-answers under **Answers** when you want to reuse them in the application form.
+title, its PDF and optionally its `.tex` source; for form answers or another
+document, its text. Form answers have both an archived document revision and
+live application answers; update the live answers under **Answers** when you want to reuse them in the application form.
 
 ![The Documents tab with a revision open: the text read from its source, its source and PDF, the changes since the previous revision and its actions](../images/documents.png)
 
@@ -150,37 +140,16 @@ revision is incomplete until its PDF is stored, then complete and fixed: its
 files never change. **Compare with revision 1** (for the revision before the
 open one) lists the lines removed and added since then, with the unchanged lines
 around them. For a changed CV or letter, choose **New PDF** (or **New
-revision**) and upload the new PDF and, if you have it, its source. A CV or
-letter saved before 0.22 also shows the content stored with it then, read-only.
-Click a file name to preview a supported PDF, image or text file with its size
-and hash.
+revision**) and upload the new PDF and, if you have it, its source. Click a
+file name to preview a supported PDF, image or text file with its size and hash.
 
 The list shows the state of the CV and letter from the current revisions, and
 "Missing: letter" (for example) when a required document has no complete
-revision. **Inputs changed** marks an
-application whose current revisions use a frozen copy made before a later change
-to something the documents use, and the line below names the first change, for
-example "Profile summary and 2 more". The tab **Inputs** lists every change with
-what happened to it: "Profile summary — changed", "“Available from February
-2027.” — added · Facts about me". A writing rule for the CV only marks the CV
-("CV only").
-
-Only what documents use counts: the Profile's name, headline, contact details,
-links and summary; the statements of Facts about me and Writing rules in
-Preferences; the source, guidance and rules of the selected templates; the
-text, dates and skills of the selected Career entries and the wording of their
-claims. Editing Profile metadata, the other Preferences sections (what you are
-looking for or rule out, working with me), the order of statements, a
-template's name, the order of entries or claims, a claim's selection fields or
-any free-form metadata leaves every application current, and so does changing
-spacing or changing a part back. A frozen copy made before Preferences existed
-(0.24) holds none of them; **Inputs** says that Preferences changes are not
-compared for it. Frozen copies never change; to refresh, prepare a new one and
-save new revisions.
+revision.
 
 Editing a form question keeps compatible live answers. If a changed type, option
 or limit makes an answer invalid, the editor shows why and requires an explicit
-choice before clearing it. Frozen copies and document revisions stay unchanged.
+choice before clearing it. Document revisions stay unchanged.
 
 ## Ready
 
@@ -321,8 +290,7 @@ The job's page shows the same timeline for the job and every application to it.
 listed first in its timeline; pinning another note unpins the previous one, and
 unpinning keeps the note. The application's pinned note is its standing
 guidance: edit it under **Details**, where it replaced the application note of
-earlier versions. Your agent reads it first, and each new frozen copy of your
-record includes it; copies made earlier keep the text they froze.
+earlier versions. Your agent reads it first, with the application.
 
 ![The Timeline tab: an employer reply, then the pinned note, a note on the job and the changes, each with who made it](../images/application-history.png)
 

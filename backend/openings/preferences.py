@@ -171,14 +171,6 @@ def read_sections(conn):
     ]
 
 
-def frozen_preferences(conn):
-    """The sections as a context freezes them: {section: {version, items}}."""
-    return {
-        record["section"]: {"version": record["version"], "items": record["items"]}
-        for record in read_sections(conn)
-    }
-
-
 def settings_record(conn):
     """The two settings with their defaults and the setting's version."""
     row = conn.execute(

@@ -55,7 +55,7 @@ docker compose config
 Use focused invariant checks and complete user workflows. For dashboard changes,
 check populated lists, desktop/mobile layouts, keyboard access, unsaved edits and
 loading/error states. For data changes, check versions, deletion/cancellation,
-frozen contexts, exact revision/file associations and backup consistency. Collection
+exact revision/file associations and backup consistency. Collection
 changes need a resume-after-deferral workflow, cumulative counts and a source edit
 that leaves queued snapshots unchanged. Check that incomplete automatic candidates
 stay outside the archive, then enter once after their text arrives. Exercise one
@@ -106,16 +106,14 @@ The default run (`uv run pytest -n auto`) skips the `performance` marker.
 ### Backend time budgets
 
 `backend/tests/test_performance_budgets.py` builds a synthetic workspace of
-25,000 jobs with their ingest signals, 500 applications, 20 sources and 60 frozen
-contexts in a few seconds, and fails when the median of five reads exceeds its
-budget: the Applications list, the reads of Today, the New jobs list (with counts
-and facets), text search, the overview, the staleness report, insights, source
-yield and the timeline of a busy job and application. The budgets are about six
+25,000 jobs with their ingest signals, 500 applications and 20 sources in a few
+seconds, and fails when the median of five reads exceeds its budget: the
+Applications list, the reads of Today, the New jobs list (with counts and
+facets), text search, the overview, insights, source yield and the timeline of a busy job and application. The budgets are about six
 times the time measured on a laptop, so a slower CI runner passes and a real
 regression does not. It is marked `performance`, which the default `pytest` run
-deselects (`addopts` in `pyproject.toml`), together with the 500-context storage
-benchmark and the labelled duplicate benchmark; run them with
-`uv run pytest -m performance`. CI runs them weekly. Never raise a budget to make
+deselects (`addopts` in `pyproject.toml`), together with the labelled duplicate
+benchmark; run them with `uv run pytest -m performance`. CI runs them weekly. Never raise a budget to make
 a change pass: make the read faster, or explain in the pull request why it must
 cost more.
 

@@ -56,7 +56,7 @@ async def exercise(base, token, folder, tectonic):
                 checks["typed_module_discovery"] = {
                     "profile_get",
                     "templates_create",
-                    "contexts_create",
+                    "documents_create",
                     "files_reserve_upload",
                 } <= names
                 checks["career_file_tool_annotations"] = (
@@ -195,33 +195,33 @@ async def exercise(base, token, folder, tectonic):
                     and "expected_version" in unversioned.content[0].text
                     and gone == []
                 )
-                context = unpack(
+                # The agent reads the live records; frozen contexts are gone (0.24).
+                frozen = await session.call_tool(
+                    "contexts_create", {"value": {"application_id": application["id"]}}
+                )
+                checks["contexts_removed_with_a_hint"] = (
+                    frozen.is_error
+                    and "tool_removed" in frozen.content[0].text
+                    and "contexts_create" not in names
+                    and not {"contexts_get", "contexts_list", "staleness_get"} & names
+                )
+                guidance = unpack(
                     await session.call_tool(
-                        "contexts_create",
-                        {
-                            "value": {
-                                "application_id": application["id"],
-                                "template_id": template["id"],
-                                "idempotency_key": "agent-preparation",
-                            }
-                        },
+                        "applications_get", {"application_id": application["id"]}
                     )
+                )["pinned_note"]
+                writing = unpack(await session.call_tool("preferences_get", {}))
+                live = unpack(
+                    await session.call_tool("templates_get", {"template_id": template["id"]})
                 )
-                resource = await session.read_resource(context["resource_uri"])
-                checks["context_resource"] = (
-                    json.loads(resource.contents[0].text)["signature"] == context["signature"]
+                checks["pinned_note_on_the_application"] = (
+                    guidance["body"] == "Prefer technical detail."
                 )
-                checks["pinned_note_in_context"] = (
-                    context["payload"]["application"]["note"] == "Prefer technical detail."
-                    and "roles" not in context["payload"]["profile"]
-                )
-                checks["stored_instructions_in_context"] = (
-                    bool(context["payload"]["preferences"]["writing"]["items"])
-                    and context["payload"]["instructions"]["template_append"][template["id"]]
-                    == "Use concise evidence-backed bullets."
+                checks["live_instructions_readable"] = (
+                    bool(writing) and live["guidance"] == "Use concise evidence-backed bullets."
                 )
                 source = folder / "application.tex"
-                source.write_text(context["payload"]["templates"][0]["tex"])
+                source.write_text(live["tex"])
                 subprocess.run(  # noqa: ASYNC221 - sequential manual driver
                     [tectonic, "--untrusted", "--outdir", str(folder), str(source)],
                     check=True,
@@ -269,7 +269,6 @@ async def exercise(base, token, folder, tectonic):
                         {
                             "value": {
                                 "application_id": application["id"],
-                                "context_id": context["id"],
                                 "kind": "cv",
                                 "title": "CV",
                                 "claim_ids": [claim["id"]],
@@ -440,13 +439,6 @@ async def exercise(base, token, folder, tectonic):
                         )
                     )["tex"]
                     == tex
-                    and unpack(
-                        await session.call_tool(
-                            "contexts_list",
-                            {"value": {"application_id": application["id"], "summary": True}},
-                        )
-                    )["items"][0]["document_count"]
-                    == 2
                 )
                 current = unpack(
                     await session.call_tool(
@@ -510,9 +502,8 @@ async def exercise(base, token, folder, tectonic):
                         ).fetchone()[0]
                         == pdf
                     )
-                    checks["backup_context_and_revisions"] = (
-                        restored.execute("SELECT COUNT(*) FROM contexts").fetchone()[0] == 1
-                        and restored.execute("SELECT COUNT(*) FROM documents").fetchone()[0] == 3
+                    checks["backup_revisions"] = (
+                        restored.execute("SELECT COUNT(*) FROM documents").fetchone()[0] == 3
                     )
     return {
         "purpose": "new production-module MCP/REST/external-compilation/file/backup round trip",

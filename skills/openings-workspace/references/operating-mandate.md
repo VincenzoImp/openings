@@ -14,7 +14,7 @@ focused questions, apply to Ready applications and mark each one Applied or clos
   owner states, in their words.
 - Keep collection effective: tune searches and filters, add companies worth
   monitoring, retire noisy sources.
-- Track the pipeline: stale or expired applications, follow-ups, employer replies
+- Track the pipeline: expired applications, follow-ups, employer replies
   the owner reports, applications past the no-reply period, and what the
   insights say about where answers come from.
 - Improve the method itself: when a workflow or the product falls short,

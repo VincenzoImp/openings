@@ -197,26 +197,18 @@ def test_handshake_and_per_request_protocols_report_the_same_static_server(tmp_p
         assert listen.json()["error"]["code"] == -32601
 
 
-def test_missing_context_resource_keeps_the_domain_message(tmp_path):
-    app = create_app(tmp_path / "mcp-resource.sqlite", start_worker=False)
-    app.state.auth.setup("synthetic-password")
-    token = app.state.auth.create_token("Synthetic MCP client")["token"]
-    headers = {
-        "Authorization": "Bearer " + token,
-        "Accept": "application/json, text/event-stream",
-    }
-    with TestClient(app, base_url="http://localhost:8080") as client:
-        response = client.post(
-            "/mcp",
-            headers=headers,
-            json={
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "resources/read",
-                "params": {"uri": "openings://contexts/unknown"},
-            },
-        )
-    assert response.status_code == 200
-    error = response.json()["error"]
-    assert error["code"] == -32602
-    assert error["message"] == "Application context was not found."
+def test_context_and_staleness_tools_answer_with_their_replacement(mcp, agent_token):
+    # Frozen contexts and staleness are gone (0.24); REST answers 404.
+    for name, replacement in (
+        ("contexts_create", "applications_get"),
+        ("contexts_get", "preferences_get"),
+        ("contexts_list", "documents_create"),
+        ("staleness_get", "documents_list"),
+        ("staleness_list", "applications_list"),
+    ):
+        _, removed = mcp.call(name, {})
+        assert removed["code"] == "tool_removed" and replacement in removed["message"]
+        assert removed["details"] == {"tool": name}
+    for path in ("/contexts", "/contexts/any", "/staleness", "/applications/any/staleness"):
+        response = mcp.client.get("/api/v1" + path, headers=agent_token["headers"])
+        assert response.status_code == 404

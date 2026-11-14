@@ -10,8 +10,6 @@ from pydantic import ValidationError
 from openings.activity import ActivityService
 from openings.actors import OWNER, SYSTEM, acting_as, token_actor
 from openings.app import create_app
-from openings.career import CareerService, TemplateCreate
-from openings.documents import ContextCreate, DocumentService
 from openings.errors import DomainError
 from openings.workspace import Workspace
 from timeline_fixtures import guided_application
@@ -243,29 +241,6 @@ def test_the_application_note_field_is_gone_and_the_pinned_note_holds_guidance(t
     workspace.pin_note(pinned["id"], {"expected_version": 2, "pinned": False})
     assert workspace.get_application(application["id"])["pinned_note"] is None
     assert workspace.list_applications(q="Revised guid")["total"] == 0
-
-
-def test_new_contexts_freeze_the_pinned_note(tmp_path):
-    workspace = Workspace(tmp_path / "timeline.sqlite")
-    documents = DocumentService(workspace)
-    CareerService(workspace).create_template(TemplateCreate(name="Synthetic CV", tex="TeX"))
-    target = job(workspace)
-    application = workspace.create_application({"job_id": target["id"]})
-    workspace.add_note(
-        target["id"],
-        {"body": "Pinned guidance ✓", "application_id": application["id"], "pinned": True},
-    )
-    workspace.add_note(target["id"], {"body": "Not pinned", "application_id": application["id"]})
-    context = documents.prepare_context(
-        ContextCreate(application_id=application["id"], note="For this pass")
-    )
-    payload = context["payload"]
-    assert payload["application"]["note"] == "Pinned guidance ✓"
-    assert payload["instructions"]["application_note"] == "Pinned guidance ✓\n\nFor this pass"
-    # A later edit leaves the frozen copy as it was.
-    pinned = workspace.get_application(application["id"])["pinned_note"]
-    workspace.update_note(pinned["id"], {"expected_version": 1, "body": "Changed"})
-    assert documents.get_context(context["id"])["payload"] == payload
 
 
 def test_merge_keeps_one_pinned_job_note(tmp_path):

@@ -431,7 +431,6 @@ function affected(read: string, changed: string) {
   if (a === "applications")
     return [
       "jobs",
-      "contexts",
       "documents",
       "files",
       "career",
