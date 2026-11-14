@@ -24,7 +24,7 @@ import { Queue } from "./jobs/Queue";
 const NONE: JobList = { items: [], total: 0 };
 
 /**
- * Everything collection found, in four tabs: the jobs to review, the
+ * Everything collection found, in four tabs: the new jobs, the
  * Shortlist, the dismissed jobs and all of them, each beside the selected
  * job. `#jobs?section=…&job=…` opens a tab and a job; the shell rewrites the
  * old Inbox, Shortlist and `?job=` addresses (shell/routes.ts).
@@ -61,7 +61,7 @@ export default function JobsPage({ onOpenApplication }: Links) {
   // The rows of the list, to move on from a job that leaves it.
   const rows = useRef<string[]>([]);
   /**
-   * Before a triage of `id`: in To review and the Shortlist, where the job
+   * Before a triage of `id`: in New and Shortlisted, where the job
    * leaves the list, returns what shows the next row (or the previous one at
    * the end) once the change is saved.
    */
@@ -105,7 +105,7 @@ export default function JobsPage({ onOpenApplication }: Links) {
         }))}
       >
         <div className="stack jobs-panel">
-          {section === "review" && <AgentBanner />}
+          {section === "new" && <AgentBanner />}
           <Split
             columns="minmax(0, 1.15fr) minmax(0, 1fr)"
             labels={filters.job ? ["List", "Selected job"] : undefined}
@@ -154,7 +154,7 @@ export default function JobsPage({ onOpenApplication }: Links) {
           onClose={() => setAdding(false)}
           onOpenJob={(job) => {
             setAdding(false);
-            setValues({ section: "review", job, offset: "0" });
+            setValues({ section: "new", job, offset: "0" });
             setPane(1);
           }}
         />

@@ -1,4 +1,4 @@
-"""Typed inputs of contexts, document revisions, reviews and file uploads."""
+"""Typed inputs of contexts, document revisions and file uploads."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 from pathlib import PurePosixPath
 from typing import Any, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from ..career.models import Input
 
@@ -37,12 +37,43 @@ class ContextCreate(Input):
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
 
 
-DocumentKind = Literal["resume", "cover_letter", "answers", "other"]
-# A CV or letter revision is its uploaded source and PDF; its text is derived from
-# the source. The other kinds keep structured content: there the structure is the
-# document (form answers).
-SOURCE_KINDS = frozenset({"resume", "cover_letter"})
+DocumentKind = Literal["cv", "letter", "answers", "other"]
+# A CV or letter revision is its PDF and an optional TeX source; it is complete once
+# its PDF is stored. The other kinds keep structured content: there the structure is
+# the document (form answers).
+SOURCE_KINDS = frozenset({"cv", "letter"})
 SHA256 = r"^[a-fA-F0-9]{64}$"
+# An inline TeX source, as UTF-8 bytes.
+MAX_INLINE_SOURCE = 256 * 1024
+
+
+def safe_relative_name(value):
+    value = value.replace("\\", "/")
+    path = PurePosixPath(value)
+    if (
+        not path.name
+        or path.is_absolute()
+        or ":" in path.parts[0]
+        or any(part in {"..", "."} for part in path.parts)
+        or "\x00" in value
+    ):
+        raise ValueError("Use a relative file name without parent-directory segments.")
+    if any(ord(character) < 32 for character in value):
+        raise ValueError("Control characters are not permitted in file names.")
+    return value
+
+
+class FileSpec(Input):
+    """A file to upload with a grant the create returns: its name, size and, optionally, hash."""
+
+    name: str = Field(min_length=1, max_length=500)
+    size: int = Field(gt=0, strict=True)
+    sha256: str | None = Field(default=None, pattern=SHA256)
+
+    @field_validator("name")
+    @classmethod
+    def valid_name(cls, value):
+        return safe_relative_name(value)
 
 
 class DocumentCreate(Input):
@@ -54,11 +85,23 @@ class DocumentCreate(Input):
         description="Retrying with the same key and request returns the record the first request created.",
     )
     context_id: str | None = None
-    kind: DocumentKind = "resume"
+    kind: DocumentKind = "cv"
     title: str = Field(default="", max_length=300)
     content: dict[str, Any] | None = Field(
         default=None,
-        description="Structured content of form answers or another document. Not accepted for a CV or letter (resume, cover_letter): upload its .tex source and PDF to the revision instead.",
+        description="Structured content of form answers or another document. Not accepted for a CV or letter (cv, letter): those are a PDF and an optional TeX source.",
+    )
+    pdf: FileSpec | None = Field(
+        default=None,
+        description="CV or letter: the PDF to upload. The result's uploads.pdf is a one-shot grant: PUT the exact bytes to its url with its headers. The revision is incomplete until its PDF is stored, then complete and immutable.",
+    )
+    source: str | None = Field(
+        default=None,
+        description="CV or letter, optional: the TeX source inline (UTF-8, at most 256 KB). Its readable text is derived from it; the PDF must then be built from it (the PDF grant names its SHA-256).",
+    )
+    source_file: FileSpec | None = Field(
+        default=None,
+        description="CV or letter, optional, instead of source: a .tex file to upload with the grant uploads.source, before the PDF.",
     )
     claim_ids: list[str] = Field(
         default_factory=list,
@@ -91,13 +134,27 @@ class DocumentCreate(Input):
     def distinct_ids(cls, value):
         return list(dict.fromkeys(value))
 
+    @field_validator("source")
+    @classmethod
+    def bounded_source(cls, value):
+        if value is not None and len(value.encode("utf-8")) > MAX_INLINE_SOURCE:
+            raise ValueError("An inline source is at most 256 KB; upload a larger one as a file.")
+        return value
 
-class ReviewUpdate(Input):
-    review_state: Literal["approved"] = "approved"
-    expected_version: int = Field(ge=1)
+    @model_validator(mode="after")
+    def files_of_a_cv_or_letter(self):
+        if self.source is not None and self.source_file is not None:
+            raise ValueError(
+                "Give the source inline (source) or as a file (source_file), not both."
+            )
+        if self.kind not in SOURCE_KINDS and (
+            self.pdf or self.source is not None or self.source_file
+        ):
+            raise ValueError("pdf, source and source_file belong to a CV or letter revision.")
+        return self
 
 
-StalenessStage = Literal["draft", "applied", "interview", "offer", "closed", "all"]
+StalenessStage = Literal["shortlisted", "applied", "interview", "offer", "closed", "all"]
 
 
 # The filters, page and detail of each list: MCP's value, REST's query string.
@@ -116,7 +173,6 @@ class DocumentQuery(Input):
     offset: int = 0
     summary: bool = True
     q: str = ""
-    review_state: Literal["draft", "approved"] | None = None
 
 
 class FileQuery(Input):
@@ -131,7 +187,7 @@ class FileQuery(Input):
 
 
 class StalenessQuery(Input):
-    status: StalenessStage = "draft"
+    status: StalenessStage = "shortlisted"
     stale_only: bool = True
     limit: int = 50
     offset: int = 0
@@ -147,25 +203,13 @@ class UploadReservation(Input):
     source_sha256: str | None = Field(
         default=None,
         pattern=SHA256,
-        description="For a PDF of a document revision: the SHA-256 of the revision's .tex source the PDF was built from. Required for a CV or letter PDF; a PDF naming another source is refused.",
+        description="For the PDF of a CV or letter revision that has a TeX source: the SHA-256 of that source (required then; a PDF naming another source is refused). A PDF-only revision names none.",
     )
 
     @field_validator("name")
     @classmethod
     def safe_relative_name(cls, value):
-        value = value.replace("\\", "/")
-        path = PurePosixPath(value)
-        if (
-            not path.name
-            or path.is_absolute()
-            or ":" in path.parts[0]
-            or any(part in {"..", "."} for part in path.parts)
-            or "\x00" in value
-        ):
-            raise ValueError("Use a relative file name without parent-directory segments.")
-        if any(ord(character) < 32 for character in value):
-            raise ValueError("Control characters are not permitted in file names.")
-        return value
+        return safe_relative_name(value)
 
     @field_validator("media_type")
     @classmethod

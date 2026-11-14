@@ -113,7 +113,7 @@ test("the jobs to review, 200 rows with their signals, are interactive in under 
 }) => {
   await signIn(page);
   const inbox = await page.evaluate(() =>
-    fetch("/api/v1/jobs?queue=inbox&limit=1").then((response) =>
+    fetch("/api/v1/jobs?triage=new&limit=1").then((response) =>
       response.json(),
     ),
   );

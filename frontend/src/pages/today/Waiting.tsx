@@ -1,9 +1,14 @@
-import type { Application, ListResult } from "../../api";
-import { Card, EmptyState } from "../../design";
+import { api, type Application, type ListResult } from "../../api";
+import { Button, Card, EmptyState, List, ListRow } from "../../design";
 import { Loaded, plural } from "../../library/common";
 import type { Fresh } from "../../library/useFresh";
+import { useWorkspace } from "../../state";
 import { CloseNoReply } from "../applications/CloseNoReply";
-import { INSIGHTS } from "../applications/links";
+import { INSIGHTS, reviewHref } from "../applications/links";
+import { daysBetween } from "../applications/model";
+import { localToday } from "../../api";
+
+const SHOWN = 5;
 
 /** Applications sent long ago without a recorded reply: record one, or close them as no reply. */
 export function Waiting({
@@ -18,6 +23,17 @@ export function Waiting({
   /** The no-reply period. */
   days: number;
 }) {
+  const { mutate, pending } = useWorkspace();
+  const close = (application: Application) =>
+    void mutate(
+      () =>
+        api(`/applications/${application.id}`, "PATCH", {
+          expected_version: application.version,
+          status: "closed",
+          outcome: "no_response",
+        }),
+      "Closed as no reply.",
+    );
   return (
     <Card
       title="Waiting for a reply"
@@ -29,9 +45,36 @@ export function Waiting({
       }
     >
       <Loaded from={list} label="Loading applications…">
-        {({ total }) =>
+        {({ items, total }) =>
           total ? (
             <div className="body stack">
+              <List label="Applications without a reply">
+                {items.slice(0, SHOWN).map((application) => {
+                  const title = application.job?.title || "Untitled role";
+                  return (
+                    <ListRow
+                      key={application.id}
+                      title={title}
+                      href={reviewHref(application.id)}
+                      meta={[
+                        application.job?.company,
+                        application.applied_at &&
+                          `sent ${daysBetween(application.applied_at, localToday())} days ago`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    >
+                      <Button
+                        size="sm"
+                        disabled={pending}
+                        onClick={() => close(application)}
+                      >
+                        Close as no reply<span className="sr"> {title}</span>
+                      </Button>
+                    </ListRow>
+                  );
+                })}
+              </List>
               <p>
                 {total === 1
                   ? "1 application was"

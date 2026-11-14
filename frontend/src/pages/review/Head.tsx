@@ -1,9 +1,7 @@
 import { useState } from "react";
 import {
-  ApiError,
   api,
   downloadWorkspaceFile,
-  readinessLabels,
   type Application,
   type ListResult,
   type WorkspaceFile,
@@ -18,8 +16,7 @@ import { nextReady, queuePlace } from "./model";
 
 const NONE = { items: [], total: 0 };
 /** The Ready applications in Today's order. */
-const READY_QUEUE =
-  "/applications?status=draft&ready=true&sort=deadline&limit=200";
+const READY_QUEUE = "/applications?stage=ready&sort=deadline&limit=200";
 
 /** "1 of 6 ready · Next: Data Platform Engineer", in Today's order. */
 function QueuePlace({ id }: { id: string }) {
@@ -46,7 +43,7 @@ function QueuePlace({ id }: { id: string }) {
 /**
  * The application's name, stage and the actions that end the review: mark it
  * applied or stop, download the documents, open the posting; for a sent
- * application, record the employer's answer.
+ * application, record the employer's reply.
  */
 export function Head({
   application,
@@ -81,14 +78,8 @@ export function Head({
       after?: Application;
     } = {};
     const ok = await mutate(async () => {
-      // Read it again: the Ready mark may have been cleared since the page loaded.
+      // Read it again for its current version.
       const fresh = await api<Application>(`/applications/${application.id}`);
-      if (fresh.readiness !== "ready")
-        throw new ApiError(
-          `This application is no longer ready (${(readinessLabels[fresh.readiness || "none"] || "changed").toLowerCase()}), so it was not marked applied. Review it again.`,
-          409,
-          "application_not_ready",
-        );
       const queue = await api<ListResult<Application>>(READY_QUEUE);
       done.next = nextReady(queue.items, application.id);
       done.before = fresh;
@@ -110,24 +101,16 @@ export function Head({
       reload();
     }
   }
-  /** Back to Preparing without a sent day, Ready again as it was. */
+  /** Back to Shortlisted without a sent day (refused once a reply is recorded). */
   async function undo(sent: Application, previous: Application) {
-    const ok = await mutate(async () => {
-      const draft = await api<Application>(
-        `/applications/${sent.id}`,
-        "PATCH",
-        {
+    const ok = await mutate(
+      () =>
+        api<Application>(`/applications/${sent.id}`, "PATCH", {
           expected_version: sent.version,
           status: previous.status,
-          applied_at: previous.applied_at ?? null,
-        },
-      );
-      if (previous.ready_at)
-        await api(`/applications/${sent.id}/ready`, "POST", {
-          expected_version: draft.version,
-          ready: true,
-        });
-    }, "Back to Ready. It was not marked applied.");
+        }),
+      "Back to Shortlisted. It was not marked applied.",
+    );
     if (!ok) return;
     setAllSent(false);
     if (location.hash === reviewHref(sent.id)) reload();
@@ -164,19 +147,23 @@ export function Head({
           <span className="sr"> (opens a new tab)</span>
         </a>
       )}
-      {!mobile && application.status === "draft" && (
+      {!mobile && application.status === "shortlisted" && (
         <Button variant="quiet" onClick={() => setDialog("stop")}>
           Not pursuing
         </Button>
       )}
-      {stage === "ready" && (
-        <Button variant="primary" disabled={pending} onClick={markApplied}>
+      {application.status === "shortlisted" && (
+        <Button
+          variant={stage === "ready" ? "primary" : undefined}
+          disabled={pending}
+          onClick={markApplied}
+        >
           Mark applied
         </Button>
       )}
       {sent && (
         <Button variant="primary" onClick={() => setDialog("respond")}>
-          Record response
+          Record reply
         </Button>
       )}
     </>
@@ -229,7 +216,7 @@ export function Head({
           onClose={() => setDialog(null)}
           footer={
             <>
-              <Button onClick={() => setDialog(null)}>Keep preparing</Button>
+              <Button onClick={() => setDialog(null)}>Keep it</Button>
               <Button variant="danger" disabled={pending} onClick={stop}>
                 Close as not pursued
               </Button>
@@ -243,10 +230,7 @@ export function Head({
         </Dialog>
       )}
       {dialog === "respond" && (
-        <Dialog
-          title="Record the employer's answer"
-          onClose={() => setDialog(null)}
-        >
+        <Dialog title="Record reply" onClose={() => setDialog(null)}>
           <Respond
             stacked
             application={application}

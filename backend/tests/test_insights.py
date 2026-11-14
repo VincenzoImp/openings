@@ -18,7 +18,6 @@ from openings.insights import (
     source_kind,
     source_name,
 )
-from openings.outcomes import ResponseService
 
 MCP_HEADERS = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
 
@@ -92,10 +91,18 @@ def days_ago(days):
     return (datetime.now(UTC) - timedelta(days=days)).replace(microsecond=0)
 
 
+def record_reply(workspace, application_id, kind, day):
+    """Record an employer reply through the application update, as the owner reports it."""
+    current = workspace.get_application(application_id)
+    workspace.update_application(
+        application_id,
+        {"expected_version": current["version"], "reply": {"kind": kind, "date": day}},
+    )
+
+
 def seeded(app):
     """Nine sent applications with known answers, and three never sent."""
     workspace = app.state.workspace
-    responses = ResponseService(workspace)
     applied = days_ago(40)
     day = applied.date()
 
@@ -113,12 +120,11 @@ def seeded(app):
             },
         )
         for kind, offset in answers:
-            responses.add_response(
-                application["id"],
-                {"kind": kind, "date": (day + timedelta(days=offset)).isoformat()},
+            record_reply(
+                workspace, application["id"], kind, (day + timedelta(days=offset)).isoformat()
             )
-        if status != "applied":
-            current = workspace.get_application(application["id"])
+        current = workspace.get_application(application["id"])
+        if (current["status"], current["outcome"]) != (status, outcome):
             workspace.update_application(
                 application["id"],
                 {
@@ -183,7 +189,7 @@ def test_insights_count_only_employer_answers_and_withhold_small_samples(tmp_pat
     result = service.insights()
     overall = result["overall"]
     assert result["min_sample"] == 5
-    assert result["excluded"] == {"preparing": 1, "closed_unsent": 2}
+    assert result["excluded"] == {"shortlisted": 1, "closed_unsent": 2}
     assert {key: overall[key] for key in ("sent", "responded", "interviews", "offers")} == {
         "sent": 9,
         "responded": 5,
@@ -267,7 +273,6 @@ def test_rest_and_mcp_return_the_same_insights(tmp_path):
 def test_month_and_time_buckets_follow_dates(tmp_path):
     app = create_app(tmp_path / "buckets.sqlite", start_worker=False)
     workspace = app.state.workspace
-    responses = ResponseService(workspace)
     start = date.today() - timedelta(days=90)
     for offset in (0, 6, 7, 8, 14, 15, 30, 31):
         job = workspace.ingest_job({"title": f"Data Engineer {offset}", "posting": "Build."})
@@ -280,9 +285,8 @@ def test_month_and_time_buckets_follow_dates(tmp_path):
                 "applied_at": start.isoformat(),
             },
         )
-        responses.add_response(
-            application["id"],
-            {"kind": "rejection", "date": (start + timedelta(days=offset)).isoformat()},
+        record_reply(
+            workspace, application["id"], "rejection", (start + timedelta(days=offset)).isoformat()
         )
     result = InsightsService(workspace).insights()
     assert [row["count"] for row in result["time_to_response"]] == [3, 2, 2, 1]

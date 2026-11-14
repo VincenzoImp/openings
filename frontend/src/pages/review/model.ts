@@ -3,8 +3,8 @@
 import type { Application, Document, WorkspaceFile } from "../../api";
 
 export const kindLabels: Record<string, string> = {
-  resume: "CV",
-  cover_letter: "Letter",
+  cv: "CV",
+  letter: "Letter",
   answers: "Form answers",
   other: "Other",
 };
@@ -40,8 +40,8 @@ export const isSource = (file: WorkspaceFile) =>
     "text/x-latex",
   ].includes(file.media_type.split(";")[0]);
 
-/** A CV or letter is its .tex source and PDF; other kinds keep structured content. */
-export const SOURCE_KINDS = ["resume", "cover_letter"];
+/** A CV or letter is its PDF and an optional .tex source; other kinds keep structured content. */
+export const SOURCE_KINDS = ["cv", "letter"];
 export const isSourceKind = (kind: string) => SOURCE_KINDS.includes(kind);
 
 /** The source and the PDF of a revision, and how the PDF names its source. */
@@ -59,14 +59,11 @@ export function sourceAndPdf(revision: Pick<Document, "files">) {
   return { source, pdf, pairing };
 }
 
-/** Why a revision cannot be approved yet, or null. */
-export function approvalBlock(revision: Pick<Document, "kind" | "files">) {
+/** Why a CV or letter revision is not complete yet, or null when it is. */
+export function incompleteReason(revision: Pick<Document, "kind" | "files">) {
   if (!isSourceKind(revision.kind)) return null;
-  const { source, pdf } = sourceAndPdf(revision);
-  if (!source)
-    return "Add the .tex source before approving: its text is what you review.";
-  if (!pdf) return "Add the PDF built from the source before approving.";
-  return null;
+  const { pdf } = sourceAndPdf(revision);
+  return pdf ? null : "Upload its PDF: until then it does not count for Ready.";
 }
 
 export interface Notice {
@@ -80,7 +77,7 @@ export interface Notice {
  * unresolved requirements and the required questions without an answer.
  */
 export function beforeYouSend(app: Application): Notice[] {
-  if (app.status !== "draft") return [];
+  if (app.status !== "shortlisted") return [];
   const notices: Notice[] = [];
   const empty = (app.questions || []).filter((question) => {
     if (!question.required) return false;

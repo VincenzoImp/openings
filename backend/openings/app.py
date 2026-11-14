@@ -48,10 +48,6 @@ from .interfaces.insights import (
     register_api as register_insights_api,
     register_mcp as register_insights_mcp,
 )
-from .interfaces.outcomes import (
-    register_api as register_response_api,
-    register_mcp as register_response_mcp,
-)
 from .interfaces.preferences import (
     register_api as register_preferences_api,
     register_mcp as register_preferences_mcp,
@@ -67,7 +63,6 @@ from .interfaces.source_yield import (
 from .interfaces.system import register_system
 from .limits import REQUEST_LIMIT, BodyLimit
 from .mcp_server import OpeningsMCP
-from .outcomes import ResponseService
 from .preferences import PreferencesService
 from .skill_notes import SkillNotesService
 from .skills import SkillLibrary
@@ -95,7 +90,6 @@ def create_app(database=None, start_worker=True):
     activity = ActivityService(workspace)
     requests = RequestService(workspace)
     preferences = PreferencesService(workspace)
-    responses = ResponseService(workspace)
     insights = InsightsService(workspace)
     source_yield = YieldService(workspace)
     workspace.discovery = discovery
@@ -116,7 +110,6 @@ def create_app(database=None, start_worker=True):
     register_activity_mcp(mcp, activity)
     register_request_mcp(mcp, requests)
     register_preferences_mcp(mcp, preferences)
-    register_response_mcp(mcp, responses)
     register_insights_mcp(mcp, insights)
     register_yield_mcp(mcp, source_yield)
     skills = SkillLibrary()
@@ -148,7 +141,7 @@ def create_app(database=None, start_worker=True):
     app.state.activity, app.state.requests = activity, requests
     app.state.preferences = preferences
     app.state.skill_notes = skill_notes
-    app.state.responses, app.state.insights = responses, insights
+    app.state.insights = insights
     app.state.source_yield = source_yield
     app.add_middleware(BodyLimit)
     # The client address is the real one only when uvicorn trusts the proxy
@@ -279,7 +272,6 @@ def create_app(database=None, start_worker=True):
     register_activity_api(router, activity)
     register_request_api(router, requests)
     register_preferences_api(router, preferences)
-    register_response_api(router, responses)
     register_insights_api(router, insights)
     register_yield_api(router, source_yield)
     app.include_router(router)
