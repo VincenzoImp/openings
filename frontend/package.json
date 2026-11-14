@@ -11,7 +11,8 @@
     "format": "prettier --write src tests scripts index.html ui.html vite.config.ts playwright.config.ts",
     "format:check": "prettier --check src tests scripts index.html ui.html vite.config.ts playwright.config.ts",
     "test": "node --test tests/*.test.mjs",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --project=chromium --project=chromium-mobile",
+    "test:e2e:all": "playwright test --project=webkit --project=webkit-mobile --project=chromium-performance",
     "screenshots": "node scripts/screenshots.mjs",
     "api:gen": "node scripts/api.mjs",
     "api:check": "node scripts/api.mjs --check"
