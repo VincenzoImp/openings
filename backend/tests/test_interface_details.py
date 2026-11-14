@@ -43,7 +43,7 @@ def test_a_reply_without_a_date_is_recorded_on_today(app):
     assert not any(item.name.startswith("responses_") for item in tools)
     tool = next(item for item in tools if item.name == "applications_update")
     value = json.dumps(tool.input_schema)
-    assert "today (UTC) for a new reply when omitted" in value
+    assert "today when omitted" in value
     required = [schema.get("required", []) for schema in schemas(tool.input_schema)]
     assert not any("date" in names for names in required)
 
@@ -85,17 +85,18 @@ def test_skill_prompts_declare_no_arguments_and_return_their_own_skill(app):
         assert texts[prompt.name].startswith(f"Follow the Openings `{prompt.name}` skill")
 
 
-def test_tool_schemas_are_named_after_their_tools_and_keys_have_one_length(app):
+def test_tool_schemas_have_no_titles_and_idempotency_keys_have_one_length(app):
     tools = asyncio.run(app.state.mcp.list_tools())
-    lengths = set()
     for tool in tools:
-        assert tool.input_schema.get("title") in (None, f"{tool.name}Arguments"), tool.name
-        for schema in schemas(tool.input_schema):
-            key = schema.get("properties", {}).get("idempotency_key")
-            if key:
-                for option in [key, *key.get("anyOf", [])]:
-                    if option.get("type") == "string":
-                        lengths.add((tool.name, option.get("maxLength")))
+        titles = [s["title"] for s in schemas(tool.input_schema) if isinstance(s.get("title"), str)]
+        assert not titles, tool.name
+    lengths = set()
+    for name, schema in app.openapi()["components"]["schemas"].items():
+        key = schema.get("properties", {}).get("idempotency_key")
+        if key:
+            for option in [key, *key.get("anyOf", [])]:
+                if option.get("type") == "string":
+                    lengths.add((name, option.get("maxLength")))
     assert lengths and {length for _, length in lengths} == {200}, sorted(lengths)
 
 
@@ -112,22 +113,27 @@ def test_tokens_default_to_the_scoped_agent_kind(app):
         assert created.json()["kind"] == "agent"
 
 
-def test_workspace_info_says_document_revisions_are_saved_never_submitted(app):
+def test_the_workflow_says_document_revisions_are_saved_never_submitted(app):
     token = app.state.auth.create_token("Synthetic agent")["token"]
     with TestClient(app, base_url="http://localhost:8080") as client:
-        response = client.post(
+        info = client.get("/api/v1/workspace", headers={"Authorization": "Bearer " + token}).json()
+        initialized = client.post(
             "/mcp",
             headers={**MCP_HEADERS, "Authorization": "Bearer " + token},
             json={
                 "jsonrpc": "2.0",
                 "id": 1,
-                "method": "tools/call",
-                "params": {"name": "workspace_info", "arguments": {}},
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                    "clientInfo": {"name": "synthetic", "version": "1"},
+                },
             },
-        )
-    info = json.loads(response.json()["result"]["content"][0]["text"])
-    assert "save CV and letter revisions" in info["workflow"]
+        ).json()["result"]
+    assert "save each revision" in info["workflow"]
     assert "submit" not in info["workflow"].lower()
+    assert "Never submit an application" in initialized["instructions"]
 
 
 def test_a_public_fetch_without_a_provider_budget_fails_closed(monkeypatch):

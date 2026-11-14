@@ -22,32 +22,36 @@ class ImportOperations:
         except json.JSONDecodeError:
             item = KnowledgeCreate(kind="other", title=value.title, narrative=value.text)
             return {
-                "knowledge": [item.model_dump()],
+                "entries": [item.model_dump()],
                 "warnings": ["Text is preserved as one narrative. Review before importing."],
             }
+        if isinstance(data, dict) and "knowledge" in data and "entries" not in data:
+            # The file format of 0.23 named the entries "knowledge".
+            data = {**data, "entries": data["knowledge"]}
+            del data["knowledge"]
         if isinstance(data, list):
-            data = {"knowledge": data}
-        elif isinstance(data, dict) and "title" in data and "knowledge" not in data:
-            data = {"knowledge": [data]}
+            data = {"entries": data}
+        elif isinstance(data, dict) and "title" in data and "entries" not in data:
+            data = {"entries": [data]}
         elif (
             isinstance(data, dict)
-            and "knowledge" not in data
+            and "entries" not in data
             and "profile" not in data
             and any(key in DEFAULT_PROFILE for key in data)
         ):
             data = {"profile": data}
-        if not isinstance(data, dict) or not isinstance(data.get("knowledge", []), list):
+        if not isinstance(data, dict) or not isinstance(data.get("entries", []), list):
             raise DomainError(
                 422,
                 "import_format",
-                "Use a profile object, a JSON knowledge array, or an object with profile/knowledge fields.",
+                "Use a profile object, a JSON array of career entries, or an object with profile and entries.",
             )
         try:
             items = [
                 KnowledgeCreate.model_validate(item).model_dump()
-                for item in data.get("knowledge", [])
+                for item in data.get("entries", [])
             ]
-            result = {"knowledge": items}
+            result = {"entries": items}
             if data.get("profile") is not None:
                 if not isinstance(data["profile"], dict):
                     raise DomainError(422, "import_format", "The profile must be a JSON object.")
@@ -68,7 +72,7 @@ class ImportOperations:
         result["warnings"] = [
             f"Field '{key}' is not imported; edit it explicitly in the workspace."
             for key in data
-            if key not in {"knowledge", "profile"}
+            if key not in {"entries", "profile"}
         ]
         if result.get("profile"):
             result["warnings"].append(
@@ -104,7 +108,7 @@ class ImportOperations:
         with self.db.transaction() as conn:
             if profile_data is not None:
                 self._apply_profile(conn, profile_data, value.expected_profile_version)
-            for item in value.knowledge:
+            for item in value.entries:
                 identifiers.append(self._insert_knowledge(conn, item, timestamp))
         return {
             "profile": self.get_profile(),

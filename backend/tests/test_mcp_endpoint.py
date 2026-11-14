@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from openings import __version__
 from openings.app import create_app
+from openings.mcp_server import INSTRUCTIONS
 
 
 def test_advertised_mcp_endpoint_and_trailing_slash_support_json_rpc(tmp_path):
@@ -51,7 +52,7 @@ def test_advertised_mcp_endpoint_and_trailing_slash_support_json_rpc(tmp_path):
                 json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
             )
             assert tools.status_code == 200
-            assert "workspace_info" in {tool["name"] for tool in tools.json()["result"]["tools"]}
+            assert "workspace_context" in {tool["name"] for tool in tools.json()["result"]["tools"]}
             read = client.post(
                 path,
                 headers=headers,
@@ -59,14 +60,14 @@ def test_advertised_mcp_endpoint_and_trailing_slash_support_json_rpc(tmp_path):
                     "jsonrpc": "2.0",
                     "id": 3,
                     "method": "tools/call",
-                    "params": {"name": "workspace_info", "arguments": {}},
+                    "params": {"name": "workspace_context", "arguments": {}},
                 },
             )
             assert read.status_code == 200
             result = read.json()["result"]
             assert not result.get("isError")
             value = result.get("structuredContent") or json.loads(result["content"][0]["text"])
-            assert value["name"] == "Openings"
+            assert value["workspace"]["version"] == __version__
             assert read.headers["cache-control"] == "no-store"
     assert [entry for entry in observed if entry[2]] == [
         ("/mcp/", b"/mcp/", b"client=synthetic%20agent"),
@@ -166,6 +167,7 @@ def test_handshake_and_per_request_protocols_report_the_same_static_server(tmp_p
                 "protocolVersion": negotiated,
                 "capabilities": CAPABILITIES,
                 "serverInfo": identity,
+                "instructions": INSTRUCTIONS,
             }
 
         def per_request(method, params=None):
@@ -189,7 +191,7 @@ def test_handshake_and_per_request_protocols_report_the_same_static_server(tmp_p
         assert discovered["capabilities"] == CAPABILITIES
         assert discovered["_meta"]["io.modelcontextprotocol/serverInfo"] == identity
         tools = per_request("tools/list").json()["result"]["tools"]
-        assert "workspace_info" in {tool["name"] for tool in tools}
+        assert "workspace_context" in {tool["name"] for tool in tools}
         # No tool, prompt or resource changes at runtime, so no stream is ever held open.
         listen = per_request("subscriptions/listen", {"notifications": {"toolsListChanged": True}})
         assert listen.status_code == 404
@@ -200,15 +202,15 @@ def test_handshake_and_per_request_protocols_report_the_same_static_server(tmp_p
 def test_context_and_staleness_tools_answer_with_their_replacement(mcp, agent_token):
     # Frozen contexts and staleness are gone (0.24); REST answers 410 Gone.
     for name, replacement in (
-        ("contexts_create", "applications_get"),
-        ("contexts_get", "preferences_get"),
-        ("contexts_list", "documents_create"),
-        ("staleness_get", "documents_list"),
-        ("staleness_list", "documents_list"),
+        ("contexts_create", "workspace_context"),
+        ("contexts_get", "workspace_context"),
+        ("contexts_list", "workspace_context"),
+        ("staleness_get", "applications_get"),
+        ("staleness_list", "applications_list"),
     ):
         _, removed = mcp.call(name, {})
-        assert removed["code"] == "tool_removed" and replacement in removed["message"]
-        assert removed["details"] == {"tool": name}
+        assert removed["code"] == "removed" and replacement in removed["message"]
+        assert removed["details"] == {"tool": name, "use": replacement}
     for path in ("/contexts", "/contexts/any", "/staleness", "/applications/any/staleness"):
         response = mcp.client.get("/api/v1" + path, headers=agent_token["headers"])
         assert response.status_code == 410

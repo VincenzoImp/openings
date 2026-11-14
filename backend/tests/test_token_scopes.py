@@ -90,11 +90,10 @@ def test_an_agent_token_is_refused_owner_operations(app, client):
 def test_an_agent_token_keeps_the_workflow_operations(app, client):
     agent = app.state.auth.create_token("Synthetic agent", "agent")
     headers = bearer(agent)
-    info, error = tool(client, agent, "workspace_info")
-    assert error is None
-    assert info["actor"] == "agent:Synthetic agent" and "open_requests" not in info
-    assert "run" not in info["workflow"].replace("Report", "")
-    assert client.get("/api/v1/workspace", headers=headers).json()["actor"] == info["actor"]
+    context, error = tool(client, agent, "workspace_context")
+    assert error is None and context["workspace"]["you"] == "agent:Synthetic agent"
+    info = client.get("/api/v1/workspace", headers=headers).json()
+    assert info["actor"] == context["workspace"]["you"] and "open_requests" not in info
     job = client.post(
         "/api/v1/jobs",
         json={"title": "Synthetic engineer", "company": "Example", "posting": "Build APIs."},
@@ -104,14 +103,14 @@ def test_an_agent_token_keeps_the_workflow_operations(app, client):
         f"/api/v1/jobs/{job['id']}/notes", json={"body": "Synthetic note"}, headers=headers
     ).json()
     assert note["author"] == "agent:Synthetic agent"
-    history = client.get("/api/v1/events", params={"job_id": job["id"]}, headers=headers).json()[
+    history = client.get("/api/v1/changes", params={"job_id": job["id"]}, headers=headers).json()[
         "items"
     ]
     assert {item["actor"] for item in history} == {"agent:Synthetic agent"}
-    # Export and permanent deletion stay available: they are workspace data operations.
-    assert client.get("/api/v1/export", headers=headers).status_code == 200
-    export, error = tool(client, agent, "workspace_export")
-    assert error is None and export["headers"]["X-Operational-Token"]
+    # The records export is the owner's; the backup and permanent deletion stay available.
+    assert client.get("/api/v1/export", headers=headers).status_code == 403
+    _, error = tool(client, agent, "workspace_export")
+    assert error["code"] == "owner_only" and error["details"]["use"] == "workspace_backup"
     current = client.get(f"/api/v1/jobs/{job['id']}", headers=headers).json()
     forgotten, error = tool(
         client, agent, "jobs_delete", {"job_id": job["id"], "expected_version": current["version"]}

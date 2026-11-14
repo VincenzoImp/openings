@@ -153,7 +153,7 @@ class KnowledgeCreate(KnowledgeFields):
         default=None,
         min_length=1,
         max_length=200,
-        description="Retrying with the same key and request returns the record the first request created.",
+        description="A retry with the same key returns the first result.",
     )
 
 
@@ -170,12 +170,12 @@ class KnowledgeUpdate(KnowledgeFields, NonNullUpdate):
 
 
 class ClaimCreate(Input):
-    knowledge_id: str
+    career_id: str = Field(description="The career entry it belongs to.")
     idempotency_key: str | None = Field(
         default=None,
         min_length=1,
         max_length=200,
-        description="Retrying with the same key and request returns the record the first request created.",
+        description="A retry with the same key returns the first result.",
     )
     text: str = Field(min_length=1, max_length=5000)
     approved: bool = False
@@ -192,7 +192,7 @@ class ClaimCreate(Input):
 
 class ClaimUpdate(NonNullUpdate):
     expected_version: int = Field(ge=1, strict=True)
-    knowledge_id: str | None = None
+    career_id: str | None = None
     text: str | None = Field(default=None, min_length=1, max_length=5000)
     approved: bool | None = None
     position: int | None = Field(default=None, ge=0, strict=True)
@@ -217,7 +217,7 @@ class TemplateCreate(Input):
         default=None,
         min_length=1,
         max_length=200,
-        description="Retrying with the same key and request returns the record the first request created.",
+        description="A retry with the same key returns the first result.",
     )
 
     @field_validator("rules")
@@ -247,7 +247,7 @@ class ImportPreview(Input):
 
 
 class CareerImport(Input):
-    knowledge: list[KnowledgeCreate] = Field(default_factory=list, max_length=200)
+    entries: list[KnowledgeCreate] = Field(default_factory=list, max_length=200)
     profile: dict[str, Any] | None = None
     expected_profile_version: int | None = Field(default=None, ge=0, strict=True)
 
@@ -262,7 +262,7 @@ class KnowledgeQuery(Input):
 
 
 class ClaimQuery(Input):
-    knowledge_id: str = ""
+    career_id: str = ""
     approved: bool | None = None
     limit: int = 100
     offset: int = 0
@@ -276,6 +276,65 @@ class TemplateQuery(Input):
     offset: int = 0
     summary: bool = True
     q: str = ""
+
+
+# Batch reads and saves (career_get, career_save, highlights_save, templates_save). An
+# item with an id updates that record with its version; without one it creates one.
+# Each item is checked against the create or update model on its own.
+class CareerRead(Input):
+    ids: list[str] | None = Field(
+        default=None, max_length=50, description="Up to 50 entry ids; omit to search q and kind."
+    )
+    q: str = Field(default="", max_length=1000)
+    kind: str = Field(default="", max_length=40)
+
+
+class CareerItem(Input):
+    career_id: str | None = Field(default=None, description="Update this entry; omit to add one.")
+    expected_version: int | None = Field(default=None, ge=1, description="Required to update.")
+    kind: KnowledgeKind | None = None
+    title: str | None = Field(default=None, max_length=300)
+    organization: str | None = Field(default=None, max_length=300)
+    dates: CareerDates | None = None
+    skills: list[str] | None = Field(default=None, max_length=200)
+    position: int | None = Field(default=None, ge=0)
+    narrative: str | None = Field(default=None, max_length=100000)
+    metadata: dict[str, Any] | None = None
+    idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class CareerSave(Input):
+    items: list[CareerItem] = Field(min_length=1, max_length=50)
+
+
+class HighlightItem(Input):
+    highlight_id: str | None = Field(default=None, description="Update this one; omit to add one.")
+    expected_version: int | None = Field(default=None, ge=1, description="Required to update.")
+    career_id: str | None = Field(default=None, description="Its entry; required to add one.")
+    text: str | None = Field(default=None, max_length=5000)
+    approved: bool | None = None
+    always_include: bool | None = Field(
+        default=None, description="In every CV unless the job gives a reason to leave it out."
+    )
+    position: int | None = Field(default=None, ge=0)
+    metadata: dict[str, Any] | None = None
+    idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class HighlightsSave(Input):
+    items: list[HighlightItem] = Field(min_length=1, max_length=100)
+
+
+class TemplateSave(Input):
+    template_id: str | None = Field(default=None, description="Update this one; omit to add one.")
+    expected_version: int | None = Field(default=None, ge=1, description="Required to update.")
+    name: str | None = Field(default=None, max_length=200)
+    kind: Literal["cv", "letter"] | None = None
+    tex: str | None = Field(default=None, max_length=1000000)
+    guidance: str | None = Field(default=None, max_length=20000)
+    rules: dict[str, Any] | None = Field(default=None, description=RULES_DESCRIPTION)
+    is_default: bool | None = None
+    idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 def validate_rules(value):
