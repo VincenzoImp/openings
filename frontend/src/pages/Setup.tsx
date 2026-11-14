@@ -85,7 +85,7 @@ export default function SetupPage() {
       )}
       <p className="caption">
         Prefer to do it without an agent? Fill in the basics under Your record,
-        then add entries and claims in <a href="#career">Career</a> and your
+        then add entries and claims in <a href="#profile">Profile</a> and your
         templates in <a href="#templates">Templates</a>. You can connect an
         agent later in <a href="#settings">Settings</a>, and open this guide
         again from Settings, Workspace.

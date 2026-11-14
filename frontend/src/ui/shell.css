@@ -19,11 +19,19 @@
     min-height: 0;
   }
   .ui-app-content {
+    /* The containing block of what is positioned inside the content, so
+       nothing in it (a visually hidden label) reaches past the frame. */
+    position: relative;
     display: flex;
     flex-direction: column;
     flex: 1;
     min-height: 0;
     overflow: auto;
+  }
+  /* Focus lands here on a new screen; the screen is the cue, not a ring. */
+  .ui-app-content:focus {
+    outline: none;
+    box-shadow: none;
   }
   .ui-app-bottom,
   .ui-topbar {

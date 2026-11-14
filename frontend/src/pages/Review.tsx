@@ -7,6 +7,8 @@ import {
   Loading,
   Tabs,
 } from "../design";
+import { useTitle } from "../shell/context";
+import { useRoute } from "../shell/router";
 import { useResource, useUrlState } from "../state";
 import { Answers } from "./review/Answers";
 import { Details } from "./review/Details";
@@ -119,14 +121,16 @@ function Review({
 /**
  * Review and apply: the posting, the CV and the letter side by side with the
  * actions that end the task, then answers, requirements, timeline, documents
- * and details. `#review?application=…&tab=…` opens it.
+ * and details. `#applications/<id>?tab=…` opens it.
  */
 export default function ReviewPage() {
-  const [id] = useUrlState("application", "");
+  const id = useRoute().params.id ?? "";
   const record = useResource<Application | null>(
     id ? `/applications/${id}` : null,
     null,
   );
+  // The phone's top bar names the role, as the page's own head does.
+  useTitle(record.data?.job?.title || null);
   if (!id)
     return (
       <>

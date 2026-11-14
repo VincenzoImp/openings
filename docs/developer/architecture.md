@@ -456,6 +456,57 @@ The scheduler and collector progress independently. Network-capable MCP tools
 run outside the event loop. Queued tasks have leases and cancellation; stale work
 cannot overwrite a current result. See [source configuration](../user/sources.md).
 
+## Dashboard
+
+The dashboard is a shell around one routed screen at a time:
+
+| Path | Role |
+|---|---|
+| `frontend/src/shell/routes.ts` | The route table: one hash route per screen (`#jobs`, `#applications/<id>`), its title, its parent for a second-level page and its navigation item. No aliases: an address that names no route opens Today. |
+| `frontend/src/shell/router.ts` | `useRoute()` (id, `params`, `query`), `navigate()`, `href()` and `addLeaveGuard()`. Links are plain `<a href="#…">`. |
+| `frontend/src/shell/Screens.tsx` | `LOADERS`: the lazy module of each route, its error boundary and loading skeleton. |
+| `frontend/src/shell/Shell.tsx` | The design system's sidebar, phone top and bottom bars, the ⌘K palette, the Add job dialog, the shortcut sheet and the global keyboard (`g t`/`g j`/`g a`/`g p`, `n`, `/`, `?`, ⌘K). |
+| `frontend/src/query/` | TanStack Query over the generated client: `queryClient`, resource keys, `useApiMutation` and `useVersionedMutation` with `ConflictNotice`. |
+
+**A screen module** is what each screen issue replaces, one at a time:
+
+- **Route.** One entry in `ROUTES` and one in `LOADERS`. The module
+  default-exports a component without props. It reads its address with
+  `useRoute()` (`route.params.id`, `route.query.get("tab")`) and changes it
+  with `navigate(href(...), { replace: true })` for state that should not add a
+  history entry (filters, the selected row).
+- **Data.** Reads are `useQuery` calls through `api` and `call` of
+  `src/api/client.ts`, with keys that start with the resource, the first
+  segment of the REST path: `["jobs", "list", filters]`, `["jobs", "one", id]`.
+  Lists poll with `refetchInterval: POLL_MS`; there is no Refresh button.
+  Writes are `useApiMutation({ touches: ["jobs", "applications"] })`, which
+  reads again every query of those resources. A versioned record is saved with
+  `useVersionedMutation`: on 409 the form keeps its draft and shows
+  `ConflictNotice` (Reload, Keep editing). Forms keep their draft in state.
+- **Layout slots.** The screen draws its own `PageHeader` (h1 and at most one
+  action; on a second-level page the breadcrumb from
+  `breadcrumb(route, title)`), its toolbar and its panes inside the content
+  area, which scrolls on its own. On a phone the shell's top bar shows the
+  title (`useTitle(title)` when it differs from the route's) and its Search
+  and Add job; `<TopBarActions>` replaces those with up to three icon buttons
+  of the screen. A second-level page gets the back chevron from its route's
+  `parent`. Toasts come from `useToast()` of `src/ui`.
+- **Keyboard.** The shell owns `g`+letter, `n`, `/`, `?` and ⌘K. A screen binds
+  its own keys on its content (the `List` model: `j`/`k`, Enter, `x`, Esc and
+  row letters such as `s` and `d`); a key the screen handles calls
+  `preventDefault()`, and the shell then ignores it. Shortcuts rest while a
+  dialog is open or a field has focus.
+- **Leaving.** A screen with unsaved edits registers `addLeaveGuard()` and
+  shows the design system's `LeaveDialog`, calling the guard's `proceed` once
+  the person chose to leave.
+
+Screens not yet rebuilt keep their old code (`src/pages`, `src/state.tsx`,
+`src/api.ts` and `src/design`, whose stylesheet sits in the `legacy` cascade
+layer and maps its names onto the design system's tokens) until their issue
+replaces them; a rebuilt screen leaves the `LEGACY` list in `Screens.tsx`.
+`npm run budget` holds the first screen, each lazy chunk, all JavaScript and
+the stylesheet to their gzip budgets.
+
 ## Extending the app
 
 Add behavior in the shared service before exposing it through REST, MCP and the

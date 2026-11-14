@@ -6,11 +6,12 @@
   gap: var(--s2);
   min-height: 36px;
   padding: 0 var(--s4);
-  border: 1px solid var(--control);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-xs);
   border-radius: var(--radius-sm);
   background: var(--card);
   color: var(--ink);
-  font: 500 var(--t-md) / 1.2 var(--sans);
+  font: 500 var(--fs-md) / 1.2 var(--sans);
   text-decoration: none;
   cursor: pointer;
   white-space: nowrap;
@@ -19,15 +20,16 @@
   background: var(--hover);
 }
 .btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--on-accent);
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
 }
 .btn.primary:hover {
   filter: brightness(1.08);
 }
 .btn.quiet {
   border-color: transparent;
+  box-shadow: none;
   background: none;
   color: var(--ink-2);
 }
@@ -41,7 +43,7 @@
 .btn.sm {
   min-height: 28px;
   padding: 0 var(--s3);
-  font-size: var(--t-sm);
+  font-size: var(--fs-sm);
 }
 .btn:disabled,
 .btn[aria-disabled="true"] {
@@ -53,7 +55,7 @@
   background: var(--card);
 }
 .btn.primary:disabled:hover {
-  background: var(--accent);
+  background: var(--primary);
 }
 .btn.quiet:disabled:hover {
   background: none;
@@ -101,8 +103,8 @@
   animation: spin 0.75s linear infinite;
 }
 .btn.primary .spinner {
-  border-color: color-mix(in srgb, var(--on-accent) 40%, transparent);
-  border-top-color: var(--on-accent);
+  border-color: color-mix(in srgb, var(--on-primary) 40%, transparent);
+  border-top-color: var(--on-primary);
 }
 @keyframes spin {
   to {

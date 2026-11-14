@@ -1,53 +1,48 @@
-/* Openings design tokens: the single source for colour, type and space.
-   The contrast of every colour on its backgrounds is asserted by
-   tests/contrast.test.mjs. */
+/* The old dashboard stylesheet's token names, mapped onto the design system
+   (src/ui/tokens.css). The screens not yet rebuilt (#222–#227) keep their
+   class names while they take the new colours, Inter and the new shell; this
+   file and the rest of src/design are deleted in #228.
+
+   Names the design system also defines (--bg, --surface, --hover, --control,
+   --accent, --on-accent, --accent-soft, --danger, --danger-soft, --backdrop,
+   --mono) are not redefined here: the old rules read the new values. The old
+   type scale and row height were renamed (--fs-*, --row-min) because the
+   design system uses --t-* and --row with another meaning.
+
+   No colour literal lives here: tests/contrast.test.mjs resolves every alias
+   to the design system's values and holds the old pairs to WCAG AA. */
 :root {
-  /* Surfaces, from the page shell up to raised paper */
-  --bg: #ebe8e0;
-  --surface: #f6f4ee;
-  --card: #fffdf9;
-  --line: #dcddd2;
-  --line-strong: #c2c4b6;
-  /* Boundary of buttons and inputs: at least 3:1 on surface, card, hover and
-     the soft accent. Controls with a border never sit directly on --bg. */
-  --control: #85877a;
-  --hover: #f0eee6;
+  /* Surfaces */
+  --card: var(--surface);
+  --line: var(--border);
+  --line-strong: var(--border-strong);
 
-  /* Text: ink for content, ink-2 for secondary text, ink-3 for captions on surface or card */
-  --ink: #23241e;
-  --ink-2: #5c5e54;
-  --ink-3: #696b60;
+  /* Text */
+  --ink: var(--text);
+  --ink-2: var(--text-2);
+  --ink-3: var(--text-3);
 
-  /* One accent for primary actions and selection */
-  --accent: #4d6340;
-  --on-accent: #ffffff;
-  --accent-soft: #e9efe2;
+  /* Meaning */
+  --ready: var(--success);
+  --ready-soft: var(--success-soft);
+  --attention: var(--warning);
+  --attention-soft: var(--warning-soft);
+  --info: var(--accent-text);
+  --info-soft: var(--accent-soft);
+  --agent: var(--text-2);
+  --agent-soft: var(--bg-subtle);
 
-  /* Meaning: each has a text colour and a soft background, both AA with each other */
-  --ready: #3a6335;
-  --ready-soft: #e6f0e0;
-  --attention: #7a5200;
-  --attention-soft: #f6ead0;
-  --danger: #94483b;
-  --danger-soft: #f6e3de;
-  --info: #3d5a73;
-  --info-soft: #e3ebf2;
-  --agent: #5b4b8a;
-  --agent-soft: #ebe7f5;
+  --shadow: var(--shadow-md);
 
-  --shadow: 0 1px 2px #2b2a2010, 0 8px 28px #2b2a2012;
-  --backdrop: #23241e59;
-
-  /* Type scale (rem of 16px): 12, 13, 14, 16, 20, 28 */
-  --t-xs: 0.75rem;
-  --t-sm: 0.8125rem;
-  --t-md: 0.875rem;
-  --t-lg: 1rem;
-  --t-xl: 1.25rem;
-  --t-2xl: 1.75rem;
-  --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --serif: Georgia, "Times New Roman", serif;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* Type: Inter everywhere; sizes of 16px rem */
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.875rem;
+  --fs-lg: 1rem;
+  --fs-xl: 1.125rem;
+  --fs-2xl: 1.375rem;
+  --sans: var(--font);
+  --serif: var(--font);
 
   /* Spacing: multiples of 4px */
   --s1: 4px;
@@ -58,38 +53,19 @@
   --s6: 32px;
   --s7: 48px;
 
-  --radius: 8px;
-  --radius-sm: 5px;
-  --row: 44px; /* minimum height of a clickable row and of touch targets */
-  --sidebar: 232px;
-  --topbar: 52px;
-  --tabbar: 56px;
+  --radius: var(--r-lg);
+  --radius-sm: var(--r-md);
+  --row-min: 44px; /* minimum height of a clickable row and of touch targets */
+
+  /* The new shell: no top bar on wide screens; the phone's bars sit outside
+     the scrolling content, so only fixed elements need their height. */
+  --sidebar: var(--sidebar-w);
+  --topbar: 0px;
+  --tabbar: 0px;
 }
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #1a1c17;
-  --surface: #21231d;
-  --card: #292b24;
-  --line: #3d4034;
-  --line-strong: #555948;
-  --control: #858972;
-  --hover: #30332a;
-  --ink: #ecece0;
-  --ink-2: #b9bcab;
-  --ink-3: #9da18f;
-  --accent: #b9cfa3;
-  --on-accent: #1c2416;
-  --accent-soft: #34402b;
-  --ready: #a9d19b;
-  --ready-soft: #2c3a27;
-  --attention: #e6c27a;
-  --attention-soft: #40361f;
-  --danger: #e0a79a;
-  --danger-soft: #44302b;
-  --info: #a9c4dc;
-  --info-soft: #2a3642;
-  --agent: #c3b6ea;
-  --agent-soft: #353049;
-  --shadow: 0 1px 2px #0005, 0 8px 28px #0006;
-  --backdrop: #0b0c0a99;
+@media (max-width: 719px) {
+  :root {
+    --sidebar: 0px;
+    --tabbar: var(--bar-bottom);
+  }
 }

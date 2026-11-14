@@ -153,10 +153,8 @@ test("keyboard only: a ready application is reviewed from Today and marked appli
   };
   expect(await reached(new RegExp(`^Review ${title}$`))).toBe(true);
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(
-    new RegExp(`#review\\?application=${application.id}$`),
-  );
-  await expect(page.locator(".main h1")).toHaveText(title);
+  await expect(page).toHaveURL(new RegExp(`#applications/${application.id}$`));
+  await expect(page.locator("h1:visible")).toHaveText(title);
   await expect(page.getByText(/of \d+ ready/)).toBeVisible();
   const before = page
     .locator(".banner")
@@ -178,9 +176,7 @@ test("keyboard only: a ready application is reviewed from Today and marked appli
     )
     .toBe("applied");
   if (next)
-    await expect(page).toHaveURL(
-      new RegExp(`#review\\?application=${next.id}$`),
-    );
+    await expect(page).toHaveURL(new RegExp(`#applications/${next.id}$`));
   else await expect(page.getByText("All sent.")).toBeVisible();
   const sent = await call(page, `/applications/${application.id}`);
   expect(sent.applied_at).toBeTruthy();
@@ -189,7 +185,7 @@ test("keyboard only: a ready application is reviewed from Today and marked appli
   expect(history.items.map((event: any) => event.kind)).toContain(
     "application_updated",
   );
-  await go(page, `review?application=${application.id}`);
+  await go(page, `applications/${application.id}`);
   await expect(
     page.getByRole("button", { name: "Record reply" }).first(),
   ).toBeVisible();
@@ -209,21 +205,17 @@ test("after Mark applied the next Ready application opens, with Undo", async ({
     ready: true,
     deadline: "2000-01-02",
   });
-  await go(page, `review?application=${first.id}`);
+  await go(page, `applications/${first.id}`);
   await settled(page);
   await page.getByRole("button", { name: "Mark applied" }).first().click();
-  await expect(page).toHaveURL(
-    new RegExp(`#review\\?application=${second.id}$`),
-  );
-  await expect(page.locator(".main h1")).toHaveText(`${prefix} second`);
+  await expect(page).toHaveURL(new RegExp(`#applications/${second.id}$`));
+  await expect(page.locator("h1:visible")).toHaveText(`${prefix} second`);
   await expect(toast(page)).toContainText("Marked applied.");
   const sent = await call(page, `/applications/${first.id}`);
   expect([sent.status, !!sent.applied_at]).toEqual(["applied", true]);
   // Undo: back to the first one, Shortlisted and Ready again, never sent.
   await toast(page).getByRole("button", { name: "Undo" }).click();
-  await expect(page).toHaveURL(
-    new RegExp(`#review\\?application=${first.id}$`),
-  );
+  await expect(page).toHaveURL(new RegExp(`#applications/${first.id}$`));
   await expect
     .poll(async () => {
       const back = await call(page, `/applications/${first.id}`);
@@ -240,9 +232,7 @@ test("after Mark applied the next Ready application opens, with Undo", async ({
   await page.getByRole("button", { name: "Mark applied" }).first().click();
   await expect(page.getByText("All sent.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Back to Today" })).toBeVisible();
-  await expect(page).toHaveURL(
-    new RegExp(`#review\\?application=${first.id}$`),
-  );
+  await expect(page).toHaveURL(new RegExp(`#applications/${first.id}$`));
   await expect(
     page.getByRole("button", { name: "Record reply" }).first(),
   ).toBeVisible();
@@ -270,7 +260,7 @@ test("the reply dialog lays its fields out one under the other, without an earli
   await page.route(/\/api\/v1\/applications\?stage=ready/, (route) =>
     route.fulfill({ json: { items: [application], total: 1 } }),
   );
-  await go(page, `review?application=${application.id}`);
+  await go(page, `applications/${application.id}`);
   await settled(page);
   await page.getByRole("button", { name: "Mark applied" }).first().click();
   await expect(toast(page)).toContainText("Marked applied.");
@@ -344,11 +334,14 @@ test("the list is as tall as its rows: no empty rows below them", async ({
   );
   expect(await rows.count()).toBeGreaterThan(20);
   const height = () =>
-    page.evaluate(() => document.documentElement.scrollHeight);
+    page.evaluate(() => document.getElementById("content")!.scrollHeight);
   const before = await height();
   // Scroll through the whole list: no row changes size once it is drawn.
   for (let y = 0; y < before; y += 400) {
-    await page.evaluate((top) => window.scrollTo(0, top), y);
+    await page.evaluate(
+      (top) => document.getElementById("content")!.scrollTo(0, top),
+      y,
+    );
     await page.waitForTimeout(30);
   }
   expect(await height()).toBe(before);
@@ -370,7 +363,7 @@ test("without LaTeX: a PDF CV and letter uploaded in the review page make the ap
     false,
     ["cv", "letter"],
   ]);
-  await go(page, `review?application=${application.id}&tab=details`);
+  await go(page, `applications/${application.id}?tab=details`);
   await settled(page);
   await expect(
     page.locator(".banner").filter({ hasText: "Not ready yet" }),
@@ -443,7 +436,7 @@ test("a new revision without its PDF leaves Ready, and the page says what is mis
   });
   const after = await call(page, `/applications/${application.id}`);
   expect([after.ready, after.missing]).toEqual([false, ["cv"]]);
-  await go(page, `review?application=${application.id}&tab=details`);
+  await go(page, `applications/${application.id}?tab=details`);
   await settled(page);
   await expect(page.locator(".review-head .tag").first()).toHaveText(
     "Shortlisted",
@@ -722,7 +715,7 @@ test("answers and the questions of the form are edited without JSON", async ({
   const application = await make(page, unique("Answers"), {
     questions: [{ id: "motivation", label: "Why this role?", type: "text" }],
   });
-  await go(page, `review?application=${application.id}&tab=answers`);
+  await go(page, `applications/${application.id}?tab=answers`);
   await settled(page);
   await page.getByLabel("Why this role?").fill("Synthetic motivation.");
   // The page reads the application again after the save, with its new version.
@@ -805,8 +798,8 @@ test("requirements, the plan and a concurrent change in the details", async ({
       },
     ],
   });
-  await go(page, `review?application=${application.id}&tab=requirements`);
-  await expect(page).toHaveURL(/#review\?application=.*&tab=requirements$/);
+  await go(page, `applications/${application.id}?tab=requirements`);
+  await expect(page).toHaveURL(/#applications\/.*\?tab=requirements$/);
   await settled(page);
   const list = page.getByRole("form", { name: "Requirements" });
   await list.getByRole("checkbox", { name: "Resolved" }).first().check();
@@ -918,7 +911,7 @@ test("documents, revisions and their files are managed in the review page", asyn
   const application = await make(page, unique("Documents"));
   // A CV: its source and the PDF built from it, complete, revised, compared
   // with the first revision and deleted.
-  await go(page, `review?application=${application.id}&tab=documents`);
+  await go(page, `applications/${application.id}?tab=documents`);
   await settled(page);
   await page.getByRole("button", { name: "Add a document" }).click();
   await dialog(page).getByLabel("Title").fill("Workflow CV");
@@ -1035,7 +1028,7 @@ test("the timeline records replies, notes and who made each change", async ({
     { token: agent.token, id: application.id, version: application.version },
   );
   await call(page, "/tokens/" + agent.id, "DELETE");
-  await go(page, `review?application=${application.id}&tab=timeline`);
+  await go(page, `applications/${application.id}?tab=timeline`);
   await settled(page);
   const history = page.getByRole("list", {
     name: "Timeline of this application",
@@ -1115,7 +1108,7 @@ test("an application is stopped as Not pursued and then deleted", async ({
   page,
 }) => {
   const application = await make(page, unique("Stop and delete"));
-  await go(page, `review?application=${application.id}&tab=details`);
+  await go(page, `applications/${application.id}?tab=details`);
   await settled(page);
   // Nothing on the page writes a request for the agent.
   await expect(page.getByText("Ask your agent")).toHaveCount(0);
@@ -1157,7 +1150,7 @@ test("on a phone the review page shows one pane at a time above a fixed action b
 }) => {
   test.skip(!isNarrow(page), "The pane switch exists on narrow screens.");
   const application = await make(page, unique("Phone review"), { ready: true });
-  await go(page, `review?application=${application.id}`);
+  await go(page, `applications/${application.id}`);
   await settled(page);
   const panes = page.getByRole("group", { name: "Shown document" });
   await expect(page.locator(".pane:visible")).toHaveCount(1);
@@ -1171,7 +1164,10 @@ test("on a phone the review page shows one pane at a time above a fixed action b
     .boundingBox();
   const actions = await bar.boundingBox();
   expect(actions!.y + actions!.height).toBeLessThanOrEqual(nav!.y + 1);
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  // The content scrolls inside the shell, between its bars.
+  await page.evaluate(() =>
+    document.getElementById("content")!.scrollTo(0, 1e6),
+  );
   const end = await page.locator(".review-more").boundingBox();
   expect(end!.y + end!.height).toBeLessThanOrEqual(actions!.y + 1);
   await fitsViewport(page);

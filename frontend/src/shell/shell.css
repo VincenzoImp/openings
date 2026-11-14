@@ -1,0 +1,203 @@
+/* The dashboard's shell around the design system's frame: the skip link,
+   the screen frame, the phone's top-bar slots, the ⌘K palette, the Add job
+   form and the shortcut sheet. */
+@layer screens {
+  .shell-skip {
+    position: fixed;
+    top: var(--s-2);
+    left: var(--s-2);
+    z-index: 50;
+    padding: var(--s-2) var(--s-4);
+    border-radius: var(--r-md);
+    background: var(--primary);
+    color: var(--on-primary);
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+    text-decoration: none;
+    translate: 0 -200%;
+  }
+  .shell-skip:focus {
+    translate: none;
+    box-shadow: var(--focus-ring);
+    outline: none;
+  }
+  .shell-side {
+    height: 100%;
+  }
+  .shell-screen {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+  .shell-loading {
+    padding: var(--s-6);
+  }
+
+  /* The phone's top bar: a screen's own buttons replace Search and Add. */
+  .shell-slot {
+    display: contents;
+  }
+  .shell-slot:not(:empty) + .shell-defaults {
+    display: none;
+  }
+  .shell-defaults {
+    display: flex;
+  }
+
+  /* ⌘K */
+  .shell-palette {
+    width: min(600px, calc(100vw - 32px));
+    max-height: min(480px, calc(100dvh - 120px));
+    margin: 12vh auto auto;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-xl);
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+  }
+  .shell-palette[open] {
+    display: flex;
+    flex-direction: column;
+  }
+  .shell-palette::backdrop {
+    background: var(--backdrop);
+  }
+  .shell-palette-field {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    padding: 0 var(--s-4);
+    border-bottom: 1px solid var(--border);
+    color: var(--text-3);
+  }
+  .shell-palette-field input {
+    flex: 1;
+    min-width: 0;
+    height: 48px;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: var(--t-lg);
+    outline: none;
+  }
+  /* The field shows the focus, not the bare input inside it. */
+  .shell-palette-field input:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
+  .shell-palette-field input::placeholder {
+    color: var(--text-3);
+  }
+  .shell-palette-field:focus-within {
+    box-shadow: var(--focus-inset);
+  }
+  .shell-palette-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--s-1) var(--s-1) var(--s-2);
+  }
+  .shell-palette-head {
+    padding: var(--s-3) var(--s-3) var(--s-1);
+    color: var(--text-3);
+    font: var(--t-xs);
+    font-weight: var(--w-medium);
+  }
+  .shell-palette-item {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-height: 36px;
+    padding: var(--s-1-5) var(--s-3);
+    border-radius: var(--r-md);
+    color: var(--text-2);
+    font: var(--t-sm);
+    cursor: default;
+  }
+  .shell-palette-item[aria-selected="true"] {
+    background: var(--selected);
+    color: var(--text);
+  }
+  .shell-palette-item > .ui-icon {
+    flex: none;
+    color: var(--text-3);
+  }
+  .shell-palette-label {
+    display: flex;
+    flex: 1;
+    gap: var(--s-2);
+    align-items: baseline;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .shell-palette-sub {
+    overflow: hidden;
+    color: var(--text-3);
+    font: var(--t-xs);
+    text-overflow: ellipsis;
+  }
+  .shell-palette-empty {
+    padding: 0 var(--s-4);
+    color: var(--text-3);
+    font: var(--t-sm);
+  }
+  .shell-palette-empty:not(:empty) {
+    padding-bottom: var(--s-4);
+  }
+
+  /* Add job */
+  .shell-addjob {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+  }
+  .shell-disclosure summary {
+    width: max-content;
+    border-radius: var(--r-sm);
+    color: var(--text-2);
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+    cursor: pointer;
+  }
+  .shell-disclosure summary:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+  .shell-addjob-details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+    padding-top: var(--s-3);
+  }
+
+  /* The shortcut sheet */
+  .shell-keys h3 {
+    margin-bottom: var(--s-2);
+    color: var(--text-3);
+    font: var(--t-xs);
+    font-weight: var(--w-medium);
+  }
+  .shell-keys dl > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    min-height: 30px;
+    font: var(--t-sm);
+  }
+  .shell-keys dd {
+    display: flex;
+    gap: var(--s-1);
+  }
+
+  @media (max-width: 719px) {
+    .shell-palette {
+      margin-top: var(--s-4);
+    }
+  }
+}

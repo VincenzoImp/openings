@@ -52,7 +52,7 @@ test("a saved search is added, switched on, run once, stopped and removed", asyn
   page,
 }) => {
   const name = unique("Synthetic search");
-  await go(page, "collection");
+  await go(page, "sources");
   // The empty list offers the same button: use the one of the screen.
   await page
     .locator(".page-head")
@@ -127,7 +127,7 @@ test("a saved search is added, switched on, run once, stopped and removed", asyn
   await fitsViewport(page);
 
   // Remove it from the list; it asks first.
-  await go(page, `collection?q=${encodeURIComponent(name)}`);
+  await go(page, `sources?q=${encodeURIComponent(name)}`);
   await sourceRow(page, name)
     .getByRole("button", { name: `Remove ${name}` })
     .click();
@@ -156,7 +156,7 @@ test("a preview through paused providers asks no job board and saves nothing", a
   await gate(() => false);
   try {
     const sources = (await call(page, "/sources?limit=1")).total;
-    await go(page, "collection");
+    await go(page, "sources");
     await page
       .locator(".page-head")
       .getByRole("button", { name: "Add a search", exact: true })
@@ -208,7 +208,7 @@ test("sources filter by kind and act in bulk, with run-only limits", async ({
         },
       }),
     );
-  await go(page, `collection?q=${encodeURIComponent(stamp)}`);
+  await go(page, `sources?q=${encodeURIComponent(stamp)}`);
   await page
     .getByRole("group", { name: "Kind of source" })
     .getByRole("button", { name: /^Company boards/ })
@@ -277,7 +277,7 @@ test("the source and provider editors recover their own concurrent versions", as
       providers: ["linkedin"],
     },
   });
-  await go(page, `collection?q=${encodeURIComponent(name)}`);
+  await go(page, `sources?q=${encodeURIComponent(name)}`);
   await sourceRow(page, name)
     .getByRole("button", { name: "Edit", exact: true })
     .click();
@@ -302,7 +302,7 @@ test("the source and provider editors recover their own concurrent versions", as
     items: [{ id: latest.id, expected_version: latest.version }],
   });
 
-  await go(page, "collection?section=providers");
+  await go(page, "sources?section=providers");
   const provider = (await call(page, "/providers")).items.find(
     (item: { capability: { supported: boolean } }) => item.capability.supported,
   );
@@ -333,7 +333,7 @@ test("the source and provider editors recover their own concurrent versions", as
 test("keyboard only: move through the Collection tabs and pause collection", async ({
   page,
 }) => {
-  await go(page, "collection");
+  await go(page, "sources");
   const before = await call(page, "/collection");
   await expect(page.getByRole("tab")).toHaveText([
     "Sources",
@@ -343,7 +343,7 @@ test("keyboard only: move through the Collection tabs and pause collection", asy
   await page.getByRole("tab", { name: "Sources" }).focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("tab", { name: "Runs and tasks" })).toBeFocused();
-  await expect(page).toHaveURL(/#collection\?section=runs$/);
+  await expect(page).toHaveURL(/#sources\?section=runs$/);
   await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("tab", { name: "Providers" })).toBeFocused();
   await expect(
@@ -363,7 +363,7 @@ test("keyboard only: move through the Collection tabs and pause collection", asy
   await expect
     .poll(async () => (await call(page, "/collection")).enabled)
     .toBe(before.enabled);
-  await go(page, "collection?section=runs&view=tasks");
+  await go(page, "sources?section=runs&view=tasks");
   const tasks = page.getByRole("table", { name: "Collection tasks" });
   await expect(tasks).toBeVisible();
   // A task's details: what it was asked and what it recorded.
@@ -520,7 +520,7 @@ test("backup, records export and a guarded restore", async ({ page }) => {
   const reloaded = page.waitForEvent("load");
   await button.click();
   await reloaded;
-  await expect(page.locator(".main h1")).toHaveText("Settings");
+  await expect(page.locator("h1:visible")).toHaveText("Settings");
   expect((await call(page, "/jobs?limit=1")).total).toBe(jobs);
 });
 
@@ -602,7 +602,7 @@ test("the password form and the list of operations", async ({ page }) => {
   // The session was not really ended: loading the page again signs back in.
   await page.goto("/#settings?section=agents");
   await page.reload();
-  await expect(page.locator(".main h1")).toHaveText("Settings");
+  await expect(page.locator("h1:visible")).toHaveText("Settings");
   // The operations an agent can call, as the workspace serves them.
   const list = page.waitForEvent("popup");
   await page.getByRole("link", { name: "Available operations" }).click();

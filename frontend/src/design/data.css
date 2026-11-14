@@ -37,7 +37,7 @@
   grid-template-columns: var(--cols);
   gap: 0 var(--s3);
   align-items: center;
-  min-height: var(--row);
+  min-height: var(--row-min);
   padding: var(--s2) var(--s4);
   border-top: 1px solid var(--line);
 }
@@ -46,7 +46,7 @@
   border-top: 0;
   border-bottom: 1px solid var(--line);
   color: var(--ink-2);
-  font-size: var(--t-xs);
+  font-size: var(--fs-xs);
   font-weight: 600;
 }
 .grid-head + [role="rowgroup"] > .grid-row:first-child {
@@ -71,7 +71,7 @@
 .grid-row .meta,
 .grid-table .meta {
   color: var(--ink-2);
-  font-size: var(--t-sm);
+  font-size: var(--fs-sm);
 }
 .grid-row .title {
   font-weight: 600;
@@ -166,7 +166,7 @@
 }
 .respond legend {
   padding: 0 0 var(--s1);
-  font-size: var(--t-sm);
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 .respond .segmented {
@@ -252,7 +252,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--card);
-  font: var(--t-sm) / 1.5 var(--mono);
+  font: var(--fs-sm) / 1.5 var(--mono);
 }
 .diff > li {
   padding: 1px var(--s3) 1px var(--s5);
@@ -336,7 +336,7 @@
   .grid-row [data-label]::before {
     content: attr(data-label) ": ";
     color: var(--ink-2);
-    font-size: var(--t-sm);
+    font-size: var(--fs-sm);
   }
   .bulkbar > strong {
     flex: 1 1 100%;

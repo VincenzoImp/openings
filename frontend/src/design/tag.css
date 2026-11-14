@@ -6,7 +6,7 @@
   min-height: 22px;
   padding: 0 var(--s2);
   border-radius: 999px;
-  font-size: var(--t-xs);
+  font-size: var(--fs-xs);
   font-weight: 600;
   line-height: 1.3;
   white-space: nowrap;
@@ -45,7 +45,7 @@
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: var(--t-xs);
+  font-size: var(--fs-xs);
   font-weight: 600;
   line-height: 1.5;
   text-align: center;
