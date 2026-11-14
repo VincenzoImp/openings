@@ -1,14 +1,14 @@
 [project]
 name = "openings"
 version = "0.24.2"
-description = "A portable, agent-friendly job-search workspace."
+description = "A self-hosted job-search workspace: collect jobs, prepare applications and track replies, by hand or with your own AI agent."
 readme = "README.md"
 requires-python = ">=3.14"
 license = {text = "MIT"}
 dependencies = [
   "fastapi==0.162.2", "uvicorn==0.54.0", "mcp==2.3.0",
   "requests==2.34.2", "beautifulsoup4==4.15.0", "curl-cffi==0.17.0", "markdownify==1.2.3",
-  "httpx==0.28.1", "python-multipart==0.0.33", "itsdangerous==2.2.0",
+  "httpx==0.28.1", "httpcore==1.0.9", "itsdangerous==2.2.0",
   # Readable text of a PDF-only CV or letter revision: pure Python, no TeX or system library.
   "pypdf==6.21.4",
 ]
@@ -36,11 +36,13 @@ dev = [
   # Validates the served OpenAPI document (test_openapi.py).
   "openapi-spec-validator==0.9.0",
 ]
+# The uv that CI uses: setup-uv reads it here and Dependabot updates it. Not installed.
+uv = ["uv==0.13.8"]
 
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]
 asyncio_mode = "auto"
-# Performance budgets and benchmarks run weekly (nightly.yml) or with `-m performance`.
+# Performance budgets and benchmarks run weekly (weekly.yml) or with `-m performance`.
 addopts = "-m 'not performance'"
 markers = [
   "performance: time budgets of hot reads on a large synthetic workspace (select with -m performance)",
@@ -49,7 +51,7 @@ markers = [
 [tool.ruff]
 target-version = "py314"
 line-length = 100
-# Lets import sorting recognise `openings` and sibling test modules as first-party.
+# Lets import sorting recognize `openings` and sibling test modules as first-party.
 src = ["backend", "backend/tests"]
 
 [tool.ruff.lint]
@@ -65,7 +67,7 @@ combine-as-imports = true
 [tool.ruff.lint.per-file-ignores]
 # Vendored code stays byte-identical to upstream to simplify future updates.
 # Correctness rules (pycodestyle errors, Pyflakes, bugbear, ...) still apply;
-# only the style and modernisation rules that would require edits are waived:
+# only the style and modernization rules that would require edits are waived:
 # broad provider `except Exception` handlers (BLE001), import order (I001),
 # upstream `noqa` markers for rules this project does not enable (RUF100), and
 # pyupgrade rewrites (UP).

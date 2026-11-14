@@ -50,7 +50,7 @@ def accepted(token):
                 actor = None
             if actor == 'owner':
                 print('This is an owner token with full access. An agent token '
-                      '(Settings → Agent access) is enough for an agent.', file=sys.stderr)
+                      '(Settings › API & agents) is enough for an agent.', file=sys.stderr)
             return True
     except urllib.error.HTTPError as error:
         if error.code in (401, 403):

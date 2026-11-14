@@ -49,7 +49,7 @@ A simpler Openings: a dashboard for you, a small sharp interface for your agent,
 - Database schema 15. Only a schema-14 workspace (0.23.x) upgrades; open an older one with 0.23.1 first.
 - The upgrade builds a new database and copies your data in, so the result equals a fresh schema-15 workspace. The previous file is kept as `openings.pre-0.24.sqlite`, and every record of a removed feature is written to `openings.pre-0.24-archive.json` beside it (contexts, approval states, policy items, legacy content, removed columns). Neither is deleted automatically.
 - Policy items, general instructions and template statements become Preferences statements (long texts are split, never cut); unconfirmed items are marked as proposals. Saved jobs without an application get a Shortlisted application. Stored Ready marks are archived; Ready is computed from documents and requirements.
-- Rehearsed on a real 0.23.1 workspace (5,790 jobs, 539 applications, 2,215 document revisions): 2.1 s, every Ready application stayed Ready (190 of 190), 35 applications created for saved jobs, database 290 → 250 MB, archive 46 MB.
+- Rehearsed on a large real workspace (thousands of jobs, hundreds of applications): about 2 s, and every Ready application stayed Ready.
 - Rollback: stop the server, put `openings.pre-0.24.sqlite` back as `openings.sqlite` and start 0.23.1. Changes made after the upgrade are then lost.
 
 ## 0.23.1 — 2026-11-13
@@ -69,7 +69,7 @@ No schema change: the workspace stays at schema 14.
 
 ## 0.23.0 — 2026-11-13
 
-The end of the redesign: a setup guide for new workspaces, parity enforced in CI, and the deprecated names and fields removed. **Read [Upgrading to 0.23](docs/user/upgrading-0.23.md) before upgrading scripts or agents.**
+The end of the redesign: a setup guide for new workspaces, parity enforced in CI, and the deprecated names and fields removed. **Read [Upgrading to 0.23](https://github.com/VincenzoImp/openings/blob/v0.23.0/docs/user/upgrading-0.23.md) before upgrading scripts or agents.**
 
 - **Setup guide:** a new workspace opens on a guide that connects your agent (token and client configuration), shows your record being built (Profile, Policy, searches, entries, claims, templates) with the agent's questions, and lets you fill in the Profile basics, Eligibility facts, the no-reply period and a first search yourself. Skip it, continue it from Today, or open it again from Settings › Workspace.
 - **Breaking: removed what 0.19 to 0.22 deprecated.** The 30 MCP tool names from before 0.22 and the flat list arguments are gone; every MCP tool now refuses an argument it does not take (`422 validation`) instead of ignoring it.
@@ -85,7 +85,7 @@ The end of the redesign: a setup guide for new workspaces, parity enforced in CI
 
 ## 0.22.0 — 2026-11-13
 
-The breaking group of the redesign: one timeline, documents that are their source, and one name per operation. **Read [Upgrading to 0.22](docs/user/upgrading-0.22.md) before upgrading scripts or agents.**
+The breaking group of the redesign: one timeline, documents that are their source, and one name per operation. **Read [Upgrading to 0.22](https://github.com/VincenzoImp/openings/blob/v0.22.0/docs/user/upgrading-0.22.md) before upgrading scripts or agents.**
 
 - **One timeline** for each job and application: notes and attributed changes in one list, pinned note first, with scope and filters by kind, who, scope and period (`GET /jobs/{id}/timeline`, `GET /applications/{id}/timeline`, MCP `timeline_get`). Notes record their run and can be pinned, one per job and per application (`POST /notes/{id}/pin`, `notes_pin`).
 - **The application note becomes the pinned note.** The `note` field is deprecated: it is still read and written through the pinned note until 0.23; reads return `pinned_note`.
@@ -245,7 +245,7 @@ No schema version change: the derived `context_inputs` table is created automati
 - Add an [operator workspace template](examples/operator-workspace/README.md): operating mandate, MCP configuration for six clients from one URL, a launcher that checks the token and sets `OPENINGS_URL`, and a script that fetches the server's skills.
 - `setup-openings` checks for a LaTeX compiler on the agent's machine and offers a synthetic trial with the bundled examples.
 - Settings → Agent access shows copy-ready MCP configuration for Claude Code, Codex and JSON clients, and lists the available skills.
-- Add the [agent-operated job search](docs/user/agent-operated.md) guide: the agent runs and improves the search; the owner applies to prepared Drafts and records Applied.
+- Add the [agent-operated job search](https://github.com/VincenzoImp/openings/blob/v0.14.0/docs/user/agent-operated.md) guide: the agent runs and improves the search; the owner applies to prepared Drafts and records Applied.
 - Career claims and Prepare Shortlist present the strongest truthful case and never volunteer gaps in application documents.
 
 No database change: workspace schema remains 6.

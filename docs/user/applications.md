@@ -130,8 +130,8 @@ optional note. One action records the reply and moves the stage:
 | Rejection | Closed, Rejected |
 | Other (for example a request for references) | unchanged |
 
-A wrongly recorded reply is corrected or removed through the API; that never
-moves the stage. Only applications you marked applied can have replies. A sent
+The dashboard cannot edit a recorded reply yet: your agent or the REST API
+corrects or removes one (`applications_update`), and that never moves the stage. Only applications you marked applied can have replies. A sent
 application's `…` also has **Close as no reply**, **Withdraw** and, at Offer,
 **Accept offer**, each with **Undo**.
 

@@ -120,10 +120,10 @@ def write():
 
 
 def set_url(origin):
-    """Point the openings server at <origin>/mcp, keeping other settings."""
+    """Point the openings server at <origin>/mcp/, keeping other settings."""
     path = root / '.agents/mcp.json'
     data = json.loads(path.read_text())
-    data['mcpServers']['openings']['url'] = origin.rstrip('/') + '/mcp'
+    data['mcpServers']['openings']['url'] = origin.rstrip('/') + '/mcp/'
     path.write_text(as_json(data))
 
 

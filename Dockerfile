@@ -1,17 +1,22 @@
 # syntax=docker/dockerfile:1.7
-FROM node:26-bookworm-slim AS frontend
+FROM node:26-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1 AS frontend
 WORKDIR /build/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
 COPY frontend/ ./
-RUN npm run build
+# The dashboard only: the design system gallery (ui.html) is for the browser tests.
+RUN npm run build -- --mode dashboard
 
-FROM ghcr.io/astral-sh/uv:0.13.8 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.8@sha256:5cc1805e2426484abca4ad46ea783bab281fdb225fd82d8ce6d66a81254bac85 AS uv
 FROM python:3.14-slim-bookworm@sha256:3fe1a0b6c2d6b2ebb572906cdabeca75aeb558c0c17db5ffefbcf8094871c32b AS dependencies
 COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /app
 ENV UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
-COPY pyproject.toml uv.lock README.md ./
+# The locked dependencies first, so a change of the code alone reuses their layer.
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --no-editable --no-install-project
+COPY README.md ./
 COPY backend/ ./backend/
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-editable
 
@@ -19,7 +24,7 @@ FROM python:3.14-slim-bookworm@sha256:3fe1a0b6c2d6b2ebb572906cdabeca75aeb558c0c1
 ARG VERSION=0.24.2
 ARG VCS_REF=unknown
 LABEL org.opencontainers.image.title="Openings" \
-      org.opencontainers.image.description="Your job search workspace" \
+      org.opencontainers.image.description="A self-hosted job-search workspace: collect jobs, prepare applications and track replies, by hand or with your own AI agent." \
       org.opencontainers.image.source="https://github.com/VincenzoImp/openings" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="${VERSION}" \

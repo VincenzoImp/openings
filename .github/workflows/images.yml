@@ -1,9 +1,9 @@
 name: Release images
 
-# Flow: version -> checks (CI) and audit -> image (native amd64/arm64: build with
-# SBOM and max provenance, push by digest, smoke-test that digest) -> publish
-# (multi-arch index from the tested digests, tagged X.Y.Z and X.Y) -> release
-# (GitHub Release from the CHANGELOG section).
+# Flow: version -> checks (CI passed on this commit) and audit -> image (native
+# amd64/arm64: build with SBOM and max provenance, push by digest, smoke-test that
+# digest) -> publish (multi-arch index from the tested digests, tagged X.Y.Z and
+# X.Y) -> release (GitHub Release from the CHANGELOG section).
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version matching pyproject.toml, for example 0.5.0'
+        description: 'Version matching pyproject.toml, for example 1.2.3'
         required: true
         type: string
       publish:
@@ -63,12 +63,35 @@ jobs:
               )
           PY
 
+  # The tag is on a commit whose CI already ran: wait for that run and require
+  # it to pass instead of running it again.
   checks:
     needs: version
-    uses: ./.github/workflows/ci.yml
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+    steps:
+      - name: CI passed on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          run=''
+          for _ in {1..30}; do
+            run="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$SHA" \
+              --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+            if [ -n "$run" ]; then break; fi
+            sleep 20
+          done
+          if [ -z "$run" ]; then
+            echo "::error::No CI run for $SHA."
+            exit 1
+          fi
+          gh run watch "$run" --repo "$GITHUB_REPOSITORY" --exit-status --interval 30
 
-  # Pull requests no longer audit dependencies (nightly.yml does, weekly);
-  # a release still refuses to publish over a known advisory.
+  # Pull requests do not audit dependencies (weekly.yml does); a release still
+  # refuses to publish over a known advisory.
   audit:
     needs: version
     runs-on: ubuntu-24.04
@@ -78,17 +101,12 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
-          version: '0.13.8'
           python-version: '3.14'
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '26'
-      - name: Audit locked runtime Python dependencies
-        run: |
-          uv export --locked --no-dev --no-emit-project --no-hashes --output-file /tmp/openings-requirements.txt
-          uvx --from pip-audit==2.10.1 pip-audit --requirement /tmp/openings-requirements.txt --no-deps --disable-pip
-      - name: Audit npm dependencies
-        run: npm --prefix frontend audit --audit-level=moderate
+      - name: Audit dependencies
+        run: scripts/audit_dependencies.sh
 
   image:
     name: image (${{ matrix.arch }})
@@ -131,37 +149,12 @@ jobs:
           sbom: true
           provenance: mode=max
       - name: Smoke the pushed digest
-        shell: bash
         env:
           ARCH: ${{ matrix.arch }}
           REF: ${{ needs.version.outputs.image }}@${{ steps.build.outputs.digest }}
-          VERSION: ${{ needs.version.outputs.version }}
         run: |
-          set -euo pipefail
           docker pull --platform "linux/$ARCH" "$REF"
-          docker volume create openings-release
-          trap 'docker logs openings-release; docker rm -f openings-release; docker volume rm openings-release' EXIT
-          docker run -d --name openings-release --init --cpus=0.5 --memory=512m \
-            --platform "linux/$ARCH" --publish 127.0.0.1:18080:8080 \
-            --mount source=openings-release,target=/data "$REF"
-          for _ in {1..60}; do
-            if curl --silent --fail http://127.0.0.1:18080/health > /tmp/openings-health.json; then break; fi
-            sleep 1
-          done
-          python -c "import json,os; h=json.load(open('/tmp/openings-health.json')); assert h['status']=='ok' and h['version']==os.environ['VERSION'], h"
-          test "$(docker exec openings-release id -u)" = 10001
-          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18080/api/v1/career/profile)" = 401
-          curl --silent --fail http://127.0.0.1:18080/api/v1/auth/setup \
-            --header 'Content-Type: application/json' --cookie-jar /tmp/openings-cookie \
-            --data '{"password":"synthetic-release-password"}' --output /dev/null
-          curl --silent --fail --cookie /tmp/openings-cookie \
-            http://127.0.0.1:18080/api/v1/capabilities --output /tmp/openings-capabilities.json
-          python -c "import json,os; p=json.load(open('/tmp/openings-capabilities.json')); assert p['version']==os.environ['VERSION'] and p['operations']"
-          curl --silent --fail --cookie /tmp/openings-cookie \
-            http://127.0.0.1:18080/api/v1/skills --output /tmp/openings-skills.json
-          python -c "import json,pathlib; served={s['name'] for s in json.load(open('/tmp/openings-skills.json'))['items']}; shipped={p.parent.name for p in pathlib.Path('skills').glob('*/SKILL.md')}; assert served==shipped and served, (served, shipped)"
-          curl --silent --fail http://127.0.0.1:18080/ --output /tmp/openings-index.html
-          python -c "assert '<div id=\"root\"></div>' in open('/tmp/openings-index.html').read()"
+          scripts/smoke_image.sh "$REF" "$ARCH"
       - name: Record the tested digest
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -211,7 +204,7 @@ jobs:
           tags=(--tag "$IMAGE:$VERSION")
           if [ -n "$MINOR" ]; then tags+=(--tag "$IMAGE:$MINOR"); fi
           docker buildx imagetools create "${tags[@]}" \
-            --annotation 'index:org.opencontainers.image.description=Job collection, career knowledge and application tracking with dashboard, REST and MCP' \
+            --annotation 'index:org.opencontainers.image.description=A self-hosted job-search workspace: collect jobs, prepare applications and track replies, by hand or with your own AI agent.' \
             --annotation 'index:org.opencontainers.image.source=https://github.com/VincenzoImp/openings' \
             --annotation 'index:org.opencontainers.image.licenses=MIT' \
             --annotation "index:org.opencontainers.image.version=$VERSION" \
