@@ -7,7 +7,7 @@ import { Field, Input, SearchField, Textarea } from "../../ui/Field";
 import { formatDay, formatDate } from "../../ui/format";
 import { Icon } from "../../ui/Icon";
 import { useToast } from "../../ui/Toast";
-import { useCorrect, useJobSearch } from "./data";
+import { fetchJob, useCorrect, useJobSearch } from "./data";
 import { sourceLabel, type Job, type JobSummary } from "./model";
 
 /**
@@ -106,12 +106,11 @@ export function CorrectDrawer({
           <ConflictNotice
             onReload={async () => {
               await save.reload();
-              if (job) fill(job);
+              if (job) fill(await fetchJob(job.id, 0));
             }}
             onKeepEditing={async () => {
               await save.keepEditing();
-              const current = save.conflict?.currentVersion;
-              if (current) setVersion(current);
+              if (job) setVersion((await fetchJob(job.id, 0)).version);
             }}
           />
         )}

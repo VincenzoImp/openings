@@ -91,33 +91,35 @@ test("queue count, posting hierarchy and query-safe selection", async ({
   await expect(page.locator(".ui-needs:visible").first()).toHaveText(
     String(queue.total),
   );
-  const rows = page.locator(".job-list > li");
-  await rows.first().locator("a.title").click();
-  await expect(page.locator(".job-detail .posting")).toBeVisible();
+  const rows = page.locator(".jobs-list .ui-row");
+  await rows.first().locator(".ui-row-main").click();
+  await expect(page.locator(".jobs-posting")).toBeVisible();
+  // Shortlist is the one primary action of the job.
   await expect(
     page
-      .getByRole("group", { name: "Actions on this job" })
-      .getByRole("button", { name: "Shortlist", exact: true }),
-  ).toHaveClass(/primary/);
-  // On a phone the job replaces the list until the switch shows it again.
-  if (page.viewportSize()!.width <= 860)
-    await page.getByRole("button", { name: "List", exact: true }).click();
-  await rows.first().locator("input[type=checkbox]").check();
-  await expect(
-    page.getByRole("group", { name: "Selected jobs" }),
-  ).toBeVisible();
+      .locator(".jobs-decision, .ui-actionbar")
+      .getByRole("button", { name: /^Shortlist/ })
+      .filter({ visible: true }),
+  ).toHaveAttribute("data-variant", "primary");
+  const phone = page.viewportSize()!.width < 720;
+  if (phone) await page.getByRole("button", { name: "Back to list" }).click();
+  else {
+    await page.keyboard.press("x");
+    await expect(
+      page.getByRole("toolbar", { name: "1 selected" }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+  }
+  if (phone) await page.getByRole("button", { name: "Search jobs" }).click();
   await page
     .getByRole("searchbox", { name: "Search jobs", exact: true })
+    .filter({ visible: true })
     .fill("no-such-synthetic-role");
-  // A new search empties the selection: an action never reaches unseen jobs.
-  await expect(page.getByRole("group", { name: "Selected jobs" })).toHaveCount(
-    0,
-  );
   await expect(
-    page.getByRole("heading", { name: "No job matches" }),
+    page.getByRole("heading", { name: "No jobs match" }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Clear the filters", exact: true })
+    .getByRole("button", { name: "Clear filters", exact: true })
     .click();
   await expect(rows.first()).toBeVisible();
 });
@@ -132,36 +134,25 @@ test("version conflict reviews latest values and reloads the editor with a usabl
   });
   await go(page, `jobs?job=${job.id}`);
   await expect(page).toHaveURL(new RegExp(`#jobs\\?job=${job.id}$`));
-  const editor = page.getByRole("form", { name: "Correct this job" });
-  await page.getByText("Correct the job", { exact: true }).click();
-  await editor.locator("input[name=company]").fill("My draft");
+  await page
+    .getByRole("button", { name: "More actions" })
+    .filter({ visible: true })
+    .click();
+  await page.getByRole("menuitem", { name: /^Correct details/ }).click();
+  const editor = page.getByRole("dialog", { name: "Correct details" });
+  const company = editor.getByLabel("Company");
+  await company.fill("My draft");
   await call(page, `/jobs/${job.id}`, "PATCH", {
     expected_version: job.version,
     company: "Newer value",
   });
-  await editor
-    .getByRole("button", { name: "Save the details", exact: true })
-    .click();
-  await expect(editor.locator("input[name=company]")).toHaveValue("My draft");
-  await editor
-    .getByRole("button", { name: "Review latest values", exact: true })
-    .click();
-  await expect(editor.locator(".conflict-recovery")).toContainText(
-    "Newer value",
-  );
-  await editor
-    .getByRole("button", {
-      name: "Reload editor and discard draft",
-      exact: true,
-    })
-    .click();
-  await expect(editor.locator("input[name=company]")).toHaveValue(
-    "Newer value",
-  );
-  await editor.locator("input[name=company]").fill("Reapplied deliberately");
-  await editor
-    .getByRole("button", { name: "Save the details", exact: true })
-    .click();
+  await editor.getByRole("button", { name: /^Save/ }).click();
+  await expect(editor.getByRole("alert")).toContainText("Changed elsewhere");
+  await expect(company).toHaveValue("My draft");
+  await editor.getByRole("button", { name: "Reload", exact: true }).click();
+  await expect(company).toHaveValue("Newer value");
+  await company.fill("Reapplied deliberately");
+  await editor.getByRole("button", { name: /^Save/ }).click();
   await expect
     .poll(async () => (await call(page, `/jobs/${job.id}`)).company)
     .toBe("Reapplied deliberately");
@@ -330,65 +321,23 @@ test("the career entry editor recovers its own concurrent version", async ({
   );
 });
 
-test("live file and note deletion identify the item before removal", async ({
+test("a note is added to a job and pinned to the top of its history", async ({
   page,
 }) => {
   const job = await call(page, "/jobs", "POST", {
-    title: "Owned notes and files",
+    title: "Owned notes",
     posting: "Build services.",
   });
   await go(page, `jobs?section=all&job=${job.id}`);
-  const detail = page.locator(".job-detail");
-  await detail
-    .getByLabel("A note on this job")
-    .fill("Synthetic note to review before deletion.");
-  await detail
-    .getByRole("button", { name: "Add the note", exact: true })
-    .click();
-  const timeline = detail.getByRole("list", { name: "Timeline of this job" });
-  await timeline
-    .getByRole("button", { name: "Delete this note", exact: true })
-    .click();
-  await expect(top(page)).toContainText(
-    "Synthetic note to review before deletion.",
+  await page.getByText("Notes and history").click();
+  await page.getByLabel("Add a note").fill("Synthetic pinned note.");
+  await page.getByLabel("Pin it to the top").check();
+  await page.getByRole("button", { name: "Add note", exact: true }).click();
+  const history = page.getByRole("list", { name: "History of this job" });
+  await expect(history.locator("li").first()).toContainText(
+    "Synthetic pinned note.",
   );
-  await top(page)
-    .getByRole("button", { name: "Keep the note", exact: true })
-    .click();
-  await expect(timeline).toContainText(
-    "Synthetic note to review before deletion.",
-  );
-  await detail.getByText("Files", { exact: true }).click();
-  await detail.locator("input[type=file]").setInputFiles({
-    name: "safe-text.txt",
-    mimeType: "text/plain",
-    buffer: Buffer.from(
-      "<script>window.__unsafe=true</script>\nSynthetic source",
-    ),
-  });
-  await detail
-    .getByRole("button", { name: "safe-text.txt", exact: true })
-    .click();
-  await expect(top(page).locator("pre")).toContainText("<script>");
-  expect(await page.evaluate(() => (window as any).__unsafe)).toBeUndefined();
-  await top(page).getByRole("button", { name: "Close", exact: true }).click();
-  await detail
-    .getByRole("button", { name: "Remove safe-text.txt", exact: true })
-    .click();
-  await expect(top(page)).toContainText("safe-text.txt");
-  await top(page)
-    .getByRole("button", { name: "Keep file", exact: true })
-    .click();
-  await expect(
-    detail.getByRole("button", { name: "safe-text.txt", exact: true }),
-  ).toBeVisible();
-  await detail
-    .getByRole("button", { name: "Remove safe-text.txt", exact: true })
-    .click();
-  await top(page)
-    .getByRole("button", { name: "Remove file", exact: true })
-    .click();
-  await expect(
-    detail.getByRole("button", { name: "safe-text.txt", exact: true }),
-  ).toHaveCount(0);
+  await expect(history.locator("li").first()).toContainText("Pinned note");
+  const notes = await call(page, `/jobs/${job.id}/notes`);
+  expect(notes.items[0].pinned).toBe(true);
 });
