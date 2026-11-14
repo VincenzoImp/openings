@@ -19,15 +19,8 @@ frontend/screenshots/
 
 # Runtime state (all persistent data lives under data/)
 data/
-results/
 logs/
 *.log
-/chroma/
-/db/
-
-# User configuration
-settings.yaml
-config/settings.yaml
 
 # IDE
 .vscode/
@@ -51,7 +44,6 @@ tmp/
 .coverage
 coverage.xml
 htmlcov/
-MagicMock/
 
 # Type checking and linting
 .mypy_cache/
@@ -68,6 +60,3 @@ docker-compose.override.yml
 
 # Local agent settings
 .claude/
-.superpowers/
-# Internal planning/spec artifacts — keep them out of the published docs/ tree
-docs/superpowers/
