@@ -1,21 +1,14 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { test, expect, type Page } from "./fixtures";
-import { call, go, isPhone, ownerSession } from "./session";
+import { call, go, isPhone } from "./session";
 
 // Templates: a list grouped CV / Letter beside the selected template, with
 // Preview · Source · Files · Limits. Each test starts from the seeded
 // workspace (fixtures.ts).
 const ROOT = resolve(import.meta.dirname, "../..");
-const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {
-  errors.set(page, []);
-  page.on("pageerror", (error) => errors.get(page)!.push(error.message));
-  await page.context().addCookies(ownerSession());
   await go(page, "today");
-});
-test.afterEach(async ({ page }) => {
-  expect(errors.get(page)).toEqual([]);
 });
 
 type Template = {

@@ -1,28 +1,19 @@
 import { readFileSync } from "node:fs";
-import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Page } from "./fixtures";
 import {
   call,
+  findings,
   fitsViewport,
   go,
   isPhone,
-  ownerSession,
-  type Cookies,
+  settled,
+  themes,
+  useTheme,
 } from "./session";
 
 // Settings (#227): Account, API & agents, Data and Advanced on one page, a
 // sub-navigation on a wide screen and a list of sections on a phone. Each
 // test starts from the seeded workspace (fixtures.ts).
-const cookies: Cookies = ownerSession();
-const errors = new WeakMap<Page, string[]>();
-test.beforeEach(async ({ page }) => {
-  errors.set(page, []);
-  page.on("pageerror", (error) => errors.get(page)!.push(error.message));
-  await page.context().addCookies(cookies);
-});
-test.afterEach(async ({ page }) => {
-  expect(errors.get(page)).toEqual([]);
-});
 
 const unique = (name: string) =>
   `${name} ${test.info().project.name} ${Date.now()}`;
@@ -328,30 +319,13 @@ test("Advanced: request limits of the sites in use save on blur", async ({
 test("Settings with its dialogs open has no serious accessibility finding", async ({
   page,
 }) => {
-  const check = async () => {
-    // A dialog or menu still fading in would be measured half blended.
-    await page.evaluate(() =>
-      Promise.all(
-        document
-          .getAnimations()
-          .map((animation) => animation.finished.catch(() => undefined)),
-      ),
-    );
-    const { violations } = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-      .analyze();
-    expect(
-      violations
-        .filter((item) => ["serious", "critical"].includes(item.impact ?? ""))
-        .map(
-          (item) => `${item.id}: ${item.nodes.map((n) => n.target).join(" ")}`,
-        ),
-    ).toEqual([]);
-  };
-  for (const theme of ["light", "dark"]) {
-    await page.emulateMedia({ colorScheme: theme as "light" | "dark" });
+  const check = async () => expect(await findings(page)).toEqual([]);
+  for (const theme of themes()) {
+    // A fresh load per theme, never a reload with requests in flight.
+    await useTheme(page, theme);
+    await page.goto("about:blank");
     await go(page, "settings?section=agents");
-    await page.reload();
+    await settled(page);
     await page.getByRole("button", { name: "New token" }).click();
     await check();
     await page.keyboard.press("Escape");

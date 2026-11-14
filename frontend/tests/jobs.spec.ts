@@ -1,21 +1,13 @@
 import { test, expect, type Page } from "./fixtures";
-import { call, go, isPhone, ownerSession, type Cookies } from "./session";
+import { call, go, isPhone } from "./session";
 
 // Jobs (#223): the triage flow. A decision moves on to the next job, every
 // decision has Undo, the keyboard does it all, Dismissed shows who dismissed
 // a job and restores it, a possible duplicate is decided inside the job, and
 // a phone pushes the job full screen with its decision at the bottom. Each
 // test starts from the seeded workspace (fixtures.ts).
-const cookies: Cookies = ownerSession();
-const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {
-  errors.set(page, []);
-  page.on("pageerror", (error) => errors.get(page)!.push(error.message));
-  await page.context().addCookies(cookies);
   await go(page, "today");
-});
-test.afterEach(async ({ page }) => {
-  expect(errors.get(page)).toEqual([]);
 });
 
 const unique = (name: string) =>
@@ -355,6 +347,32 @@ test("forgetting a job asks first and names what is lost", async ({ page }) => {
   await expect
     .poll(async () => (await call(page, `/jobs?q=${made.title}`)).total)
     .toBe(0);
+});
+
+test("a job's details are corrected from its … menu", async ({ page }) => {
+  const made = await job(page, unique("Correct me"));
+  const corrected = unique("Corrected title");
+  await go(page, `jobs?job=${made.id}`);
+  await expect(title(page)).toHaveText(made.title);
+  await page
+    .getByRole("button", { name: "More actions" })
+    .filter({ visible: true })
+    .click();
+  await page.getByRole("menuitem", { name: /^Correct details/ }).click();
+  const drawer = page.getByRole("dialog", { name: "Correct details" });
+  await expect(drawer.getByLabel("Role")).toHaveValue(made.title);
+  await drawer.getByLabel("Role").fill(corrected);
+  await drawer.getByLabel("Location").fill("Basel, Switzerland");
+  await drawer.getByRole("button", { name: /^Save/ }).click();
+  await expect(toast(page)).toContainText("Details saved");
+  await expect(drawer).toBeHidden();
+  await expect(title(page)).toHaveText(corrected);
+  const stored = await call(page, `/jobs/${made.id}`);
+  expect([stored.title, stored.location, stored.company]).toEqual([
+    corrected,
+    "Basel, Switzerland",
+    "Northwind Data",
+  ]);
 });
 
 test("on a phone the job is pushed full screen, its decision stays at the bottom, and a swipe decides", async ({

@@ -1,12 +1,13 @@
-import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Page } from "./fixtures";
 import {
   call,
+  findings,
   fitsViewport,
   go,
   isPhone,
-  ownerSession,
-  type Cookies,
+  settled,
+  themes,
+  useTheme,
 } from "./session";
 
 // Job sources (#227): the schedule line, the source rows with their menu,
@@ -14,16 +15,6 @@ import {
 // runs no collection worker, so a check stays queued until it is stopped,
 // and Test answers come from a route: the tests never reach a job board.
 // Each test starts from the seeded workspace (fixtures.ts).
-const cookies: Cookies = ownerSession();
-const errors = new WeakMap<Page, string[]>();
-test.beforeEach(async ({ page }) => {
-  errors.set(page, []);
-  page.on("pageerror", (error) => errors.get(page)!.push(error.message));
-  await page.context().addCookies(cookies);
-});
-test.afterEach(async ({ page }) => {
-  expect(errors.get(page)).toEqual([]);
-});
 
 const unique = (name: string) =>
   `${name} ${test.info().project.name} ${Date.now()}`;
@@ -370,30 +361,15 @@ test("Sources with its menu and editor open has no serious accessibility finding
   await page.route("**/api/v1/sources/preview", (route) =>
     route.fulfill({ json: PREVIEW }),
   );
-  const check = async () => {
-    // A dialog or menu still fading in would be measured half blended.
-    await page.evaluate(() =>
-      Promise.all(
-        document
-          .getAnimations()
-          .map((animation) => animation.finished.catch(() => undefined)),
-      ),
-    );
-    const { violations } = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-      .analyze();
-    expect(
-      violations
-        .filter((item) => ["serious", "critical"].includes(item.impact ?? ""))
-        .map(
-          (item) => `${item.id}: ${item.nodes.map((n) => n.target).join(" ")}`,
-        ),
-    ).toEqual([]);
-  };
-  for (const theme of ["light", "dark"]) {
-    await page.emulateMedia({ colorScheme: theme as "light" | "dark" });
+  const check = async () => expect(await findings(page)).toEqual([]);
+  for (const theme of themes()) {
+    // A fresh load per theme once the last one's requests are answered: a
+    // reload with requests in flight fails them (WebKit), and Recent checks
+    // then shows its load error instead of the list.
+    await useTheme(page, theme);
+    await page.goto("about:blank");
     await go(page, "sources");
-    await page.reload();
+    await settled(page);
     await page.getByText("Recent checks", { exact: true }).click();
     await expect(
       page.getByRole("list", { name: "Recent checks" }),

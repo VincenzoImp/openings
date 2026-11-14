@@ -1,18 +1,11 @@
 import { test, expect, type Page } from "./fixtures";
-import { call, go, isPhone, ownerSession } from "./session";
+import { call, go, isPhone } from "./session";
 
 // Preferences: statements as lines of text in five sections, edited in
 // place; the spoken languages and the no-reply period. Each test starts from
 // the seeded workspace (fixtures.ts).
-const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {
-  errors.set(page, []);
-  page.on("pageerror", (error) => errors.get(page)!.push(error.message));
-  await page.context().addCookies(ownerSession());
   await go(page, "preferences");
-});
-test.afterEach(async ({ page }) => {
-  expect(errors.get(page)).toEqual([]);
 });
 
 const texts = async (page: Page, name: string) =>
