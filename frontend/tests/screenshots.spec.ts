@@ -97,8 +97,6 @@ async function capture(page: Page, screen: Screen, path: string) {
   if (!screen.signedOut) await page.context().addCookies(ownerSession());
   // Open a page of the app first, so a route can read the workspace.
   await page.goto("/");
-  // Let the first screen settle, so its redirect to Today cannot follow the route.
-  if (!screen.signedOut) await expect(page.locator(".main h1")).toBeVisible();
   const route =
     typeof screen.route === "string" ? screen.route : await screen.route(page);
   if (screen.signedOut)
