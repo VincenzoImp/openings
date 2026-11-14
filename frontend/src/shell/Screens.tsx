@@ -16,7 +16,7 @@ import { ROUTES, type RouteId } from "./routes";
 // A screen issue replaces one loader's target and nothing else.
 type Module = Promise<{ default: ComponentType }>;
 export const LOADERS: Record<RouteId, () => Module> = {
-  today: () => import("../pages/Today"),
+  today: () => import("../screens/today/Today"),
   jobs: () => import("../pages/Jobs"),
   applications: () => import("../screens/applications/Applications"),
   application: () => import("../screens/application/Page"),
@@ -25,7 +25,7 @@ export const LOADERS: Record<RouteId, () => Module> = {
   templates: () => import("../pages/Templates"),
   sources: () => import("../pages/Collection"),
   settings: () => import("../pages/Settings"),
-  setup: () => import("../pages/Setup"),
+  setup: () => import("../screens/setup/Setup"),
 };
 
 const SCREENS = Object.fromEntries(
@@ -42,14 +42,12 @@ export function preload(id: RouteId) {
 // The screens built before the design system keep their own frame until
 // their issue rebuilds them (#222–#227); a rebuilt screen leaves this list.
 const LEGACY = new Set<RouteId>([
-  "today",
   "jobs",
   "profile",
   "preferences",
   "templates",
   "sources",
   "settings",
-  "setup",
 ]);
 
 /**
