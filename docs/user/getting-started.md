@@ -66,13 +66,12 @@ cards below show:
   together. Nothing closes by itself.
 
 You talk to your agent in its own chat; **Settings › Skills** lists what you can
-ask it. How your applications fare is under
-**Applications**, **Insights**.
+ask it. How your applications fare is under **Applications**, **Stats**.
 
 On a phone the bottom bar shows the four Work destinations and **More**, which
-opens Library and System. The top bar switches between the light and dark theme
-and between comfortable and compact rows; both choices are remembered in the
-browser, and the theme follows the system until you choose one.
+opens Library and System. The top bar switches between the light and dark theme;
+the choice is remembered in the browser, and the theme follows the system until
+you choose one.
 
 ## Your first job
 

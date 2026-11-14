@@ -76,7 +76,7 @@ export const NARROWING: (keyof Filters)[] = [
 ];
 
 export const SIGNAL_FILTERS: Record<string, string> = {
-  likely_duplicate: "Likely duplicate",
+  likely_duplicate: "Possible duplicate",
   no_longer_listed: "No longer listed",
   language_required: "Requires a language",
   pending: "Signals pending",
@@ -203,7 +203,7 @@ export function signalTags(
     tags.push({ text: "No longer listed", tone: "danger" });
   if (signals?.duplicate)
     tags.push({
-      text: `Likely duplicate ${signals.duplicate.confidence.toFixed(2)}`,
+      text: "Possible duplicate",
       tone: "info",
     });
   for (const group of signals?.required || [])
@@ -213,13 +213,7 @@ export function signalTags(
         tone: own && !met(group) ? "attention" : undefined,
       });
   if (signals?.language && (full || !met([signals.language])))
-    tags.push({
-      text: full
-        ? `Posting in ${languageName(signals.language)}`
-        : `In ${languageName(signals.language)}`,
-    });
-  for (const code of signals?.welcome || [])
-    tags.push({ text: `${languageName(code)} welcome` });
+    tags.push({ text: `In ${languageName(signals.language)}` });
   if (job.complete === false)
     tags.push({ text: "Text incomplete", tone: "attention" });
   return tags;

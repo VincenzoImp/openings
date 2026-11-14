@@ -1,4 +1,4 @@
-/* Openings design tokens: the single source for colour, type, space and density.
+/* Openings design tokens: the single source for colour, type and space.
    The contrast of every colour on its backgrounds is asserted by
    tests/contrast.test.mjs. */
 :root {
@@ -92,9 +92,4 @@
   --agent-soft: #353049;
   --shadow: 0 1px 2px #0005, 0 8px 28px #0006;
   --backdrop: #0b0c0a99;
-}
-:root[data-density="compact"] {
-  --row: 36px;
-  --s4: 12px;
-  --s5: 16px;
 }

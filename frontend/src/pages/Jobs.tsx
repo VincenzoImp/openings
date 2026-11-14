@@ -25,8 +25,7 @@ const NONE: JobList = { items: [], total: 0 };
 /**
  * Everything collection found, in four tabs: the new jobs, the
  * Shortlist, the dismissed jobs and all of them, each beside the selected
- * job. `#jobs?section=…&job=…` opens a tab and a job; the shell rewrites the
- * old Inbox, Shortlist and `?job=` addresses (shell/routes.ts).
+ * job. `#jobs?section=…&job=…` opens a tab and a job.
  */
 export default function JobsPage({ onOpenApplication }: Links) {
   const [values, setValues] = useUrlFilters(DEFAULTS);

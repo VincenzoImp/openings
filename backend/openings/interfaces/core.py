@@ -1,4 +1,4 @@
-"""REST routes and MCP tools of the workspace: jobs, notes, applications and the overview."""
+"""REST routes and MCP tools of the workspace: jobs, notes and applications."""
 
 import os
 from typing import Annotated
@@ -26,7 +26,6 @@ from ..models import (
     NoteInput,
     NotePatch,
     NotePin,
-    PeriodQuery,
     TimelineQuery,
     TriageInput,
 )
@@ -75,20 +74,6 @@ OPERATIONS = (
         tool=Tool(READ_ONLY, custom=True),
     ),
     Operation(
-        "overview.read",
-        "overview",
-        "get",
-        "Archive",
-        "Read submitted-attempt funnel and activity for a period",
-        params=(query_model(PeriodQuery),),
-        call=lambda s, value: s.overview(**(value or PeriodQuery()).model_dump()),
-        rest=(Route("GET", "/overview", "overview"),),
-        tool=Tool(
-            READ_ONLY,
-            "Read funnel counts and activity from recorded application history.",
-        ),
-    ),
-    Operation(
         "jobs.list",
         "jobs",
         "list",
@@ -99,7 +84,7 @@ OPERATIONS = (
         rest=(Route("GET", "/jobs", "jobs"),),
         tool=Tool(
             READ_ONLY,
-            "Search compact paginated job summaries with triage (new, shortlisted, dismissed, active), location, source, remote and date filters; include_facets=true adds filter value lists and include_counts=true the number of jobs by triage. Each job has its ingest signals (posting language, languages the posting requires or welcomes, the earlier job it likely duplicates with a confidence, whether the source no longer lists it) and, when dismissed, its dismissal (who and why). Filter by signal, posting_language, posting_language_not, requires, dismissed_by (owner, agent, agent:<token name> or system), batch_id (jobs changed by one call; restore an agent's batch with jobs_bulk action new) or since (dismissed at or after); hide_unspoken_required=true leaves out jobs requiring a language the owner does not speak. Read jobs_get for full content.",
+            "Search compact paginated job summaries with triage (new, shortlisted, dismissed, active), location, source, remote and date filters; include_facets=true adds filter value lists and include_counts=true the number of jobs by triage. Each job has its ingest signals (posting language, languages the posting requires, the earlier job it likely duplicates with a confidence, whether the source no longer lists it) and, when dismissed, its dismissal (who and why). Filter by signal, posting_language, posting_language_not, requires, dismissed_by (owner, agent, agent:<token name> or system), batch_id (jobs changed by one call; restore an agent's batch with jobs_bulk action new) or since (dismissed at or after); hide_unspoken_required=true leaves out jobs requiring a language the owner does not speak. Read jobs_get for full content.",
         ),
     ),
     Operation(

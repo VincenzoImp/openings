@@ -12,10 +12,9 @@ from . import (
     discovery,
     documents,
     events,
-    insights,
     preferences,
     skills,
-    source_yield,
+    stats,
     system,
 )
 
@@ -28,8 +27,7 @@ AREAS = (
     discovery,
     events,
     preferences,
-    insights,
-    source_yield,
+    stats,
 )
 
 

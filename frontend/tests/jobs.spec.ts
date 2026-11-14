@@ -10,8 +10,9 @@ import {
 
 // Jobs (stage 4 of #135): the tabs New, Shortlisted, Dismissed and All
 // beside the selected job, its signals, the duplicate decision inside the job,
-// hiding jobs that require a language the owner does not speak, and the yield
-// of each source in Collection. Each test starts from the seeded workspace (fixtures.ts).
+// hiding jobs that require a language the owner does not speak, and what the
+// jobs of each source became in Collection. Each test starts from the seeded
+// workspace (fixtures.ts).
 const cookies: Cookies = ownerSession();
 const errors = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page }) => {
@@ -170,6 +171,8 @@ test("jobs requiring a language I don't speak are hidden on request, never dismi
   await page.getByRole("searchbox", { name: "Search jobs" }).fill(title);
   const german = row(page, title);
   await expect(german).toContainText("Requires German");
+  await expect(german).toContainText("In German");
+  await expect(german).not.toContainText(/welcome/i);
   const toggle = page.getByRole("switch", {
     name: "Hide jobs requiring languages I don't speak",
   });
@@ -206,7 +209,7 @@ test("jobs requiring a language I don't speak are hidden on request, never dismi
   await fitsViewport(page);
 });
 
-test("a likely duplicate is decided inside the job: different, then merged", async ({
+test("a possible duplicate is decided inside the job: kept apart, then merged", async ({
   page,
 }) => {
   const tag = unique("Duplicate");
@@ -222,12 +225,17 @@ test("a likely duplicate is decided inside the job: different, then merged", asy
   await go(page, `jobs?signal=likely_duplicate&job=${copy.id}`);
   await settled(page);
   // On a phone the selected job replaces the list.
-  if (!isNarrow(page))
-    await expect(row(page, copy.title)).toContainText("Likely duplicate");
+  if (!isNarrow(page)) {
+    await expect(row(page, copy.title)).toContainText("Possible duplicate");
+    // A chip never shows the score.
+    await expect(row(page, copy.title)).not.toContainText(/\d\.\d\d/);
+  }
   const box = detail(page).locator(".duplicate");
   await expect(box).toContainText(earlier.title);
+  await expect(box).toContainText("Possible duplicate");
+  await expect(box).not.toContainText(/\d\.\d\d|% of the text/);
   await expect(box).toContainText("identical posting text");
-  await box.getByRole("button", { name: "Different", exact: true }).click();
+  await box.getByRole("button", { name: "Keep both", exact: true }).click();
   await expect(toast(page)).toContainText("different vacancy");
   await expect(box).toHaveCount(0);
   expect((await call(page, `/jobs/${copy.id}`)).signals.duplicate).toBeNull();
@@ -238,8 +246,15 @@ test("a likely duplicate is decided inside the job: different, then merged", asy
   });
   await go(page, `jobs?job=${third.id}`);
   await settled(page);
+  // Details offer one merge entry, without a separate list of copies.
+  await expect(
+    detail(page).getByText("Possible copies and merging"),
+  ).toHaveCount(0);
+  await expect(
+    detail(page).getByRole("button", { name: "Merge with another job…" }),
+  ).toBeVisible();
   await detail(page)
-    .getByRole("button", { name: "Same vacancy: merge", exact: true })
+    .getByRole("button", { name: "Merge into one job", exact: true })
     .click();
   await expect(dialog(page)).toContainText("Which record stays?");
   await dialog(page)
@@ -392,7 +407,7 @@ test("Dismissed by agent shows who dismissed each job and why, and Restore bring
   await call(page, `/tokens/${agent.id}`, "DELETE");
 });
 
-test("signals filter the list and Collection shows what each source yielded", async ({
+test("signals filter the list and Collection counts what each source found", async ({
   page,
 }) => {
   await go(page, "jobs");
@@ -409,22 +424,30 @@ test("signals filter the list and Collection shows what each source yielded", as
   await expect(page.getByRole("tab", { name: /^New/ })).toContainText(
     String(counts.new),
   );
-  await go(page, "collection?section=yield");
+  // Collection: each source says what its jobs became, without zeros.
+  await go(page, "collection");
   await settled(page);
-  const table = page.getByRole("table", { name: "Yield by source" });
-  await expect(table).toContainText("Python engineer Zurich");
-  const yieldNow = await call(
-    page,
-    "/collection/yield?since=" +
-      new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10),
-  );
-  await expect(table.getByRole("row").last()).toContainText(
-    String(yieldNow.total.collected),
-  );
-  await page.getByRole("button", { name: "All time" }).click();
-  await settled(page);
-  await expect(table).toBeVisible();
-  await expect(page.getByText("Dismissed by your rules")).toHaveCount(0);
+  const sources = (await call(page, "/sources?summary=false")).items as {
+    name: string;
+    counts: Record<string, number>;
+  }[];
+  const line = (counts: Record<string, number>) =>
+    ["found", "shortlisted", "applied", "replied"]
+      .filter((key) => counts[key] > 0)
+      .map((key) => `${counts[key]} ${key}`)
+      .join(" · ");
+  const counted = sources.filter((source) => line(source.counts));
+  expect(counted.length).toBeGreaterThan(0);
+  const table = page.getByRole("table", { name: "Sources" });
+  for (const source of counted)
+    await expect(
+      table.locator("tr", { hasText: source.name }).locator(".source-counts"),
+    ).toHaveText(line(source.counts));
+  for (const source of sources.filter((item) => !line(item.counts)))
+    await expect(
+      table.locator("tr", { hasText: source.name }).locator(".source-counts"),
+    ).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Yield" })).toHaveCount(0);
   await fitsViewport(page);
 });
 

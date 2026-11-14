@@ -64,11 +64,10 @@ guidance and typed limits.
 Compare claims within and across entries. Merge exact duplicates unless they
 serve distinct template slots; correct claims that exceed their entry's evidence;
 keep each claim attached to the entry where the work occurred, with source
-links in metadata. Selection is typed, not metadata: `default_in_cv` (in the CV
-unless the job gives a reason to leave it out), `role` (`core` carries the
-account, `supporting` is used when the job calls for it, `bench` is kept in
-reserve) and `group` (a free short name for claims that belong together). Move
-selection values an earlier run wrote into metadata to these fields. New claims must follow from recorded evidence; ask the owner
+links in metadata. `always_include` (★, in the CV unless the job gives a reason
+to leave it out) is the one typed selection field; keep any other selection hint,
+such as a role or a group, in metadata (0.24 moved the former `role` and `group`
+fields there). New claims must follow from recorded evidence; ask the owner
 for any new fact.
 
 ## MASTER and template changes

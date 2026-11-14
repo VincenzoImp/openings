@@ -35,11 +35,8 @@ const CONFLICTS: Record<string, string> = {
   ambiguous: "it matches another vacancy too",
 };
 
-/** Why two records look like one vacancy, in a sentence. */
-export function reasonsLine(
-  reasons: DuplicateReasons,
-  similarity: number | null,
-) {
+/** Why two records look like one vacancy, in a sentence, without a score. */
+export function reasonsLine(reasons: DuplicateReasons) {
   const matched = reasons.matched.map(
     (key) => MATCHED[key] || key.replaceAll("_", " "),
   );
@@ -48,8 +45,6 @@ export function reasonsLine(
   );
   const parts = [];
   if (matched.length) parts.push(`Both have ${matched.join(", ")}`);
-  if (similarity !== null && similarity !== undefined)
-    parts.push(`${Math.round(similarity * 100)}% of the text matches`);
   if (conflicts.length) parts.push(`but ${conflicts.join(", ")}`);
   return parts.length ? parts.join("; ").replace("; but", ", but") + "." : "";
 }
@@ -104,17 +99,13 @@ export function Duplicate({
           · found on {sourceLabel(candidate)}, {date(candidate.created_at)}
         </div>
         <div className="row">
-          <Tag tone="info">Likely duplicate {flag.confidence.toFixed(2)}</Tag>
+          <Tag tone="info">Possible duplicate</Tag>
           <Tag tone={place.tone}>{place.text}</Tag>
-          {reasons && (
-            <span className="caption">
-              {reasonsLine(reasons, item?.similarity ?? null)}
-            </span>
-          )}
+          {reasons && <span className="caption">{reasonsLine(reasons)}</span>}
         </div>
         <div className="row">
           <Button size="sm" disabled={pending} onClick={() => setMerging(true)}>
-            Same vacancy: merge
+            Merge into one job
           </Button>
           <Button
             size="sm"
@@ -129,7 +120,7 @@ export function Duplicate({
               )
             }
           >
-            Different
+            Keep both
           </Button>
         </div>
       </div>

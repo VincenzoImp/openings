@@ -1,45 +1,21 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 // Node strips the types of the source files; these modules have no React.
-const routes = await import("../src/shell/routes.ts");
 const collection = await import("../src/pages/collection/model.ts");
 const settings = await import("../src/pages/settings/model.ts");
 
-test("links of the old Settings and Collection open where their parts moved", () => {
-  const hash = routes.canonicalHash;
-  // Provider settings and the task list of Settings are tabs of Collection.
+test("a source row counts what its jobs became, without zeros", () => {
+  const line = collection.sourceCountsLine;
   assert.equal(
-    hash("#settings?section=collection"),
-    "#collection?section=providers",
+    line({ found: 31, shortlisted: 9, applied: 3, replied: 1 }),
+    "31 found · 9 shortlisted · 3 applied · 1 replied",
   );
   assert.equal(
-    hash("#settings?section=activity&source_id=s1"),
-    "#collection?section=runs&source_id=s1",
+    line({ found: 12, shortlisted: 0, applied: 2, replied: 0 }),
+    "12 found · 2 applied",
   );
-  assert.equal(
-    hash("#settings?section=activity&activity_view=tasks&state=failed"),
-    "#collection?section=runs&state=failed&view=tasks",
-  );
-  // The two lists of the old Collection are one list filtered by kind.
-  assert.equal(
-    hash("#collection?section=searches&q=data"),
-    "#collection?q=data&kind=search",
-  );
-  assert.equal(hash("#collection?section=companies"), "#collection?kind=board");
-  // Skills are a tab of Settings.
-  assert.equal(hash("#skills"), "#settings?section=skills");
-  assert.equal(
-    hash("#skills?skill=review-inbox"),
-    "#settings?skill=review-inbox&section=skills",
-  );
-  assert.equal(routes.routeOf("#skills"), "settings");
-  // Current addresses stay as they are.
-  assert.equal(hash("#settings?section=agents"), null);
-  assert.equal(hash("#collection?section=runs"), null);
-  // The design's name of the setup guide.
-  assert.equal(hash("#onboarding"), "#setup");
-  assert.equal(routes.routeOf("#setup?step=record"), "setup");
-  assert.equal(hash("#setup"), null);
+  assert.equal(line({ found: 0, shortlisted: 0, applied: 0, replied: 0 }), "");
+  assert.equal(line(undefined), "");
 });
 
 test("a run or task is described by its counts, state and schedule", () => {

@@ -58,6 +58,10 @@ REMOVED_TOOLS = {
     "policy_rule_preview": "Removed in 0.24 with the automatic rules: nothing is dismissed automatically. Filter jobs_list (signal, requires, hide_unspoken_required) and dismiss with jobs_bulk.",
     "instructions_get": "Removed in 0.24: general instructions are Writing rules in Preferences (preferences_get, section writing).",
     "instructions_update": "Removed in 0.24: general instructions are Writing rules in Preferences (preferences_update, section writing).",
+    # #211 secondary features trimmed.
+    "insights_get": "Removed in 0.24: Insights became Stats. Use stats_get (period 90d, 12m or all).",
+    "overview_get": "Removed in 0.24: use stats_get for sent applications, replies and the funnel, and jobs_list (include_counts) or applications_list for current counts.",
+    "sources_yield": "Removed in 0.24: sources_list returns counts per source (found, shortlisted, applied, replied); stats_get gives replies by source.",
 }
 
 # #209: the agent-collaboration layer.

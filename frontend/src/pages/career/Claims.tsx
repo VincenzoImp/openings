@@ -1,13 +1,12 @@
 import { useState } from "react";
 import {
   api,
-  claimRoles,
   version,
   type Claim,
   type Knowledge,
   type ListResult,
 } from "../../api";
-import { Button, ErrorBanner, Loading, Switch, Tag } from "../../design";
+import { Button, ErrorBanner, IconButton, Loading, Tag } from "../../design";
 import { ConfirmDialog } from "../../library/common";
 import { useFresh } from "../../library/useFresh";
 import { useWorkspace } from "../../state";
@@ -16,8 +15,8 @@ import { ClaimDialog } from "./ClaimDialog";
 const NONE: ListResult<Claim> = { items: [], total: 0 };
 
 /**
- * One claim: its wording, whether documents may use it, and the typed
- * selection fields as controls that save at once.
+ * One claim: its wording, whether you approved it, the star that keeps it in
+ * every CV, and a menu with Edit and Delete.
  */
 export function ClaimRow({
   claim,
@@ -34,6 +33,7 @@ export function ClaimRow({
 }) {
   const { mutate, pending, notify } = useWorkspace();
   const [removing, setRemoving] = useState(false);
+  const [menu, setMenu] = useState(false);
   const text = claim.text_preview ?? claim.text;
   const short = text.length > 60 ? text.slice(0, 60) + "…" : text;
   const patch = (fields: Partial<Claim>, message: string) =>
@@ -56,102 +56,74 @@ export function ClaimRow({
         {claim.approved ? (
           <Tag tone="ready">Approved</Tag>
         ) : (
-          <Tag tone="attention">Not approved by you</Tag>
+          <Tag tone="attention">Not approved</Tag>
         )}
       </div>
       {showEntry && entry && <div className="caption">{entry}</div>}
-      <div className="claim-controls">
-        <Switch
-          label={`Default in CV: ${short}`}
-          checked={claim.default_in_cv}
-          disabled={pending || !claim.approved}
-          onChange={(checked) =>
-            patch(
-              { default_in_cv: checked },
-              checked
-                ? "The claim is in the CV by default."
-                : "The claim is left out by default.",
-            )
-          }
-        >
-          Default in CV
-        </Switch>
-        <label>
-          Role
-          <select
-            className="input"
-            aria-label={`Role of: ${short}`}
-            value={claim.role}
-            disabled={pending}
-            onChange={(event) =>
-              patch(
-                { role: event.target.value as Claim["role"] },
-                "Role saved.",
-              )
-            }
-          >
-            {Object.entries(claimRoles).map(([role, label]) => (
-              <option key={role} value={role}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Group
-          <input
-            className="input"
-            key={claim.version}
-            aria-label={`Group of: ${short}`}
-            list="claim-groups"
-            maxLength={100}
-            placeholder="No group"
-            defaultValue={claim.group}
-            disabled={pending}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") event.currentTarget.blur();
-            }}
-            onBlur={(event) => {
-              const group = event.target.value.trim();
-              if (group !== claim.group) void patch({ group }, "Group saved.");
-            }}
-          />
-        </label>
-      </div>
       <div className="row rule-state">
+        {!claim.approved && (
+          <Button
+            size="sm"
+            disabled={pending}
+            aria-label={`Approve: ${short}`}
+            onClick={() => patch({ approved: true }, "Claim approved.")}
+          >
+            Approve
+          </Button>
+        )}
         <Button
           size="sm"
+          variant="quiet"
+          className="star"
           disabled={pending}
-          aria-label={`${claim.approved ? "Mark as draft" : "Approve"}: ${short}`}
+          aria-pressed={claim.always_include}
+          aria-label={`Always include in my CV: ${short}`}
+          title="Always include in my CV"
           onClick={() =>
             patch(
-              { approved: !claim.approved },
-              claim.approved ? "Claim marked as draft." : "Claim approved.",
+              { always_include: !claim.always_include },
+              claim.always_include
+                ? "The claim is no longer always included."
+                : "The claim is always included in your CV.",
             )
           }
         >
-          {claim.approved ? "Mark as draft" : "Approve"}
+          <span aria-hidden="true">{claim.always_include ? "★" : "☆"}</span>
         </Button>
-        <Button
-          size="sm"
-          aria-label={`Edit claim: ${short}`}
-          onClick={() =>
-            api<Claim>(`/career/claims/${claim.id}`)
-              .then(onEdit)
-              .catch((cause) => notify(cause.message, true))
-          }
-        >
-          Edit
-        </Button>
-        <Button
-          size="sm"
-          variant="quiet danger"
-          disabled={pending}
-          aria-label={`Remove claim: ${short}`}
-          onClick={() => setRemoving(true)}
-        >
-          Remove
-        </Button>
+        {menu && (
+          <>
+            <Button
+              size="sm"
+              aria-label={`Edit claim: ${short}`}
+              onClick={() => {
+                setMenu(false);
+                api<Claim>(`/career/claims/${claim.id}`)
+                  .then(onEdit)
+                  .catch((cause) => notify(cause.message, true));
+              }}
+            >
+              Edit
+            </Button>
+            <Button
+              size="sm"
+              variant="quiet danger"
+              disabled={pending}
+              aria-label={`Delete claim: ${short}`}
+              onClick={() => {
+                setMenu(false);
+                setRemoving(true);
+              }}
+            >
+              Delete
+            </Button>
+          </>
+        )}
+        <IconButton
+          icon="more"
+          label={`More actions for claim: ${short}`}
+          aria-expanded={menu}
+          onClick={() => setMenu(!menu)}
+        />
         {!claim.approved && (
           <span className="caption">
             Documents cannot use it until you approve it.
@@ -160,8 +132,8 @@ export function ClaimRow({
       </div>
       {removing && (
         <ConfirmDialog
-          title="Remove this claim?"
-          confirm="Remove claim"
+          title="Delete this claim?"
+          confirm="Delete claim"
           keep="Keep claim"
           onClose={() => setRemoving(false)}
           onConfirm={async () => {
@@ -172,7 +144,7 @@ export function ClaimRow({
                     `/career/claims/${claim.id}?expected_version=${claim.version}`,
                     "DELETE",
                   ),
-                "Claim removed.",
+                "Claim deleted.",
               )
             )
               setRemoving(false);
@@ -193,20 +165,6 @@ export const replaced = (saved: Claim) => (list: ListResult<Claim>) => ({
   ...list,
   items: list.items.map((item) => (item.id === saved.id ? saved : item)),
 });
-
-/** The group names in use, offered while a group is typed. */
-export function ClaimGroups({ claims }: { claims: Claim[] }) {
-  const groups = [
-    ...new Set(claims.map((claim) => claim.group).filter(Boolean)),
-  ].sort();
-  return (
-    <datalist id="claim-groups">
-      {groups.map((group) => (
-        <option key={group} value={group} />
-      ))}
-    </datalist>
-  );
-}
 
 /** The claims of one entry, inside its editor. */
 export function EntryClaims({ entry }: { entry: Knowledge }) {
@@ -247,7 +205,6 @@ export function EntryClaims({ entry }: { entry: Knowledge }) {
           a CV could use.
         </p>
       )}
-      <ClaimGroups claims={data.items} />
       {editing && (
         <ClaimDialog
           record={editing === "new" ? undefined : editing}

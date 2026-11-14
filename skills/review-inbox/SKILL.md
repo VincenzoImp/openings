@@ -44,7 +44,7 @@ Read Career descriptions when a title, duty or requirement is ambiguous.
 
 Every job carries `signals`, computed when it was collected and without a model:
 the posting's `language`, the languages it states as `required` (groups: one
-language of a group is enough) or `welcome`, a likely `duplicate` of an earlier
+language of a group is enough), a likely `duplicate` of an earlier
 job with its confidence, and `no_longer_listed` when a company board stopped
 listing it. `computed: false` means a job from before 0.21 whose signals are
 still being computed; read the posting instead. Use them to order and to find
