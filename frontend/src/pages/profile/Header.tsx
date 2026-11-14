@@ -37,14 +37,23 @@ const headerOf = (profile: Profile): HeaderDraft => ({
 
 const TEXT = ["name", "headline", "location", "email", "phone"] as const;
 
-/** How many fields of the draft differ from the record. */
-function headerChanges(draft: HeaderDraft, profile: Profile) {
-  const stored = headerOf(profile);
-  const text = TEXT.filter((key) => draft[key] !== stored[key]).length;
-  const links =
-    JSON.stringify(draft.links.filter((link) => link.url.trim())) !==
-    JSON.stringify(stored.links);
-  return text + (links ? 1 : 0);
+const cleanLinks = (links: ProfileLink[]) =>
+  links
+    .filter((link) => link.url.trim())
+    .map((link) => ({ label: link.label.trim(), url: link.url.trim() }));
+
+/**
+ * What the person changed since the block opened: only these fields are
+ * saved, so a change made elsewhere to another field is kept.
+ */
+function headerPatch(draft: HeaderDraft, start: HeaderDraft) {
+  const patch: Record<string, unknown> = {};
+  for (const key of TEXT)
+    if (draft[key].trim() !== start[key].trim()) patch[key] = draft[key].trim();
+  const links = cleanLinks(draft.links);
+  if (JSON.stringify(links) !== JSON.stringify(cleanLinks(start.links)))
+    patch.links = links;
+  return patch;
 }
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -108,31 +117,24 @@ export function HeaderBlock({ profile }: { profile: Profile }) {
 }
 
 function HeaderForm({ profile }: { profile: Profile }) {
-  const [draft, setDraft] = useState(() => headerOf(profile));
+  const [start, setStart] = useState(() => headerOf(profile));
+  const [draft, setDraft] = useState(start);
   const [base, setBase] = useState(profile.version);
   const [checked, setChecked] = useState(false);
-  const changes = headerChanges(draft, profile);
+  const patch = headerPatch(draft, start);
+  const changes = Object.keys(patch).length;
   const emailError =
     draft.email.trim() && !EMAIL.test(draft.email.trim())
       ? "Write the whole address, for example alex@example.com."
       : undefined;
   const block = useBlockSave({
-    write: (body: HeaderDraft) =>
-      writes.profile({
-        expected_version: base,
-        name: body.name.trim(),
-        headline: body.headline.trim(),
-        location: body.location.trim(),
-        email: body.email.trim(),
-        phone: body.phone.trim(),
-        links: body.links
-          .filter((link) => link.url.trim())
-          .map((link) => ({ label: link.label.trim(), url: link.url.trim() })),
-      }),
+    write: (body: Record<string, unknown>) =>
+      writes.profile({ ...body, expected_version: base }),
     saved: () => "Saved the header",
     onReload: () => {
       const stored = cached.profile();
       if (stored) {
+        setStart(headerOf(stored));
         setDraft(headerOf(stored));
         setBase(stored.version);
       }
@@ -161,7 +163,7 @@ function HeaderForm({ profile }: { profile: Profile }) {
           document.querySelector<HTMLElement>("[name=email]")?.focus();
           return false;
         }
-        return block.save(draft);
+        return block.save(patch);
       }}
     >
       <div className="pf-fields">
@@ -289,7 +291,8 @@ export function SummaryBlock({ profile }: { profile: Profile }) {
 }
 
 function SummaryForm({ profile }: { profile: Profile }) {
-  const [text, setText] = useState(profile.summary);
+  const [start, setStart] = useState(profile.summary);
+  const [text, setText] = useState(start);
   const [base, setBase] = useState(profile.version);
   const block = useBlockSave({
     write: (body: { summary: string }) =>
@@ -298,6 +301,7 @@ function SummaryForm({ profile }: { profile: Profile }) {
     onReload: () => {
       const stored = cached.profile();
       if (stored) {
+        setStart(stored.summary);
         setText(stored.summary);
         setBase(stored.version);
       }
@@ -307,7 +311,7 @@ function SummaryForm({ profile }: { profile: Profile }) {
   return (
     <EditBlock
       title="Edit summary"
-      changes={text !== profile.summary ? 1 : 0}
+      changes={text.trim() !== start.trim() ? 1 : 0}
       saving={block.saving}
       notice={block.notice}
       onSave={() => block.save({ summary: text })}

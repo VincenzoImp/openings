@@ -106,6 +106,10 @@ export function EntryBlock({
   const remove = useApiMutation({
     touches: ["career", "files"],
     mutationFn: () => writes.deleteEntry(entry.id, entry.version),
+    // The block is gone once its entry is: the toast comes from the mutation.
+    onSuccess: () =>
+      toast.show({ message: `Deleted “${entry.title}”`, tone: "success" }),
+    onError: (error) => toast.show({ message: error.message, tone: "error" }),
   });
   if (editing.open === entry.id)
     return (
@@ -113,7 +117,10 @@ export function EntryBlock({
     );
   const place = placeOf(entry);
   const dates = formatDates(entry.dates as never);
-  const sub = [entry.organization, place].filter(Boolean).join(" · ");
+  // In Education and Other the kind is named, unless the section says it.
+  const kind =
+    showKind && entry.kind !== "education" ? KINDS[entry.kind as Kind] : "";
+  const sub = [kind, entry.organization, place].filter(Boolean).join(" · ");
   const name = entry.title;
   return (
     <>
@@ -138,16 +145,7 @@ export function EntryBlock({
             </h3>
             {dates && <span className="pf-entry-dates">{dates}</span>}
           </header>
-          {(sub || showKind) && (
-            <p className="pf-entry-sub">
-              {showKind && (
-                <span className="pf-entry-kind">
-                  {KINDS[entry.kind as Kind] ?? entry.kind}
-                </span>
-              )}
-              {sub}
-            </p>
-          )}
+          {sub && <p className="pf-entry-sub">{sub}</p>}
           {entry.narrative?.trim() && (
             <div className="pf-prose pf-entry-text">
               {entry.narrative
@@ -168,14 +166,7 @@ export function EntryBlock({
         title={`Delete “${name}” permanently?`}
         confirm="Delete permanently"
         onClose={() => setDeleting(false)}
-        onConfirm={() =>
-          remove.mutate(undefined, {
-            onSuccess: () =>
-              toast.show({ message: `Deleted “${name}”`, tone: "success" }),
-            onError: (error) =>
-              toast.show({ message: error.message, tone: "error" }),
-          })
-        }
+        onConfirm={() => remove.mutate()}
       >
         <DeleteSummary context={context} />
       </ConfirmDialog>
@@ -362,8 +353,22 @@ export function EntryForm({
       id = created.id;
       base.current = { ...base.current, id, entry: created.version };
     } else if (fieldChanges(value, stored)) {
+      // Only what the person changed, so a change made elsewhere stays.
+      const changed = {
+        kind: value.kind !== stored.kind,
+        title: value.title.trim() !== stored.title.trim(),
+        organization: value.organization.trim() !== stored.organization.trim(),
+        narrative: value.narrative.trim() !== stored.narrative.trim(),
+        skills: !same(value.skills, stored.skills),
+        dates: !same(datesOf(value.dates), datesOf(stored.dates)),
+        metadata: value.location.trim() !== stored.location.trim(),
+      };
       const saved = await writes.updateEntry(id, {
-        ...fields,
+        ...Object.fromEntries(
+          Object.entries(fields).filter(
+            ([key]) => changed[key as keyof typeof changed],
+          ),
+        ),
         expected_version: base.current.entry,
       });
       base.current.entry = saved.version;
