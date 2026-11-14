@@ -5,11 +5,10 @@ import sqlite3
 from unittest.mock import patch
 
 import pytest
-from fastapi import APIRouter, FastAPI
-from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from document_fixtures import bare_api
 from openings.career import (
     CareerService,
     ClaimCreate,
@@ -26,8 +25,6 @@ from openings.documents import (
     UploadReservation,
 )
 from openings.errors import DomainError
-from openings.interfaces.career import register_api as register_career_api
-from openings.interfaces.documents import register_api
 from openings.workspace import Workspace
 from timeline_fixtures import guided_application
 
@@ -68,16 +65,7 @@ def workspace(database_path):
         {"title": "Backend Engineer", "company": "Example Co", "posting": "Build Python APIs."}
     )
     application = guided_application(workspace, job["id"], "Prefer practical examples.")
-    api = FastAPI()
-
-    @api.exception_handler(DomainError)
-    async def domain_error(request, error):
-        return JSONResponse({"error": {"code": error.code, "message": error.message}}, error.status)
-
-    router = APIRouter(prefix="/api/v1")
-    register_career_api(router, career)
-    register_api(router, documents)
-    api.include_router(router)
+    api = bare_api(workspace, career=career, documents=documents)
     with TestClient(api) as client:
         yield workspace, career, documents, client, evidence, claim, template, application
 

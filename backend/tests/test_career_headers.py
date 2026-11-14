@@ -112,11 +112,17 @@ def test_complete_entry_workflow_headers_and_order(tmp_path, transport):
 
         def call(tool, method, path, arguments):
             if transport == "rest":
+                # REST names the identifiers in the path and the rest in the body or query.
+                body = {
+                    k: v
+                    for k, v in arguments.items()
+                    if not (k.endswith("_id") and f"/{v}" in path)
+                }
                 response = client.request(
                     method,
                     "/api/v1" + path,
-                    params=arguments.get("value", arguments) if method == "GET" else None,
-                    json=arguments.get("value") if method != "GET" else None,
+                    params=body if method == "GET" else None,
+                    json=body if method != "GET" else None,
                 )
                 response.raise_for_status()
                 return response.json()
@@ -139,29 +145,21 @@ def test_complete_entry_workflow_headers_and_order(tmp_path, transport):
             "POST",
             "/career/knowledge",
             {
-                "value": {
-                    "title": "Engineer",
-                    "organization": "Example Cloud",
-                    "skills": ["Python", "python"],
-                    "dates": {"kind": "period", "start": "2024-08", "current": True},
-                }
+                "title": "Engineer",
+                "organization": "Example Cloud",
+                "skills": ["Python", "python"],
+                "dates": {"kind": "period", "start": "2024-08", "current": True},
             },
         )
         second = call(
             "knowledge_create",
             "POST",
             "/career/knowledge",
-            {
-                "value": {
-                    "title": "Languages",
-                    "kind": "skill",
-                    "position": 0,
-                }
-            },
+            {"title": "Languages", "kind": "skill", "position": 0},
         )
         assert first["narrative"] == "" and first["position"] == 0 and first["skills"] == ["Python"]
         summary = call(
-            "knowledge_list", "GET", "/career/knowledge", {"value": {"q": "Cloud", "summary": True}}
+            "knowledge_list", "GET", "/career/knowledge", {"q": "Cloud", "summary": True}
         )
         assert summary["total"] == 1
         row = summary["items"][0]
@@ -172,39 +170,24 @@ def test_complete_entry_workflow_headers_and_order(tmp_path, transport):
             "claims_create",
             "POST",
             "/career/claims",
-            {
-                "value": {
-                    "knowledge_id": first["id"],
-                    "text": "First wording.",
-                    "approved": True,
-                }
-            },
+            {"knowledge_id": first["id"], "text": "First wording.", "approved": True},
         )
         c2 = call(
             "claims_create",
             "POST",
             "/career/claims",
-            {
-                "value": {
-                    "knowledge_id": first["id"],
-                    "text": "Earlier wording.",
-                    "approved": True,
-                }
-            },
+            {"knowledge_id": first["id"], "text": "Earlier wording.", "approved": True},
         )
         assert c2["position"] == c1["position"] + 1
         c1 = call(
             "claims_update",
             "PATCH",
             "/career/claims/" + c1["id"],
-            {
-                "claim_id": c1["id"],
-                "value": {"expected_version": c1["version"], "position": 5},
-            },
+            {"claim_id": c1["id"], "expected_version": c1["version"], "position": 5},
         )
-        rows = call(
-            "claims_list", "GET", "/career/claims", {"value": {"q": "Cloud", "summary": True}}
-        )["items"]
+        rows = call("claims_list", "GET", "/career/claims", {"q": "Cloud", "summary": True})[
+            "items"
+        ]
         assert [row["id"] for row in rows] == [c2["id"], c1["id"]]
         assert rows[0]["knowledge_organization"] == "Example Cloud"
 
@@ -214,13 +197,11 @@ def test_complete_entry_workflow_headers_and_order(tmp_path, transport):
             "/career/knowledge/" + first["id"],
             {
                 "knowledge_id": first["id"],
-                "value": {
-                    "expected_version": first["version"],
-                    "dates": None,
-                    "organization": "",
-                    "skills": [],
-                    "position": 4,
-                },
+                "expected_version": first["version"],
+                "dates": None,
+                "organization": "",
+                "skills": [],
+                "position": 4,
             },
         )
         assert (
@@ -233,16 +214,14 @@ def test_complete_entry_workflow_headers_and_order(tmp_path, transport):
             "POST",
             "/career/import",
             {
-                "value": {
-                    "knowledge": [
-                        {
-                            "kind": "award",
-                            "title": "Community award",
-                            "organization": "Example",
-                            "dates": {"kind": "single", "start": "2025"},
-                        }
-                    ]
-                }
+                "knowledge": [
+                    {
+                        "kind": "award",
+                        "title": "Community award",
+                        "organization": "Example",
+                        "dates": {"kind": "single", "start": "2025"},
+                    }
+                ]
             },
         )
         assert imported["items"][0]["dates"]["start"] == "2025"

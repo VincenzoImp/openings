@@ -21,11 +21,17 @@ def test_awards_and_publications_survive_import_filtering_and_citation(tmp_path,
 
         def call(tool, method, path, arguments):
             if transport == "rest":
+                # REST names the identifiers in the path and the rest in the body or query.
+                body = {
+                    k: v
+                    for k, v in arguments.items()
+                    if not (k.endswith("_id") and f"/{v}" in path)
+                }
                 response = client.request(
                     method,
                     "/api/v1" + path,
-                    params=arguments.get("value", arguments) if method == "GET" else None,
-                    json=arguments.get("value") if method != "GET" else None,
+                    params=body if method == "GET" else None,
+                    json=body if method != "GET" else None,
                 )
                 response.raise_for_status()
                 return response.json()
@@ -53,14 +59,13 @@ def test_awards_and_publications_survive_import_filtering_and_citation(tmp_path,
             for kind in ("award", "publication")
         ]
         created = [
-            call("knowledge_create", "POST", "/career/knowledge", {"value": entry})
-            for entry in entries
+            call("knowledge_create", "POST", "/career/knowledge", entry) for entry in entries
         ]
         preview = call(
             "career_preview_import",
             "POST",
             "/career/import/preview",
-            {"value": {"text": json.dumps(entries)}},
+            {"text": json.dumps(entries)},
         )
         assert [row["kind"] for row in preview["knowledge"]] == ["award", "publication"]
         before_import = call("knowledge_list", "GET", "/career/knowledge", {})
@@ -69,7 +74,7 @@ def test_awards_and_publications_survive_import_filtering_and_citation(tmp_path,
             "career_import",
             "POST",
             "/career/import",
-            {"value": {"knowledge": preview["knowledge"]}},
+            {"knowledge": preview["knowledge"]},
         )
         assert imported["total"] == 2
         for entry, record in zip(entries, created):
@@ -77,7 +82,7 @@ def test_awards_and_publications_survive_import_filtering_and_citation(tmp_path,
                 "knowledge_list",
                 "GET",
                 "/career/knowledge",
-                {"value": {"kind": entry["kind"], "summary": True}},
+                {"kind": entry["kind"], "summary": True},
             )
             assert listed["total"] == 2
             assert {row["kind"] for row in listed["items"]} == {entry["kind"]}
@@ -93,23 +98,19 @@ def test_awards_and_publications_survive_import_filtering_and_citation(tmp_path,
             "jobs_create",
             "POST",
             "/jobs",
-            {"value": {"title": "Engineer", "company": "Example", "posting": "Build APIs."}},
+            {"title": "Engineer", "company": "Example", "posting": "Build APIs."},
         )
-        application = call(
-            "applications_create", "POST", "/applications", {"value": {"job_id": job["id"]}}
-        )
+        application = call("applications_create", "POST", "/applications", {"job_id": job["id"]})
         cited = [record["id"] for record in created + imported["items"]]
         document = call(
             "documents_create",
             "POST",
             "/documents",
             {
-                "value": {
-                    "application_id": application["id"],
-                    "kind": "other",
-                    "content": {"text": "Synthetic notes."},
-                    "knowledge_ids": cited,
-                }
+                "application_id": application["id"],
+                "kind": "other",
+                "content": {"text": "Synthetic notes."},
+                "knowledge_ids": cited,
             },
         )
         assert document["knowledge_ids"] == cited
@@ -121,11 +122,9 @@ def test_awards_and_publications_survive_import_filtering_and_citation(tmp_path,
             f"/career/knowledge/{award['id']}",
             {
                 "knowledge_id": award["id"],
-                "value": {
-                    "expected_version": award["version"],
-                    "kind": "publication",
-                    "narrative": "Revised live evidence.",
-                },
+                "expected_version": award["version"],
+                "kind": "publication",
+                "narrative": "Revised live evidence.",
             },
         )
         assert changed["kind"] == "publication"

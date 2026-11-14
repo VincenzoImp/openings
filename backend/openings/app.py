@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from mcp.server.transport_security import TransportSecuritySettings
 
-from . import __version__, backups
+from . import __version__
 from .actors import SYSTEM, acting_as, batch
 from .auth import Auth, LoginGuard
 from .career import CareerService
@@ -21,38 +21,11 @@ from .discovery import DiscoveryService
 from .documents import DocumentService
 from .errors import DomainError
 from .events import EventLog
-from .interfaces.career import (
-    register_api as register_career_api,
-    register_mcp as register_career_mcp,
-)
-from .interfaces.core import register_core, register_core_mcp
-from .interfaces.discovery import (
-    register_api as register_discovery_api,
-    register_mcp as register_discovery_mcp,
-)
-from .interfaces.documents import (
-    register_api as register_document_api,
-    register_mcp as register_document_mcp,
-)
-from .interfaces.events import (
-    register_api as register_events_api,
-    register_mcp as register_events_mcp,
-)
-from .interfaces.preferences import (
-    register_api as register_preferences_api,
-    register_mcp as register_preferences_mcp,
-)
-from .interfaces.skills import (
-    register_api as register_skills_api,
-    register_mcp as register_skills_mcp,
-)
-from .interfaces.stats import (
-    register_api as register_stats_api,
-    register_mcp as register_stats_mcp,
-)
-from .interfaces.system import register_system
+from .interfaces import bind_mcp, bind_rest, register_prompts, register_transport
+from .interfaces.operation import request_origin
 from .limits import REQUEST_LIMIT, BodyLimit
 from .mcp_server import OpeningsMCP
+from .openapi import build as build_openapi, errors
 from .preferences import PreferencesService
 from .skills import SkillLibrary
 from .stats import StatsService
@@ -62,8 +35,14 @@ from .workspace import Workspace
 
 def error_response(error):
     retry = error.details.get("retry_after_seconds") if isinstance(error.details, dict) else None
+    body = {
+        "code": error.code,
+        "status": error.status,
+        "message": error.message,
+        "details": error.details,
+    }
     return JSONResponse(
-        {"error": {"code": error.code, "message": error.message, "details": error.details}},
+        {"error": body},
         status_code=error.status,
         headers={"Retry-After": str(retry)} if retry else None,
     )
@@ -90,15 +69,13 @@ def create_app(database=None, start_worker=True):
     # Tools, prompts and resources never change at runtime, so no notification
     # stream is offered: every exchange stays one request and one JSON response.
     mcp = OpeningsMCP("Openings", version=__version__, subscriptions=False)
-    register_core_mcp(mcp, workspace)
-    register_career_mcp(mcp, career)
-    register_document_mcp(mcp, documents)
-    register_discovery_mcp(mcp, discovery)
-    register_events_mcp(mcp, events)
-    register_preferences_mcp(mcp, preferences)
-    register_stats_mcp(mcp, stats)
     skills = SkillLibrary()
-    register_skills_mcp(mcp, skills)
+    # Operations receive the workspace with its services (interfaces/operation.py).
+    workspace.auth, workspace.career, workspace.documents = auth, career, documents
+    workspace.events, workspace.preferences, workspace.stats = events, preferences, stats
+    workspace.skills = skills
+    bind_mcp(mcp, workspace)
+    register_prompts(mcp, skills)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -122,9 +99,9 @@ def create_app(database=None, start_worker=True):
     )
     app.state.workspace, app.state.auth, app.state.mcp = workspace, auth, mcp
     app.state.career, app.state.documents, app.state.discovery = career, documents, discovery
-    app.state.events = events
-    app.state.preferences = preferences
-    app.state.stats = stats
+    app.state.events, app.state.preferences, app.state.stats = events, preferences, stats
+    app.state.skills = skills
+    app.openapi = lambda: build_openapi(app)
     app.add_middleware(BodyLimit)
     # The client address is the real one only when uvicorn trusts the proxy
     # (OPENINGS_TRUSTED_PROXIES); otherwise every proxied client shares one bucket.
@@ -147,20 +124,11 @@ def create_app(database=None, start_worker=True):
             }
             actor = SYSTEM
             if path.startswith("/api/v1/") and path not in public:
-                if path in {
-                    "/api/v1/backup",
-                    "/api/v1/backup/restore",
-                    "/api/v1/export",
-                } and request.headers.get("x-operational-token"):
-                    operation = (
-                        "export"
-                        if path == "/api/v1/export" and request.method == "GET"
-                        else "backup"
-                        if path == "/api/v1/backup" and request.method == "GET"
-                        else "restore"
-                        if path.endswith("/restore") and request.method == "POST"
-                        else "invalid"
-                    )
+                if path in {"/api/v1/backup", "/api/v1/export"} and request.headers.get(
+                    "x-operational-token"
+                ):
+                    # A grant of workspace_backup or workspace_export, for one GET.
+                    operation = path.removeprefix("/api/v1/") if request.method == "GET" else ""
                     actor = auth.authorize_operation(
                         request.headers["x-operational-token"], operation
                     )
@@ -186,9 +154,13 @@ def create_app(database=None, start_worker=True):
                 request.scope["raw_path"] = request.scope.get("raw_path", b"/mcp") + b"/"
             # Handlers, offloaded threads and MCP tools inherit the actor from this context.
             # Every change of one request shares one batch id.
-            with acting_as(actor), batch():
-                async with semaphore:
-                    response = await call_next(request)
+            origin = request_origin.set(str(request.base_url).rstrip("/"))
+            try:
+                with acting_as(actor), batch():
+                    async with semaphore:
+                        response = await call_next(request)
+            finally:
+                request_origin.reset(origin)
             if sign_in:
                 if response.status_code == 401:
                     login_guard.failed()
@@ -224,37 +196,10 @@ def create_app(database=None, start_worker=True):
             DomainError(409, "constraint", "This change conflicts with existing workspace data.")
         )
 
-    @app.get("/health")
-    def health():
-        workspace.db.one("SELECT 1")
-        backup = backups.status(workspace.db)
-        worker = workspace.worker
-        age = worker.heartbeat_age() if worker else None
-        body = {
-            "status": "ok",
-            "version": __version__,
-            "backup": {key: backup[key] for key in ("last_at", "age_hours", "ok")},
-            "worker": {
-                "heartbeat_age_seconds": None if age is None else round(age, 1),
-            },
-        }
-        # A stalled scheduler fails the container healthcheck; a restore restarts it.
-        if worker and not workspace.maintenance and worker.stalled():
-            return JSONResponse({**body, "status": "worker_stalled"}, status_code=503)
-        return body
-
     router = APIRouter(prefix="/api/v1")
 
-    register_system(router, mcp, workspace, auth, public_url)
-
-    register_core(router, workspace)
-    register_skills_api(router, skills)
-    register_career_api(router, career)
-    register_document_api(router, documents)
-    register_discovery_api(router, discovery)
-    register_events_api(router, events)
-    register_preferences_api(router, preferences)
-    register_stats_api(router, stats)
+    register_transport(app, router, public_url)
+    bind_rest(router, errors)
     app.include_router(router)
     # Building the transport also creates the session manager the lifespan runs.
     app.mount(

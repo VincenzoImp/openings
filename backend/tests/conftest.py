@@ -16,8 +16,6 @@ Test modules keep their own data builders (`*_fixtures.py`); the setup of a
 workspace, an application and its sessions lives here.
 """
 
-import copy
-import inspect
 import json
 import shutil
 import sqlite3
@@ -25,7 +23,6 @@ from contextlib import closing
 
 import pytest
 from fastapi.testclient import TestClient
-from mcp.server.mcpserver.tools.base import Tool
 
 from openings.app import create_app
 from openings.auth import Auth
@@ -133,44 +130,3 @@ def mcp(app, agent_token):
     # A client without the owner's cookie: the agent token is the only credential.
     with TestClient(app, base_url=BASE_URL) as client:
         yield McpClient(client, agent_token)
-
-
-@pytest.fixture(autouse=True, scope="session")
-def reuse_tool_schemas():
-    """Build each MCP tool's argument model and JSON schema once per session.
-
-    Every `create_app` registers the same tools on new service objects, and
-    building their pydantic models is most of its cost. A tool depends only on
-    its function's name, signature and options, so a tool built for an earlier
-    application is copied with the new function. Production builds one
-    application per process and is unaffected.
-    """
-    original = Tool.from_function.__func__
-    built = {}
-
-    def from_function(cls, fn, name=None, **options):
-        try:
-            signature = inspect.signature(fn)
-            key = (
-                cls,
-                name,
-                fn.__module__,
-                fn.__qualname__,
-                fn.__doc__,
-                inspect.iscoroutinefunction(fn),
-                tuple(
-                    (p.name, p.kind, p.annotation, p.default) for p in signature.parameters.values()
-                ),
-                signature.return_annotation,
-                repr(sorted(options.items())),
-            )
-            tool = built.get(key)
-        except TypeError, AttributeError, ValueError:  # unhashable or unnamed: build as usual
-            return original(cls, fn, name, **options)
-        if tool is None:
-            tool = built[key] = original(cls, fn, name, **options)
-        return tool.model_copy(update={"fn": fn, "parameters": copy.deepcopy(tool.parameters)})
-
-    Tool.from_function = classmethod(from_function)
-    yield
-    Tool.from_function = classmethod(original)

@@ -1,5 +1,6 @@
 """Consistent portable snapshots and validated in-place restore."""
 
+import asyncio
 import json
 import os
 import shutil
@@ -8,6 +9,7 @@ import time
 from contextlib import closing
 from pathlib import Path
 
+from . import events
 from .common import encode, now
 from .compaction import compact
 from .db import SCHEMA_VERSION, schema_error, utc_stamp
@@ -281,3 +283,55 @@ def _restore_current(workspace, source_path):
         "authentication_preserved": True,
         "message": "Workspace restored. Reload the dashboard.",
     }
+
+
+def backup_file_for(workspace, actor):
+    """A temporary consistent backup file; an agent's leaves out the installation credentials."""
+    name = workspace.db.temp_file("backup")
+    try:
+        workspace.db.backup(name)
+        if actor.is_agent:
+            # An agent may back up before broad changes, but never receives the
+            # password hash, the session secret or the tokens of the installation.
+            remove_installation_credentials(name)
+    except BaseException:
+        workspace.db.remove_temp(name)
+        raise
+    return name
+
+
+async def restore_upload(workspace, headers, chunks):
+    """Receive a raw SQLite upload within the restore limit and restore it."""
+    # Refuse before writing anything when the declared size cannot fit.
+    status = storage_status(workspace.db)
+    limit = status["restore_limit_bytes"]
+    declared = headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > limit:
+        raise backup_too_large(int(declared), status)
+    name = workspace.db.temp_file("restore")
+    count = 0
+    try:
+        with open(name, "wb") as upload:  # noqa: ASYNC230 - local temp file, bounded chunks
+            async for chunk in chunks:
+                count += len(chunk)
+                if count > limit:
+                    raise backup_too_large(count, status)
+                upload.write(chunk)
+        with open(name, "rb") as check_file:  # noqa: ASYNC230 - 16-byte local read
+            header = check_file.read(16)
+        if header != b"SQLite format 3\x00":
+            raise DomainError(422, "backup_format", "Select a SQLite database backup.")
+        workspace.maintenance = True
+        try:
+            result = await asyncio.to_thread(restore_database, workspace, name)
+            with workspace.db.transaction() as conn:
+                events.record(conn, "workspace_restored", ("workspace", "backup"))
+            # Other jobs now: build the duplicate index and missing signals again.
+            workspace.reset_duplicates()
+            workspace.warm_duplicates()
+            return result
+        except sqlite3.DatabaseError:
+            raise DomainError(422, "backup_format", "This database backup could not be read.")
+    finally:
+        workspace.maintenance = False
+        workspace.db.remove_temp(name)

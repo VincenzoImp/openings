@@ -262,7 +262,7 @@ def test_a_cv_is_its_source_and_the_pdf_built_from_it(client):
     _, error = tool(
         client,
         "documents_create",
-        {"value": {"application_id": application["id"], "content": {"text": "CV"}}},
+        {"application_id": application["id"], "content": {"text": "CV"}},
     )
     assert "content_not_accepted" in error or "optional TeX source" in error
     created = client.post(
@@ -324,7 +324,7 @@ def test_a_cv_is_its_source_and_the_pdf_built_from_it(client):
     assert complete["complete"] is True and "review_state" not in complete
     # The text stays the one derived from the TeX source.
     assert (complete["text"], complete["text_from"]) == (TEXT, "tex")
-    assert client.post(f"/api/v1/documents/{cv['id']}/review", json={}).status_code in {404, 405}
+    assert client.post(f"/api/v1/documents/{cv['id']}/review", json={}).status_code == 410
     assert tool(client, "documents_review", {"document_id": cv["id"]})[0] is None
     mcp, _ = tool(client, "documents_get", {"document_id": cv["id"]})
     assert mcp == complete

@@ -196,7 +196,7 @@ def test_one_pinned_note_per_scope_and_pinning_is_recorded(tmp_path):
     assert (replaced["pinned"], replaced["version"]) == (False, 2)
     with pytest.raises(DomainError) as stale:
         workspace.pin_note(first["id"], {"expected_version": 1})
-    assert stale.value.details == {"current_version": 2}
+    assert stale.value.details == {"current_version": 2, "id": first["id"]}
     # Unpinning keeps the note; doing it twice is no change.
     unpinned = workspace.pin_note(second["id"], {"expected_version": 2, "pinned": False})
     assert (unpinned["pinned"], unpinned["version"]) == (False, 3)
@@ -271,7 +271,7 @@ def tool(client, headers, name, arguments):
     return result.get("structuredContent") or json.loads(result["content"][0]["text"])
 
 
-def test_rest_and_mcp_return_identical_timelines(tmp_path):
+def test_both_timeline_routes_and_the_tool_read_one_timeline(tmp_path):
     app = create_app(tmp_path / "parity.sqlite", start_worker=False)
     app.state.auth.setup("synthetic-password")
     workspace = app.state.workspace
@@ -299,7 +299,7 @@ def test_rest_and_mcp_return_identical_timelines(tmp_path):
             ):
                 rest = client.get(path + query, headers=headers)
                 assert rest.status_code == 200, rest.text
-                mcp = tool(client, headers, "timeline_get", {**arguments, "value": value})
+                mcp = tool(client, headers, "timeline_get", {**arguments, **value})
                 assert mcp == rest.json(), (path, value)
                 assert mcp["items"], (path, value)
         # Pinning over REST and MCP alike.
@@ -312,7 +312,7 @@ def test_rest_and_mcp_return_identical_timelines(tmp_path):
             client,
             headers,
             "notes_pin",
-            {"note_id": note["id"], "value": {"expected_version": 2, "pinned": False}},
+            {"note_id": note["id"], "expected_version": 2, "pinned": False},
         )
         assert (unpinned["pinned"], unpinned["version"]) == (False, 3)
         refused = client.get(f"/api/v1/jobs/{job_id}/timeline?kinds=text", headers=headers)

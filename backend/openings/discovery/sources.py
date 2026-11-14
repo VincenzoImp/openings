@@ -6,7 +6,7 @@ from .. import events
 from ..collectors import company as company_collectors, jobspy as jobspy_collector
 from ..collectors.catalog import COMPANY_ADAPTERS
 from ..collectors.policy import ProviderDeferred
-from ..common import check_version, decode_record, encode, missing, new_id, now
+from ..common import batch_result, check_version, decode_record, encode, missing, new_id, now
 from ..errors import DomainError
 from ..idempotency import fingerprint, remember, replay
 from ..scheduling import next_due, schedule_adapter
@@ -86,11 +86,12 @@ class SourceOperations:
                                 overrides=value.overrides,
                             )
                         )
-                items.append({"id": selected.id, "result": result})
+                items.append({"id": selected.id, "ok": True, "result": result})
             except DomainError as error:
                 items.append(
                     {
                         "id": selected.id,
+                        "ok": False,
                         "error": {
                             "code": error.code,
                             "message": error.message,
@@ -99,13 +100,7 @@ class SourceOperations:
                         },
                     }
                 )
-        failed = sum("error" in item for item in items)
-        return {
-            "items": items,
-            "total": len(items),
-            "succeeded": len(items) - failed,
-            "failed": failed,
-        }
+        return batch_result(items)
 
     def _source(self, source_id):
         row = self.db.one("SELECT * FROM sources WHERE id=?", (source_id,))

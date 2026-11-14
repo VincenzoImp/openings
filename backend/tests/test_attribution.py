@@ -4,7 +4,7 @@ import pytest
 
 from openings.actors import OWNER, SYSTEM, acting_as, batch, current_batch, token_actor
 from openings.events import EventLog
-from openings.mcp_server import REMOVED_TOOLS
+from openings.removed import REMOVED_TOOLS
 
 
 def add_jobs(workspace, count, prefix="Synthetic role"):
@@ -112,7 +112,7 @@ def test_an_agent_triage_of_fifty_jobs_is_one_batch_the_owner_restores(app, mcp,
         mine = workspace.set_triage(
             add_jobs(workspace, 1, "Owner role")[0]["id"], "dismissed", 1, "Mine."
         )
-    _, error = mcp.call("jobs_bulk", {"value": bulk(jobs, "dismissed", reason="Too junior.")})
+    _, error = mcp.call("jobs_bulk", bulk(jobs, "dismissed", reason="Too junior."))
     assert error is None, error
     triaged = events_of(app, kind="triage_changed", actor="agent:Synthetic agent")
     assert len(triaged) == 50
@@ -148,9 +148,7 @@ def test_an_agent_triage_of_fifty_jobs_is_one_batch_the_owner_restores(app, mcp,
 def test_one_mcp_tool_call_is_one_batch(app, mcp):
     jobs = add_jobs(app.state.workspace, 2)
     for job in jobs:
-        _, error = mcp.call(
-            "notes_create", {"job_id": job["id"], "value": {"body": "Synthetic note."}}
-        )
+        _, error = mcp.call("notes_create", {"job_id": job["id"], "body": "Synthetic note."})
         assert error is None, error
     notes = events_of(app, kind="note_added")
     assert len(notes) == 2 and len({item["batch_id"] for item in notes}) == 2
@@ -185,6 +183,6 @@ def test_no_removed_tool_or_route_remains(app, mcp, owner_token):
     }
     assert len(removed) == 19 and not removed & listed
     for path in ("/api/v1/runs", "/api/v1/questions", "/api/v1/requests", "/api/v1/skills/x/notes"):
-        assert client.get(path).status_code == 404
+        assert client.get(path).status_code == 410
     info = client.get("/api/v1/workspace").json()
     assert info["actor"] == "owner" and "open_requests" not in info

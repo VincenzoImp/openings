@@ -8,13 +8,13 @@ Payloads hold identifiers, field names and versions, never record content.
 
 from typing import Annotated
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field
 
 from .actors import AGENT_PREFIX, current_actor, current_batch
 from .common import new_id, now
 from .db import decode_record, encode
 from .errors import DomainError
-from .models import Input, normalized_date
+from .models import Since, SubjectRef, Until
 
 # Who wrote a row with an ``actor`` (or ``author``) label column, by filter value.
 WHO = {
@@ -100,7 +100,7 @@ def label(*parts):
     return " · ".join(part for part in parts if part)
 
 
-class EventQuery(Input):
+class EventQuery(SubjectRef):
     actor: str | None = Field(
         default=None,
         max_length=200,
@@ -115,8 +115,6 @@ class EventQuery(Input):
         default=False,
         description="Also list changes by the system (collection, worker, upgrade); they are left out unless actor=system.",
     )
-    subject_type: str | None = Field(default=None, max_length=50)
-    subject_id: str | None = Field(default=None, max_length=100)
     subject_types: list[Annotated[str, Field(min_length=1, max_length=50)]] | None = Field(
         default=None,
         max_length=20,
@@ -125,21 +123,10 @@ class EventQuery(Input):
     job_id: str | None = Field(default=None, max_length=100)
     application_id: str | None = Field(default=None, max_length=100)
     kind: str | None = Field(default=None, max_length=100)
-    since: str | None = None
-    until: str | None = None
+    since: Since | None = None
+    until: Until | None = None
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
-
-    @field_validator("since", "until")
-    @classmethod
-    def valid_date(cls, value, info):
-        return normalized_date(value, end=info.field_name == "until")
-
-    @model_validator(mode="after")
-    def whole_reference(self):
-        if self.subject_id is not None and self.subject_type is None:
-            raise ValueError("Provide subject_type when filtering by subject_id.")
-        return self
 
 
 # Current names of changed records, by subject type; deleted records have none.

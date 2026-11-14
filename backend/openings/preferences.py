@@ -30,7 +30,7 @@ from .actors import current_actor
 from .common import encode, now
 from .errors import DomainError, conflict
 from .job_signals import normalize_languages
-from .models import Input
+from .models import Input, NonBlank
 
 SECTIONS = ("looking_for", "ruled_out", "facts", "writing", "working_with_me")
 SECTION_TITLES = {
@@ -59,21 +59,13 @@ _CODE = re.compile(r"^[a-z]{2}$")
 
 
 class PreferenceItem(Input):
-    text: str = Field(
+    text: NonBlank = Field(
         min_length=1, max_length=MAX_TEXT, description="The statement in the owner's words."
     )
     scope: Scope | None = Field(
         default=None,
         description="Writing rules only: all (the default), cv or letter. Other sections take none.",
     )
-
-    @field_validator("text")
-    @classmethod
-    def not_blank(cls, value):
-        value = value.strip()
-        if not value:
-            raise ValueError("Write the statement; an empty one is left out.")
-        return value
 
 
 class PreferencesUpdate(Input):

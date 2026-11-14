@@ -96,11 +96,11 @@ def test_stats_on_rest_and_the_removed_routes(client):
     assert result["period"] == "12m" and result["applied"] == 0
     assert client.get("/api/v1/stats?period=week").status_code == 422
     for path in ("/api/v1/overview", "/api/v1/insights", "/api/v1/collection/yield"):
-        assert client.get(path).status_code == 404, path
+        assert client.get(path).status_code == 410, path
 
 
 def test_stats_on_mcp_and_the_removed_tools(mcp):
-    value, error = mcp.call("stats_get", {"value": {"period": "all"}})
+    value, error = mcp.call("stats_get", {"period": "all"})
     assert error is None and value["period"] == "all"
     for name, replacement in (
         ("insights_get", "stats_get"),

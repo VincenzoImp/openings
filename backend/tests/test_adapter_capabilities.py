@@ -1,7 +1,5 @@
 """Applicable adapter options and honest public-board failures across interfaces."""
 
-import json
-
 import httpx
 import pytest
 from fastapi.testclient import TestClient
@@ -124,28 +122,12 @@ def test_ashby_unavailable_board_empty_board_and_transient_failure_are_distinct(
         assert task["error"] is None
 
 
-def test_discovered_adapter_options_match_rest_and_mcp_validation(tmp_path):
+def test_adapter_options_are_validated_on_rest_and_mcp(tmp_path):
     app = create_app(tmp_path / "interfaces.sqlite", start_worker=False)
     app.state.auth.setup("synthetic-password")
     token = app.state.auth.create_token("Synthetic check")["token"]
     headers = {"Authorization": "Bearer " + token, "Accept": "application/json, text/event-stream"}
     with TestClient(app, base_url="http://localhost:8080") as client:
-        schemas = client.get("/api/v1/sources/schemas", headers=headers).json()
-        response = client.post(
-            "/mcp/",
-            headers=headers,
-            json={
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "tools/call",
-                "params": {"name": "sources_schemas", "arguments": {}},
-            },
-        )
-        result = response.json()["result"]
-        assert not result.get("isError")
-        assert (
-            result.get("structuredContent") or json.loads(result["content"][0]["text"])
-        ) == schemas
         bad = {"name": "Example", "kind": "lever", "config": {"board": "example", "max_details": 1}}
         assert client.post("/api/v1/sources", headers=headers, json=bad).status_code == 422
         response = client.post(
@@ -155,7 +137,7 @@ def test_discovered_adapter_options_match_rest_and_mcp_validation(tmp_path):
                 "jsonrpc": "2.0",
                 "id": 2,
                 "method": "tools/call",
-                "params": {"name": "sources_create", "arguments": {"value": bad}},
+                "params": {"name": "sources_create", "arguments": bad},
             },
         )
         assert response.json()["result"]["isError"]

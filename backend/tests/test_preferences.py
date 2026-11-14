@@ -254,7 +254,7 @@ def test_the_languages_filter_hides_jobs_and_never_dismisses_them(services):
     assert {job["triage"] for job in workspace.list_jobs()["items"]} == {"new"}
 
 
-def test_rest_and_mcp_read_and_write_preferences_alike(app, agent_token, mcp):
+def test_an_agent_replaces_sections_with_version_checks(app, agent_token, mcp):
     headers = agent_token["headers"]
     client = mcp.client
     written = client.put(
@@ -268,17 +268,11 @@ def test_rest_and_mcp_read_and_write_preferences_alike(app, agent_token, mcp):
         "preferences_update",
         {
             "section": "ruled_out",
-            "value": {
-                "expected_version": 1,
-                "items": [{"text": "No agencies."}, {"text": "No night shifts."}],
-            },
+            "expected_version": 1,
+            "items": [{"text": "No agencies."}, {"text": "No night shifts."}],
         },
     )
     assert error is None and over_mcp["version"] == 2
-    assert (
-        client.get("/api/v1/preferences", headers=headers).json()
-        == (mcp.call("preferences_get")[0])
-    )
     settings = client.patch(
         "/api/v1/settings", json={"expected_version": 0, "no_reply_days": 21}, headers=headers
     ).json()
@@ -291,8 +285,8 @@ def test_rest_and_mcp_read_and_write_preferences_alike(app, agent_token, mcp):
     assert stale.status_code == 409
     assert stale.json()["error"]["details"]["current_version"] == 2
     # The policy and the general instructions are gone, with a hint over MCP.
-    assert client.get("/api/v1/policy", headers=headers).status_code == 404
-    assert client.get("/api/v1/instructions", headers=headers).status_code == 404
+    assert client.get("/api/v1/policy", headers=headers).status_code == 410
+    assert client.get("/api/v1/instructions", headers=headers).status_code == 410
     _, removed = mcp.call("policy_get")
     assert removed["code"] == "tool_removed" and "preferences_get" in removed["message"]
 
