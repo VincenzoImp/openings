@@ -1,6 +1,7 @@
 """Hot reads and cascade deletes use indexes instead of full table scans."""
 
 import sqlite3
+from contextlib import closing
 
 from openings.discovery.sources import SOURCE_COUNTS
 
@@ -35,7 +36,7 @@ QUERIES = [
 
 
 def test_queries_do_not_scan_their_table(database_path):
-    with sqlite3.connect(database_path) as conn:
+    with closing(sqlite3.connect(database_path)) as conn:
         for sql, table in QUERIES:
             plan = conn.execute("EXPLAIN QUERY PLAN " + sql, ("x",) * sql.count("?")).fetchall()
             details = [row[-1] for row in plan]

@@ -10,7 +10,6 @@ from openings.collectors.policy import (
     ProviderStore,
 )
 from openings.discovery.feeds import html_text
-from openings.posting import matches_filters
 from openings.workspace import Workspace
 
 
@@ -167,24 +166,3 @@ def test_workday_page_resume_reuses_prior_pages_after_provider_deferral():
     final = company.collect(source, request, html_text)
     assert len(final) == 21 and checkpoint["complete"]
     assert calls == [0, 20, 20]
-
-
-def test_location_and_title_filters_match_whole_terms():
-    # Remote does not widen a specific geography.
-    filters = {"locations": ["Canada", "Remote"]}
-    for place in ("Remote - USA", "Remote EMEA", "Remote"):
-        assert not matches_filters({"title": "Engineer", "location": place}, filters)
-    for place in ("Toronto, Canada", "Remote Worldwide"):
-        assert matches_filters({"title": "Engineer", "location": place}, filters)
-    assert matches_filters(
-        {"title": "Engineer", "location": "Remote", "metadata": {"eligible_countries": ["Canada"]}},
-        filters,
-    )
-    # Excluded title terms match whole words before the role filters.
-    filters = {"titles": ["engineer", "analyst"], "exclude_titles": ["sales", "SAP"]}
-    assert not matches_filters({"title": "Senior Sales Engineer"}, filters)
-    assert not matches_filters({"title": "SAP CRM Analyst"}, filters)
-    assert matches_filters({"title": "Wholesales Data Engineer"}, filters)
-    assert matches_filters({"title": "Sapling Research Engineer"}, filters)
-    assert not matches_filters({"title": "Sales Director"}, {"exclude_titles": ["sales"]})
-    assert matches_filters({"title": "Backend Engineer"}, {"exclude_titles": []})

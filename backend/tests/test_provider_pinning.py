@@ -1,78 +1,23 @@
-"""Provider sessions (requests and curl) connect only to the checked public address."""
+"""Public fetches and provider sessions (requests, curl) connect only to the checked address."""
 
-import ipaddress
 import socket
-import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 from curl_cffi import CurlOpt
 
-from discovery_fixtures import patch_discovery
+from discovery_fixtures import open_gate, patch_discovery, synthetic_resolver
 from openings._vendor.jobspy.util import RequestsRotating, TLSRotating
 from openings.collectors.pinning import PinnedAdapter, curl_resolve_entry
-from openings.collectors.policy import ProviderPatch
 from openings.discovery import DiscoveryService, network
 from openings.errors import DomainError
-from openings.workspace import Workspace
 
 
 @pytest.fixture
-def local_server():
-    seen = []
-
-    class Handler(BaseHTTPRequestHandler):
-        def do_GET(self):
-            seen.append((self.headers["Host"].split(":")[0], self.path))
-            if self.path == "/start":
-                self.send_response(302)
-                self.send_header("Location", self.server.redirect)
-                self.send_header("Content-Length", "0")
-                self.end_headers()
-                return
-            body = b"internal"
-            self.send_response(200)
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def log_message(self, *args):
-            pass
-
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    server.seen = seen
-    thread = threading.Thread(
-        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
-    )
-    thread.start()
-    yield server
-    server.shutdown()
-    server.server_close()
-    thread.join(timeout=5)
-
-
-@pytest.fixture
-def gate(tmp_path, monkeypatch):
-    service = DiscoveryService(Workspace(tmp_path / "pinning.sqlite"))
-    service.update_provider("manual", ProviderPatch(expected_version=1, min_interval_seconds=0))
+def gate(workspace):
+    """The provider gate with its real URL checks; only DNS answers are scripted."""
+    service = DiscoveryService(workspace)
+    open_gate(service, "manual")
     return service
-
-
-def synthetic_resolver(monkeypatch, answers):
-    """Return the next scripted address for each lookup of a host; names never reach DNS."""
-    calls = []
-
-    def resolve(host, port, *args, **kwargs):
-        if host in answers:
-            calls.append(host)
-            address = answers[host].pop(0)
-        else:
-            address = str(ipaddress.ip_address(host))  # the pinned dial itself
-        family = socket.AF_INET6 if ":" in address else socket.AF_INET
-        return [(family, socket.SOCK_STREAM, 6, "", (address, port))]
-
-    monkeypatch.setattr(network.socket, "getaddrinfo", resolve)
-    return calls
 
 
 def session_for(gate, session_class):
@@ -83,6 +28,32 @@ def session_for(gate, session_class):
 
 def runtime(gate):
     return gate.providers.get("manual")["runtime"]
+
+
+def test_a_public_fetch_connects_only_to_the_checked_address(gate, monkeypatch, local_server):
+    """``fetch_bytes`` (httpx): each hop is checked, then dialed at the checked address."""
+    port = local_server.server_address[1]
+    budget = gate.http_budget("manual")
+    with monkeypatch.context() as public:
+        patch_discovery(public, "is_public_address", lambda address: address == "127.0.0.1")
+        synthetic_resolver(public, {"pinned.test": ["127.0.0.1"] * 2})
+        assert network.fetch_bytes(f"http://pinned.test:{port}/page", budget=budget) == b"internal"
+        assert local_server.seen == [("pinned.test", "/page")]
+        local_server.redirect = f"http://rebind.test:{port}/secret"
+        synthetic_resolver(
+            public,
+            {"start.test": ["127.0.0.1", "127.0.0.1"], "rebind.test": ["127.0.0.1", "10.0.0.8"]},
+        )
+        with pytest.raises(DomainError) as refused:
+            network.fetch_bytes(f"http://start.test:{port}/start", budget=budget)
+        assert refused.value.code == "private_url"
+        assert local_server.seen[1:] == [("start.test", "/start")]
+    # A name that rebinds to a private address after the URL check is refused unconnected.
+    calls = synthetic_resolver(monkeypatch, {"rebind.test": ["93.184.216.34", "127.0.0.1"]})
+    with pytest.raises(DomainError) as refused:
+        network.fetch_bytes(f"http://rebind.test:{port}/secret", budget=budget)
+    assert refused.value.code == "private_url" and calls == ["rebind.test", "rebind.test"]
+    assert len(local_server.seen) == 2
 
 
 @pytest.mark.parametrize("session_class", [RequestsRotating, TLSRotating])

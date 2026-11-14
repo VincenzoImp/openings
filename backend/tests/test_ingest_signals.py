@@ -12,7 +12,7 @@ import pytest
 
 from discovery_fixtures import patch_discovery
 from openings.actors import OWNER, acting_as, token_actor
-from openings.discovery import DiscoveryService, SourceCreate
+from openings.discovery import SourceCreate
 from openings.language_signals import language_requirements, posting_language, text_signals
 from openings.workspace import Workspace
 
@@ -183,10 +183,10 @@ def test_triage_reasons_and_who_dismissed(services):
         workspace.set_triage(third["id"], "shortlisted", third["version"], "Nice")
 
 
-def test_a_board_that_stops_listing_a_posting_marks_it_and_dismisses_nothing(tmp_path, monkeypatch):
-    workspace = Workspace(tmp_path / "collection.sqlite")
-    service = DiscoveryService(workspace)
-    workspace.discovery = service
+def test_a_board_that_stops_listing_a_posting_marks_it_and_dismisses_nothing(
+    collection, monkeypatch
+):
+    workspace, service = collection
     source = service.create_source(
         SourceCreate(name="Example board", kind="greenhouse", config={"board": "example"})
     )
@@ -225,7 +225,7 @@ def test_a_board_that_stops_listing_a_posting_marks_it_and_dismisses_nothing(tmp
     assert second["state"] == "succeeded" and second["result"]["unlisted"] == 2
     after = {item["title"]: item for item in workspace.list_jobs()["items"]}
     assert after["Engineer 2"]["signals"]["no_longer_listed"]
-    # A label only: the job waits in the Inbox.
+    # A label only: the job stays New.
     assert after["Engineer 2"]["triage"] == "new"
     assert (
         after["Engineer 3"]["triage"] == "shortlisted"

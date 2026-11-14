@@ -6,11 +6,12 @@ Providers are synthetic and nothing sleeps: the lane's idle waits advance the cl
 import json
 import logging
 import threading
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 import pytest
 
 from discovery_fixtures import patch_discovery
+from doubles import START, Clock, Lane
 from openings import retention
 from openings.collectors import policy
 from openings.collectors.policy import ProviderDeferred, ProviderPatch
@@ -19,39 +20,7 @@ from openings.errors import DomainError
 from openings.worker import Worker
 from openings.workspace import Workspace
 
-START = datetime(2026, 3, 2, 8, 0, tzinfo=UTC)
 BOARD_URL = "https://boards-api.greenhouse.io/v1/boards/example/jobs"
-
-
-class Clock:
-    def __init__(self):
-        self.moment = START
-
-    def advance(self, seconds):
-        self.moment += timedelta(seconds=seconds)
-
-    def stamp(self, offset=0):
-        return (self.moment + timedelta(seconds=offset)).isoformat(timespec="microseconds")
-
-    @property
-    def elapsed(self):
-        return (self.moment - START).total_seconds()
-
-
-class Lane:
-    """The stop event of a lane: an idle wait advances the clock instead of sleeping."""
-
-    def __init__(self, clock, idle):
-        self.clock, self.idle, self.waits, self.stopped = clock, idle, [], False
-
-    def is_set(self):
-        return self.stopped
-
-    def wait(self, seconds):
-        self.waits.append(seconds)
-        self.clock.advance(seconds)
-        self.stopped = len(self.waits) >= self.idle
-        return self.stopped
 
 
 @pytest.fixture
@@ -109,7 +78,7 @@ def emit(source, *keys):
 
 
 def collect(worker, clock, idle=1, owner="worker-a"):
-    stopping = Lane(clock, idle)
+    stopping = Lane(idle, clock)
     worker._loop(owner, stopping, "collect")
     return stopping
 
@@ -419,7 +388,7 @@ def test_lanes_survive_a_failed_cycle(clock, caplog):
     assert "background worker could not complete this cycle" in caplog.text
 
     scheduler = Stub(failures=1)
-    stopping = Lane(clock, 3)
+    stopping = Lane(3, clock)
     with caplog.at_level(logging.ERROR, logger="openings.worker"):
         Worker(None, scheduler)._schedule_loop(stopping)
     assert scheduler.cycles == 3 and stopping.waits == [15, 15, 15]
@@ -465,12 +434,12 @@ def test_missed_daily_slots_coalesce_into_one_run(lane, clock, monkeypatch):
     def runs():
         return service.list_runs(source_id=source["id"])["items"]
 
-    worker._schedule_loop(Lane(clock, 2))
+    worker._schedule_loop(Lane(2, clock))
     assert runs() == []
 
     # Two days without a scheduler leave seven elapsed slots.
     clock.advance(2 * 86400 + 5 * 3600 - 30)
-    stopping = Lane(clock, 3)
+    stopping = Lane(3, clock)
     worker._schedule_loop(stopping)
     assert stopping.waits == [15, 15, 15]
     assert len(runs()) == 1
@@ -480,15 +449,15 @@ def test_missed_daily_slots_coalesce_into_one_run(lane, clock, monkeypatch):
 
     # A slot that elapses while the run is still active is absorbed by it.
     clock.advance(6 * 3600)
-    worker._schedule_loop(Lane(clock, 1))
+    worker._schedule_loop(Lane(1, clock))
     assert len(runs()) == 1
     collect(worker, clock)
     assert service.get_run(planned["id"])["state"] == "succeeded"
-    worker._schedule_loop(Lane(clock, 1))
+    worker._schedule_loop(Lane(1, clock))
     assert len(runs()) == 1
 
     clock.advance(12 * 3600)
-    worker._schedule_loop(Lane(clock, 1))
+    worker._schedule_loop(Lane(1, clock))
     assert sorted(service.get_run(run["id"])["planned_at"] for run in runs()) == [
         "2026-03-04T12:00:00.000000+00:00",
         "2026-03-05T06:00:00.000000+00:00",
@@ -501,11 +470,11 @@ def test_paused_automation_schedules_nothing_until_resumed(lane, clock):
     paused = make_source(service, board="paused")
     service.update_collection(CollectionWrite(enabled=False, expected_version=0))
     clock.advance(3 * 86400)
-    worker._schedule_loop(Lane(clock, 2))
+    worker._schedule_loop(Lane(2, clock))
     assert service.list_runs()["total"] == 0
 
     service.update_collection(CollectionWrite(enabled=True, expected_version=1))
-    worker._schedule_loop(Lane(clock, 2))
+    worker._schedule_loop(Lane(2, clock))
     # One run for the enabled source, however many intervals passed; none for the paused one.
     assert [run["source_id"] for run in service.list_runs()["items"]] == [source["id"]]
     assert service.list_runs(source_id=paused["id"])["total"] == 0
@@ -516,7 +485,7 @@ def test_paused_automation_schedules_nothing_until_resumed(lane, clock):
     )
     service.cancel_run(service.list_runs()["items"][0]["id"])
     clock.advance(3 * 86400)
-    worker._schedule_loop(Lane(clock, 2))
+    worker._schedule_loop(Lane(2, clock))
     assert service.list_runs()["total"] == 1
 
 

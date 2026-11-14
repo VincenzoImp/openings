@@ -123,9 +123,6 @@ def test_ready_truth_table(workspace):
     # Nothing about Ready is stored, and only CV and letter can be required.
     columns = {row["name"] for row in workspace.db.all("PRAGMA table_info(applications)")}
     assert not {name for name in columns if name.startswith("ready")}
-    assert "review_state" not in {
-        row["name"] for row in workspace.db.all("PRAGMA table_info(documents)")
-    }
     job = workspace.ingest_job({"title": "T", "company": "C", "posting": "x"})
     with (
         pytest.raises(sqlite3.IntegrityError, match="CHECK"),

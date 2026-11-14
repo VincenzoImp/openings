@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import type { Options } from "./tests/fixtures";
 
 // The global setup seeds one synthetic workspace; every worker serves its own
 // copy and restores it before each test (tests/server.ts, tests/fixtures.ts),
@@ -10,7 +11,7 @@ const SCREENSHOTS = "screenshots.spec.ts";
 const desktop = { width: 1440, height: 1000 };
 const mobile = { width: 390, height: 844 };
 
-export default defineConfig({
+export default defineConfig<Options>({
   testDir: "./tests",
   testMatch: "*.spec.ts",
   fullyParallel: true,
@@ -49,11 +50,12 @@ export default defineConfig({
       timeout: 300000,
       use: { browserName: "chromium", viewport: desktop },
     },
-    // Images of every screen for visual review (`npm run screenshots`).
+    // Images of every screen for visual review (`npm run screenshots`);
+    // each screen adds the owner cookie itself unless it shows sign-in.
     {
       name: "screenshots",
       testMatch: SCREENSHOTS,
-      use: { browserName: "chromium" },
+      use: { browserName: "chromium", signedIn: false },
     },
   ],
 });

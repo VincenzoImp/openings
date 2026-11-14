@@ -1,19 +1,25 @@
 """Scheduled local backups, pre-upgrade copies and the owner's access to them (#205)."""
 
+import hashlib
+import json
 import shutil
 import sqlite3
 import stat
 import threading
 from contextlib import closing
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
-from openings import backups, compaction
-from openings.app import create_app
+from doubles import Lane
+from openings import backups, compaction, operations
+from openings.common import now
 from openings.db import SCHEMA_VERSION, Database
+from openings.discovery import DiscoveryService
 from openings.errors import DomainError
+from openings.operations import restore_database
 from openings.worker import Worker
 from openings.workspace import Workspace
 
@@ -143,20 +149,6 @@ def test_a_backup_runs_when_due_and_not_before(tmp_path):
     assert backups.last_attempt(workspace.db) == attempt
 
 
-class OneCycle:
-    """A stop event that ends the scheduler loop after its first idle wait."""
-
-    def __init__(self):
-        self.stopped = False
-
-    def is_set(self):
-        return self.stopped
-
-    def wait(self, seconds):
-        self.stopped = True
-        return True
-
-
 class IdleDiscovery:
     def schedule_due(self, stopping):
         return None
@@ -166,11 +158,11 @@ def test_the_worker_backs_up_on_its_cycle_and_survives_a_failure(tmp_path, monke
     workspace = Workspace(tmp_path / "openings.sqlite")
     worker = Worker(workspace, IdleDiscovery())
     worker.prune_seconds = 10**9
-    worker._schedule_loop(OneCycle())
+    worker._schedule_loop(Lane())
     assert len(backups.scheduled(tmp_path / "backups")) == 1
     assert worker.heartbeat_age() is not None
     # Not due again: the next cycle leaves the one backup.
-    worker._schedule_loop(OneCycle())
+    worker._schedule_loop(Lane())
     assert len(backups.scheduled(tmp_path / "backups")) == 1
 
     def broken(*_):
@@ -179,7 +171,7 @@ def test_the_worker_backs_up_on_its_cycle_and_survives_a_failure(tmp_path, monke
     for item in (tmp_path / "backups").iterdir():
         item.unlink()
     monkeypatch.setattr(backups, "run_backup", broken)
-    worker._schedule_loop(OneCycle())
+    worker._schedule_loop(Lane())
     assert backups.last_attempt(workspace.db)["outcome"] == "failed"
 
 
@@ -228,7 +220,7 @@ def test_the_owner_lists_downloads_and_deletes_kept_copies(kept, client):
 
 
 def test_names_outside_the_listing_are_not_found(kept, app, owner_token):
-    """Exact names of the listing only; an owner token reaches them (agents: test_interfaces)."""
+    """Exact names of the listing only; an owner token reaches them (agents: test_parity)."""
     headers = owner_token["headers"]
     kept.path.with_name("unrelated.sqlite").write_bytes(b"synthetic")
     with TestClient(app, base_url="http://localhost:8080") as client:
@@ -255,29 +247,108 @@ def test_names_outside_the_listing_are_not_found(kept, app, owner_token):
         assert missing.value.status == 404
 
 
-def test_health_reports_the_backup_and_the_worker(tmp_path):
-    app = create_app(tmp_path / "openings.sqlite")
+def test_health_reports_the_backup_and_the_worker(app, client):
     workspace = app.state.workspace
-    with TestClient(app) as client:
-        body = client.get("/health").json()
-        assert body["status"] == "ok"
-        assert set(body["backup"]) == {"last_at", "age_hours", "ok"}
-        assert body["worker"]["heartbeat_age_seconds"] is not None
-        # The scheduler's first cycle writes the first backup.
-        deadline = datetime.now(UTC) + timedelta(seconds=10)
-        while not client.get("/health").json()["backup"]["ok"]:
-            assert datetime.now(UTC) < deadline
-            threading.Event().wait(0.05)
-        # A scheduler that stops cycling fails the healthcheck.
-        workspace.worker.beat -= workspace.worker.stall_seconds + 1
-        stalled = client.get("/health")
-        assert stalled.status_code == 503
-        assert stalled.json()["status"] == "worker_stalled"
-
-
-def test_health_without_a_worker(app, client):
     body = client.get("/health").json()
     assert body["status"] == "ok"
     assert body["backup"] == {"last_at": None, "age_hours": None, "ok": False}
     assert body["worker"] == {"heartbeat_age_seconds": None}
-    assert not (app.state.workspace.db.path.parent / "backups").exists()
+    assert not (workspace.db.path.parent / "backups").exists()
+    # The scheduler's first cycle writes the first backup and beats.
+    workspace.worker = Worker(workspace, IdleDiscovery())
+    workspace.worker.prune_seconds = 10**9
+    workspace.worker._schedule_loop(Lane())
+    workspace.worker.thread = threading.current_thread()  # a live scheduler thread
+    body = client.get("/health").json()
+    assert body["status"] == "ok" and body["backup"]["ok"] is True
+    assert body["worker"]["heartbeat_age_seconds"] is not None
+    # A scheduler that stops cycling fails the healthcheck.
+    workspace.worker.beat -= workspace.worker.stall_seconds + 1
+    stalled = client.get("/health")
+    assert stalled.status_code == 503
+    assert stalled.json()["status"] == "worker_stalled"
+
+
+# Restore
+
+
+def test_a_backup_keeps_exact_files_and_a_restore_keeps_provider_requests(workspace, tmp_path):
+    original = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build."})
+    value = b"synthetic file bytes"
+    sha = hashlib.sha256(value).hexdigest()
+    with workspace.db.transaction() as c:
+        c.execute("INSERT INTO blobs VALUES(?,?,?)", (sha, value, len(value)))
+        c.execute(
+            "INSERT INTO files(id,sha256,name,size,job_id,created_at) VALUES(?,?,?,?,?,?)",
+            ("f1", sha, "source.tex", len(value), original["id"], now()),
+        )
+    discovery = DiscoveryService(workspace)
+    provider = discovery.providers.get("linkedin")
+    workspace.db.backup(tmp_path / "before-requests.sqlite")
+    with closing(sqlite3.connect(tmp_path / "before-requests.sqlite")) as copy:
+        assert copy.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        assert copy.execute("SELECT content FROM blobs").fetchone()[0] == value
+    deadline = (datetime.now(UTC) + timedelta(minutes=20)).isoformat(timespec="microseconds")
+    workspace.db.execute(
+        "UPDATE providers SET runtime=? WHERE id='linkedin'",
+        (
+            json.dumps(
+                {
+                    "events": [datetime.now(UTC).timestamp()],
+                    "cooldown_until": deadline,
+                    "total_requests": 1,
+                }
+            ),
+        ),
+    )
+    # The installation's tokens stay as they are, with their last context read.
+    token = ("t1", "Agent", "synthetic-hash", now(), "agent", "2026-01-02T03:04:05Z")
+    workspace.db.execute(
+        "INSERT INTO api_tokens(id,name,token_hash,created_at,kind,context_read_at) "
+        "VALUES(?,?,?,?,?,?)",
+        token,
+    )
+    restore_database(workspace, tmp_path / "before-requests.sqlite")
+    assert workspace.db.one("SELECT * FROM api_tokens")["context_read_at"] == token[-1]
+    restored = discovery.providers.get("linkedin")
+    assert restored["runtime"]["cooldown_until"] == deadline
+    assert restored["runtime"]["requests_day"] == 1
+    assert restored["policy"] == provider["policy"]
+
+
+def test_a_refused_or_failed_restore_leaves_the_workspace_as_it_was(
+    workspace, tmp_path, monkeypatch
+):
+    kept = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build APIs."})
+    # A backup of an unsupported schema is refused without reading further.
+    for version in (1, 4):
+        archive = tmp_path / f"unsupported-{version}.sqlite"
+        with closing(sqlite3.connect(archive)) as connection:
+            connection.execute(f"PRAGMA user_version={version}")
+            connection.execute("CREATE TABLE marker(value TEXT)")
+            connection.commit()
+        original = archive.read_bytes()
+        with pytest.raises(DomainError) as refused:
+            restore_database(workspace, archive)
+        assert refused.value.code == "backup_version"
+        assert archive.read_bytes() == original
+    # A restore that fails after the copy began is rolled back and the worker restarts.
+    DiscoveryService(workspace)  # its providers' runtime is carried over the copy
+    backup = tmp_path / "backup.sqlite"
+    workspace.db.backup(backup)
+    later = workspace.ingest_job({"title": "Later engineer", "posting": "Run services."})
+    calls = []
+    workspace.worker = SimpleNamespace(
+        stop=lambda: calls.append("stop"), start=lambda: calls.append("start")
+    )
+
+    def broken(*_):
+        raise RuntimeError("Synthetic failure while restoring.")
+
+    monkeypatch.setattr(operations, "preserve_provider_runtime", broken)
+    with pytest.raises(RuntimeError):
+        restore_database(workspace, backup)
+    assert calls == ["stop", "start"]
+    assert {job["id"] for job in workspace.list_jobs()["items"]} == {kept["id"], later["id"]}
+    assert workspace.db.one("PRAGMA quick_check")["quick_check"] == "ok"
+    assert not list(workspace.db.path.parent.glob("*rollback*"))
