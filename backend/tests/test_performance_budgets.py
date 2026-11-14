@@ -1,16 +1,15 @@
 """Time budgets of the hot REST reads on a large synthetic workspace.
 
 The workspace has 25,000 jobs with their ingest signals, 500 applications in
-every stage, 20 company sources, Career evidence and 60 frozen contexts
-(large_fixtures.py). Each route is read once to warm up, then the median of
+every stage, 20 company sources and Career evidence (large_fixtures.py). Each route is read once to warm up, then the median of
 five reads must stay under its budget.
 
 The budgets were set from the median on an Apple M-series laptop, times three
 for a shared CI runner, times two again for noise, rounded up; a route that
 outgrows its budget has become several times slower, not a little noisier.
 Measured on the laptop (2026-11): applications 24 ms, Today's reads 38 ms in
-all, new 12 ms (29 ms with counts or facets), text search 106 ms, staleness
-6 ms; the three reads of a busy timeline (1,500 entries) 13 ms. Stats must stay
+all, new 12 ms (29 ms with counts or facets), text search 106 ms;
+the three reads of a busy timeline (1,500 entries) 13 ms. Stats must stay
 under 50 ms (#211).
 
 Run them alone with ``uv run pytest -m performance``; skip them with
@@ -26,12 +25,11 @@ from fastapi.testclient import TestClient
 from large_fixtures import seed_large, seed_signals
 from openings.app import create_app
 from openings.career import ClaimCreate, KnowledgeCreate, TemplateCreate
-from openings.documents import ContextCreate
 from timeline_fixtures import guided_application
 
 pytestmark = pytest.mark.performance
 
-JOBS, APPLICATIONS, SOURCES, CONTEXTS = 25_000, 500, 20, 60
+JOBS, APPLICATIONS, SOURCES = 25_000, 500, 20
 # The reads of the Today screen, measured together as one budget.
 TODAY = (
     "/api/v1/jobs?complete=false&limit=1",
@@ -50,7 +48,6 @@ BUDGETS_MS = {
     "jobs new counts": (("/api/v1/jobs?triage=new&limit=200&include_counts=true",), 200),
     "jobs new facets": (("/api/v1/jobs?triage=new&limit=200&include_facets=true",), 200),
     "jobs search": (("/api/v1/jobs?q=engineer&limit=200",), 700),
-    "staleness": (("/api/v1/staleness?status=all&stale_only=false",), 100),
     "stats": (("/api/v1/stats?period=all",), 50),
     "sources with counts": (("/api/v1/sources?limit=100",), 200),
     # Revisions are searched in the text derived from their sources.
@@ -83,11 +80,6 @@ def client(tmp_path_factory):
     career.create_template(
         TemplateCreate(name="Synthetic CV", tex="Synthetic TeX", is_default=True)
     )
-    drafts = workspace.db.all(
-        "SELECT id FROM applications WHERE status='shortlisted' ORDER BY id LIMIT ?", (CONTEXTS,)
-    )
-    for row in drafts:
-        app.state.documents.prepare_context(ContextCreate(application_id=row["id"]))
     with TestClient(app) as client:
         client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
         yield client

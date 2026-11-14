@@ -229,7 +229,10 @@ in, so an upgraded workspace has exactly the layout of a new one:
    0600): a JSON file with `format`, `from_schema`, `counts` and one section per
    removed table or field. Fields that leave the schema are kept there by record
    id under `dropped_columns`, and stored text that was not valid JSON under
-   `repaired_json` (the record keeps an empty value).
+   `repaired_json` (the record keeps an empty value). Prepared document
+   contexts go there too, with their parts and the metadata of their files, and
+   so does the content CV and letter revisions stored before 0.22; the bytes of
+   files only those contexts used stay in `openings.pre-0.24.sqlite`.
 4. It checks the new file (integrity, references between records, the number of
    rows of every table, applications that are not Closed, the bytes of stored
    files, the archive read back). If any check fails, the new file and the archive

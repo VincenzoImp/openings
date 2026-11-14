@@ -4,8 +4,7 @@ A CV or letter revision (``SOURCE_KINDS``) is its PDF and an optional TeX source
 the evidence it cites and an optional note. Creating it returns one-shot upload
 grants; it is incomplete until its PDF is stored, then complete and immutable
 (``sources.py``). Its readable text comes from the source, else from the PDF. Form
-answers and other documents keep structured content. Content stored on a CV or
-letter before 0.22 is kept read-only as ``legacy_content``.
+answers and other documents keep structured content.
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ from .sources import PDF, refresh_text, source_hash, store_pdf_text
 from .text import is_tex_source
 
 # Columns of a revision summary; the full record adds content, text and evidence.
-SUMMARY_COLUMNS = "id,application_id,context_id,kind,title,previous_id,text_from,version,created_at"
+SUMMARY_COLUMNS = "id,application_id,kind,title,previous_id,text_from,version,created_at"
 TEX = "application/x-tex"
 
 
@@ -55,139 +54,33 @@ def readable_lines(row) -> list[str]:
 class RevisionOperations:
     """Creating, reading, reviewing, comparing and deleting document revisions."""
 
-    def _validate_content(self, content, context, kind):
-        if not context:
-            return
-        snapshot = context["payload"]
-        evidence = {row["id"] for row in snapshot["knowledge"]}
-        claims = {row["id"]: row for row in snapshot["claims"]}
-        templates = [row for row in snapshot["templates"] if row["kind"] == kind]
-        rules = templates[0].get("rules", {}) if templates else {}
-
-        def walk(item):
-            if isinstance(item, dict):
-                supplied_evidence = item.get("evidence_ids", item.get("knowledge_ids"))
-                if supplied_evidence is not None and (
-                    not isinstance(supplied_evidence, list)
-                    or any(not isinstance(key, str) for key in supplied_evidence)
-                    or not set(supplied_evidence) <= evidence
-                ):
-                    raise DomainError(
-                        422,
-                        "unknown_evidence",
-                        "Content cites evidence outside its frozen context.",
-                    )
-                supplied_claims = item.get("claim_ids")
-                if supplied_claims is not None:
-                    if (
-                        not isinstance(supplied_claims, list)
-                        or any(not isinstance(key, str) for key in supplied_claims)
-                        or not set(supplied_claims) <= claims.keys()
-                    ):
-                        raise DomainError(
-                            422,
-                            "unapproved_claim",
-                            "Content cites unapproved claims or claims outside its frozen context.",
-                        )
-                    if supplied_evidence is not None and any(
-                        claims[key]["knowledge_id"] not in supplied_evidence
-                        for key in supplied_claims
-                    ):
-                        raise DomainError(
-                            422, "claim_evidence", "A claim does not belong to its cited evidence."
-                        )
-                if "bullets" in item and isinstance(item["bullets"], list):
-                    bullets = item["bullets"]
-                    if rules.get("max_bullets") and len(bullets) > rules["max_bullets"]:
-                        raise DomainError(
-                            422,
-                            "bullet_limit",
-                            "Content exceeds the selected template's bullet-count limit.",
-                        )
-                    for bullet in bullets:
-                        text = (
-                            bullet
-                            if isinstance(bullet, str)
-                            else bullet.get("text", "")
-                            if isinstance(bullet, dict)
-                            else ""
-                        )
-                        if not isinstance(text, str):
-                            raise DomainError(
-                                422, "bullet_text", "Structured bullet text must be a string."
-                            )
-                        if rules.get("max_bullet_chars") and len(text) > rules["max_bullet_chars"]:
-                            raise DomainError(
-                                422,
-                                "bullet_limit",
-                                "A bullet exceeds the selected template's character limit.",
-                            )
-                for child in item.values():
-                    walk(child)
-            elif isinstance(item, list):
-                for child in item:
-                    walk(child)
-
-        walk(content)
-        if kind == "answers":
-            answers = content.get("answers", {})
-            if isinstance(answers, dict):
-                for question in snapshot.get("questions", []):
-                    answer = answers.get(question.get("id"))
-                    if answer is None:
-                        continue
-                    maximum = question.get("max_length", question.get("max_chars"))
-                    if maximum and isinstance(answer, str) and len(answer) > maximum:
-                        raise DomainError(
-                            422,
-                            "answer_limit",
-                            f"Answer '{question.get('label', question.get('id'))}' exceeds its character limit.",
-                        )
-                    options = question.get("options", [])
-                    allowed = [
-                        option.get("value", option.get("label"))
-                        if isinstance(option, dict)
-                        else option
-                        for option in options
-                    ]
-                    if allowed and answer not in allowed:
-                        raise DomainError(
-                            422, "answer_choice", "An answer is not one of the permitted choices."
-                        )
-
     @staticmethod
-    def _validate_evidence(conn, context, claim_ids, knowledge_ids):
-        """Cited claims and Career entries come from the frozen context, else exist now."""
-        if context:
-            claims = {row["id"] for row in context["payload"]["claims"]}
-            entries = {row["id"] for row in context["payload"]["knowledge"]}
-        else:
+    def _validate_evidence(conn, claim_ids, knowledge_ids):
+        """Cited claims are approved and cited Career entries exist."""
 
-            def existing(table, ids, extra=""):
-                if not ids:
-                    return set()
-                marks = ",".join("?" for _ in ids)
-                return {
-                    row[0]
-                    for row in conn.execute(
-                        f"SELECT id FROM {table} WHERE id IN ({marks}){extra}", ids
-                    )
-                }
+        def existing(table, ids, extra=""):
+            if not ids:
+                return set()
+            marks = ",".join("?" for _ in ids)
+            return {
+                row[0]
+                for row in conn.execute(f"SELECT id FROM {table} WHERE id IN ({marks}){extra}", ids)
+            }
 
-            claims = existing("claims", claim_ids, " AND approved=1")
-            entries = existing("knowledge", knowledge_ids)
+        claims = existing("claims", claim_ids, " AND approved=1")
+        entries = existing("knowledge", knowledge_ids)
         if not set(claim_ids) <= claims:
             raise DomainError(
                 422,
                 "unapproved_claim",
-                "The revision cites unapproved claims or claims outside its frozen context.",
+                "The revision cites claims that are not approved or do not exist.",
                 {"claim_ids": sorted(set(claim_ids) - claims)},
             )
         if not set(knowledge_ids) <= entries:
             raise DomainError(
                 422,
                 "unknown_evidence",
-                "The revision cites Career entries outside its frozen context.",
+                "The revision cites Career entries that do not exist.",
                 {"knowledge_ids": sorted(set(knowledge_ids) - entries)},
             )
 
@@ -224,25 +117,11 @@ class RevisionOperations:
                         "revision_parent",
                         "A previous revision must belong to the same application and document kind.",
                     )
-                context_id = value.context_id or (previous["context_id"] if previous else None)
-                context = None
-                if context_id:
-                    context = self.context_record(
-                        conn, _get(conn, "contexts", context_id, "Application context")
-                    )
-                    if context["application_id"] != application["id"]:
-                        raise DomainError(
-                            422,
-                            "context_application",
-                            "The context belongs to another application.",
-                        )
-                if not source_kind:
-                    self._validate_content(value.content or {}, context, value.kind)
-                self._validate_evidence(conn, context, value.claim_ids, value.knowledge_ids)
+                self._validate_evidence(conn, value.claim_ids, value.knowledge_ids)
                 # A retry returns the revision it created: for a CV or letter, only while
                 # that revision has no file yet.
                 old = conn.execute(
-                    "SELECT id FROM documents d WHERE application_id=? AND context_id IS ? AND kind=? "
+                    "SELECT id FROM documents d WHERE application_id=? AND kind=? "
                     "AND title=? AND content=? AND previous_id IS ? AND note=? AND claim_ids=? "
                     "AND knowledge_ids=?"
                     + (
@@ -255,7 +134,6 @@ class RevisionOperations:
                     + " ORDER BY created_at LIMIT 1",
                     (
                         value.application_id,
-                        context_id,
                         value.kind,
                         value.title,
                         content,
@@ -270,12 +148,11 @@ class RevisionOperations:
                 else:
                     document_id = new_id()
                     conn.execute(
-                        "INSERT INTO documents(id,application_id,context_id,kind,title,content,previous_id,"
-                        "note,claim_ids,knowledge_ids,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                        "INSERT INTO documents(id,application_id,kind,title,content,previous_id,"
+                        "note,claim_ids,knowledge_ids,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
                         (
                             document_id,
                             value.application_id,
-                            context_id,
                             value.kind,
                             value.title,
                             content,
@@ -410,9 +287,8 @@ class RevisionOperations:
             content = result.pop("content")
             if result["kind"] not in SOURCE_KINDS:
                 result["content"] = json.loads(content)
-            for key in ("claim_ids", "knowledge_ids", "legacy_content"):
-                if result[key] is not None:
-                    result[key] = json.loads(result[key])
+            for key in ("claim_ids", "knowledge_ids"):
+                result[key] = json.loads(result[key])
             result["files"] = files[result["id"]]
             sources = [
                 file for file in result["files"] if is_tex_source(file["name"], file["media_type"])

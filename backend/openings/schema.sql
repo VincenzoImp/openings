@@ -132,39 +132,19 @@ CREATE TABLE templates (
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE UNIQUE INDEX templates_default ON templates(kind) WHERE is_default=1;
-CREATE TABLE contexts (
- id TEXT PRIMARY KEY, application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
- signature TEXT NOT NULL, created_at TEXT NOT NULL,
- -- The payload is rebuilt from frame literals and context_parts (snapshots.py); the
- -- other columns summarise it for lists.
- frame TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(frame)), job_title, company, note_preview, knowledge_count INTEGER,
- claim_count INTEGER, template_name, file_count INTEGER NOT NULL DEFAULT 0
-);
--- Derived from immutable contexts: the input versions each context froze. Rebuildable.
-CREATE TABLE context_inputs (
- context_id TEXT PRIMARY KEY REFERENCES contexts(id) ON DELETE CASCADE,
- created_at TEXT NOT NULL, profile_version INTEGER,
- templates TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(templates)),
- knowledge TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(knowledge)),
- claims TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(claims)),
- -- Short hashes of the parts it froze: Profile parts, Preferences statements and
- -- template contents, compared by staleness.py. Derived from the payload.
- parts TEXT CHECK(parts IS NULL OR json_valid(parts))
-);
 -- A document revision. A CV or letter (cv, letter) is its PDF and optional .tex
 -- source (files): it is complete once its PDF is stored. content stays '{}'; text is
 -- the readable text, from the source (text_from 'tex', documents/text.py) or else
--- from the PDF ('pdf', documents/pdf.py), NULL when none could be read;
--- legacy_content keeps, read-only, the content such a revision had before 0.22.
+-- from the PDF ('pdf', documents/pdf.py), NULL when none could be read.
 -- Form answers and other kinds keep structured content. claim_ids and
 -- knowledge_ids are the evidence it cites.
 CREATE TABLE documents (
  id TEXT PRIMARY KEY, application_id TEXT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
- context_id TEXT REFERENCES contexts(id) ON DELETE CASCADE, kind TEXT NOT NULL,
+ kind TEXT NOT NULL,
  title TEXT NOT NULL DEFAULT '', content TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(content)),
  previous_id TEXT REFERENCES documents(id) ON DELETE SET NULL,
  version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL,
- text TEXT, text_from TEXT CHECK(text_from IS NULL OR text_from IN ('tex','pdf')), legacy_content TEXT CHECK(legacy_content IS NULL OR json_valid(legacy_content)),
+ text TEXT, text_from TEXT CHECK(text_from IS NULL OR text_from IN ('tex','pdf')),
  note TEXT NOT NULL DEFAULT '',
  claim_ids TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(claim_ids) AND json_type(claim_ids)='array'),
  knowledge_ids TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(knowledge_ids) AND json_type(knowledge_ids)='array')
@@ -177,14 +157,13 @@ CREATE TABLE files (
  media_type TEXT NOT NULL DEFAULT 'application/octet-stream', size INTEGER NOT NULL,
  knowledge_id TEXT REFERENCES knowledge(id) ON DELETE CASCADE,
  template_id TEXT REFERENCES templates(id) ON DELETE CASCADE,
- context_id TEXT REFERENCES contexts(id) ON DELETE CASCADE,
  document_id TEXT REFERENCES documents(id) ON DELETE CASCADE,
  job_id TEXT REFERENCES jobs(id) ON DELETE CASCADE, created_at TEXT NOT NULL,
  -- The SHA-256 of the source a revision's PDF was built from; NULL for every other
  -- file, for a PDF-only revision and for PDFs uploaded before 0.22.
  source_sha256 TEXT,
- CHECK((knowledge_id IS NOT NULL)+(template_id IS NOT NULL)+(context_id IS NOT NULL)+
-       (document_id IS NOT NULL)+(job_id IS NOT NULL)=1)
+ CHECK((knowledge_id IS NOT NULL)+(template_id IS NOT NULL)+(document_id IS NOT NULL)+
+       (job_id IS NOT NULL)=1)
 );
 CREATE TABLE transfer_grants (
  token_hash TEXT PRIMARY KEY, payload TEXT NOT NULL CHECK(json_valid(payload)), method TEXT NOT NULL,
@@ -219,10 +198,7 @@ CREATE UNIQUE INDEX applications_active_job ON applications(job_id) WHERE status
 CREATE INDEX applications_status ON applications(status,updated_at);
 CREATE INDEX applications_deadline ON applications(deadline);
 CREATE INDEX documents_app ON documents(application_id,created_at);
-CREATE INDEX documents_context ON documents(context_id);
-CREATE INDEX contexts_app ON contexts(application_id,created_at);
 CREATE INDEX files_document ON files(document_id);
-CREATE INDEX files_context ON files(context_id);
 CREATE INDEX files_template ON files(template_id);
 CREATE INDEX files_knowledge ON files(knowledge_id);
 CREATE INDEX claims_knowledge ON claims(knowledge_id);
@@ -294,39 +270,6 @@ CREATE INDEX requests_job ON requests(job_id);
 CREATE INDEX requests_application ON requests(application_id);
 CREATE INDEX requests_knowledge ON requests(knowledge_id);
 CREATE INDEX requests_run ON requests(run_id);
--- Content-addressed parts of frozen contexts; context files are served from them.
-CREATE TABLE snapshot_parts (
- id INTEGER PRIMARY KEY, hash TEXT NOT NULL,
- kind TEXT NOT NULL DEFAULT 'text' CHECK(kind IN ('text','list','asset')),
- content TEXT NOT NULL, blob TEXT REFERENCES blobs(sha256),
- UNIQUE(hash,kind), CHECK((kind='asset')=(blob IS NOT NULL))
-);
-CREATE INDEX snapshot_parts_blob ON snapshot_parts(blob) WHERE blob IS NOT NULL;
-CREATE TABLE snapshot_list_items (
- list_id INTEGER NOT NULL REFERENCES snapshot_parts(id) ON DELETE CASCADE,
- position INTEGER NOT NULL, part_id INTEGER NOT NULL REFERENCES snapshot_parts(id),
- PRIMARY KEY(list_id,position)
-) WITHOUT ROWID;
-CREATE INDEX snapshot_list_items_part ON snapshot_list_items(part_id);
-CREATE TABLE context_parts (
- context_id TEXT NOT NULL REFERENCES contexts(id) ON DELETE CASCADE,
- position INTEGER NOT NULL, part_id INTEGER NOT NULL REFERENCES snapshot_parts(id),
- file_id TEXT, file_created_at TEXT,
- PRIMARY KEY(context_id,position)
-) WITHOUT ROWID;
-CREATE INDEX context_parts_part ON context_parts(part_id);
-CREATE UNIQUE INDEX context_parts_file ON context_parts(file_id) WHERE file_id IS NOT NULL;
-CREATE VIEW context_files AS
- SELECT cp.file_id AS id, p.blob AS sha256, json_extract(p.content,'$.path') AS name,
-  json_extract(p.content,'$.media_type') AS media_type, json_extract(p.content,'$.size') AS size,
-  NULL AS knowledge_id, NULL AS template_id, cp.context_id AS context_id,
-  NULL AS document_id, NULL AS job_id, coalesce(cp.file_created_at,c.created_at) AS created_at,
-  NULL AS source_sha256
- FROM context_parts cp JOIN snapshot_parts p ON p.id=cp.part_id JOIN contexts c ON c.id=cp.context_id
- WHERE cp.file_id IS NOT NULL;
-CREATE VIEW all_files AS
- SELECT id,sha256,name,media_type,size,knowledge_id,template_id,context_id,document_id,job_id,created_at,source_sha256 FROM files
- UNION ALL SELECT id,sha256,name,media_type,size,knowledge_id,template_id,context_id,document_id,job_id,created_at,source_sha256 FROM context_files;
 -- The owner's Preferences (preferences.py): five sections of statements in the
 -- owner's words, each replaced whole with its own version. An item is
 -- {"text": ...}, and in writing {"text": ..., "scope": "all"|"cv"|"letter"}.

@@ -5,7 +5,7 @@ A note's scope is its job, or one application of that job when
 an open run, that run. A job and an application each have at most one pinned
 note (partial unique indexes); pinning a note unpins the one pinned in its
 scope, and both changes are recorded. The application's pinned note is its
-standing guidance, which a new frozen context includes.
+standing guidance.
 """
 
 from ..actors import current_actor, pop_actor

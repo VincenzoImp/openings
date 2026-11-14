@@ -145,7 +145,7 @@ export function Answers({ application }: { application: Application }) {
       ) : (
         <EmptyState title="No form questions">
           Add the questions of the employer's application form. Your agent
-          drafts the answers from the same frozen copy of your record.
+          drafts the answers from your record.
         </EmptyState>
       )}
       <section aria-label="Questions of the form" className="stack">
@@ -224,7 +224,7 @@ export function Answers({ application }: { application: Application }) {
         >
           <p>
             <strong>{removing.label}</strong> and its saved answer are removed.
-            Frozen contexts and document revisions keep their copies.
+            Document revisions keep their copies.
           </p>
         </ConfirmDialog>
       )}

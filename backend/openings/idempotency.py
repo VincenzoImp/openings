@@ -21,7 +21,6 @@ TABLES = frozenset(
         "api_tokens",
         "applications",
         "claims",
-        "contexts",
         "documents",
         "jobs",
         "knowledge",

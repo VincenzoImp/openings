@@ -21,7 +21,7 @@ from openings.career import (
     TemplateUpdate,
 )
 from openings.discovery import CollectionWrite, DiscoveryService, SourceCreate, SourcePatch
-from openings.documents import ContextCreate, DocumentCreate, DocumentService, UploadReservation
+from openings.documents import DocumentCreate, DocumentService, UploadReservation
 from openings.errors import DomainError
 from openings.preferences import PreferencesService
 from openings.worker import Worker
@@ -208,11 +208,9 @@ def test_every_kind_of_write_leaves_an_attributed_record_without_content(tmp_pat
             note["id"], {"expected_version": note["version"], "body": secret + "!"}
         )
         application = workspace.create_application({"job_id": job["id"]})
-        context = documents.prepare_context(ContextCreate(application_id=application["id"]))
         document = documents.create_document(
             DocumentCreate(
                 application_id=application["id"],
-                context_id=context["id"],
                 kind="other",
                 content={"text": secret},
             )
@@ -256,7 +254,6 @@ def test_every_kind_of_write_leaves_an_attributed_record_without_content(tmp_pat
         "note_added",
         "note_edited",
         "note_deleted",
-        "context_prepared",
         "document_created",
         "document_deleted",
         "file_uploaded",

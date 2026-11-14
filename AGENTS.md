@@ -6,7 +6,7 @@ behavior. The running OpenAPI schema and MCP `tools/list` are the contract.
 - Keep business logic in shared services. Every dashboard action is a REST
   operation; every operation that is not owner-only is also an MCP tool. REST and
   MCP may offer more than the dashboard.
-- Preserve version checks, context/document immutability, exact file ownership,
+- Preserve version checks, document immutability, exact file ownership,
   reversible dismissal and deliberate permanent deletion.
 - Keep incomplete automatic candidates in collection checkpoints; admit usable
   posting text before archive and count bookkeeping. Preserve manual partial input.

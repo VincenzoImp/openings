@@ -284,11 +284,14 @@ class Database:
             source.backup(target)
 
     def collect_blobs(self):
-        """Remove snapshot parts and file bytes that nothing references any more."""
-        from .snapshots import collect_unused
-
+        """Remove file bytes that no file references any more."""
         with self.transaction() as conn:
             collect_unused(conn)
+
+
+def collect_unused(conn):
+    """Remove file bytes that no file references any more, in the caller's transaction."""
+    conn.execute("DELETE FROM blobs WHERE sha256 NOT IN (SELECT sha256 FROM files)")
 
 
 def encode(value):

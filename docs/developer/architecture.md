@@ -26,8 +26,8 @@ flowchart LR
 | `backend/openings/stats.py` | Stats of sent applications in a period: replies, interviews, the median days to a reply, the funnel and replies by source |
 | `backend/openings/career/` | Profile, detailed evidence, claims and templates |
 | `backend/openings/preferences.py` | The owner's Preferences: five free-text sections with their versions, and the settings `no_reply_days` and `spoken_languages` |
-| `backend/openings/documents/` | Frozen contexts, document revisions and scoped file transfers |
-| `backend/openings/snapshots.py`, `compaction.py` | Content-addressed storage of frozen contexts; giving freed pages back to the data volume |
+| `backend/openings/documents/` | Document revisions and scoped file transfers |
+| `backend/openings/compaction.py` | Giving freed pages back to the data volume |
 | `backend/openings/retention.py` | Refresh events, what an observation stores, pruning of finished collection runs and tasks |
 | `backend/openings/operations.py` | Backup credentials, restore, the room a restore needs and storage status |
 | `backend/openings/backups.py` | Scheduled local backups run by the worker, their rotation and status, and the owner's access to them and to the pre-upgrade copies `db.py` keeps |
@@ -69,13 +69,13 @@ belongs to the module of its concern.
 |---|---|
 | `workspace/` | `service.py` settings and the attributed change log; `jobs.py` job reads, filters and search; `job_changes.py` ingest, corrections, triage and Forget; `identity.py` URL lookup, duplicate candidates, distinct marks and Merge; `notes.py` notes, their author, run and pin; `timeline.py` the timeline of a job or an application; `readiness.py` computed Ready (the one rule lists, reads, counts and filters use); `applications.py` preparation summaries, lists and history; `application_changes.py` one open attempt per job, stages, Mark applied and its undo, deletion; `shortlist.py` the application a shortlist starts and its undo; `replies.py` employer replies through the application update; `bulk.py` per-item bulk results |
 | `discovery/` | `service.py` the provider gate (`http_budget`, `fetch_bytes`); `models.py` typed inputs; `network.py` the public-address policy and the bounded fetch; `resolution.py` board detection and source configuration; `feeds.py` posting readers (Lever, Ashby, RSS) and adapter dispatch; `sources.py` source schemas, preview and writes; `runs.py` the global switch, provider policies, queueing, scheduling and run records; `tasks.py` leases, retry and running one collection |
-| `documents/` | `contexts.py` frozen contexts and their staleness reports; `revisions.py` creation with upload grants, cited evidence, comparison and deletion; `sources.py` when a CV or letter is complete, the pairing of its source and PDF and its text; `text.py` readable text of a TeX source; `pdf.py` readable text of a PDF (pypdf); `latex.py` what CV and letter class commands print; `files.py` owned files and scoped transfer grants; `models.py` inputs |
+| `documents/` | `revisions.py` creation with upload grants, cited evidence, comparison and deletion; `sources.py` when a CV or letter is complete, the pairing of its source and PDF and its text; `text.py` readable text of a TeX source; `pdf.py` readable text of a PDF (pypdf); `latex.py` what CV and letter class commands print; `files.py` owned files and scoped transfer grants; `models.py` inputs |
 | `career/` | `profile.py` the Profile; `entries.py` Career entries; `claims.py`; `templates.py`; `imports.py`; `models.py` inputs and defaults; `records.py` row helpers shared with documents |
 | `interfaces/` | One module per area declaring its operations and binding them to its service: `core.py` (workspace, jobs, notes, applications), `career.py`, `documents.py`, `discovery.py`, `activity.py`, `agent_requests.py`, `preferences.py`, `stats.py`, `skills.py` and `system.py` (sign-in, tokens, capabilities, backup, restore, examples, export); `registry.py` the declaration and its binding |
 
 Services never import FastAPI routing or MCP registration; `interfaces/` binds
 them, and `app.py` calls each area in a fixed order. Smaller concerns stay single
-modules (`activity.py`, `outcomes.py`, `stats.py`, `staleness.py`,
+modules (`activity.py`, `outcomes.py`, `stats.py`,
 `job_signals.py` and the others in the code map). When a module approaches the
 limit, split it the same way rather than growing it.
 
@@ -112,7 +112,7 @@ an area. A tool is named `canonical_name`, `<resource>_<verb>` with a plural
 resource (decision 11); no tool is named by hand, so a clearer name means a
 clearer `resource` or `verb` (`files_reserve_upload`, `workspace_backup`,
 `tokens_revoke`). A singular resource names one record of the workspace or a
-mass noun (`profile`, `preferences`, `workspace`, `knowledge`, `staleness`).
+mass noun (`profile`, `preferences`, `workspace`, `knowledge`).
 
 A tool's arguments have one shape: the record ids a REST path names, flat;
 `expected_version` of a delete, flat; and one `value`, the REST body of a write
@@ -167,10 +167,11 @@ route, tool or surface is not registered.
   Mark applied (`status=applied`, `applied_at` defaulting to now) is the owner's
   act and never automatic; going back to Shortlisted undoes it while no reply
   exists. Forget permanently removes job-owned records.
-- **Snapshots:** preparing a context freezes the job, career evidence, instructions,
-  questions, selected templates and exact assets. Later profile edits affect new
-  contexts. A changed document is a new revision with its own uploaded files.
-  Attachment changes increment the document version.
+- **Revisions:** an agent writes from the live records (the application with its
+  pinned note, the job, Profile, Career, claims, templates and Preferences) and a
+  revision records the claim and Career entry ids it cites. A changed document is
+  a new revision with its own uploaded files. Attachment changes increment the
+  document version.
 - **Documents:** a CV or letter revision (`SOURCE_KINDS`: `cv`, `letter`) is its
   files: a required PDF and an optional `.tex` source (inline at creation, at most
   256 KB, or uploaded). Creating it returns one-shot upload grants (`uploads.pdf`,
@@ -197,35 +198,7 @@ route, tool or surface is not registered.
   the same text, so the stored text can be checked against it; a parser change
   needs a schema step that derives it again. `compare_documents` diffs two revisions' text by line with
   `difflib`; form answers keep structured content and compare it as
-  `path: value` lines. Content a CV or letter stored before schema 13 is kept
-  read-only in `legacy_content`.
-- **Snapshot storage:** a context's payload is one canonical JSON text, and its
-  signature is the SHA-256 of that text. `snapshots.py` stores the text as a frame
-  of literals with one part between each pair: every Career entry, claim and
-  template, the Profile, the job, the template guidance and each Preferences section are parts, stored
-  once in `snapshot_parts` under the SHA-256 of their own text and shared by all
-  contexts (`context_parts`; a list part names its items in `snapshot_list_items`).
-  Reading a context concatenates frame and parts, so payload and signature are
-  reproduced byte for byte without re-encoding; a payload without the canonical
-  form is kept whole. A context's asset files are parts too: the part names the
-  blob, the reference keeps the file id the payload exposes, and the `all_files`
-  view serves them beside the rows of `files`. Deleting an application or job
-  removes the parts and bytes nothing references any more, in the same transaction
-  or once per bulk run. Foreign keys make a dangling reference impossible.
-- **Staleness:** contexts are never rewritten. `context_inputs` is derived from
-  each payload: the versions it froze and `parts`, a 16-hex-digit SHA-256 prefix
-  of each Profile part, each Preferences statement of `facts` and `writing` (with
-  its scope) and the content of each template, entry and claim. `staleness.py`
-  compares them with the live records on read, only for what documents use
-  (`DOCUMENT_PROFILE_PARTS`, the statements of `DOCUMENT_SECTIONS`, identified by
-  content, so an edit is a removal and an addition,
-  `RECORD_FIELDS` of templates, entries and claims, prose with whitespace runs
-  collapsed): a moved version settles on its content hash, an equal version needs
-  no read. It filters a scoped writing rule per document kind. Rows without part hashes, or of another
-  `PARTS_FORMAT`, are derived again from the frozen payload when the workspace
-  opens or a report reads them; a payload that cannot be read stores no part
-  and is compared by whole Profile version. Refreshing means a new context and
-  new revisions.
+  `path: value` lines.
 - **Preferences:** `preference_sections` holds one row per section
   (`looking_for`, `ruled_out`, `facts`, `writing`, `working_with_me`) with its
   statements as a JSON array (`{text}`, and `{text, scope}` in `writing`), its
@@ -233,8 +206,7 @@ route, tool or surface is not registered.
   section, names its version and bumps it by one; an unchanged list writes
   nothing. Nothing is typed or applied automatically: the agent reads the text.
   The two values the product itself uses live in the `workspace` setting:
-  `no_reply_days` and `spoken_languages`. Preparing a context freezes the
-  sections (`payload.preferences`), each as its own content-addressed part.
+  `no_reply_days` and `spoken_languages`.
 - **Signals:** `job_signals` holds one row per job: the posting's language and
   confidence and the required language groups (one language of a group suffices;
   a language stated only as an advantage is not required) from `language_signals` (weighted function words and phrase
@@ -281,8 +253,8 @@ route, tool or surface is not registered.
   first and then by time, with counts by kind. An application's timeline holds
   its rows and its job's rows without an application. `note_added` and
   `note_edited` are not entries: the note is. The application's pinned note is
-  its standing guidance, which a new context freezes as `application.note` and
-  `instructions.application_note`; an application has no note field of its own.
+  its standing guidance, returned with the application as `pinned_note`; an
+  application has no note field of its own.
 - **Runs and questions:** a token has one open run (a partial unique index); its
   writes attach to it. A run without activity is reported as interrupted but
   only an explicit supersede closes it. A finished run stores its report and
@@ -333,7 +305,7 @@ route, tool or surface is not registered.
   names the current version.
 
 SQLite uses WAL and stores SHA-256-deduplicated BLOBs for attachments. Lists return
-compact paginated summaries; full postings, narratives, contexts and file bytes
+compact paginated summaries; full postings, narratives and file bytes
 are separate reads. Application preparation summaries count current revision leaves
 by kind and how many are complete; Ready and `missing` are computed from the same
 leaves and the unresolved blocking requirements. Byte downloads and record exports prepare a
@@ -362,6 +334,10 @@ schema go to `<stem>.pre-0.24-archive.json` beside the database (mode 0600,
 written through a temporary name): `SECTIONS` of removed records, every
 non-default value of a dropped column (`dropped_columns`), stored texts that were
 not JSON (`repaired_json`) and any table nothing copies (`dropped_tables`).
+Document contexts leave this way: each context with the hashes of its parts,
+each part once by hash, the metadata of their files and the content CV and
+letter revisions stored before 0.22; bytes only context files referenced stay in
+the pre-upgrade copy.
 Before the swap it checks the new file's integrity, that no reference broke that
 was not broken before, the row count of every table (copied plus created), the
 `INVARIANTS` (applications not Closed besides those it starts, shortlisted jobs,

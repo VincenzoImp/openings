@@ -165,7 +165,6 @@ async def test_export_disconnect_closes_snapshot(spec_version, snapshots):
 @pytest.mark.asyncio
 async def test_export_preserves_nullable_career_dates_and_scoped_mcp_download(tmp_path):
     from openings.career import ClaimCreate, KnowledgeCreate, TemplateCreate
-    from openings.documents import ContextCreate
 
     app = create_app(tmp_path / "nullable-export.sqlite", start_worker=False)
     career, workspace, documents = app.state.career, app.state.workspace, app.state.documents
@@ -183,7 +182,9 @@ async def test_export_preserves_nullable_career_dates_and_scoped_mcp_download(tm
     career.create_template(TemplateCreate(name="Synthetic CV", tex="Example", is_default=True))
     job = workspace.ingest_job({"title": "Synthetic role", "posting": "Build reliable services."})
     application = workspace.create_application({"job_id": job["id"]})
-    documents.prepare_context(ContextCreate(application_id=application["id"]))
+    documents.create_document(
+        {"application_id": application["id"], "knowledge_ids": [undated["id"]]}
+    )
     with TestClient(app) as client:
         assert client.get("/api/v1/export").status_code == 401
         client.post("/api/v1/auth/setup", json={"password": "synthetic-password"})
@@ -199,5 +200,6 @@ async def test_export_preserves_nullable_career_dates_and_scoped_mcp_download(tm
     assert entries["Undated project"]["dates"] is None
     assert entries["Dated project"]["dates"]["start"] == "2025"
     assert archive["claims"][0]["id"] == claim["id"]
-    assert archive["contexts"][0]["payload"]["knowledge"][0]["dates"] is None
+    assert "contexts" not in archive
+    assert archive["documents"][0]["knowledge_ids"] == [undated["id"]]
     assert "auth" not in archive["settings"]

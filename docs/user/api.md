@@ -36,14 +36,14 @@ Paste the posting when extraction cannot obtain the complete text.
 |---|---|
 | Archive | `GET/POST /jobs`, `GET /jobs/resolve`, `GET /jobs/duplicates`, `POST /jobs/bulk`, `GET/PATCH/DELETE /jobs/{id}`, `POST /jobs/{id}/triage`, `/merge`, `/distinct`, `GET/POST /jobs/{id}/notes` |
 | Notes and timelines | `GET/PATCH/DELETE /notes/{id}`, `POST /notes/{id}/pin` plus job-owned list/create routes; `GET /jobs/{id}/timeline`, `GET /applications/{id}/timeline` |
-| Applications | `GET/POST /applications`, `POST /applications/bulk`, `GET/PATCH/DELETE /applications/{id}`, `GET /applications/{id}/events`, `GET /applications/{id}/staleness`, `GET /staleness` |
+| Applications | `GET/POST /applications`, `POST /applications/bulk`, `GET/PATCH/DELETE /applications/{id}`, `GET /applications/{id}/events` |
 | Employer replies | `PATCH /applications/{id}` with `reply`; `GET /stats` |
 | Career | `GET/PATCH /career/profile`, CRUD `/career/knowledge` and `/career/claims`, `POST /career/import/preview` then `/career/import` |
 | Preferences | `GET /preferences`, `PUT /preferences/{section}`, `PATCH /settings` |
 | Templates | CRUD `/templates` |
 | Collection | `GET/PATCH /collection`, `GET /providers`, `PATCH /providers/{id}`, CRUD `/sources`, `/sources/schemas`, preview/run, `/sources/bulk` and `/collection/runs` |
 | Tasks | `GET /tasks`, `GET /tasks/{id}`, `POST /tasks/{id}/cancel` or `/retry` |
-| Documents | `GET/POST /contexts`, `GET /contexts/{id}`, `GET/POST /documents`, `GET/DELETE /documents/{id}`, `GET /documents/{id}/comparison` |
+| Documents | `GET/POST /documents`, `GET/DELETE /documents/{id}`, `GET /documents/{id}/comparison` |
 | Files | `GET /files`, `GET/DELETE /files/{id}`, `GET /files/{id}/content`, `POST /files/uploads`, `POST /files/{id}/download` |
 | Agent activity | `GET /events`; `GET/POST /runs`, `GET/PATCH /runs/{id}`, `POST /runs/{id}/finish`; `GET/POST /questions`, `GET /questions/{id}`, `POST /questions/{id}/answer`, `POST /questions/{id}/withdraw`; `GET/POST /requests`, `GET /requests/{id}`, `POST /requests/{id}/take`, `/complete`, `/decline`, `/withdraw` |
 | Skills | `GET /skills`, `GET /skills/{name}`, `GET /skills/{name}/files/{path}`, `GET/PUT /skills/{name}/notes` |
@@ -70,10 +70,7 @@ Lists return summaries by default and take `summary=false` for full records:
 | `GET /collection/runs` | Run state, counts, timing, compact `tasks` (`id`, `kind`, `provider`, `state`, `attempts`, `error`, `next_run_at`, `updated_at`) | `source_snapshot` and full task payloads/results |
 
 `GET /sources/{id}` and `GET /collection/runs/{id}` always return the full record.
-Context lists never return payloads: with `summary=true` (the default) they
-include frozen job/template labels, evidence/claim counts, a bounded
-`note_preview` and file/document counts, and with `summary=false` only the id,
-application, signature and time. Files contain metadata only.
+Files contain metadata only.
 Versioned changes include the last read `expected_version`, and every delete
 names it as a query parameter, for example
 `DELETE /notes/{id}?expected_version=3`; a delete without it is refused with
@@ -90,11 +87,7 @@ fields stay present; read `GET /jobs/{id}` for the full posting.
 Application list/detail records include `preparation`: per-kind counts of current
 revision leaves (`revisions`) and of complete ones, their PDF stored
 (`complete`). A new revision inherits no files. These counts do not certify
-content quality or submission. `stale_inputs` lists the input kinds (`profile`, `preferences`,
-`template`, `knowledge`, `claim`) that changed after the contexts
-of the current leaves were frozen; it is empty when they are current.
-`stale_changes` holds the first three changes of the staleness report and
-`stale_changes_total` their number.
+content quality or submission.
 A version conflict returns HTTP 409 with the stored version, for example
 `{"error":{"code":"conflict","message":"…","details":{"current_version":4}}}`;
 reload before editing again. This includes settings records (profile,
@@ -251,10 +244,10 @@ DELETE /applications/APPLICATION_ID?expected_version=2
 ```
 
 Forgetting a job removes its identities, documents and application history.
-Deleting an application removes that attempt and its contexts/documents/files,
+Deleting an application removes that attempt and its documents/files,
 while preserving the job and other attempts; deleting a job's last application
-returns the job to `new`. Frozen contexts and complete revisions retain their
-content; create a new revision/context for changed input.
+returns the job to `new`. Complete revisions retain their content; create a new
+revision for changed input.
 
 The authenticated `/capabilities` list gives the version, the schema, the
 caller's `token_kind` and, for each operation, its MCP `name`, its main REST
@@ -308,8 +301,7 @@ each kind for the other filters; `limit` (at most 200) and `offset` page.
 An application's standing guidance is its pinned note. `GET
 /applications/{id}` returns `pinned_note` (the note record, or null); write it
 with the notes routes above. `q` on the application list searches the pinned
-notes. A frozen context carries the pinned note as `application.note` and
-`instructions.application_note`. An application has no `note` field since 0.23:
+notes. An application has no `note` field since 0.23:
 sending one is refused with `422 validation`.
 
 ## Runs, questions and the change log
@@ -535,11 +527,10 @@ settings, defaults, run counters and request pacing.
 
 ## Document and byte flow
 
-1. `POST /contexts` with `application_id` and optional `template_id`/`template_ids`,
-   evidence/claim IDs, note and `idempotency_key`. The context freezes the selected
-   profile, evidence, Preferences, template guidance, questions and template
-   assets.
-2. `POST /documents` with `application_id`, `context_id`, `kind`, `title`, the
+1. Read the live records the documents use: the application (with
+   `pinned_note`), the job, the Profile, Career entries and claims, templates
+   (with their files) and Preferences.
+2. `POST /documents` with `application_id`, `kind`, `title`, the
    evidence it uses (`claim_ids`, `knowledge_ids`) and an optional `note`. Kinds:
    `cv`, `letter`, `answers`, `other`. A CV or letter is a required PDF and an
    optional `.tex` source and takes no `content` (`422 content_not_accepted`):
@@ -553,7 +544,7 @@ settings, defaults, run counters and request pacing.
    names the source's SHA-256. `POST /files/uploads` still reserves other
    uploads with `owner_type`, `owner_id`, relative `name`, `media_type`, exact
    `size` in bytes and optional hex `sha256`. File owners are `knowledge`,
-   `template`, `document` or `job`; frozen context assets are read-only.
+   `template`, `document` or `job`.
 4. Resolve each returned relative `url` against the workspace origin and send raw
    bytes with its returned `method` and `headers`. This scoped transfer needs no
    owner bearer token. SHA-256 is always computed server-side. Files are limited
@@ -596,9 +587,7 @@ a source, the text is extracted from the PDF with a pure-Python reader
 (`text_from: "pdf"`); when extraction fails the revision has no text and is
 still complete. The text is for search and comparison; the PDF is the document.
 `GET /documents/{id}` returns `complete`, `text`, `text_from`, `source_sha256`, `claim_ids`,
-`knowledge_ids`, `note`, `files` and `legacy_content` (the content a CV or
-letter stored before 0.22, read-only, else null); form answers also return
-`content`. `GET /documents?q=` searches titles, notes and the readable text.
+`knowledge_ids`, `note` and `files`; form answers also return `content`. `GET /documents?q=` searches titles, notes and the readable text.
 
 `GET /documents/{id}/comparison` (MCP `documents_compare`) compares a revision's
 text with the revision it replaces, or with `other_id` of the same application,
@@ -607,64 +596,12 @@ the `added` and `removed` counts, and `text.document`/`text.other`, false for a
 side without text (a CV or letter whose text could not be read). Form answers compare their
 content as `path: value` lines.
 
-### Stale contexts
-
-A context prepared since 0.24 contains `preferences`: each section with its
-`version` and `items`. Earlier contexts are unchanged.
-
-Contexts record the inputs they froze: each selected template, Career entry and
-claim with its version, and a short hash of each Profile part, each Preferences
-statement and the content of each template, entry and claim.
-`GET /applications/{id}/staleness` compares them with the current records for
-each current revision leaf and returns `stale`, `inputs`, `changes` and
-per-document status (`current`, `stale` or `no_context`) with that document's
-`changes` and `comparison`.
-
-Only what documents use is compared:
-
-- **Profile:** the parts `name`, `headline`, `contact` (email, phone, location),
-  `links` and `summary`. `metadata` is frozen too but never makes a document
-  stale: rules and facts belong in Preferences. (Contexts frozen before 0.23
-  also hold the Profile's `preferences` and `roles`; they are not compared.)
-- **Preferences:** the statements of `facts` and `writing`, by content (text
-  and scope). The other sections and the order of statements are not compared.
-  A writing rule scoped to `cv` concerns the CV only, one scoped to `letter`
-  the letter only.
-- **Templates, entries and claims:** by the content documents
-  use: a template's kind, source, guidance and rules; an
-  entry's kind, title, organization, dates, skills and narrative; a claim's text
-  and entry. A new version that only changes a name, a position, the default
-  flag, a claim's `always_include` or
-  free-form `metadata` keeps documents current, and so does a change undone. A
-  claim that is no longer approved still counts. Entries and claims the context
-  did not freeze are ignored.
-- Text is compared with its runs of whitespace made single spaces, except a
-  template's source.
-
-A change has `input` (`profile`, `preferences`, `template`, `knowledge` or
-`claim`), `id` (the Profile part, `<section>:<hash>` for a statement, or the
-record), `label`, `state`, `frozen_version` and `current_version`; a
-Preferences change also has its `section`, its label is the statement's text
-and its versions are the section's. States: `changed`, `deleted` and
-`unapproved` for records; `added` and `removed` for statements (an edited
-statement is removed and added).
-
-`comparison` says what a document's context allowed: `profile` is `parts`, or
-`whole` when the frozen payload could not be read part by part (`id` is then
-null and the Profile version is compared); `preferences` is `items`, or
-`not_frozen` for a context prepared before 0.24, which is not compared for it.
-
-`GET /staleness` lists such reports across applications: `status` defaults to
-`shortlisted` (`all` for every stage), `stale_only` defaults to `true`,
-with `limit`/`offset`. These reads never change a context. To refresh an
-application, prepare a new context and save new revisions linked with `previous_id`.
-
 For direct downloads, authenticated `GET /files/{id}/content` supports PDF/image
 preview. External agents can reserve a scoped download via `POST /files/{id}/download`.
 Transfer URLs contain no secret; keep the returned headers private. The returned
 file metadata records exact bytes and ownership.
 
-Structured evidence references and supported bullet/answer limits are validated
-against the frozen context. PDF page targets and factual accuracy still require
-external/human review. Archiving an `answers` document does not change the live
+A revision may cite only approved claims (`422 unapproved_claim`) and existing
+Career entries (`422 unknown_evidence`). PDF page targets and factual accuracy
+still require external/human review. Archiving an `answers` document does not change the live
 application answers: update `PATCH /applications/{id}` explicitly for that.
