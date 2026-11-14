@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.24.0 — 2026-11-14
+
+A simpler Openings: a dashboard for you, a small sharp interface for your agent, and a new design. **This release changes stored data, REST and MCP; read the upgrade notes below before starting it.**
+
+**The dashboard, rebuilt for a person working by hand**
+
+- New design: neutral light and dark themes, Inter, icons, quiet lists whose actions appear on hover, read-first pages with Edit → Save, undo instead of confirm, ⌘K search, keyboard shortcuts everywhere, a real phone layout.
+- Navigation: Today · Jobs · Applications | Profile · Preferences · Templates | Sources · Settings.
+- **Today**: what is ready to send (Start applying), what needs attention, applications waiting too long for a reply (close them as no reply, with undo), new jobs.
+- **Jobs**: triage in one flow — shortlist (`s`) or dismiss (`d`) moves to the next job, `z` undoes, bulk selection, plain-word signals (language, required languages, possible duplicate, no longer listed) and a filter that hides jobs requiring languages you don't speak. On a phone the job opens full screen.
+- **Applications**: one list grouped by what needs action, small Stats, and an application page that follows the stage — what is missing while you prepare, posting/CV/letter side by side when Ready with **Mark applied** moving to the next one (with undo), history and **Record reply** once sent.
+- **Profile** reads like a CV, each block edited in place; highlights (formerly claims) are approved and starred for "always include". Import CV text with a preview.
+- **Preferences** replaces Policy: five plain-text sections (What I'm looking for, What I rule out, Facts about me, Writing rules for all/CV/letter, Working with me), languages you speak and the no-reply period.
+- **Sources** with per-source counts and a Test before saving; **Settings** with Account, API & agents, Data (backups, restore) and Advanced.
+- A first-run guide that starts with you; connecting an agent is optional and last.
+
+**Simpler product**
+
+- Shortlisting a job starts its application. **Ready is computed**: every required document (CV and letter by default) has a PDF and no blocking requirement is open. Per-document approval is gone; the TeX source is optional and text comes from the PDF when there is none.
+- Removed: agent runs, questions and requests ("Ask your agent"), the Activity screen and agent status, skill local notes, policy confirmation, typed values and the rules engine, frozen contexts and "inputs changed", Insights breakdowns, Yield, Board view, density, claim role/group (kept in metadata), template rule statements (moved to Writing rules).
+- Every change still records who made it (you, an agent token by name, or the system), and Jobs › Dismissed filters what an agent dismissed so you can restore it.
+
+**For agents and scripts (breaking)**
+
+- MCP has 44 tools instead of 129 (`tools/list` about 35k characters instead of 135k), server `instructions`, and `workspace_context` as the one start read (profile, preferences, career summary, templates, counts and your corrections since the agent's last read). Batch writes and reads for triage, applications, replies, career, highlights and sources. Owner-only operations (password, tokens, restore, export, career import) are not MCP tools.
+- Calling a removed or renamed tool answers with the tool to use instead; removed REST routes answer `410`.
+- Vocabulary: `inbox`/`saved` → `new`/`shortlisted`, stage `draft` → `shortlisted`, `resume`/`cover_letter` → `cv`/`letter`, `knowledge`/`claims` → `career`/`highlights`, `responses` → replies through `applications_update`, policy → preferences.
+- The 8 shipped skills are rewritten (about 31 KB instead of 126 KB). **Refresh your agent's skills** and remove old local copies.
+- OpenAPI now has descriptions, tags, a bearer scheme and one error model; the dashboard uses a client generated from it.
+
+**Upgrade notes**
+
+- Database schema 15. Only a schema-14 workspace (0.23.x) upgrades; open an older one with 0.23.1 first.
+- The upgrade builds a new database and copies your data in, so the result equals a fresh schema-15 workspace. The previous file is kept as `openings.pre-0.24.sqlite`, and every record of a removed feature is written to `openings.pre-0.24-archive.json` beside it (contexts, approval states, policy items, legacy content, removed columns). Neither is deleted automatically.
+- Policy items, general instructions and template statements become Preferences statements (long texts are split, never cut); unconfirmed items are marked as proposals. Saved jobs without an application get a Shortlisted application. Stored Ready marks are archived; Ready is computed from documents and requirements.
+- Rehearsed on a real 0.23.1 workspace (5,790 jobs, 539 applications, 2,215 document revisions): 2.1 s, every Ready application stayed Ready (190 of 190), 35 applications created for saved jobs, database 290 → 250 MB, archive 46 MB.
+- Rollback: stop the server, put `openings.pre-0.24.sqlite` back as `openings.sqlite` and start 0.23.1. Changes made after the upgrade are then lost.
+
 ## 0.23.1 — 2026-11-13
 
 Your data protected before the big changes, and the most annoying problems of the current dashboard fixed.

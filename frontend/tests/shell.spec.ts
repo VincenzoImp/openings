@@ -263,6 +263,20 @@ test("⌘K and / open the palette: jobs, applications and commands", async ({
   const [application] = (await call(page, "/applications?stage=ready&limit=1"))
     .items;
   await page.keyboard.press("Escape");
+  if (!isPhone(page)) {
+    // On a wide Jobs screen `/` searches the list; elsewhere it is the
+    // palette's.
+    const search = page.getByRole("searchbox", { name: "Search jobs" });
+    await expect(search).toBeVisible();
+    await main(page).focus();
+    await page.keyboard.press("/");
+    await expect(search).toBeFocused();
+    await expect(palette).toBeHidden();
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("g");
+    await page.keyboard.press("t");
+    await expect(page).toHaveURL(/#today$/);
+  }
   await main(page).focus();
   await page.keyboard.press("/");
   await expect(input).toBeFocused();
