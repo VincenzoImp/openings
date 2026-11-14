@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { test, expect, type Page } from "./fixtures";
-import { call, go, ownerSession } from "./session";
+import { blockButton, call, go, ownerSession } from "./session";
 
 // Images of every screen of the seeded workspace for visual review, not a
 // pixel comparison: `npm run screenshots` writes them to frontend/screenshots/
@@ -168,9 +168,7 @@ const SOURCES_AND_SETTINGS: Screen[] = [
 ];
 /** Open the editor of the entry with this title on the Profile. */
 const editEntry = (title: string) => async (page: Page) => {
-  await page
-    .getByRole("button", { name: `Edit ${title}`, exact: true })
-    .click();
+  await blockButton(page, `Edit ${title}`);
   await expect(page.locator("form.pf-entry-form")).toBeVisible();
 };
 
@@ -397,7 +395,7 @@ const SCREENS: Screen[] = [
     sheet: true,
     route: "profile",
     open: async (page) => {
-      await page.getByRole("button", { name: "Edit header" }).click();
+      await blockButton(page, "Edit header");
       await page.getByLabel("Headline").fill("Senior data engineer, energy");
     },
   },

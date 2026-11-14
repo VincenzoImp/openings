@@ -1,6 +1,13 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Page } from "./fixtures";
-import { call, go, isPhone, ownerSession, upload } from "./session";
+import {
+  blockButton,
+  call,
+  go,
+  isPhone,
+  ownerSession,
+  upload,
+} from "./session";
 
 // Profile (#profile): the career record read as a CV, one block edited at a
 // time. Each test starts from the seeded workspace (fixtures.ts); the same
@@ -23,26 +30,6 @@ const form = (page: Page, name: string) =>
   page.getByRole("form", { name, exact: true });
 const save = (page: Page) =>
   page.getByRole("button", { name: /^Save( ⌘↵)?$/ }).click();
-/**
- * A block's Edit or … button. At rest a phone shows the CV as text: a tap
- * on the block shows its actions first.
- */
-async function blockButton(page: Page, name: string) {
-  const button = page.getByRole("button", {
-    name,
-    exact: true,
-    includeHidden: true,
-  });
-  if (isPhone(page)) {
-    await button
-      .locator(
-        "xpath=ancestor::div[contains(concat(' ', @class, ' '), ' pf-block ')][1]",
-      )
-      .click({ position: { x: 4, y: 4 } });
-    await expect(button).toBeVisible();
-  }
-  await button.click();
-}
 async function entryByTitle(page: Page, title: string) {
   const { items } = await call(
     page,
