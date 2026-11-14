@@ -46,13 +46,13 @@ flowchart LR
 | `skills/` | Agent workflow skills (Agent Skills format) and their shared references |
 
 The running OpenAPI schema at `/api/openapi.json` and MCP `tools/list` are the
-contract. Authenticated `GET /api/v1/capabilities` and `capabilities_get` list,
-computed from the operation declarations (see below), the version, the schema,
-the caller's token kind and each operation's MCP name, main REST route and
-owner-only access. Parity runs one way: every dashboard action is a REST
-operation, and every operation that is not owner-only is also an MCP tool;
-`backend/tests/test_parity.py` checks it. Read [REST](../user/api.md) and
-[agent](../user/agents.md) guides for usable examples.
+contract; `uv run python -m openings.openapi` prints the schema without a server.
+Authenticated `GET /api/v1/capabilities` (REST only) lists the version, the
+schema, the caller's token kind and each operation's name, main REST route and
+access (`read`, `write`, `destructive` or `owner`). Parity runs one way: every
+dashboard action is a REST operation, and every operation that is not owner-only
+is also an MCP tool; `backend/tests/test_parity.py` checks it. Read
+[REST](../user/api.md) and [agent](../user/agents.md) guides for usable examples.
 
 ## Module map
 
@@ -70,7 +70,7 @@ belongs to the module of its concern.
 | `discovery/` | `service.py` the provider gate (`http_budget`, `fetch_bytes`); `models.py` typed inputs; `network.py` the public-address policy and the bounded fetch; `resolution.py` board detection and source configuration; `feeds.py` posting readers (Lever, Ashby, RSS) and adapter dispatch; `sources.py` source schemas, preview and writes; `runs.py` the global switch, provider policies, queueing, scheduling and run records; `tasks.py` leases, retry and running one collection |
 | `documents/` | `revisions.py` creation with upload grants, cited evidence, comparison and deletion; `sources.py` when a CV or letter is complete, the pairing of its source and PDF and its text; `text.py` readable text of a TeX source; `pdf.py` readable text of a PDF (pypdf); `latex.py` what CV and letter class commands print; `files.py` owned files and scoped transfer grants; `models.py` inputs |
 | `career/` | `profile.py` the Profile; `entries.py` Career entries; `claims.py`; `templates.py`; `imports.py`; `models.py` inputs and defaults; `records.py` row helpers shared with documents |
-| `interfaces/` | One module per area declaring its operations and binding them to its service: `core.py` (workspace, jobs, notes, applications), `career.py`, `documents.py`, `discovery.py`, `events.py`, `preferences.py`, `stats.py`, `skills.py` and `system.py` (sign-in, tokens, capabilities, backup, restore, examples, export); `registry.py` the declaration and its binding |
+| `interfaces/` | `operation.py` the decorator and its REST and MCP binding; one module of typed operation functions per area: `core.py` (workspace, jobs, notes, timeline, applications, Stats, the change log, skills), `career.py` (profile, entries, highlights, templates, import), `documents.py` (revisions, files), `discovery.py` (collection, providers, sources, runs, tasks), `preferences.py` and `system.py` (owner-only tokens, password and kept backups; backup and export grants); `transport.py` the hand-written byte, stream, session and protocol routes |
 
 Services never import FastAPI routing or MCP registration; `interfaces/` binds
 them, and `app.py` calls each area in a fixed order. Smaller concerns stay single
@@ -80,60 +80,73 @@ limit, split it the same way rather than growing it.
 
 ## Operation declarations
 
-Each logical operation is declared once, as an `Operation` in its area's
-`interfaces/` module (`OPERATIONS`): its id, group and label, its
-`resource` and `verb`, its parameters (`Param`), the service call, its REST
-routes (`Route`: method, path, route name, status code) and its MCP tool
-(`Tool`: annotations, description), and `access="owner"` where the service
-requires owner authority. An owner-only operation may have no tool (REST only);
-every other operation has one. `registry.bind_rest` and `registry.bind_mcp` generate
-the FastAPI routes and MCP tools from it, both calling the same service code:
+Each operation is one typed function in its area's `interfaces/` module, under
+the `@operation` decorator (`interfaces/operation.py`):
 
-- A parameter is declared once with its MCP annotation and default; `Param.rest`
-  gives REST's when it differs (a query model through `query_model`, a bounded
-  integer). A route or tool can replace the parameters or the call for itself,
-  as when one tool has two REST routes.
-- `Tool.method` makes the service method itself the tool (Career, documents);
-  `Tool.offload` runs the call in a worker thread from an async tool, for tools
-  that reach the network; an async call makes both transports async.
-- `custom=True` marks a route or tool registered by hand next to the
-  declarations, because it needs the HTTP request, cookies, streamed bytes or
-  the MCP context: browser sessions, the password change, the capabilities,
-  backup, restore, export, file transfers and `workspace_info`. It is still
-  declared, so the parity test and the capabilities list cover it.
-- `EXEMPTIONS` declare the transport-only routes with a one-line reason
-  (session routes, health, the MCP transport, examples) and
-  `SURFACES` the hand-registered MCP resource and prompts.
+```python
+@operation("PATCH /jobs/{job_id}", access=WRITE, tags=["jobs"])
+def jobs_update(ws: WS, job_id: str, body: JobPatch) -> JobSummary:
+    """Correct a job's fields.
 
-REST routes are registered in declaration order, which matters for matching
-(`/jobs/resolve` before `/jobs/{job_id}`); MCP tools follow the same order within
-an area. A tool is named `canonical_name`, `<resource>_<verb>` with a plural
-resource (decision 11); no tool is named by hand, so a clearer name means a
-clearer `resource` or `verb` (`files_reserve_upload`, `workspace_backup`,
-`tokens_revoke`). A singular resource names one record of the workspace or a
-mass noun (`profile`, `preferences`, `workspace`, `knowledge`).
+    With the version jobs_get returned; returns the compact summary.
+    """
+    return ws.update_job(job_id, body)
+```
 
-A tool's arguments have one shape: the record ids a REST path names, flat;
-`expected_version` of a delete, flat; and one `value`, the REST body of a write
-or the query string of a read (`query_model`). Every paged list returns `items`,
-`total`, `limit` and `offset` and summaries by default; every delete names
-`expected_version` (a file's version is always 1: files never change); every
-create accepts `idempotency_key`, kept in `idempotency_keys` (`idempotency.py`:
-the table, the key, a SHA-256 of the request and the record's id). A retry of the
-same request returns the same record, the key with another request is a 409 and
-a key whose record is gone is free again.
+- **REST**: FastAPI reads the function itself. `ws: WS` is the workspace, with
+  its services attached by `app.py` (`ws.career`, `ws.documents`,
+  `ws.discovery`, `ws.preferences`, `ws.stats`, `ws.events`, `ws.skills`,
+  `ws.auth`), injected as a dependency; a model parameter is the JSON body,
+  `Q[Model]` a model read from the query string; the return annotation is the
+  response model (`responses.py`, validated and sent without the fields a record
+  does not carry). The function name is the `operationId`, the docstring's first
+  line the summary and the rest (at most 250 characters) the description.
+- **MCP**: the tool has the function's name and description. Its arguments are
+  the other parameters with the model's fields flattened beside them, so a call
+  names the same fields as the REST path and body
+  (`jobs_update({job_id, expected_version, title})`). An argument a tool does not
+  take is refused with `422 validation`, never ignored. The tool is built once
+  per operation and shared by every application.
+- **Access**: `READ`, `WRITE`, `DESTRUCTIVE` set the MCP annotations and the
+  documented errors; `open_world=True` marks a call through the provider gate.
+  `OWNER` operations (password, tokens, kept backups) refuse an agent token and
+  are REST only; an agent that calls one over MCP is told the REST route.
+- **Transport routes** (`interfaces/transport.py`) are written by hand because
+  they move bytes, stream, set cookies or are protocol plumbing: sign-in and the
+  session, the capabilities summary, backup, restore, kept backup downloads,
+  export, examples, file transfers and content, a skill's file by path,
+  `/health` and `/mcp/`. `TRANSPORT_ONLY` lists each with a one-line reason.
+- **Removed routes and tools** of 0.23 are one table (`removed.py`): a removed
+  REST route answers `410 Gone` with `{"error": {"code": "removed", "details":
+  {"use": ...}}}`, a removed tool `tool_removed` with the same message.
 
-A tool has that one name and that one shape. The earlier names and the flat
-list arguments, kept as deprecated aliases in 0.22, were removed in 0.23 (see
-[CHANGELOG.md](../../CHANGELOG.md)), and
-`OpeningsMCP.call_tool` refuses an argument a tool does not take with
-`422 validation` instead of ignoring it, so a filter passed beside `value` is
-never dropped silently.
+`openapi.py` completes the document: tags by resource, the `bearerAuth` scheme
+(and the dashboard's session cookie and CSRF header), one `Error` model
+(`{"error": {code, status, message, details}}`) for every documented 401, 403,
+404, 409, 413, 422 and 429, `x-openings-access` on each operation and request
+examples for the batch operations and the upload sequence. The dashboard's types
+are generated from it (`npm --prefix frontend run api:gen` writes
+`frontend/src/api/schema.d.ts`; `api:check` in CI fails when a backend model
+changed without it), and `frontend/src/api/client.ts` wraps them with
+openapi-fetch.
 
-`backend/tests/test_parity.py` fails when an `/api/v1` route belongs to no
-operation or transport exemption, or to more than one, or when an operation that
-is not owner-only has no MCP tool; `test_interfaces.py` fails when a declared
-route, tool or surface is not registered.
+A tool is named `<resource>_<verb>` with a plural resource (decision 11); a
+singular resource names one record of the workspace or a mass noun (`profile`,
+`preferences`, `workspace`, `knowledge`). Every paged list returns `items`,
+`total`, `limit` and `offset` and summaries by default; every batch returns one
+`BatchResult` (`batch_id` and one `{index, id, ok, version, result | error}` per
+item); every delete names `expected_version` (a file's version is always 1:
+files never change); every create accepts `idempotency_key`, kept in
+`idempotency_keys` (`idempotency.py`: the table, the key, a SHA-256 of the
+request and the record's id). A retry of the same request returns the same
+record, the key with another request is a 409 and a key whose record is gone is
+free again.
+
+`backend/tests/test_parity.py` fails when an `/api/v1` route is neither one
+operation nor a listed transport route, or when the MCP tools are not exactly
+the operations that are not owner-only; it also calls a read and a write over
+both interfaces. `test_openapi.py` validates the document and checks that every
+operation has a description, tags, a response model and its documented errors.
 
 ## Data and workflow rules
 

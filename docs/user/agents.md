@@ -33,9 +33,9 @@ change, governed by the operating mandate rather than by the token.
 
 Tokens created before version 0.17 are owner tokens and keep full access. To
 scope an existing agent, create an agent token, give it to the agent and revoke
-the old one. `POST /tokens` and `tokens_create` default to `owner` when no `kind`
-is sent, so existing scripts keep working; the dashboard form offers `agent`
-first. `workspace_info` returns `actor` (`owner` or `agent:<token name>`), so an
+the old one. `POST /tokens` creates an `agent` token when no `kind` is sent.
+Token management, the password, restore and kept backups are owner-only REST
+routes and not MCP tools. `workspace_info` returns `actor` (`owner` or `agent:<token name>`), so an
 agent can see which kind it holds. Use an owner token only when you want to run owner actions
 yourself from an external MCP session.
 
@@ -128,12 +128,12 @@ skills: discover the tools/resources and their typed input schemas.
    applications and records Applied. Portals and sending are outside Openings.
 
 Check the discovered input schemas. Every tool is named `<resource>_<verb>`
-and takes the same shape: identifiers flat (`job_id`, `application_id`),
-`expected_version` flat on a delete, and one `value` object for the rest, the
-REST body of a write or the filters, page and options of a read. A paged list
-takes `value`: for example, `jobs_list({"value":{"q":"Python",
-"triage":"shortlisted","limit":20}})`, returns `items`, `total`, `limit` and `offset`,
-and returns summaries unless `value.summary` is false. Set `include_facets: true`
+and takes flat arguments with the names REST uses: the identifiers of the REST
+path (`job_id`, `application_id`) beside the fields of the REST body of a write
+or the filters, page and options of a read. A paged list takes its filters
+directly: for example, `jobs_list({"q":"Python","triage":"shortlisted","limit":20})`
+returns `items`, `total`, `limit` and `offset`, and returns summaries unless
+`summary` is false. An argument a tool does not take is refused, not ignored. Set `include_facets: true`
 only when filter value lists are needed. Read the single record (or pass
 `summary: false`) for full narratives, template TeX, revision text, files,
 diagnostics and task results before generating from evidence or templates.
@@ -142,17 +142,15 @@ Every create takes an `idempotency_key` for retries. `jobs_triage`, `jobs_update
 full posting); read `jobs_get` for the text. Tool errors include `details`; a
 version conflict reports `details.current_version`, including for Profile,
 Preferences, settings and collection settings.
-A write wraps its body in `value`. For example:
+A write names its fields beside the identifiers. For example:
 
 ```json
 {
   "name": "notes_create",
   "arguments": {
     "job_id": "JOB_ID",
-    "value": {
-      "body": "Asked the owner about relocation.",
-      "idempotency_key": "note-attempt-1"
-    }
+    "body": "Asked the owner about relocation.",
+    "idempotency_key": "note-attempt-1"
   }
 }
 ```
@@ -268,15 +266,15 @@ sent the application. `status: "shortlisted"` undoes it while no reply exists.
 - An answers document created with `documents_create` archives a revision. Use
   `applications_update` with `value.answers` and `value.expected_version` for live
   application answers.
-- Use `jobs_list` with `value.triage="new"` to review and select jobs, then
+- Use `jobs_list` with `triage="new"` to review and select jobs, then
   `applications_list` with `stage: "shortlisted"` to prepare the applications
   shortlisting started. Closed attempts remain in Applications. Restore known
   workaround dismissals explicitly.
 
 REST supports the same workflow when scripting is more convenient. See the
-[API guide](api.md) for transfers and optimistic updates. `workspace_backup`,
-`workspace_restore` and `workspace_export` return short-lived, single-use
-operational transfer instructions. Restore replaces workspace data.
+[API guide](api.md) for transfers and optimistic updates. `workspace_backup`
+and `workspace_export` return short-lived, single-use operational transfer
+instructions. Restore replaces workspace data and is the owner's REST route.
 
 Your agent supplies its own model access and compilation tools. You can also
 prepare and upload documents manually.
