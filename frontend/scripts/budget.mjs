@@ -13,9 +13,9 @@
 // rebuilt (#222–#227) the budgets are 120 kB and 215 kB (the first rebuilt
 // screens also bring the list, menu, tabs and page primitives the others will
 // share); #228 deletes the old code and sets them back to 85 kB and 160 kB.
-//
-// The stylesheet is measured as one text: Vite gives each shared chunk its
-// own CSS file, and the split itself is not style the dashboard carries.
+// The stylesheet's interim budget is 27 kB: while old and new screens
+// coexist, Vite gives each shared chunk of the design system its own CSS
+// file; it is lowered again in #228.
 //
 // Sizes are gzip (level 9) in kB of 1000 bytes, as Vite reports them. The
 // design system gallery (ui.html) is not part of the dashboard: its size is
@@ -28,9 +28,9 @@ const BUDGET = {
   first: 120 * KB, // 85 kB once #228 deletes the old screens' code
   later: 30 * KB,
   all: 215 * KB, // 160 kB once #228 deletes the old screens' code
-  css: 20 * KB,
+  css: 27 * KB, // lowered again in #228
 };
-const HOME = "src/pages/Today.tsx";
+const HOME = "src/screens/today/Today.tsx";
 
 const dist = new URL("../dist/", import.meta.url);
 let manifest;
@@ -114,15 +114,7 @@ add(
 const styles = new Set(
   [...dashboard].flatMap((key) => manifest[key].css || []),
 );
-add(
-  "Stylesheet",
-  gzipSync(
-    Buffer.concat([...styles].map((file) => readFileSync(new URL(file, dist)))),
-    { level: 9 },
-  ).length,
-  BUDGET.css,
-  `${styles.size} files`,
-);
+add("Stylesheet", total([...styles]), BUDGET.css, `${styles.size} files`);
 
 const info = [];
 if (manifest[GALLERY]) {

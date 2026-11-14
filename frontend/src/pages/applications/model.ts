@@ -1,6 +1,6 @@
-// What the old Today and Jobs screens still read about applications. The
-// Applications screen and the application page live in src/screens; this
-// file, links.ts and CloseNoReply.tsx go with the old screens (#222, #223).
+// What the old Jobs screen still reads about applications. The Applications
+// screen and the application page live in src/screens; this file and
+// links.ts go with the old Jobs screen (#223).
 import type { Stage } from "../../api";
 
 export const stageLabels: Record<Stage, string> = {
@@ -17,13 +17,3 @@ export const outcomeLabels: Record<string, string> = {
   no_response: "No reply",
 };
 
-const day = (value: string) => {
-  const [year, month, date] = value.slice(0, 10).split("-").map(Number);
-  return new Date(year, month - 1, date);
-};
-/** Whole days from one calendar day to another. */
-export const daysBetween = (from: string, to: string) =>
-  Math.max(
-    0,
-    Math.round((day(to).valueOf() - day(from).valueOf()) / 86_400_000),
-  );
