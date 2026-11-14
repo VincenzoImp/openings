@@ -16,6 +16,13 @@ from openings.common import new_id
 POSTING = "Build reliable data services.\n\nResponsibilities\nDesign pipelines with a small team."
 
 
+def dated(value):
+    """A day as ISO text, also inside a reply."""
+    if isinstance(value, dict):
+        return {key: dated(item) for key, item in value.items()}
+    return value.isoformat() if hasattr(value, "isoformat") else value
+
+
 def ago(**delta):
     return (datetime.now(UTC) - timedelta(**delta)).isoformat(timespec="microseconds")
 
@@ -35,7 +42,8 @@ def seed_today(app, client, before_open_run):
         return workspace.create_application({"job_id": job["id"], **fields})
 
     def make_ready(application):
-        for kind, title in (("resume", "CV"), ("cover_letter", "Letter")):
+        """A CV and a letter, each with its source and PDF: the application is Ready."""
+        for kind, title in (("cv", "CV"), ("letter", "Letter")):
             source_revision(
                 documents,
                 client.put,
@@ -43,10 +51,7 @@ def seed_today(app, client, before_open_run):
                 kind,
                 "Synthetic.",
                 title=title,
-                approve=True,
             )
-        current = workspace.get_application(application["id"])
-        workspace.set_ready(application["id"], {"expected_version": current["version"]})
 
     def shift(run, started, minutes=None):
         """Move a run and what it recorded into the past."""
@@ -93,8 +98,8 @@ def seed_today(app, client, before_open_run):
             },
         )
 
-    # What employers answered: an interview, a rejection, an application closed as
-    # no reply and a Draft closed without being sent (left out of Insights).
+    # What employers replied: an interview, a rejection, an application closed as
+    # no reply and one closed without being sent (left out of Insights).
     with acting_as(OWNER):
         for title, company, location, sent, moves in (
             (
@@ -102,7 +107,7 @@ def seed_today(app, client, before_open_run):
                 "Alpine Research",
                 "Lausanne, Switzerland",
                 24,
-                [{"status": "interview", "response_date": (today - timedelta(days=16))}],
+                [{"reply": {"kind": "interview", "date": (today - timedelta(days=16))}}],
             ),
             (
                 "Engineering Lead",
@@ -111,10 +116,11 @@ def seed_today(app, client, before_open_run):
                 23,
                 [
                     {
-                        "status": "closed",
-                        "outcome": "rejected",
-                        "response_date": (today - timedelta(days=11)),
-                        "response_note": "Position filled internally.",
+                        "reply": {
+                            "kind": "rejection",
+                            "date": (today - timedelta(days=11)),
+                            "note": "Position filled internally.",
+                        }
                     }
                 ],
             ),
@@ -154,10 +160,7 @@ def seed_today(app, client, before_open_run):
                     application["id"],
                     {
                         "expected_version": application["version"],
-                        **{
-                            key: value.isoformat() if hasattr(value, "isoformat") else value
-                            for key, value in move.items()
-                        },
+                        **{key: dated(value) for key, value in move.items()},
                     },
                 )
 
@@ -202,13 +205,17 @@ def seed_today(app, client, before_open_run):
         review = activity.start_run(
             {"workflow": "review-inbox", "scope": "3 jobs to review", "supersede": True}
         )
-        workspace.set_triage(inbox[0]["id"], "saved", workspace.get_job(inbox[0]["id"])["version"])
-        workspace.set_triage(inbox[1]["id"], "saved", workspace.get_job(inbox[1]["id"])["version"])
+        workspace.set_triage(
+            inbox[0]["id"], "shortlisted", workspace.get_job(inbox[0]["id"])["version"]
+        )
+        workspace.set_triage(
+            inbox[1]["id"], "shortlisted", workspace.get_job(inbox[1]["id"])["version"]
+        )
         workspace.set_triage(inbox[2]["id"], "dismissed", inbox[2]["version"])
         activity.ask_question(
             {
                 "question": "Do you want roles that require on-call work at night?",
-                "why": "2 new jobs mention it and your policy does not. I left them in Jobs to review.",
+                "why": "2 new jobs mention it and your policy does not. I left them in New.",
             }
         )
         relocation = activity.ask_question({"question": "Would you relocate outside Switzerland?"})
@@ -283,7 +290,7 @@ def seed_today(app, client, before_open_run):
             taken["id"],
             {
                 "expected_version": taken["version"],
-                "result": "Prepared and marked ready. The start date waits for your answer.",
+                "result": "Prepared its CV and letter. The start date waits for your answer.",
             },
         )
         requests.decline_request(
@@ -299,7 +306,7 @@ def seed_today(app, client, before_open_run):
                 "expected_version": activity.get_run(prepare["id"])["version"],
                 "summary": "7 applications are ready for you. One was not written: the employer "
                 "accepts only applications written without AI tools.",
-                "changes": "Wrote a CV and a letter for seven applications and marked them ready.",
+                "changes": "Wrote a CV and a letter for seven applications.",
                 "not_done": [
                     {
                         "item": "Platform Engineer · Harbor Bank",

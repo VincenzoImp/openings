@@ -15,6 +15,8 @@ from .identity import JobIdentity
 from .job_changes import JobChanges
 from .jobs import JobReads
 from .notes import Notes
+from .replies import ReplyChanges
+from .shortlist import Shortlist
 from .timeline import Timeline
 
 
@@ -26,6 +28,8 @@ class Workspace(
     Timeline,
     ApplicationReads,
     ApplicationChanges,
+    ReplyChanges,
+    Shortlist,
     BulkChanges,
 ):
     def __init__(self, path):

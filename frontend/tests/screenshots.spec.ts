@@ -32,7 +32,7 @@ const SCREENS: Screen[] = [
   {
     name: "review",
     route: async (page) =>
-      `review?application=${await first(page, "/applications?status=draft&ready=true&limit=1")}`,
+      `review?application=${await first(page, "/applications?stage=ready&limit=1")}`,
     docs: "review",
   },
   { name: "jobs", route: "jobs", docs: "jobs" },
@@ -43,7 +43,7 @@ const SCREENS: Screen[] = [
   },
   {
     name: "jobs-shortlist",
-    route: "jobs?section=shortlist",
+    route: "jobs?section=shortlisted",
     docs: "shortlist",
   },
   { name: "jobs-empty", route: "jobs?q=no%20job%20has%20this%20title" },

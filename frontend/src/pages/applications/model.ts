@@ -1,21 +1,27 @@
 // What the Applications screen shows about an application, in words: its
-// stage, plan, documents and the employer's answer. No React: tested directly.
-import type { Application, ResponseKind, Stage } from "../../api";
+// stage, plan, documents and the employer's reply. No React: tested directly.
+import type { Application, ReplyKind, Stage } from "../../api";
 import { daysAgo, deadlineTag, shortDate } from "../../library/time.ts";
 
 export type StageKey =
-  "all" | "preparing" | "ready" | "applied" | "interview" | "offer" | "closed";
+  | "all"
+  | "shortlisted"
+  | "ready"
+  | "applied"
+  | "interview"
+  | "offer"
+  | "closed";
 export const STAGES: { id: StageKey; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "preparing", label: "Preparing" },
+  { id: "shortlisted", label: "Shortlisted" },
   { id: "ready", label: "Ready" },
   { id: "applied", label: "Applied" },
   { id: "interview", label: "Interview" },
   { id: "offer", label: "Offer" },
   { id: "closed", label: "Closed" },
+  { id: "all", label: "All" },
 ];
 export const stageLabels: Record<Stage, string> = {
-  draft: "Preparing",
+  shortlisted: "Shortlisted",
   applied: "Applied",
   interview: "Interview",
   offer: "Offer",
@@ -27,11 +33,11 @@ export const outcomeLabels: Record<string, string> = {
   not_pursued: "Not pursued",
   no_response: "No reply",
 };
-export const responseLabels: Record<ResponseKind, string> = {
+export const replyLabels: Record<ReplyKind, string> = {
   interview: "Interview",
   rejection: "Rejection",
   offer: "Offer",
-  other: "Other answer",
+  other: "Other reply",
 };
 export type Tone = "ready" | "attention" | "danger" | "info" | "agent";
 export interface Label {
@@ -39,9 +45,9 @@ export interface Label {
   tone?: Tone;
 }
 
-/** The stage chip an application belongs to: Ready is a stage inside Preparing. */
-export function stageOf(app: Pick<Application, "status" | "ready_at">) {
-  if (app.status === "draft") return app.ready_at ? "ready" : "preparing";
+/** The stage chip an application belongs to: Ready is a computed stage inside Shortlisted. */
+export function stageOf(app: Pick<Application, "status" | "ready">) {
+  if (app.status === "shortlisted" && app.ready) return "ready";
   return app.status as StageKey;
 }
 export function stageTag(app: Application): Label {
@@ -53,12 +59,26 @@ export function stageTag(app: Application): Label {
   return { text };
 }
 
+const DOCUMENT_WORDS: Record<string, string> = { cv: "CV", letter: "letter" };
+/** "Missing: letter" from what Ready lacks; empty when nothing is missing. */
+export function missingText(
+  app: Pick<Application, "missing" | "status" | "requirements">,
+) {
+  if (app.status !== "shortlisted" || !app.missing?.length) return "";
+  const words = app.missing.map((item) => {
+    if (DOCUMENT_WORDS[item]) return DOCUMENT_WORDS[item];
+    const id = item.replace(/^requirement:/, "");
+    const requirement = app.requirements?.find((entry) => entry.id === id);
+    return requirement ? `requirement “${requirement.text}”` : "a requirement";
+  });
+  return `Missing: ${words.join(", ")}`;
+}
+
 /** The filters of the address (the shell maps the old page's names to them). */
 export const DEFAULTS = {
   stage: "all",
   q: "",
   outcome: "",
-  readiness: "",
   sort: "updated",
   applied_since: "",
   applied_until: "",
@@ -71,19 +91,10 @@ export type Filters = typeof DEFAULTS;
 export function listQuery(filters: Filters, limit: number, offset = 0) {
   const query = new URLSearchParams();
   const stage = filters.stage as StageKey;
-  if (stage === "preparing" || stage === "ready") {
-    query.set("status", "draft");
-    query.set("ready", String(stage === "ready"));
-  } else if (stage !== "all") query.set("status", stage);
-  for (const key of [
-    "q",
-    "outcome",
-    "readiness",
-    "applied_since",
-    "applied_until",
-  ] as const)
+  if (stage !== "all") query.set("stage", stage);
+  for (const key of ["q", "outcome", "applied_since", "applied_until"] as const)
     if (filters[key]) query.set(key, filters[key]);
-  if (filters.waiting) query.set("no_reply_due", "true");
+  if (filters.waiting) query.set("needs", "reply_overdue");
   query.set("sort", filters.sort || "updated");
   query.set("limit", String(limit));
   if (offset) query.set("offset", String(offset));
@@ -94,14 +105,16 @@ export function listQuery(filters: Filters, limit: number, offset = 0) {
 export function stageCounts(result: {
   total: number;
   stage_counts?: Record<string, number>;
-  ready_count?: number;
 }): Record<StageKey, number> {
   const counts = result.stage_counts || {};
-  const ready = result.ready_count || 0;
+  const all = ["shortlisted", "applied", "interview", "offer", "closed"].reduce(
+    (sum, key) => sum + (counts[key] || 0),
+    0,
+  );
   return {
-    all: result.total,
-    preparing: (counts.draft || 0) - ready,
-    ready,
+    all: Object.keys(counts).length ? all : result.total,
+    shortlisted: counts.shortlisted || 0,
+    ready: counts.ready || 0,
     applied: counts.applied || 0,
     interview: counts.interview || 0,
     offer: counts.offer || 0,
@@ -109,7 +122,7 @@ export function stageCounts(result: {
   };
 }
 
-/** Priority, deadline and a blocking requirement, for an application being prepared. */
+/** Priority, deadline and a blocking requirement, for a shortlisted application. */
 export function planTags(app: Application, now = new Date()): Label[] {
   const tags: Label[] = [];
   if (app.priority != null)
@@ -117,7 +130,7 @@ export function planTags(app: Application, now = new Date()): Label[] {
       text: `P${app.priority}`,
       tone: app.priority <= 1 ? "attention" : undefined,
     });
-  if (app.status === "draft") {
+  if (app.status === "shortlisted") {
     const deadline = deadlineTag(app.deadline, now);
     if (deadline)
       tags.push({
@@ -136,7 +149,7 @@ export function planTags(app: Application, now = new Date()): Label[] {
   return tags;
 }
 
-const KINDS: Record<string, string> = { resume: "CV", cover_letter: "letter" };
+const KINDS: Record<string, string> = { cv: "CV", letter: "letter" };
 /** The state of the CV and letter, from the current revisions. */
 export function documentState(app: Application): Label[] {
   const items = (app.preparation || []).filter((item) => KINDS[item.kind]);
@@ -146,29 +159,25 @@ export function documentState(app: Application): Label[] {
       text: (app.preparation || []).length ? "Other documents" : "None",
     });
   else {
-    const approved = items.filter(
-      (item) => item.revisions && item.approved === item.revisions,
-    );
-    const missing = items.filter((item) => item.pdf < item.revisions);
-    if (approved.length === items.length)
+    const complete = items.filter((item) => item.complete > 0);
+    if (complete.length === items.length)
       lines.push({
         text:
           items.length === 2
-            ? "CV and letter approved"
-            : `${capital(KINDS[items[0].kind])} approved`,
+            ? "CV and letter uploaded"
+            : `${capital(KINDS[items[0].kind])} uploaded`,
       });
-    else if (!approved.length)
-      lines.push({
-        text: missing.length ? "Written, without PDF" : "Written, not approved",
-      });
+    else if (!complete.length) lines.push({ text: "Waiting for the PDF" });
     else
       lines.push({
-        text: `${capital(KINDS[approved[0].kind])} approved, ${
-          KINDS[items.find((item) => !approved.includes(item))!.kind]
-        } not yet`,
+        text: `${capital(KINDS[complete[0].kind])} uploaded, ${
+          KINDS[items.find((item) => !complete.includes(item))!.kind]
+        } without PDF`,
       });
   }
-  if (app.status === "draft" && app.stale_inputs?.length)
+  const missing = missingText(app);
+  if (missing) lines.push({ text: missing, tone: "attention" });
+  if (app.status === "shortlisted" && app.stale_inputs?.length)
     lines.push({ text: "Inputs changed", tone: "attention" });
   return lines;
 }
@@ -188,26 +197,26 @@ const dayText = (value: string, now: Date) => shortDate(day(value), now);
 
 /** When it was sent, for the Plan column of a sent application. */
 export function sentLine(app: Application, now = new Date()) {
-  if (app.status === "draft") return "";
+  if (app.status === "shortlisted") return "";
   if (!app.applied_at) return app.status === "closed" ? "Never sent" : "";
   return `Sent ${dayText(app.applied_at, now)}`;
 }
 
 /**
- * What the employer answered, or how long the wait is. `days` is the
+ * What the employer replied, or how long the wait is. `days` is the
  * no-reply period: a longer wait is shown as needing attention.
  */
-export function responseLine(
+export function replyLine(
   app: Application,
   days: number,
   now = new Date(),
 ): Label & { quiet?: boolean; badge?: boolean } {
-  const last = app.last_response;
+  const last = app.last_reply;
   const after =
     last && app.applied_at
       ? `, after ${daysBetween(app.applied_at, last.date)} days`
       : "";
-  if (app.status === "draft") return { text: "" };
+  if (app.status === "shortlisted") return { text: "" };
   if (app.status === "closed") {
     if (app.outcome === "no_response") {
       const closed = app.concluded_on || app.updated_at || "";
@@ -226,13 +235,13 @@ export function responseLine(
       };
     if (last)
       return {
-        text: `${responseLabels[last.kind]} · ${dayText(last.date, now)}${after}`,
+        text: `${replyLabels[last.kind]} · ${dayText(last.date, now)}${after}`,
       };
     return { text: outcomeLabels[app.outcome || ""] || "Closed", quiet: true };
   }
   if (last)
     return {
-      text: `${responseLabels[last.kind]} · ${dayText(last.date, now)}`,
+      text: `${replyLabels[last.kind]} · ${dayText(last.date, now)}`,
     };
   if (!app.applied_at) return { text: "No reply yet" };
   const waited = daysAgo(new Date(app.applied_at), now);
@@ -244,16 +253,12 @@ export function responseLine(
   };
 }
 
-/** True when the owner records an employer response from this row. */
-export const awaitsAnswer = (app: Application) =>
+/** True when the owner records an employer reply from this row. */
+export const awaitsReply = (app: Application) =>
   ["applied", "interview", "offer"].includes(app.status);
 
-export type BulkAction =
-  "no_reply" | "close" | "reopen" | "mark_ready" | "unmark_ready" | "delete";
-type BulkFields = Pick<
-  Application,
-  "status" | "applied_at" | "ready_at" | "readiness"
->;
+export type BulkAction = "no_reply" | "close" | "reopen" | "delete";
+type BulkFields = Pick<Application, "status" | "applied_at">;
 /** Whether one bulk action applies to one application, as the server decides. */
 const BULK_VALID: Record<BulkAction, (app: BulkFields) => boolean> = {
   no_reply: (app) =>
@@ -261,9 +266,6 @@ const BULK_VALID: Record<BulkAction, (app: BulkFields) => boolean> = {
     (app.status !== "closed" && !!app.applied_at),
   close: (app) => app.status !== "closed",
   reopen: (app) => app.status === "closed",
-  mark_ready: (app) =>
-    app.status === "draft" && !app.ready_at && app.readiness === "reviewed",
-  unmark_ready: (app) => app.status === "draft" && !!app.ready_at,
   delete: () => true,
 };
 /** The bulk actions valid for every selected application, in the bar's order. */

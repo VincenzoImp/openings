@@ -1,4 +1,4 @@
-"""Actionable queues use full application history across shared interfaces."""
+"""Jobs by triage (New, Shortlisted, Dismissed) across shared interfaces."""
 
 import json
 
@@ -21,22 +21,18 @@ def add(workspace, title):
     )
 
 
-def test_queues_follow_full_history_and_explicit_deletion(tmp_path):
+def test_triage_follows_the_application_and_explicit_deletion(tmp_path):
     ws = Workspace(tmp_path / "queues.sqlite")
     job = add(ws, "Backend engineer")
-    assert ws.list_jobs(queue="inbox")["total"] == 1
-    job = ws.set_triage(job["id"], "saved", job["version"])
-    assert ws.list_jobs(queue="inbox")["total"] == 0
-    assert ws.list_jobs(queue="shortlist")["total"] == 1
-    first = ws.create_application({"job_id": job["id"], "idempotency_key": "first"})
-    assert (
-        ws.create_application({"job_id": job["id"], "idempotency_key": "first"})["id"]
-        == first["id"]
-    )
+    assert ws.list_jobs(triage="new")["total"] == 1
+    job = ws.set_triage(job["id"], "shortlisted", job["version"])
+    assert ws.list_jobs(triage="new")["total"] == 0
+    assert ws.list_jobs(triage="shortlisted")["total"] == 1
+    first = ws.get_application(job["application"]["id"])
     with pytest.raises(DomainError) as duplicate:
         ws.create_application({"job_id": job["id"]})
     assert duplicate.value.status == 409
-    for stage in ("draft", "applied", "interview", "offer", "closed"):
+    for stage in ("applied", "interview", "offer", "closed"):
         first = ws.update_application(
             first["id"],
             {
@@ -45,52 +41,54 @@ def test_queues_follow_full_history_and_explicit_deletion(tmp_path):
                 **({"outcome": "rejected"} if stage == "closed" else {}),
             },
         )
-        assert ws.list_jobs(queue="shortlist")["total"] == 0
-        assert ws.list_jobs(queue="inbox")["total"] == 0
-        assert ws.list_jobs(queue="applications")["total"] == 1
+        # Closing an application never changes the job's triage.
+        assert ws.list_jobs(triage="shortlisted")["total"] == 1
+        assert ws.list_jobs(triage="new")["total"] == 0
     job = ws.get_job(job["id"])
     dismissed = ws.set_triage(job["id"], "dismissed", job["version"])
-    restored = ws.set_triage(job["id"], "saved", dismissed["version"])
-    assert ws.list_jobs(queue="shortlist")["total"] == 0
-    ws.ingest_job(
-        {
-            "title": "Backend engineer",
-            "company": "Example",
-            "posting": "Build APIs.",
-            "url": job["url"],
-        }
-    )
-    later = ws.create_application({"job_id": restored["id"]})
+    assert dismissed["application"]["status"] == "closed"
+    restored = ws.set_triage(job["id"], "shortlisted", dismissed["version"])
+    # Shortlisting a job whose applications are all closed starts a new one.
+    later = restored["application"]
+    assert later["status"] == "shortlisted" and later["id"] != first["id"]
     ws.delete_application(later["id"], later["version"])
-    assert ws.list_jobs(queue="shortlist")["total"] == 0  # Older submitted attempt remains.
+    assert ws.get_job(job["id"])["triage"] == "shortlisted"  # Older attempt remains.
     assert ws.get_application(first["id"])["applied_at"]
     pending = add(ws, "Platform engineer")
-    draft = ws.create_application({"job_id": pending["id"]})
+    started = ws.create_application({"job_id": pending["id"]})
+    assert ws.get_job(pending["id"])["triage"] == "shortlisted"
     with pytest.raises(DomainError):
-        ws.delete_application(draft["id"], draft["version"] + 1)
-    ws.delete_application(draft["id"], draft["version"])
-    assert [j["id"] for j in ws.list_jobs(queue="shortlist")["items"]] == [pending["id"]]
+        ws.delete_application(started["id"], started["version"] + 1)
+    ws.delete_application(started["id"], started["version"])
+    # Deleting a job's only application returns it to New.
+    assert [j["id"] for j in ws.list_jobs(triage="new")["items"]] == [pending["id"]]
+    counts = ws.list_jobs(include_counts=True)["counts"]
+    assert {key: counts[key] for key in ("all", "new", "shortlisted", "dismissed")} == {
+        "all": 2,
+        "new": 1,
+        "shortlisted": 1,
+        "dismissed": 0,
+    }
 
 
 @pytest.mark.asyncio
-async def test_rest_mcp_queues_filter_before_totals_facets_and_pagination(tmp_path):
+async def test_rest_mcp_triage_filters_before_totals_facets_and_pagination(tmp_path):
     app = create_app(tmp_path / "interfaces.sqlite", start_worker=False)
     ws = app.state.workspace
     for title in ["C role", "A role", "B role"]:
         job = add(ws, title)
-        ws.set_triage(job["id"], "saved", job["version"])
-        if title == "B role":
-            ws.create_application({"job_id": job["id"]})
+        if title != "B role":
+            ws.set_triage(job["id"], "shortlisted", job["version"])
     with TestClient(app) as client:
         setup = client.post("/api/v1/auth/setup", json={"password": "synthetic-password"}).json()
         client.headers["X-CSRF-Token"] = setup["csrf_token"]
-        result = client.get("/api/v1/jobs?queue=shortlist&sort=title&limit=1&offset=1").json()
+        result = client.get("/api/v1/jobs?triage=shortlisted&sort=title&limit=1&offset=1").json()
         assert result["total"] == 2 and result["items"][0]["title"] == "C role"
         mcp = await app.state.mcp.call_tool(
             "jobs_list",
             {
                 "value": {
-                    "queue": "shortlist",
+                    "triage": "shortlisted",
                     "sort": "title",
                     "limit": 1,
                     "offset": 1,
@@ -99,6 +97,7 @@ async def test_rest_mcp_queues_filter_before_totals_facets_and_pagination(tmp_pa
         )
         structured = json.loads(mcp.content[0].text)
         assert structured == result
+        assert client.get("/api/v1/jobs?queue=shortlist").status_code == 422
         job = result["items"][0]
         stale = client.post(
             "/api/v1/jobs/bulk",
@@ -108,7 +107,7 @@ async def test_rest_mcp_queues_filter_before_totals_facets_and_pagination(tmp_pa
             },
         ).json()
         assert stale["failed"] == 1
-        assert client.get("/api/v1/jobs?queue=shortlist").json()["total"] == 2
+        assert client.get("/api/v1/jobs?triage=shortlisted").json()["total"] == 2
         assert client.get("/api/v1/scoring").status_code == 404
         assert (
             client.post(

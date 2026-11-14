@@ -39,8 +39,8 @@ const part = (page: Page, title: string) =>
 async function emptyWorkspace(page: Page) {
   const empty = { items: [], total: 0, limit: 1, offset: 0 };
   const lists = [
-    "/jobs?queue=inbox&limit=1",
-    "/applications?status=draft&limit=1",
+    "/jobs?triage=new&limit=1",
+    "/applications?limit=1",
     "/career/knowledge?limit=1",
     "/sources?limit=1",
     "/tokens",

@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from openings.app import create_app
 from openings.collectors.jobspy import JobSpyConfig
 from openings.discovery import network
-from openings.outcomes import ResponseService, today
+from openings.outcomes import today
 
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 
@@ -32,31 +32,41 @@ def schemas(value):
             yield from schemas(item)
 
 
-def test_a_response_without_a_date_is_recorded_on_today(app):
+def test_a_reply_without_a_date_is_recorded_on_today(app):
     workspace = app.state.workspace
     job = workspace.ingest_job({"title": "Synthetic analyst", "posting": "Model data."})
     application = workspace.create_application({"job_id": job["id"]})
     application = workspace.update_application(
         application["id"], {"expected_version": application["version"], "status": "applied"}
     )
-    response = ResponseService(workspace).add_response(application["id"], {"kind": "other"})
-    assert response["date"] == today()
     tools = asyncio.run(app.state.mcp.list_tools())
-    tool = next(item for item in tools if item.name == "responses_create")
+    assert not any(item.name.startswith("responses_") for item in tools)
+    tool = next(item for item in tools if item.name == "applications_update")
     value = json.dumps(tool.input_schema)
-    assert "today when omitted" in value
+    assert "today (UTC) for a new reply when omitted" in value
     required = [schema.get("required", []) for schema in schemas(tool.input_schema)]
     assert not any("date" in names for names in required)
 
     token = app.state.auth.create_token("Synthetic agent")["token"]
     with TestClient(app, base_url="http://localhost:8080") as client:
-        created = client.post(
+        headers = {"Authorization": "Bearer " + token}
+        gone = client.post(
             f"/api/v1/applications/{application['id']}/responses",
-            json={"kind": "interview", "note": "Call next week."},
-            headers={"Authorization": "Bearer " + token},
+            json={"kind": "other"},
+            headers=headers,
         )
-        assert created.status_code == 201, created.text
-        assert created.json()["date"] == today()
+        assert gone.status_code in {404, 405}
+        recorded = client.patch(
+            f"/api/v1/applications/{application['id']}",
+            json={
+                "expected_version": application["version"],
+                "reply": {"kind": "interview", "note": "Call next week."},
+            },
+            headers=headers,
+        )
+        assert recorded.status_code == 200, recorded.text
+        body = recorded.json()
+        assert body["status"] == "interview" and body["replies"][0]["date"] == today()
 
 
 def test_skill_prompts_declare_no_arguments_and_return_their_own_skill(app):
@@ -116,7 +126,7 @@ def test_workspace_info_says_document_revisions_are_saved_never_submitted(app):
             },
         )
     info = json.loads(response.json()["result"]["content"][0]["text"])
-    assert "save document revisions" in info["workflow"]
+    assert "save CV and letter revisions" in info["workflow"]
     assert "submit" not in info["workflow"].lower()
 
 

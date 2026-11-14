@@ -19,9 +19,9 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
 - **Collect:** scheduled keyword/location searches on LinkedIn, Indeed and Glassdoor,
   or selected company boards (Greenhouse, Lever, Ashby, Workday and more) and RSS
   feeds. Role, location and `exclude_titles` filters skip noise before it reaches
-  your Inbox. You can also add any job by URL or pasted text.
-- **Triage:** review new jobs beside their posting, keep them on a Shortlist or
-  dismiss them with a reason; dismissed jobs stay remembered and can be restored.
+  your New jobs. You can also add any job by URL or pasted text.
+- **Triage:** review new jobs beside their posting, shortlist them (which starts
+  the application) or dismiss them with a reason; dismissed jobs stay remembered and can be restored.
   Each job arrives with signals computed without a model: the posting's language,
   the languages it requires, a likely duplicate of an earlier job (merged only
   when you confirm) and a company-board posting no longer listed. Signals label
@@ -34,25 +34,27 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
   how the agent should work with you. Your agent reads and applies them.
 - **Prepare:** store your Profile, Career entries, approved claims (★ always
   include in your CV), LaTeX templates with guidance and typed limits. Each application freezes the exact context its CV,
-  cover letter and form answers were written from. A CV or letter revision is its
-  `.tex` source and the PDF built from it; Openings reads its text from the source
-  for review, search and comparison between revisions, without running TeX.
-- **Plan:** give applications a priority, a deadline and the employer's requirements
-  (authorship rules, attachments, references, language, eligibility). Filter by
-  readiness (blocked, no documents, missing PDF, needs review, reviewed, ready) and
-  sort by deadline or priority. Close, reopen or delete applications in bulk.
-- **Hand over:** an application is marked **Ready** once its documents are approved
-  and nothing blocks it. Its review page shows the posting, CV and letter side by
-  side with the open requirements; download both PDFs, apply on the employer's
-  site and **Mark applied**. A later change to the documents clears the mark.
+  letter and form answers were written from. A CV or letter revision is a PDF,
+  with the `.tex` source it was built from when there is one, so no LaTeX is
+  needed; Openings reads its text from the source, or else from the PDF, for
+  search and comparison between revisions, without running TeX.
+- **Plan:** give applications a priority, a deadline, the documents they need and
+  the employer's requirements (authorship rules, attachments, references,
+  language, eligibility), and sort by deadline or priority. Close, reopen or
+  delete applications in bulk.
+- **Hand over:** a Shortlisted application is **Ready** as soon as each document
+  it needs has a complete revision and nothing blocks it; nobody marks it. Its
+  review page shows the posting, CV and letter side by side with the open
+  requirements, and says what is missing otherwise; download the PDFs, apply on
+  the employer's site and **Mark applied**.
 - **Stay consistent:** applications built on older inputs are flagged after a
   change to a part their documents use (Profile header and summary, facts and
   writing rules in Preferences, templates, Career), naming the part, and a PDF built from another
   source than its revision's is refused.
-- **Track:** follow applications through Preparing, Ready, Applied, Interview,
-  Offer and Closed. Record the employer's rejection,
-  interview or offer with its date, and close the ones that never answered as
-  **No reply** after a period you set in Preferences.
+- **Track:** follow applications through Shortlisted, Ready, Applied, Interview,
+  Offer and Closed. **Record reply** stores the employer's
+  interview, offer or rejection with its date and moves the stage with it; close
+  the ones that never answered as **No reply** after a period you set in Preferences.
 - **Learn:** **Stats** shows, for the last 90 days, 12 months or all time, how many
   applications you sent, the share that got a reply or led to an interview, the
   median days to a reply, the funnel and, once two sources have enough
@@ -65,7 +67,7 @@ and submit. Jobs, documents and file bytes live in one portable SQLite database.
 - **Automate:** the dashboard, REST API and MCP share one service layer and the same
   operations.
 
-![The review page: the posting, CV and letter side by side with their PDFs, the place in the Ready queue and Mark applied](docs/images/review.png)
+![The review page: the posting, CV and letter side by side with their PDFs, the place among the Ready applications and Mark applied](docs/images/review.png)
 
 ## Agent-operated
 
@@ -74,7 +76,7 @@ Openings works best when your own AI agent runs it. The server ships
 `skills_get` and one MCP prompt per skill). With them, an agent reviews new jobs
 against your Preferences, prepares a CV and letter for every shortlisted job, records
 employer requirements, tunes searches and keeps your Career record current. You
-answer its questions, apply to the prepared Drafts and mark them Applied.
+answer its questions, apply to the Ready applications and mark them Applied.
 
 The agent uses its own model access and tools and never submits applications for
 you. Read [Agent-operated job search](docs/user/agent-operated.md).

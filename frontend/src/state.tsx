@@ -436,7 +436,6 @@ function affected(read: string, changed: string) {
       "career",
       "templates",
       "preferences",
-      "responses",
       // An application carries its pinned note.
       "notes",
     ].includes(b);

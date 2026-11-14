@@ -15,3 +15,5 @@ class DocumentService(ContextOperations, RevisionOperations, FileOperations):
         self.db = workspace.db
         self.max_file_bytes = max_file_bytes
         self._upload_slots = asyncio.Semaphore(2)
+        # PDF-only revisions whose text could not be read, tried once per process.
+        self._unreadable = set()

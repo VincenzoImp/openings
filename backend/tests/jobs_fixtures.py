@@ -254,7 +254,7 @@ def seed_jobs(app):
         return workspace.set_triage(job["id"], value, job["version"], reason)
 
     with acting_as(agent):
-        triage("lumen-platform", "saved")
+        triage("lumen-platform", "shortlisted")
         triage("orbit-junior", "dismissed", "Junior role; you look for mid to senior level.")
         activity.ask_question(
             {

@@ -117,6 +117,13 @@ PLANNED = (
         ),
     ),
     (
+        "CV and letter revisions with a PDF (complete in 0.24)",
+        (
+            "SELECT count(*) FROM documents d WHERE kind IN ('resume','cover_letter') AND "
+            "EXISTS(SELECT 1 FROM files f WHERE f.document_id=d.id AND f.media_type='application/pdf')"
+        ),
+    ),
+    (
         "CV and letter revisions without a PDF",
         (
             "SELECT count(*) FROM documents d WHERE kind IN ('resume','cover_letter') AND NOT "
@@ -201,8 +208,9 @@ STATES = (
     ("api tokens by kind", "SELECT kind, count(*) FROM api_tokens GROUP BY 1"),
 )
 
-# Ready as 0.24 computes it: a Draft whose current CV and letter revisions both have a
-# PDF and that has no unresolved blocking requirement (#214).
+# Ready as 0.24 computes it right after the upgrade (every application requires CV and
+# letter): a Draft whose current CV and letter revisions both have a PDF and that has
+# no unresolved blocking requirement (#214). "ready" counts both directions.
 _LEAF = (
     "EXISTS(SELECT 1 FROM documents d WHERE d.application_id=a.id AND d.kind='{kind}' AND NOT "
     "EXISTS(SELECT 1 FROM documents c WHERE c.previous_id=d.id) AND EXISTS(SELECT 1 FROM files "

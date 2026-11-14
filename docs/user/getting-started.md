@@ -46,9 +46,9 @@ stored in the workspace.
 ## Finding your way
 
 The navigation has three groups. **Work** holds Today, Applications, Jobs (the
-tabs To review, Shortlist, Dismissed and All, each with the selected job beside
-the list; after you shortlist or dismiss a job in To review or the Shortlist, the
-next job of the list is shown) and Activity. **Library** holds Career, Preferences and Templates. **System** holds
+tabs New, Shortlisted, Dismissed and All, each with the selected job beside
+the list; after you shortlist or dismiss a job in New, the next job of the list
+is shown) and Activity. **Library** holds Career, Preferences and Templates. **System** holds
 Collection and Settings. The numbers beside Applications and Activity count the
 applications ready to apply and the agent's open questions; the line at the bottom
 names the agent while one of its runs is open.
@@ -56,17 +56,19 @@ names the agent while one of its runs is open.
 **Today** is the first screen. A sentence counts what waits for you, and the
 cards below answer three questions:
 
-- **Ready to apply:** the applications your agent marked ready, closest deadline
-  first, then priority. **Review** opens the application's review page, where
+- **Ready to apply:** the Shortlisted applications whose required documents are
+  complete and that no requirement blocks, closest deadline first, then
+  priority. **Review** opens the application's review page, where
   you check the CV and letter beside the posting and mark it applied.
 - **Needs your decision:** the agent's open questions, answered in place, and
   applications blocked by a requirement. **Not now** only folds the answer box
   away; the question stays open.
-- **What happened:** the pipeline (Preparing, Ready, Applied, Interview, Offer,
+- **What happened:** the pipeline (Shortlisted, Ready, Applied, Interview, Offer,
   each a link to its list), the agent's runs and collection **since your last
   visit**, and the applications **waiting for a reply** longer than the no-reply period
   set in Preferences (30 days unless you change it), with
-  **Record replies** to open them and **Close N as no reply**.
+  **Record replies** to open them and **Close as no reply**, one by one or all
+  together. Nothing closes by itself.
 
 "Since your last visit" starts where your previous visit ended: a visit lasts
 while Today keeps being opened and ends after 30 minutes without it, so reloading
@@ -83,14 +85,14 @@ you choose one.
 ## Your first job
 
 1. Sign in at `http://127.0.0.1:8080` (see above for the first start).
-2. In **Jobs** (it opens on **To review**), choose **Add a job**. Paste a URL
+2. In **Jobs** (it opens on **New**), choose **Add a job**. Paste a URL
    or enter the title, company and full posting. The address is looked up first:
    a job already in your workspace is shown instead of a copy. If URL extraction
    cannot obtain the text, paste it yourself.
 3. Select the job to read its posting and signals beside the list, then choose
-   **Shortlist** or **Start application**. Starting creates an application in
-   Preparing and removes it from the pending Shortlist; an existing application
-   opens instead. **Dismiss…** keeps its identity and history and asks for an
+   **Shortlist** or **Dismiss…**. Shortlisting starts the job's application in
+   stage Shortlisted, needing a CV and a letter; undoing it removes that
+   application while nothing has been added to it. **Dismiss…** keeps its identity and history and asks for an
    optional reason.
 4. In **Collection**, add a saved search or company board, preview it, then enable
    its schedule. New sources start paused.

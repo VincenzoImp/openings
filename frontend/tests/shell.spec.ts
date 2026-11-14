@@ -185,7 +185,7 @@ test("each screen has one address; an unknown or retired one opens Today", async
 }) => {
   const [first] = (
     await page.evaluate(() =>
-      fetch("/api/v1/applications?status=applied&limit=1").then((response) =>
+      fetch("/api/v1/applications?stage=applied&limit=1").then((response) =>
         response.json(),
       ),
     )
@@ -212,7 +212,7 @@ test("navigation counts come from the workspace and the agent line shows an open
       (path) => fetch("/api/v1" + path).then((response) => response.json()),
       path,
     );
-  const ready = (await api("/applications?status=draft&limit=1")).ready_count;
+  const ready = (await api("/applications?limit=1")).stage_counts.ready;
   const applications = page
     .getByRole("navigation", { name: "Main" })
     .getByRole("link", { name: /^Applications/ });
@@ -261,9 +261,8 @@ for (const width of [360, 390, 600, 860, 861, 1024, 1280, 1600])
         (path) => fetch("/api/v1" + path).then((response) => response.json()),
         path,
       );
-    const ready = (await api("/applications?status=draft&ready=true&limit=1"))
-      .items[0];
-    const sent = (await api("/applications?status=interview&limit=1")).items[0];
+    const ready = (await api("/applications?stage=ready&limit=1")).items[0];
+    const sent = (await api("/applications?stage=interview&limit=1")).items[0];
     // A job with every kind of signal: a likely duplicate of a job in progress.
     const flagged = (await api("/jobs?signal=likely_duplicate&limit=1"))
       .items[0];

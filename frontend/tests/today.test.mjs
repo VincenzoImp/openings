@@ -263,15 +263,15 @@ test("a change says where it moved a record", () => {
   const change = (kind, payload) => ({ id: "1", kind, payload });
   assert.equal(
     wording.changeDetail(
-      change("application_updated", { from: "draft", to: "applied" }),
+      change("application_updated", { from: "shortlisted", to: "applied" }),
     ),
-    "Preparing → Applied",
+    "Shortlisted → Applied",
   );
   assert.equal(
     wording.changeDetail(
-      change("triage_changed", { from: "inbox", to: "saved" }),
+      change("triage_changed", { from: "new", to: "shortlisted" }),
     ),
-    "Inbox → Shortlist",
+    "New → Shortlisted",
   );
   // A change that kept the stage names the fields it touched instead.
   assert.equal(
