@@ -225,7 +225,7 @@ def test_a_board_that_stops_listing_a_posting_marks_it_and_dismisses_nothing(
     assert second["state"] == "succeeded" and second["result"]["unlisted"] == 2
     after = {item["title"]: item for item in workspace.list_jobs()["items"]}
     assert after["Engineer 2"]["signals"]["no_longer_listed"]
-    # A label only: the job waits in the Inbox.
+    # A label only: the job stays New.
     assert after["Engineer 2"]["triage"] == "new"
     assert (
         after["Engineer 3"]["triage"] == "shortlisted"

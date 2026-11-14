@@ -1,4 +1,6 @@
-"""Typed career headers preserve precision and optional content."""
+"""Typed career headers and categories preserve precision and optional content."""
+
+import json
 
 import pytest
 from pydantic import ValidationError
@@ -93,8 +95,9 @@ def test_a_claim_is_always_included_or_not_and_keeps_other_hints_in_metadata(wor
             HighlightCreate.model_validate({"career_id": entry["id"], "text": "X.", **removed})
 
 
-def test_complete_entry_workflow_headers_and_order(client):
-    """The one-record career routes the dashboard uses, and the owner's import (REST only)."""
+@pytest.fixture
+def call(client):
+    """A REST call of the dashboard: the body is the query of a GET."""
 
     def call(method, path, body=None):
         response = client.request(
@@ -106,6 +109,11 @@ def test_complete_entry_workflow_headers_and_order(client):
         response.raise_for_status()
         return response.json()
 
+    return call
+
+
+def test_complete_entry_workflow_headers_and_order(call):
+    """The one-record career routes the dashboard uses, and the owner's import (REST only)."""
     first = call(
         "POST",
         "/career/entries",
@@ -174,3 +182,54 @@ def test_complete_entry_workflow_headers_and_order(client):
     )
     assert imported["items"][0]["dates"]["start"] == "2025"
     assert imported["items"][0]["position"] == 5
+
+
+def test_awards_and_publications_survive_import_filtering_and_citation(client, call):
+    entries = [
+        {
+            "kind": kind,
+            "title": f"Example {kind}",
+            "narrative": f"Synthetic supporting evidence for an example {kind}.",
+            "metadata": {"year": 2024, "url": "https://example.org/evidence"},
+        }
+        for kind in ("award", "publication")
+    ]
+    created = [call("POST", "/career/entries", entry) for entry in entries]
+    preview = call("POST", "/career/import/preview", {"text": json.dumps(entries)})
+    assert [row["kind"] for row in preview["entries"]] == ["award", "publication"]
+    assert call("GET", "/career/entries")["total"] == 2
+    imported = call("POST", "/career/import", {"entries": preview["entries"]})
+    assert imported["total"] == 2
+    for entry, record in zip(entries, created):
+        listed = call("GET", "/career/entries", {"kind": entry["kind"], "summary": True})
+        assert listed["total"] == 2
+        assert {row["kind"] for row in listed["items"]} == {entry["kind"]}
+        read = call("GET", "/career/batch", {"ids": [record["id"]]})["items"][0]
+        assert all(read[key] == value for key, value in entry.items())
+
+    job = call("POST", "/jobs", {"title": "Engineer", "company": "Example", "posting": "Build."})
+    started = call("POST", "/applications/batch", {"items": [{"job_id": job["id"]}]})
+    application = started["items"][0]["result"]
+    cited = [record["id"] for record in created + imported["items"]]
+    document = call(
+        "POST",
+        "/documents",
+        {
+            "application_id": application["id"],
+            "kind": "other",
+            "content": {"text": "Synthetic notes."},
+            "career_ids": cited,
+        },
+    )
+    assert document["career_ids"] == cited
+    award = created[0]
+    changed = call(
+        "PATCH",
+        f"/career/entries/{award['id']}",
+        {"expected_version": award["version"], "kind": "publication", "narrative": "Revised."},
+    )
+    assert changed["kind"] == "publication"
+    # The revision keeps citing the entry by id.
+    assert call("GET", f"/documents/{document['id']}")["career_ids"] == cited
+    invalid = {"kind": "unsupported", "title": "Invalid category"}
+    assert client.post("/api/v1/career/entries", json=invalid).status_code == 422

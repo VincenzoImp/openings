@@ -1021,3 +1021,14 @@ def test_a_refused_start_writes_nothing(tmp_path, monkeypatch):
             Database(other)
         assert refused.value.code == "schema_version" and words in refused.value.message
         unchanged_after_refusal(other, digest_before)
+
+    # So is the database of another program: no schema version, tables of its own.
+    unrelated = tmp_path / "unrelated.sqlite"
+    with closing(sqlite3.connect(unrelated)) as conn:
+        conn.execute("CREATE TABLE jobs (old_field TEXT)")
+        conn.execute("INSERT INTO jobs VALUES ('retained')")
+        conn.commit()
+    digest_before = digest(unrelated)
+    with pytest.raises(DomainError):
+        Workspace(unrelated)
+    unchanged_after_refusal(unrelated, digest_before)

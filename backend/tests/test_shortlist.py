@@ -177,6 +177,13 @@ def test_closing_never_changes_triage_and_a_closed_application_is_kept(workspace
     assert job["triage"] == "shortlisted"
     dismissed = workspace.set_triage(job["id"], "dismissed", job["version"])
     assert dismissed["application"]["id"] == application["id"]
+    counts = workspace.list_jobs(include_counts=True)["counts"]
+    assert {key: counts[key] for key in ("all", "new", "shortlisted", "dismissed")} == {
+        "all": 1,
+        "new": 0,
+        "shortlisted": 0,
+        "dismissed": 1,
+    }
 
 
 def test_reopening_a_closed_application_follows_the_rules_of_a_start(workspace):

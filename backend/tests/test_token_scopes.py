@@ -60,7 +60,7 @@ def test_an_agent_token_keeps_the_workflow_operations(app, client):
     ]
     assert {item["actor"] for item in history} == {"agent:Synthetic agent"}
     # The records export is the owner's; the backup and permanent deletion stay available.
-    # Every owner-only route refuses an agent token (test_interfaces.py); the refusal
+    # Every owner-only route refuses an agent token (test_parity.py); the refusal
     # says which authority is missing.
     refused_over_rest(client.get("/api/v1/export", headers=headers))
     _, error = tool(client, agent, "workspace_export")
@@ -211,6 +211,14 @@ def test_a_session_write_needs_its_csrf_header_and_a_revoked_token_is_refused(tm
         assert client.post("/api/v1/jobs", json={"posting": "Text"}).status_code == 403
         client.headers["X-CSRF-Token"] = setup.json()["csrf_token"]
         token = client.post("/api/v1/tokens", json={"name": "test"}).json()
+        kept = client.post("/api/v1/tokens", json={"name": "kept", "kind": "owner"}).json()
         client.delete("/api/v1/tokens/" + token["id"])
+        # A new password ends the session and keeps the tokens.
+        rotation = {"current_password": PASSWORD, "password": "replacement-password"}
+        assert client.post("/api/v1/auth/password", json=rotation).status_code == 200
+        assert client.get("/api/v1/jobs").status_code == 401
         client.cookies.clear()
         assert client.get("/api/v1/jobs", headers=bearer(token)).status_code == 401
+        assert client.get("/api/v1/capabilities", headers=bearer(kept)).json()["version"]
+        listed = client.get("/api/v1/tokens", headers=bearer(kept)).json()["items"]
+        assert [item["name"] for item in listed] == ["kept"] and listed[0]["last_used_at"]
