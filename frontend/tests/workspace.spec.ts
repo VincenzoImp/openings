@@ -199,7 +199,9 @@ test("mobile applications, templates and stats stay usable inside the viewport",
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await go(page, "applications");
-  await expect(page.getByRole("table", { name: "Applications" })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Applications" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("group", { name: "Stage" }).getByRole("button"),
   ).toHaveCount(7);
@@ -228,7 +230,7 @@ test("mobile applications, templates and stats stay usable inside the viewport",
     .toBeLessThanOrEqual(390);
   // Stats fits the phone: its numbers and the funnel.
   await go(page, "applications?section=stats");
-  await expect(page.getByRole("table", { name: "Funnel" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Funnel" })).toBeVisible();
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(390);
