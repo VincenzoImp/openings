@@ -304,7 +304,7 @@ class Timeline(Page):
 # Applications
 
 
-class Requirement(Out):
+class EmployerRequirement(Out):
     id: str
     kind: str
     text: str
@@ -354,7 +354,7 @@ class Application(ApplicationRow):
     job: Job | JobSummary
     questions: list[Json] = []
     answers: Json = {}
-    requirements: list[Requirement] = []
+    requirements: list[EmployerRequirement] = []
     replies: list[Reply] = []
     pinned_note: Note | None = None
     from_shortlist: bool = False
