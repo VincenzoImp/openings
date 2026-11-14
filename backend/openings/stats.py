@@ -5,8 +5,9 @@ Interview or Offer, or has an employer reply (``replies``). With a period of
 ``90d`` or ``12m`` only applications sent (``applied_at``) since then count;
 ``all`` counts every sent application.
 
-For each sent application: it got a reply when it has any response; it reached
-an interview when it has an interview or offer response or was ever moved to
+For each sent application: it got a reply when it has any response, reached an
+interview or an offer, or was closed as rejected or accepted, so the funnel never
+grows from one step to the next; it reached an interview when it has an interview or offer response or was ever moved to
 Interview or Offer; it reached an offer when it has an offer response, was moved
 to Offer or was accepted. Its days to the first reply are the day of its first
 response minus the day of ``applied_at`` (never below zero).
@@ -73,6 +74,14 @@ def _interview(row):
     ) or _offer(row)
 
 
+def _replied(row):
+    return bool(
+        row["first_reply"] is not None
+        or (row["status"] == "closed" and row["outcome"] in ("rejected", "accepted"))
+        or _interview(row)
+    )
+
+
 def _days(row):
     if not (row["first_reply"] and row["applied_at"]):
         return None
@@ -94,7 +103,7 @@ class StatsService:
             (since,) if since else (),
         )
         applied = len(rows)
-        replied = sum(row["first_reply"] is not None for row in rows)
+        replied = sum(map(_replied, rows))
         interviews = sum(map(_interview, rows))
         offers = sum(map(_offer, rows))
         waits = [wait for wait in map(_days, rows) if wait is not None]
@@ -102,7 +111,7 @@ class StatsService:
         for row in rows:
             counts = by_source.setdefault(row["source"] or OTHER_SOURCE, [0, 0])
             counts[0] += 1
-            counts[1] += row["first_reply"] is not None
+            counts[1] += _replied(row)
         enough = {name: counts for name, counts in by_source.items() if counts[0] >= MIN_PER_SOURCE}
         return {
             "period": value.period,

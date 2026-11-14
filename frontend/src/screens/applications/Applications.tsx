@@ -14,8 +14,9 @@ import { Button, IconButton } from "../../ui/Button";
 import { SearchField } from "../../ui/Field";
 import { List, ListGroup, ListRows, useSelection } from "../../ui/List";
 import { Menu, type MenuEntry, type MenuGroup } from "../../ui/Menu";
-import { Callout, EmptyState, PageHeader, SkeletonRows } from "../../ui/Page";
-import { FilterChips, Segmented } from "../../ui/Tabs";
+import { LoadError } from "../../ui/LoadError";
+import { EmptyState, PageHeader, SkeletonRows } from "../../ui/Page";
+import { FilterChips, Segmented, Tabs } from "../../ui/Tabs";
 import { useToast } from "../../ui/Toast";
 import { BulkActions } from "./Bulk";
 import {
@@ -51,17 +52,21 @@ import { ApplicationRowView, pageHref } from "./Row";
 import { PERIODS, StatsView } from "./Stats";
 import "./applications.css";
 
-/** The stage chips: one row, a horizontal scroller on a phone. */
-function StageChips({
+/**
+ * The stage tabs: underline tabs, pills on a phone; a horizontal scroller with
+ * a fade where they do not fit. A count shows only once it is known.
+ */
+function StageTabs({
   value,
   counts,
   onChange,
 }: {
   value: Filters["stage"];
-  counts: Record<string, number>;
+  counts: Record<string, number> | null;
   onChange: (stage: Filters["stage"]) => void;
 }) {
   const count = (id: string) => {
+    if (!counts) return undefined;
     if (id === "all")
       return ["shortlisted", "applied", "interview", "offer", "closed"].reduce(
         (sum, key) => sum + (counts[key] ?? 0),
@@ -72,20 +77,18 @@ function StageChips({
     return counts[id] ?? 0;
   };
   return (
-    <div className="ap-chips" role="group" aria-label="Stage">
-      {STAGE_FILTERS.map((stage) => (
-        <button
-          key={stage.id}
-          type="button"
-          className="ap-chip"
-          aria-pressed={value === stage.id}
-          onClick={() => onChange(stage.id)}
-        >
-          {stage.label}
-          <span className="ui-count">{count(stage.id)}</span>
-        </button>
-      ))}
-    </div>
+    <Tabs
+      label="Stage"
+      idPrefix="ap"
+      className="ap-stages"
+      value={value}
+      onChange={(id) => onChange(id as Filters["stage"])}
+      items={STAGE_FILTERS.map((stage) => ({
+        id: stage.id,
+        label: stage.label,
+        count: count(stage.id),
+      }))}
+    />
   );
 }
 
@@ -217,7 +220,7 @@ export default function ApplicationsScreen() {
       {
         onSuccess: () =>
           toast.show({
-            message: `Reopened "${jobOf(app).title}"`,
+            message: `Reopened “${jobOf(app).title}”`,
             tone: "success",
           }),
         onError: (error) =>
@@ -245,18 +248,11 @@ export default function ApplicationsScreen() {
   else if (list.isError && !list.data)
     body = (
       <div className="ap-pad">
-        <Callout
-          icon={SearchX}
-          tone="danger"
-          title="The applications could not be read"
-          actions={
-            <Button size="sm" onClick={() => void list.refetch()}>
-              Try again
-            </Button>
-          }
-        >
-          {errorText(list.error)}
-        </Callout>
+        <LoadError
+          what="your applications"
+          error={list.error}
+          retry={() => void list.refetch()}
+        />
       </div>
     );
   else if (!list.data) body = <SkeletonRows rows={8} />;
@@ -309,11 +305,14 @@ export default function ApplicationsScreen() {
             items: rows.filter((app) => needsRank(app, days) === rank),
           })).filter((group) => group.items.length)
         : [];
-    const row = (app: ApplicationRow) => (
+    // The stage glyph tells stages apart only where they mix: the All tab,
+    // and its last group.
+    const row = (app: ApplicationRow, mixed = filters.stage === "all") => (
       <ApplicationRowView
         key={app.id}
         app={app}
         noReplyDays={days}
+        mixed={mixed}
         onDialog={(kind) => setDialog({ kind, app })}
         onReopen={() => reopen(app)}
       />
@@ -339,11 +338,17 @@ export default function ApplicationsScreen() {
               label={group.label}
               count={group.items.length}
             >
-              {group.items.map(row)}
+              {group.items.map((app) =>
+                row(
+                  app,
+                  filters.stage === "all" &&
+                    group.label === NEEDS_GROUPS[NEEDS_GROUPS.length - 1],
+                ),
+              )}
             </ListGroup>
           ))
         ) : (
-          <ListRows>{rows.map(row)}</ListRows>
+          <ListRows>{rows.map((app) => row(app))}</ListRows>
         )}
       </List>
     );
@@ -389,12 +394,14 @@ export default function ApplicationsScreen() {
             )}
           />
         )}
-        <IconButton
+        <Button
+          variant="ghost"
+          size="sm"
           icon={filters.stats ? ListIcon : ChartNoAxesColumn}
-          label={filters.stats ? "Show the list" : "Show stats"}
-          tooltip="none"
           onClick={() => set({ stats: !filters.stats })}
-        />
+        >
+          {filters.stats ? "List" : "Stats"}
+        </Button>
       </TopBarActions>
       {filters.stats ? (
         <div
@@ -419,9 +426,9 @@ export default function ApplicationsScreen() {
           role="toolbar"
           aria-label="Applications"
         >
-          <StageChips
+          <StageTabs
             value={filters.stage}
-            counts={list.counts}
+            counts={list.data && !list.isError ? list.counts : null}
             onChange={(stage) => set({ stage })}
           />
           <div className="ap-tools">
@@ -484,7 +491,13 @@ export default function ApplicationsScreen() {
           onClear={() => set(cleared(filters))}
         />
       )}
-      <div className="ap-body" data-view={filters.stats ? "stats" : "list"}>
+      <div
+        className="ap-body"
+        id="ap-panel"
+        role={filters.stats ? undefined : "tabpanel"}
+        aria-labelledby={filters.stats ? undefined : `ap-tab-${filters.stage}`}
+        data-view={filters.stats ? "stats" : "list"}
+      >
         {body}
       </div>
       <ApplicationDialogs

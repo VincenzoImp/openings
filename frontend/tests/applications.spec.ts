@@ -302,7 +302,7 @@ test("close as no reply from the page with Undo, and in bulk from the list", asy
     "Clear",
   ]);
   await bar.getByRole("button", { name: "Close as no reply" }).click();
-  await expect(toast(page)).toContainText("Closed 2 as no reply");
+  await expect(toast(page)).toContainText("Closed 2 applications as no reply");
   const closed = await Promise.all(
     [first, second, single].map(
       async (app) => (await read(page, app.id)).outcome ?? null,
@@ -323,8 +323,8 @@ test("the list starts with what needs action and opens the page; Stats has its n
   const box = (await row.boundingBox())!;
   expect(box.y).toBeLessThanOrEqual(isPhone(page) ? 220 : 300);
   await page
-    .getByRole("group", { name: "Stage" })
-    .getByRole("button", { name: /^Applied/ })
+    .getByRole("tablist", { name: "Stage" })
+    .getByRole("tab", { name: /^Applied/ })
     .click();
   await expect(page).toHaveURL(/stage=applied/);
   await row.click();
