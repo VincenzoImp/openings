@@ -3,7 +3,9 @@
 Preferences hold what you want, in your own words. Your agent reads them when it
 reviews jobs, writes documents and works with you, and asks you when they do not
 cover a case. Nothing in them acts on its own: no job is dismissed and no
-document changes automatically. Open them under **Library → Preferences**.
+document changes automatically. Open them under **You → Preferences**.
+
+![Preferences, with each section as lines of text](../images/preferences.png)
 
 ## Sections
 
@@ -21,19 +23,24 @@ a template keeps only its source, files, guidance and limits.
 
 ## Editing
 
-Each section lists its statements. **Edit** a statement in place and save it,
-**+ Add** one at the end, change the order with the arrows and **Delete** from
-the `…` menu, which asks first. A Writing rule has **Applies to**: All, CV or
-Letter. If the section changed in another session while you were editing, the
-page says so, shows the latest list and keeps your text; save again.
+Each section reads as a list of lines. Point at a line (or focus it with Tab)
+for **Edit**, which turns it into a text field in place, and `…`, with
+**Move to** another section and **Delete** (with Undo). **+ Add** writes a new
+line at the end: Enter saves it and opens the next one, Esc stops. Drag a
+line's handle to reorder it, or press Alt+↑/↓ on a focused line; Enter edits
+it and Delete removes it. A writing rule is tagged **All**, **CV** or
+**Letter**. An empty section shows two grey examples. Every change saves the
+whole section at once; if it changed in another session meanwhile, the page
+says so, keeps your text and offers **Reload** or **Keep editing**.
 
 ## Settings
 
 Two values are typed because Openings uses them itself:
 
-- **Languages I speak** (in Facts about me): the jobs filter **Hide jobs
-  requiring languages I don't speak** leaves out jobs whose required languages
-  are all outside this list. It only filters the list; it never dismisses a job.
+- **Languages I speak** (in Facts about me): the link **Hide new jobs that
+  require another language** opens Jobs with that filter and says how many of
+  the new jobs it would hide. It only filters the list; it never dismisses a
+  job.
 - **Count an application as no reply after [30] days** (under Following up):
   the no-reply period of
   [applications](applications.md#record-what-the-employer-did), from 1 to 365
