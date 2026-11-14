@@ -17,7 +17,6 @@ from .. import __version__, backups, events
 from ..actors import current_actor, require_owner
 from ..auth import COOKIE, MAX_AGE
 from ..db import SCHEMA_VERSION
-from ..documents import DocumentService
 from ..errors import DomainError
 from ..models import Input
 from ..operations import (
@@ -511,7 +510,7 @@ def register_system(router, mcp, workspace, auth, public_url):
                 "claims": ["metadata"],
                 "preference_sections": ["items"],
                 "templates": ["rules"],
-                "documents": ["content", "legacy_content", "claim_ids", "knowledge_ids"],
+                "documents": ["content", "claim_ids", "knowledge_ids"],
                 "sources": ["config", "schedule"],
                 "providers": ["policy", "runtime"],
             }
@@ -527,7 +526,6 @@ def register_system(router, mcp, workspace, auth, public_url):
                 "claims",
                 "templates",
                 "preference_sections",
-                "contexts",
                 "documents",
                 "files",
                 "sources",
@@ -539,13 +537,8 @@ def register_system(router, mcp, workspace, auth, public_url):
                 for table in tables:
                     yield ',"' + table + '":['
                     first = True
-                    # Context files are served from snapshot parts; payloads are rebuilt.
-                    source = "all_files" if table == "files" else table
-                    for row in conn.execute("SELECT * FROM " + source):
+                    for row in conn.execute("SELECT * FROM " + table):
                         item = dict(row)
-                        if table == "contexts":
-                            item = DocumentService.context_record(conn, row)
-                            del item["resource_uri"]
                         for key in json_fields.get(table, []):
                             if item[key] is not None:
                                 item[key] = json.loads(item[key])

@@ -912,55 +912,16 @@ test("requirements, the plan and a concurrent change in the details", async ({
   ).toContainText("Lead with the API work.");
 });
 
-test("documents, revisions, frozen copies and their files are managed in the review page", async ({
+test("documents, revisions and their files are managed in the review page", async ({
   page,
 }) => {
   const application = await make(page, unique("Documents"));
-  await go(page, `review?application=${application.id}&tab=inputs`);
+  // A CV: its source and the PDF built from it, complete, revised, compared
+  // with the first revision and deleted.
+  await go(page, `review?application=${application.id}&tab=documents`);
   await settled(page);
-  // A frozen copy with deliberately empty selections.
-  await page.getByRole("button", { name: "Prepare a frozen copy" }).click();
-  await dialog(page)
-    .getByRole("checkbox", { name: "Choose the Career entries" })
-    .check();
-  await dialog(page)
-    .getByRole("checkbox", { name: "Choose the approved claims" })
-    .check();
-  await dialog(page)
-    .getByRole("group", { name: /Career entries/ })
-    .getByRole("button", { name: "Clear matching" })
-    .click();
-  await expect(
-    dialog(page)
-      .getByRole("group", { name: /Approved claims/ })
-      .getByRole("checkbox"),
-  ).toHaveCount(0);
-  const saved = page.waitForEvent("download");
-  await dialog(page).getByRole("button", { name: "Save and download" }).click();
-  await saved;
-  await expect(dialog(page)).toHaveCount(0);
-  const contexts = await call(
-    page,
-    `/contexts?application_id=${application.id}`,
-  );
-  const context = await call(page, `/contexts/${contexts.items[0].id}`);
-  expect([context.payload.knowledge, context.payload.claims]).toEqual([[], []]);
-  const copies = page.getByRole("list", { name: "Frozen copies" });
-  await copies.getByRole("button", { name: "Files" }).first().click();
-  await expect(copies).toContainText(/No file in this copy|\.tex|\.pdf/);
-  const again = page.waitForEvent("download");
-  await copies
-    .getByRole("button", { name: /^Download/ })
-    .first()
-    .click();
-  await again;
-
-  // A CV from that copy: its source and the PDF built from it, complete,
-  // revised, compared with the first revision and deleted.
-  await page.getByRole("tab", { name: "Documents" }).click();
   await page.getByRole("button", { name: "Add a document" }).click();
   await dialog(page).getByLabel("Title").fill("Workflow CV");
-  await dialog(page).getByLabel("Written from").selectOption({ index: 1 });
   await dialog(page)
     .getByLabel("Source (.tex)")
     .setInputFiles({
@@ -1044,119 +1005,10 @@ test("documents, revisions, frozen copies and their files are managed in the rev
     .click();
   await expect(revisions.locator(":scope > li")).toHaveCount(1);
 
-  // An input changes after the copy: the Inputs tab says what changed.
-  const writing = (await call(page, "/preferences")).sections.find(
-    (section: { section: string }) => section.section === "writing",
-  );
-  await call(page, "/preferences/writing", "PUT", {
-    expected_version: writing.version,
-    items: [...writing.items, { text: "Synthetic writing rule." }],
-  });
-  // The change was made elsewhere: the page shows it once read again.
-  await page.reload();
-  await settled(page);
-  await page.getByRole("tab", { name: "Inputs" }).click();
-  await expect(page.getByText("Inputs changed since")).toBeVisible();
-  await expect(
-    page.getByRole("list", {
-      name: "Inputs changed since the documents were written",
-    }),
-  ).toContainText("Preference “Synthetic writing rule.”");
+  // Document work leaves the answers alone.
   expect((await call(page, `/applications/${application.id}`)).answers).toEqual(
     {},
   );
-});
-
-test("the Inputs tab and the list name the parts that changed since the documents were written", async ({
-  page,
-}) => {
-  const stamp = unique("Inputs");
-  const application = await make(page, stamp);
-  const sectionOf = async (name: string) =>
-    (await call(page, "/preferences")).sections.find(
-      (section: { section: string }) => section.section === name,
-    );
-  /** Replace one statement of a section (or add it), as an agent would. */
-  const write = async (
-    name: string,
-    from: string | null,
-    item: { text: string; scope?: string },
-  ) => {
-    const section = await sectionOf(name);
-    const items = section.items.filter(
-      (other: { text: string }) => other.text !== from,
-    );
-    await call(page, `/preferences/${name}`, "PUT", {
-      expected_version: section.version,
-      items: [...items, item],
-    });
-  };
-  const authorization = `Work authorization ${stamp}: EU citizen.`;
-  const onePage = `One page ${stamp}: keep the CV to one page.`;
-  await write("facts", null, { text: authorization });
-  await write("writing", null, { text: onePage, scope: "cv" });
-  const context = await call(page, "/contexts", "POST", {
-    application_id: application.id,
-  });
-  for (const kind of ["cv", "letter"])
-    await call(page, "/documents", "POST", {
-      application_id: application.id,
-      context_id: context.id,
-      kind,
-      title: kind === "cv" ? "CV" : "Letter",
-    });
-  const profile = async (fields: Record<string, unknown>) =>
-    call(page, "/career/profile", "PATCH", {
-      expected_version: (await call(page, "/career/profile")).version,
-      ...fields,
-    });
-  const before = await call(page, "/career/profile");
-
-  // Metadata is not used by documents: they stay current.
-  await profile({ metadata: { ...before.metadata, synthetic: stamp } });
-  await go(page, `review?application=${application.id}&tab=inputs`);
-  await settled(page);
-  await expect(page.getByText("Inputs are current")).toBeVisible();
-
-  // The summary, a fact and a CV rule change: a changed statement is the
-  // old one removed and the new one added.
-  await profile({ summary: `${before.summary} ${stamp}` });
-  await write("facts", authorization, {
-    text: `Work authorization ${stamp}: no sponsorship needed.`,
-  });
-  await write("writing", onePage, {
-    text: `One page ${stamp}: no photo.`,
-    scope: "cv",
-  });
-  await page.reload();
-  await settled(page);
-  await expect(page.getByText("Inputs changed since")).toBeVisible();
-  const changes = page.getByRole("list", {
-    name: "Inputs changed since the documents were written",
-  });
-  await expect(changes.getByRole("listitem")).toHaveText([
-    /^Profile summary\s*changed$/,
-    new RegExp(
-      `^Preference “Work authorization ${stamp}: no sponsorship needed.”\\s*added · Facts about me$`,
-    ),
-    new RegExp(
-      `^Preference “Work authorization ${stamp}: EU citizen.”\\s*removed · Facts about me$`,
-    ),
-    new RegExp(
-      `^Preference “One page ${stamp}: no photo.”\\s*added · Writing rules · CV only$`,
-    ),
-    new RegExp(
-      `^Preference “One page ${stamp}: keep the CV to one page.”\\s*removed · Writing rules · CV only$`,
-    ),
-  ]);
-  await expect(changes).not.toContainText("Metadata");
-  await fitsViewport(page);
-
-  // The list names the first change and counts the others.
-  await go(page, `applications?q=${encodeURIComponent(stamp)}`);
-  await settled(page);
-  await expect(row(page, stamp)).toContainText("Inputs changed");
-  await expect(row(page, stamp)).toContainText("Profile summary and 4 more");
 });
 
 test("the timeline records replies, notes and who made each change", async ({

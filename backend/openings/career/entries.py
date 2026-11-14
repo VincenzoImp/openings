@@ -108,7 +108,7 @@ class EntryOperations:
         return record_id
 
     def update_knowledge(self, knowledge_id: str, value: KnowledgeUpdate) -> dict:
-        """Revise entry fields with version protection; dates=null clears dates, frozen contexts remain unchanged."""
+        """Revise entry fields with version protection; dates=null clears dates; document revisions keep the ids they cite."""
         data = values(value)
         expected = data.pop("expected_version")
         with self.db.transaction() as conn:
@@ -154,7 +154,7 @@ class EntryOperations:
         return self.get_knowledge(knowledge_id)
 
     def delete_knowledge(self, knowledge_id: str, expected_version: int) -> dict:
-        """Permanently delete a career record and its reusable claims/live assets; frozen contexts retain copies."""
+        """Permanently delete a career record and its reusable claims/live assets; document revisions are unchanged."""
         with self.db.transaction() as conn:
             check_version(
                 _get(conn, "knowledge", knowledge_id, "Career knowledge"), expected_version

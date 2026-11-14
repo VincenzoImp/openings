@@ -44,8 +44,7 @@ export function useAssets(ownerType: string, ownerId: string) {
 export const isPdf = (file: WorkspaceFile) => kindOf(file) === "PDF";
 
 /**
- * Files attached to a record: open, download, remove and add. Frozen copies
- * in prepared applications are not affected by a removal.
+ * Files attached to a record: open, download, remove and add.
  */
 export function Assets({
   ownerType,

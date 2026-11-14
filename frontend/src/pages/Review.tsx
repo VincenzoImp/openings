@@ -12,7 +12,6 @@ import { Answers } from "./review/Answers";
 import { Details } from "./review/Details";
 import { DocumentPanes, useCurrentDocuments } from "./review/DocumentPanes";
 import { Head } from "./review/Head";
-import { Inputs } from "./review/Inputs";
 import { beforeYouSend, tabOf } from "./review/model";
 import { Requirements } from "./review/Requirements";
 import { Revisions } from "./review/Revisions";
@@ -90,7 +89,6 @@ function Review({
               count: application.open_requirements || undefined,
             },
             { id: "timeline", label: "Timeline" },
-            { id: "inputs", label: "Inputs" },
             { id: "documents", label: "Documents" },
             { id: "details", label: "Details" },
           ]}
@@ -100,8 +98,6 @@ function Review({
               <Requirements key={key} application={application} />
             ) : tab === "timeline" ? (
               <Timeline application={application} reload={reload} />
-            ) : tab === "inputs" ? (
-              <Inputs application={application} />
             ) : tab === "documents" ? (
               <Revisions application={application} />
             ) : tab === "details" ? (
@@ -122,8 +118,8 @@ function Review({
 
 /**
  * Review and apply: the posting, the CV and the letter side by side with the
- * actions that end the task, then answers, requirements, timeline, inputs,
- * documents and details. `#review?application=…&tab=…` opens it.
+ * actions that end the task, then answers, requirements, timeline, documents
+ * and details. `#review?application=…&tab=…` opens it.
  */
 export default function ReviewPage() {
   const [id] = useUrlState("application", "");

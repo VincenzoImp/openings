@@ -37,7 +37,7 @@ function Ready({ application }: { application: Application }) {
 
 /**
  * The application's pinned note: its standing guidance, which the agent reads
- * first and new frozen copies of the record include. Saving edits the pinned
+ * first. Saving edits the pinned
  * note or pins a new one; unpinning keeps the note in the timeline.
  */
 function PinnedNote({ application }: { application: Application }) {
@@ -66,7 +66,7 @@ function PinnedNote({ application }: { application: Application }) {
     <form className="stack" onSubmit={save} aria-label="Pinned note">
       <Field
         label="Pinned note"
-        hint="Standing guidance for this application: your agent reads it first, and new frozen copies of your record include it. Other notes are in the Timeline."
+        hint="Standing guidance for this application: your agent reads it first. Other notes are in the Timeline."
       >
         <textarea
           name="body"
@@ -304,10 +304,9 @@ export function Details({
           }}
         >
           <p>
-            The application is removed for good with its frozen copies,
-            documents, files, replies and history. The job and its other
-            applications stay. To stop and keep everything, close it as Not
-            pursued instead.
+            The application is removed for good with its documents, files,
+            replies and history. The job and its other applications stay. To
+            stop and keep everything, close it as Not pursued instead.
           </p>
         </ConfirmDialog>
       )}

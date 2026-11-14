@@ -1,7 +1,6 @@
 """Small invariant checks for career data and external document storage."""
 
 import hashlib
-import json
 import sqlite3
 from unittest.mock import patch
 
@@ -22,7 +21,6 @@ from openings.career import (
     TemplateUpdate,
 )
 from openings.documents import (
-    ContextCreate,
     DocumentCreate,
     DocumentService,
     UploadReservation,
@@ -30,7 +28,6 @@ from openings.documents import (
 from openings.errors import DomainError
 from openings.interfaces.career import register_api as register_career_api
 from openings.interfaces.documents import register_api
-from openings.preferences import PreferencesService
 from openings.workspace import Workspace
 from timeline_fixtures import guided_application
 
@@ -134,68 +131,11 @@ def test_relevant_profile_edits_are_distinct_from_contacts_and_templates(workspa
     assert career.get_knowledge(evidence["id"])["narrative"].startswith("Built Python")
 
 
-def test_context_freezes_preferences_evidence_and_file_bytes(workspace):
-    ws, career, documents, client, evidence, _, template, application = workspace
-    asset, _ = upload(
-        documents, client, "template", template["id"], "assets/logo.txt", b"synthetic logo"
-    )
-    PreferencesService(ws).update_preferences(
-        "writing", {"expected_version": 0, "items": [{"text": "Use supplied facts only."}]}
-    )
-    request = ContextCreate(
-        application_id=application["id"],
-        idempotency_key="prepare-once",
-        note="Keep the technical details.",
-    )
-    frozen = documents.prepare_context(request)
-    assert frozen["payload"]["preferences"]["writing"] == {
-        "version": 1,
-        "items": [{"text": "Use supplied facts only.", "scope": "all"}],
-    }
-    assert "general" not in frozen["payload"]["instructions"]
-    assert (
-        frozen["payload"]["instructions"]["template_append"][template["id"]]
-        == "Use concise wording."
-    )
-    assert frozen["payload"]["knowledge"][0]["narrative"] == evidence["narrative"]
-    assert (
-        hashlib.sha256(
-            json.dumps(
-                frozen["payload"], ensure_ascii=False, sort_keys=True, separators=(",", ":")
-            ).encode()
-        ).hexdigest()
-        == frozen["signature"]
-    )
-    career.update_knowledge(
-        evidence["id"],
-        KnowledgeUpdate(
-            expected_version=evidence["version"], narrative="Edited after preparation."
-        ),
-    )
-    documents.delete_file(asset["id"], 1)
-    assert documents.prepare_context(request)["id"] == frozen["id"]
-    old = documents.get_context(frozen["id"])
-    file_id = old["payload"]["files"][0]["id"]
-    assert client.get(f"/api/v1/files/{file_id}/content").content == b"synthetic logo"
-    assert old["payload"]["knowledge"][0]["narrative"] == evidence["narrative"]
-    with pytest.raises(DomainError):
-        documents.prepare_context(
-            ContextCreate(
-                application_id=application["id"],
-                idempotency_key="prepare-once",
-                note="Different command",
-            )
-        )
-    assert ws.get_application(application["id"])["status"] == "shortlisted"
-
-
 def test_document_revisions_validate_evidence_and_never_inherit_old_pdf(workspace, tmp_path):
     ws, _, documents, client, evidence, claim, _, application = workspace
-    context = documents.prepare_context(ContextCreate(application_id=application["id"]))
     first = documents.create_document(
         DocumentCreate(
             application_id=application["id"],
-            context_id=context["id"],
             claim_ids=[claim["id"], claim["id"]],
             knowledge_ids=[evidence["id"]],
             note="Leads with the latency work.",
@@ -236,7 +176,7 @@ def test_document_revisions_validate_evidence_and_never_inherit_old_pdf(workspac
         DocumentCreate(application_id=application["id"], previous_id=first["id"])
     )
     assert second["revision_number"] == 2
-    assert second["files"] == [] and second["context_id"] == context["id"]
+    assert second["files"] == [] and "context_id" not in second
     assert client.get(pdf["url"]).content == data
     for invented, code in (
         ({"claim_ids": ["unknown"]}, "unapproved_claim"),
@@ -244,22 +184,11 @@ def test_document_revisions_validate_evidence_and_never_inherit_old_pdf(workspac
         ({"content": {"text": "Free-form wording."}}, "content_not_accepted"),
     ):
         with pytest.raises(DomainError) as error:
-            documents.create_document(
-                DocumentCreate(
-                    application_id=application["id"], context_id=context["id"], **invented
-                )
-            )
+            documents.create_document(DocumentCreate(application_id=application["id"], **invented))
         assert error.value.code == code
-    with pytest.raises(DomainError) as error:
-        documents.create_document(
-            DocumentCreate(
-                application_id=application["id"],
-                context_id=context["id"],
-                kind="answers",
-                content={"bullets": [{"text": "Invented", "evidence_ids": ["unknown"]}]},
-            )
-        )
-    assert error.value.code == "unknown_evidence"
+    # Frozen contexts are gone (0.24): a revision names no context.
+    with pytest.raises(ValidationError):
+        DocumentCreate(application_id=application["id"], context_id="any")
     ws.db.backup(tmp_path / "portable.sqlite")
     with sqlite3.connect(tmp_path / "portable.sqlite") as restored:
         assert restored.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
@@ -331,11 +260,9 @@ def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_
             metadata={"long": "metadata " * 1000},
         ),
     )
-    context = documents.prepare_context(ContextCreate(application_id=application["id"]))
     first = documents.create_document(
         DocumentCreate(
             application_id=application["id"],
-            context_id=context["id"],
             title="Candidate CV",
         )
     )
@@ -379,9 +306,7 @@ def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_
     assert reads.call_count == 3 and singles.call_count == 1
     assert {row["revision_number"] for row in result["items"]} == set(range(1, 27))
     assert sum(row["file_count"] for row in result["items"]) == 2
-    assert all(
-        not {"content", "files", "text", "legacy_content"} & row.keys() for row in result["items"]
-    )
+    assert all(not {"content", "files", "text"} & row.keys() for row in result["items"])
     # The text derived from the source is searched too.
     found = client.get("/api/v1/documents", params={"q": "document document"}).json()
     assert [row["id"] for row in found["items"]] == [first["id"]]
@@ -409,8 +334,6 @@ def test_filtered_summary_pages_keep_large_content_in_detail_and_batch_revision_
     template_summary = career.list_templates(q="Example", summary=True)["items"][0]
     assert template_summary["id"] == template["id"]
     assert not {"tex", "rules", "guidance"} & template_summary.keys()
-    context_summary = documents.list_contexts(q="Example Co", summary=True)["items"][0]
-    assert context_summary["document_count"] == 26 and "payload" not in context_summary
     assert (
         documents.list_files(
             owner_type="document", application_id=application["id"], q="candidate", summary=True

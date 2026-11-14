@@ -5,7 +5,7 @@ const model = await import("../src/pages/applications/model.ts");
 const { replyPlan, likelyChoice } =
   await import("../src/pages/applications/recording.ts");
 const review = await import("../src/pages/review/model.ts");
-const staleness = await import("../src/library/staleness.ts");
+const routes = await import("../src/shell/routes.ts");
 
 const now = new Date(2026, 10, 13, 10, 0);
 const app = (fields) => ({
@@ -178,116 +178,6 @@ test("plan tags and the state of the documents", () => {
     model.documentState(app({ preparation: [], missing: ["letter"] }))[1],
     { text: "Missing: letter", tone: "attention" },
   );
-  assert.equal(
-    model.documentState(app({ preparation: [], stale_inputs: ["profile"] }))[1]
-      .tone,
-    "attention",
-  );
-});
-
-test("what changed since the documents were written, in words", () => {
-  const change = (fields) => ({
-    id: null,
-    label: "",
-    state: "changed",
-    frozen_version: 1,
-    current_version: 2,
-    ...fields,
-  });
-  const summary = change({ input: "profile", id: "summary", label: "Summary" });
-  const authorization = change({
-    input: "preferences",
-    id: "facts:a1",
-    label: "Work authorization: EU citizen",
-    section: "facts",
-    state: "removed",
-  });
-  const page = change({
-    input: "preferences",
-    id: "writing:b2",
-    label: "One page",
-    section: "writing",
-    state: "added",
-  });
-  const template = change({ input: "template", id: "t1", label: "MASTER CV" });
-  assert.deepEqual(
-    [summary, authorization, template].map((item) =>
-      staleness.changeName(item),
-    ),
-    [
-      "Profile summary",
-      "Preference “Work authorization: EU citizen”",
-      "Template “MASTER CV”",
-    ],
-  );
-  assert.deepEqual(
-    [summary, authorization, page, template].map(staleness.changeState),
-    [
-      "changed",
-      "removed · Facts about me",
-      "added · Writing rules",
-      "changed · version 1 → 2",
-    ],
-  );
-  const whole = change({ input: "profile", label: "Profile" });
-  assert.equal(staleness.changeName(whole), "Profile");
-  assert.equal(staleness.changeState(whole), "changed · compared as a whole");
-  assert.equal(
-    staleness.changeName(
-      change({ input: "claim", id: "c1", label: "x".repeat(60) }),
-      32,
-    ),
-    `Claim “${"x".repeat(31)}…”`,
-  );
-
-  // The list names the first change and counts the rest.
-  const detail = (fields) =>
-    staleness.staleDetail(app({ stale_inputs: ["profile"], ...fields }));
-  assert.equal(
-    detail({ stale_changes: [summary], stale_changes_total: 1 }),
-    "Profile summary",
-  );
-  assert.equal(
-    detail({ stale_changes: [summary, authorization], stale_changes_total: 4 }),
-    "Profile summary and 3 more",
-  );
-  assert.equal(detail({}), "");
-  assert.equal(
-    model.documentState(
-      app({
-        preparation: [],
-        stale_inputs: ["profile"],
-        stale_changes: [summary],
-      }),
-    )[1].text,
-    "Inputs changed",
-  );
-
-  // A rule for the CV concerns the CV only; notes say what was not compared.
-  const report = {
-    documents: [
-      {
-        kind: "cv",
-        context_id: "c",
-        changes: [summary, page],
-        comparison: { profile: "parts", preferences: "items" },
-      },
-      {
-        kind: "letter",
-        context_id: "c",
-        changes: [summary],
-        comparison: { profile: "parts", preferences: "not_frozen" },
-      },
-    ],
-  };
-  const kinds = { cv: "CV", letter: "Letter" };
-  assert.equal(staleness.concerned(page, report, kinds), "CV");
-  assert.equal(staleness.concerned(summary, report, kinds), "");
-  assert.equal(staleness.comparisonNotes(report).length, 1);
-  assert.match(
-    staleness.comparisonNotes(report)[0],
-    /before Preferences existed/,
-  );
 });
 
 test("recording a reply: one update that moves the stage when the reply implies it", () => {
@@ -397,6 +287,7 @@ test("the review page: current revisions, before you send, the queue and old tab
   assert.equal(review.queuePlace(queue, "w"), null);
   assert.equal(review.tabOf("history"), "timeline");
   assert.equal(review.tabOf("details"), "details");
+  assert.equal(review.tabOf("inputs"), "documents");
   assert.equal(review.tabOf("nonsense"), "answers");
 });
 

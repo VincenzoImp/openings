@@ -271,7 +271,8 @@ def test_a_cv_is_its_source_and_the_pdf_built_from_it(client):
     )
     assert created.status_code == 201
     cv = created.json()
-    assert "content" not in cv and (cv["text"], cv["legacy_content"]) == (None, None)
+    assert "content" not in cv and cv["text"] is None
+    assert not {"context_id", "legacy_content"} & cv.keys()
     assert (cv["note"], cv["claim_ids"], cv["knowledge_ids"]) == ("First draft.", [], [])
 
     # A PDF naming a source comes after that source.

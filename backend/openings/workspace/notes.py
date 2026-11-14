@@ -4,8 +4,7 @@ A note's scope is its job, or one application of that job when
 ``application_id`` is set. Each note records who wrote it (an actor label). A
 job and an application each have at most one pinned note (partial unique
 indexes); pinning a note unpins the one pinned in its scope, and both changes
-are recorded. The application's pinned note is its
-standing guidance, which a new frozen context includes.
+are recorded. The application's pinned note is its standing guidance.
 """
 
 from .. import events

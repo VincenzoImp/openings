@@ -294,7 +294,7 @@ OPERATIONS = (
         rest=(Route("POST", "/jobs/{job_id}/notes", "note"),),
         tool=Tool(
             WRITE,
-            "Write a note on a job, or on one of its applications with application_id. The note records you as its author. pinned=true pins it: it is listed first, and a job and an application each have one pinned note (pinning unpins the previous one). The application's pinned note is its standing guidance, included in new frozen contexts.",
+            "Write a note on a job, or on one of its applications with application_id. The note records you as its author. pinned=true pins it: it is listed first, and a job and an application each have one pinned note (pinning unpins the previous one). The application's pinned note is its standing guidance for its documents.",
         ),
     ),
     Operation(
@@ -494,7 +494,7 @@ def register_core_mcp(mcp, workspace):
             "api_base": "/api/v1",
             "actor": current_actor().label,
             "storage": storage_status(workspace.db),
-            "workflow": "Read Preferences, career and templates; prepare a frozen context; write and compile externally; save CV and letter revisions with their PDF (and TeX source); an application is Ready when its required documents are complete. Mark applied and replies are recorded only as the owner reports them. Report what you did in the chat.",
+            "workflow": "Read Preferences, career, templates and the application; write and compile externally; save CV and letter revisions with their PDF (and TeX source); an application is Ready when its required documents are complete. Mark applied and replies are recorded only as the owner reports them. Report what you did in the chat.",
         }
 
     bind_mcp(mcp, OPERATIONS, workspace)

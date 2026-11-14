@@ -184,12 +184,22 @@ PLANNED = (
     ),
     ("context files", "SELECT count(*) FROM context_parts WHERE file_id IS NOT NULL"),
     (
-        "blob bytes referenced only by context files",
-        (
-            "SELECT total(b.size) FROM blobs b WHERE EXISTS(SELECT 1 FROM snapshot_parts p WHERE "
-            "p.blob=b.sha256) AND NOT EXISTS(SELECT 1 FROM files f WHERE f.sha256=b.sha256)"
-        ),
+        "context files stored as file rows",
+        "SELECT count(*) FROM files WHERE context_id IS NOT NULL",
     ),
+    ("context inputs", "SELECT count(*) FROM context_inputs"),
+    ("snapshot parts by kind: text", "SELECT count(*) FROM snapshot_parts WHERE kind='text'"),
+    ("snapshot parts by kind: list", "SELECT count(*) FROM snapshot_parts WHERE kind='list'"),
+    ("snapshot parts by kind: asset", "SELECT count(*) FROM snapshot_parts WHERE kind='asset'"),
+    ("snapshot list items", "SELECT count(*) FROM snapshot_list_items"),
+    # The same query the migration's bytes invariant subtracts.
+    ("blob bytes referenced only by context files", m15.CONTEXT_ONLY_BYTES_215.replace("old.", "")),
+    (
+        "blobs referenced only by context files",
+        "SELECT count(*) FROM blobs b WHERE "
+        + m15.CONTEXT_ONLY_BLOB_215.format(blob="b.sha256").replace("old.", ""),
+    ),
+    ("blob bytes", "SELECT total(length(content)) FROM blobs"),
     # #211 secondary features
     (
         "claims with a role other than supporting",
@@ -402,6 +412,25 @@ AFTER = (
         (
             "SELECT sum(json_type(metadata,'$.role') IS NOT NULL), "
             "sum(json_type(metadata,'$.group') IS NOT NULL), sum(always_include) FROM claims"
+        ),
+    ),
+)
+
+
+AFTER += (
+    # #215 contexts and staleness
+    ("blob bytes", "SELECT total(length(content)) FROM blobs"),
+    (
+        "blobs no file references",
+        (
+            "SELECT count(*) FROM blobs b WHERE NOT EXISTS(SELECT 1 FROM files f "
+            "WHERE f.sha256=b.sha256)"
+        ),
+    ),
+    (
+        "document revisions and their files",
+        (
+            "SELECT count(*),(SELECT count(*) FROM files WHERE document_id IS NOT NULL) FROM documents"
         ),
     ),
 )

@@ -184,9 +184,9 @@ export function BulkBar({
           }
         >
           <p>
-            Each application is removed for good, with its contexts, documents,
-            files and history. The jobs stay in your workspace. To stop without
-            losing anything, close them as Not pursued instead.
+            Each application is removed for good, with its documents, files and
+            history. The jobs stay in your workspace. To stop without losing
+            anything, close them as Not pursued instead.
           </p>
         </Dialog>
       )}

@@ -169,15 +169,6 @@ function Detail({
         ))}
         {!document.files?.length && <li className="muted">No file yet.</li>}
       </ul>
-      {document.legacy_content && (
-        <details>
-          <summary>Content saved with this revision before 0.22</summary>
-          <p className="caption">
-            Kept as it was, read-only. The source and the PDF are the revision.
-          </p>
-          <ValueTree value={document.legacy_content} />
-        </details>
-      )}
       {comparing && <Changes document={document} />}
       {incomplete && <p className="caption">{incomplete}</p>}
       <div className="row">

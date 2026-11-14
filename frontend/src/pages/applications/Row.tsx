@@ -1,6 +1,5 @@
 import type { Application } from "../../api";
 import { Button, Cell, GridRow, Tag, cx } from "../../design";
-import { staleDetail } from "../../library/staleness";
 import { dayTime } from "../../library/time";
 import { reviewHref } from "./links";
 import {
@@ -124,8 +123,6 @@ export function Row({
   const sent = sentLine(application);
   const response = replyLine(application, days);
   const documents = documentState(application);
-  const stale =
-    application.status === "shortlisted" ? staleDetail(application) : "";
   return (
     <>
       <GridRow selected={selected}>
@@ -161,7 +158,6 @@ export function Row({
         <Cell label="Documents">
           <span>{documents[0].text}</span>
           <Tags items={documents.slice(1)} />
-          {stale && <div className="meta">{stale}</div>}
         </Cell>
         <Cell label="Reply">
           {response.text ? (

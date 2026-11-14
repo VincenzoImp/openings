@@ -88,7 +88,7 @@ The supported merge is `jobs_merge(job_id, value: {target_id, expected_version,
 target_version})` or `POST /jobs/{source_id}/merge` with the same body. Read both
 versions immediately before it. The source is merged into the chosen target;
 source identities, postings, applications, events, notes and owned files move to
-the target. The source job ID is removed. Frozen document contexts are not rewritten.
+the target. The source job ID is removed. Document revisions are not rewritten.
 The target keeps its own title, posting fields and triage; the merge does not
 choose the best description or interest state. Queued or running tasks for both
 records are cancelled. Record the surviving ID and re-read its actual application
