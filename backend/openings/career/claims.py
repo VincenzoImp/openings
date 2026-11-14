@@ -15,19 +15,19 @@ class ClaimOperations:
 
     def list_claims(
         self,
-        knowledge_id: str = "",
+        career_id: str = "",
         approved: bool | None = None,
         limit: int = 100,
         offset: int = 0,
         summary: bool = True,
         q: str = "",
     ) -> dict:
-        """List reusable claims by evidence (knowledge_id), approval or text (q). summary=true (the default) omits metadata and bounds wording previews; summary=false returns full claims. always_include is always returned."""
+        """List highlights by career entry (career_id), approval or text (q). summary=true (the default) omits metadata and bounds wording previews; summary=false returns full claims. always_include is always returned."""
         _page(limit, offset)
         where, params = [], []
-        if knowledge_id:
+        if career_id:
             where.append("knowledge_id=?")
-            params.append(knowledge_id)
+            params.append(career_id)
         if approved is not None:
             where.append("approved=?")
             params.append(int(approved))
@@ -39,8 +39,8 @@ class ClaimOperations:
         clause = " WHERE " + " AND ".join(where) if where else ""
         columns = (
             "id,knowledge_id,approved,position,always_include,version,created_at,updated_at,substr(text,1,240) AS text_preview,"
-            "(SELECT title FROM knowledge WHERE knowledge.id=claims.knowledge_id) AS knowledge_title,"
-            "(SELECT organization FROM knowledge WHERE knowledge.id=claims.knowledge_id) AS knowledge_organization"
+            "(SELECT title FROM knowledge WHERE knowledge.id=claims.knowledge_id) AS career_title,"
+            "(SELECT organization FROM knowledge WHERE knowledge.id=claims.knowledge_id) AS career_organization"
             if summary
             else "*"
         )
@@ -59,7 +59,7 @@ class ClaimOperations:
         """Read a reusable claim and its evidence ID."""
         row = self.db.one("SELECT * FROM claims WHERE id=?", (claim_id,))
         if not row:
-            missing("Claim")
+            missing("Highlight")
         return _claim(row)
 
     def create_claim(self, value: ClaimCreate) -> dict:
@@ -75,17 +75,17 @@ class ClaimOperations:
         return self.get_claim(record_id)
 
     def _insert_claim(self, conn, value, record_id, timestamp):
-        _get(conn, "knowledge", value.knowledge_id, "Career knowledge")
+        _get(conn, "knowledge", value.career_id, "Career entry")
         conn.execute(
             "INSERT INTO claims(id,knowledge_id,text,approved,position,always_include,metadata,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
             (
                 record_id,
-                value.knowledge_id,
+                value.career_id,
                 value.text,
                 int(value.approved),
                 value.position
                 if value.position is not None
-                else self._next_position(conn, "claims", value.knowledge_id),
+                else self._next_position(conn, "claims", value.career_id),
                 int(value.always_include),
                 encode(value.metadata),
                 timestamp,
@@ -94,9 +94,9 @@ class ClaimOperations:
         )
         events.record(
             conn,
-            "claim_created",
-            ("claim", record_id),
-            {"knowledge_id": value.knowledge_id, "approved": value.approved},
+            "highlight_created",
+            ("highlight", record_id),
+            {"career_id": value.career_id, "approved": value.approved},
         )
 
     def update_claim(self, claim_id: str, value: ClaimUpdate) -> dict:
@@ -104,17 +104,17 @@ class ClaimOperations:
         data = values(value)
         expected = data.pop("expected_version")
         with self.db.transaction() as conn:
-            row = _get(conn, "claims", claim_id, "Claim")
+            row = _get(conn, "claims", claim_id, "Highlight")
             check_version(row, expected)
             previous = _claim(row)
             merged = {**previous, **data}
-            _get(conn, "knowledge", merged["knowledge_id"], "Career knowledge")
-            if previous["knowledge_id"] != merged["knowledge_id"] and "position" not in data:
-                merged["position"] = self._next_position(conn, "claims", merged["knowledge_id"])
+            _get(conn, "knowledge", merged["career_id"], "Career entry")
+            if previous["career_id"] != merged["career_id"] and "position" not in data:
+                merged["position"] = self._next_position(conn, "claims", merged["career_id"])
             changed = [
                 key
                 for key in [
-                    "knowledge_id",
+                    "career_id",
                     "text",
                     "approved",
                     "position",
@@ -126,10 +126,10 @@ class ClaimOperations:
             if changed:
                 events.record(
                     conn,
-                    "claim_updated",
-                    ("claim", claim_id),
+                    "highlight_updated",
+                    ("highlight", claim_id),
                     {
-                        "knowledge_id": merged["knowledge_id"],
+                        "career_id": merged["career_id"],
                         "fields": changed,
                         "version": row["version"] + 1,
                     },
@@ -137,7 +137,7 @@ class ClaimOperations:
                 conn.execute(
                     "UPDATE claims SET knowledge_id=?,text=?,approved=?,position=?,always_include=?,metadata=?,version=version+1,updated_at=? WHERE id=?",
                     (
-                        merged["knowledge_id"],
+                        merged["career_id"],
                         merged["text"],
                         int(merged["approved"]),
                         merged["position"],
@@ -152,10 +152,13 @@ class ClaimOperations:
     def delete_claim(self, claim_id: str, expected_version: int) -> dict:
         """Permanently delete a reusable claim; document revisions keep the ids they cite."""
         with self.db.transaction() as conn:
-            row = _get(conn, "claims", claim_id, "Claim")
+            row = _get(conn, "claims", claim_id, "Highlight")
             check_version(row, expected_version)
             conn.execute("DELETE FROM claims WHERE id=?", (claim_id,))
             events.record(
-                conn, "claim_deleted", ("claim", claim_id), {"knowledge_id": row["knowledge_id"]}
+                conn,
+                "highlight_deleted",
+                ("highlight", claim_id),
+                {"career_id": row["knowledge_id"]},
             )
         return {"deleted": True, "id": claim_id}

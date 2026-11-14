@@ -135,7 +135,7 @@ function ProfileScreen() {
   else {
     const highlightsOf = groups(
       byPosition(highlights.data),
-      (item) => item.knowledge_id,
+      (item) => item.career_id,
     );
     const filesOf = groups(files.data ?? [], (file) => file.owner_id);
     body = (

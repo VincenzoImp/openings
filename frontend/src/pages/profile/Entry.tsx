@@ -297,7 +297,7 @@ export function EntryForm({
     const fresh = cached.entries().find((item) => item.id === id);
     const highlights = cached
       .highlights()
-      .filter((item) => item.knowledge_id === id);
+      .filter((item) => item.career_id === id);
     if (fresh) base.current.entry = fresh.version;
     base.current.highlights = new Map(
       highlights.map((item) => [item.id, item.version]),
@@ -385,7 +385,7 @@ export function EntryForm({
       const old = base.current.stored.find((row) => row.id === item.id);
       if (!item.id || !old) {
         const created = await writes.createHighlight({
-          knowledge_id: id,
+          career_id: id,
           text: item.text.trim(),
           approved: item.approved,
           always_include: item.always,

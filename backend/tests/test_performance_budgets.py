@@ -73,9 +73,7 @@ def client(tmp_path_factory):
             )
         )
         career.create_claim(
-            ClaimCreate(
-                knowledge_id=entry["id"], text=f"Synthetic claim {index:02d}", approved=True
-            )
+            ClaimCreate(career_id=entry["id"], text=f"Synthetic claim {index:02d}", approved=True)
         )
     career.create_template(
         TemplateCreate(name="Synthetic CV", tex="Synthetic TeX", is_default=True)

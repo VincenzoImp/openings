@@ -41,7 +41,7 @@ async function inspect(raw: string): Promise<Preview> {
   const result = await writes.previewImport(
     entries.length
       ? JSON.stringify({
-          knowledge: entries.map(({ highlights, location, ...entry }) => ({
+          entries: entries.map(({ highlights, location, ...entry }) => ({
             ...entry,
             metadata: location ? { location } : {},
           })),
@@ -50,7 +50,7 @@ async function inspect(raw: string): Promise<Preview> {
   );
   return {
     header: patch,
-    entries: (result.knowledge as EntryInput[]).map((input, index) => ({
+    entries: (result.entries as EntryInput[]).map((input, index) => ({
       input,
       highlights: entries[index]?.highlights ?? [],
     })),
@@ -62,14 +62,14 @@ async function inspect(raw: string): Promise<Preview> {
 async function add({ header, entries, version }: Preview) {
   const filled = Object.keys(header).length > 0;
   const result = await writes.import({
-    knowledge: entries.map((entry) => entry.input),
+    entries: entries.map((entry) => entry.input),
     ...(filled ? { profile: header, expected_profile_version: version } : {}),
   });
   // The highlights the person read in the preview are their own words.
   for (const [index, item] of result.items.entries())
     for (const [position, text] of entries[index].highlights.entries())
       await writes.createHighlight({
-        knowledge_id: item.id,
+        career_id: item.id,
         text,
         approved: true,
         always_include: false,

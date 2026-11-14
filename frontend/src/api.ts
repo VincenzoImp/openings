@@ -365,8 +365,8 @@ export interface Document extends Versioned {
   /** The SHA-256 of the revision's source, which its PDF names. */
   source_sha256?: string | null;
   note?: string;
-  claim_ids?: string[];
-  knowledge_ids?: string[];
+  highlight_ids?: string[];
+  career_ids?: string[];
   previous_id?: string;
   revision_number?: number;
   files?: WorkspaceFile[];
@@ -461,7 +461,7 @@ export const tokenKinds: Record<TokenKind, string> = {
  * null when it was written before attribution was recorded.
  */
 export type Actor = string | null;
-/** One recorded change (`/events`). */
+/** One recorded change (`/changes`). */
 export interface Activity {
   id?: string;
   kind?: string;
