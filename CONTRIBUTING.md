@@ -109,7 +109,8 @@ The default run (`uv run pytest -n auto`) skips the `performance` marker.
 25,000 jobs with their ingest signals, 500 applications and 20 sources in a few
 seconds, and fails when the median of five reads exceeds its budget: the
 Applications list, the reads of Today, the New jobs list (with counts and
-facets), text search, the overview, insights, source yield and the timeline of a busy job and application. The budgets are about six
+facets), text search, Stats (under 50 ms), the
+sources with their counts and the timeline of a busy job and application. The budgets are about six
 times the time measured on a laptop, so a slower CI runner passes and a real
 regression does not. It is marked `performance`, which the default `pytest` run
 deselects (`addopts` in `pyproject.toml`), together with the labelled duplicate
@@ -133,7 +134,7 @@ The dashboard has budgets that CI checks:
   colour token on the backgrounds it is used on from
   `frontend/src/design/tokens.css` and holds it to WCAG AA.
 - **Keyboard.** `frontend/tests/shell.spec.ts` operates the navigation, the More
-  sheet, the theme and the density from the keyboard alone;
+  sheet and the theme from the keyboard alone;
   `frontend/tests/today.spec.ts` answers a question on Today,
   `frontend/tests/activity.spec.ts` moves through the Activity tabs and opens a
   run's report, `frontend/tests/applications.spec.ts` goes from Today's

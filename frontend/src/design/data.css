@@ -1,8 +1,7 @@
-/* Grid table, rate bar, selection bar, board, response form and review panes:
+/* Grid table, rate bar, selection bar, response form and review panes:
    what Applications and its review page are made of. */
 /* A scrolling container holds its hidden labels: they would widen the page. */
-.grid-wrap,
-.board {
+.grid-wrap {
   position: relative;
   overflow-x: auto;
 }
@@ -149,45 +148,6 @@
 }
 .measure {
   max-width: 68ch;
-}
-.insight-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--s5);
-  align-items: start;
-}
-
-/* Board: one column per stage, scrolling inside its own container. */
-.board {
-  display: grid;
-  grid-template-columns: repeat(var(--columns, 5), minmax(190px, 1fr));
-  gap: var(--s3);
-  padding: var(--s4);
-  overflow-x: auto;
-}
-.board h3 {
-  display: flex;
-  justify-content: space-between;
-  padding: 0 var(--s1) var(--s2);
-}
-.tile {
-  display: block;
-  margin-bottom: var(--s2);
-  padding: var(--s2) var(--s3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  text-decoration: none;
-}
-.tile:hover {
-  border-color: var(--line-strong);
-}
-.tile strong {
-  display: block;
-  overflow-wrap: anywhere;
-}
-.tile .tags {
-  margin-top: var(--s1);
 }
 
 /* The form that records an employer response. */
@@ -391,7 +351,6 @@
     width: 100%;
   }
   .respond,
-  .insight-grid,
   .panes {
     grid-template-columns: minmax(0, 1fr);
   }

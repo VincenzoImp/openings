@@ -12,7 +12,7 @@ export type Candidate = Pick<
 /**
  * Merge two records of one vacancy: the job kept receives the other's
  * observations, notes, files and applications; the other is removed. With a
- * `target` the choice is preset (a likely duplicate); otherwise search for it.
+ * `target` the choice is preset (a possible duplicate); otherwise search for it.
  */
 export function MergeDialog({
   job,

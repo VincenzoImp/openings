@@ -150,7 +150,7 @@ export function TabPanel({
   );
 }
 
-/** A small set of exclusive choices, such as board or list. */
+/** A small set of exclusive choices, such as a period. */
 export function SegmentedControl({
   label,
   options,

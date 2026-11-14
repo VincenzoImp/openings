@@ -52,7 +52,6 @@ export interface JobSignals {
   language_confidence: number | null;
   /** Groups of language codes; one language of a group is enough. */
   required: string[][];
-  welcome: string[];
   duplicate_checked: boolean;
   duplicate: {
     job_id: string;
@@ -119,41 +118,6 @@ export interface JobList extends ListResult<Job> {
     /** Whether they are left out of this list. */
     hidden: boolean;
   };
-}
-export interface YieldCounts {
-  collected: number;
-  to_review: number;
-  shortlisted: number;
-  applied: number;
-  responded: number;
-  interviews: number;
-  offers: number;
-  dismissed: number;
-  likely_duplicates: number;
-  no_longer_listed: number;
-}
-export interface YieldRow extends YieldCounts {
-  source_id: string | null;
-  name: string;
-  kind: "search" | "company" | "feed" | "manual";
-  kind_label: string;
-  source_kind: string | null;
-  enabled: boolean | null;
-  last_run_at: string | null;
-  last_error: string | null;
-  providers: (YieldCounts & { provider: string; label: string })[];
-  dismissed_by: Record<DismissedBy, number>;
-  kept_rate: number | null;
-  withheld: string | null;
-}
-export interface SourceYield {
-  period: { since: string | null; until: string | null };
-  min_sample: number;
-  items: YieldRow[];
-  total: YieldCounts &
-    Pick<YieldRow, "name" | "dismissed_by" | "kept_rate" | "withheld"> & {
-      sources: number;
-    };
 }
 export interface DuplicateJob extends Versioned {
   title: string;
@@ -376,17 +340,9 @@ export interface Claim extends Versioned {
   position: number;
   approved: boolean;
   /** In the CV unless the job gives a reason to leave it out. */
-  default_in_cv: boolean;
-  role: ClaimRole;
-  group: string;
+  always_include: boolean;
   metadata: Json;
 }
-export const claimRoles = {
-  core: "Core",
-  supporting: "Supporting",
-  bench: "Bench",
-} as const;
-export type ClaimRole = keyof typeof claimRoles;
 /** Typed limits and any other free-form key (engine, date_format). */
 export interface TemplateRules extends Json {
   max_pages?: number;
@@ -493,6 +449,14 @@ export interface Source extends Versioned {
   last_task_id?: string;
   last_run?: CollectionRun;
   last_diagnostics?: { warnings?: string[] }[];
+  /** The jobs this source found and how far they went. */
+  counts?: SourceCounts;
+}
+export interface SourceCounts {
+  found: number;
+  shortlisted: number;
+  applied: number;
+  replied: number;
 }
 export interface BackgroundTask {
   id: string;
@@ -638,61 +602,30 @@ export interface OwnerQuestion extends Versioned {
   withdrawn_by: Actor | null;
   withdrawn_at: string | null;
 }
-/** Counts and rates of one group of sent applications (insights). */
-export interface InsightMetrics {
-  sent: number;
-  responded: number;
+export type StatsPeriod = "90d" | "12m" | "all";
+/** What happened to the applications sent in a period (`/stats`). */
+export interface Stats {
+  period: StatsPeriod;
+  since: string | null;
+  applied: number;
+  replied: number;
+  reply_rate: number | null;
   interviews: number;
-  offers: number;
-  rejections: number;
-  no_reply: number;
-  waiting: number;
-  response_rate: number | null;
   interview_rate: number | null;
-  offer_rate: number | null;
-  withheld: "too_few_sent" | null;
-  median_days_to_response: number | null;
-  median_withheld: "too_few_dated_answers" | null;
-  timed: number;
-  undated: number;
-}
-export interface InsightGroup extends InsightMetrics {
-  key: string;
-  label: string;
-}
-export type InsightDimension =
-  "role_family" | "seniority" | "location" | "source_kind" | "source" | "month";
-export interface Insights {
-  min_sample: number;
-  period: { applied_since: string | null; applied_until: string | null };
-  overall: InsightMetrics;
-  time_to_response: {
-    key: string;
-    label: string;
+  median_days_to_reply: number | null;
+  funnel: {
+    stage: "applied" | "replied" | "interview" | "offer";
     count: number;
-    share: number | null;
   }[];
-  groups: Record<InsightDimension, InsightGroup[]>;
-  excluded: { shortlisted: number; closed_unsent: number };
-  no_reply: NoReply;
-}
-export interface FunnelStep {
-  stage: string;
-  count: number;
-  outcomes: Record<string, number>;
-}
-export interface Overview {
-  sent: number;
-  interviews: number;
-  offers: number;
-  active: number;
-  shortlisted: number;
-  ready?: number;
-  new: number;
-  incomplete: number;
-  funnel: FunnelStep[];
-  activity: Activity[];
-  [key: string]: unknown;
+  /** Only when at least two sources have enough applications to compare. */
+  by_source:
+    | {
+        source: string;
+        applied: number;
+        replied: number;
+        reply_rate: number | null;
+      }[]
+    | null;
 }
 export interface Session {
   configured: boolean;

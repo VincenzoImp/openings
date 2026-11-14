@@ -1,6 +1,12 @@
 // What the Collection screen derives from sources, runs and tasks. Pure
 // functions without React, so they can be tested on their own.
-import type { BackgroundTask, CollectionRun, Json, Source } from "../../api";
+import type {
+  BackgroundTask,
+  CollectionRun,
+  Json,
+  Source,
+  SourceCounts,
+} from "../../api";
 
 export interface ConfigProperty {
   default?: unknown;
@@ -67,6 +73,15 @@ export function sourceLine(source: Source) {
     return ["Search", query && `"${query}"`, where].filter(Boolean).join(" · ");
   }
   return `Company board · ${String(source.url || source.config.board || source.kind)}`;
+}
+
+/** "31 found · 9 shortlisted · 3 applied": what a source's jobs became, without zeros. */
+export function sourceCountsLine(counts?: SourceCounts | null) {
+  if (!counts) return "";
+  return (["found", "shortlisted", "applied", "replied"] as const)
+    .filter((key) => counts[key] > 0)
+    .map((key) => `${counts[key]} ${key}`)
+    .join(" · ");
 }
 
 export function scheduleLabel(schedule: Json) {

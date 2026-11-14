@@ -94,7 +94,8 @@ def test_source_page_batches_reads_and_preserves_provider_summaries(populated, m
         monkeypatch.setattr(workspace.db, name, read)
     page = service.list_sources(limit=500, summary=False)
     assert page["total"] == len(page["items"]) == 350
-    assert len(reads) <= 5
+    # Sources, latest runs, their tasks, the per-source counts, the setting and the total.
+    assert len(reads) <= 6
     first = page["items"][0]
     assert first["last_outcome"] == "running"
     assert first["last_task_id"] in {"indeed-new", "linkedin-new"}

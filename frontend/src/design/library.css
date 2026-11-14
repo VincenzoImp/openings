@@ -331,28 +331,6 @@ img.frame {
   padding: var(--s3) var(--s4);
   border-top: 1px solid var(--line);
 }
-.claim-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s2) var(--s4);
-  margin-top: var(--s2);
-}
-.claim-controls label {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s2);
-  color: var(--ink-2);
-  font-size: var(--t-sm);
-}
-.claim-controls .input {
-  width: auto;
-  min-height: 30px;
-  padding: 0 var(--s2);
-}
-.claim-controls input.input {
-  width: 14ch;
-}
 .skill-edit {
   display: flex;
   flex-wrap: wrap;
@@ -443,8 +421,6 @@ img.frame {
   .kv-head {
     display: none;
   }
-  .claim-controls label,
-  .claim-controls .input,
   .skill-edit input {
     min-height: 44px;
   }

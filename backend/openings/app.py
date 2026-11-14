@@ -22,7 +22,6 @@ from .career import CareerService
 from .discovery import DiscoveryService
 from .documents import DocumentService
 from .errors import DomainError
-from .insights import InsightsService
 from .interfaces.activity import (
     register_api as register_activity_api,
     register_mcp as register_activity_mcp,
@@ -44,10 +43,6 @@ from .interfaces.documents import (
     register_api as register_document_api,
     register_mcp as register_document_mcp,
 )
-from .interfaces.insights import (
-    register_api as register_insights_api,
-    register_mcp as register_insights_mcp,
-)
 from .interfaces.preferences import (
     register_api as register_preferences_api,
     register_mcp as register_preferences_mcp,
@@ -56,9 +51,9 @@ from .interfaces.skills import (
     register_api as register_skills_api,
     register_mcp as register_skills_mcp,
 )
-from .interfaces.source_yield import (
-    register_api as register_yield_api,
-    register_mcp as register_yield_mcp,
+from .interfaces.stats import (
+    register_api as register_stats_api,
+    register_mcp as register_stats_mcp,
 )
 from .interfaces.system import register_system
 from .limits import REQUEST_LIMIT, BodyLimit
@@ -66,7 +61,7 @@ from .mcp_server import OpeningsMCP
 from .preferences import PreferencesService
 from .skill_notes import SkillNotesService
 from .skills import SkillLibrary
-from .source_yield import YieldService
+from .stats import StatsService
 from .worker import Worker
 from .workspace import Workspace
 
@@ -90,8 +85,7 @@ def create_app(database=None, start_worker=True):
     activity = ActivityService(workspace)
     requests = RequestService(workspace)
     preferences = PreferencesService(workspace)
-    insights = InsightsService(workspace)
-    source_yield = YieldService(workspace)
+    stats = StatsService(workspace)
     workspace.discovery = discovery
     workspace.worker = Worker(workspace, discovery) if start_worker else None
     allowed_hosts = ["localhost:*", "127.0.0.1:*", "[::1]:*"]
@@ -110,8 +104,7 @@ def create_app(database=None, start_worker=True):
     register_activity_mcp(mcp, activity)
     register_request_mcp(mcp, requests)
     register_preferences_mcp(mcp, preferences)
-    register_insights_mcp(mcp, insights)
-    register_yield_mcp(mcp, source_yield)
+    register_stats_mcp(mcp, stats)
     skills = SkillLibrary()
     skill_notes = SkillNotesService(workspace, skills)
     register_skills_mcp(mcp, skills, skill_notes)
@@ -141,8 +134,7 @@ def create_app(database=None, start_worker=True):
     app.state.activity, app.state.requests = activity, requests
     app.state.preferences = preferences
     app.state.skill_notes = skill_notes
-    app.state.insights = insights
-    app.state.source_yield = source_yield
+    app.state.stats = stats
     app.add_middleware(BodyLimit)
     # The client address is the real one only when uvicorn trusts the proxy
     # (OPENINGS_TRUSTED_PROXIES); otherwise every proxied client shares one bucket.
@@ -272,8 +264,7 @@ def create_app(database=None, start_worker=True):
     register_activity_api(router, activity)
     register_request_api(router, requests)
     register_preferences_api(router, preferences)
-    register_insights_api(router, insights)
-    register_yield_api(router, source_yield)
+    register_stats_api(router, stats)
     app.include_router(router)
     # Building the transport also creates the session manager the lifespan runs.
     app.mount(

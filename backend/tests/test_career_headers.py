@@ -7,7 +7,13 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from openings.app import create_app
-from openings.career import CareerDates, ClaimCreate, ClaimUpdate, KnowledgeCreate
+from openings.career import (
+    CareerDates,
+    CareerService,
+    ClaimCreate,
+    ClaimUpdate,
+    KnowledgeCreate,
+)
 
 
 @pytest.mark.parametrize(
@@ -75,6 +81,25 @@ def test_summary_claim_preview_is_ordered_bounded_and_independent_of_description
     assert row["claim_preview"] == later["text"][:240]
     assert row["narrative_preview"] == "User context."
     assert career.get_knowledge(owner["id"])["narrative"] == "User context."
+
+
+def test_a_claim_is_always_included_or_not_and_keeps_other_hints_in_metadata(workspace):
+    career = CareerService(workspace)
+    entry = career.create_knowledge(KnowledgeCreate(title="Synthetic entry", narrative="Built."))
+    claim = career.create_claim(
+        ClaimCreate(knowledge_id=entry["id"], text="Built APIs.", metadata={"role": "core"})
+    )
+    assert claim["always_include"] is False and claim["metadata"] == {"role": "core"}
+    claim = career.update_claim(
+        claim["id"], ClaimUpdate(expected_version=claim["version"], always_include=True)
+    )
+    assert claim["always_include"] is True and claim["metadata"] == {"role": "core"}
+    listed = career.list_claims()["items"][0]
+    assert listed["always_include"] is True
+    assert not {"role", "group", "default_in_cv"} & set(listed) & set(claim)
+    for removed in ({"role": "core"}, {"group": "Scale"}, {"default_in_cv": True}):
+        with pytest.raises(ValidationError):
+            ClaimCreate.model_validate({"knowledge_id": entry["id"], "text": "X.", **removed})
 
 
 @pytest.mark.parametrize("transport", ["rest", "mcp"])

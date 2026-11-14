@@ -1,16 +1,14 @@
 import { Button, IconButton } from "../design";
-import type { Density, Theme } from "./preferences";
+import type { Theme } from "./preferences";
 import { HOME, SCREENS, destinationOf } from "./routes";
 
-/** Where you are, what the workspace is doing, and the two display choices. */
+/** Where you are, what the workspace is doing, and the theme. */
 export function TopBar({
   route,
   saving,
   onRefresh,
   theme,
   onTheme,
-  density,
-  onDensity,
   inert,
 }: {
   route: string;
@@ -18,8 +16,6 @@ export function TopBar({
   onRefresh: () => void;
   theme: Theme;
   onTheme: () => void;
-  density: Density;
-  onDensity: () => void;
   inert?: boolean;
 }) {
   const destination = destinationOf(route);
@@ -33,7 +29,6 @@ export function TopBar({
     });
   const group = today ? "" : destination?.group;
   const otherTheme = theme === "light" ? "dark" : "light";
-  const otherDensity = density === "compact" ? "comfortable" : "compact";
   return (
     <header className="topbar" inert={inert}>
       <p className="crumb muted grow">
@@ -60,16 +55,6 @@ export function TopBar({
         label="Refresh workspace"
         onClick={onRefresh}
       />
-      <Button
-        type="button"
-        variant="quiet"
-        size="sm"
-        icon={density === "compact" ? "compact" : "comfortable"}
-        aria-label={`Density: ${density}. Switch to ${otherDensity}`}
-        onClick={onDensity}
-      >
-        <span className="only-desktop">Density</span>
-      </Button>
       <Button
         type="button"
         variant="quiet"

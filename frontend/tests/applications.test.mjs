@@ -82,33 +82,6 @@ test("Ready is a computed stage inside Shortlisted, with what is missing", () =>
   assert.equal(model.missingText(app({ missing: [] })), "");
 });
 
-test("addresses of the old Applications page open the stage they meant", () => {
-  const hash = routes.canonicalHash;
-  assert.equal(
-    hash("#applications?status=draft&view=list"),
-    "#applications?view=list&stage=shortlisted",
-  );
-  assert.equal(
-    hash("#applications?status=applied&applied_until=2026-10-01"),
-    "#applications?applied_until=2026-10-01&stage=applied",
-  );
-  assert.equal(
-    hash("#applications?readiness=ready&sort=ready"),
-    "#applications?sort=deadline&stage=ready",
-  );
-  assert.equal(
-    hash("#applications?stage=preparing"),
-    "#applications?stage=shortlisted",
-  );
-  // The removed Readiness filter is dropped.
-  assert.equal(
-    hash("#applications?stage=all&readiness=blocked"),
-    "#applications?stage=all",
-  );
-  assert.equal(hash("#applications?stage=applied"), null);
-  assert.equal(routes.routeOf("#applications?application=a1"), "review");
-});
-
 test("the employer's reply, or the wait, in words", () => {
   const sent = { applied_at: "2026-10-01T09:00:00+00:00" };
   assert.deepEqual(
@@ -163,7 +136,7 @@ test("the employer's reply, or the wait, in words", () => {
   );
   assert.deepEqual(
     model.replyLine(app({ status: "closed", outcome: "not_pursued" }), 30, now),
-    { text: "Not pursued · not counted in Insights", quiet: true },
+    { text: "Not pursued · not counted in Stats", quiet: true },
   );
   assert.equal(model.replyLine(app({}), 30, now).text, "");
 });

@@ -114,8 +114,7 @@ export function Workspace({
           </div>
           <footer>
             <span className="caption grow">
-              Theme and density are in the top bar and remembered by this
-              browser.
+              The theme is in the top bar and remembered by this browser.
             </span>
             <Button size="sm" icon="logout" onClick={onLogout}>
               Sign out
