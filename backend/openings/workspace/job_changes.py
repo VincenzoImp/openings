@@ -287,6 +287,9 @@ class JobChanges:
                 (triage, stamp, row["id"]),
             )
         payload = {"from": row["triage"], "to": triage}
+        if triage == "dismissed" and reason:
+            # Kept for the owner's corrections an agent reads (workspace_context feedback).
+            payload["reason"] = reason
         events.record(conn, "triage_changed", payload=payload, job_id=row["id"], actor=actor)
 
     def forget_job(self, job_id, expected_version, collect=True):

@@ -108,8 +108,8 @@ function Detail({
   // A complete CV or letter (its PDF stored) never changes: a change is a new revision.
   const complete = sourceKind ? !!pdf : false;
   const incomplete = incompleteReason(document);
-  const claims = document.claim_ids?.length || 0;
-  const entries = document.knowledge_ids?.length || 0;
+  const claims = document.highlight_ids?.length || 0;
+  const entries = document.career_ids?.length || 0;
   return (
     <div className="stack revision">
       {sourceKind ? (

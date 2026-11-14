@@ -35,11 +35,11 @@ def test_mcp_errors_keep_code_status_details_and_current_version(tmp_path):
     headers = {"Authorization": "Bearer " + token, "Accept": "application/json, text/event-stream"}
     job = app.state.workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build."})
     with TestClient(app, base_url="http://localhost:8080") as client:
-        missing = error_body(call(client, headers, "jobs_get", {"job_id": "unknown"}))
+        missing = error_body(call(client, headers, "documents_get", {"document_id": "unknown"}))
         assert missing == {
             "code": "not_found",
             "status": 404,
-            "message": "Job was not found.",
+            "message": "Document revision was not found.",
             "details": None,
         }
 
@@ -57,7 +57,7 @@ def test_mcp_errors_keep_code_status_details_and_current_version(tmp_path):
 
         invalid = error_body(call(client, headers, "jobs_get", {}, 3))
         assert invalid["code"] == "validation" and invalid["status"] == 422
-        assert invalid["details"][0]["field"] == ["job_id"]
+        assert invalid["details"][0]["field"] == ["ids"]
 
 
 def test_sync_tools_run_in_worker_threads(tmp_path):
@@ -76,5 +76,5 @@ def test_sync_tools_run_in_worker_threads(tmp_path):
     job = workspace.ingest_job({"title": "Synthetic engineer", "posting": "Build."})
     workspace.get_job = record
     with TestClient(app, base_url="http://localhost:8080") as client:
-        assert call(client, headers, "jobs_get", {"job_id": job["id"]}).get("isError") is False
+        assert call(client, headers, "jobs_get", {"ids": [job["id"]]}).get("isError") is False
     assert seen and all(name.startswith("AnyIO worker thread") for name in seen), seen

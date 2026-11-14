@@ -295,7 +295,7 @@ class FileOperations:
                         current.get("source_sha256"),
                     ),
                 )
-                if current["owner_type"] in {"template", "knowledge"}:
+                if current["owner_type"] in {"template", "career"}:
                     conn.execute(
                         f"UPDATE {OWNER_TABLES[current['owner_type']]} SET version=version+1,updated_at=? WHERE id=?",
                         (now(), current["owner_id"]),
@@ -402,7 +402,7 @@ class FileOperations:
                 descriptor["owner_id"],
                 row["job_id"],
             )
-            if descriptor["owner_type"] in {"knowledge", "template"}:
+            if descriptor["owner_type"] in {"career", "template"}:
                 conn.execute(
                     f"UPDATE {OWNER_TABLES[descriptor['owner_type']]} SET version=version+1,updated_at=? WHERE id=?",
                     (now(), descriptor["owner_id"]),

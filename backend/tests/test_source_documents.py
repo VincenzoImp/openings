@@ -11,6 +11,7 @@ from openings.app import create_app
 from openings.documents import DocumentCreate
 from openings.documents.text import derive_text, revision_text, tokens
 from openings.errors import DomainError
+from openings.interfaces.operation import without_empty
 
 SOURCE = r"""\documentclass{article}
 \usepackage{hyperref}
@@ -273,7 +274,7 @@ def test_a_cv_is_its_source_and_the_pdf_built_from_it(client):
     cv = created.json()
     assert "content" not in cv and cv["text"] is None
     assert not {"context_id", "legacy_content"} & cv.keys()
-    assert (cv["note"], cv["claim_ids"], cv["knowledge_ids"]) == ("First draft.", [], [])
+    assert (cv["note"], cv["highlight_ids"], cv["career_ids"]) == ("First draft.", [], [])
 
     # A PDF naming a source comes after that source.
     source = SOURCE.encode()
@@ -327,7 +328,7 @@ def test_a_cv_is_its_source_and_the_pdf_built_from_it(client):
     assert client.post(f"/api/v1/documents/{cv['id']}/review", json={}).status_code == 410
     assert tool(client, "documents_review", {"document_id": cv["id"]})[0] is None
     mcp, _ = tool(client, "documents_get", {"document_id": cv["id"]})
-    assert mcp == complete
+    assert mcp == without_empty(complete)
 
     # A new revision is compared with the one it replaces, line by line.
     revised = client.post(
@@ -343,7 +344,10 @@ def test_a_cv_is_its_source_and_the_pdf_built_from_it(client):
         {"change": "added", "text": "Skills: Python, SQL, Rust."},
     ]
     assert comparison["text"] == {"document": True, "other": True}
-    assert tool(client, "documents_compare", {"document_id": revised["id"]})[0] == comparison
+    read, _ = tool(
+        client, "documents_get", {"document_id": revised["id"], "compare_to": "previous"}
+    )
+    assert read["comparison"] == without_empty(comparison)
     backwards = client.get(
         f"/api/v1/documents/{cv['id']}/comparison", params={"other_id": revised["id"]}
     ).json()
