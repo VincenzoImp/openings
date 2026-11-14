@@ -43,7 +43,7 @@ One query and one place per search; split "Zurich or Basel" into two.
 
 `collection_get` lists failing sources and `sources_get` their recent errors.
 Provider limits and cooldowns are protective: wait them out rather than
-raising them. Retry a failed fetch with `collection_update` once the cause is
+raising or lifting them, unless the owner asks. Retry a failed fetch with `collection_update` once the cause is
 fixed. Turn collection off only when the owner asks.
 
 ## Report back

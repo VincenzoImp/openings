@@ -144,8 +144,9 @@ shows the size, free space and retention.
 - Set `OPENINGS_PASSWORD`, or choose the password in the dashboard, before binding
   beyond localhost.
 - Revoke a token in Settings to end its access on its next request. Changing the
-  password signs out browsers and keeps tokens.
-- Download links for backups and exports work once and expire after 120 seconds.
+  password asks for the current one, signs out browsers and keeps tokens.
+- Upload and download links work once. File links expire after ten minutes,
+  backup and export links after 120 seconds.
 - Report vulnerabilities as described in [SECURITY.md](../../SECURITY.md).
 
 ## Troubleshooting
@@ -153,7 +154,7 @@ shows the size, free space and retention.
 | Symptom | Check |
 |---|---|
 | Sign-in returns 429 for everyone behind a proxy | Set `OPENINGS_TRUSTED_PROXIES` and recreate the container. |
-| A download link returns `transfer_used` | A link works once; request a new one. |
+| An upload or download link returns `transfer_used` | A link works once; request a new one. |
 | MCP rejects the host, or links point to the wrong machine | Set `OPENINGS_PUBLIC_URL` to the origin clients use. |
 | A job has incomplete text | Open the job's `…` › **Correct details** and paste the posting. |
 | A source is waiting | Read the reason and the time it resumes; a pause of a job site survives restarts. |
