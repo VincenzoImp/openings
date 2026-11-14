@@ -2,7 +2,7 @@
 
 import hashlib
 
-from fastapi import APIRouter, FastAPI
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from openings.auth import Auth
@@ -134,8 +134,6 @@ def bare_api(workspace, **services):
         body = {"code": error.code, "message": error.message}
         return JSONResponse({"error": body}, status_code=error.status)
 
-    router = APIRouter(prefix="/api/v1")
-    register_transport(api, router, "")
-    bind_rest(router, errors)
-    api.include_router(router)
+    register_transport(api, api.router, "")
+    bind_rest(api.router, errors)
     return api

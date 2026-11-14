@@ -133,13 +133,14 @@ def _endpoint(fn, path):
 
 
 def bind_rest(router, errors):
-    """Add every operation's routes; ``errors(op, path)`` gives its documented errors."""
+    """Add every operation's routes under ``API_PREFIX``; ``errors(op, path)`` gives
+    its documented errors."""
     for op in OPERATIONS:
         action = op.summary[0].lower() + op.summary[1:].rstrip(".")
         for index, (method, path) in enumerate(op.routes):
             name = op.name if index == 0 else f"{op.name}_{index}"
             router.add_api_route(
-                path,
+                API_PREFIX + path,
                 _endpoint(op.fn, path) if len(op.routes) > 1 else op.fn,
                 methods=[method],
                 name=name,
