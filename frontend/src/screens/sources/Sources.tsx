@@ -66,7 +66,7 @@ type Editing = {
  * sit collapsed at the bottom.
  */
 export default function SourcesScreen() {
-  useTitle("Job sources");
+  useTitle("Sources");
   const sources = useSources();
   const labels = useKindLabels();
   const toast = useToast();
@@ -155,7 +155,7 @@ export default function SourcesScreen() {
   return (
     <div className="src-screen">
       <PageHeader
-        title="Job sources"
+        title="Sources"
         action={
           list.length > 0 && (
             <Button icon={Plus} onClick={() => open({ kind: "search" })}>

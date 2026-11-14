@@ -89,7 +89,6 @@ test("Account: theme, setup guide, sign out and a checked password", async ({
     page.getByRole("link", { name: "Open setup guide" }),
   ).toHaveAttribute("href", "#setup");
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
-  await expect(page.locator(".set-owner").first()).toContainText("Owner only");
 
   await page.getByRole("button", { name: "Change password" }).click();
   const dialog = page.getByRole("dialog", { name: "Change password" });

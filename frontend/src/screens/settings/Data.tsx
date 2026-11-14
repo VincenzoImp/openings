@@ -25,7 +25,7 @@ import {
   useWorkspaceInfo,
   type KeptBackup,
 } from "./queries";
-import { OwnerOnly, SettingRow, SettingsGroup, SettingsSection } from "./Rows";
+import { SettingRow, SettingsGroup, SettingsSection } from "./Rows";
 import { LoadError } from "../../ui/LoadError";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -83,7 +83,6 @@ export function Data() {
       {owner && (
         <SettingRow
           title="Restore"
-          note={<OwnerOnly />}
           control={
             <Button icon={ArchiveRestore} onClick={() => setRestoring(true)}>
               Restore from backup…
@@ -96,7 +95,6 @@ export function Data() {
       {owner && (
         <SettingRow
           title="Export records"
-          note={<OwnerOnly />}
           control={
             <Button
               variant="ghost"
@@ -196,7 +194,7 @@ function KeptCopies({
     schedule.last_attempt?.outcome === "failed" || schedule.ok === false;
   return (
     <>
-      <SettingsGroup title="Automatic backups" note={<OwnerOnly />}>
+      <SettingsGroup title="Automatic backups">
         <p className="set-row-desc">
           {!schedule.enabled ? (
             "Automatic backups are off for this installation."
@@ -238,7 +236,7 @@ function KeptCopies({
         )}
       </SettingsGroup>
       {copies.length > 0 && (
-        <SettingsGroup title="Copies before upgrades" note={<OwnerOnly />}>
+        <SettingsGroup title="Copies before upgrades">
           <p className="set-row-desc">
             Taken before each upgrade changed the database. Delete the ones you
             no longer need.

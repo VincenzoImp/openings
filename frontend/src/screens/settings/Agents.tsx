@@ -27,7 +27,7 @@ import {
   useWorkspaceInfo,
   type TokenRow,
 } from "./queries";
-import { OwnerOnly, SettingsSection } from "./Rows";
+import { SettingsSection } from "./Rows";
 import { LoadError } from "../../ui/LoadError";
 
 /**
@@ -44,7 +44,7 @@ export function Agents() {
       lead="Openings has no AI of its own; nothing happens until you ask your agent."
     >
       <ol className="set-steps">
-        <Step number={1} title="Create a token" note={owner && <OwnerOnly />}>
+        <Step number={1} title="Create a token">
           {owner ? (
             <Tokens />
           ) : (

@@ -72,7 +72,7 @@ function ProfileScreen() {
       editing.open === "new:other",
   );
   const rail = [
-    { id: "header", title: "Header" },
+    { id: "header", title: p?.name.trim() || "Contact" },
     { id: "summary", title: "Summary" },
     ...shown,
     ...(skills.length ? [{ id: "skills", title: "Skills" }] : []),

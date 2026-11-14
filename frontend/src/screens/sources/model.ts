@@ -132,7 +132,8 @@ export function sitesLine(source: SourceView) {
 
 /**
  * What a source searches, in one line, without empty parts:
- * "Data engineer · Zurich · LinkedIn, Indeed" or "Greenhouse · northstar".
+ * "Data engineer · Zurich · LinkedIn, Indeed", "Greenhouse" or "RSS feed · example.test".
+ * A board's internal slug is not shown; the source's name says which board.
  */
 export function describeSource(
   source: SourceView,
@@ -151,7 +152,7 @@ export function describeSource(
     ? shortUrl(source.url)
     : text(source.config.url)
       ? shortUrl(text(source.config.url))
-      : text(source.config.board);
+      : "";
   const label =
     kind === "feed"
       ? "RSS feed"
