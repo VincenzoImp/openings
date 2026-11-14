@@ -21,18 +21,18 @@ import {
   TriangleAlert,
   X,
 } from "lucide-react";
-import { useShell, TopBarActions } from "../shell/context";
-import { href, navigate, useRoute } from "../shell/router";
-import { Button, IconButton } from "../ui/Button";
-import { ConfirmDialog, Dialog } from "../ui/Dialog";
-import { SearchField } from "../ui/Field";
-import { isModKey, isTyping } from "../ui/keys";
-import { BulkBar, useSelection } from "../ui/List";
-import { Menu, Popover, type MenuEntry } from "../ui/Menu";
-import { Callout, EmptyState, PageHeader, SkeletonRows } from "../ui/Page";
-import { SplitPane } from "../ui/Split";
-import { FilterChips, Tabs, Toolbar } from "../ui/Tabs";
-import { useToast, type ToastOptions } from "../ui/Toast";
+import { useShell, TopBarActions } from "../../shell/context";
+import { href, navigate, useRoute } from "../../shell/router";
+import { Button, IconButton } from "../../ui/Button";
+import { ConfirmDialog, Dialog } from "../../ui/Dialog";
+import { SearchField } from "../../ui/Field";
+import { isModKey, isTyping } from "../../ui/keys";
+import { BulkBar, useSelection } from "../../ui/List";
+import { Menu, Popover, type MenuEntry } from "../../ui/Menu";
+import { Callout, EmptyState, PageHeader, SkeletonRows } from "../../ui/Page";
+import { SplitPane } from "../../ui/Split";
+import { FilterChips, Tabs, Toolbar } from "../../ui/Tabs";
+import { useToast, type ToastOptions } from "../../ui/Toast";
 import {
   fetchJob,
   prefetchJob,
@@ -42,11 +42,11 @@ import {
   useJobList,
   useMerge,
   type BulkAction,
-} from "./jobs/data";
-import { FilterPanel } from "./jobs/FilterPanel";
-import { CorrectDrawer, MergeDialog, SourcesDialog } from "./jobs/JobDialogs";
-import { JobDetail, type DetailHandlers } from "./jobs/JobDetail";
-import { JobList } from "./jobs/JobList";
+} from "./data";
+import { FilterPanel } from "./FilterPanel";
+import { CorrectDrawer, MergeDialog, SourcesDialog } from "./JobDialogs";
+import { JobDetail, type DetailHandlers } from "./JobDetail";
+import { JobList } from "./JobList";
 import {
   SECTIONS,
   SORTS,
@@ -65,9 +65,9 @@ import {
   type Section,
   type Sort,
   type View,
-} from "./jobs/model";
-import { useSeen } from "./jobs/seen";
-import "./jobs/jobs.css";
+} from "./model";
+import { useSeen } from "./seen";
+import "./jobs.css";
 
 const PAGE = 200;
 

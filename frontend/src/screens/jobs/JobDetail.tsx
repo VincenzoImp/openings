@@ -6,12 +6,9 @@ import {
   Clock,
   Ellipsis,
   ExternalLink,
-  GitMerge,
   Globe,
   Layers,
   MapPin,
-  PencilLine,
-  Pin,
   RotateCcw,
   Trash2,
   TriangleAlert,
@@ -170,11 +167,7 @@ function JobCallout({ job, on }: { job: Job; on: DetailHandlers }) {
         }
         actions={
           <>
-            <Button
-              size="sm"
-              icon={GitMerge}
-              onClick={() => on.mergeInto(job, other)}
-            >
+            <Button size="sm" onClick={() => on.mergeInto(job, other)}>
               Merge into one job
             </Button>
             <Button
@@ -316,12 +309,7 @@ function History({ job }: { job: Job }) {
               <li key={item.id} data-kind={item.type}>
                 {note ? (
                   <>
-                    <p className="jobs-timeline-note">
-                      {note.pinned && (
-                        <Icon icon={Pin} size="sm" className="jobs-pin" />
-                      )}
-                      {note.body}
-                    </p>
+                    <p className="jobs-timeline-note">{note.body}</p>
                     <p className="jobs-timeline-meta">
                       {note.pinned ? "Pinned note" : "Note"}
                       {by ? ` ${by}` : ""} · {when}
@@ -463,7 +451,6 @@ export function JobDetail({
     {
       id: "correct",
       label: "Correct details",
-      icon: PencilLine,
       kbd: "E",
       disabled: loading,
       onSelect: () => on.correct(job),
@@ -471,7 +458,6 @@ export function JobDetail({
     {
       id: "merge",
       label: "Merge with another job…",
-      icon: GitMerge,
       disabled: loading,
       onSelect: () => on.merge(job),
     },
