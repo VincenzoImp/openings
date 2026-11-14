@@ -1,4 +1,4 @@
-"""Applicable adapter options and honest public-board failures across interfaces."""
+"""Boards detected from URLs, applicable adapter options and honest public-board failures."""
 
 import httpx
 import pytest
@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from discovery_fixtures import mock_http, patch_discovery
 from openings.discovery import DiscoveryService, SourceCreate, SourcePreview
+from openings.discovery.resolution import detect_source
 from openings.errors import DomainError
 from openings.workspace import Workspace
 
@@ -107,3 +108,53 @@ def test_ashby_unavailable_board_empty_board_and_transient_failure_are_distinct(
             assert task["attempts"] == 1
         if status == 200:
             assert task["error"] is None
+
+
+DETECTED = [
+    ("https://boards.greenhouse.io/example/jobs/1", "greenhouse", "example"),
+    ("https://job-boards.greenhouse.io/embed/job_board?for=example", "greenhouse", "example"),
+    ("https://boards-api.greenhouse.io/v1/boards/example/jobs", "greenhouse", "example"),
+    ("https://jobs.lever.co/example/abc", "lever", "example"),
+    ("https://jobs.eu.lever.co/example", "lever", "example"),
+    ("https://api.eu.lever.co/v0/postings/example", "lever", "example"),
+    ("https://jobs.ashbyhq.com/example/1", "ashby", "example"),
+    ("https://api.ashbyhq.com/posting-api/job-board/example", "ashby", "example"),
+    ("https://example.recruitee.com/o/role", "recruitee", "example"),
+    ("https://example.jobs.personio.de/job/1", "personio", "example"),
+    ("https://apply.workable.com/example/j/1", "workable", "example"),
+    ("https://example.breezy.hr/p/1", "breezy", "example"),
+    ("https://example.bamboohr.com/careers", "bamboohr", "example"),
+    ("https://careers.smartrecruiters.com/Example", "smartrecruiters", "Example"),
+    ("https://ats.rippling.com/example/jobs", "rippling", "example"),
+    ("https://join.com/companies/example", "joincom", "example"),
+    (
+        "https://example.wd5.myworkdayjobs.com/en-US/Careers/job/1",
+        "workday",
+        "example.wd5.myworkdayjobs.com/Careers",
+    ),
+    (
+        "https://example.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX/jobs",
+        "oracle",
+        "example.fa.ocs.oraclecloud.com/CX",
+    ),
+]
+
+
+def test_a_board_url_names_its_kind_board_and_region():
+    for url, kind, board in DETECTED:
+        detected = detect_source(url)
+        found = (detected["kind"], detected["config"]["board"], detected["url"])
+        assert found == (kind, board, url)
+        if kind == "lever":
+            assert detected["config"]["region"] == ("eu" if ".eu." in url else "global")
+        else:
+            assert "region" not in detected["config"], url
+    for url, code in (
+        ("https://example.org/careers", "unsupported_source"),
+        ("https://jobs.lever.co/", "unsupported_source"),
+        ("https://join.com/example", "unsupported_source"),
+        ("https://jobs.lever.co/exa%20mple", "invalid_board"),
+    ):
+        with pytest.raises(DomainError) as refused:
+            detect_source(url)
+        assert refused.value.code == code, url

@@ -2,6 +2,7 @@
 
 import shutil
 import sqlite3
+from contextlib import closing
 
 from openings import compaction
 from openings.workspace import Workspace
@@ -20,7 +21,8 @@ def test_startup_compacts_a_mostly_free_file_and_keeps_search_working(tmp_path, 
     with workspace.db.connect() as conn:
         conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     large = path.stat().st_size
-    free, total = compaction.free_space(sqlite3.connect(path))
+    with closing(sqlite3.connect(path)) as conn:
+        free, total = compaction.free_space(conn)
     assert free * 4 >= total
 
     # Below the configured minimum nothing is rewritten.
