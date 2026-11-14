@@ -1,136 +1,121 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 // Node strips the types of these modules; none of them uses React.
-const { isNewWorkspace } = await import("../src/shell/setup.ts");
-const model = await import("../src/pages/setup/model.ts");
+const checklist = await import("../src/screens/setup/checklist.ts");
+const model = await import("../src/screens/setup/model.ts");
 const preferences = await import("../src/pages/preferences/model.ts");
 
-const blank = {
-  profile: { name: "", headline: "", location: "", email: "" },
-  sections: [
-    { section: "looking_for", items: [] },
-    { section: "ruled_out", items: [] },
-  ],
-  noReply: { days: 30, source: "default" },
-  sources: 0,
-  tokens: [],
-  entries: 0,
-  claims: 0,
-  templates: 0,
-  applications: 0,
-};
-const token = (name, created_at, last_used_at = null) => ({
-  name,
-  kind: "agent",
-  created_at,
-  last_used_at,
+const empty = { name: "", preferences: 0, sources: 0, jobs: 0, cv: 0 };
+
+test("the setup checklist reads three server facts, nothing else", () => {
+  const start = checklist.progress(empty);
+  assert.equal(start.done, 0);
+  assert.equal(start.total, 3);
+  assert.equal(start.empty, true);
+  assert.equal(start.finished, false);
+  assert.deepEqual(
+    start.items.map((item) => [item.step, item.title]),
+    [
+      ["about", "Tell us what you're looking for"],
+      ["jobs", "Add a job source or a job"],
+      ["cv", "Add your CV"],
+    ],
+  );
+  // A name alone is not enough: what you look for is needed too.
+  const named = checklist.progress({ ...empty, name: "Alex" });
+  assert.equal(named.done, 0);
+  assert.equal(named.empty, false);
+  assert.equal(
+    checklist.progress({ ...empty, name: "Alex", preferences: 1 }).done,
+    1,
+  );
+  // A source or a job; a career entry, a highlight or a template.
+  for (const facts of [{ sources: 1 }, { jobs: 3 }])
+    assert.equal(checklist.checklist({ ...empty, ...facts })[1].done, true);
+  assert.equal(checklist.checklist({ ...empty, cv: 1 })[2].done, true);
+  const all = checklist.progress({
+    name: "Alex",
+    preferences: 2,
+    sources: 0,
+    jobs: 1,
+    cv: 4,
+  });
+  assert.equal(all.finished, true);
+  assert.equal(all.done, 3);
 });
 
-test("a workspace is new only while it has no name, entry, source, token or job", () => {
-  const empty = { name: " ", entries: 0, sources: 0, tokens: 0, jobs: 0 };
-  assert.equal(isNewWorkspace(empty), true);
-  for (const change of [
+const sections = (items) => [
+  { section: "looking_for", version: 4, items },
+  { section: "ruled_out", version: 1, items: [] },
+];
+const workspace = (items, spoken = []) => ({
+  sections: sections(items),
+  settings: { spoken_languages: spoken, version: 7 },
+});
+
+test("About you reads what the workspace already says", () => {
+  assert.deepEqual(
+    model.aboutFrom(
+      { name: "Alex Example" },
+      workspace(
+        [
+          { text: "Small teams" },
+          { text: "Roles: data engineer" },
+          { text: "Where: Zurich or remote" },
+        ],
+        ["en", "de"],
+      ),
+    ),
+    {
+      name: "Alex Example",
+      roles: "data engineer",
+      where: "Zurich or remote",
+      languages: ["en", "de"],
+    },
+  );
+  assert.equal(model.stepOf("cv"), "cv");
+  assert.equal(model.stepOf("record"), "about");
+  assert.equal(model.stepOf(null), "about");
+});
+
+test("About you replaces its own statements and keeps the others", () => {
+  const before = workspace(
+    [{ text: "Small teams" }, { text: "Roles: analyst" }],
+    ["en"],
+  );
+  const about = {
+    name: " Alex ",
+    roles: "data engineer",
+    where: "Zurich",
+    languages: ["en", "it"],
+  };
+  assert.deepEqual(model.aboutChanges(about, { name: "" }, before), {
+    name: "Alex",
+    lookingFor: {
+      expected_version: 4,
+      items: [
+        { text: "Small teams" },
+        { text: "Roles: data engineer" },
+        { text: "Where: Zurich" },
+      ],
+    },
+    languages: ["en", "it"],
+  });
+  // Nothing changed: nothing is written.
+  const same = model.aboutChanges(
+    { name: "Alex", roles: "analyst", where: "", languages: ["en"] },
     { name: "Alex" },
-    { entries: 1 },
-    { sources: 1 },
-    { tokens: 1 },
-    { jobs: 1 },
-  ])
-    assert.equal(isNewWorkspace({ ...empty, ...change }), false);
-});
-
-test("the agent is connected once one of its tokens made a call", () => {
-  assert.deepEqual(model.connection([]), { state: "todo", token: null });
-  const waiting = model.connection([
-    token("old", "2026-11-01T00:00:00Z"),
-    token("new", "2026-11-02T00:00:00Z"),
-  ]);
-  assert.equal(waiting.state, "waiting");
-  assert.equal(waiting.token.name, "new");
-  const done = model.connection([
-    token("first", "2026-11-01T00:00:00Z", "2026-11-03T00:00:00Z"),
-    token("second", "2026-11-02T00:00:00Z", "2026-11-04T00:00:00Z"),
-    token("unused", "2026-11-05T00:00:00Z"),
-  ]);
-  assert.equal(done.state, "done");
-  assert.equal(done.token.name, "second");
-});
-
-test("a new workspace starts by connecting the agent, with nothing done", () => {
-  const steps = model.steps(blank);
-  assert.equal(steps.agent.line, "Not started");
-  assert.equal(steps.record.line, "Not started");
-  assert.equal(steps.next.line, "After the record");
-  assert.equal(model.firstStep(blank), "agent");
-  assert.equal(model.setupComplete(blank), false);
-  assert.ok(model.recordItems(blank).every((item) => item.state === "todo"));
-});
-
-test("the record counts each part from the workspace", () => {
-  const facts = {
-    ...blank,
-    profile: { ...blank.profile, name: "Alex Morgan", headline: "Engineer" },
-    sections: [
-      { section: "looking_for", items: [{ text: "a" }, { text: "b" }] },
-      { section: "ruled_out", items: [{ text: "c" }] },
-    ],
-    noReply: { days: 45, source: "settings" },
-    sources: 1,
-    entries: 9,
-    claims: 1,
-    templates: 0,
-  };
-  const items = Object.fromEntries(
-    model.recordItems(facts).map((item) => [item.id, item]),
+    before,
   );
-  assert.equal(items.profile.state, "done");
-  assert.equal(items.profile.meta, "Alex Morgan · Engineer");
-  assert.equal(items.preferences.state, "done");
-  assert.equal(
-    items.preferences.meta,
-    "2 statements on what you look for · 1 you rule out · no reply after 45 days",
-  );
-  assert.equal(items.searches.meta, "1 saved search or company board");
-  assert.equal(items.entries.meta.startsWith("9 entries"), true);
-  assert.equal(items.claims.meta.startsWith("1 statement "), true);
-  assert.equal(items.templates.state, "todo");
-  assert.equal(model.steps(facts).record.line, "In progress · 5 of 6");
-  // The record is not done and the agent is not connected: the agent first.
-  assert.equal(model.firstStep(facts), "agent");
-  const connected = {
-    ...facts,
-    tokens: [
-      token("career-agent", "2026-11-01T00:00:00Z", "2026-11-02T00:00:00Z"),
-    ],
-  };
-  assert.equal(model.firstStep(connected), "record");
-  const complete = { ...connected, templates: 2, applications: 3 };
-  assert.equal(model.firstStep(complete), "next");
-  assert.equal(model.setupComplete(complete), true);
-  assert.equal(model.steps(complete).next.line, "3 applications");
-});
-
-test("preferences are in progress until they say what you look for and the no-reply period", () => {
-  const withStatement = {
-    ...blank,
-    sections: [
-      { section: "looking_for", items: [{ text: "Backend roles" }] },
-      { section: "ruled_out", items: [] },
-    ],
-  };
-  const item = (facts) =>
-    model.recordItems(facts).find((entry) => entry.id === "preferences");
-  assert.equal(item(withStatement).state, "progress");
-  assert.match(item(withStatement).meta, /no reply period not set/);
-  const withPeriod = {
-    ...blank,
-    sections: [{ section: "ruled_out", items: [{ text: "Agencies" }] }],
-    noReply: { days: 30, source: "settings" },
-  };
-  assert.equal(item(withPeriod).state, "progress");
-  assert.equal(
-    item({ ...withStatement, noReply: withPeriod.noReply }).state,
-    "done",
+  assert.deepEqual(same, { name: null, lookingFor: null, languages: null });
+  // A cleared field removes its statement.
+  assert.deepEqual(
+    model.aboutChanges(
+      { name: "Alex", roles: "", where: "", languages: ["en"] },
+      { name: "Alex" },
+      before,
+    ).lookingFor.items,
+    [{ text: "Small teams" }],
   );
 });
 
