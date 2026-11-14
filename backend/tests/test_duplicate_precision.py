@@ -6,6 +6,7 @@ from duplicate_benchmark import (
     benchmark_jobs,
     grouped_pairs,
     legacy_groups,
+    likely_duplicates,
     precision_recall,
     true_pairs,
 )
@@ -361,7 +362,7 @@ def test_one_job_is_scored_against_its_blocks_only(benchmark, monkeypatch):
     before = workspace.db.one("SELECT count(*) n, sum(version) v FROM jobs")
 
     archived = by_vacancy["backend-zurich"]
-    found = workspace.likely_duplicates(archived[0])
+    found = likely_duplicates(workspace, archived[0])
     assert {item["job_id"] for item in found} == set(archived[1:])
     assert all(item["tier"] == "high" for item in found)
     assert found[0]["reasons"]["matched"][0] == "apply_target"
@@ -376,16 +377,16 @@ def test_one_job_is_scored_against_its_blocks_only(benchmark, monkeypatch):
         "source_key": "glassdoor:991",
         "metadata": {"source": "glassdoor", "date_posted": "2026-03-06"},
     }
-    found = workspace.likely_duplicates(incoming)
+    found = likely_duplicates(workspace, incoming)
     assert [records[match["job_id"]]["vacancy"] for match in found] == ["data-bern"] * 3
     assert found[0]["confidence"] >= HIGH_CONFIDENCE and found[0]["tier"] == "high"
-    assert {match["job_id"] for match in workspace.likely_duplicates(incoming, 0, 50)} > {
+    assert {match["job_id"] for match in likely_duplicates(workspace, incoming, 0, 50)} > {
         match["job_id"] for match in found
     }
-    assert workspace.likely_duplicates({"title": "Beekeeper", "company": "Nowhere"}) == []
+    assert likely_duplicates(workspace, {"title": "Beekeeper", "company": "Nowhere"}) == []
     assert workspace.db.one("SELECT count(*) n, sum(version) v FROM jobs") == before
     with pytest.raises(DomainError):
-        workspace.likely_duplicates("absent")
+        likely_duplicates(workspace, "absent")
 
 
 def test_features_are_read_again_only_for_changed_jobs(tmp_path, monkeypatch):

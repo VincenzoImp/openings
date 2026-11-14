@@ -21,10 +21,20 @@ and ``kind`` says why it is still another vacancy:
 - ``collision``: an unrelated employer whose text happens to share a numeric id.
 """
 
+import hashlib
 import random
 from itertools import combinations
 
-from openings.duplicate_signals import normalize_title, posting_fingerprint, words
+from openings.common import now
+from openings.duplicate_signals import (
+    MIN_POSTING_WORDS,
+    job_features,
+    normalize_title,
+    words,
+)
+from openings.duplicates import DEFAULT_MIN_CONFIDENCE, confidence_tier
+from openings.errors import missing
+from openings.identities import job_identities, normalize_url
 
 ROLE = {
     "en": [
@@ -649,3 +659,43 @@ def legacy_groups(rows):
     for row in rows:
         groups.setdefault(find(row["id"]), []).append(row["id"])
     return [members for members in groups.values() if len(members) > 1]
+
+
+def posting_fingerprint(posting):
+    """Hash of the posting's words, ignoring case, punctuation and whitespace."""
+    tokens = words((posting or "")[:50_000])
+    if len(tokens) < MIN_POSTING_WORDS:
+        return None
+    return hashlib.sha256(" ".join(tokens).encode()).hexdigest()[:16]
+
+
+def likely_duplicates(workspace, job, min_confidence=DEFAULT_MIN_CONFIDENCE, limit=5):
+    """Archived jobs most likely to be the same vacancy as one job, best first.
+
+    ``job`` is an archived job ID, or the fields of a posting not archived yet.
+    """
+    with workspace.db.connect() as connection:
+        index = workspace._duplicate_index(connection)
+    if isinstance(job, str):
+        features = index.jobs.get(job) or missing("Job")
+    else:
+        url = normalize_url(job.get("url") or "")
+        features = job_features(
+            {
+                **job,
+                "id": None,
+                "url": url,
+                "identities": job_identities(url, job.get("source_key")),
+                "urls": [(job.get("raw") or {}).get("job_url_direct")],
+                "created_at": job.get("created_at") or now(),
+            }
+        )
+    return [
+        {
+            "job_id": job_id,
+            "confidence": evidence.score,
+            "tier": confidence_tier(evidence.score),
+            "reasons": {"matched": list(evidence.matched), "conflicts": list(evidence.conflicts)},
+        }
+        for job_id, evidence in index.matches(features, min_confidence, limit)
+    ]

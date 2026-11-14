@@ -172,10 +172,9 @@ class SourceOperations:
                     for task in run["tasks"]
                     if task["error"] and task["state"] == "failed"
                 )[:1000]
-                or None
                 if run
-                else None
-            )
+                else ""
+            ) or raw["last_error"]
             row["next_run_at"] = (
                 run["next_run_at"]
                 if run and run["state"] in ("queued", "running")
@@ -370,7 +369,9 @@ class SourceOperations:
             resolved = old
         if merged["enabled"]:
             require_automatic_collection(resolved["kind"])
-        schedule = schedule_adapter.validate_python(merged["schedule"]).model_dump()
+        schedule = schedule_adapter.validate_python(
+            merged["schedule"] or {"kind": "interval"}
+        ).model_dump()
         with self.db.transaction() as connection:
             row = connection.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchone()
             check_version(row, value.expected_version)

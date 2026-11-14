@@ -5,8 +5,8 @@ import math
 
 from .. import events
 from ..actors import current_actor
-from ..common import check_version, new_id, now
-from ..db import collect_unused, encode
+from ..common import check_version, encode, new_id, now
+from ..db import collect_unused
 from ..errors import DomainError, conflict, missing
 from ..idempotency import fingerprint, remember, replay
 from ..models import ApplicationFields, ApplicationInput, ApplicationPatch
@@ -164,7 +164,13 @@ class ApplicationChanges:
             moved = self.reply_stage(c, row, reply, changes)
             status = changes.get("status") or row["status"]
             if row["status"] == "closed" and status != "closed":
+                # Reopening starts the application again, with the rules of a start.
+                job = c.execute("SELECT * FROM jobs WHERE id=?", (row["job_id"],)).fetchone()
+                if job["triage"] == "dismissed":
+                    conflict("Restore the dismissed job before reopening its application.")
                 self._check_active_application(c, row["job_id"], excluding=application_id)
+                if job["triage"] != "shortlisted":
+                    self._triage(c, job, "shortlisted", current_actor())
             self._check_outcome(row, status, changes)
             if status == "shortlisted" and row["status"] != "shortlisted":
                 self._undo_applied(c, row, changes)

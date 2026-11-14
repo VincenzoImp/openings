@@ -7,7 +7,7 @@ import pytest
 from starlette.requests import ClientDisconnect
 
 from openings.documents import UploadReservation
-from openings.transfers import SnapshotResponse
+from openings.snapshots import SnapshotResponse
 
 
 @pytest.mark.asyncio

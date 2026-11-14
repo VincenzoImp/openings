@@ -1,5 +1,7 @@
 """Application priority, deadline, employer requirements and readiness and what is missing for Ready."""
 
+import json
+
 import pytest
 
 from document_fixtures import attach, attach_pdf
@@ -83,8 +85,11 @@ def test_planning_fields_validate_and_clear_explicitly(tmp_path):
         {"expected_version": application["version"], "priority": None, "deadline": None},
     )
     assert cleared["priority"] is None and cleared["deadline"] is None
-    events = workspace.application_events(application["id"])["items"]
-    assert {"priority", "deadline"} <= set(events[0]["payload"]["fields"])
+    events = workspace.db.all(
+        "SELECT payload FROM events WHERE application_id=? ORDER BY created_at DESC",
+        (application["id"],),
+    )
+    assert {"priority", "deadline"} <= set(json.loads(events[0]["payload"])["fields"])
 
 
 def test_missing_documents_follow_current_revisions_and_sorts_by_plan(app, client):

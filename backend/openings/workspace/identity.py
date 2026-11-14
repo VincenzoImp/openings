@@ -7,8 +7,7 @@ import time
 
 from .. import events
 from ..actors import current_actor
-from ..common import check_version, now
-from ..db import encode
+from ..common import check_version, encode, now
 from ..duplicate_signals import job_features, posting_similarity
 from ..duplicates import DEFAULT_MIN_CONFIDENCE, HIGH_CONFIDENCE, DuplicateIndex, confidence_tier
 from ..errors import DomainError, missing
@@ -282,42 +281,6 @@ class JobIdentity:
         thread = threading.Thread(target=build, name="duplicate-warmup", daemon=True)
         thread.start()
         return thread
-
-    def likely_duplicates(self, job, min_confidence=DEFAULT_MIN_CONFIDENCE, limit=5):
-        """Archived jobs most likely to be the same vacancy as one job, best first.
-
-        `job` is an archived job ID, or the fields of a posting that is not archived
-        yet (title, company, location, url, posting, metadata, source_key, raw).
-        Read-only: a signal for review, never a merge.
-        """
-        with self.db.connect() as connection:
-            index = self._duplicate_index(connection)
-        if isinstance(job, str):
-            features = index.jobs.get(job) or missing("Job")
-        else:
-            url = normalize_url(job.get("url") or "")
-            features = job_features(
-                {
-                    **job,
-                    "id": None,
-                    "url": url,
-                    "identities": job_identities(url, job.get("source_key")),
-                    "urls": [(job.get("raw") or {}).get("job_url_direct")],
-                    "created_at": job.get("created_at") or now(),
-                }
-            )
-        return [
-            {
-                "job_id": job_id,
-                "confidence": evidence.score,
-                "tier": confidence_tier(evidence.score),
-                "reasons": {
-                    "matched": list(evidence.matched),
-                    "conflicts": list(evidence.conflicts),
-                },
-            }
-            for job_id, evidence in index.matches(features, min_confidence, limit)
-        ]
 
     def duplicate_jobs(self, value=None):
         """Candidate duplicate groups for review. Never merges or changes records."""

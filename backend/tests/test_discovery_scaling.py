@@ -3,7 +3,7 @@
 import pytest
 
 from discovery_fixtures import patch_discovery
-from openings.db import encode
+from openings.common import encode
 from openings.discovery import CollectionWrite, DiscoveryService
 from openings.errors import DomainError
 from openings.scheduling import next_due
