@@ -5,6 +5,7 @@
   .apg {
     display: flex;
     flex-direction: column;
+    flex: 1 0 auto;
     min-width: 0;
     padding-bottom: var(--s-12);
   }
@@ -684,6 +685,10 @@
 
   /* Phone: the bottom bar carries the primary; Ready shows one part at a time. */
   @container app (max-width: 719px) {
+    /* The action bar closes the page: no room below it. */
+    .apg:has(.ui-actionbar) {
+      padding-bottom: 0;
+    }
     .apg-head {
       padding-top: var(--s-3);
     }
