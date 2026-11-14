@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 // Node strips the types of these modules; none of them uses React.
 const today = await import("../src/screens/today/model.ts");
+const applications = await import("../src/screens/applications/model.ts");
 
 const row = (id, fields = {}) => ({
   id,
@@ -34,35 +35,25 @@ test("the summary line names only what is not zero", () => {
   assert.equal(today.greeting("", evening), "Good evening");
 });
 
-test("a deadline is danger when past, warning within a week, plain later", () => {
+test("Today and Applications say a deadline in the same words", () => {
   const now = new Date(2026, 10, 13, 10, 0); // Friday
-  assert.deepEqual(today.deadlineText("2026-11-11", now), {
-    text: "Closed 11 Nov",
+  const label = (day) => applications.deadlineLabel(day, now);
+  assert.deepEqual(label("2026-11-11"), {
+    text: "Overdue 2 days",
     tone: "danger",
   });
-  assert.deepEqual(today.deadlineText("2026-11-13", now), {
-    text: "Closes today",
+  assert.deepEqual(label("2026-11-13"), { text: "Due today", tone: "warning" });
+  assert.deepEqual(label("2026-11-14"), {
+    text: "Due tomorrow",
     tone: "warning",
   });
-  assert.deepEqual(today.deadlineText("2026-11-14", now), {
-    text: "Closes tomorrow",
-    tone: "warning",
-  });
-  assert.deepEqual(today.deadlineText("2026-11-17", now), {
-    text: "Closes Tue",
-    tone: "warning",
-  });
-  assert.deepEqual(today.deadlineText("2026-11-20", now), {
-    text: "Closes 20 Nov",
-    tone: "warning",
-  });
-  assert.deepEqual(today.deadlineText("2026-12-02", now), {
-    text: "Closes 2 Dec",
-  });
-  assert.deepEqual(today.deadlineText("2027-01-05", now), {
-    text: "Closes 5 Jan 2027",
-  });
-  assert.equal(today.deadlineText(null, now), null);
+  assert.deepEqual(label("2026-11-17"), { text: "Due Tue" });
+  assert.deepEqual(label("2026-11-20"), { text: "Due 20 Nov" });
+  assert.deepEqual(label("2027-01-05"), { text: "Due 5 Jan 2027" });
+  assert.equal(label(null), null);
+  // Never "Closed": that is a stage, not a deadline.
+  for (const day of ["2026-11-01", "2026-11-12", "2026-11-13"])
+    assert.doesNotMatch(label(day).text, /Clos/);
   assert.equal(today.dueThisWeek("2026-11-20", now), true);
   assert.equal(today.dueThisWeek("2026-11-21", now), false);
   assert.equal(today.dueThisWeek("2026-11-12", now), false);

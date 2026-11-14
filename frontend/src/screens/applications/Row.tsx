@@ -8,6 +8,7 @@ import { href, navigate } from "../../shell/router";
 import { jobOf, type ApplicationRow } from "./data";
 import type { DialogKind } from "./dialogs";
 import { isSent, stageOf, statusPhrase } from "./model";
+import { HighPriority } from "./priority";
 
 /** The page of an application. */
 export const pageHref = (id: string) => href("application", { id });
@@ -84,24 +85,31 @@ export function rowMenu(
 }
 
 /**
- * One application: priority, role, company and place, then the stage glyph
- * and its status phrase. On hover, focus or selection the phrase gives way
- * to the stage's action (Apply, Record reply) and the `…` menu.
+ * One application: role, company and place, then its one status phrase. The
+ * stage glyph shows only where stages mix (`mixed`); in a stage tab or group
+ * the phrase says the rest (a Ready row: its deadline). On hover, focus or
+ * selection the phrase gives way to the stage's action (Apply, Record reply)
+ * and the `…` menu.
  */
 export function ApplicationRowView({
   app,
   noReplyDays,
+  mixed = true,
   onDialog,
   onReopen,
 }: {
   app: ApplicationRow;
   noReplyDays: number;
+  /** Rows of several stages together: the stage glyph tells them apart. */
+  mixed?: boolean;
   onDialog: (kind: DialogKind) => void;
   onReopen: () => void;
 }) {
   const job = jobOf(app);
   const stage = stageOf(app);
-  const phrase = statusPhrase(app, noReplyDays);
+  const phrase = statusPhrase(app, noReplyDays, undefined, {
+    stageShown: !mixed,
+  });
   const actions: RowAction[] = [];
   if (stage === "ready")
     actions.push({
@@ -120,7 +128,7 @@ export function ApplicationRowView({
     <ListRow
       id={app.id}
       href={pageHref(app.id)}
-      leading={<PriorityGlyph priority={app.priority} />}
+      leading={<HighPriority priority={app.priority} />}
       title={job.title}
       sub={
         <>
@@ -131,13 +139,26 @@ export function ApplicationRowView({
               {job.location}
             </span>
           )}
-          <span className="ap-sub-status">
-            {" · "}
-            <ToneText tone={phrase.tone}>{phrase.text}</ToneText>
-          </span>
+          {phrase.text && (
+            <span className="ap-sub-status">
+              {" · "}
+              <ToneText tone={phrase.tone}>{phrase.text}</ToneText>
+            </span>
+          )}
         </>
       }
-      meta={<StatusText app={app} noReplyDays={noReplyDays} />}
+      meta={
+        mixed ? (
+          <StatusText app={app} noReplyDays={noReplyDays} />
+        ) : (
+          phrase.text && (
+            <span className="ap-status">
+              <span className="ui-sr">{STAGES[stage]}: </span>
+              <ToneText tone={phrase.tone}>{phrase.text}</ToneText>
+            </span>
+          )
+        )
+      }
       actions={actions}
       menu={(tabIndex) => (
         <Menu

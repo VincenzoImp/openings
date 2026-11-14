@@ -194,7 +194,7 @@ test("mobile applications, templates and stats stay usable inside the viewport",
     page.getByRole("region", { name: "Applications" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("group", { name: "Stage" }).getByRole("button"),
+    page.getByRole("tablist", { name: "Stage" }).getByRole("tab"),
   ).toHaveCount(7);
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))

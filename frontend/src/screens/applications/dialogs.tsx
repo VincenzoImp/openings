@@ -149,7 +149,6 @@ export function RecordReplyDialog({
     setNote("");
   }, [target]);
   const change = useChange(onClose);
-  const words = REPLY_KINDS.find((item) => item.id === kind)!.label;
   return (
     <FormDialog
       open={!!target}
@@ -170,7 +169,7 @@ export function RecordReplyDialog({
               remove: false,
             },
           },
-          `Recorded: ${words.toLowerCase()} for "${target.title}"`,
+          `Recorded the reply to “${target.title}”`,
         )
       }
     >
@@ -262,7 +261,7 @@ export function CloseDialog({
         change.run(
           target,
           { status: "closed", outcome: outcome as Patch["outcome"] },
-          `Closed "${target.title}" · ${OUTCOMES[outcome].toLowerCase()}`,
+          `Closed “${target.title}” as ${OUTCOMES[outcome].toLowerCase()}`,
         )
       }
     >
@@ -316,7 +315,7 @@ export function StageDialog({
           stage === "closed"
             ? { status: "closed", outcome: outcome as Patch["outcome"] }
             : { status: stage as Patch["status"] },
-          `Moved "${target.title}" to ${label}`,
+          `Moved “${target.title}” to ${label}`,
         )
       }
     >
@@ -375,7 +374,7 @@ export function PlanDialog({
           },
           {
             onSuccess: () => {
-              toast.show({ message: "Plan saved", tone: "success" });
+              toast.show({ message: "Saved the plan", tone: "success" });
               onClose();
             },
             onError: (error) => {
@@ -457,7 +456,7 @@ export function RequiredDialog({
         change.run(
           target,
           { required_documents: kinds as ("cv" | "letter")[] },
-          "Required documents saved",
+          "Saved the required documents",
         )
       }
     >
@@ -506,7 +505,7 @@ export function DeleteDialog({
           {
             onSuccess: () => {
               toast.show({
-                message: `Deleted "${target.title}"`,
+                message: `Deleted “${target.title}”`,
                 tone: "success",
               });
               onDeleted?.();
