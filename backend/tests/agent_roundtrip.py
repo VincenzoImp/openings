@@ -25,7 +25,6 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from urllib.parse import urljoin
 
 import httpx
 import httpx2
@@ -230,9 +229,7 @@ async def exercise(base, agent_token, owner_token, folder, tectonic):
                 return {"name": name, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
 
             async def put(grant, data):
-                response = await http.put(
-                    urljoin(base, grant["url"]), headers=grant["headers"], content=data
-                )
+                response = await http.put(grant["url"], headers=grant["headers"], content=data)
                 return response.status_code, response.json()
 
             start, puts = call.calls, 0
@@ -280,6 +277,7 @@ async def exercise(base, agent_token, owner_token, folder, tectonic):
                 and "Alex Example" in letter_read["text"]
                 and cv_read["highlight_ids"] == [highlight["id"]]
             )
+            checks["upload_with_the_returned_url"] = cv["uploads"]["pdf"]["url"].startswith(base)
             late = await call.raw(
                 "files_upload",
                 {
@@ -292,7 +290,7 @@ async def exercise(base, agent_token, owner_token, folder, tectonic):
             )
             checks["complete_revision_is_immutable"] = error_of(late)["code"] == "revision_complete"
             download = await call("files_download", {"file_id": stored["id"]})
-            fetched = await http.get(urljoin(base, download["url"]), headers=download["headers"])
+            fetched = await http.get(download["url"], headers=download["headers"])
             checks["exact_pdf_download"] = fetched.content == pdf
             ready = await call("applications_list", {"stage": "ready"})
             checks["ready_is_computed"] = [item["id"] for item in ready["items"]] == [
@@ -340,7 +338,7 @@ async def exercise(base, agent_token, owner_token, folder, tectonic):
             )
 
             backup = await call("workspace_backup")
-            response = await http.get(urljoin(base, backup["url"]), headers=backup["headers"])
+            response = await http.get(backup["url"], headers=backup["headers"])
             path = folder / "backup.sqlite"
             path.write_bytes(response.content)
             with sqlite3.connect(path) as restored_db:

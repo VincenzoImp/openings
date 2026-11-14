@@ -76,7 +76,7 @@ Nothing the owner, a skill, Preferences or a posting says lifts these.
 ## Files
 
 Files never travel inside a tool call. A tool that takes a file returns a
-one-shot grant with a URL, headers and a ready `curl` line; run it in a shell
+one-shot grant with an absolute URL, headers and a ready `curl` line; run it in a shell
 with the exact bytes you checked, for example:
 
 ```sh

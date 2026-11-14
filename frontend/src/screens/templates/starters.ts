@@ -13,6 +13,11 @@ export const EXAMPLE_CV: NewTemplate = {
 \\usepackage[margin=1.7cm]{geometry}
 \\usepackage[T1]{fontenc}
 \\usepackage{hyperref}
+\\usepackage{iftex}
+\\ifpdftex % pdfTeX only: searchable ligatures; Tectonic and XeTeX skip it
+  \\input{glyphtounicode}
+  \\pdfgentounicode=1
+\\fi
 \\pagestyle{empty}
 \\setlength{\\parindent}{0pt}
 \\begin{document}
@@ -47,6 +52,11 @@ export const EXAMPLE_LETTER: NewTemplate = {
   tex: `\\documentclass[11pt,a4paper]{article}
 \\usepackage[margin=2.2cm]{geometry}
 \\usepackage[T1]{fontenc}
+\\usepackage{iftex}
+\\ifpdftex % pdfTeX only: searchable ligatures; Tectonic and XeTeX skip it
+  \\input{glyphtounicode}
+  \\pdfgentounicode=1
+\\fi
 \\pagestyle{empty}
 \\setlength{\\parindent}{0pt}
 \\setlength{\\parskip}{0.8em}

@@ -9,6 +9,8 @@ reads as the PDF's text runs in order, one line per line of the page.
 import io
 import logging
 
+from .text import plain_letters
+
 LOG = logging.getLogger(__name__)
 
 # Bounds for one extraction: pages read and characters kept.
@@ -29,5 +31,5 @@ def pdf_text(data: bytes) -> str | None:
         LOG.info("No text from a PDF (%s).", type(error).__name__)
         return None
     lines = [line.rstrip() for page in pages for line in page.splitlines()]
-    text = "\n".join(lines).strip()[:MAX_CHARACTERS]
+    text = plain_letters("\n".join(lines)).strip()[:MAX_CHARACTERS]
     return text or None

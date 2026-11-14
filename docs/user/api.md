@@ -104,8 +104,8 @@ MCP and JSON carry no file bytes, so a file goes up in two steps:
    `letter`), `application_id`, the `career_ids` and `highlight_ids` it uses and
    `pdf: {name, size}`, and optionally the TeX source inline as `source` (up to 256
    KB) or as `source_file`. `POST /files/uploads` does the same for a career,
-   template or job file. The result has `uploads`, one grant per file, each with a
-   `url`, `headers` and a ready `curl` line.
+   template or job file. The result has `uploads`, one grant per file, each with an
+   absolute `url`, `headers` and a ready `curl` line.
 2. `PUT` the exact bytes to the grant's `url` with its headers (`X-Transfer-Token`;
    no bearer token). When `uploads` has a source grant too, send the source first. With a source, the
    PDF's request names its SHA-256, and a PDF built from another source is
@@ -120,5 +120,5 @@ A grant works once and expires after ten minutes; files are limited to 20 MiB. T
 revision is complete when its PDF is stored, and a complete revision never changes.
 A download works the same way: `POST /files/{id}/download` returns a grant to `GET`.
 
-The origin in the `curl` line is `OPENINGS_PUBLIC_URL`, so it must be reachable from
-the machine that runs it.
+The origin of the grant's `url` and `curl` line is `OPENINGS_PUBLIC_URL` (else the origin
+the request reached), so it must be reachable from the machine that runs it.

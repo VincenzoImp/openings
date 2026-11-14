@@ -1,6 +1,11 @@
 \documentclass[11pt,a4paper]{article}
 \usepackage[margin=2.2cm]{geometry}
 \usepackage[T1]{fontenc}
+\usepackage{iftex}
+\ifpdftex % pdfTeX only: searchable ligatures; Tectonic and XeTeX skip it
+  \input{glyphtounicode}
+  \pdfgentounicode=1
+\fi
 \pagestyle{empty}
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.8em}

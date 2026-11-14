@@ -696,7 +696,7 @@ export interface paths {
     put?: never;
     /**
      * Create a CV, letter or answers revision of an application.
-     * @description CV/letter: pdf {name, size}, optional TeX source; PUT the PDF to uploads.pdf (curl line given). Complete once its PDF is stored. Never sends.
+     * @description CV/letter: pdf {name, size}, optional TeX source; PUT the PDF to uploads.pdf's absolute url (curl line given). Complete once its PDF is stored. Never sends.
      */
     post: operations["documents_create"];
     delete?: never;
@@ -928,7 +928,7 @@ export interface paths {
     put?: never;
     /**
      * Reserve an upload for a career, template, job or revision file.
-     * @description Returns a one-shot grant: PUT the exact bytes to its url with its headers (curl line given). sha256 is checked when given.
+     * @description Returns a one-shot grant: PUT the exact bytes to its absolute url with its headers (curl line given). sha256 is checked when given.
      */
     post: operations["files_upload"];
     delete?: never;
@@ -3177,7 +3177,10 @@ export interface components {
       max_bytes?: number | null;
       /** Method */
       method: string;
-      /** Url */
+      /**
+       * Url
+       * @description Absolute, on the workspace's public origin.
+       */
       url: string;
     } & {
       [key: string]: unknown;
@@ -3926,7 +3929,10 @@ export interface components {
       };
       /** Method */
       method: string;
-      /** Url */
+      /**
+       * Url
+       * @description Absolute, on the workspace's public origin.
+       */
       url: string;
     } & {
       [key: string]: unknown;
