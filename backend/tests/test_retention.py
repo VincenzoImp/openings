@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 
+from doubles import Lane
 from openings import operations, retention
 from openings._vendor.jobspy.model import JobPost
 from openings.collectors.catalog import COMPANY_KINDS
@@ -19,10 +20,10 @@ from openings.operations import (
     restore_limit,
     restore_room,
 )
-from openings.retention import KEPT_RUNS_PER_SOURCE, observation_payload, prune
+from openings.retention import KEPT_RUNS_PER_SOURCE, prune
 from openings.worker import Worker
 from openings.workspace import Workspace
-from provider_fixtures import JOBSPY_ROW, provider_postings, released_payload
+from provider_fixtures import JOBSPY_ROW, provider_postings
 
 MIB = 1024**2
 
@@ -107,15 +108,12 @@ def test_an_observation_stores_only_the_provider_values_in_use(tmp_path):
     for item in provider_postings():
         job = workspace.ingest_job(item)
         row = workspace.db.one("SELECT payload FROM postings WHERE job_id=?", (job["id"],))
-        stored = json.loads(row["payload"])
-        assert row["payload"] == encode(observation_payload(released_payload(item)))
-        assert set(stored) <= {"source_key", "raw"}
-        assert stored.get("source_key") == item.get("source_key")
-        assert stored.get("raw", {}) == (
-            {"job_url_direct": item["raw"]["job_url_direct"]}
-            if (item.get("raw") or {}).get("job_url_direct") is not None
-            else {}
-        )
+        direct = (item.get("raw") or {}).get("job_url_direct")
+        expected = {
+            **({"source_key": item["source_key"]} if item.get("source_key") else {}),
+            **({"raw": {"job_url_direct": direct}} if direct is not None else {}),
+        }
+        assert json.loads(row["payload"]) == expected
         assert len(row["payload"]) < 400
     board = next(i for i in provider_postings() if i["source_key"] == "indeed:in-2001")
     # The trimmed observation is found again by its source key under another URL.
@@ -260,17 +258,6 @@ def test_pruning_is_bounded_and_keeps_records_of_agent_changes(collected, monkey
     assert retention.retention_days() == 90
     monkeypatch.setenv("OPENINGS_RETENTION_DAYS", "30")
     assert prune(workspace.db)["runs"] == 1
-
-
-class Lane:
-    def __init__(self, cycles):
-        self.cycles = cycles
-
-    def is_set(self):
-        return self.cycles <= 0
-
-    def wait(self, seconds):
-        self.cycles -= 1
 
 
 def test_the_worker_prunes_at_start_and_then_at_a_slow_pace(collected, monkeypatch):

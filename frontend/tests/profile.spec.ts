@@ -1,27 +1,10 @@
-import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Page } from "./fixtures";
-import {
-  blockButton,
-  call,
-  go,
-  isPhone,
-  ownerSession,
-  upload,
-} from "./session";
+import { blockButton, call, findings, go, isPhone, upload } from "./session";
 
 // Profile (#profile): the career record read as a CV, one block edited at a
 // time. Each test starts from the seeded workspace (fixtures.ts); the same
 // journeys run at desktop width (in place, with the save bar) and on a phone
 // (a full-screen sheet with Cancel and Save in its header).
-const errors = new WeakMap<Page, string[]>();
-test.beforeEach(async ({ page }) => {
-  errors.set(page, []);
-  page.on("pageerror", (error) => errors.get(page)!.push(error.message));
-  await page.context().addCookies(ownerSession());
-});
-test.afterEach(async ({ page }) => {
-  expect(errors.get(page)).toEqual([]);
-});
 
 const SENIOR = "Senior data engineer";
 const toast = (page: Page, text: string | RegExp) =>
@@ -336,14 +319,7 @@ test("editing is a sheet on a phone and in place on a wide screen; both pass axe
     ).toBeVisible();
     await expect(sheet.getByRole("button", { name: "Save" })).toBeVisible();
   } else await expect(sheet).toHaveCount(0);
-  const { violations } = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
-    .analyze();
-  expect(
-    violations
-      .filter((item) => item.impact === "serious" || item.impact === "critical")
-      .map((item) => item.id),
-  ).toEqual([]);
+  expect(await findings(page)).toEqual([]);
   await page.keyboard.press("Escape");
   await expect(sheet).toHaveCount(0);
   await expect(form(page, `Edit ${SENIOR}`)).toHaveCount(0);

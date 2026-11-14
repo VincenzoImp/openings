@@ -5,10 +5,10 @@ import sqlite3
 
 import pytest
 
+from document_fixtures import guided_application
 from openings.actors import OWNER, SYSTEM, acting_as, batch, token_actor
 from openings.errors import DomainError
 from openings.workspace import Workspace
-from timeline_fixtures import guided_application
 
 AGENT = token_actor("agent-token", "Synthetic agent", "agent")
 

@@ -24,6 +24,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from contextlib import closing
 from pathlib import Path
 
 import httpx
@@ -344,7 +345,7 @@ async def exercise(base, agent_token, owner_token, folder, tectonic):
             response = await http.get(backup["url"], headers=backup["headers"])
             path = folder / "backup.sqlite"
             path.write_bytes(response.content)
-            with sqlite3.connect(path) as restored_db:
+            with closing(sqlite3.connect(path)) as restored_db:
                 checks["backup_integrity"] = (
                     restored_db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
                     and restored_db.execute("PRAGMA foreign_key_check").fetchall() == []

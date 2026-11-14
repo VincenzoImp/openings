@@ -53,6 +53,9 @@ def test_summaries_filtering_and_merge_preserve_application_intent(workspace):
         workspace.create_application({"job_id": first["id"], "idempotency_key": "first"})["id"]
         == previous["id"]
     )
+    # The key belongs to the first job's request; another job's is refused.
+    with pytest.raises(DomainError):
+        workspace.create_application({"job_id": second["id"], "idempotency_key": "first"})
 
 
 def test_interface_workflow_requires_explicit_outcomes_and_versioned_deletion(client):
