@@ -1,0 +1,45 @@
+/* Sign in and the first password: one card in the middle of the page. */
+@layer screens {
+  .auth {
+    display: grid;
+    place-items: center;
+    min-height: 100dvh;
+    padding: var(--s-6) var(--s-4);
+    background: var(--bg-subtle);
+  }
+  .auth-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    width: min(400px, 100%);
+    padding: var(--s-8);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-sm);
+  }
+  .auth-card h1 {
+    font: var(--t-xl);
+    font-weight: var(--w-semibold);
+    letter-spacing: var(--tr-xl);
+  }
+  .auth-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    font-weight: var(--w-semibold);
+  }
+  .auth-lead {
+    color: var(--text-2);
+  }
+  .auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+  }
+  @media (max-width: 480px) {
+    .auth-card {
+      padding: var(--s-6) var(--s-4);
+    }
+  }
+}

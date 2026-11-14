@@ -226,11 +226,6 @@
     letter-spacing: 0;
     white-space: pre-line;
   }
-  .jobs-pin {
-    flex: none;
-    margin-top: 2px;
-    color: var(--text-3);
-  }
   .jobs-timeline-meta {
     color: var(--text-3);
     font: var(--t-xs);

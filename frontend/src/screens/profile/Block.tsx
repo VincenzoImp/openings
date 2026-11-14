@@ -19,25 +19,11 @@ import {
 } from "react";
 import { MoreHorizontal, Pencil } from "lucide-react";
 import { Button, IconButton } from "../../ui/Button";
+import { usePhone } from "../../ui/ActionSheet";
 import { Menu, type MenuEntry } from "../../ui/Menu";
 import { LeaveDialog, SaveBar, useUnloadGuard } from "../../ui/ReadEdit";
 import { isModKey } from "../../ui/keys";
 import { addLeaveGuard } from "../../shell/router";
-
-const PHONE = "(max-width: 719px)";
-
-/** Whether the dashboard has its phone layout. */
-export function usePhone() {
-  return useSyncExternalStore(
-    (listener) => {
-      const media = matchMedia(PHONE);
-      media.addEventListener("change", listener);
-      return () => media.removeEventListener("change", listener);
-    },
-    () => matchMedia(PHONE).matches,
-    () => false,
-  );
-}
 
 interface Editing {
   /** The open block, or null. */

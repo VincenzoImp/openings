@@ -7,7 +7,7 @@ import { call, go, ownerSession } from "./session";
 // pixel comparison: `npm run screenshots` writes them to frontend/screenshots/
 // (desktop 1440×1000 and mobile 390×844, light and dark), and CI uploads them
 // as the `screenshots` artifact of a pull request that changes the dashboard.
-// `npm run screenshots -- --docs` writes the light desktop images the user
+// `npm run screenshots -- --docs` writes the light images the user
 // documentation embeds to docs/images/ instead. A new screen or a key state
 // (empty, populated, dialog open) gets one line in SCREENS.
 type Screen = {
@@ -20,6 +20,8 @@ type Screen = {
   open?: (page: Page) => Promise<void>;
   /** The file name under docs/images, for an image the docs embed. */
   docs?: string;
+  /** The same for the phone image. Docs images show the viewport only. */
+  docsMobile?: string;
   signedOut?: boolean;
   /** Prepare the page before the screen is opened (a replaced response). */
   before?: (page: Page) => Promise<void>;
@@ -341,7 +343,7 @@ const SCREENS: Screen[] = [
       await expect(page.locator("dialog[open]")).toBeVisible();
     },
   },
-  { name: "jobs", route: "jobs", docs: "jobs" },
+  { name: "jobs", route: "jobs", docs: "jobs", docsMobile: "jobs-mobile" },
   {
     name: "jobs-selected",
     route: async (page) =>
@@ -514,7 +516,12 @@ const VIEWPORTS = {
 };
 const THEMES = ["light", "dark"] as const;
 
-async function capture(page: Page, screen: Screen, path: string) {
+async function capture(
+  page: Page,
+  screen: Screen,
+  path: string,
+  viewportOnly = false,
+) {
   if (!screen.signedOut) await page.context().addCookies(ownerSession());
   // Open a page of the app first, so a route can read the workspace.
   await page.goto("/");
@@ -526,13 +533,14 @@ async function capture(page: Page, screen: Screen, path: string) {
     await expect(page.locator("input[name=password]")).toBeVisible();
   else await go(page, route);
   await page.waitForLoadState("networkidle");
-  await expect(page.locator(".loading")).toHaveCount(0);
+  await expect(page.locator(".ui-skeleton-rows")).toHaveCount(0);
   await screen.open?.(page);
   // The shell fills the viewport and its content scrolls inside it. For a
   // full-page image the frame grows with the content instead: the sidebar
   // spans the whole height and the phone's bars sit above and below it.
-  await page.addStyleTag({ content: FULL_PAGE });
-  const fullPage = !(screen.sheet && (page.viewportSize()?.width ?? 0) < 720);
+  if (!viewportOnly) await page.addStyleTag({ content: FULL_PAGE });
+  const fullPage =
+    !viewportOnly && !(screen.sheet && (page.viewportSize()?.width ?? 0) < 720);
   await page.screenshot({ path, fullPage, animations: "disabled" });
 }
 
@@ -545,7 +553,7 @@ const FULL_PAGE = `
 
 for (const [size, viewport] of Object.entries(VIEWPORTS))
   for (const theme of THEMES) {
-    if (DOCS && (size !== "desktop" || theme !== "light")) continue;
+    if (DOCS && theme !== "light") continue;
     test.describe(`${size} ${theme}`, () => {
       test.use({ viewport });
       test.beforeEach(async ({ page }) => {
@@ -556,17 +564,18 @@ for (const [size, viewport] of Object.entries(VIEWPORTS))
         }, theme);
       });
       for (const screen of SCREENS) {
-        if (DOCS && !screen.docs) continue;
+        const docs = size === "desktop" ? screen.docs : screen.docsMobile;
+        if (DOCS && !docs) continue;
         test(screen.name, async ({ page }) => {
           const path = DOCS
-            ? join(ROOT, "docs/images", `${screen.docs}.png`)
+            ? join(ROOT, "docs/images", `${docs}.png`)
             : join(
                 ROOT,
                 "frontend/screenshots",
                 `${size}-${theme}`,
                 `${screen.name}.png`,
               );
-          await capture(page, screen, path);
+          await capture(page, screen, path, DOCS);
         });
       }
       // The design system gallery (ui.html), which the dashboard never serves.

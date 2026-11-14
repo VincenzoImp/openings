@@ -1,16 +1,57 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { api, type Session } from "../api";
-import { Button, ErrorBanner } from "../design";
+import { CircleAlert } from "lucide-react";
+import { api, call } from "../api/client";
+import { Button } from "../ui/Button";
+import { Field, Input } from "../ui/Field";
+import { BrandMark } from "../ui/Icon";
+import { Callout } from "../ui/Page";
+import "./auth.css";
+
+/** The browser session: whether an owner exists and is signed in. */
+export interface Session {
+  configured: boolean;
+  authenticated: boolean;
+  csrf_token?: string;
+}
 
 /** The frame of the screens shown before the workspace: one card. */
 export function AuthFrame({ children }: { children: ReactNode }) {
   return (
     <main className="auth">
-      <section className="auth-card card">
-        <span className="brand">Openings</span>
+      <section className="auth-card">
+        <span className="auth-brand">
+          <BrandMark size={24} />
+          Openings
+        </span>
         {children}
       </section>
     </main>
+  );
+}
+
+/** A failure before the workspace opens, with Try again when it can help. */
+export function AuthError({
+  message,
+  retry,
+}: {
+  message: string;
+  retry?: () => void;
+}) {
+  return (
+    <div role="alert">
+      <Callout
+        icon={CircleAlert}
+        tone="danger"
+        title={message}
+        actions={
+          retry && (
+            <Button size="sm" onClick={retry}>
+              Try again
+            </Button>
+          )
+        }
+      />
+    </div>
   );
 }
 
@@ -35,11 +76,11 @@ export function Auth({
     }
     setPending(true);
     try {
-      onSuccess(
-        await api<Session>(configured ? "/auth/login" : "/auth/setup", "POST", {
-          password,
-        }),
-      );
+      const body = { password };
+      const session = configured
+        ? await call(api.POST("/api/v1/auth/login", { body }))
+        : await call(api.POST("/api/v1/auth/setup", { body }));
+      onSuccess(session as Session);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to sign in.");
     } finally {
@@ -48,18 +89,19 @@ export function Auth({
   }
   return (
     <AuthFrame>
-      <p className="eyebrow">Your job search workspace</p>
-      <h1>{configured ? "Sign in to Openings" : "Set up your workspace"}</h1>
-      <p className="muted">
-        {configured
-          ? "Enter your owner password to access your workspace."
-          : "Create the owner password for this installation. Your profile, jobs and documents stay together in one workspace."}
-      </p>
-      <form className="stack" onSubmit={submit}>
-        {error && <ErrorBanner message={error} />}
-        <label className="field">
-          <span>{configured ? "Password" : "Choose a password"}</span>
-          <input
+      <h1>{configured ? "Sign in" : "Set up your workspace"}</h1>
+      {!configured && (
+        <p className="auth-lead">
+          Choose the owner password of this installation.
+        </p>
+      )}
+      <form className="auth-form" onSubmit={submit}>
+        {error && <AuthError message={error} />}
+        <Field
+          label={configured ? "Password" : "Choose a password"}
+          hint={configured ? undefined : "At least 10 characters."}
+        >
+          <Input
             name="password"
             type="password"
             minLength={configured ? 1 : 10}
@@ -67,29 +109,22 @@ export function Auth({
             autoFocus
             autoComplete={configured ? "current-password" : "new-password"}
           />
-          {!configured && (
-            <small className="hint">At least 10 characters.</small>
-          )}
-        </label>
+        </Field>
         {!configured && (
-          <label className="field">
-            <span>Confirm password</span>
-            <input
+          <Field label="Confirm password">
+            <Input
               name="confirm"
               type="password"
               minLength={10}
               required
               autoComplete="new-password"
             />
-          </label>
+          </Field>
         )}
-        <Button variant="primary" loading={pending}>
+        <Button variant="primary" type="submit" disabled={pending}>
           {configured ? "Sign in" : "Create workspace"}
         </Button>
       </form>
-      <p className="caption auth-note">
-        Jobs, career evidence and application documents.
-      </p>
     </AuthFrame>
   );
 }

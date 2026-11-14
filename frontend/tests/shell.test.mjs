@@ -140,7 +140,7 @@ test("a swipe needs a mostly horizontal drag past the threshold", () => {
 test("the page declares the cascade layers before any stylesheet", () => {
   for (const page of ["index.html", "ui.html"]) {
     const html = readFileSync(new URL(`../${page}`, import.meta.url), "utf8");
-    const layers = html.indexOf("@layer reset, tokens, legacy, ui, screens;");
+    const layers = html.indexOf("@layer reset, tokens, ui, screens;");
     assert.ok(layers > 0, `${page} declares the layer order`);
     assert.ok(layers < html.indexOf("<script"), page);
   }

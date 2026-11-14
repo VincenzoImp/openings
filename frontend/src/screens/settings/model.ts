@@ -88,10 +88,3 @@ export function spacing(value: string) {
   if (number < 0 || number > 3600) return null;
   return Math.round(number * 10) / 10;
 }
-
-/** This workspace as the setup guide reads it (every field may be missing). */
-export interface WorkspaceInfo {
-  origin?: string | null;
-  version?: string;
-  schema_version?: number;
-}

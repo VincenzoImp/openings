@@ -3,8 +3,15 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 // Node strips the types of these modules; they import no React.
-const { formatDate, formatDay, formatFull, formatNumber, EMPTY } =
-  await import("../src/ui/format.ts");
+const {
+  formatDate,
+  formatDay,
+  formatFull,
+  formatNumber,
+  formatTime,
+  plural,
+  EMPTY,
+} = await import("../src/ui/format.ts");
 const { listIndex, cycleIndex, typeahead, isTyping, plainKey } =
   await import("../src/ui/keys.ts");
 
@@ -37,6 +44,14 @@ test("dates accept ISO strings, never show them, and mark invalid ones", () => {
     formatFull(new Date(2026, 10, 13, 14, 5)),
     "Fri 13 Nov 2026, 14:05",
   );
+  assert.equal(formatTime(new Date(2026, 10, 13, 9, 5)), "09:05");
+});
+
+test("a count reads with its noun, in the one number format", () => {
+  assert.equal(plural(1, "job"), "1 job");
+  assert.equal(plural(0, "job"), "0 jobs");
+  assert.equal(plural(2, "entry", "entries"), "2 entries");
+  assert.equal(plural(12500, "job"), "12,500 jobs");
 });
 
 test("numbers group thousands; compact counts shorten", () => {
@@ -99,21 +114,23 @@ function files(dir) {
       : [join(dir, entry.name)],
   );
 }
-const UI = new URL("../src/ui/", import.meta.url).pathname;
+const SRC = new URL("../src/", import.meta.url).pathname;
 
-test("src/ui has no hex colour outside tokens.css", () => {
+// P7: colours come from the tokens only, in every screen and component.
+test("src has no hex colour outside tokens.css", () => {
   const found = [];
-  for (const file of files(UI)) {
+  for (const file of files(SRC)) {
+    if (file.endsWith("schema.d.ts")) continue;
     if (!/\.(css|tsx?)$/.test(file) || file.endsWith("tokens.css")) continue;
     const text = readFileSync(file, "utf8");
     for (const match of text.matchAll(/(?<![\w&])#[0-9a-fA-F]{3,8}\b/g))
-      found.push(`${file.slice(UI.length)}: ${match[0]}`);
+      found.push(`${file.slice(SRC.length)}: ${match[0]}`);
   }
   assert.deepEqual(found, []);
 });
 
-test("every stylesheet of src/ui sits in a cascade layer, and no weight is 700", () => {
-  for (const file of files(UI)) {
+test("every stylesheet sits in a cascade layer, and no weight is 700", () => {
+  for (const file of files(SRC)) {
     if (!file.endsWith(".css")) continue;
     const text = readFileSync(file, "utf8");
     if (!file.endsWith("base.css"))

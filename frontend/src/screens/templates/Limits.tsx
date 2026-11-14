@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import { Field, Input, EMPTY, Properties, ReadEdit, useToast } from "../../ui";
+import {
+  Field,
+  Input,
+  EMPTY,
+  Properties,
+  ReadEdit,
+  formatNumber,
+  useToast,
+} from "../../ui";
 import { ConflictNotice } from "../../query/ConflictNotice";
 import { isConflict } from "../../query/mutation";
 import { useUpdateTemplate, type Template } from "../../query/templates";
@@ -108,7 +116,7 @@ export function LimitsTab({
           <Field
             key={key}
             label={label}
-            hint={`In ${unit}, up to ${max.toLocaleString("en")}. Empty: no limit.`}
+            hint={`In ${unit}, up to ${formatNumber(max)}. Empty: no limit.`}
             error={errors[key]}
             className="ui-field-full"
           >

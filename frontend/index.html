@@ -6,11 +6,11 @@
     <meta name="theme-color" content="#ffffff" />
     <meta name="color-scheme" content="light dark" />
     <title>Openings — Your job search workspace</title>
-    <!-- The cascade layers in their order, before any stylesheet: the build
-         splits the CSS per chunk, and the first mention of a layer fixes its
-         place. The old stylesheet (legacy) goes in #228. -->
+    <!-- The cascade layers in their order, before any stylesheet: the first
+         mention of a layer fixes its place, whatever order the build gives
+         the rules. -->
     <style>
-      @layer reset, tokens, legacy, ui, screens;
+      @layer reset, tokens, ui, screens;
     </style>
   </head>
   <body>

@@ -26,6 +26,7 @@ import { href, navigate, useRoute } from "../../shell/router";
 import { Button, IconButton } from "../../ui/Button";
 import { ConfirmDialog, Dialog } from "../../ui/Dialog";
 import { SearchField } from "../../ui/Field";
+import { formatTime, plural } from "../../ui/format";
 import { isModKey, isTyping } from "../../ui/keys";
 import { BulkBar, useSelection } from "../../ui/List";
 import { Menu, Popover, type MenuEntry } from "../../ui/Menu";
@@ -84,8 +85,6 @@ function useMedia(query: string) {
 }
 
 const title = (job: { title?: string }) => `“${job.title || "Untitled role"}”`;
-const plural = (count: number, one: string, many = one + "s") =>
-  `${count} ${count === 1 ? one : many}`;
 const reasonOf = (error: unknown) =>
   (error as Error)?.message || "Something went wrong.";
 
@@ -839,7 +838,7 @@ export default function Jobs() {
       }
     >
       {next
-        ? `Your sources are checked next at ${new Date(next).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}.`
+        ? `Your sources are checked next at ${formatTime(next)}.`
         : "New jobs from your sources arrive here."}
     </EmptyState>
   ) : view.section === "dismissed" ? (

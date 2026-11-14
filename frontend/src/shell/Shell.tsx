@@ -10,7 +10,6 @@ import {
 import { ListChecks, Plus, Search } from "lucide-react";
 import { useSetup } from "../query/setup";
 import { useAccountName, useNeedsCounts } from "../query/shell";
-import { confirmLeave, useFormProtection } from "../state";
 // The design system's modules, not its index: the first screen loads only
 // the primitives the shell draws (each module brings its own stylesheet).
 import { IconButton } from "../ui/Button";
@@ -27,7 +26,7 @@ import {
 import { ToastProvider } from "../ui/Toast";
 import { ShellContext, type ShellApi } from "./context";
 import { BOTTOM, NAV, NEEDS_LABEL, type NavDef } from "./nav";
-import { addLeaveGuard, href, navigate, useRoute } from "./router";
+import { href, navigate, useRoute } from "./router";
 import { ROUTES } from "./routes";
 import { Screen, preload } from "./Screens";
 import { CHORD_MS, readKey, type ShellAction } from "./shortcuts";
@@ -55,7 +54,6 @@ const ShortcutSheet = lazy(() =>
  * shortcut sheet and the global keyboard.
  */
 export function Shell({ onSignOut }: { onSignOut: () => void }) {
-  useFormProtection();
   const route = useRoute();
   const counts = useNeedsCounts();
   const name = useAccountName();
@@ -71,10 +69,6 @@ export function Shell({ onSignOut }: { onSignOut: () => void }) {
   const [title, setTitle] = useState<string | null>(null);
   const [actionsSlot, setActionsSlot] = useState<HTMLElement | null>(null);
   const content = useRef<HTMLElement | null>(null);
-
-  // Unsaved edits of the old screens ask before leaving (#228 replaces this
-  // with the screens' own in-app dialog).
-  useEffect(() => addLeaveGuard(() => confirmLeave()), []);
 
   const close = useCallback(() => setOverlay(null), []);
   const shell = useMemo<ShellApi>(
