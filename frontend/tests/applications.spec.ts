@@ -751,7 +751,14 @@ test("answers and the questions of the form are edited without JSON", async ({
   await dialog(page).getByRole("button", { name: "Save the question" }).click();
   await expect(dialog(page)).toHaveCount(0);
   await page.getByLabel("Which office?").selectOption("Basel");
+  // Edit the question only once the page holds the version this save made.
+  const rereadAgain = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/api/v1/applications/${application.id}`) &&
+      response.request().method() === "GET",
+  );
   await page.getByRole("button", { name: "Save answers" }).click();
+  await rereadAgain;
   await expect
     .poll(async () =>
       Object.values(
