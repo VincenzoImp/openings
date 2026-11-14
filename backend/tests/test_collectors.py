@@ -11,7 +11,12 @@ import pytest
 
 from discovery_fixtures import patch_discovery
 from openings.collectors import company
-from openings.collectors.policy import ProviderDeferred, ProviderPatch, retry_after
+from openings.collectors.policy import (
+    MAX_RETRY_AFTER,
+    ProviderDeferred,
+    ProviderPatch,
+    retry_after,
+)
 from openings.common import now
 from openings.discovery import (
     CollectionWrite,
@@ -300,7 +305,26 @@ def test_the_gate_refuses_cancelled_work_unknown_providers_and_guessed_retry_aft
     assert retry_after("not a date", 1) is None
     assert retry_after("3", 1) == 4
     later = datetime.now(UTC).replace(microsecond=0) + timedelta(seconds=120)
-    assert retry_after(format_datetime(later, usegmt=True), 1) == later.timestamp()
+    moment = later.timestamp() - 120
+    assert retry_after(format_datetime(later, usegmt=True), moment) == later.timestamp()
+
+
+def test_a_server_pause_is_at_most_a_day_and_the_owner_can_lift_it(collection):
+    _, service = collection
+    day = MAX_RETRY_AFTER
+    assert retry_after("99999999999", 1) == retry_after("1e300", 1) == 1 + day
+    assert retry_after("nan", 1) is retry_after("-5", 1) is None
+    assert retry_after("Fri, 31 Dec 9999 23:59:59 GMT", 1) == 1 + day
+    budget = service.http_budget("greenhouse")
+    budget.after(429, {"Retry-After": "1e300"})
+    paused = service.providers.get("greenhouse")
+    until = datetime.fromisoformat(paused["runtime"]["cooldown_until"])
+    assert until <= datetime.now(UTC) + timedelta(seconds=day)
+    lifted = service.update_provider(
+        "greenhouse", ProviderPatch(expected_version=paused["version"]), clear_cooldown=True
+    )
+    assert lifted["runtime"]["cooldown_until"] is None
+    service.http_budget("greenhouse").before("GET", "https://boards.greenhouse.io/example")
 
 
 def test_actual_requests_and_curl_transports_bound_bodies_and_record_integer_status(collection):
