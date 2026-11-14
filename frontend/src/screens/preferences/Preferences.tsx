@@ -8,13 +8,13 @@ import {
   LeaveDialog,
   useUnloadGuard,
   useToast,
-} from "../ui";
-import { addLeaveGuard } from "../shell/router";
+} from "../../ui";
+import { addLeaveGuard } from "../../shell/router";
 import {
   usePreferences,
   type SectionName,
   type Statement,
-} from "../query/preferences";
+} from "../../query/preferences";
 import {
   SECTIONS,
   itemName,
@@ -23,11 +23,11 @@ import {
   reordered,
   saved,
   sectionTitle,
-} from "./preferences/model";
-import { PreferenceSection, type SectionActions } from "./preferences/Section";
-import { FollowingUp, Languages } from "./preferences/Settings";
-import { useStatements } from "./preferences/useStatements";
-import "./preferences/preferences.css";
+} from "./model";
+import { PreferenceSection, type SectionActions } from "./Section";
+import { FollowingUp, Languages } from "./Settings";
+import { useStatements } from "./useStatements";
+import "./preferences.css";
 
 /**
  * Preferences: in the owner's words, what they want, rule out and are, how

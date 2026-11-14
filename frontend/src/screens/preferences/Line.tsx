@@ -7,7 +7,7 @@ import {
 } from "react";
 import { Ellipsis, GripVertical, Pencil, Trash2 } from "lucide-react";
 import { Button, IconButton, Segmented, Tag, type MenuEntry } from "../../ui";
-import { SheetMenu } from "../../ui/ActionSheet";
+import { SheetMenu } from "../../ui";
 import type { Scope, SectionName, Statement } from "../../query/preferences";
 import { SCOPES, SECTIONS, itemName, scopeLabels } from "./model";
 

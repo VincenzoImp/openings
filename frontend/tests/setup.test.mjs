@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 // Node strips the types of these modules; none of them uses React.
 const checklist = await import("../src/screens/setup/checklist.ts");
 const model = await import("../src/screens/setup/model.ts");
-const preferences = await import("../src/pages/preferences/model.ts");
+const preferences = await import("../src/screens/preferences/model.ts");
 
 const empty = { name: "", preferences: 0, sources: 0, jobs: 0, cv: 0 };
 
