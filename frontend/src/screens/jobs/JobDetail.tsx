@@ -9,6 +9,8 @@ import {
   Globe,
   Layers,
   MapPin,
+  Merge,
+  Pencil,
   RotateCcw,
   Trash2,
   TriangleAlert,
@@ -194,7 +196,7 @@ function JobCallout({ job, on }: { job: Job; on: DetailHandlers }) {
         title="The posting text is incomplete"
         actions={
           <Button size="sm" onClick={() => on.correct(job)}>
-            Correct details
+            Paste full text
           </Button>
         }
       >
@@ -417,40 +419,13 @@ export function JobDetail({
       !(callout === "incomplete" && tag === "Text incomplete") &&
       !tag.startsWith("Requires"),
   );
+  // Shortlist, Dismiss and Restore are the buttons of the detail; the menu
+  // holds what is less frequent.
   const menu: MenuEntry[] = [
-    ...(job.triage === "new"
-      ? [
-          {
-            id: "shortlist",
-            label: "Shortlist",
-            icon: Bookmark,
-            kbd: "S",
-            onSelect: () => on.shortlist(job),
-          },
-          {
-            id: "dismiss",
-            label: "Dismiss",
-            icon: X,
-            kbd: "D",
-            onSelect: () => on.dismiss(job),
-          },
-          "separator" as const,
-        ]
-      : job.triage === "dismissed"
-        ? [
-            {
-              id: "restore",
-              label: "Restore",
-              icon: RotateCcw,
-              kbd: "R",
-              onSelect: () => on.restore(job),
-            },
-            "separator" as const,
-          ]
-        : []),
     {
       id: "correct",
       label: "Correct details",
+      icon: Pencil,
       kbd: "E",
       disabled: loading,
       onSelect: () => on.correct(job),
@@ -458,6 +433,7 @@ export function JobDetail({
     {
       id: "merge",
       label: "Merge with another job…",
+      icon: Merge,
       disabled: loading,
       onSelect: () => on.merge(job),
     },

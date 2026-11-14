@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useAddJob, useKnownJob } from "../query/shell";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
+import { Disclosure } from "../ui/Disclosure";
 import { Field, Input, Textarea } from "../ui/Field";
 import { Callout } from "../ui/Page";
 import { useToast } from "../ui/Toast";
@@ -142,8 +143,7 @@ export function AddJob({
             that job.
           </Callout>
         )}
-        <details className="shell-disclosure">
-          <summary>More details</summary>
+        <Disclosure title="More details" className="shell-disclosure">
           <div className="shell-addjob-details">
             <Field label="Role" optional>
               <Input
@@ -176,7 +176,7 @@ export function AddJob({
               />
             </Field>
           </div>
-        </details>
+        </Disclosure>
       </form>
     </Dialog>
   );

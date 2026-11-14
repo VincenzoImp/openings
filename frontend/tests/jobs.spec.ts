@@ -142,13 +142,15 @@ test("mouse triage: row and pane actions, a reason typed in the toast, and Undo"
   const made = await jobs(page, tag, 3);
   await go(page, `jobs?q=${encodeURIComponent(tag)}`);
   await expect(rows(page)).toHaveCount(3);
-  // The row's hover action shortlists: the toast offers the application.
+  // The row's hover action shortlists; the toast offers Undo only.
   await row(page, made[0].title).hover();
   await row(page, made[0].title)
     .getByRole("button", { name: "Shortlist" })
     .click();
-  await expect(toast(page)).toContainText("Shortlisted — application started");
-  await expect(toast(page).getByRole("button", { name: "Open" })).toBeVisible();
+  await expect(toast(page)).toContainText(`Shortlisted “${made[0].title}”`);
+  await expect(toast(page).getByRole("button", { name: "Open" })).toHaveCount(
+    0,
+  );
   await expect(title(page)).toHaveText(made[1].title);
   // The pane's Dismiss is immediate; the reason is added from the toast.
   await page
@@ -159,15 +161,26 @@ test("mouse triage: row and pane actions, a reason typed in the toast, and Undo"
   await toast(page).getByRole("button", { name: "Add reason" }).click();
   await page.getByLabel("Why did you dismiss it?").fill("Too far from home.");
   await page.keyboard.press("Enter");
-  await expect(toast(page)).toContainText("Reason saved");
+  await expect(toast(page)).toContainText("Saved the reason");
   const dismissed = await call(page, `/jobs/${made[1].id}`);
   expect(dismissed.triage).toBe("dismissed");
   expect(dismissed.dismissal.reason).toBe("Too far from home.");
   expect(dismissed.dismissal.by).toBe("owner");
-  // The … menu dismisses too; Undo brings the job back where it was.
+  // The … menu holds no copy of the visible decisions.
   await expect(title(page)).toHaveText(made[2].title);
   await page.getByRole("button", { name: "More actions" }).click();
-  await page.getByRole("menuitem", { name: /^Dismiss/ }).click();
+  await expect(
+    page.getByRole("menuitem", { name: /^Correct details/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("menuitem", { name: /^(Shortlist|Dismiss)/ }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  // Undo brings the job back where it was.
+  await page
+    .locator(".jobs-decision")
+    .getByRole("button", { name: /^Dismiss/ })
+    .click();
   await expect(page.getByText("No jobs match")).toBeVisible();
   await toast(page).getByRole("button", { name: /Undo/ }).click();
   await expect(title(page)).toHaveText(made[2].title);
@@ -251,7 +264,7 @@ test("a possible duplicate is decided inside the job: kept apart, then merged", 
   await expect(callout).toContainText("Both have the same company");
   await expect(callout).not.toContainText(/\d\.\d\d/);
   await callout.getByRole("button", { name: "Keep both" }).click();
-  await expect(toast(page)).toContainText("Kept as two different jobs");
+  await expect(toast(page)).toContainText("as two jobs");
   await expect(callout).toHaveCount(0);
   expect((await call(page, `/jobs/${copy.id}`)).signals.duplicate).toBeNull();
   // A third copy merges into the earlier record, which stays.
@@ -261,7 +274,7 @@ test("a possible duplicate is decided inside the job: kept apart, then merged", 
   });
   await go(page, `jobs?job=${third.id}`);
   await callout.getByRole("button", { name: "Merge into one job" }).click();
-  await expect(toast(page)).toContainText("Merged into");
+  await expect(toast(page)).toContainText(/^Merged “.+” into “.+”/);
   const kept = await call(page, `/jobs/${earlier.id}`);
   expect(kept.postings).toHaveLength(2);
   const left = await call(page, `/jobs?q=${encodeURIComponent(tag)}&limit=10`);

@@ -118,9 +118,7 @@ test("queue count, posting hierarchy and query-safe selection", async ({
   await expect(
     page.getByRole("heading", { name: "No jobs match" }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Clear filters", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Clear search", exact: true }).click();
   await expect(rows.first()).toBeVisible();
 });
 
