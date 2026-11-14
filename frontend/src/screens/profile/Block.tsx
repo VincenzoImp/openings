@@ -120,7 +120,8 @@ export function ReadBlock({
   children: ReactNode;
 }) {
   return (
-    <div className={`pf-block ${className ?? ""}`}>
+    // Focusable by a tap, so a phone shows the block's actions on intent.
+    <div className={`pf-block ${className ?? ""}`} tabIndex={-1}>
       {children}
       <div className="pf-block-actions">
         <Button

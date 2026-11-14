@@ -29,6 +29,8 @@
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    /* A touch target's invisible margin never widens the page. */
+    overflow-x: clip;
   }
   .shell-loading {
     padding: var(--s-6);

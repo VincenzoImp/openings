@@ -23,6 +23,26 @@ const form = (page: Page, name: string) =>
   page.getByRole("form", { name, exact: true });
 const save = (page: Page) =>
   page.getByRole("button", { name: /^Save( ⌘↵)?$/ }).click();
+/**
+ * A block's Edit or … button. At rest a phone shows the CV as text: a tap
+ * on the block shows its actions first.
+ */
+async function blockButton(page: Page, name: string) {
+  const button = page.getByRole("button", {
+    name,
+    exact: true,
+    includeHidden: true,
+  });
+  if (isPhone(page)) {
+    await button
+      .locator(
+        "xpath=ancestor::div[contains(concat(' ', @class, ' '), ' pf-block ')][1]",
+      )
+      .click({ position: { x: 4, y: 4 } });
+    await expect(button).toBeVisible();
+  }
+  await button.click();
+}
 async function entryByTitle(page: Page, title: string) {
   const { items } = await call(
     page,
@@ -66,7 +86,7 @@ test("the header is edited and cancelled; leaving with changes asks first", asyn
   page,
 }) => {
   await go(page, "profile");
-  await page.getByRole("button", { name: "Edit header" }).click();
+  await blockButton(page, "Edit header");
   const header = form(page, "Edit header");
   await header.getByLabel("Headline").fill("Changed headline");
   if (!isPhone(page))
@@ -88,7 +108,7 @@ test("the header is edited and cancelled; leaving with changes asks first", asyn
   expect((await call(page, "/career/profile")).headline).toBe(SENIOR);
   // Saving keeps the metadata the API holds.
   const before = await call(page, "/career/profile");
-  await page.getByRole("button", { name: "Edit header" }).click();
+  await blockButton(page, "Edit header");
   await form(page, "Edit header").getByLabel("Phone").fill("+41 00 000 00 00");
   await save(page);
   await toast(page, "Saved the header");
@@ -104,9 +124,7 @@ test("an entry is edited and saved, with its place and dates", async ({
   page,
 }) => {
   await go(page, "profile");
-  await page
-    .getByRole("button", { name: `Edit ${SENIOR}`, exact: true })
-    .click();
+  await blockButton(page, `Edit ${SENIOR}`);
   const entry = form(page, `Edit ${SENIOR}`);
   await entry.getByLabel("Organization").fill("Example Energy");
   await entry.getByLabel("Location").fill("Basel");
@@ -133,9 +151,7 @@ test("highlights are added, approved, starred and reordered inside their entry",
 }) => {
   await go(page, "profile");
   const id = (await entryByTitle(page, SENIOR)).id;
-  await page
-    .getByRole("button", { name: `Edit ${SENIOR}`, exact: true })
-    .click();
+  await blockButton(page, `Edit ${SENIOR}`);
   const entry = form(page, `Edit ${SENIOR}`);
   await entry.getByRole("button", { name: "Approve highlight 4" }).click();
   await entry.getByRole("button", { name: "Add highlight" }).click();
@@ -228,9 +244,7 @@ test("an entry is deleted permanently after the dialog lists what goes", async (
   );
   await page.reload();
   await expect(page.getByText("reference.txt")).toBeVisible();
-  await page
-    .getByRole("button", { name: "More actions for Synthetic project 03" })
-    .click();
+  await blockButton(page, "More actions for Synthetic project 03");
   await page.getByRole("menuitem", { name: "Delete permanently…" }).click();
   const ask = page.getByRole("dialog", {
     name: "Delete “Synthetic project 03” permanently?",
@@ -288,7 +302,7 @@ test("a block changed elsewhere keeps the draft: Keep editing, then save", async
   page,
 }) => {
   await go(page, "profile");
-  await page.getByRole("button", { name: "Edit header" }).click();
+  await blockButton(page, "Edit header");
   const header = form(page, "Edit header");
   await header.getByLabel("Headline").fill("My unsaved headline");
   const current = await call(page, "/career/profile");
@@ -314,9 +328,7 @@ test("editing is a sheet on a phone and in place on a wide screen; both pass axe
   page,
 }) => {
   await go(page, "profile");
-  await page
-    .getByRole("button", { name: `Edit ${SENIOR}`, exact: true })
-    .click();
+  await blockButton(page, `Edit ${SENIOR}`);
   const sheet = page.locator("dialog.pf-sheet[open]");
   if (isPhone(page)) {
     await expect(sheet).toBeVisible();
