@@ -119,17 +119,6 @@
   align-items: flex-start;
   margin-top: var(--s2);
 }
-/* Yield of each source (Collection). */
-.yield-table .grid-row.total {
-  background: var(--surface);
-}
-@media (min-width: 861px) {
-  .yield-table [role="cell"].num,
-  .yield-table [role="columnheader"]:nth-child(n + 2):nth-child(-n + 4),
-  .yield-table [role="columnheader"]:nth-child(n + 6):nth-child(-n + 7) {
-    text-align: right;
-  }
-}
 /* The selected job scrolls on its own beside a long list. */
 @media (min-width: 861px) {
   .split > .job-detail {

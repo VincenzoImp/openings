@@ -321,65 +321,31 @@ test("a preferences conflict reloads the section and keeps the unsaved text", as
   ).toBeDisabled();
 });
 
-test("the profile is saved with typed fields and free-form details edited as rows", async ({
+test("the profile is saved with typed fields and keeps its metadata", async ({
   page,
-}, info) => {
+}) => {
   const headline = unique("Engineer");
-  const key = `badge_${info.project.name.replace("-", "_")}`;
+  const before = await call(page, "/career/profile");
   await go(page, "career");
   const profile = page.getByRole("form", { name: "Profile" });
   await profile.getByLabel("Headline").fill(headline);
   // Target roles and preferences are Preferences statements, not Profile fields.
   await expect(profile.getByLabel("Target roles")).toHaveCount(0);
   await expect(profile.getByLabel("Preferences")).toHaveCount(0);
-  const details = profile.getByRole("group", {
-    name: "Other profile details as keys and values",
-  });
-  // No JSON text box anywhere.
+  // No free-form editor and no JSON text box.
+  await expect(profile.getByText("Other details")).toHaveCount(0);
   await expect(page.locator("textarea[name=metadata]")).toHaveCount(0);
-  if (!(await details.getByLabel(`Type of ${key}`).count())) {
-    await details.getByRole("button", { name: "Add a detail" }).click();
-    await details.getByLabel("Key", { exact: true }).last().fill(key);
-  }
-  await details.getByLabel(`Type of ${key}`).selectOption("number");
-  await details.getByLabel(`Value of ${key}`).fill("42");
-  // A nested value is read-only until it is opened as fields, one level down.
-  const nested = details.locator(".kv-row").filter({
-    has: page.locator('input[value="interview_availability"]'),
-  });
-  await expect(nested.locator("summary")).toHaveText("3 fields");
-  await nested.getByRole("button", { name: "Edit as fields" }).click();
-  const fields = details.getByRole("group", {
-    name: "Fields of interview_availability",
-  });
-  const hour = `${10 + (Date.now() % 9)}:00`;
-  await fields.getByLabel("Value of from").fill(hour);
-  await expect(fields.getByLabel("Type of days")).toHaveValue("list");
   await profile.getByRole("button", { name: "Save profile" }).click();
   await saved(page, "Profile saved.");
   const stored = await call(page, "/career/profile");
   expect(stored.headline).toBe(headline);
   expect(stored).not.toHaveProperty("roles");
   expect(stored).not.toHaveProperty("preferences");
-  expect(stored.metadata[key]).toBe(42);
-  expect(stored.metadata.interview_availability).toEqual({
-    days: ["Tue", "Thu"],
-    from: hour,
-    timezone: "Europe/Zurich",
-  });
-  // A key used twice is refused before anything is sent.
-  await details.getByRole("button", { name: "Add a detail" }).click();
-  await details.getByLabel("Key", { exact: true }).last().fill(key);
-  await expect(details.getByRole("status")).toContainText("is used twice");
-  await profile.getByRole("button", { name: "Save profile" }).click();
-  await expect(page.locator(".toast.error").last()).toContainText(
-    "is used twice",
-  );
-  page.once("dialog", (confirm) => confirm.accept());
-  await page.reload();
+  // Metadata stays in the API: saving here does not change it.
+  expect(stored.metadata).toEqual(before.metadata);
 });
 
-test("a career entry with claims, typed selection, files and import is managed end to end", async ({
+test("a career entry with claims, the star, files and import is managed end to end", async ({
   page,
 }) => {
   const title = unique("Staff engineer");
@@ -403,13 +369,7 @@ test("a career entry with claims, typed selection, files and import is managed e
   await editor.getByLabel("Add a skill").fill("Go, SQL");
   await page.keyboard.press("Enter");
   await editor.getByLabel("Description").fill("Built storage services.");
-  const other = editor.getByRole("group", {
-    name: "Other details of the entry as keys and values",
-  });
-  await other.getByRole("button", { name: "Add a detail" }).click();
-  await other.getByLabel("Key", { exact: true }).fill("team_size");
-  await other.getByLabel("Type of team_size").selectOption("number");
-  await other.getByLabel("Value of team_size").fill("6");
+  await expect(editor.getByText("Other details")).toHaveCount(0);
   await editor.getByRole("button", { name: "Save entry" }).click();
   await expect(
     editor.getByRole("heading", { name: `Edit entry: ${title}` }),
@@ -426,60 +386,66 @@ test("a career entry with claims, typed selection, files and import is managed e
       `/career/knowledge?summary=false&q=${encodeURIComponent(title)}`,
     )
   ).items[0];
-  expect([entry.skills, entry.metadata, entry.dates.start]).toEqual([
+  expect([entry.skills, entry.dates.start]).toEqual([
     ["Rust", "Go", "SQL"],
-    { team_size: 6 },
     "2020-03",
   ]);
 
-  // A claim: added as a draft, approved, then selected with typed controls.
+  // A claim: added as a draft, approved, then starred.
   const text = `Cut storage cost by a third (${Date.now()}).`;
   await editor.getByRole("button", { name: "Add a claim" }).click();
+  await expect(dialog(page).getByLabel("Order")).toHaveCount(0);
   await dialog(page).getByLabel("Claim", { exact: true }).fill(text);
   await dialog(page).getByRole("button", { name: "Save claim" }).click();
   const claim = editor.locator(".claim").filter({ hasText: text });
-  await expect(claim).toContainText("Not approved by you");
-  await expect(claim.getByRole("switch")).toBeDisabled();
+  await expect(claim.locator(".tag")).toHaveText("Not approved");
   await claim.getByRole("button", { name: /^Approve: / }).click();
   await expect(claim.locator(".tag")).toHaveText("Approved");
-  await claim.getByRole("switch").click();
-  await expect(claim.getByRole("switch")).toBeChecked();
-  await claim.getByLabel(/^Role of: /).selectOption("core");
-  await saved(page, "Role saved.");
-  await claim.getByLabel(/^Group of: /).fill("Impact");
-  await page.keyboard.press("Enter");
-  await saved(page, "Group saved.");
+  await expect(claim.getByRole("button", { name: /^Approve: / })).toHaveCount(
+    0,
+  );
+  const star = claim.getByRole("button", {
+    name: /^Always include in my CV: /,
+  });
+  await expect(star).toHaveAttribute("aria-pressed", "false");
+  await star.click();
+  await expect(star).toHaveAttribute("aria-pressed", "true");
+  // No role, group or order on the row.
+  await expect(claim.locator("select, input")).toHaveCount(0);
   const read = async () =>
     (await call(page, `/career/claims?summary=false&knowledge_id=${entry.id}`))
       .items[0];
   let stored = await read();
-  expect([
-    stored.approved,
-    stored.default_in_cv,
-    stored.role,
-    stored.group,
-  ]).toEqual([true, true, "core", "Impact"]);
+  expect([stored.approved, stored.always_include]).toEqual([true, true]);
+  expect(stored).not.toHaveProperty("role");
+  expect(stored).not.toHaveProperty("group");
   await show(page, "Record");
   await expect(item).toContainText("1 claim");
   await show(page, "Selected entry");
 
-  // The full editor of a claim: wording, role, order and free-form details.
+  // The editor of a claim, from its menu: what an agent keeps in its
+  // metadata survives an edit here.
+  await call(page, `/career/claims/${stored.id}`, "PATCH", {
+    expected_version: stored.version,
+    metadata: { source: "Synthetic review" },
+  });
+  await claim
+    .getByRole("button", { name: /^More actions for claim: / })
+    .click();
   await claim.getByRole("button", { name: /^Edit claim: / }).click();
+  await expect(dialog(page).getByText("Other details")).toHaveCount(0);
+  await expect(
+    dialog(page).getByLabel("Always include in my CV"),
+  ).toBeChecked();
   await dialog(page)
     .getByLabel("Claim", { exact: true })
     .fill(text + " Twice.");
-  await dialog(page).getByLabel("Role").selectOption("bench");
-  await dialog(page).getByLabel("Order").fill("3");
-  await dialog(page).getByRole("button", { name: "Add a detail" }).click();
-  await dialog(page).getByLabel("Key", { exact: true }).fill("source");
-  await dialog(page).getByLabel("Value of source").fill("Synthetic review");
   await dialog(page).getByRole("button", { name: "Save claim" }).click();
   await expect(page.locator("dialog[open]")).toHaveCount(0);
   stored = await read();
-  expect([stored.text, stored.role, stored.position, stored.metadata]).toEqual([
+  expect([stored.text, stored.always_include, stored.metadata]).toEqual([
     text + " Twice.",
-    "bench",
-    3,
+    true,
     { source: "Synthetic review" },
   ]);
 
@@ -491,7 +457,15 @@ test("a career entry with claims, typed selection, files and import is managed e
   await page.getByLabel("Approval").selectOption("false");
   await expect(found).toHaveCount(0);
   await page.getByLabel("Approval").selectOption("true");
-  await found.getByRole("button", { name: /^Mark as draft: / }).click();
+  // Approval is withdrawn in the editor.
+  await found
+    .getByRole("button", { name: /^More actions for claim: / })
+    .click();
+  await found.getByRole("button", { name: /^Edit claim: / }).click();
+  await dialog(page)
+    .getByLabel("I have checked and approve this claim")
+    .uncheck();
+  await dialog(page).getByRole("button", { name: "Save claim" }).click();
   await expect(found).toHaveCount(0);
   await page.getByRole("tab", { name: "Entries" }).click();
   await show(page, "Record");
@@ -524,8 +498,11 @@ test("a career entry with claims, typed selection, files and import is managed e
   await expect(file).toHaveCount(0);
 
   // The claim and then the entry are removed with their versions.
-  await claim.getByRole("button", { name: /^Remove claim: / }).click();
-  await dialog(page).getByRole("button", { name: "Remove claim" }).click();
+  await claim
+    .getByRole("button", { name: /^More actions for claim: / })
+    .click();
+  await claim.getByRole("button", { name: /^Delete claim: / }).click();
+  await dialog(page).getByRole("button", { name: "Delete claim" }).click();
   await expect(claim).toHaveCount(0);
   await editor.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(dialog(page)).toContainText(`${title} · Example Labs`);

@@ -4,7 +4,7 @@ import { Loaded, plural } from "../../library/common";
 import type { Fresh } from "../../library/useFresh";
 import { useWorkspace } from "../../state";
 import { CloseNoReply } from "../applications/CloseNoReply";
-import { INSIGHTS, reviewHref } from "../applications/links";
+import { STATS, reviewHref } from "../applications/links";
 import { daysBetween } from "../applications/model";
 import { localToday } from "../../api";
 
@@ -39,8 +39,8 @@ export function Waiting({
       title="Waiting for a reply"
       count={applied}
       actions={
-        <a className="btn quiet sm" href={INSIGHTS}>
-          Insights
+        <a className="btn quiet sm" href={STATS}>
+          Stats
         </a>
       }
     >

@@ -3,8 +3,8 @@
 Four signals, all deterministic and without a model:
 
 - ``language``: the language the posting is written in (``language_signals``);
-- ``required`` and ``welcome``: languages the posting states as required (groups,
-  one language of a group is enough) or as an advantage;
+- ``required``: languages the posting states as required (groups, one language of
+  a group is enough); a language stated only as an advantage is not required;
 - ``duplicate``: the earlier job this one most likely repeats, with the confidence
   of ``duplicates.score_pair`` (at least ``DEFAULT_MIN_CONFIDENCE``). A flag only:
   nothing is merged;
@@ -37,7 +37,7 @@ LOG = logging.getLogger(__name__)
 # The compact signals of a job in list queries (one primary-key read per row).
 SIGNALS_SQL = (
     "(SELECT json_object('format',s.format,'language',s.language,'language_confidence',"
-    "s.language_confidence,'required',json(s.required),'welcome',json(s.welcome),"
+    "s.language_confidence,'required',json(s.required),"
     "'duplicate_checked',s.duplicate_checked,'duplicate_of',s.duplicate_of,"
     "'duplicate_confidence',s.duplicate_confidence) "
     "FROM job_signals s WHERE s.job_id={alias}.id)"
@@ -86,7 +86,6 @@ def signal_record(raw, unlisted_at=None):
             "language": None,
             "language_confidence": None,
             "required": [],
-            "welcome": [],
             "duplicate_checked": False,
             "duplicate": None,
             "no_longer_listed": unlisted_at is not None,
@@ -105,7 +104,6 @@ def signal_record(raw, unlisted_at=None):
         "language": data["language"],
         "language_confidence": data["language_confidence"],
         "required": data["required"],
-        "welcome": data["welcome"],
         "duplicate_checked": bool(data["duplicate_checked"]),
         "duplicate": duplicate,
         "no_longer_listed": unlisted_at is not None,
@@ -145,10 +143,10 @@ def store_text_signals(conn, job_id, title, posting, content_version, stamp=None
     found = text_signals(title, posting)
     conn.execute(
         "INSERT INTO job_signals(job_id,format,content_version,language,language_confidence,"
-        "required,welcome,computed_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(job_id) DO UPDATE SET "
+        "required,computed_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(job_id) DO UPDATE SET "
         "format=excluded.format,content_version=excluded.content_version,"
         "language=excluded.language,language_confidence=excluded.language_confidence,"
-        "required=excluded.required,welcome=excluded.welcome,computed_at=excluded.computed_at",
+        "required=excluded.required,computed_at=excluded.computed_at",
         (
             job_id,
             FORMAT,
@@ -156,7 +154,6 @@ def store_text_signals(conn, job_id, title, posting, content_version, stamp=None
             found["language"],
             found["language_confidence"],
             encode(found["required"]),
-            encode(found["welcome"]),
             stamp or now(),
         ),
     )

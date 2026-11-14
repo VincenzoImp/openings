@@ -4,7 +4,6 @@ import type {
   CollectionRun,
   ListResult,
   OwnerQuestion,
-  Overview,
   Run,
 } from "../api";
 import { Pipeline } from "../design";
@@ -112,10 +111,12 @@ export default function TodayPage(links: Links) {
     NONE,
     ["collection", "sources"],
   );
-  const overview = useFresh<Overview | null>("/overview", null, [
-    "applications",
-    "jobs",
-  ]);
+  // Jobs not dismissed whose posting text is incomplete: the owner pastes it.
+  const incomplete = useFresh<ListResult<never>>(
+    "/jobs?complete=false&triage=active&limit=1",
+    NONE,
+    ["jobs"],
+  );
 
   const counted = [ready, questions, blocked, waiting, lastRun];
   const summary = counted.some((item) => item.error)
@@ -157,7 +158,7 @@ export default function TodayPage(links: Links) {
             <Decisions
               questions={questions}
               blocked={blocked}
-              incomplete={overview.data?.incomplete ?? 0}
+              incomplete={incomplete.data.total}
               {...links}
             />
           </div>

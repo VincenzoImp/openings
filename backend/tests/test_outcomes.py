@@ -10,6 +10,7 @@ from openings.actors import OWNER, acting_as, token_actor
 from openings.errors import DomainError
 from openings.outcomes import no_reply_period, today
 from openings.preferences import PreferencesService
+from openings.stats import StatsQuery, StatsService
 
 
 def days_ago(days):
@@ -208,8 +209,7 @@ def test_no_reply_closes_only_sent_applications_by_hand(workspace):
     listed = workspace.list_applications(outcome="no_response")
     assert [item["id"] for item in listed["items"]] == [bulk["id"]]
     assert listed["items"][0]["concluded_on"] == today()
-    funnel = workspace.overview()["funnel"]
-    assert funnel[0]["outcomes"]["no_response"] == 1
+    assert StatsService(workspace).stats(StatsQuery(period="all"))["applied"] == 2
 
 
 def test_the_no_reply_period_lists_overdue_applications_and_closes_nothing(workspace):

@@ -8,9 +8,9 @@ The budgets were set from the median on an Apple M-series laptop, times three
 for a shared CI runner, times two again for noise, rounded up; a route that
 outgrows its budget has become several times slower, not a little noisier.
 Measured on the laptop (2026-11): applications 24 ms, Today's reads 38 ms in
-all, new 12 ms (29 ms with counts or facets), text search 106 ms, overview
-19 ms, insights 8 ms, source yield 90 ms; the three reads of a busy
-timeline (1,500 entries) 13 ms.
+all, new 12 ms (29 ms with counts or facets), text search 106 ms;
+the three reads of a busy timeline (1,500 entries) 13 ms. Stats must stay
+under 50 ms (#211).
 
 Run them alone with ``uv run pytest -m performance``; skip them with
 ``-m "not performance"``.
@@ -32,7 +32,7 @@ pytestmark = pytest.mark.performance
 JOBS, APPLICATIONS, SOURCES = 25_000, 500, 20
 # The reads of the Today screen, measured together as one budget.
 TODAY = (
-    "/api/v1/overview",
+    "/api/v1/jobs?complete=false&limit=1",
     "/api/v1/applications?limit=1",
     "/api/v1/applications?stage=ready&sort=deadline&limit=5",
     "/api/v1/applications?needs=documents&sort=deadline&limit=3",
@@ -48,9 +48,8 @@ BUDGETS_MS = {
     "jobs new counts": (("/api/v1/jobs?triage=new&limit=200&include_counts=true",), 200),
     "jobs new facets": (("/api/v1/jobs?triage=new&limit=200&include_facets=true",), 200),
     "jobs search": (("/api/v1/jobs?q=engineer&limit=200",), 700),
-    "overview": (("/api/v1/overview",), 150),
-    "insights": (("/api/v1/insights",), 100),
-    "source yield": (("/api/v1/collection/yield",), 600),
+    "stats": (("/api/v1/stats?period=all",), 50),
+    "sources with counts": (("/api/v1/sources?limit=100",), 200),
     # Revisions are searched in the text derived from their sources.
     "document search": (("/api/v1/documents?q=Northstar&limit=100",), 50),
 }
@@ -150,5 +149,5 @@ def test_the_workspace_is_as_large_as_stated(client):
     jobs = client.get("/api/v1/jobs?limit=1&include_counts=true").json()
     applications = client.get("/api/v1/applications?limit=1").json()
     assert jobs["total"] == JOBS and applications["total"] == APPLICATIONS
-    sources = client.get("/api/v1/collection/yield").json()
-    assert len([item for item in sources["items"] if item.get("source_id")]) >= SOURCES // 2
+    sources = client.get("/api/v1/sources?limit=100").json()["items"]
+    assert len([item for item in sources if item["counts"]["found"]]) >= SOURCES // 2

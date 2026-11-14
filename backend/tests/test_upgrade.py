@@ -601,6 +601,71 @@ def test_bytes_only_contexts_referenced_are_left_in_the_pre_upgrade_copy(tmp_pat
     assert query(pre_upgrade, "SELECT total(length(content)) FROM blobs")[0][0] == before
 
 
+# #211 Trim secondary features.
+
+
+def test_claim_role_and_group_fold_into_metadata_and_the_archive(tmp_path):
+    path = load_fixture(
+        tmp_path / "openings.sqlite",
+        # A key the owner already set is kept; the value goes to the archive.
+        """UPDATE claims SET metadata='{"group":"Mine","source":"synthetic"}'
+        WHERE id=(SELECT min(id) FROM claims WHERE role='core');""",
+    )
+    before = {
+        row[0]: row[1:]
+        for row in query(path, 'SELECT id,role,"group",default_in_cv,metadata FROM claims')
+    }
+    Database(path)
+    pre_upgrade = m15.files(path).pre_upgrade
+    assert query(
+        path,
+        "SELECT count(*) FROM pragma_table_info('claims') WHERE name IN "
+        "('role','group','default_in_cv')",
+    ) == [(0,)]
+    after = {
+        row[0]: row[1:] for row in query(path, "SELECT id,always_include,metadata FROM claims")
+    }
+    assert set(after) == set(before)
+    conflicts = set()
+    for claim_id, (role, group, in_cv, metadata) in before.items():
+        always, folded = after[claim_id]
+        assert always == in_cv
+        expected = json.loads(metadata)
+        for key, value, default in (("role", role, "supporting"), ("group", group, "")):
+            if value != default:
+                if key in expected:
+                    conflicts.add(claim_id)
+                else:
+                    expected[key] = value
+        assert json.loads(folded) == expected, claim_id
+    assert len(conflicts) == 1
+    archive = json.loads(m15.files(path).archive.read_text())
+    fields = archive["claim_fields"]
+    assert {row["id"]: (row["role"], row["group"]) for row in fields} == {
+        claim_id: (role, group)
+        for claim_id, (role, group, _, _) in before.items()
+        if role != "supporting" or group
+    }
+    assert {row["id"] for row in fields if row["conflict"]} == conflicts
+    assert archive["counts"]["claim_fields"] == len(fields) == 8
+    assert not any(key.startswith("claims.") for key in archive.get("dropped_columns", {}))
+    assert query(pre_upgrade, "SELECT count(*) FROM claims WHERE default_in_cv=1") == [(4,)]
+
+
+def test_welcome_languages_leave_the_signals_for_the_archive(upgraded):
+    path, pre_upgrade, archive_path = upgraded[:3]
+    archive = json.loads(archive_path.read_text())
+    welcome = query(
+        pre_upgrade, "SELECT job_id,welcome FROM job_signals WHERE welcome<>'[]' ORDER BY job_id"
+    )
+    assert welcome
+    assert [(row["job_id"], row["welcome"]) for row in archive["job_signals_welcome"]] == welcome
+    assert "job_signals.welcome" not in archive.get("dropped_columns", {})
+    columns = "job_id,format,language,language_confidence,required,duplicate_of,distinct_from"
+    sql = f"SELECT {columns} FROM job_signals ORDER BY job_id"
+    assert query(path, sql) == query(pre_upgrade, sql)
+
+
 # Archive.
 
 

@@ -22,6 +22,25 @@ from .models import (
 from .network import HTTP_BUDGET
 from .resolution import automatic_collection_supported, require_automatic_collection, resolve_source
 
+# What became of the jobs each source found, counting each job once per source (its
+# first posting from that source): found, shortlisted (in the Shortlist or with an
+# application), applied (an application was sent) and replied (an employer reply).
+SOURCE_COUNTS = """
+SELECT p.source_id,count(*) AS found,
+ coalesce(sum(j.triage='shortlisted' OR EXISTS(SELECT 1 FROM applications a WHERE a.job_id=p.job_id)),0)
+  AS shortlisted,
+ coalesce(sum(EXISTS(SELECT 1 FROM applications a WHERE a.job_id=p.job_id AND (a.applied_at IS NOT
+  NULL OR a.status IN ('applied','interview','offer') OR EXISTS(SELECT 1 FROM replies r WHERE
+  r.application_id=a.id)))),0) AS applied,
+ coalesce(sum(EXISTS(SELECT 1 FROM applications a JOIN replies r ON r.application_id=a.id
+  WHERE a.job_id=p.job_id)),0) AS replied
+FROM postings p JOIN jobs j ON j.id=p.job_id
+WHERE p.source_id IN ({ids}) AND NOT EXISTS(SELECT 1 FROM postings q WHERE q.source_id=p.source_id
+ AND q.job_id=p.job_id AND q.rowid<p.rowid)
+GROUP BY p.source_id
+"""
+COUNT_KEYS = ("found", "shortlisted", "applied", "replied")
+
 
 class SourceOperations:
     """Saved searches and company/feed sources of DiscoveryService."""
@@ -117,6 +136,10 @@ class SourceOperations:
         for task in tasks:
             grouped[task["run_id"]].append(task)
         latest = {row["source_id"]: self._run_record(row, grouped[row["id"]]) for row in runs}
+        counts = {
+            row["source_id"]: {key: row[key] for key in COUNT_KEYS}
+            for row in self.db.all(SOURCE_COUNTS.format(ids=placeholders), ids)
+        }
         enabled = (self.workspace.get_settings("collection", {"enabled": True})["data"] or {}).get(
             "enabled", True
         )
@@ -137,6 +160,7 @@ class SourceOperations:
             row["last_outcome"] = run["state"] if run else None
             row["last_task_id"] = run["task_ids"][0] if run and run["task_ids"] else None
             row["last_counts"] = run["counts"] if run else {}
+            row["counts"] = counts.get(row["id"], dict.fromkeys(COUNT_KEYS, 0))
             diagnostics = (
                 [diag for task in run["tasks"] for diag in task["result"].get("diagnostics", [])]
                 if run

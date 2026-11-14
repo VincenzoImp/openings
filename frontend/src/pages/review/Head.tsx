@@ -225,7 +225,7 @@ export function Head({
         >
           <p>
             It closes with the outcome Not pursued. Its documents and history
-            stay, Insights does not count it, and you can reopen it later.
+            stay, Stats does not count it, and you can reopen it later.
           </p>
         </Dialog>
       )}

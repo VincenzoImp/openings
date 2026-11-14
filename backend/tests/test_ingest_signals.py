@@ -2,7 +2,7 @@
 
 The labelled fixture (language_fixture.json) is synthetic: postings in English,
 German, French and Italian (and a few in Spanish, Dutch and Portuguese) with the
-language they are written in and the languages they require or welcome.
+language they are written in and the languages they require.
 """
 
 import json
@@ -24,14 +24,13 @@ MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 
 # What the detectors must reach on the labelled fixture. Measured when written:
 # language 89/89 correct where a language was given (89 of 90 labelled postings),
-# required 83/83 correct with 83/83 found, welcome 28/28 with 28/28 found. A held-out
-# round of 26 postings written before the detectors saw them scored language 25/25,
-# required 19/20 (recall 19/25) and welcome 5/5 on the first run.
+# required 83/83 correct with 83/83 found. A held-out round of 26 postings written
+# before the detectors saw them scored language 25/25 and required 19/20 (recall
+# 19/25) on the first run. A language stated only as an advantage is not required.
 LANGUAGE_PRECISION = 0.95
 LANGUAGE_COVERAGE = 0.9
 REQUIRED_PRECISION = 0.9
 REQUIRED_RECALL = 0.8
-WELCOME_PRECISION = 0.85
 
 
 def test_language_detection_reaches_the_stated_precision():
@@ -50,43 +49,35 @@ def test_language_detection_reaches_the_stated_precision():
 
 
 def test_language_requirement_detection_reaches_the_stated_precision():
-    found = {"required": [0, 0, 0], "welcome": [0, 0, 0]}  # correct, predicted, labelled
+    correct = predicted = labelled = 0
     for item in FIXTURE:
         signals = text_signals(item["title"], item["posting"])
-        for key, gold, got in (
-            (
-                "required",
-                {tuple(g) for g in item["required"]},
-                {tuple(g) for g in signals["required"]},
-            ),
-            ("welcome", set(item["welcome"]), set(signals["welcome"])),
-        ):
-            found[key][0] += len(gold & got)
-            found[key][1] += len(got)
-            found[key][2] += len(gold)
-    correct, predicted, labelled = found["required"]
+        gold = {tuple(g) for g in item["required"]}
+        got = {tuple(g) for g in signals["required"]}
+        correct += len(gold & got)
+        predicted += len(got)
+        labelled += len(gold)
+    found = (correct, predicted, labelled)
     assert labelled >= 60
     assert correct / predicted >= REQUIRED_PRECISION, found
     assert correct / labelled >= REQUIRED_RECALL, found
-    correct, predicted, labelled = found["welcome"]
-    assert correct / predicted >= WELCOME_PRECISION, found
 
 
 @pytest.mark.parametrize(
-    ("text", "required", "welcome"),
+    ("text", "required"),
     [
-        ("Fluent German required, English is a plus.", [["de"]], ["en"]),
-        ("Deutsch C1 und Englisch B2.", [["de"], ["en"]], []),
-        ("La langue française est exigée.", [["fr"]], []),
-        ("Richiesta la conoscenza fluente del francese o del tedesco.", [["de", "fr"]], []),
-        ("Knowledge of the German market is important.", [], []),
-        ("Keine Deutschkenntnisse erforderlich.", [], []),
-        ("Le français n'est pas requis.", [], []),
-        ("Wir betreuen deutsche Kunden.", [], []),
+        ("Fluent German required, English is a plus.", [["de"]]),
+        ("Deutsch C1 und Englisch B2.", [["de"], ["en"]]),
+        ("La langue française est exigée.", [["fr"]]),
+        ("Richiesta la conoscenza fluente del francese o del tedesco.", [["de", "fr"]]),
+        ("Knowledge of the German market is important.", []),
+        ("Keine Deutschkenntnisse erforderlich.", []),
+        ("Le français n'est pas requis.", []),
+        ("Wir betreuen deutsche Kunden.", []),
     ],
 )
-def test_requirement_phrases(text, required, welcome):
-    assert language_requirements(text) == {"required": required, "welcome": welcome}
+def test_requirement_phrases(text, required):
+    assert language_requirements(text) == {"required": required}
 
 
 GERMAN = (

@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "./fixtures";
 import { go, isNarrow, ownerSession, type Cookies } from "./session";
 
-// The shell: navigation groups, route aliases, theme and density, screens
+// The shell: navigation groups, routes, the theme, screens
 // loaded on demand, and everything of it operated from the keyboard alone.
 const cookies: Cookies = ownerSession();
 const errors = new WeakMap<Page, string[]>();
@@ -35,9 +35,7 @@ const tabKey = (page: Page) =>
     ? "Alt+Tab"
     : "Tab";
 
-test("keyboard only: skip link, navigation, theme and density", async ({
-  page,
-}) => {
+test("keyboard only: skip link, navigation and theme", async ({ page }) => {
   // The first Tab reaches the skip link; Enter moves focus to the content.
   await page.keyboard.press(tabKey(page));
   await expect(
@@ -75,22 +73,13 @@ test("keyboard only: skip link, navigation, theme and density", async ({
     `Theme: ${other}. Switch to ${before}`,
   );
 
-  // Density: compact rows, also remembered.
-  const density = page.getByRole("button", { name: /^Density:/ });
-  await density.focus();
-  await page.keyboard.press("Space");
-  await expect(root).toHaveAttribute("data-density", "compact");
-  await expect(density).toBeFocused();
-  await expect(density).toHaveAccessibleName(
-    "Density: compact. Switch to comfortable",
-  );
+  // The top bar has no density control.
+  await expect(page.getByRole("button", { name: /^Density/ })).toHaveCount(0);
 
   await page.reload();
   await expect(page.locator(".main h1")).toHaveText("Applications");
   await expect(root).toHaveAttribute("data-theme", other);
-  await expect(root).toHaveAttribute("data-density", "compact");
-  await page.getByRole("button", { name: /^Density:/ }).click();
-  await expect(root).not.toHaveAttribute("data-density", "compact");
+  await expect(root).not.toHaveAttribute("data-density");
 });
 
 test("keyboard only: the sidebar reaches every destination in its group", async ({
@@ -191,29 +180,9 @@ test("keyboard only: More opens, keeps focus, closes with Escape and navigates",
   ).resolves.toBeLessThanOrEqual(page.viewportSize()!.width);
 });
 
-test("design names are aliases and old routes keep their deep links", async ({
+test("each screen has one address; an unknown or retired one opens Today", async ({
   page,
 }) => {
-  // Overview became Today; its links with a period open the Progress of
-  // Applications, Insights, where the numbers of Overview are now.
-  await go(page, "overview");
-  await expect(page).toHaveURL(/#today$/);
-  await go(page, "overview?since=2026-01-01");
-  await expect(page.locator(".main h1")).toHaveText("Applications");
-  await expect(page).toHaveURL(
-    /#applications\?since=2026-01-01&section=insights$/,
-  );
-  await expect(page.getByLabel("Sent from")).toHaveValue("2026-01-01");
-  // The old Applications page: its stage filter and the drawer's address.
-  await go(page, "applications?status=draft&view=list");
-  await expect(page).toHaveURL(/#applications\?view=list&stage=shortlisted$/);
-  await expect(
-    page.getByRole("group", { name: "Stage" }).getByRole("button", {
-      name: /^Shortlisted/,
-    }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await go(page, "applications?readiness=ready&sort=ready");
-  await expect(page).toHaveURL(/#applications\?sort=deadline&stage=ready$/);
   const [first] = (
     await page.evaluate(() =>
       fetch("/api/v1/applications?stage=applied&limit=1").then((response) =>
@@ -221,42 +190,18 @@ test("design names are aliases and old routes keep their deep links", async ({
       ),
     )
   ).items;
-  await go(page, `applications?application=${first.id}&detail=history`);
-  await expect(page).toHaveURL(
-    new RegExp(`#review\\?application=${first.id}&tab=history$`),
-  );
+  await go(page, `review?application=${first.id}&tab=timeline`);
+  await expect(page.locator(".main h1")).toHaveText(first.job.title);
   await expect(page.getByRole("tab", { name: "Timeline" })).toHaveAttribute(
     "aria-selected",
     "true",
   );
-  await go(page, `today?application=${first.id}`);
-  await expect(page.locator(".main h1")).toHaveText(first.job.title);
-  const applications = page
-    .getByRole("navigation", { name: "Main" })
-    .getByRole("link", { name: /^Applications/ });
-  if (!isNarrow(page))
-    await expect(applications).toHaveAttribute("aria-current", "page");
-  // The old Inbox and Shortlist addresses open the tabs of Jobs.
-  const jobs = page
-    .getByRole("navigation", { name: "Main" })
-    .getByRole("link", { name: /^Jobs/ });
-  for (const [route, url, tab] of [
-    ["jobs?queue=dismissed", /#jobs\?section=dismissed$/, /^Dismissed/],
-    ["inbox?queue=dismissed", /#jobs\?section=dismissed$/, /^Dismissed/],
-    ["inbox", /#jobs$/, /^New/],
-    ["shortlist", /#jobs\?section=shortlisted$/, /^Shortlisted/],
-    ["inbox?queue=all", /#jobs\?section=all$/, /^All$/],
-  ] as const) {
+  // Names of earlier versions are no longer rewritten.
+  for (const route of ["overview", "inbox", "shortlist", "no-such-screen"]) {
     await go(page, route);
-    await expect(page).toHaveURL(url);
-    await expect(page.getByRole("tab", { name: tab })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    await expect(jobs).toHaveAttribute("aria-current", "page");
+    await expect(page.locator(".main h1")).toHaveText("Today");
+    await expect(page).toHaveURL(new RegExp(`#${route}$`));
   }
-  await go(page, "no-such-screen");
-  await expect(page.locator(".main h1")).toHaveText("Today");
 });
 
 test("navigation counts come from the workspace and the agent line shows an open run", async ({
@@ -325,8 +270,7 @@ for (const width of [360, 390, 600, 860, 861, 1024, 1280, 1600])
     for (const [route, title] of [
       ["today", "Today"],
       ["applications", "Applications"],
-      ["applications?view=board", "Applications"],
-      ["applications?section=insights", "Applications"],
+      ["applications?section=stats", "Applications"],
       [`review?application=${ready.id}`, ready.job.title],
       [`review?application=${sent.id}&tab=timeline`, sent.job.title],
       [`review?application=${ready.id}&tab=details`, ready.job.title],
@@ -344,7 +288,6 @@ for (const width of [360, 390, 600, 860, 861, 1024, 1280, 1600])
       ["templates", "Templates"],
       ["templates?section=rules", "Templates"],
       ["collection", "Collection"],
-      ["collection?section=yield", "Collection"],
       ["collection?section=runs", "Collection"],
       ["collection?section=providers", "Collection"],
       ["settings", "Settings"],

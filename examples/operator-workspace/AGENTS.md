@@ -38,7 +38,7 @@ copies them into `.agents/skills/`.
 | New or incomplete workspace: install, connect, onboard | `setup-openings` |
 | Review or clear new jobs | `review-inbox` |
 | Prepare CVs and letters for Shortlisted applications | `prepare-shortlist` |
-| Pipeline, Ready priority, owner-reported progress and replies, no reply, insights | `track-applications` |
+| Pipeline, Ready priority, owner-reported progress and replies, no reply, stats | `track-applications` |
 | Interview preparation | `prepare-interview` |
 | Career, claims, CV MASTER and letter template | `maintain-career` |
 | Searches, monitored companies, filters | `manage-sources` |
