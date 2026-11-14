@@ -10,11 +10,10 @@ from openings.app import create_app
 PASSWORD = "synthetic-password"  # the owner of the `owned_database` fixture
 
 
-def test_the_product_application_has_no_test_routes(app):
+def test_the_product_application_has_no_test_routes(app, client):
     paths = [getattr(route, "path", "") for route in app.routes]
     assert paths and not [path for path in paths if path.startswith("/__e2e__")]
-    with TestClient(app) as client:
-        assert client.post(RESET_PATH).status_code != 204
+    assert client.post(RESET_PATH).status_code != 204
 
 
 def test_reset_restores_the_snapshot_and_keeps_its_sessions(tmp_path, owned_database):

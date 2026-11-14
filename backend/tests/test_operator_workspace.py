@@ -14,9 +14,18 @@ def test_template_adapters_match_its_mcp_definition():
     subprocess.run([sys.executable, SYNC, "--check"], cwd=TEMPLATE, check=True)
 
 
-def test_url_option_rewrites_every_client_adapter(tmp_path):
+def test_url_option_rewrites_every_client_adapter_and_needs_https(tmp_path):
     workspace = tmp_path / "workspace"
     shutil.copytree(TEMPLATE, workspace, symlinks=True)
+    # Plain HTTP is only accepted for localhost.
+    result = subprocess.run(
+        [sys.executable, SYNC, "--url", "http://openings.example"],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0 and "HTTPS" in result.stderr
     subprocess.run(
         [sys.executable, SYNC, "--url", "https://openings.example/"], cwd=workspace, check=True
     )
@@ -29,16 +38,3 @@ def test_url_option_rewrites_every_client_adapter(tmp_path):
         'bearer_token_env_var = "OPENINGS_TOKEN"' in (workspace / ".codex/config.toml").read_text()
     )
     subprocess.run([sys.executable, SYNC, "--check"], cwd=workspace, check=True)
-
-
-def test_plain_http_is_only_accepted_for_localhost(tmp_path):
-    workspace = tmp_path / "workspace"
-    shutil.copytree(TEMPLATE, workspace, symlinks=True)
-    result = subprocess.run(
-        [sys.executable, SYNC, "--url", "http://openings.example"],
-        cwd=workspace,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode != 0 and "HTTPS" in result.stderr

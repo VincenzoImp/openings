@@ -11,12 +11,9 @@ PACKAGE = Path(migrations.__file__).parent
 FIXTURES = Path(__file__).with_name("fixtures")
 
 
-def test_exactly_one_migration_from_the_previous_schema():
+def test_exactly_one_migration_from_the_previous_schema_with_its_real_fixture():
     assert set(migrations.MIGRATIONS) == {SCHEMA_VERSION - 1}
     assert set(migrations.CONVERSIONS) == {SCHEMA_VERSION - 1}
-
-
-def test_the_previous_schema_has_its_real_fixture():
     assert (FIXTURES / f"workspace-{SCHEMA_VERSION - 1}.sql.gz").is_file()
 
 

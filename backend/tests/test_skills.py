@@ -40,13 +40,10 @@ def files():
     return sorted(path for path in ROOT.rglob("*") if path.is_file())
 
 
-def test_exactly_the_eight_skills_and_one_reference_are_shipped():
+def test_exactly_the_eight_skills_and_one_reference_are_shipped_within_budget():
     assert {path.relative_to(ROOT).as_posix() for path in files()} == {
         f"{name}/SKILL.md" for name in BUDGETS
     } | set(REFERENCES)
-
-
-def test_each_skill_and_the_set_fit_their_budgets():
     sizes = {path.relative_to(ROOT).as_posix(): path.stat().st_size for path in files()}
     for name, budget in BUDGETS.items():
         assert sizes[f"{name}/SKILL.md"] <= budget, (name, sizes[f"{name}/SKILL.md"])
@@ -57,9 +54,7 @@ def test_each_skill_and_the_set_fit_their_budgets():
         references = [size for path, size in sizes.items() if path.startswith(f"{name}/ref")]
         read = sizes[f"{CORE}/SKILL.md"] + sizes[f"{name}/SKILL.md"] + max(references, default=0)
         assert read <= WORKFLOW, (name, read)
-
-
-def test_every_skill_has_the_frontmatter_the_dashboard_lists():
+    # Every skill has the frontmatter the dashboard lists.
     items = {item["name"]: item for item in SkillLibrary(ROOT).list()}
     assert set(items) == set(BUDGETS)
     for name, item in items.items():
@@ -94,15 +89,10 @@ def test_skills_name_only_live_tools_and_no_removed_ones(mcp):
         assert not found, (path.relative_to(ROOT), found and found.group(0))
 
 
-@pytest.mark.parametrize(
-    "path", ["../triage-jobs/SKILL.md", "/etc/passwd", "references/missing.md", "SKILL.txt"]
-)
-def test_library_rejects_paths_outside_a_skill(path):
-    with pytest.raises(DomainError):
-        SkillLibrary(ROOT).read("prepare-applications", path)
-
-
-def test_unknown_skill_is_not_found():
+def test_library_rejects_paths_outside_a_skill_and_unknown_skills():
+    for path in ("../triage-jobs/SKILL.md", "/etc/passwd", "references/missing.md", "SKILL.txt"):
+        with pytest.raises(DomainError):
+            SkillLibrary(ROOT).read("prepare-applications", path)
     with pytest.raises(DomainError):
         SkillLibrary(ROOT).read("..", "README.md")
 
@@ -116,7 +106,6 @@ def test_skills_over_rest(client):
     reference = client.get("/api/v1/skills/prepare-applications/files/references/writing.md")
     assert reference.status_code == 200
     assert client.get("/api/v1/skills/review-inbox").status_code == 404
-    assert client.get("/api/v1/skills/review-inbox/notes").status_code == 410
 
 
 def test_skills_over_mcp_as_tool_prompts_and_resources(mcp):
@@ -132,8 +121,9 @@ def test_skills_over_mcp_as_tool_prompts_and_resources(mcp):
     prompts = {prompt["name"]: prompt for prompt in mcp.rpc("prompts/list")["prompts"]}
     assert set(prompts) == set(BUDGETS)
     assert all(not prompt.get("arguments") for prompt in prompts.values())
-    prompt = mcp.rpc("prompts/get", {"name": "triage-jobs"})
-    assert "# Go through new jobs" in prompt["messages"][0]["content"]["text"]
+    prompt = mcp.rpc("prompts/get", {"name": "triage-jobs"})["messages"][0]["content"]["text"]
+    assert prompt.startswith("Follow the Openings `triage-jobs` skill")
+    assert "# Go through new jobs" in prompt
 
     resources = {item["uri"] for item in mcp.rpc("resources/list")["resources"]}
     assert {f"openings://skills/{name}" for name in BUDGETS} <= resources

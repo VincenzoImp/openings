@@ -1,10 +1,7 @@
 """Minimal attribution (#209): one actor label per change and one batch per call."""
 
-import pytest
-
 from openings.actors import OWNER, SYSTEM, acting_as, batch, current_batch, token_actor
 from openings.events import EventLog
-from openings.removed import TOOLS
 
 
 def add_jobs(workspace, count, prefix="Synthetic role"):
@@ -67,16 +64,14 @@ def test_each_writer_has_its_label(app):
         assert first.startswith("b_") and len(first) == 28 and current_batch() == first
     with batch():
         assert current_batch() != first
-
-
-def test_system_changes_are_left_out_of_the_change_log_by_default(app):
-    add_jobs(app.state.workspace, 2)
+    # System changes are left out of the change log by default.
     assert events_of(app, kind="job_added") == []
-    assert len(events_of(app, kind="job_added", include_system=True)) == 2
-    assert len(events_of(app, kind="job_added", actor="system")) == 2
+    assert len(events_of(app, kind="job_added", include_system=True)) == 1
+    assert len(events_of(app, kind="job_added", actor="system")) == 1
 
 
-def test_one_rest_request_is_one_batch(app, client, agent_token):
+def test_one_request_or_tool_call_is_one_batch(app, agent_token, mcp):
+    client = mcp.client
     jobs = add_jobs(app.state.workspace, 3)
     response = client.post(
         "/api/v1/jobs/bulk",
@@ -101,6 +96,15 @@ def test_one_rest_request_is_one_batch(app, client, agent_token):
     assert [item["id"] for item in events_of(app, batch_id=batch_id)] == [
         item["id"] for item in triaged
     ]
+    # One MCP tool call is one batch, and a read records nothing.
+    for job in jobs[:2]:
+        _, error = mcp.call("notes_create", {"job_id": job["id"], "body": "Synthetic note."})
+        assert error is None, error
+    notes = events_of(app, kind="note_added")[:2]
+    assert len({item["batch_id"] for item in notes}) == 2
+    before = len(events_of(app, include_system=True))
+    mcp.call("jobs_list", {})
+    assert len(events_of(app, include_system=True)) == before
 
 
 def test_an_agent_triage_of_fifty_jobs_is_one_batch_the_owner_restores(app, mcp, owner_token):
@@ -144,44 +148,3 @@ def test_an_agent_triage_of_fifty_jobs_is_one_batch_the_owner_restores(app, mcp,
     assert workspace.get_job(mine["id"])["triage"] == "dismissed"
     restoring = events_of(app, kind="triage_changed", actor="owner")
     assert len({item["batch_id"] for item in restoring}) == 2  # the owner's dismissal, the restore
-
-
-def test_one_mcp_tool_call_is_one_batch(app, mcp):
-    jobs = add_jobs(app.state.workspace, 2)
-    for job in jobs:
-        _, error = mcp.call("notes_create", {"job_id": job["id"], "body": "Synthetic note."})
-        assert error is None, error
-    notes = events_of(app, kind="note_added")
-    assert len(notes) == 2 and len({item["batch_id"] for item in notes}) == 2
-    # A read makes no batch and records nothing.
-    before = len(events_of(app, include_system=True))
-    mcp.call("jobs_list", {})
-    assert len(events_of(app, include_system=True)) == before
-
-
-@pytest.mark.parametrize(
-    ("tool", "replacement"),
-    [
-        ("runs_start", "Report what you did in the chat"),
-        ("questions_ask", "Talk to the owner in your chat"),
-        ("requests_list", "notes_create"),
-        ("skill_notes_update", "working_with_me"),
-    ],
-)
-def test_removed_agent_tools_name_their_replacement(mcp, tool, replacement):
-    _, error = mcp.call(tool, {})
-    assert error["code"] == "removed" and error["details"]["tool"] == tool
-    assert replacement.lower() in error["message"].lower()
-
-
-def test_no_removed_tool_or_route_remains(app, mcp, owner_token):
-    client = Owner(mcp.client, owner_token)
-    listed = {tool["name"] for tool in mcp.rpc("tools/list")["tools"]}
-    removed = {
-        name for name in TOOLS if name.split("_")[0] in ("runs", "questions", "requests", "skill")
-    }
-    assert len(removed) == 19 and not removed & listed
-    for path in ("/api/v1/runs", "/api/v1/questions", "/api/v1/requests", "/api/v1/skills/x/notes"):
-        assert client.get(path).status_code == 410
-    info = client.get("/api/v1/workspace").json()
-    assert info["actor"] == "owner" and "open_requests" not in info

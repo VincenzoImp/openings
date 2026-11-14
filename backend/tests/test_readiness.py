@@ -121,6 +121,22 @@ def test_ready_truth_table(workspace):
     }
     page = workspace.list_applications(needs="documents", limit=200)
     assert {item["id"] for item in page["items"]} == needs and page["total"] == len(needs)
+    # Nothing about Ready is stored, and only CV and letter can be required.
+    columns = {row["name"] for row in workspace.db.all("PRAGMA table_info(applications)")}
+    assert not {name for name in columns if name.startswith("ready")}
+    assert "review_state" not in {
+        row["name"] for row in workspace.db.all("PRAGMA table_info(documents)")
+    }
+    job = workspace.ingest_job({"title": "T", "company": "C", "posting": "x"})
+    with (
+        pytest.raises(sqlite3.IntegrityError, match="CHECK"),
+        workspace.db.transaction() as conn,
+    ):
+        conn.execute(
+            "INSERT INTO applications(id,job_id,required_documents,created_at,updated_at) "
+            "VALUES(?,?,?,?,?)",
+            (new_id(), job["id"], encode(["answers"]), now(), now()),
+        )
 
 
 @pytest.fixture
@@ -178,21 +194,3 @@ def test_ready_follows_uploads_new_revisions_and_required_documents(app, put):
     # Deleting the complete CV removes Ready.
     documents.delete_document(cv["id"], documents.get_document(cv["id"])["version"])
     assert workspace.get_application(application["id"])["missing"] == ["cv"]
-
-
-def test_nothing_about_ready_is_stored(workspace):
-    columns = {row["name"] for row in workspace.db.all("PRAGMA table_info(applications)")}
-    assert not {name for name in columns if name.startswith("ready")}
-    assert "review_state" not in {
-        row["name"] for row in workspace.db.all("PRAGMA table_info(documents)")
-    }
-    job = workspace.ingest_job({"title": "T", "company": "C", "posting": "x"})
-    with (
-        pytest.raises(sqlite3.IntegrityError, match="CHECK"),
-        workspace.db.transaction() as conn,
-    ):
-        conn.execute(
-            "INSERT INTO applications(id,job_id,required_documents,created_at,updated_at) "
-            "VALUES(?,?,?,?,?)",
-            (new_id(), job["id"], encode(["answers"]), now(), now()),
-        )

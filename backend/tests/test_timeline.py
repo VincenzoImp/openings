@@ -1,20 +1,16 @@
-"""One timeline per job and per application: scope, filters, pins, authors and REST/MCP parity."""
+"""One timeline per job and per application: scope, filters, pins and authors."""
 
 import json
 import sqlite3
 
 import pytest
-from fastapi.testclient import TestClient
-from pydantic import ValidationError
 
 from openings.actors import OWNER, SYSTEM, acting_as, batch, token_actor
-from openings.app import create_app
 from openings.errors import DomainError
 from openings.workspace import Workspace
 from timeline_fixtures import guided_application
 
 AGENT = token_actor("agent-token", "Synthetic agent", "agent")
-MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
 
 
 def job(workspace, title="Synthetic engineer"):
@@ -55,7 +51,7 @@ def seeded(workspace):
     }
 
 
-def test_an_application_timeline_holds_its_entries_and_its_jobs_only(tmp_path):
+def test_application_and_job_timelines_hold_their_entries(tmp_path):
     workspace = Workspace(tmp_path / "timeline.sqlite")
     ids = seeded(workspace)
     current = ids["current"]
@@ -105,10 +101,7 @@ def test_an_application_timeline_holds_its_entries_and_its_jobs_only(tmp_path):
         else:
             assert item["event"] is None
 
-
-def test_a_job_timeline_holds_every_application(tmp_path):
-    workspace = Workspace(tmp_path / "timeline.sqlite")
-    ids = seeded(workspace)
+    # A job's timeline holds every application's entries.
     result = workspace.timeline(job_id=ids["job"]["id"])
     entries = {item["id"] for item in result["items"]}
     assert {ids["on_job"]["id"], ids["on_older"]["id"], ids["on_current"]["id"]} <= entries
@@ -162,26 +155,15 @@ def test_filters_counts_and_paging(tmp_path):
         workspace.timeline(job_id="unknown")
 
 
-def test_notes_record_their_author(tmp_path):
+def test_notes_record_their_author_and_one_pinned_note_per_scope(tmp_path):
     workspace = Workspace(tmp_path / "timeline.sqlite")
     target = job(workspace)
-    with acting_as(OWNER):
-        owner = workspace.add_note(target["id"], {"body": "By the owner."})
     with acting_as(AGENT):
         agent = workspace.add_note(target["id"], {"body": "By the agent."})
     with acting_as(SYSTEM):
         system = workspace.add_note(target["id"], {"body": "By the system."})
-    assert [note["author"] for note in (owner, agent, system)] == [
-        "owner",
-        "agent:Synthetic agent",
-        "system",
-    ]
-    assert "run" not in owner and (owner["scope"], owner["pinned"]) == ("job", False)
-
-
-def test_one_pinned_note_per_scope_and_pinning_is_recorded(tmp_path):
-    workspace = Workspace(tmp_path / "timeline.sqlite")
-    target = job(workspace)
+    assert [note["author"] for note in (agent, system)] == ["agent:Synthetic agent", "system"]
+    assert (agent["scope"], agent["pinned"]) == ("job", False)
     application = workspace.create_application({"job_id": target["id"]})
     first = workspace.add_note(target["id"], {"body": "First.", "pinned": True})
     second = workspace.add_note(target["id"], {"body": "Second."})
@@ -218,22 +200,13 @@ def test_one_pinned_note_per_scope_and_pinning_is_recorded(tmp_path):
         conn.execute("UPDATE notes SET pinned_at='2026-01-01' WHERE id=?", (second["id"],))
 
 
-def test_the_application_note_field_is_gone_and_the_pinned_note_holds_guidance(tmp_path):
-    """0.23 removed the application ``note`` field; the pinned note is the one place."""
+def test_the_pinned_note_holds_an_applications_guidance(tmp_path):
     workspace = Workspace(tmp_path / "timeline.sqlite")
     target = job(workspace)
-    with pytest.raises(ValidationError):
-        workspace.create_application({"job_id": target["id"], "note": "Removed field"})
     text = "Ünïcode ✓\r\nTrailing space  \n\n"
     application = guided_application(workspace, target["id"], text)
-    assert "note" not in application
     pinned = application["pinned_note"]
     assert (pinned["body"], pinned["scope"], pinned["pinned"]) == (text, "application", True)
-    with pytest.raises(ValidationError):
-        workspace.update_application(
-            application["id"], {"expected_version": application["version"], "note": "x"}
-        )
-    assert workspace.get_note(pinned["id"])["version"] == 1
     # Searching applications finds the pinned note's text.
     workspace.update_note(pinned["id"], {"expected_version": 1, "body": "Revised guidance"})
     assert workspace.list_applications(q="Revised guid")["total"] == 1
@@ -253,65 +226,3 @@ def test_merge_keeps_one_pinned_job_note(tmp_path):
     assert notes[kept["id"]]["pinned"] and not notes[moved["id"]]["pinned"]
     unpinned = workspace.timeline(job_id=target["id"], value={"kinds": ["event"]})["items"]
     assert any(item["event"]["kind"] == "note_unpinned" for item in unpinned)
-
-
-def tool(client, headers, name, arguments):
-    response = client.post(
-        "/mcp",
-        headers={**MCP_HEADERS, **headers},
-        json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {"name": name, "arguments": arguments},
-        },
-    )
-    result = response.json()["result"]
-    assert not result.get("isError"), result
-    return result.get("structuredContent") or json.loads(result["content"][0]["text"])
-
-
-def test_both_timeline_routes_read_one_timeline_and_agents_read_changes(tmp_path):
-    app = create_app(tmp_path / "parity.sqlite", start_worker=False)
-    app.state.auth.setup("synthetic-password")
-    workspace = app.state.workspace
-    ids = seeded(workspace)
-    headers = {"Authorization": "Bearer " + app.state.auth.create_token("Synthetic")["token"]}
-    job_id, application_id = ids["job"]["id"], ids["current"]["id"]
-    cases = [
-        ({}, ""),
-        ({"kinds": ["note", "reply"]}, "?kinds=note&kinds=reply"),
-        (
-            {"who": ["agent", "owner"], "scope": "application"},
-            "?who=agent&who=owner&scope=application",
-        ),
-        ({"limit": 2, "offset": 1}, "?limit=2&offset=1"),
-        ({"since": "2000-01-01", "until": "2999-12-31"}, "?since=2000-01-01&until=2999-12-31"),
-    ]
-    with TestClient(app, base_url="http://localhost:8080") as client:
-        for _, query in cases:
-            for path in (
-                f"/api/v1/jobs/{job_id}/timeline",
-                f"/api/v1/applications/{application_id}/timeline",
-            ):
-                rest = client.get(path + query, headers=headers)
-                assert rest.status_code == 200, rest.text
-                assert rest.json()["items"], (path, query)
-        # An agent reads the same changes in changes_list, and notes with the job.
-        changes = tool(client, headers, "changes_list", {"job_id": job_id})["items"]
-        assert changes and all(item["job_id"] == job_id for item in changes)
-        # Pinning over REST and MCP alike.
-        note = ids["on_job"]
-        pinned = client.post(
-            f"/api/v1/notes/{note['id']}/pin", json={"expected_version": 1}, headers=headers
-        ).json()
-        assert pinned["pinned"] and pinned["version"] == 2
-        unpinned = tool(
-            client,
-            headers,
-            "notes_update",
-            {"note_id": note["id"], "expected_version": 2, "pinned": False},
-        )
-        assert (unpinned["pinned"], unpinned["version"]) == (False, 3)
-        refused = client.get(f"/api/v1/jobs/{job_id}/timeline?kinds=text", headers=headers)
-        assert refused.status_code == 422

@@ -1,21 +1,12 @@
-"""Compact agent-facing defaults, settings conflict details and revocable browser sessions."""
-
-import json
+"""Compact list and mutation defaults, settings conflict details and revocable browser
+sessions. MCP serves the same records without empty fields (test_parity.py)."""
 
 from fastapi.testclient import TestClient
 
-from openings.app import create_app
+from conftest import BASE_URL, PASSWORD, McpClient
 from openings.db import encode
-from openings.interfaces.operation import without_empty
-from test_mcp_contract import call, error_body
 
-PASSWORD = "synthetic-password"
 STAMP = "2026-01-01T00:00:00.000000+00:00"
-
-
-def structured(result):
-    assert result.get("isError") is not True, result
-    return json.loads(result["content"][0]["text"])
 
 
 def stable(value):
@@ -31,11 +22,7 @@ def stable(value):
     return value
 
 
-def populated(tmp_path):
-    app = create_app(tmp_path / "responses.sqlite", start_worker=False)
-    app.state.auth.setup(PASSWORD)
-    token = app.state.auth.create_token("Synthetic agent")["token"]
-    headers = {"Authorization": "Bearer " + token, "Accept": "application/json, text/event-stream"}
+def populated(app):
     ws = app.state.workspace
     jobs = [
         ws.ingest_job(
@@ -79,179 +66,111 @@ def populated(tmp_path):
                 STAMP,
             ),
         )
-    return app, headers, jobs, application
+    return jobs, application
 
 
-def test_lists_default_to_compact_records_with_full_opt_in(tmp_path):
-    app, headers, _jobs, _application = populated(tmp_path)
-    with TestClient(app, base_url="http://localhost:8080") as client:
-        rest = client.get("/api/v1/jobs", headers=headers).json()
-        mcp = structured(call(client, headers, "jobs_list", {}))
-        # MCP returns the same record without its empty fields.
-        assert "facets" not in rest and mcp == without_empty(rest) and rest["total"] == 3
-        faceted = client.get("/api/v1/jobs?include_facets=true", headers=headers).json()
-        assert faceted["facets"]["companies"] == ["Example 0", "Example 1"]
-        assert faceted["items"] == rest["items"]
-        mcp_faceted = structured(call(client, headers, "jobs_list", {"include_facets": True}, 2))
-        assert mcp_faceted == without_empty(faceted)
+def test_lists_and_mutations_default_to_compact_records_with_full_opt_in(app, client, agent_token):
+    jobs, application = populated(app)
+    mcp = McpClient(client, agent_token)
+    rest = client.get("/api/v1/jobs").json()
+    assert "facets" not in rest and rest["total"] == 3
+    faceted = client.get("/api/v1/jobs?include_facets=true").json()
+    assert faceted["facets"]["companies"] == ["Example 0", "Example 1"]
+    assert faceted["items"] == rest["items"]
 
-        documents = client.get("/api/v1/documents", headers=headers).json()
-        assert documents["items"][0]["file_count"] == 0
-        assert "content" not in documents["items"][0]
-        read = structured(
-            call(client, headers, "applications_get", {"ids": [_application["id"]]}, 3)
-        )
-        assert read["items"][0]["documents"] == without_empty(documents["items"])
-        full = client.get("/api/v1/documents?summary=false", headers=headers).json()
-        assert full["items"][0]["content"]["sections"] and full["items"][0]["files"] == []
+    documents = client.get("/api/v1/documents").json()
+    assert documents["items"][0]["file_count"] == 0
+    assert "content" not in documents["items"][0]
+    full = client.get("/api/v1/documents?summary=false").json()
+    assert full["items"][0]["content"]["sections"] and full["items"][0]["files"] == []
 
-        sources = client.get("/api/v1/sources", headers=headers).json()
-        source = sources["items"][0]
-        assert source["last_diagnostic_count"] == 3 and "last_diagnostics" not in source
-        assert "source_snapshot" not in source["last_run"]
-        assert source["last_run"]["tasks"] == [
-            {
-                "id": "task-1",
-                "kind": "collect",
-                "provider": "greenhouse",
-                "state": "queued",
-                "attempts": 0,
-                "error": "provider paused",
-                "next_run_at": STAMP,
-                "updated_at": STAMP,
-            }
-        ]
-        assert stable(structured(call(client, headers, "sources_list", {}, 4))) == stable(
-            without_empty(sources)
-        )
-        full = client.get("/api/v1/sources?summary=false", headers=headers).json()["items"][0]
-        assert len(full["last_diagnostics"]) == 3
-        assert full["last_run"]["tasks"][0]["result"]["received"] == 4
-        detail = client.get("/api/v1/sources/source-1", headers=headers).json()
-        assert detail.pop("recent_runs") and stable(full) == stable(detail)
-
-        runs = client.get("/api/v1/collection/runs", headers=headers).json()
-        assert runs["items"][0]["tasks"] == source["last_run"]["tasks"]
-        assert runs["items"][0]["counts"]["received"] == 4
-        detail = structured(call(client, headers, "sources_get", {"source_id": "source-1"}, 5))
-        assert stable(detail["recent_runs"]) == stable(without_empty(runs["items"]))
-        full = client.get("/api/v1/collection/runs?summary=false", headers=headers).json()
-        assert stable(full["items"][0]) == stable(
-            client.get("/api/v1/collection/runs/run-1", headers=headers).json()
-        )
-        assert "checkpoint" not in full["items"][0]["tasks"][0]["payload"]
-
-
-def test_job_and_application_mutations_return_compact_jobs(tmp_path):
-    app, headers, jobs, application = populated(tmp_path)
-    with TestClient(app, base_url="http://localhost:8080") as client:
-        job = jobs[1]
-        triaged = client.post(
-            f"/api/v1/jobs/{job['id']}/triage",
-            headers=headers,
-            json={"triage": "shortlisted", "expected_version": job["version"]},
-        ).json()
-        assert triaged["triage"] == "shortlisted" and triaged["version"] == job["version"] + 1
-        assert "posting" not in triaged and "postings" not in triaged
-        assert triaged["posting_preview"].startswith("Build reliable services.")
-        assert (
-            triaged
-            == client.get("/api/v1/jobs?triage=shortlisted", headers=headers).json()["items"][0]
-        )
-        job = jobs[2]
-        via_mcp = structured(
-            call(
-                client,
-                headers,
-                "jobs_triage",
-                {"items": [{"job_id": job["id"], "to": "dismissed", "reason": "Synthetic."}]},
-            )
-        )
-        item = via_mcp["items"][0]
-        assert item["ok"] and item["result"] == {"version": 2, "triage": "dismissed"}
-        updated = structured(
-            call(
-                client,
-                headers,
-                "jobs_update",
-                {"job_id": job["id"], "title": "Renamed", "expected_version": 2},
-                2,
-            )
-        )
-        assert updated["title"] == "Renamed" and updated["version"] == 3
-        assert "posting" not in updated
-        assert client.get(f"/api/v1/jobs/{job['id']}", headers=headers).json()["posting"]
-
-        changed = client.patch(
-            f"/api/v1/applications/{application['id']}",
-            headers=headers,
-            json={"priority": 3, "expected_version": application["version"]},
-        ).json()
-        assert changed["priority"] == 3 and changed["job"]["id"] == jobs[0]["id"]
-        assert "posting" not in changed["job"] and changed["job"]["posting_preview"]
-        assert changed["preparation"] is not None
-        read = client.get(f"/api/v1/applications/{application['id']}", headers=headers).json()
-        assert read["job"]["posting"] and read["version"] == changed["version"]
-
-
-def test_settings_conflicts_report_current_version(tmp_path):
-    app, headers, jobs, _application = populated(tmp_path)
-    with TestClient(app, base_url="http://localhost:8080") as client:
-        profile = client.get("/api/v1/career/profile", headers=headers).json()
-        settings = client.get("/api/v1/preferences", headers=headers).json()["settings"]
-        collection = client.get("/api/v1/collection", headers=headers).json()
-        for method, path, body, current, record in [
-            (
-                "PATCH",
-                "/api/v1/career/profile",
-                {"name": "Synthetic"},
-                profile["version"],
-                "profile",
-            ),
-            ("PATCH", "/api/v1/settings", {"no_reply_days": 40}, settings["version"], "settings"),
-            (
-                "PATCH",
-                "/api/v1/collection",
-                {"enabled": False},
-                collection["version"],
-                "collection",
-            ),
-        ]:
-            response = client.request(
-                method, path, headers=headers, json={**body, "expected_version": current + 5}
-            )
-            assert response.status_code == 409, (path, response.text)
-            error = response.json()["error"]
-            assert error["code"] == "conflict"
-            assert error["details"] == {"current_version": current, "id": record}, path
-
-        for ident, (name, arguments, current, record) in enumerate(
-            [
-                ("profile_update", {"name": "Synthetic"}, profile["version"], "profile"),
-                ("settings_update", {"no_reply_days": 40}, settings["version"], "settings"),
-                ("collection_update", {"enabled": False}, collection["version"], "collection"),
-            ],
-            start=10,
-        ):
-            value = {**arguments, "expected_version": current + 5}
-            error = error_body(call(client, headers, name, value, ident))
-            assert error["status"] == 409
-            assert error["details"] == {"current_version": current, "id": record}
-
-        stale = client.post(
-            "/api/v1/jobs/bulk",
-            headers=headers,
-            json={"action": "shortlisted", "items": [{"id": jobs[1]["id"], "expected_version": 9}]},
-        ).json()
-        assert stale["items"][0]["error"]["details"] == {
-            "current_version": jobs[1]["version"],
-            "id": jobs[1]["id"],
+    sources = client.get("/api/v1/sources").json()
+    source = sources["items"][0]
+    assert source["last_diagnostic_count"] == 3 and "last_diagnostics" not in source
+    assert "source_snapshot" not in source["last_run"]
+    assert source["last_run"]["tasks"] == [
+        {
+            "id": "task-1",
+            "kind": "collect",
+            "provider": "greenhouse",
+            "state": "queued",
+            "attempts": 0,
+            "error": "provider paused",
+            "next_run_at": STAMP,
+            "updated_at": STAMP,
         }
+    ]
+    full = client.get("/api/v1/sources?summary=false").json()["items"][0]
+    assert len(full["last_diagnostics"]) == 3
+    assert full["last_run"]["tasks"][0]["result"]["received"] == 4
+    detail = client.get("/api/v1/sources/source-1").json()
+    assert detail.pop("recent_runs") and stable(full) == stable(detail)
+
+    runs = client.get("/api/v1/collection/runs").json()
+    assert runs["items"][0]["tasks"] == source["last_run"]["tasks"]
+    assert runs["items"][0]["counts"]["received"] == 4
+    full = client.get("/api/v1/collection/runs?summary=false").json()
+    assert stable(full["items"][0]) == stable(client.get("/api/v1/collection/runs/run-1").json())
+    assert "checkpoint" not in full["items"][0]["tasks"][0]["payload"]
+
+    # Mutations answer with the compact job, not the posting.
+    job = jobs[1]
+    triaged = client.post(
+        f"/api/v1/jobs/{job['id']}/triage",
+        json={"triage": "shortlisted", "expected_version": job["version"]},
+    ).json()
+    assert triaged["triage"] == "shortlisted" and triaged["version"] == job["version"] + 1
+    assert "posting" not in triaged and "postings" not in triaged
+    assert triaged["posting_preview"].startswith("Build reliable services.")
+    assert triaged == client.get("/api/v1/jobs?triage=shortlisted").json()["items"][0]
+    job = jobs[2]
+    updated, error = mcp.call(
+        "jobs_update", {"job_id": job["id"], "title": "Renamed", "expected_version": 1}
+    )
+    assert error is None and updated["title"] == "Renamed" and updated["version"] == 2
+    assert "posting" not in updated
+    assert client.get(f"/api/v1/jobs/{job['id']}").json()["posting"]
+
+    changed = client.patch(
+        f"/api/v1/applications/{application['id']}",
+        json={"priority": 3, "expected_version": application["version"]},
+    ).json()
+    assert changed["priority"] == 3 and changed["job"]["id"] == jobs[0]["id"]
+    assert "posting" not in changed["job"] and changed["job"]["posting_preview"]
+    assert changed["preparation"] is not None
+    read = client.get(f"/api/v1/applications/{application['id']}").json()
+    assert read["job"]["posting"] and read["version"] == changed["version"]
 
 
-def test_logout_revokes_browser_sessions_but_keeps_api_tokens(tmp_path):
-    app, headers, _jobs, _application = populated(tmp_path)
-    with TestClient(app, base_url="http://localhost:8080") as client:
+def test_settings_conflicts_report_current_version(app, client):
+    jobs, _application = populated(app)
+    profile = client.get("/api/v1/career/profile").json()
+    settings = client.get("/api/v1/preferences").json()["settings"]
+    collection = client.get("/api/v1/collection").json()
+    for path, body, current, record in [
+        ("/api/v1/career/profile", {"name": "Synthetic"}, profile["version"], "profile"),
+        ("/api/v1/settings", {"no_reply_days": 40}, settings["version"], "settings"),
+        ("/api/v1/collection", {"enabled": False}, collection["version"], "collection"),
+    ]:
+        response = client.patch(path, json={**body, "expected_version": current + 5})
+        assert response.status_code == 409, (path, response.text)
+        error = response.json()["error"]
+        assert error["code"] == "conflict"
+        assert error["details"] == {"current_version": current, "id": record}, path
+
+    stale = client.post(
+        "/api/v1/jobs/bulk",
+        json={"action": "shortlisted", "items": [{"id": jobs[1]["id"], "expected_version": 9}]},
+    ).json()
+    assert stale["items"][0]["error"]["details"] == {
+        "current_version": jobs[1]["version"],
+        "id": jobs[1]["id"],
+    }
+
+
+def test_logout_revokes_browser_sessions_but_keeps_api_tokens(app, agent_token):
+    headers = agent_token["headers"]
+    with TestClient(app, base_url=BASE_URL) as client:
         login = client.post("/api/v1/auth/login", json={"password": PASSWORD})
         assert login.status_code == 200
         stolen = client.cookies.get("openings_session")
@@ -275,7 +194,6 @@ def test_logout_revokes_browser_sessions_but_keeps_api_tokens(tmp_path):
         client.cookies.clear()
 
         assert client.get("/api/v1/jobs", headers=headers).status_code == 200
-        assert structured(call(client, headers, "jobs_list", {}))["total"] == 3
 
         again = client.post("/api/v1/auth/login", json={"password": PASSWORD})
         assert again.status_code == 200

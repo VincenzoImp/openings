@@ -30,7 +30,7 @@ def tools_list(mcp):
     return response
 
 
-def test_tools_list_stays_within_its_budget(mcp, owner_token):
+def test_tools_list_and_instructions_stay_within_their_budget(mcp, owner_token):
     response = tools_list(mcp)
     size = len(response.text)
     tools = response.json()["result"]["tools"]
@@ -40,26 +40,12 @@ def test_tools_list_stays_within_its_budget(mcp, owner_token):
         warnings.warn(f"tools/list is {size} characters (target {TOOLS_LIST_TARGET})", stacklevel=1)
     for tool in tools:
         assert len(tool["description"]) <= DESCRIPTION_LIMIT, tool["name"]
-    # An owner token sees the same tools: owner-only operations are never tools.
-    mcp.token = owner_token
-    assert tools_list(mcp).json()["result"]["tools"] == tools
-
-
-def test_the_server_instructions_fit_and_say_where_to_start():
     assert len(INSTRUCTIONS) <= INSTRUCTIONS_LIMIT
     assert "workspace_context" in INSTRUCTIONS and "skills_get" in INSTRUCTIONS
-
-
-def _defaults(text):
-    """Defaults a description states: "x defaults to y", "default y", "y (default)"."""
-    found = re.findall(r"\bdefaults? (?:to )?([\w.:-]+)", text)
-    found += re.findall(r"([\w.:-]+) \(default\)", text)
-    return found
-
-
-def test_every_default_a_description_states_is_the_schemas(mcp):
+    assert "Never submit an application" in INSTRUCTIONS
+    # Every default a description states is the schema's.
     stated = 0
-    for tool in tools_list(mcp).json()["result"]["tools"]:
+    for tool in tools:
         properties = tool["inputSchema"]["properties"]
         for name, value in re.findall(r"\b(\w+) defaults? (?:to )?([\w.:-]+)", tool["description"]):
             if name in properties:
@@ -75,6 +61,16 @@ def test_every_default_a_description_states_is_the_schemas(mcp):
                 default = schema.get("default", schema.get("items", {}).get("default"))
                 assert default is not None and value in json.dumps(default), (tool["name"], name)
     assert stated
+    # An owner token sees the same tools: owner-only operations are never tools.
+    mcp.token = owner_token
+    assert tools_list(mcp).json()["result"]["tools"] == tools
+
+
+def _defaults(text):
+    """Defaults a description states: "x defaults to y", "default y", "y (default)"."""
+    found = re.findall(r"\bdefaults? (?:to )?([\w.:-]+)", text)
+    found += re.findall(r"([\w.:-]+) \(default\)", text)
+    return found
 
 
 def test_workspace_context_of_a_realistic_workspace_fits(app, mcp):

@@ -1,7 +1,6 @@
 """Duplicate candidates: labelled benchmark, signals, confidence tiers and one-job scoring."""
 
 import pytest
-from fastapi.testclient import TestClient
 
 from duplicate_benchmark import (
     benchmark_jobs,
@@ -11,7 +10,6 @@ from duplicate_benchmark import (
     true_pairs,
 )
 from openings import duplicates
-from openings.app import create_app
 from openings.duplicate_signals import (
     apply_targets,
     compare_location,
@@ -179,7 +177,8 @@ def test_groups_are_ordered_by_confidence_with_reasons(benchmark):
     assert {group["tier"] for group in groups} == {"high", "medium", "low"}
 
 
-def test_company_names_ignore_legal_corporate_and_country_suffixes():
+def test_signals_normalize_companies_requisitions_and_apply_targets():
+    # Company names ignore legal, corporate and country suffixes.
     same = [
         "Norvane Robotics",
         "Norvane Robotics AG",
@@ -194,8 +193,7 @@ def test_company_names_ignore_legal_corporate_and_country_suffixes():
     assert normalize_company("Switzerland") == "switzerland"
     assert normalize_company("Norvane Labs") != normalize_company("Norvane Robotics")
 
-
-def test_requisition_ids_come_from_titles_and_labelled_text():
+    # Requisition ids come from titles and labelled text.
     assert reference_ids("Backend Engineer (R-48213)", "") == {"48213"}
     assert reference_ids("Backend Engineer - JR0020931", "") == {"20931"}
     assert reference_ids("Summer Internship 2026", "Reference: 2026 salary survey") == set()
@@ -205,8 +203,7 @@ def test_requisition_ids_come_from_titles_and_labelled_text():
     assert reference_ids("Ingegnere", "Rif. 2291-IT") == {"2291IT"}
     assert reference_ids("Engineer", "We reference 12 projects and job 3 of 5.") == set()
 
-
-def test_apply_targets_recognise_ats_postings_and_url_forms():
+    # Apply targets recognise ATS postings and URL forms.
     assert apply_targets("https://boards.greenhouse.io/norvane/jobs/7700101") == {
         "greenhouse:7700101"
     }
@@ -223,9 +220,8 @@ def test_apply_targets_recognise_ats_postings_and_url_forms():
     assert apply_targets("https://solvanta.example/") == set() == apply_targets("not a url")
 
 
-@pytest.mark.parametrize(
-    ("first", "second", "expected"),
-    [
+def test_locations_agree_conflict_or_stay_unknown():
+    for first, second, expected in [
         ("Zurich, Switzerland", "Zürich, ZH, Switzerland", "agree"),
         ("Geneva, Switzerland", "Genf, Schweiz", "agree"),
         ("Berlin / Munich", "München, Deutschland", "agree"),
@@ -238,16 +234,13 @@ def test_apply_targets_recognise_ats_postings_and_url_forms():
         ("Remote (Berlin)", "Munich", None),
         ("Switzerland", "Zurich, Switzerland", None),
         ("", "Zurich", None),
-    ],
-)
-def test_locations_agree_conflict_or_stay_unknown(first, second, expected):
-    a, b = features(location=first), features(location=second)
-    assert compare_location(a, b) == compare_location(b, a) == expected
+    ]:
+        a, b = features(location=first), features(location=second)
+        assert compare_location(a, b) == compare_location(b, a) == expected, (first, second)
 
 
-@pytest.mark.parametrize(
-    ("first", "second", "expected"),
-    [
+def test_titles_are_compared_without_decoration():
+    for first, second, expected in [
         ("Backend Engineer", "Backend Engineer (m/w/d)", "same"),
         ("Backend Engineer", "Backend Engineer – Zurich (80-100%)", "same"),
         ("Backend Engineer", "Backend Engineer (R-48213)", "same"),
@@ -255,12 +248,10 @@ def test_locations_agree_conflict_or_stay_unknown(first, second, expected):
         ("Embedded Engineer II", "Embedded Engineer III", "seniority"),
         ("Backend Engineer", "Backend Engineer Payments", "similar"),
         ("Backend Engineer", "Data Engineer", None),
-    ],
-)
-def test_titles_are_compared_without_decoration(first, second, expected):
-    a = features(title=first, location="Zurich, Switzerland")
-    b = features(title=second, location="Zurich, Switzerland")
-    assert compare_title(a, b) == compare_title(b, a) == expected
+    ]:
+        a = features(title=first, location="Zurich, Switzerland")
+        b = features(title=second, location="Zurich, Switzerland")
+        assert compare_title(a, b) == compare_title(b, a) == expected, (first, second)
 
 
 def test_company_and_title_alone_never_prove_a_duplicate():
@@ -439,46 +430,35 @@ def test_features_are_read_again_only_for_changed_jobs(tmp_path, monkeypatch):
     assert merged["reasons"]["conflicts"] == ["location"]
 
 
-def test_confidence_tiers_and_filter_over_rest(tmp_path):
-    app = create_app(tmp_path / "rest.sqlite", start_worker=False)
-    with TestClient(app) as client:
-        owner = client.post("/api/v1/auth/setup", json={"password": "synthetic-password"}).json()
-        client.headers["X-CSRF-Token"] = owner["csrf_token"]
-        for path, location, text in (
-            ("one", "Basel, Switzerland", TEXT),
-            ("two", "Basel", TEXT + " Imported from the employer."),
-            ("three", "Lausanne, Switzerland", TEXT),
-            ("four", "Basel, Switzerland", OTHER_TEXT),
-        ):
-            created = client.post(
-                "/api/v1/jobs",
-                json={
-                    "url": f"https://example.test/{path}",
-                    "title": "QA Manager",
-                    "company": "Haldrin Biotech",
-                    "location": location,
-                    "posting": text,
-                },
-            )
-            assert created.status_code == 200
-        default = client.get("/api/v1/jobs/duplicates").json()
-        assert default["min_confidence"] == 0.5 and default["tiers"] == {
-            "high": 0.85,
-            "medium": 0.5,
-        }
-        assert [(group["tier"], group["size"]) for group in default["items"]] == [("high", 2)]
-        high = client.get("/api/v1/jobs/duplicates", params={"min_confidence": 0.85}).json()
-        assert high["items"] == default["items"]
-        everything = client.get("/api/v1/jobs/duplicates", params={"min_confidence": 0}).json()
-        assert [(group["tier"], group["size"]) for group in everything["items"]] == [("low", 4)]
-        assert set(everything["items"][0]["reasons"]["conflicts"]) == {"location", "posting_text"}
-        for invalid in ("1.5", "-0.1", "high"):
-            response = client.get("/api/v1/jobs/duplicates", params={"min_confidence": invalid})
-            assert response.status_code == 422
-        schema = client.get("/api/openapi.json").json()
-        parameters = schema["paths"]["/api/v1/jobs/duplicates"]["get"]["parameters"]
-        assert "min_confidence" in {parameter["name"] for parameter in parameters}
-
+def test_confidence_tiers_and_filter_over_rest(app, client):
+    for path, location, text in (
+        ("one", "Basel, Switzerland", TEXT),
+        ("two", "Basel", TEXT + " Imported from the employer."),
+        ("three", "Lausanne, Switzerland", TEXT),
+        ("four", "Basel, Switzerland", OTHER_TEXT),
+    ):
+        created = client.post(
+            "/api/v1/jobs",
+            json={
+                "url": f"https://example.test/{path}",
+                "title": "QA Manager",
+                "company": "Haldrin Biotech",
+                "location": location,
+                "posting": text,
+            },
+        )
+        assert created.status_code == 200
+    default = client.get("/api/v1/jobs/duplicates").json()
+    assert default["min_confidence"] == 0.5 and default["tiers"] == {"high": 0.85, "medium": 0.5}
+    assert [(group["tier"], group["size"]) for group in default["items"]] == [("high", 2)]
+    high = client.get("/api/v1/jobs/duplicates", params={"min_confidence": 0.85}).json()
+    assert high["items"] == default["items"]
+    everything = client.get("/api/v1/jobs/duplicates", params={"min_confidence": 0}).json()
+    assert [(group["tier"], group["size"]) for group in everything["items"]] == [("low", 4)]
+    assert set(everything["items"][0]["reasons"]["conflicts"]) == {"location", "posting_text"}
+    for invalid in ("1.5", "-0.1", "high"):
+        response = client.get("/api/v1/jobs/duplicates", params={"min_confidence": invalid})
+        assert response.status_code == 422
     assert app.state.workspace.duplicate_jobs({"min_confidence": 0.85}) == high
 
 
