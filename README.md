@@ -103,8 +103,8 @@ access, storage and upgrades.
 
 ## Connect an agent
 
-1. A new workspace opens on the setup guide; its first step, like **Settings →
-   Agent access**, creates an agent token and gives the configuration for Claude
+1. **Settings → Agent access** (also offered at the end of the setup guide)
+   creates an agent token and gives the configuration for Claude
    Code, Codex or another MCP client. An agent token cannot change
    your password, manage tokens or restore a backup. The endpoint is
    `http://127.0.0.1:8080/mcp` with `Authorization: Bearer <token>`.
