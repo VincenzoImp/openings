@@ -64,7 +64,7 @@ changes with the version you run. Say it in your own words.
 ![Settings, Agent access: the tokens, the token form and the client configuration](../images/agent-access.png)
 
 For a persistent setup, an optional [operator workspace](../../examples/operator-workspace/README.md)
-holds a standing mandate and launcher scripts for six clients. You do not need it.
+holds the connection setup, a skills list and launcher scripts for six clients. You do not need it.
 
 ## Token kinds
 

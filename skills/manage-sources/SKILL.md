@@ -1,72 +1,53 @@
 ---
 name: manage-sources
-title: Tune job sources
-summary: Have your sources measured and searches, companies, filters and schedules added, tuned or retired.
-example: Check which job sources bring me useful jobs and retire the noisy ones.
-description: Review and tune Openings collection sources by measuring what each source contributes to kept jobs and applications, then add, tune or retire searches, monitored companies, filters and schedules as standing work under the operating mandate.
-compatibility: Requires access to the Openings MCP server or REST API, as described in the openings-workspace skill.
+title: Manage job sources
+summary: Have searches, company boards and feeds added, previewed, tuned or paused so new jobs fit what you want.
+example: Follow Northstar Labs' job board and add a search for data engineer jobs in Zurich.
+description: Add, tune, pause and review Openings job sources - "add a search for...", "follow company X", "why so much noise from Y?", "which sources work?". Previews every new source before saving and measures sources by what they bring.
 ---
 
-# Manage sources
+# Manage job sources
 
-Use this workflow to keep collection effective: measure quality, add or tune
-searches, add companies worth monitoring, and reduce noise among New jobs. It is standing
-work under the [operating mandate](../openings-workspace/references/operating-mandate.md). Never change sources as a side
-effect of triage or preparation; record each change and its reason.
+Read [openings](../openings/SKILL.md) first and call `workspace_context`:
+What I'm looking for and What I rule out define a useful job.
 
-Read [Openings workspace](../openings-workspace/SKILL.md) for transport, source
-schemas, provider limits and optimistic versions. Read the current Profile and
-the owner's Preferences (`preferences_get`), above all What I'm looking for and
-What I rule out: they define what a useful job is. Keep no personal search
-criteria in this skill.
+## Add a source
 
-## Questions and report
+1. `collection_get` with the source kinds: what each kind needs (a search
+   query and place, a company's board, a feed URL). For a company, find its
+   careers page and use its board kind when one matches; otherwise a search.
+2. Preview it with `sources_run`: nothing is stored. Read the sample against
+   the Preferences: how many would the owner want? Narrow the query, place or
+   title filters until most are relevant, without excluding jobs they want.
+3. Save it with `sources_save`, enabled, on a daily schedule unless the owner
+   says otherwise. Add several in one batch and check every item.
+4. Run it once with `sources_run` when the owner wants results now.
 
-Ask the owner in the chat when a missing fact matters, and never record an
-answer the owner did not give. Report what you did in the chat.
+One query and one place per search; split "Zurich or Basel" into two.
 
-## Measure before changing
+## Tune a noisy source
 
-For each source, read its configuration, schedule, last runs and errors with
-`sources_list` (REST `GET /sources`). Each source's `counts` give the jobs it
-found and how many were shortlisted, applied to and got a reply; `stats_get`
-gives replies by source once two sources have five sent applications each. A
-search whose jobs are mostly flagged as likely duplicates of other sources
-(`jobs_list` with `signal: likely_duplicate`) adds little. Do not judge a source
-that found few jobs. Separate history from the current filters: jobs collected
-before a filter change do not describe it.
+1. `sources_list` gives each source's counts: found, shortlisted, applied,
+   replied. Judge a source only after it has found enough jobs.
+2. Read why its jobs were dismissed: `jobs_list` of dismissed jobs, narrowed
+   to its site or company, shows each dismissal reason. A recurring, clear
+   mismatch (another field, a ruled out title or language) is worth a filter;
+   a varied mix is triage's job.
+3. Prefer the narrowest fix: a more specific query or place, or excluded
+   title words checked against the shortlisted jobs so none would be lost.
+   Preview the change before saving.
+4. Pause a source that brings nothing useful; delete one only when the owner
+   asks.
 
-Dismissals were made by agents applying the Preferences, so a high dismissal
-rate measures collected text outside them, not the owner's taste. A source
-whose jobs mostly require languages the owner does not speak (`jobs_list` with
-`hide_unspoken_required` reports the count) is better narrowed by place or
-language, so that collection stops paying for them. Applications
-the owner closed without applying are not preference evidence either: postings
-close or become unfeasible. Derive every filter from the Preferences and Career
-records, and use dismissed titles only to find recurring clear mismatches
-(unrelated domains, sales, roles the owner rules out). Check each candidate term
-against shortlisted jobs so a filter never removes work the owner is looking for.
+## Failures
 
-## Tune
+`collection_get` lists failing sources and `sources_get` their recent errors.
+Provider limits and cooldowns are protective: wait them out rather than
+raising them. Retry a failed fetch with `collection_update` once the cause is
+fixed. Turn collection off only when the owner asks.
 
-Prefer the narrowest change that removes a measured, recurring mismatch:
+## Report back
 
-- a more specific query or location for keyword searches;
-- excluded title terms (whole words) for recurring unrelated roles, when the
-  service supports them, checked against the shortlisted sample;
-- include-only title terms for company boards with many unrelated departments;
-- a company board source for an employer that appears repeatedly among shortlisted jobs,
-  or that the Profile and Career evidence make a strong target.
-
-Read the current source schemas before writing; a source's service is fixed after
-creation. Preserve omitted configuration and use expected versions. Use a run
-override or preview to test a change before saving it when the service allows.
-Do not disable a source only because it keeps few jobs when it is cheap and
-targeted. Excluding a term removes jobs before any agent reads them, so prefer
-terms with no ambiguous technical use and leave borderline titles to triage.
-
-## Report
-
-List each changed source with before/after configuration and the counts that
-justified it (found, shortlisted, applied, replied), in the chat. Re-measure after
-the next collection cycles before tuning the same source again.
+In chat: each source added, changed or paused, with what its preview or
+counts showed; failures and their causes; what you suggest next, such as a
+company worth following.

@@ -185,7 +185,7 @@ def seed_large(workspace, jobs, applications, sources=0):
                 ),
             )
             conn.execute(
-                "INSERT INTO events(id,job_id,application_id,kind,payload,created_at,subject_type,subject_id,actor_kind) "
+                "INSERT INTO events(id,job_id,application_id,kind,payload,created_at,subject_type,subject_id,actor) "
                 "VALUES(?,?,?,?,?,?,?,?,?)",
                 (
                     new_id(),
@@ -233,8 +233,8 @@ def seed_large(workspace, jobs, applications, sources=0):
             kind = {"interview": "interview", "offer": "offer", "closed": "rejection"}.get(status)
             if kind and applied and outcome != "no_response":
                 conn.execute(
-                    "INSERT INTO replies(id,application_id,kind,date,created_by_kind,"
-                    "updated_by_kind,created_at,updated_at) VALUES(?,?,?,?,'owner','owner',?,?)",
+                    "INSERT INTO replies(id,application_id,kind,date,created_by,"
+                    "updated_by,created_at,updated_at) VALUES(?,?,?,?,'owner','owner',?,?)",
                     (
                         new_id(),
                         app_id,
