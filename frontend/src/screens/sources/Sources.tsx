@@ -42,6 +42,7 @@ import { RecentChecks } from "./RecentChecks";
 import { SourceEditor } from "./SourceEditor";
 import { SourceRow, type SourceActions } from "./SourceRow";
 import "./sources.css";
+import { LoadError } from "../../ui/LoadError";
 
 /** Row letters: e edits, c checks now, p pauses or resumes. */
 const SHORTCUTS: Record<string, "edit" | "check" | "toggle"> = {
@@ -175,17 +176,11 @@ export default function SourcesScreen() {
       {sources.isPending ? (
         <SkeletonRows rows={4} />
       ) : sources.isError ? (
-        <EmptyState
-          icon={Radar}
-          title="Job sources could not be read"
-          actions={
-            <Button variant="primary" onClick={() => void sources.refetch()}>
-              Try again
-            </Button>
-          }
-        >
-          {sources.error.message}
-        </EmptyState>
+        <LoadError
+          what="your job sources"
+          error={sources.error}
+          retry={() => void sources.refetch()}
+        />
       ) : list.length === 0 ? (
         <EmptyState
           icon={Radar}

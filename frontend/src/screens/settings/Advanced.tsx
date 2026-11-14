@@ -9,6 +9,7 @@ import { useSources } from "../sources/queries";
 import { gateOf, spacing } from "./model";
 import { useProviders, useUpdateProvider, useWorkspaceInfo } from "./queries";
 import { SettingsGroup, SettingsSection } from "./Rows";
+import { LoadError } from "../../ui/LoadError";
 
 type Provider = {
   id: string;
@@ -58,9 +59,14 @@ function Limits() {
     return <SkeletonRows rows={3} />;
   if (providers.isError || sources.isError)
     return (
-      <p className="set-row-desc set-danger" role="alert">
-        The request limits could not be read.
-      </p>
+      <LoadError
+        what="the request limits"
+        error={providers.error ?? sources.error}
+        retry={() => {
+          void providers.refetch();
+          void sources.refetch();
+        }}
+      />
     );
   const used = sitesInUse(sources.data);
   const rows = (providers.data as unknown as Provider[]).filter((provider) =>
