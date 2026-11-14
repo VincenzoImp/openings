@@ -1,0 +1,618 @@
+/* Profile: a CV-like column (at most 760 px) with an "On this page" rail on
+   wide screens. Hierarchy by type and space; a block gets a frame only
+   while it is edited. */
+@layer screens {
+  .pf-body {
+    padding: var(--s-4) var(--pane-pad) var(--s-16);
+  }
+  .pf > .ui-page-header {
+    max-width: calc(968px + 2 * var(--pane-pad));
+  }
+  .pf-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 760px) 160px;
+    gap: var(--s-12);
+    align-items: start;
+  }
+  .pf-cv {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-10);
+    min-width: 0;
+  }
+  .pf-empty {
+    margin-top: var(--s-12);
+  }
+  .pf-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .pf-rail {
+    position: sticky;
+    top: var(--s-6);
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border);
+    font: var(--t-sm);
+  }
+  .pf-rail p {
+    margin: 0 0 var(--s-2) var(--s-3);
+    color: var(--text-3);
+    font: var(--t-xs);
+  }
+  .pf-rail a {
+    padding: 5px var(--s-3);
+    color: var(--text-3);
+  }
+  .pf-rail a:hover {
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  /* A block: text at rest, Edit and … on hover or focus */
+  .pf-block {
+    position: relative;
+    margin: 0 calc(-1 * var(--s-4));
+    padding: var(--s-3) var(--s-4);
+    border-radius: var(--r-lg);
+    transition: background-color var(--d-fast) var(--ease);
+  }
+  .pf-block:hover,
+  .pf-block:focus-within {
+    background: var(--bg-subtle);
+  }
+  .pf-block-actions {
+    position: absolute;
+    top: var(--s-2);
+    right: var(--s-2);
+    display: flex;
+    gap: var(--s-1);
+    opacity: 0;
+  }
+  .pf-block:hover > .pf-block-actions,
+  .pf-block:focus-within > .pf-block-actions,
+  .pf-block-actions:has([aria-expanded="true"]) {
+    opacity: 1;
+  }
+  .pf-block:hover .pf-entry-dates,
+  .pf-block:focus-within .pf-entry-dates {
+    opacity: 0;
+  }
+
+  /* Header */
+  .pf-header-top {
+    display: flex;
+    align-items: center;
+    gap: var(--s-4);
+    padding-right: 72px;
+  }
+  .pf-header-names {
+    min-width: 0;
+  }
+  .pf-name {
+    font: var(--t-3xl);
+    font-weight: var(--w-semibold);
+    letter-spacing: var(--tr-3xl);
+    overflow-wrap: anywhere;
+  }
+  .pf-missing {
+    color: var(--text-3);
+    font-weight: var(--w-regular);
+  }
+  .pf-headline {
+    margin-top: 2px;
+    color: var(--text-2);
+    font: var(--t-lg);
+  }
+  .pf-contacts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1-5) var(--s-5);
+    margin: var(--s-4) 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--text-2);
+    font: var(--t-sm);
+  }
+  .pf-contacts li {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1-5);
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .pf-contacts .ui-icon {
+    flex: none;
+    color: var(--text-3);
+  }
+  .pf-contacts a {
+    color: inherit;
+  }
+
+  /* Sections */
+  .pf-section-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    margin-bottom: var(--s-2);
+    padding-bottom: var(--s-1-5);
+    border-bottom: 1px solid var(--border);
+  }
+  .pf-section-head h2 {
+    flex: 1;
+    font: var(--t-lg);
+    font-weight: var(--w-semibold);
+    letter-spacing: var(--tr-xl);
+    outline: none;
+  }
+  .pf-section-head .ui-btn,
+  .pf-add-inline {
+    color: var(--text-3);
+  }
+  .pf-count {
+    margin-left: var(--s-2);
+    color: var(--text-3);
+    font: var(--t-sm);
+  }
+  .pf-none {
+    color: var(--text-3);
+    font: var(--t-sm);
+  }
+  .pf-add-inline,
+  .pf-show-all {
+    margin-left: calc(-1 * var(--s-2));
+  }
+  .pf-prose,
+  .pf-highlights {
+    max-width: var(--measure);
+    font: 14.5px/23px var(--font);
+  }
+  .pf-prose p + p {
+    margin-top: var(--s-2);
+  }
+
+  /* An entry */
+  .pf-entry-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-4);
+  }
+  .pf-entry-title {
+    flex: 1;
+    font: 15px/22px var(--font);
+    font-weight: var(--w-semibold);
+  }
+  .pf-entry-dates {
+    color: var(--text-3);
+    font: var(--t-sm);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .pf-entry-sub,
+  .pf-found-sub {
+    color: var(--text-2);
+    font: var(--t-sm);
+  }
+  .pf-entry-text {
+    margin-top: var(--s-2);
+    color: var(--text-2);
+    font: var(--t-md);
+    line-height: 22px;
+  }
+  .pf-highlights {
+    margin: var(--s-2) 0 0;
+    padding-left: 18px;
+    font: var(--t-md);
+    line-height: 22px;
+  }
+  .pf-highlights li + li {
+    margin-top: 3px;
+  }
+  .pf-highlights li::marker {
+    color: var(--text-3);
+  }
+  .pf-star-mark {
+    display: inline-flex;
+    margin-left: var(--s-1-5);
+    vertical-align: -2px;
+    color: var(--text-2);
+  }
+  .pf-star-mark svg,
+  .pf-star[aria-pressed="true"] svg {
+    fill: currentColor;
+  }
+  .pf-star[aria-pressed="true"] {
+    color: var(--text);
+  }
+  .pf-pending {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    margin-left: var(--s-2);
+    color: var(--warning);
+    font: var(--t-xs);
+    font-weight: var(--w-medium);
+  }
+  .pf-pending .ui-btn {
+    height: 24px;
+  }
+  .pf-tags,
+  .pf-files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1-5);
+    margin: var(--s-3) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .pf-file {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1-5);
+    max-width: 100%;
+    height: 28px;
+    padding: 0 var(--s-2) 0 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-full);
+    color: var(--text-2);
+    font: var(--t-xs);
+    font-weight: var(--w-medium);
+  }
+  a.pf-file:hover {
+    background: var(--hover);
+    text-decoration: none;
+  }
+  .pf-file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pf-file-size {
+    color: var(--text-3);
+  }
+  .pf-file button,
+  .pf-skill button {
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-full);
+    background: none;
+    color: var(--text-3);
+    cursor: pointer;
+  }
+  .pf-lost {
+    display: flex;
+    flex-direction: column;
+    margin: var(--s-2) 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* A block in edit mode */
+  .pf-editing {
+    margin: var(--s-1) calc(-1 * var(--s-4));
+    border: 1px solid var(--border);
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-sm);
+    overflow: clip;
+  }
+  .pf-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-5);
+    padding: var(--s-5);
+  }
+  .pf-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-4);
+  }
+  .pf-field-wide {
+    grid-column: 1 / -1;
+  }
+  .pf-field-half {
+    max-width: calc(50% - var(--s-2));
+  }
+  .pf-editing-idle {
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 var(--s-3) var(--s-3);
+  }
+  .pf-form fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .pf-form legend {
+    margin-bottom: var(--s-1-5);
+    padding: 0;
+  }
+  .pf-links,
+  .pf-hl-edit,
+  .pf-files-edit {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-2);
+  }
+  .pf-link-row {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto;
+    gap: var(--s-2);
+    width: 100%;
+  }
+  .pf-dates-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--s-3) var(--s-5);
+  }
+  .pf-date {
+    display: grid;
+    gap: var(--s-1);
+  }
+  .pf-date .ui-field-label {
+    color: var(--text-3);
+    font: var(--t-xs);
+  }
+  .pf-date-controls {
+    display: grid;
+    grid-template-columns: 132px 76px;
+    gap: var(--s-1-5);
+  }
+  .pf-present {
+    min-height: var(--input-h);
+    align-items: center;
+  }
+  .pf-skills-input {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-1);
+    min-height: var(--input-h);
+    padding: 3px var(--s-1-5);
+    border: 1px solid var(--control);
+    border-radius: var(--r-md);
+  }
+  .pf-skills-input:focus-within {
+    border-color: var(--accent);
+    box-shadow: var(--focus-input);
+  }
+  .pf-skills-input input {
+    flex: 1;
+    min-width: 120px;
+    height: 26px;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font: var(--t-md);
+    outline: none;
+    box-shadow: none;
+  }
+  .pf-hl-rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .pf-hl-rows > li {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: var(--s-1-5);
+    padding: var(--s-1);
+    border-radius: var(--r-lg);
+  }
+  .pf-hl-rows > li[data-unapproved] {
+    background: var(--warning-soft);
+  }
+  .pf-hl-rows > li[data-dragging] {
+    opacity: 0.5;
+  }
+  .pf-hl-handle {
+    display: grid;
+    place-items: center;
+    height: var(--input-h);
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-md);
+    background: none;
+    color: var(--text-3);
+    cursor: grab;
+  }
+  .pf-hl-handle:hover {
+    background: var(--hover);
+  }
+  .pf-hl-input {
+    min-height: var(--input-h);
+    resize: none;
+    overflow: hidden;
+  }
+  .pf-hl-tools {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-height: var(--input-h);
+  }
+  .pf-file-add {
+    margin-left: calc(-1 * var(--s-2));
+    cursor: pointer;
+  }
+  .pf-file-add:focus-within,
+  .pf-drop:focus-within {
+    box-shadow: var(--focus-ring);
+  }
+
+  /* The phone's sheet */
+  .pf-sheet {
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .pf-sheet[open] {
+    display: flex;
+    flex-direction: column;
+  }
+  .pf-sheet-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--s-2);
+    padding: calc(var(--s-1-5) + env(safe-area-inset-top)) var(--s-2)
+      var(--s-1-5);
+    border-bottom: 1px solid var(--border);
+  }
+  .pf-sheet-head h2 {
+    overflow: hidden;
+    font: 15px/20px var(--font);
+    font-weight: var(--w-semibold);
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pf-sheet-body {
+    flex: 1;
+    overflow: auto;
+  }
+  .pf-sheet .pf-form {
+    padding: var(--s-4) var(--s-4) var(--s-12);
+  }
+
+  /* Import */
+  .pf-lead {
+    margin-bottom: var(--s-4);
+    color: var(--text-2);
+    font: var(--t-sm);
+  }
+  .pf-import textarea {
+    font: 13px/20px var(--mono);
+  }
+  .pf-drop {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    margin-top: var(--s-3);
+    padding: var(--s-4);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--r-lg);
+    background: var(--bg-subtle);
+    color: var(--text-2);
+    font: var(--t-sm);
+    cursor: pointer;
+  }
+  .pf-drop:hover,
+  .pf-drop[data-over] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .pf-drop b {
+    color: var(--text);
+    font-weight: var(--w-medium);
+  }
+  .pf-drop u {
+    color: var(--accent-text);
+    text-decoration: none;
+  }
+  .pf-found {
+    padding: var(--s-3) 0;
+    border-top: 1px solid var(--border);
+  }
+  .pf-found-title {
+    font-weight: var(--w-semibold);
+  }
+  .pf-found-title span {
+    margin-left: var(--s-2);
+    color: var(--text-3);
+    font: var(--t-xs);
+  }
+  .pf-found .pf-highlights {
+    font: var(--t-sm);
+  }
+
+  .pf-skel {
+    display: grid;
+    gap: var(--s-2);
+  }
+
+  @container app (max-width: 1279px) {
+    .pf-layout {
+      grid-template-columns: minmax(0, 760px);
+    }
+    .pf-rail {
+      display: none;
+    }
+    .pf > .ui-page-header {
+      max-width: calc(760px + 2 * var(--pane-pad));
+    }
+  }
+
+  /* Touch: Edit and … are always there */
+  @media (hover: none) {
+    .pf-block-actions,
+    .pf-block .pf-entry-dates {
+      opacity: 1 !important;
+    }
+    .pf-entry-head {
+      display: block;
+      padding-right: 104px;
+    }
+  }
+
+  @container app (max-width: 719px) {
+    /* The phone's top bar carries the title. */
+    .pf > .ui-page-header {
+      display: none;
+    }
+    .pf-block-actions,
+    .pf-block .pf-entry-dates {
+      opacity: 1 !important;
+    }
+    .pf-body {
+      padding: var(--s-3) var(--s-4) var(--s-12);
+    }
+    .pf-cv {
+      gap: var(--s-8);
+    }
+    .pf-block {
+      margin: 0 calc(-1 * var(--s-3));
+      padding: var(--s-3);
+    }
+    .pf-name {
+      font-size: 24px;
+      line-height: 30px;
+    }
+    .pf-entry-head {
+      display: block;
+      padding-right: 104px;
+    }
+    .pf-fields {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .pf-field-half {
+      max-width: none;
+    }
+    .pf-hl-rows > li {
+      grid-template-columns: 24px minmax(0, 1fr);
+    }
+    .pf-hl-tools {
+      grid-column: 2;
+      justify-content: flex-end;
+    }
+  }
+}

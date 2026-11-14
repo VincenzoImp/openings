@@ -40,8 +40,7 @@
   font-size: var(--fs-sm);
   overflow-wrap: anywhere;
 }
-.statements li.editing,
-.claim.editing {
+.statements li.editing {
   background: var(--accent-soft);
   box-shadow: inset 3px 0 0 var(--accent);
 }
@@ -300,7 +299,7 @@ img.frame {
   object-fit: contain;
 }
 
-/* Record editors: a heading per kind, sections under a form, claims */
+/* Record editors: a heading per kind, sections under a form */
 .kind {
   margin: 0;
   padding: var(--s2) var(--s4);
@@ -319,42 +318,6 @@ img.frame {
 .sub > .spread {
   flex-wrap: wrap;
   margin-bottom: var(--s3);
-}
-.sub.flush {
-  padding: 0;
-}
-.sub.flush > .spread {
-  margin: 0;
-  padding: var(--s3) var(--s4);
-}
-.claim {
-  padding: var(--s3) var(--s4);
-  border-top: 1px solid var(--line);
-}
-.skill-edit {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s2);
-  padding: var(--s2);
-  border: 1px solid var(--control);
-  border-radius: var(--radius-sm);
-  background: var(--card);
-}
-.skill-edit .tag button {
-  padding: 0 0 0 2px;
-  border: 0;
-  background: none;
-  color: inherit;
-  cursor: pointer;
-}
-.skill-edit input {
-  flex: 1;
-  min-width: 90px;
-  min-height: 22px;
-  padding: 0;
-  border: 0;
-  background: none;
-  outline-offset: 4px;
 }
 .filters {
   display: flex;
@@ -421,9 +384,6 @@ img.frame {
   .kv-head {
     display: none;
   }
-  .skill-edit input {
-    min-height: 44px;
-  }
   /* .datatable.stack: each row becomes a block; cells name themselves with data-label */
   .datatable.stack,
   .datatable.stack tbody {
@@ -473,28 +433,12 @@ img.frame {
 .card.detail {
   scroll-margin-top: calc(var(--topbar) + var(--s4));
 }
-.record-head {
-  flex-wrap: wrap;
-  margin-bottom: var(--s2);
-}
 .screen > .tabs {
   margin-bottom: var(--s4);
-}
-.link-row {
-  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr) auto;
 }
 .screen summary {
   color: var(--ink-2);
   cursor: pointer;
-}
-.entries > li {
-  align-items: flex-start;
-}
-.entries .tags {
-  margin-top: var(--s1);
-}
-.claim-text {
-  align-items: flex-start;
 }
 .input.days {
   width: 6rem;
@@ -506,10 +450,6 @@ ul.chips {
 }
 .wrap {
   flex-wrap: wrap;
-}
-.preview-list {
-  max-height: 40vh;
-  overflow: auto;
 }
 .icon-btn[disabled] {
   cursor: default;
@@ -546,17 +486,4 @@ ul.chips {
   display: flex;
   flex-wrap: wrap;
   gap: var(--s2);
-}
-@media (max-width: 860px) {
-  .link-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-  .kv .link-row > :nth-child(2) {
-    grid-row: 2;
-    grid-column: 1;
-  }
-  .kv .link-row > :nth-child(3) {
-    grid-row: 1;
-    grid-column: 2;
-  }
 }

@@ -19,8 +19,6 @@ const SCREENS = [
   "jobs?section=all",
   "jobs?signal=likely_duplicate",
   "profile",
-  "profile?section=knowledge",
-  "profile?section=claims",
   "preferences",
   "templates",
   "templates?section=rules",
