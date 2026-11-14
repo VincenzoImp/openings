@@ -1,0 +1,272 @@
+/* Today: one centred column (at most 760 px) of sections, the stage strip
+   last. */
+@layer screens {
+  .today,
+  .today-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-10);
+    min-width: 0;
+  }
+  .today {
+    width: 100%;
+    max-width: calc(760px + 2 * var(--pane-pad));
+    margin: 0 auto;
+    padding: var(--s-8) var(--pane-pad) var(--s-16);
+  }
+
+  .today-head h1 {
+    font: var(--t-2xl);
+    font-weight: var(--w-semibold);
+    letter-spacing: var(--tr-2xl);
+  }
+  .today-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--s-2);
+    margin-top: var(--s-1);
+    color: var(--text-2);
+    font: var(--t-md);
+    letter-spacing: var(--tr-md);
+    font-variant-numeric: tabular-nums;
+  }
+  .today-greeting {
+    color: var(--text);
+    font-weight: var(--w-medium);
+  }
+  .today-greeting:not(:last-child)::after {
+    content: " ·";
+    color: var(--text-3);
+    font-weight: var(--w-regular);
+  }
+
+  .today-caught-up {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    color: var(--text-2);
+    font: var(--t-md);
+  }
+  .today-caught-up .ui-icon {
+    color: var(--success);
+  }
+
+  /* A section: heading and count, one action on the right, then rows. */
+  .today-section-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-height: var(--control-h);
+    margin-bottom: var(--s-2);
+  }
+  .today-section-head h2 {
+    display: flex;
+    flex: 1;
+    align-items: baseline;
+    gap: var(--s-2);
+    min-width: 0;
+    font: var(--t-md);
+    font-weight: var(--w-semibold);
+    letter-spacing: var(--tr-md);
+  }
+  .today-section-action {
+    display: flex;
+    flex: none;
+  }
+  .today-note {
+    margin: calc(var(--s-2) * -1) 0 var(--s-2);
+    color: var(--text-3);
+    font: var(--t-sm);
+  }
+
+  /* Rows run to the column's edges; their text lines up with the heading. */
+  .today-list {
+    --ui-row-pad: var(--s-3);
+    margin: 0 calc(var(--s-3) * -1);
+    border-top: 1px solid var(--border);
+  }
+  .today-list .ui-row-main {
+    height: var(--row);
+  }
+  /* Rows are links: at rest none looks selected; focus shows where j/k are. */
+  .today-list .ui-row[data-selected]:not(:focus-within) {
+    background: var(--bg);
+  }
+  .today-list .ui-row:not(:focus-within)::before {
+    display: none;
+  }
+  .today-list .ui-row[data-selected]:not(:focus-within):hover {
+    background: var(--hover);
+  }
+  .today-list .ui-row[data-selected]:not(:hover, :focus-within) .ui-row-meta {
+    display: flex;
+  }
+  .today-list
+    .ui-row[data-selected]:not(:hover, :focus-within)
+    .ui-row-actions {
+    display: none;
+  }
+  .today-more {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    margin-top: var(--s-3);
+    color: var(--text-2);
+    font: var(--t-sm);
+    font-weight: var(--w-medium);
+  }
+  .today-more:hover {
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .today-priority rect {
+    fill: var(--border-strong);
+  }
+  .today-priority rect[data-on] {
+    fill: var(--text-2);
+  }
+
+  /* The setup checklist */
+  .today-setup-progress {
+    color: var(--text-3);
+    font: var(--t-sm);
+    font-variant-numeric: tabular-nums;
+  }
+  .today-checklist {
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--border);
+    list-style: none;
+  }
+  .today-checklist li {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-height: 64px;
+    padding: var(--s-3) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .today-setup[data-compact] .today-checklist li {
+    min-height: var(--row-sm);
+  }
+  .today-check {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-full);
+    color: var(--text-2);
+    font: var(--t-xs);
+    font-weight: var(--w-semibold);
+    font-variant-numeric: tabular-nums;
+  }
+  [data-done] > .today-check {
+    border-color: var(--success);
+    background: var(--success);
+    color: var(--bg);
+  }
+  .today-check-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .today-check-title {
+    font: var(--t-md);
+    font-weight: var(--w-medium);
+  }
+  .today-check-hint {
+    color: var(--text-3);
+    font: var(--t-sm);
+  }
+  [data-done] > .today-check-title {
+    color: var(--text-3);
+    font-weight: var(--w-regular);
+  }
+  .today-check-done {
+    color: var(--text-3);
+    font: var(--t-sm);
+  }
+
+  /* The stage strip: small, last, tabular numerals. */
+  .today-stages-title {
+    margin-bottom: var(--s-2);
+    color: var(--text-3);
+    font: var(--t-xs);
+    font-weight: var(--w-medium);
+  }
+  .today-stages ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--s-6);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .today-stages a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1-5);
+    min-height: var(--control-h);
+    color: var(--text-2);
+    font: var(--t-sm);
+  }
+  .today-stages a:hover {
+    color: var(--text);
+    text-decoration: none;
+  }
+  .today-stage-count {
+    color: var(--text);
+    font-weight: var(--w-semibold);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .today-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+  }
+
+  /* Phones: the column fills the width; Start applying spans it. */
+  @container app (max-width: 719px) {
+    .today,
+    .today-main {
+      gap: var(--s-8);
+    }
+    .today {
+      padding: var(--s-5) var(--s-4) var(--s-12);
+    }
+    .today-head h1 {
+      display: none;
+    }
+    .today-summary {
+      flex-direction: column;
+      margin-top: 0;
+    }
+    .today-greeting:not(:last-child)::after {
+      content: none;
+    }
+    .today-list {
+      --ui-row-pad: var(--s-4);
+      margin: 0 calc(var(--s-4) * -1);
+    }
+    .today-section:has(.today-start) .today-section-head {
+      flex-wrap: wrap;
+    }
+    .today-section-action:has(.today-start) {
+      order: 3;
+      flex-basis: 100%;
+      margin-top: var(--s-2);
+    }
+    .today-start {
+      width: 100%;
+      height: var(--touch);
+    }
+    .today-stages a {
+      min-height: var(--touch);
+    }
+  }
+}
