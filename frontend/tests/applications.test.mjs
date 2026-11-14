@@ -8,7 +8,7 @@ const filters = await import("../src/screens/applications/filters.ts");
 const now = new Date(2026, 10, 13, 10, 0);
 const app = (fields) => ({
   id: "a1",
-  status: "shortlisted",
+  stage: "shortlisted",
   ready: false,
   missing: [],
   updated_at: "2026-11-01T10:00:00Z",
@@ -20,8 +20,8 @@ const app = (fields) => ({
 test("Ready is a computed stage inside Shortlisted", () => {
   assert.equal(model.stageOf(app({})), "shortlisted");
   assert.equal(model.stageOf(app({ ready: true })), "ready");
-  assert.equal(model.stageOf(app({ status: "offer" })), "offer");
-  assert.equal(model.stageOf(app({ status: "closed", ready: true })), "closed");
+  assert.equal(model.stageOf(app({ stage: "offer" })), "offer");
+  assert.equal(model.stageOf(app({ stage: "closed", ready: true })), "closed");
 });
 
 test("each row has one status phrase that follows its stage", () => {
@@ -44,33 +44,33 @@ test("each row has one status phrase that follows its stage", () => {
     tone: "danger",
   });
   assert.deepEqual(
-    phrase({ status: "applied", applied_at: "2026-10-12T09:00:00" }),
+    phrase({ stage: "applied", applied_at: "2026-10-12T09:00:00" }),
     { text: "Applied 12 Oct · no reply 32 days" },
   );
   assert.deepEqual(
-    phrase({ status: "applied", applied_at: "2026-09-12T09:00:00" }),
+    phrase({ stage: "applied", applied_at: "2026-09-12T09:00:00" }),
     { text: "Applied 12 Sep · no reply 62 days", tone: "warning" },
   );
   assert.deepEqual(
     phrase({
-      status: "interview",
+      stage: "interview",
       applied_at: "2026-10-01T09:00:00",
       last_reply: { kind: "interview", date: "2026-11-04" },
     }),
     { text: "Interview 4 Nov" },
   );
-  assert.deepEqual(phrase({ status: "closed", outcome: "rejected" }), {
+  assert.deepEqual(phrase({ stage: "closed", outcome: "rejected" }), {
     text: "Closed · rejected",
   });
-  assert.deepEqual(phrase({ status: "closed", outcome: "no_response" }), {
+  assert.deepEqual(phrase({ stage: "closed", outcome: "no_response" }), {
     text: "Closed · no reply",
   });
 });
 
 test("Needs action: Ready by deadline, dated Shortlisted, overdue, then the rest", () => {
   const rows = [
-    app({ id: "rest", status: "interview", updated_at: "2026-11-12T00:00Z" }),
-    app({ id: "late", status: "applied", applied_at: "2026-08-01T00:00Z" }),
+    app({ id: "rest", stage: "interview", updated_at: "2026-11-12T00:00Z" }),
+    app({ id: "late", stage: "applied", applied_at: "2026-08-01T00:00Z" }),
     app({ id: "dated", deadline: "2026-11-20" }),
     app({ id: "ready-late", ready: true, deadline: "2026-12-01" }),
     app({ id: "ready-soon", ready: true, deadline: "2026-11-15" }),
@@ -91,9 +91,9 @@ test("Needs action: Ready by deadline, dated Shortlisted, overdue, then the rest
 });
 
 test("the bulk bar offers only the actions valid for the whole selection", () => {
-  const sent = app({ status: "applied", applied_at: "2026-10-01T00:00Z" });
+  const sent = app({ stage: "applied", applied_at: "2026-10-01T00:00Z" });
   const draft = app({});
-  const closed = app({ status: "closed", outcome: "rejected" });
+  const closed = app({ stage: "closed", outcome: "rejected" });
   assert.deepEqual(model.bulkActions([sent]), [
     "no_reply",
     "close",
@@ -176,7 +176,7 @@ test("the send queue: place, next after Mark applied, the last one", () => {
 test("sent and closed applications lead with a status line", () => {
   assert.deepEqual(
     model.followUpLine(
-      app({ status: "applied", applied_at: "2026-10-12T09:00:00" }),
+      app({ stage: "applied", applied_at: "2026-10-12T09:00:00" }),
       45,
       now,
     ),
@@ -185,7 +185,7 @@ test("sent and closed applications lead with a status line", () => {
   assert.equal(
     model.closedSummary(
       app({
-        status: "closed",
+        stage: "closed",
         outcome: "rejected",
         last_reply: { kind: "rejection", date: "2026-11-02" },
         replies: [
@@ -198,7 +198,7 @@ test("sent and closed applications lead with a status line", () => {
     "Rejected on 2 Nov after interview",
   );
   assert.equal(
-    model.closedSummary(app({ status: "closed", outcome: "not_pursued" }), now),
+    model.closedSummary(app({ stage: "closed", outcome: "not_pursued" }), now),
     "Not pursued · never sent",
   );
 });

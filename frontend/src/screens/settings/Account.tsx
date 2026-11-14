@@ -80,12 +80,14 @@ function PasswordDialog({
 }) {
   const change = useChangePassword();
   const toast = useToast();
+  const [current, setCurrent] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const short = password.length < 10;
   const differs = confirm !== password;
   const close = () => {
+    setCurrent("");
     setPassword("");
     setConfirm("");
     setSubmitted(false);
@@ -94,18 +96,22 @@ function PasswordDialog({
   function save(event: FormEvent) {
     event.preventDefault();
     setSubmitted(true);
-    if (short || differs) return;
-    change.mutate(password, {
-      onSuccess: () => {
-        close();
-        toast.show({
-          message: "Password changed. Sign in with the new one.",
-          tone: "success",
-        });
-        window.dispatchEvent(new Event("openings:unauthorized"));
+    if (!current || short || differs) return;
+    change.mutate(
+      { current_password: current, password },
+      {
+        onSuccess: () => {
+          close();
+          toast.show({
+            message: "Password changed. Sign in with the new one.",
+            tone: "success",
+          });
+          window.dispatchEvent(new Event("openings:unauthorized"));
+        },
+        onError: (error) =>
+          toast.show({ message: error.message, tone: "error" }),
       },
-      onError: (error) => toast.show({ message: error.message, tone: "error" }),
-    });
+    );
   }
   return (
     <Dialog
@@ -131,6 +137,19 @@ function PasswordDialog({
       }
     >
       <form id="password-form" className="set-form" noValidate onSubmit={save}>
+        <Field
+          label="Current password"
+          error={
+            submitted && !current ? "Enter your current password." : undefined
+          }
+        >
+          <Input
+            type="password"
+            autoComplete="current-password"
+            value={current}
+            onChange={(event) => setCurrent(event.target.value)}
+          />
+        </Field>
         <Field
           label="New password"
           hint="At least 10 characters."

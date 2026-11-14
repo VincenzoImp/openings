@@ -113,7 +113,7 @@ export function useImport() {
       call(
         api.POST("/api/v1/career/import", {
           body: {
-            entries: preview.entries as Schema<"KnowledgeCreate">[],
+            entries: preview.entries as Schema<"EntryCreate">[],
             profile: preview.profile ?? null,
             expected_profile_version:
               (preview.expected_profile_version as number | undefined) ?? null,

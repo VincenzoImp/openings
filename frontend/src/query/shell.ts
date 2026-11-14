@@ -63,7 +63,7 @@ export interface ApplicationHit {
   id: string;
   title: string;
   company: string;
-  status: string;
+  stage: string;
 }
 
 /** Jobs and applications whose title or company matches, for ⌘K. */
@@ -99,7 +99,7 @@ export function usePaletteSearch(q: string) {
         id: row.id,
         title: String(row.job.title ?? "Untitled role"),
         company: String(row.job.company ?? ""),
-        status: row.status,
+        stage: row.stage,
       })),
   });
   return {
