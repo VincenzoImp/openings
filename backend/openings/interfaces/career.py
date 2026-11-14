@@ -110,7 +110,7 @@ def highlights_save(ws: WS, body: HighlightsSave) -> BatchResult:
     """Add, update or approve up to 100 highlights.
 
     Reusable wording on a career entry (career_id). highlight_id with expected_version
-    updates. always_include puts it in every CV unless the job gives a reason not to.
+    updates. always_include: use it in every CV unless the job argues against it.
     """
     return ws.career.save_highlights(body)
 
