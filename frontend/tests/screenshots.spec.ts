@@ -547,7 +547,7 @@ async function capture(
 const FULL_PAGE = `
   .ui-app { height: auto; min-height: 100dvh; }
   .ui-app-grid { min-height: 100dvh; }
-  .ui-app-content { overflow: visible; flex: none; }
+  .ui-app-content { overflow: visible; flex: 1 0 auto; }
   .ui-app-side { height: auto; }
 `;
 
